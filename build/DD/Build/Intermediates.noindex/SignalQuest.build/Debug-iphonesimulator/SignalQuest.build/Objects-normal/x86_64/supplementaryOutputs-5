@@ -1,0 +1,44 @@
+{
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Design/GlassCard.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/GlassCard.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/GlassCard.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/GlassCard.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/GlassCard.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/GlassCard.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Features/Auth/LoginView.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/LoginView.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/LoginView.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/LoginView.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/LoginView.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/LoginView.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Features/Calls/IncomingCallView.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/IncomingCallView.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/IncomingCallView.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/IncomingCallView.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/IncomingCallView.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/IncomingCallView.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Features/Leaderboards/LeaderboardsView.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/LeaderboardsView.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/LeaderboardsView.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/LeaderboardsView.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/LeaderboardsView.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/LeaderboardsView.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Features/Messages/MessagesView.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/MessagesView.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/MessagesView.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/MessagesView.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/MessagesView.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/MessagesView.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Services/MapSnapshotService.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/MapSnapshotService.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/MapSnapshotService.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/MapSnapshotService.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/MapSnapshotService.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/MapSnapshotService.swiftdeps"
+  }
+}

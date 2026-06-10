@@ -1,0 +1,30 @@
+{
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Core/Push/PushNotificationService.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PushNotificationService.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PushNotificationService.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PushNotificationService.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PushNotificationService.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PushNotificationService.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Features/Photos/PhotosView.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PhotosView.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PhotosView.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PhotosView.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PhotosView.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PhotosView.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Features/Profile/ProfileView.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/ProfileView.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/ProfileView.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/ProfileView.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/ProfileView.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/ProfileView.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Services/PrivacyService.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PrivacyService.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PrivacyService.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PrivacyService.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PrivacyService.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/x86_64/PrivacyService.swiftdeps"
+  }
+}

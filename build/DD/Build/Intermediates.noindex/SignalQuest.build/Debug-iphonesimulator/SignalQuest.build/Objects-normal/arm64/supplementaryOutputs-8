@@ -1,0 +1,30 @@
+{
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Design/SQComponents.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SQComponents.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SQComponents.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SQComponents.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SQComponents.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SQComponents.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Features/Feed/Detail/SignalDetailSheet.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SignalDetailSheet.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SignalDetailSheet.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SignalDetailSheet.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SignalDetailSheet.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SignalDetailSheet.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Features/Profile/SettingsView.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SettingsView.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SettingsView.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SettingsView.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SettingsView.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SettingsView.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/SignalQuestApp.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SignalQuestApp.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SignalQuestApp.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SignalQuestApp.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SignalQuestApp.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/SignalQuestApp.swiftdeps"
+  }
+}

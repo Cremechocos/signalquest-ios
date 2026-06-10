@@ -1,0 +1,37 @@
+{
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Core/Networking/APIClient.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/APIClient.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/APIClient.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/APIClient.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/APIClient.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/APIClient.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Core/Networking/APIEndpoint.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/APIEndpoint.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/APIEndpoint.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/APIEndpoint.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/APIEndpoint.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/APIEndpoint.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Core/Push/AppDelegate.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/AppDelegate.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/AppDelegate.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/AppDelegate.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/AppDelegate.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/AppDelegate.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Services/ANFRService.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/ANFRService.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/ANFRService.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/ANFRService.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/ANFRService.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/ANFRService.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestApp/Services/AntennasService.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/AntennasService.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/AntennasService.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/AntennasService.dia",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/AntennasService.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuest.build/Objects-normal/arm64/AntennasService.swiftdeps"
+  }
+}

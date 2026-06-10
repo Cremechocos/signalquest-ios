@@ -1,0 +1,89 @@
+{
+  "" : {
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/SignalQuestTests-primary.dia",
+    "emit-module-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/SignalQuestTests-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/SignalQuestTests-primary-emit-module.dia",
+    "pch" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/SignalQuestTests-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/SignalQuestTests-primary.swiftdeps"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestTests/APIClientTests.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/APIClientTests.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/APIClientTests.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/APIClientTests.dia",
+    "index-unit-output-path" : "/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/APIClientTests.o",
+    "llvm-bc" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/APIClientTests.bc",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/APIClientTests.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/APIClientTests.swiftdeps",
+    "swiftmodule" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/APIClientTests~partial.swiftmodule"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestTests/AuthCookieStoreTests.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AuthCookieStoreTests.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AuthCookieStoreTests.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AuthCookieStoreTests.dia",
+    "index-unit-output-path" : "/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AuthCookieStoreTests.o",
+    "llvm-bc" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AuthCookieStoreTests.bc",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AuthCookieStoreTests.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AuthCookieStoreTests.swiftdeps",
+    "swiftmodule" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AuthCookieStoreTests~partial.swiftmodule"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestTests/AutoRefreshTests.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AutoRefreshTests.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AutoRefreshTests.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AutoRefreshTests.dia",
+    "index-unit-output-path" : "/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AutoRefreshTests.o",
+    "llvm-bc" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AutoRefreshTests.bc",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AutoRefreshTests.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AutoRefreshTests.swiftdeps",
+    "swiftmodule" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/AutoRefreshTests~partial.swiftmodule"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestTests/E2EETests.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/E2EETests.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/E2EETests.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/E2EETests.dia",
+    "index-unit-output-path" : "/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/E2EETests.o",
+    "llvm-bc" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/E2EETests.bc",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/E2EETests.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/E2EETests.swiftdeps",
+    "swiftmodule" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/E2EETests~partial.swiftmodule"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestTests/ModelDecodeTests.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/ModelDecodeTests.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/ModelDecodeTests.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/ModelDecodeTests.dia",
+    "index-unit-output-path" : "/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/ModelDecodeTests.o",
+    "llvm-bc" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/ModelDecodeTests.bc",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/ModelDecodeTests.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/ModelDecodeTests.swiftdeps",
+    "swiftmodule" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/ModelDecodeTests~partial.swiftmodule"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestTests/NewModelDecodeTests.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/NewModelDecodeTests.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/NewModelDecodeTests.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/NewModelDecodeTests.dia",
+    "index-unit-output-path" : "/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/NewModelDecodeTests.o",
+    "llvm-bc" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/NewModelDecodeTests.bc",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/NewModelDecodeTests.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/NewModelDecodeTests.swiftdeps",
+    "swiftmodule" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/NewModelDecodeTests~partial.swiftmodule"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestTests/SpeedtestTests.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/SpeedtestTests.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/SpeedtestTests.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/SpeedtestTests.dia",
+    "index-unit-output-path" : "/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/SpeedtestTests.o",
+    "llvm-bc" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/SpeedtestTests.bc",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/SpeedtestTests.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/SpeedtestTests.swiftdeps",
+    "swiftmodule" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/SpeedtestTests~partial.swiftmodule"
+  },
+  "/Users/alexandregermain/Site/iOS/SignalQuestTests/TestSupport.swift" : {
+    "const-values" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/TestSupport.swiftconstvalues",
+    "dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/TestSupport.d",
+    "diagnostics" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/TestSupport.dia",
+    "index-unit-output-path" : "/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/TestSupport.o",
+    "llvm-bc" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/TestSupport.bc",
+    "object" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/TestSupport.o",
+    "swift-dependencies" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/TestSupport.swiftdeps",
+    "swiftmodule" : "/Users/alexandregermain/Site/iOS/build/DD/Build/Intermediates.noindex/SignalQuest.build/Debug-iphonesimulator/SignalQuestTests.build/Objects-normal/arm64/TestSupport~partial.swiftmodule"
+  }
+}
