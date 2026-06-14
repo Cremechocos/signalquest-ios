@@ -1,0 +1,98 @@
+import SwiftUI
+
+@MainActor
+final class CallHistoryViewModel: ObservableObject {
+    @Published var calls: [CallSession] = []
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+
+    private let service: CallsServicing
+    init(service: CallsServicing) { self.service = service }
+
+    func load() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            calls = try await service.history()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+struct CallHistoryView: View {
+    @StateObject private var model: CallHistoryViewModel
+    init(service: CallsServicing) {
+        _model = StateObject(wrappedValue: CallHistoryViewModel(service: service))
+    }
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(model.calls) { call in
+                    let style = directionStyle(call)
+                    HStack(spacing: SQSpace.md) {
+                        Image(systemName: style.icon)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(style.color)
+                            .frame(width: 38, height: 38)
+                            .background(style.color.opacity(0.14), in: Circle())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(call.participants?.joined(separator: ", ") ?? "Conversation")
+                                .font(SQType.subhead)
+                                .foregroundStyle(style.isMissed ? SQColor.danger : SQColor.label)
+                            if let date = call.createdAt {
+                                Text(date, format: .dateTime.day().month(.abbreviated).hour().minute())
+                                    .font(.caption)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                            }
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text((call.status ?? "—").capitalized)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(style.isMissed ? SQColor.danger : SQColor.labelSecondary)
+                            if let duration = durationText(call) {
+                                Text(duration)
+                                    .font(.caption2.monospacedDigit())
+                                    .foregroundStyle(SQColor.labelTertiary)
+                            }
+                        }
+                        Image(systemName: call.mode == "video" ? "video.fill" : "phone.fill")
+                            .font(.caption)
+                            .foregroundStyle(SQColor.labelTertiary)
+                    }
+                    .listRowBackground(SQColor.surface)
+                }
+            } header: {
+                Text("Journal").sqKicker()
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .signalQuestBackground()
+        .navigationTitle("Appels")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await model.load() }
+        .refreshable { await model.load() }
+    }
+
+    /// Icône flèche + couleur selon l'issue de l'appel : manqué/refusé en
+    /// danger, terminé en succès, en cours/sonnerie en orange.
+    private func directionStyle(_ call: CallSession) -> (icon: String, color: Color, isMissed: Bool) {
+        switch call.status {
+        case "missed", "rejected":
+            return ("phone.arrow.down.left.fill", SQColor.danger, true)
+        case "ended", "accepted":
+            return ("phone.arrow.up.right.fill", SQColor.success, false)
+        default:
+            return ("phone.fill", SQColor.brandRed, false)
+        }
+    }
+
+    private func durationText(_ call: CallSession) -> String? {
+        guard let start = call.createdAt, let end = call.endedAt else { return nil }
+        let seconds = Int(end.timeIntervalSince(start))
+        guard seconds > 0 else { return nil }
+        return Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond))
+    }
+}

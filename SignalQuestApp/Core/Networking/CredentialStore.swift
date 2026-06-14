@@ -1,0 +1,93 @@
+import Foundation
+
+/// Holds the JWT credentials used to authenticate against signalquest.fr.
+/// The backend currently reads the token from the `auth_token` cookie, but we
+/// keep an abstraction that lets us also emit an `Authorization: Bearer …`
+/// header and add a refresh-token slot for when the backend gains support.
+final class CredentialStore: @unchecked Sendable {
+    private enum Key {
+        static let accessToken = "auth_token"
+        static let refreshToken = "refresh_token"
+        static let tempToken = "temp_token"
+    }
+
+    private let tokenStore: TokenStore
+    private let lock = NSLock()
+
+    init(tokenStore: TokenStore = KeychainStore()) {
+        self.tokenStore = tokenStore
+    }
+
+    // MARK: Access token
+
+    func accessToken() -> String? {
+        try? tokenStore.string(for: Key.accessToken)
+    }
+
+    func setAccessToken(_ token: String) throws {
+        try tokenStore.set(token, for: Key.accessToken)
+    }
+
+    func clearAccessToken() {
+        try? tokenStore.remove(Key.accessToken)
+    }
+
+    // MARK: Refresh token (reserved)
+
+    func refreshToken() -> String? {
+        try? tokenStore.string(for: Key.refreshToken)
+    }
+
+    func setRefreshToken(_ token: String) throws {
+        try tokenStore.set(token, for: Key.refreshToken)
+    }
+
+    // MARK: Temp 2FA token (in-memory only)
+
+    private var _tempToken: String?
+
+    var tempToken: String? {
+        lock.lock(); defer { lock.unlock() }
+        return _tempToken
+    }
+
+    func setTempToken(_ token: String?) {
+        lock.lock(); defer { lock.unlock() }
+        _tempToken = token
+    }
+
+    // MARK: Bulk
+
+    func clearAll() {
+        try? tokenStore.remove(Key.accessToken)
+        try? tokenStore.remove(Key.refreshToken)
+        setTempToken(nil)
+    }
+
+    // MARK: Capture from response
+
+    /// Captures `auth_token` from any `Set-Cookie` header on the response and
+    /// stores it as the access token.
+    @discardableResult
+    func captureFromResponse(_ response: URLResponse) -> String? {
+        guard let http = response as? HTTPURLResponse else { return nil }
+        let headers = http.allHeaderFields
+        let setCookie = (headers["Set-Cookie"] ?? headers["set-cookie"]) as? String
+        guard let token = Self.parseAuthToken(from: setCookie) else { return nil }
+        try? setAccessToken(token)
+        return token
+    }
+
+    static func parseAuthToken(from setCookie: String?) -> String? {
+        guard let setCookie else { return nil }
+        for part in setCookie.components(separatedBy: ",") {
+            let segments = part.components(separatedBy: ";")
+            guard let first = segments.first?.trimmingCharacters(in: .whitespacesAndNewlines) else { continue }
+            if first.hasPrefix("auth_token=") {
+                let value = String(first.dropFirst("auth_token=".count))
+                return value.isEmpty ? nil : value
+            }
+        }
+        return nil
+    }
+}

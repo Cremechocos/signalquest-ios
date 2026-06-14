@@ -1,0 +1,106 @@
+name: SignalQuest
+options:
+  bundleIdPrefix: fr.signalquest
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "18.0"
+configs:
+  Debug: debug
+  Staging: debug
+  Release: release
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: "835X2977R7"
+packages:
+  MapLibre:
+    url: https://github.com/maplibre/maplibre-gl-native-distribution.git
+    exactVersion: 6.26.0
+  LiveKit:
+    url: https://github.com/livekit/client-sdk-swift.git
+    exactVersion: 2.14.0
+targets:
+  SignalQuest:
+    type: application
+    platform: iOS
+    sources:
+      - path: SignalQuestApp
+        excludes:
+          - Resources/**
+          - .claude/**
+          - SignalQuest.entitlements
+      - path: SignalQuestApp/Resources/Assets.xcassets
+        buildPhase: resources
+      - path: SignalQuestApp/Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      - path: SignalQuestApp/Resources/Fonts
+        buildPhase: resources
+      - path: SignalQuestApp/Resources/market_registry_fallback.json
+        buildPhase: resources
+      - path: SignalQuestApp/Resources/market_location_areas.json
+        buildPhase: resources
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Staging: Config/Staging.xcconfig
+      Release: Config/Release.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios
+        PRODUCT_NAME: SignalQuest
+        INFOPLIST_FILE: SignalQuestApp/Info.plist
+        CODE_SIGN_ENTITLEMENTS: SignalQuestApp/SignalQuest.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+    dependencies:
+      - package: MapLibre
+        product: MapLibre
+      - package: LiveKit
+        product: LiveKit
+  SignalQuestTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: SignalQuestTests
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Staging: Config/Staging.xcconfig
+      Release: Config/Release.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.tests
+        INFOPLIST_FILE: SignalQuestTests/Info.plist
+    dependencies:
+      - target: SignalQuest
+  SignalQuestUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: SignalQuestUITests
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Staging: Config/Staging.xcconfig
+      Release: Config/Release.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.uitests
+        INFOPLIST_FILE: SignalQuestUITests/Info.plist
+    dependencies:
+      - target: SignalQuest
+schemes:
+  SignalQuest:
+    build:
+      targets:
+        SignalQuest: all
+    test:
+      config: Debug
+      targets:
+        - SignalQuestTests
+        - SignalQuestUITests
+      gatherCoverageData: true
+    run:
+      config: Debug
+    archive:
+      config: Release

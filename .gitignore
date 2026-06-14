@@ -1,0 +1,38 @@
+# Xcode
+DerivedData/
+build/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.xcuserstate
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Conserver Package.resolved pour verrouiller les versions
+# Package.resolved
+
+# Firebase
+GoogleService-Info.plist
+
+# macOS
+.DS_Store
+
+# Archives
+*.xcarchive
+
+# App Store Connect API Keys
+*.p8
+
+# Environment files
+.env
+.env.local

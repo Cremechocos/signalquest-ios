@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<!-- Épinglage TLS déclaratif (App Transport Security). On épingle la SPKI des
+	     RACINES ISRG (Let's Encrypt) — X1 + X2 en secours — au lieu d'un certificat
+	     feuille ou d'un intermédiaire (R12/R13…), qui tournent fréquemment et
+	     casseraient l'app. signalquest.fr ET speedtest.signalquest.fr chaînent vers
+	     ISRG Root X1. CloudFront (CDN speedtest) n'est PAS épinglé (AC Amazon).
+	     IMPORTANT OPS : si le backend migre d'autorité de certification, mettre à
+	     jour ces empreintes AVANT le déploiement du nouveau certificat. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSPinnedDomains</key>
+		<dict>
+			<key>signalquest.fr</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSPinnedCAIdentities</key>
+				<array>
+					<dict>
+						<key>SPKI-SHA256-BASE64</key>
+						<string>C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=</string>
+					</dict>
+					<dict>
+						<key>SPKI-SHA256-BASE64</key>
+						<string>diGVwiVYbubAI3RW4hB9xU8e/CH2GnkuvVFZE8zmgzI=</string>
+					</dict>
+				</array>
+			</dict>
+		</dict>
+	</dict>
+	<key>CFBundleDisplayName</key>
+	<string>SignalQuest</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>SignalQuest utilise la caméra uniquement pendant les appels vidéo que tu démarres ou acceptes.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>SignalQuest utilise ta position uniquement si tu l&apos;autorises pour placer tes speedtests et contributions sur la carte.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SignalQuest utilise le micro uniquement pendant les appels audio ou vidéo que tu démarres ou acceptes.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>SignalQuest peut importer une photo choisie pour contribuer aux sites antennes.</string>
+	<key>SQ_API_BASE_URL</key>
+	<string>$(SQ_API_BASE_URL)</string>
+	<key>SQ_APP_BASE_URL</key>
+	<string>$(SQ_APP_BASE_URL)</string>
+	<key>SQ_DEBUG_LOGS</key>
+	<string>$(SQ_DEBUG_LOGS)</string>
+	<key>SQ_SPEEDTEST_BASE_URL</key>
+	<string>$(SQ_SPEEDTEST_BASE_URL)</string>
+	<key>SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL</key>
+	<string>$(SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL)</string>
+	<key>SQ_SPEEDTEST_DOWNLOAD_URL</key>
+	<string>$(SQ_SPEEDTEST_DOWNLOAD_URL)</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>PublicSans-Regular.ttf</string>
+		<string>PublicSans-Medium.ttf</string>
+		<string>PublicSans-SemiBold.ttf</string>
+		<string>PublicSans-Bold.ttf</string>
+		<string>Archivo-Medium.ttf</string>
+		<string>Archivo-SemiBold.ttf</string>
+		<string>Archivo-Bold.ttf</string>
+		<string>ArchivoExpanded-Bold.ttf</string>
+		<string>ArchivoExpanded-ExtraBold.ttf</string>
+		<string>ArchivoExpanded-Black.ttf</string>
+	</array>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>voip</string>
+		<string>remote-notification</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UIRequiresFullScreen</key>
+	<true/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+</dict>
+</plist>

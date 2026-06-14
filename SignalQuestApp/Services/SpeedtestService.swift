@@ -1,0 +1,1806 @@
+import Foundation
+import CoreLocation
+import Network
+import UIKit
+
+// MARK: - Service protocol
+
+protocol SpeedtestServicing: Sendable {
+    func run(pathStatus: NetworkPathStatus, location: Coordinates?, settings: SpeedtestRunSettings) async throws -> SpeedtestRunResult
+    func run(pathStatus: NetworkPathStatus, location: Coordinates?, settings: SpeedtestRunSettings, progress: SpeedtestProgressHandler?) async throws -> SpeedtestRunResult
+    func save(_ result: SpeedtestRunResult) async throws
+    func save(_ result: SpeedtestRunResult, streams: Int) async throws
+    func save(_ result: SpeedtestRunResult, streams: Int, publishToMap: Bool) async throws
+    func details(id: String) async throws -> SpeedtestDetail
+}
+
+/// Live progress emitted by the engine during a run. The UI uses this to drive
+/// the speedometer gauge before the final result lands.
+struct SpeedtestLiveProgress: Sendable {
+    let phase: SpeedtestPhase
+    let currentMbps: Double
+    /// Fraction of the current phase (0…1) — useful for a future progress arc.
+    let fraction: Double
+    let downloadLiveMbps: Double?
+    let downloadAverageMbps: Double?
+    let uploadLiveMbps: Double?
+    let uploadAverageMbps: Double?
+    let pingLiveMs: Double?
+    let pingFinalMs: Double?
+    let jitterMs: Double?
+    let pingProtocol: String?
+    let pingSampleCount: Int
+    let pingSampleTarget: Int
+    let serverName: String?
+
+    init(
+        phase: SpeedtestPhase,
+        currentMbps: Double = 0,
+        fraction: Double = 0,
+        downloadLiveMbps: Double? = nil,
+        downloadAverageMbps: Double? = nil,
+        uploadLiveMbps: Double? = nil,
+        uploadAverageMbps: Double? = nil,
+        pingLiveMs: Double? = nil,
+        pingFinalMs: Double? = nil,
+        jitterMs: Double? = nil,
+        pingProtocol: String? = nil,
+        pingSampleCount: Int = 0,
+        pingSampleTarget: Int = 0,
+        serverName: String? = nil
+    ) {
+        self.phase = phase
+        self.currentMbps = currentMbps
+        self.fraction = fraction
+        self.downloadLiveMbps = downloadLiveMbps
+        self.downloadAverageMbps = downloadAverageMbps
+        self.uploadLiveMbps = uploadLiveMbps
+        self.uploadAverageMbps = uploadAverageMbps
+        self.pingLiveMs = pingLiveMs
+        self.pingFinalMs = pingFinalMs
+        self.jitterMs = jitterMs
+        self.pingProtocol = pingProtocol
+        self.pingSampleCount = pingSampleCount
+        self.pingSampleTarget = pingSampleTarget
+        self.serverName = serverName
+    }
+}
+
+typealias SpeedtestProgressHandler = @Sendable (SpeedtestLiveProgress) -> Void
+
+protocol SpeedtestTCPProbing: Sendable {
+    func connectLatencyMs(host: String, port: UInt16, timeoutSeconds: TimeInterval) async throws -> Double
+}
+
+struct NetworkSpeedtestTCPProbe: SpeedtestTCPProbing {
+    func connectLatencyMs(host: String, port: UInt16, timeoutSeconds: TimeInterval) async throws -> Double {
+        final class ResumeGate: @unchecked Sendable {
+            private let lock = NSLock()
+            private var didResume = false
+
+            func run(_ action: () -> Void) {
+                lock.lock()
+                guard !didResume else {
+                    lock.unlock()
+                    return
+                }
+                didResume = true
+                lock.unlock()
+                action()
+            }
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let gate = ResumeGate()
+            let queue = DispatchQueue(label: "fr.signalquest.speedtest.tcp")
+            let start = Date()
+            let connection = NWConnection(
+                host: NWEndpoint.Host(host),
+                port: NWEndpoint.Port(rawValue: port) ?? .https,
+                using: .tcp
+            )
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    let elapsed = Date().timeIntervalSince(start) * 1_000
+                    gate.run {
+                        connection.cancel()
+                        continuation.resume(returning: elapsed)
+                    }
+                case .failed(let error):
+                    gate.run {
+                        connection.cancel()
+                        continuation.resume(throwing: error)
+                    }
+                case .cancelled:
+                    break
+                default:
+                    break
+                }
+            }
+            queue.asyncAfter(deadline: .now() + timeoutSeconds) {
+                gate.run {
+                    connection.cancel()
+                    continuation.resume(throwing: SpeedtestEngineError.pingFailed)
+                }
+            }
+            connection.start(queue: queue)
+        }
+    }
+}
+
+// MARK: - Engine constants (mirrors Android SpeedTestEngine.kt)
+
+private enum SpeedtestEngineConfig {
+    /// Bytes received in the first 2 s are discarded — TCP slow-start would
+    /// otherwise drag the average down on fast links.
+    static let downloadGraceTimeMs: Double = 2_000
+    static let uploadGraceTimeMs: Double = 2_000
+    /// Window length used to compute Mbps samples post-grace. Android uses
+    /// 1000 ms and reads the same value for the public p90/p95/peak stats.
+    static let publicPeakWindowMs: Double = 1_000
+    /// Live-progress emission interval. We push a smoothed value to the UI at
+    /// this cadence so the gauge climbs visibly instead of staying at 0.
+    static let sampleIntervalMs: Double = 150
+    /// Per-stream stagger to avoid thundering-herd on the first request and
+    /// match Android's behaviour exactly.
+    static let streamStaggerMs: Double = 200
+    /// If the global byte counter stops increasing for this long after grace,
+    /// the engine aborts the attempt with a stall error.
+    static let downloadStallTimeoutMs: Double = 2_500
+    /// Hard cap on parallel streams.
+    static let hardMaxStreams: Int = 16
+    /// Android caps upload fan-out lower than download to avoid saturating
+    /// client memory while several large POSTs are in flight.
+    static let hardMaxUploadStreams: Int = 12
+    /// HTTP request timeout for a single download chunk.
+    static let chunkTimeoutSeconds: TimeInterval = 25
+    /// Upload chunks can legitimately take longer on asymmetric links.
+    static let uploadTimeoutSeconds: TimeInterval = 90
+    static let minUploadBytesPerRequest: Int = 256 * 1_024
+    static let maxUploadBytesPerRequest: Int = 32 * 1_024 * 1_024
+    /// PingProbe: maximum 8 total attempts. We use one warmup when possible,
+    /// then up to 7 measured samples at a short cadence so the phase feels instant.
+    static let pingAttemptBudget: Int = 8
+    static let pingWarmupCount: Int = 1
+    static let pingIntervalMs: Double = 300
+    static let pingTimeoutSeconds: TimeInterval = 1.2
+}
+
+private enum SpeedtestEngineError: LocalizedError {
+    case downloadProducedNoBytes
+    case uploadUnavailable
+    case uploadProducedNoBytes
+    case uploadHandshakeFailed
+    case pingFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .downloadProducedNoBytes:
+            return "Le téléchargement n'a reçu aucun octet mesurable. Le speedtest a été annulé pour éviter un résultat faux."
+        case .uploadUnavailable:
+            return "Le serveur speedtest n'a pas fourni d'URL d'upload complète. Le test a été annulé."
+        case .uploadProducedNoBytes:
+            return "L'upload n'a confirmé aucun octet côté serveur. Le speedtest a été annulé pour éviter un résultat faux."
+        case .uploadHandshakeFailed:
+            return "Le serveur speedtest n'a pas accepté l'initialisation de l'upload."
+        case .pingFailed:
+            return "Impossible de mesurer une latence réseau fiable."
+        }
+    }
+}
+
+// MARK: - Service implementation
+
+final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
+    private let api: APIClient
+    private let session: URLSession
+    private let historyCache: DiskCache
+    private let pendingCache: DiskCache
+    private let tcpProbe: SpeedtestTCPProbing
+    private let pendingSaveKey = "pending-speedtest-saves"
+
+    init(
+        api: APIClient,
+        session: URLSession? = nil,
+        historyCache: DiskCache = DiskCache(folderName: "SignalQuestSpeedtestHistory"),
+        pendingCache: DiskCache = DiskCache(folderName: "SignalQuestSpeedtestPending"),
+        tcpProbe: SpeedtestTCPProbing = NetworkSpeedtestTCPProbe()
+    ) {
+        self.api = api
+        // Use ephemeral config to bypass system caching of the download payload.
+        let config = URLSessionConfiguration.ephemeral
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.urlCache = nil
+        config.httpMaximumConnectionsPerHost = 32
+        config.timeoutIntervalForRequest = SpeedtestEngineConfig.chunkTimeoutSeconds
+        self.session = session ?? URLSession(configuration: config)
+        self.historyCache = historyCache
+        self.pendingCache = pendingCache
+        self.tcpProbe = tcpProbe
+    }
+
+    func run(pathStatus: NetworkPathStatus, location: Coordinates?, settings: SpeedtestRunSettings) async throws -> SpeedtestRunResult {
+        try await run(pathStatus: pathStatus, location: location, settings: settings, progress: nil)
+    }
+
+    func run(
+        pathStatus: NetworkPathStatus,
+        location: Coordinates?,
+        settings: SpeedtestRunSettings,
+        progress: SpeedtestProgressHandler?
+    ) async throws -> SpeedtestRunResult {
+        let startedAt = Date()
+
+        let sessionResponse: SpeedtestSessionResponse = try await api.requestJSON(
+            "/api/speedtest/session",
+            body: ["streams": settings.streams, "durationSec": settings.durationSeconds],
+            authenticated: false
+        )
+
+        let downloadTarget = resolveDownloadTarget(settings: settings, sessionResponse: sessionResponse)
+
+        // Le serveur de MESURE est le VPS sélectionné par la session (il reçoit
+        // l'upload et sert de référence de latence). Le download peut provenir d'un
+        // CDN (CloudFront) : on ne doit jamais afficher/soumettre le CDN comme
+        // « serveur de test », ni mesurer le ping contre l'edge CDN.
+        let measurementServerName = sessionResponse.selectedServer?.name
+            ?? sessionResponse.selectedServer?.location
+            ?? sessionResponse.selectedServer?.host
+            ?? "Serveur SignalQuest"
+
+        progress?(SpeedtestLiveProgress(
+            phase: .ping,
+            fraction: 0,
+            pingSampleTarget: speedtestPingMeasuredSampleTarget(
+                attemptBudget: SpeedtestEngineConfig.pingAttemptBudget,
+                warmupCount: SpeedtestEngineConfig.pingWarmupCount
+            ),
+            serverName: measurementServerName
+        ))
+        // Ping de référence contre le serveur de MESURE, pas contre la cible de
+        // download (edge CloudFront). On vise `sessionResponse.downloadUrl` : c'est
+        // l'endpoint de download émis par la session = l'hôte du VPS (l'override
+        // CloudFront vient de la config, pas de la session), et il répond au GET —
+        // ce que le repli HTTP du ping exige (l'endpoint d'upload rejette le GET).
+        let pingOutcome = try await measurePings(
+            url: sessionResponse.downloadUrl,
+            token: sessionResponse.sessionToken,
+            serverName: measurementServerName,
+            progress: progress
+        )
+
+        progress?(SpeedtestLiveProgress(phase: .download, fraction: 0, serverName: measurementServerName))
+        let downloadOutcome = try await measureDownload(
+            url: downloadTarget.url,
+            token: downloadTarget.token,
+            chunkBytes: min(sessionResponse.maxDownloadBytesPerRequest ?? 25_000_000, 64_000_000),
+            durationSeconds: settings.durationSeconds,
+            streams: min(settings.streams, sessionResponse.maxStreams ?? settings.streams),
+            reliabilityMode: settings.reliabilityMode,
+            serverName: measurementServerName,
+            pingProtocol: pingOutcome.protocolName,
+            progress: progress
+        )
+
+        guard let uploadBeginURL = sessionResponse.uploadBeginUrl,
+              let uploadFinalizeURL = sessionResponse.uploadFinalizeUrl else {
+            throw SpeedtestEngineError.uploadUnavailable
+        }
+        progress?(SpeedtestLiveProgress(phase: .upload, fraction: 0, serverName: measurementServerName))
+        let uploadOutcome = try await measureUpload(
+            beginURL: uploadBeginURL,
+            uploadURL: sessionResponse.uploadUrl,
+            finalizeURL: uploadFinalizeURL,
+            token: sessionResponse.sessionToken,
+            maxBytes: boundedUploadRequestBytes(sessionResponse.maxUploadBytesPerRequest),
+            durationSeconds: settings.durationSeconds,
+            streams: min(settings.streams, sessionResponse.maxStreams ?? settings.streams),
+            serverName: measurementServerName,
+            pingProtocol: pingOutcome.protocolName,
+            progress: progress
+        )
+
+        let duration = Date().timeIntervalSince(startedAt)
+        let resolvedCity = await reverseGeocodedCity(for: location)
+        let wifiSSID = await currentWiFiSSID(for: pathStatus)
+        let result = SpeedtestRunResult(
+            id: UUID(),
+            label: "iOS speedtest",
+            downloadMbps: downloadOutcome.averageMbps,
+            downloadAverageMbps: downloadOutcome.averageMbps,
+            downloadMaxMbps: downloadOutcome.peakMbps,
+            downloadP90Mbps: downloadOutcome.p90Mbps,
+            downloadP95Mbps: downloadOutcome.p95Mbps,
+            uploadMbps: uploadOutcome.averageMbps,
+            uploadAverageMbps: uploadOutcome.averageMbps,
+            uploadMaxMbps: uploadOutcome.peakMbps,
+            uploadP90Mbps: uploadOutcome.p90Mbps,
+            uploadP95Mbps: uploadOutcome.p95Mbps,
+            pingMs: SpeedMetricCalculator.average(pingOutcome.values),
+            pingMedianMs: SpeedMetricCalculator.median(pingOutcome.values),
+            pingMinMs: pingOutcome.values.min(),
+            pingMaxMs: pingOutcome.values.max(),
+            jitterMs: SpeedMetricCalculator.jitter(pingOutcome.values),
+            pingDlMs: downloadOutcome.pingDlMs,
+            jitterDlMs: downloadOutcome.jitterDlMs,
+            pingUlMs: uploadOutcome.pingUlMs,
+            jitterUlMs: uploadOutcome.jitterUlMs,
+            pingProtocol: pingOutcome.protocolName,
+            durationSeconds: duration,
+            connectionType: pathStatus.connection,
+            cellularTechnology: pathStatus.cellularTechnology,
+            networkOperatorName: pathStatus.operatorName,
+            wifiSSID: wifiSSID,
+            city: resolvedCity,
+            coordinate: location,
+            serverName: measurementServerName,
+            downloadServerName: downloadTarget.serverName,
+            createdAt: startedAt,
+            downloadSeriesMbps: downloadOutcome.seriesMbps,
+            uploadSeriesMbps: uploadOutcome.seriesMbps,
+            uploadMeasurementSource: uploadOutcome.measurementSource,
+            deviceModel: AppleDeviceDescriptor.currentShareModelName,
+            osVersion: AppleDeviceDescriptor.currentOSVersionLabel
+        )
+        try? await appendHistory(result)
+        progress?(SpeedtestLiveProgress(
+            phase: .finished,
+            currentMbps: result.downloadAverageMbps,
+            fraction: 1,
+            downloadAverageMbps: result.downloadAverageMbps,
+            uploadAverageMbps: result.uploadAverageMbps,
+            pingFinalMs: result.pingMinMs ?? result.pingMs,
+            jitterMs: result.jitterMs,
+            pingProtocol: result.pingProtocol,
+            serverName: measurementServerName
+        ))
+        return result
+    }
+
+    // MARK: Persistence
+
+    func save(_ result: SpeedtestRunResult) async throws {
+        try await save(result, streams: 4, publishToMap: false)
+    }
+
+    func save(_ result: SpeedtestRunResult, streams: Int) async throws {
+        try await save(result, streams: streams, publishToMap: false)
+    }
+
+    func save(_ result: SpeedtestRunResult, streams: Int, publishToMap: Bool) async throws {
+        let pending = PendingSpeedtestSave(
+            id: result.id.uuidString,
+            result: result,
+            streams: streams,
+            deviceModel: await UIDevice.current.modelName,
+            createdAt: Date(),
+            isVisibleOnMap: publishToMap
+        )
+        try? await upsertPendingSave(pending)
+        do {
+            try await submitPendingSave(pending)
+            await removePendingSave(id: pending.id)
+            try? await flushPendingSaves(excluding: Set([pending.id]))
+        } catch {
+            throw error
+        }
+    }
+
+    func history() async -> [SpeedtestRunResult] {
+        (try? await historyCache.read([SpeedtestRunResult].self, for: "history")) ?? []
+    }
+
+    func retryPendingSaves() async {
+        try? await flushPendingSaves()
+    }
+
+    func details(id: String) async throws -> SpeedtestDetail {
+        let encodedId = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        return try await api.request(
+            APIEndpoint(path: "/api/speedtests/\(encodedId)", authenticated: false),
+            as: SpeedtestDetail.self
+        )
+    }
+
+    private func appendHistory(_ result: SpeedtestRunResult) async throws {
+        var values = await history()
+        values.insert(result, at: 0)
+        if values.count > 20 { values = Array(values.prefix(20)) }
+        try await historyCache.write(values, for: "history")
+    }
+
+    private struct PendingSpeedtestSave: Codable, Equatable, Sendable {
+        let id: String
+        let result: SpeedtestRunResult
+        let streams: Int
+        let deviceModel: String
+        let createdAt: Date
+        /// Choix de publication sur la carte communautaire (opt-in). Optionnel pour
+        /// rester compatible avec les sauvegardes en attente déjà sérialisées avant
+        /// l'ajout du consentement — `nil` est traité comme « non publié ».
+        let isVisibleOnMap: Bool?
+    }
+
+    private func pendingSaves() async -> [PendingSpeedtestSave] {
+        (try? await pendingCache.read([PendingSpeedtestSave].self, for: pendingSaveKey)) ?? []
+    }
+
+    private func writePendingSaves(_ values: [PendingSpeedtestSave]) async throws {
+        if values.isEmpty {
+            await pendingCache.remove(pendingSaveKey)
+        } else {
+            try await pendingCache.write(values, for: pendingSaveKey)
+        }
+    }
+
+    private func upsertPendingSave(_ pending: PendingSpeedtestSave) async throws {
+        var values = await pendingSaves().filter { $0.id != pending.id }
+        values.append(pending)
+        try await writePendingSaves(values)
+    }
+
+    private func removePendingSave(id: String) async {
+        let values = await pendingSaves().filter { $0.id != id }
+        try? await writePendingSaves(values)
+    }
+
+    private func submitPendingSave(_ pending: PendingSpeedtestSave) async throws {
+        let payload = SpeedtestSubmission.iosPayload(
+            from: pending.result,
+            streams: pending.streams,
+            deviceModel: pending.deviceModel,
+            isVisibleOnMap: pending.isVisibleOnMap ?? false
+        )
+        let _: SpeedtestSaveResponse = try await api.requestJSON("/api/speedtests", body: payload)
+    }
+
+    private func flushPendingSaves(excluding excludedIds: Set<String> = []) async throws {
+        let pending = await pendingSaves()
+        guard !pending.isEmpty else { return }
+        var remaining: [PendingSpeedtestSave] = []
+        var firstError: Error?
+        for item in pending where !excludedIds.contains(item.id) {
+            do {
+                try await submitPendingSave(item)
+            } catch {
+                remaining.append(item)
+                if firstError == nil { firstError = error }
+            }
+        }
+        for item in pending where excludedIds.contains(item.id) {
+            remaining.append(item)
+        }
+        try? await writePendingSaves(remaining)
+        if let firstError { throw firstError }
+    }
+
+    // MARK: - Target resolution
+
+    private struct ResolvedDownloadTarget: Sendable {
+        let url: URL
+        let token: String?
+        let serverName: String
+    }
+
+    private func resolveDownloadTarget(
+        settings: SpeedtestRunSettings,
+        sessionResponse: SpeedtestSessionResponse
+    ) -> ResolvedDownloadTarget {
+        if settings.downloadTarget == .awsCloudFront {
+            let cloudFrontURL = api.config.speedtestCloudFrontDownloadURL
+            if !isProtectedSpeedtestDownloadURL(
+                cloudFrontURL,
+                protectedDownloadURL: api.config.speedtestDownloadURL,
+                sessionDownloadURL: sessionResponse.downloadUrl,
+                speedtestBaseURL: api.config.speedtestBaseURL
+            ) {
+                return ResolvedDownloadTarget(
+                    url: cloudFrontURL,
+                    token: nil,
+                    serverName: settings.downloadTarget.displayName
+                )
+            }
+        }
+
+        return ResolvedDownloadTarget(
+            url: sessionResponse.downloadUrl,
+            token: sessionResponse.sessionToken,
+            serverName: sessionResponse.selectedServer?.name ?? settings.downloadTarget.displayName
+        )
+    }
+
+    // MARK: - Ping
+
+    private struct PingOutcome: Sendable {
+        let values: [Double]
+        let protocolName: String
+    }
+
+    private struct PingAttemptResult: Sendable {
+        let values: [Double]
+        let attemptsUsed: Int
+    }
+
+    private func measurePings(
+        url: URL,
+        token: String?,
+        serverName: String,
+        progress: SpeedtestProgressHandler?
+    ) async throws -> PingOutcome {
+        guard let host = url.host(percentEncoded: false) ?? url.host else {
+            throw SpeedtestEngineError.pingFailed
+        }
+        let port = UInt16(url.port ?? (url.scheme?.lowercased() == "http" ? 80 : 443))
+
+        let tcp = await measureTcpPings(host: host, port: port, serverName: serverName, progress: progress)
+        if !tcp.values.isEmpty {
+            return PingOutcome(values: tcp.values, protocolName: "TCP")
+        }
+
+        let remainingBudget = max(0, SpeedtestEngineConfig.pingAttemptBudget - tcp.attemptsUsed)
+        let http = try await measureHttpPings(url: url, token: token, attemptBudget: remainingBudget, serverName: serverName, progress: progress)
+        guard !http.values.isEmpty else { throw SpeedtestEngineError.pingFailed }
+        return PingOutcome(values: http.values, protocolName: "HTTP")
+    }
+
+    private func measureTcpPings(
+        host: String,
+        port: UInt16,
+        serverName: String,
+        progress: SpeedtestProgressHandler?
+    ) async -> PingAttemptResult {
+        var values: [Double] = []
+        var attemptsUsed = 0
+        let measuredTarget = speedtestPingMeasuredSampleTarget(
+            attemptBudget: SpeedtestEngineConfig.pingAttemptBudget,
+            warmupCount: SpeedtestEngineConfig.pingWarmupCount
+        )
+
+        do {
+            attemptsUsed += 1
+            _ = try await tcpProbe.connectLatencyMs(
+                host: host,
+                port: port,
+                timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
+            )
+        } catch {
+            return PingAttemptResult(values: [], attemptsUsed: attemptsUsed)
+        }
+
+        try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.pingIntervalMs * 1_000_000))
+        for _ in 0..<measuredTarget where attemptsUsed < SpeedtestEngineConfig.pingAttemptBudget {
+            do {
+                attemptsUsed += 1
+                let elapsed = try await tcpProbe.connectLatencyMs(
+                    host: host,
+                    port: port,
+                    timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
+                )
+                values.append(elapsed)
+                emitPingProgress(values: values, protocolName: "TCP", target: measuredTarget, serverName: serverName, progress: progress)
+            } catch {
+                break
+            }
+            try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.pingIntervalMs * 1_000_000))
+        }
+        return PingAttemptResult(values: values, attemptsUsed: attemptsUsed)
+    }
+
+    private func measureHttpPings(
+        url: URL,
+        token: String?,
+        attemptBudget: Int,
+        serverName: String,
+        progress: SpeedtestProgressHandler?
+    ) async throws -> PingAttemptResult {
+        guard attemptBudget > 0 else { return PingAttemptResult(values: [], attemptsUsed: 0) }
+        var values: [Double] = []
+        var attemptsUsed = 0
+        let warmupCount = min(SpeedtestEngineConfig.pingWarmupCount, max(0, attemptBudget - 1))
+        let measuredTarget = max(0, attemptBudget - warmupCount)
+        progress?(SpeedtestLiveProgress(
+            phase: .ping,
+            fraction: 0,
+            pingProtocol: "HTTP",
+            pingSampleTarget: measuredTarget,
+            serverName: serverName
+        ))
+
+        let total = warmupCount + measuredTarget
+        for index in 0..<total {
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+            var query = components.queryItems ?? []
+            if token != nil {
+                query.append(URLQueryItem(name: "bytes", value: "1"))
+            }
+            components.queryItems = query
+            let start = Date()
+            try await performPingRequest(url: components.url!, token: token)
+            attemptsUsed += 1
+            let elapsed = Date().timeIntervalSince(start) * 1_000
+            if index >= warmupCount {
+                values.append(elapsed)
+                emitPingProgress(values: values, protocolName: "HTTP", target: measuredTarget, serverName: serverName, progress: progress)
+            }
+            try await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.pingIntervalMs * 1_000_000))
+        }
+        return PingAttemptResult(values: values, attemptsUsed: attemptsUsed)
+    }
+
+    private func emitPingProgress(
+        values: [Double],
+        protocolName: String,
+        target: Int,
+        serverName: String,
+        progress: SpeedtestProgressHandler?
+    ) {
+        let sampleCount = values.count
+        progress?(SpeedtestLiveProgress(
+            phase: .ping,
+            fraction: target > 0 ? min(1, Double(sampleCount) / Double(target)) : 0,
+            pingLiveMs: values.last,
+            pingFinalMs: values.min(),
+            jitterMs: SpeedMetricCalculator.jitter(values),
+            pingProtocol: protocolName,
+            pingSampleCount: sampleCount,
+            pingSampleTarget: target,
+            serverName: serverName
+        ))
+    }
+
+    private func performPingRequest(url: URL, token: String?) async throws {
+        var head = URLRequest(url: url)
+        head.httpMethod = "HEAD"
+        head.timeoutInterval = SpeedtestEngineConfig.pingTimeoutSeconds
+        if let token { head.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        do {
+            let (_, response) = try await session.data(for: head)
+            if let http = response as? HTTPURLResponse, (200..<400).contains(http.statusCode) { return }
+        } catch {
+            // Some CDNs reject HEAD — fall back to a tiny GET.
+        }
+        var get = URLRequest(url: url)
+        get.httpMethod = "GET"
+        get.timeoutInterval = SpeedtestEngineConfig.pingTimeoutSeconds
+        get.setValue("bytes=0-0", forHTTPHeaderField: "Range")
+        if let token { get.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        let (_, response) = try await session.data(for: get)
+        if let http = response as? HTTPURLResponse, !(200..<400).contains(http.statusCode) {
+            throw APIError.http(
+                status: http.statusCode,
+                code: nil,
+                message: HTTPURLResponse.localizedString(forStatusCode: http.statusCode),
+                requestId: nil,
+                retryAfter: nil
+            )
+        }
+    }
+
+    private func measureLoadedPings(
+        url: URL,
+        token: String?,
+        deadline: Date,
+        protocolName: String
+    ) async -> [Double] {
+        var values: [Double] = []
+        guard let host = url.host(percentEncoded: false) ?? url.host else {
+            return []
+        }
+        let port = UInt16(url.port ?? (url.scheme?.lowercased() == "http" ? 80 : 443))
+
+        while Date() < deadline && !Task.isCancelled {
+            let start = Date()
+            do {
+                if protocolName == "TCP" {
+                    let elapsed = try await tcpProbe.connectLatencyMs(
+                        host: host,
+                        port: port,
+                        timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
+                    )
+                    if !Task.isCancelled {
+                        values.append(elapsed)
+                    }
+                } else {
+                    var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+                    var query = components.queryItems ?? []
+                    if token != nil {
+                        query.append(URLQueryItem(name: "bytes", value: "1"))
+                    }
+                    components.queryItems = query
+                    try await performPingRequest(url: components.url!, token: token)
+                    if !Task.isCancelled {
+                        let elapsed = Date().timeIntervalSince(start) * 1_000
+                        values.append(elapsed)
+                    }
+                }
+            } catch {
+                // Ignore individual failures under load
+            }
+            try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.pingIntervalMs * 1_000_000))
+        }
+        return values
+    }
+
+    // MARK: - Download (Android-aligned)
+
+    /// Aggregate outcome produced by the engine: a final average plus percentile / peak.
+    private struct DownloadOutcome: Sendable {
+        let averageMbps: Double
+        let p90Mbps: Double?
+        let p95Mbps: Double?
+        let peakMbps: Double
+        let measuredWindows: Int
+        let seriesMbps: [Double]
+        let pingDlMs: Double?
+        let jitterDlMs: Double?
+    }
+
+    private struct UploadOutcome: Sendable {
+        let averageMbps: Double
+        let p90Mbps: Double?
+        let p95Mbps: Double?
+        let peakMbps: Double
+        let confirmedBytes: Int
+        let measurementSource: String
+        let seriesMbps: [Double]
+        let pingUlMs: Double?
+        let jitterUlMs: Double?
+    }
+
+    private func measureDownload(
+        url: URL,
+        token: String?,
+        chunkBytes: Int,
+        durationSeconds: Int,
+        streams: Int,
+        reliabilityMode: Bool,
+        serverName: String,
+        pingProtocol: String,
+        progress: SpeedtestProgressHandler?
+    ) async throws -> DownloadOutcome {
+        do {
+            let outcome = try await measureDownloadAttempt(
+                url: url,
+                token: token,
+                chunkBytes: chunkBytes,
+                durationSeconds: durationSeconds,
+                streams: streams,
+                serverName: serverName,
+                pingProtocol: pingProtocol,
+                progress: progress
+            )
+            // If the multi-stream attempt yielded a meaningful number of windows
+            // we keep it. Otherwise (network refused parallelism, hit 429, …) we
+            // fall back to a single-stream run that's more conservative.
+            if outcome.measuredWindows >= 2 || !reliabilityMode || streams <= 1 {
+                return outcome
+            }
+        } catch {
+            if !reliabilityMode || streams <= 1 { throw error }
+        }
+        return try await measureDownloadAttempt(
+            url: url,
+            token: token,
+            chunkBytes: chunkBytes,
+            durationSeconds: durationSeconds,
+            streams: 1,
+            serverName: serverName,
+            pingProtocol: pingProtocol,
+            progress: progress
+        )
+    }
+
+    /// Core download algorithm — ported from Android SpeedTestEngine.measureDownload().
+    private func measureDownloadAttempt(
+        url: URL,
+        token: String?,
+        chunkBytes: Int,
+        durationSeconds: Int,
+        streams: Int,
+        serverName: String,
+        pingProtocol: String,
+        progress: SpeedtestProgressHandler?
+    ) async throws -> DownloadOutcome {
+        let graceMs = SpeedtestEngineConfig.downloadGraceTimeMs
+        let usefulDurationMs = Double(max(5, min(durationSeconds, 30))) * 1_000
+        let totalDurationMs = usefulDurationMs + graceMs  // Match Android: grace + test
+        let attemptStart = Date()
+        let deadline = attemptStart.addingTimeInterval(totalDurationMs / 1_000)
+
+        let totals = SpeedtestSyncByteCounter()
+        let liveAggregator = SpeedtestLiveSampler()
+        let samplesBox = SpeedtestSamplesBox()
+        let progressMonitor = SpeedtestStallMonitor(timeoutMs: SpeedtestEngineConfig.downloadStallTimeoutMs)
+
+        let loadedPingsTask = Task { [weak self] in
+            guard let self else { return [Double]() }
+            try? await Task.sleep(nanoseconds: UInt64(graceMs * 1_000_000))
+            guard !Task.isCancelled else { return [Double]() }
+            return await self.measureLoadedPings(url: url, token: token, deadline: deadline, protocolName: pingProtocol)
+        }
+
+        // Live progress sampler — pulses the UI every 150 ms with a smoothed Mbps.
+        let progressTask = Task { [weak self] in
+            guard self != nil else { return }
+            var lastSampleMs: Double?
+            var lastSampleTotalBytes = 0
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.sampleIntervalMs * 1_000_000))
+                if Task.isCancelled { return }
+                let now = Date()
+                if now >= deadline { return }
+                let elapsedMs = now.timeIntervalSince(attemptStart) * 1_000
+                let snapshot = totals.snapshot()
+                if elapsedMs >= graceMs {
+                    if let startMs = lastSampleMs, startMs >= graceMs {
+                        let bytesDiff = max(0, snapshot.total - lastSampleTotalBytes)
+                        if bytesDiff > 0, elapsedMs > startMs {
+                            await samplesBox.append(start: startMs, end: elapsedMs, bytes: bytesDiff)
+                        }
+                    }
+                    lastSampleMs = elapsedMs
+                    lastSampleTotalBytes = snapshot.total
+
+                    let mbps = liveAggregator.observe(totalBytes: snapshot.total, graceBytes: snapshot.grace, elapsedMs: elapsedMs, graceMs: graceMs)
+                    let effectiveBytes = max(0, snapshot.total - snapshot.grace)
+                    let averageMbps = boundedMbps(bytes: effectiveBytes, durationMs: elapsedMs - graceMs)
+                    let fraction = max(0, min(1, (elapsedMs - graceMs) / usefulDurationMs))
+                    progress?(SpeedtestLiveProgress(
+                        phase: .download,
+                        currentMbps: mbps,
+                        fraction: fraction,
+                        downloadLiveMbps: mbps,
+                        downloadAverageMbps: averageMbps,
+                        serverName: serverName
+                    ))
+                    await progressMonitor.observe(elapsedMs: elapsedMs, totalBytes: snapshot.total)
+                } else {
+                    lastSampleMs = elapsedMs
+                    lastSampleTotalBytes = snapshot.total
+                }
+            }
+        }
+        defer {
+            progressTask.cancel()
+            loadedPingsTask.cancel()
+        }
+
+        // Concurrent streams (staggered).
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for streamIndex in 0..<max(1, min(streams, SpeedtestEngineConfig.hardMaxStreams)) {
+                group.addTask { [self] in
+                    try await Task.sleep(nanoseconds: UInt64(Double(streamIndex) * SpeedtestEngineConfig.streamStaggerMs * 1_000_000))
+                    try await runDownloadStream(
+                        streamIndex: streamIndex,
+                        url: url,
+                        token: token,
+                        chunkBytes: chunkBytes,
+                        deadline: deadline,
+                        attemptStart: attemptStart,
+                        graceMs: graceMs,
+                        totals: totals,
+                        samples: samplesBox,
+                        stallMonitor: progressMonitor
+                    )
+                }
+            }
+            try await group.waitForAll()
+        }
+
+        progressTask.cancel()
+
+        let downloadPings = await loadedPingsTask.value
+        let pingDlMs = downloadPings.isEmpty ? nil : SpeedMetricCalculator.average(downloadPings)
+        let jitterDlMs = downloadPings.isEmpty ? nil : SpeedMetricCalculator.jitter(downloadPings)
+
+        // Aggregate: avg = effectiveBytes * 8 / (effectiveDurationSec) / 1e6.
+        let snapshot = totals.snapshot()
+        let measurementEndMs = min(Date().timeIntervalSince(attemptStart) * 1_000, totalDurationMs)
+        let effectiveBytes = max(0, snapshot.total - snapshot.grace)
+        let effectiveDurationMs = max(1, measurementEndMs - graceMs)
+        guard let averageMbps = measuredTransferMbps(effectiveBytes: effectiveBytes, durationMs: effectiveDurationMs) else {
+            throw SpeedtestEngineError.downloadProducedNoBytes
+        }
+
+        // p90 / p95 / peak via 1 s windows.
+        let stats = await samplesBox.publicStats(windowMs: SpeedtestEngineConfig.publicPeakWindowMs, graceMs: graceMs, endMs: measurementEndMs)
+
+        return DownloadOutcome(
+            averageMbps: averageMbps,
+            p90Mbps: stats.p90,
+            p95Mbps: stats.p95,
+            peakMbps: max(averageMbps, stats.peak),
+            measuredWindows: stats.windowCount,
+            seriesMbps: stats.seriesMbps,
+            pingDlMs: pingDlMs,
+            jitterDlMs: jitterDlMs
+        )
+    }
+
+    /// One download stream — pulls bytes through a `URLSessionDataDelegate` so
+    /// we count real received chunks without a Swift byte-by-byte loop.
+    private func runDownloadStream(
+        streamIndex: Int,
+        url: URL,
+        token: String?,
+        chunkBytes: Int,
+        deadline: Date,
+        attemptStart: Date,
+        graceMs: Double,
+        totals: SpeedtestSyncByteCounter,
+        samples: SpeedtestSamplesBox,
+        stallMonitor: SpeedtestStallMonitor
+    ) async throws {
+        while Date() < deadline && !Task.isCancelled {
+            if await stallMonitor.stalled { return }
+
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+            var query = components.queryItems ?? []
+            query.append(URLQueryItem(name: "r", value: "\(UUID().uuidString)-\(streamIndex)"))
+            if token != nil {
+                query.append(URLQueryItem(name: "bytes", value: "\(chunkBytes)"))
+            }
+            components.queryItems = query
+
+            var request = URLRequest(url: components.url ?? url)
+            request.timeoutInterval = SpeedtestEngineConfig.chunkTimeoutSeconds
+            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
+            if let token {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            } else {
+                request.setValue("bytes=0-\(chunkBytes - 1)", forHTTPHeaderField: "Range")
+            }
+
+            do {
+                try await performStreamingDownload(request: request, deadline: deadline) { byteCount in
+                    guard byteCount > 0 else { return }
+                    let elapsedMs = Date().timeIntervalSince(attemptStart) * 1_000
+                    guard elapsedMs <= deadline.timeIntervalSince(attemptStart) * 1_000 else { return }
+                    totals.add(byteCount, isGrace: elapsedMs < graceMs)
+                }
+            } catch is SpeedtestRateLimitedError {
+                try? await Task.sleep(nanoseconds: UInt64(250 + (streamIndex * 50)) * 1_000_000)
+                continue
+            } catch is CancellationError {
+                return
+            } catch {
+                // Stream errors are non-fatal — let other streams keep working.
+                // We back off briefly to avoid hammering the server.
+                try? await Task.sleep(nanoseconds: 120_000_000)
+                continue
+            }
+        }
+    }
+
+    private func performStreamingDownload(
+        request: URLRequest,
+        deadline: Date,
+        onBytes: @escaping @Sendable (Int) -> Void
+    ) async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.urlCache = nil
+        config.httpMaximumConnectionsPerHost = 1
+        config.timeoutIntervalForRequest = min(SpeedtestEngineConfig.chunkTimeoutSeconds, max(1, deadline.timeIntervalSinceNow + 2))
+        let delegate = SpeedtestDownloadDelegate(deadline: deadline, onBytes: onBytes)
+        let delegateSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        defer { delegateSession.invalidateAndCancel() }
+        let task = delegateSession.dataTask(with: request)
+        try await delegate.run(task: task)
+    }
+
+    // MARK: - Upload (Android-aligned, simpler — single chunk POSTs)
+
+    private func measureUpload(
+        beginURL: URL,
+        uploadURL: URL,
+        finalizeURL: URL,
+        token: String,
+        maxBytes: Int,
+        durationSeconds: Int,
+        streams: Int,
+        serverName: String,
+        pingProtocol: String,
+        progress: SpeedtestProgressHandler?
+    ) async throws -> UploadOutcome {
+        let graceMs = SpeedtestEngineConfig.uploadGraceTimeMs
+        let usefulDurationMs = Double(max(5, min(durationSeconds, 30))) * 1_000
+        let totalDurationMs = usefulDurationMs + graceMs
+        let beginBody = Data(#"{"warmupMs":2000,"durationMs":\#(Int(usefulDurationMs)),"windowMs":1000}"#.utf8)
+        var begin = URLRequest(url: beginURL)
+        begin.httpMethod = "POST"
+        begin.timeoutInterval = SpeedtestEngineConfig.uploadTimeoutSeconds
+        begin.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        begin.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        begin.httpBody = beginBody
+        let (beginData, beginResponse) = try await session.data(for: begin)
+        if let http = beginResponse as? HTTPURLResponse, !(200..<400).contains(http.statusCode) {
+            throw APIError.http(
+                status: http.statusCode, code: nil,
+                message: HTTPURLResponse.localizedString(forStatusCode: http.statusCode),
+                requestId: nil, retryAfter: nil
+            )
+        }
+        let beginJson = try JSONSerialization.jsonObject(with: beginData) as? [String: Any]
+        guard let runId = beginJson?["uploadRunId"] as? String, !runId.isEmpty else {
+            throw SpeedtestEngineError.uploadHandshakeFailed
+        }
+
+        let payload = Data(repeating: 0x5A, count: maxBytes)
+        let attemptStart = Date()
+        let deadline = attemptStart.addingTimeInterval(totalDurationMs / 1_000)
+        let totals = SpeedtestSyncByteCounter()
+        let samples = SpeedtestSamplesBox()
+        let liveAggregator = SpeedtestLiveSampler()
+
+        let loadedPingsTask = Task { [weak self] in
+            guard let self else { return [Double]() }
+            try? await Task.sleep(nanoseconds: UInt64(graceMs * 1_000_000))
+            guard !Task.isCancelled else { return [Double]() }
+            return await self.measureLoadedPings(url: uploadURL, token: token, deadline: deadline, protocolName: pingProtocol)
+        }
+
+        let progressTask = Task { [weak self] in
+            guard self != nil else { return }
+            var lastSampleMs: Double?
+            var lastSampleTotalBytes = 0
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.sampleIntervalMs * 1_000_000))
+                if Task.isCancelled { return }
+                if Date() >= deadline { return }
+                let elapsedMs = Date().timeIntervalSince(attemptStart) * 1_000
+                let snapshot = totals.snapshot()
+                if elapsedMs >= graceMs {
+                    if let startMs = lastSampleMs, startMs >= graceMs {
+                        let bytesDiff = max(0, snapshot.total - lastSampleTotalBytes)
+                        if bytesDiff > 0, elapsedMs > startMs {
+                            await samples.append(start: startMs, end: elapsedMs, bytes: bytesDiff)
+                        }
+                    }
+                    lastSampleMs = elapsedMs
+                    lastSampleTotalBytes = snapshot.total
+
+                    let mbps = liveAggregator.observe(totalBytes: snapshot.total, graceBytes: snapshot.grace, elapsedMs: elapsedMs, graceMs: graceMs)
+                    let effectiveBytes = max(0, snapshot.total - snapshot.grace)
+                    let averageMbps = boundedMbps(bytes: effectiveBytes, durationMs: elapsedMs - graceMs)
+                    let fraction = max(0, min(1, (elapsedMs - graceMs) / (totalDurationMs - graceMs)))
+                    progress?(SpeedtestLiveProgress(
+                        phase: .upload,
+                        currentMbps: mbps,
+                        fraction: fraction,
+                        uploadLiveMbps: mbps,
+                        uploadAverageMbps: averageMbps,
+                        serverName: serverName
+                    ))
+                } else {
+                    lastSampleMs = elapsedMs
+                    lastSampleTotalBytes = snapshot.total
+                }
+            }
+        }
+        defer {
+            progressTask.cancel()
+            loadedPingsTask.cancel()
+        }
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for streamIndex in 0..<max(1, min(streams, SpeedtestEngineConfig.hardMaxUploadStreams)) {
+                group.addTask { [self] in
+                    try await Task.sleep(nanoseconds: UInt64(Double(streamIndex) * SpeedtestEngineConfig.streamStaggerMs * 1_000_000))
+                    while Date() < deadline && !Task.isCancelled {
+                        var components = URLComponents(url: uploadURL, resolvingAgainstBaseURL: false)!
+                        var query = components.queryItems ?? []
+                        query.append(URLQueryItem(name: "r", value: "\(UUID().uuidString)-\(streamIndex)"))
+                        components.queryItems = query
+                        var upload = URLRequest(url: components.url ?? uploadURL)
+                        upload.httpMethod = "POST"
+                        upload.timeoutInterval = SpeedtestEngineConfig.uploadTimeoutSeconds
+                        upload.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                        do {
+                            let requestTimeout = max(
+                                3,
+                                min(SpeedtestEngineConfig.uploadTimeoutSeconds, deadline.timeIntervalSinceNow + 3)
+                            )
+                            let requestDeadline = min(deadline, Date().addingTimeInterval(requestTimeout))
+                            let result = try await performStreamingUpload(
+                                upload,
+                                payload: payload,
+                                deadline: requestDeadline
+                            ) { sentBytes in
+                                guard sentBytes > 0 else { return }
+                                let elapsedMs = Date().timeIntervalSince(attemptStart) * 1_000
+                                guard elapsedMs <= totalDurationMs else { return }
+                                totals.add(sentBytes, isGrace: elapsedMs < graceMs)
+                            }
+                            guard result.receivedResponse else { continue }
+                            if let statusCode = result.httpStatusCode, !(200..<400).contains(statusCode) {
+                                if statusCode == 429 {
+                                    try? await Task.sleep(nanoseconds: 250_000_000)
+                                    continue
+                                }
+                                continue
+                            }
+                            let serverConfirmed = parseUploadAckBytes(from: result.data)
+                            let confirmedBytes = computeConfirmedUploadBytes(
+                                clientWrittenBytes: result.sentBytes,
+                                serverConfirmedBytes: serverConfirmed
+                            )
+                            guard confirmedBytes > 0 else { continue }
+                        } catch {
+                            try? await Task.sleep(nanoseconds: 120_000_000)
+                            continue
+                        }
+                    }
+                }
+            }
+            try await group.waitForAll()
+        }
+
+        progressTask.cancel()
+
+        let uploadPings = await loadedPingsTask.value
+        let pingUlMs = uploadPings.isEmpty ? nil : SpeedMetricCalculator.average(uploadPings)
+        let jitterUlMs = uploadPings.isEmpty ? nil : SpeedMetricCalculator.jitter(uploadPings)
+
+        // Finalize on the server (best-effort).
+        var finalize = URLRequest(url: finalizeURL)
+        finalize.httpMethod = "POST"
+        finalize.timeoutInterval = SpeedtestEngineConfig.uploadTimeoutSeconds
+        finalize.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        finalize.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        finalize.httpBody = Data("{\"uploadRunId\":\"\(runId)\"}".utf8)
+        let serverMeasurement: UploadServerMeasurement?
+        do {
+            let (finalData, finalResponse) = try await session.data(for: finalize)
+            if let http = finalResponse as? HTTPURLResponse, !(200..<400).contains(http.statusCode) {
+                serverMeasurement = nil
+            } else {
+                serverMeasurement = UploadServerMeasurement(data: finalData)
+            }
+        } catch {
+            serverMeasurement = nil
+        }
+
+        let snapshot = totals.snapshot()
+        let measurementEndMs = min(Date().timeIntervalSince(attemptStart) * 1_000, totalDurationMs)
+        let effectiveBytes = max(0, snapshot.total - snapshot.grace)
+        let effectiveDurationMs = max(1, measurementEndMs - graceMs)
+        let confirmedBytes = computeConfirmedUploadBytes(
+            clientWrittenBytes: effectiveBytes,
+            serverConfirmedBytes: serverMeasurement?.serverBytesReceived
+        )
+        let clientAverage = measuredTransferMbps(effectiveBytes: confirmedBytes, durationMs: effectiveDurationMs) ?? 0
+        let stats = await samples.publicStats(windowMs: SpeedtestEngineConfig.publicPeakWindowMs, graceMs: graceMs, endMs: measurementEndMs)
+
+        let usableServerMeasurement = serverMeasurement?.isUsable(expectedUsefulDurationMs: usefulDurationMs) == true
+        let cappedServerAverage: Double? = if usableServerMeasurement, let serverDurationMs = serverMeasurement?.serverDurationMs {
+            boundedMbps(bytes: confirmedBytes, durationMs: serverDurationMs)
+        } else {
+            nil
+        }
+        let averageMbps = cappedServerAverage ?? clientAverage
+        guard confirmedBytes > 0, averageMbps > 0 else {
+            throw SpeedtestEngineError.uploadProducedNoBytes
+        }
+
+        // Scale client-side series and peaks by the confirmation ratio to prevent socket buffer inflation
+        let clientWrittenBytes = max(1, effectiveBytes)
+        let scaleRatio = min(1.0, Double(confirmedBytes) / Double(clientWrittenBytes))
+
+        let scaledP90 = stats.p90.map { $0 * scaleRatio }
+        let scaledP95 = stats.p95.map { $0 * scaleRatio }
+        let scaledPeak = stats.peak * scaleRatio
+        let scaledSeries = stats.seriesMbps.map { $0 * scaleRatio }
+
+        return UploadOutcome(
+            averageMbps: averageMbps,
+            p90Mbps: usableServerMeasurement ? (serverMeasurement?.serverP90Mbps ?? scaledP90) : scaledP90,
+            p95Mbps: usableServerMeasurement ? (serverMeasurement?.serverP95Mbps ?? scaledP95) : scaledP95,
+            peakMbps: max(averageMbps, usableServerMeasurement ? (serverMeasurement?.serverPeakMbps ?? scaledPeak) : scaledPeak),
+            confirmedBytes: confirmedBytes,
+            measurementSource: usableServerMeasurement ? "server-confirmed" : "client-written",
+            seriesMbps: scaledSeries,
+            pingUlMs: pingUlMs,
+            jitterUlMs: jitterUlMs
+        )
+    }
+
+    private func performStreamingUpload(
+        _ request: URLRequest,
+        payload: Data,
+        deadline: Date,
+        onBytesSent: @escaping @Sendable (Int) -> Void
+    ) async throws -> SpeedtestUploadTaskResult {
+        let config = URLSessionConfiguration.ephemeral
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.urlCache = nil
+        config.httpMaximumConnectionsPerHost = 1
+        config.timeoutIntervalForRequest = min(SpeedtestEngineConfig.uploadTimeoutSeconds, max(1, deadline.timeIntervalSinceNow + 2))
+        let delegate = SpeedtestUploadDelegate(deadline: deadline, onBytesSent: onBytesSent)
+        let delegateSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        defer { delegateSession.invalidateAndCancel() }
+        let task = delegateSession.uploadTask(with: request, from: payload)
+        return try await delegate.run(task: task)
+    }
+
+    private func reverseGeocodedCity(for coordinate: Coordinates?) async -> String? {
+        guard let coordinate else { return nil }
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        return await withTaskGroup(of: String?.self) { group in
+            group.addTask {
+                let placemarks = try? await CLGeocoder().reverseGeocodeLocation(location)
+                let placemark = placemarks?.first
+                return [
+                    placemark?.locality,
+                    placemark?.subAdministrativeArea,
+                    placemark?.administrativeArea
+                ]
+                    .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .first { !$0.isEmpty }
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                return nil
+            }
+            let city = await group.next() ?? nil
+            group.cancelAll()
+            return city
+        }
+    }
+
+    private func currentWiFiSSID(for pathStatus: NetworkPathStatus) async -> String? {
+        guard pathStatus.connection == .wifi else { return nil }
+        return await WiFiSSIDProvider.currentSSID()
+    }
+}
+
+// MARK: - Helpers
+
+private func boundedMbps(bytes: Int, durationMs: Double) -> Double {
+    guard bytes > 0, durationMs > 0 else { return 0 }
+    let mbps = (Double(bytes) * 8.0 / 1_000_000.0) / (durationMs / 1_000)
+    return mbps.isFinite && mbps >= 0 ? mbps : 0
+}
+
+func measuredTransferMbps(effectiveBytes: Int, durationMs: Double) -> Double? {
+    let mbps = boundedMbps(bytes: effectiveBytes, durationMs: durationMs)
+    guard effectiveBytes > 0, mbps > 0 else { return nil }
+    return mbps
+}
+
+func speedtestPingMeasuredSampleTarget(attemptBudget: Int, warmupCount: Int) -> Int {
+    let budget = max(0, attemptBudget)
+    guard budget > 0 else { return 0 }
+    let warmups = min(max(0, warmupCount), max(0, budget - 1))
+    return max(0, budget - warmups)
+}
+
+func boundedUploadRequestBytes(_ serverValue: Int?) -> Int {
+    let value = serverValue ?? SpeedtestEngineConfig.maxUploadBytesPerRequest
+    return min(
+        max(value, SpeedtestEngineConfig.minUploadBytesPerRequest),
+        SpeedtestEngineConfig.maxUploadBytesPerRequest
+    )
+}
+
+func computeConfirmedUploadBytes(clientWrittenBytes: Int, serverConfirmedBytes: Int?) -> Int {
+    guard clientWrittenBytes > 0 else { return 0 }
+    guard let serverConfirmedBytes else { return clientWrittenBytes }
+    return max(0, min(clientWrittenBytes, serverConfirmedBytes))
+}
+
+func isProtectedSpeedtestDownloadURL(
+    _ candidate: URL,
+    protectedDownloadURL: URL,
+    sessionDownloadURL: URL,
+    speedtestBaseURL: URL
+) -> Bool {
+    func normalizedKey(_ url: URL) -> String {
+        let scheme = (url.scheme ?? "https").lowercased()
+        let host = (url.host ?? "").lowercased()
+        let port = url.port.map { ":\($0)" } ?? ""
+        let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return "\(scheme)://\(host)\(port)/\(path)"
+    }
+
+    let candidateKey = normalizedKey(candidate)
+    let canonicalProtected = speedtestBaseURL.appendingPathComponent("download")
+    return candidateKey == normalizedKey(protectedDownloadURL)
+        || candidateKey == normalizedKey(sessionDownloadURL)
+        || candidateKey == normalizedKey(canonicalProtected)
+}
+
+private func parseUploadAckBytes(from data: Data) -> Int? {
+    guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        return nil
+    }
+    return json.intValue("bytesReceived")
+}
+
+private struct SpeedtestRateLimitedError: Error {}
+
+private struct SpeedtestUploadTaskResult: Sendable {
+    let data: Data
+    let httpStatusCode: Int?
+    let receivedResponse: Bool
+    let sentBytes: Int
+}
+
+struct UploadServerMeasurement: Equatable, Sendable {
+    let serverBytesReceived: Int?
+    let serverDurationMs: Double?
+    let serverAvgMbps: Double?
+    let serverP90Mbps: Double?
+    let serverP95Mbps: Double?
+    let serverPeakMbps: Double?
+    let serverMeasuredWindows: Int?
+    let serverMeasurementComplete: Bool?
+
+    init?(data: Data) {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        serverBytesReceived = json.intValue("serverBytesReceived")
+        serverDurationMs = json.doubleValue("serverDurationMs")
+        serverAvgMbps = json.doubleValue("serverAvgMbps")
+        serverP90Mbps = json.doubleValue("serverP90Mbps")
+        serverP95Mbps = json.doubleValue("serverP95Mbps")
+        serverPeakMbps = json.doubleValue("serverPeakMbps")
+        serverMeasuredWindows = json.intValue("serverMeasuredWindows")
+        serverMeasurementComplete = json.boolValue("serverMeasurementComplete")
+    }
+
+    func isUsable(expectedUsefulDurationMs: Double) -> Bool {
+        guard let bytes = serverBytesReceived, bytes > 0,
+              let duration = serverDurationMs, duration >= expectedUsefulDurationMs * 0.7,
+              let average = serverAvgMbps, average.isFinite, average > 0 else {
+            return false
+        }
+        if let windows = serverMeasuredWindows, windows <= 0 {
+            return false
+        }
+        return true
+    }
+}
+
+/// Thread-safe byte counter for URLSession delegate callbacks. Delegates are
+/// synchronous callbacks, so an actor would add avoidable scheduling overhead
+/// on fast links.
+final class SpeedtestSyncByteCounter: @unchecked Sendable {
+    struct Snapshot: Sendable { let total: Int; let grace: Int }
+
+    private let lock = NSLock()
+    private var total: Int = 0
+    private var grace: Int = 0
+
+    func add(_ count: Int, isGrace: Bool) {
+        let safeCount = max(0, count)
+        guard safeCount > 0 else { return }
+        lock.lock()
+        total += safeCount
+        if isGrace { grace += safeCount }
+        lock.unlock()
+    }
+
+    func add(total count: Int, grace graceCount: Int) {
+        let safeCount = max(0, count)
+        guard safeCount > 0 else { return }
+        lock.lock()
+        total += safeCount
+        grace += max(0, min(safeCount, graceCount))
+        lock.unlock()
+    }
+
+    func snapshot() -> Snapshot {
+        lock.lock()
+        let snapshot = Snapshot(total: total, grace: grace)
+        lock.unlock()
+        return snapshot
+    }
+}
+
+private final class SpeedtestURLSessionTaskBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var task: URLSessionTask?
+
+    func set(_ task: URLSessionTask) {
+        lock.lock()
+        self.task = task
+        lock.unlock()
+    }
+
+    func cancel() {
+        lock.lock()
+        let task = task
+        lock.unlock()
+        task?.cancel()
+    }
+}
+
+private final class SpeedtestDownloadDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    private let deadline: Date
+    private let onBytes: @Sendable (Int) -> Void
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var responseError: Error?
+    private var receivedBytes = 0
+
+    init(deadline: Date, onBytes: @escaping @Sendable (Int) -> Void) {
+        self.deadline = deadline
+        self.onBytes = onBytes
+    }
+
+    func run(task: URLSessionDataTask) async throws {
+        let taskBox = SpeedtestURLSessionTaskBox()
+        let timeoutTask = Task { [deadline, taskBox] in
+            let seconds = max(0, deadline.timeIntervalSinceNow)
+            if seconds > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            }
+            taskBox.cancel()
+        }
+        defer { timeoutTask.cancel() }
+
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                lock.lock()
+                self.continuation = continuation
+                lock.unlock()
+                taskBox.set(task)
+                task.resume()
+            }
+        } onCancel: {
+            taskBox.cancel()
+        }
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+    ) {
+        guard let http = response as? HTTPURLResponse else {
+            completionHandler(.allow)
+            return
+        }
+        guard (200..<400).contains(http.statusCode) else {
+            lock.lock()
+            responseError = http.statusCode == 429
+                ? SpeedtestRateLimitedError()
+                : APIError.http(
+                    status: http.statusCode,
+                    code: nil,
+                    message: HTTPURLResponse.localizedString(forStatusCode: http.statusCode),
+                    requestId: nil,
+                    retryAfter: nil
+                )
+            lock.unlock()
+            completionHandler(.cancel)
+            return
+        }
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        let count = data.count
+        guard count > 0, Date() <= deadline else { return }
+        lock.lock()
+        receivedBytes += count
+        lock.unlock()
+        onBytes(count)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        let storedError: Error?
+        let byteCount: Int
+        lock.lock()
+        storedError = responseError
+        byteCount = receivedBytes
+        lock.unlock()
+
+        if let storedError {
+            finish(.failure(storedError))
+            return
+        }
+        if let error {
+            if isCancellation(error), Date() >= deadline, byteCount > 0 {
+                finish(.success(()))
+            } else {
+                finish(.failure(error))
+            }
+            return
+        }
+        finish(.success(()))
+    }
+
+    private func finish(_ result: Result<Void, Error>) {
+        let continuation: CheckedContinuation<Void, Error>?
+        lock.lock()
+        continuation = self.continuation
+        self.continuation = nil
+        lock.unlock()
+
+        guard let continuation else { return }
+        switch result {
+        case .success:
+            continuation.resume()
+        case .failure(let error):
+            continuation.resume(throwing: error)
+        }
+    }
+}
+
+private final class SpeedtestUploadDelegate: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate, @unchecked Sendable {
+    private let deadline: Date
+    private let onBytesSent: @Sendable (Int) -> Void
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<SpeedtestUploadTaskResult, Error>?
+    private var responseData = Data()
+    private var httpStatusCode: Int?
+    private var receivedResponse = false
+    private var sentBytes = 0
+
+    init(deadline: Date, onBytesSent: @escaping @Sendable (Int) -> Void) {
+        self.deadline = deadline
+        self.onBytesSent = onBytesSent
+    }
+
+    func run(task: URLSessionUploadTask) async throws -> SpeedtestUploadTaskResult {
+        let taskBox = SpeedtestURLSessionTaskBox()
+        let timeoutTask = Task { [deadline, taskBox] in
+            let seconds = max(0, deadline.timeIntervalSinceNow)
+            if seconds > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            }
+            taskBox.cancel()
+        }
+        defer { timeoutTask.cancel() }
+
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<SpeedtestUploadTaskResult, Error>) in
+                lock.lock()
+                self.continuation = continuation
+                lock.unlock()
+                taskBox.set(task)
+                task.resume()
+            }
+        } onCancel: {
+            taskBox.cancel()
+        }
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+    ) {
+        lock.lock()
+        receivedResponse = true
+        httpStatusCode = (response as? HTTPURLResponse)?.statusCode
+        lock.unlock()
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        guard !data.isEmpty else { return }
+        lock.lock()
+        responseData.append(data)
+        lock.unlock()
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didSendBodyData bytesSent: Int64,
+        totalBytesSent: Int64,
+        totalBytesExpectedToSend: Int64
+    ) {
+        let count = max(0, Int(bytesSent))
+        guard count > 0 else { return }
+        lock.lock()
+        sentBytes += count
+        lock.unlock()
+        if Date() <= deadline {
+            onBytesSent(count)
+        }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        let result = snapshotResult()
+        if let error, !(isCancellation(error) && Date() >= deadline && result.sentBytes > 0) {
+            finish(.failure(error))
+            return
+        }
+        finish(.success(result))
+    }
+
+    private func snapshotResult() -> SpeedtestUploadTaskResult {
+        lock.lock()
+        let result = SpeedtestUploadTaskResult(
+            data: responseData,
+            httpStatusCode: httpStatusCode,
+            receivedResponse: receivedResponse,
+            sentBytes: sentBytes
+        )
+        lock.unlock()
+        return result
+    }
+
+    private func finish(_ result: Result<SpeedtestUploadTaskResult, Error>) {
+        let continuation: CheckedContinuation<SpeedtestUploadTaskResult, Error>?
+        lock.lock()
+        continuation = self.continuation
+        self.continuation = nil
+        lock.unlock()
+
+        guard let continuation else { return }
+        switch result {
+        case .success(let uploadResult):
+            continuation.resume(returning: uploadResult)
+        case .failure(let error):
+            continuation.resume(throwing: error)
+        }
+    }
+}
+
+private func isCancellation(_ error: Error) -> Bool {
+    (error as? CancellationError) != nil || (error as? URLError)?.code == .cancelled
+}
+
+private extension Dictionary where Key == String, Value == Any {
+    func intValue(_ key: String) -> Int? {
+        if let value = self[key] as? Int { return value }
+        if let value = self[key] as? Double { return Int(value) }
+        if let value = self[key] as? String { return Int(value) }
+        return nil
+    }
+
+    func doubleValue(_ key: String) -> Double? {
+        if let value = self[key] as? Double { return value }
+        if let value = self[key] as? Int { return Double(value) }
+        if let value = self[key] as? String { return Double(value) }
+        return nil
+    }
+
+    func boolValue(_ key: String) -> Bool? {
+        if let value = self[key] as? Bool { return value }
+        if let value = self[key] as? String {
+            return ["1", "true", "yes"].contains(value.lowercased())
+        }
+        return nil
+    }
+}
+
+/// Tracks the global byte total and the bytes received during the grace window
+/// so we can subtract them at the end.
+actor SpeedtestByteCounter {
+    struct Snapshot: Sendable { let total: Int; let grace: Int }
+    private var total: Int = 0
+    private var grace: Int = 0
+
+    func add(_ count: Int, isGrace: Bool) {
+        total += count
+        if isGrace { grace += count }
+    }
+
+    func add(total count: Int, grace graceCount: Int) {
+        total += max(0, count)
+        grace += max(0, min(count, graceCount))
+    }
+
+    func snapshot() -> Snapshot { Snapshot(total: total, grace: grace) }
+}
+
+/// Collected (start, end, bytes) samples used to derive p90 / p95 / peak via
+/// 1-second windows post-test, mirroring `measuredThroughputWindows` on
+/// Android.
+actor SpeedtestSamplesBox {
+    struct Sample: Sendable { let startMs: Double; let endMs: Double; let bytes: Int }
+    private var samples: [Sample] = []
+
+    func append(start: Double, end: Double, bytes: Int) {
+        samples.append(Sample(startMs: start, endMs: end, bytes: bytes))
+    }
+
+    struct PublicStats: Sendable {
+        let p90: Double?
+        let p95: Double?
+        let peak: Double
+        let windowCount: Int
+        let seriesMbps: [Double]
+    }
+
+    func publicStats(windowMs: Double, graceMs: Double, endMs: Double) -> PublicStats {
+        guard endMs > graceMs else { return PublicStats(p90: nil, p95: nil, peak: 0, windowCount: 0, seriesMbps: []) }
+        var windowSpeeds: [Double] = []
+        var windowIndex = 0
+        while true {
+            let windowStart = graceMs + Double(windowIndex) * windowMs
+            let windowEnd = windowStart + windowMs
+            if windowStart >= endMs { break }
+            var bytesInWindow = 0
+            for sample in samples {
+                let overlapStart = max(sample.startMs, windowStart)
+                let overlapEnd = min(sample.endMs, windowEnd)
+                guard overlapEnd > overlapStart else { continue }
+                let sampleSpan = max(1, sample.endMs - sample.startMs)
+                let ratio = (overlapEnd - overlapStart) / sampleSpan
+                bytesInWindow += Int(Double(sample.bytes) * ratio)
+            }
+            if bytesInWindow > 0 {
+                let mbps = boundedMbps(bytes: bytesInWindow, durationMs: windowMs)
+                if mbps > 0 && mbps < 10_000 {
+                    windowSpeeds.append(mbps)
+                }
+            }
+            windowIndex += 1
+        }
+        guard !windowSpeeds.isEmpty else {
+            return PublicStats(p90: nil, p95: nil, peak: 0, windowCount: 0, seriesMbps: [])
+        }
+        let sorted = windowSpeeds.sorted()
+        func percentile(_ p: Double) -> Double {
+            let clamped = min(max(p, 0), 1)
+            let index = Int((Double(sorted.count - 1) * clamped).rounded())
+            return sorted[index]
+        }
+        return PublicStats(
+            p90: percentile(0.9),
+            p95: percentile(0.95),
+            peak: sorted.max() ?? 0,
+            windowCount: sorted.count,
+            seriesMbps: windowSpeeds
+        )
+    }
+}
+
+/// Simple monotonic stall detector: aborts the attempt when the total byte
+/// counter has not progressed for `timeoutMs` after the grace period.
+actor SpeedtestStallMonitor {
+    private let timeoutMs: Double
+    private var lastBytes: Int = 0
+    private var lastProgressAtMs: Double = 0
+    var stalled: Bool = false
+
+    init(timeoutMs: Double) { self.timeoutMs = timeoutMs }
+
+    func observe(elapsedMs: Double, totalBytes: Int) {
+        if totalBytes > lastBytes {
+            lastBytes = totalBytes
+            lastProgressAtMs = elapsedMs
+            stalled = false
+            return
+        }
+        if lastProgressAtMs == 0 {
+            lastProgressAtMs = elapsedMs
+            return
+        }
+        if elapsedMs - lastProgressAtMs > timeoutMs {
+            stalled = true
+        }
+    }
+}
+
+/// Smoothed live-Mbps emitter for the UI gauge. Uses an exponential moving
+/// average over the post-grace effective throughput so the needle climbs
+/// instead of jumping wildly.
+final class SpeedtestLiveSampler: @unchecked Sendable {
+    private let smoothing: Double = 0.42
+    private var emaMbps: Double = 0
+
+    func observe(totalBytes: Int, graceBytes: Int, elapsedMs: Double, graceMs: Double) -> Double {
+        guard elapsedMs > graceMs else { return emaMbps }
+        let effectiveBytes = max(0, totalBytes - graceBytes)
+        let mbps = boundedMbps(bytes: effectiveBytes, durationMs: elapsedMs - graceMs)
+        if emaMbps == 0 {
+            emaMbps = mbps
+        } else {
+            emaMbps = (smoothing * mbps) + ((1 - smoothing) * emaMbps)
+        }
+        return emaMbps
+    }
+}

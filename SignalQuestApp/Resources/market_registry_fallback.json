@@ -1,0 +1,6565 @@
+{
+  "schemaVersion": 2,
+  "markets": [
+    {
+      "code": "FR",
+      "label": "France",
+      "countryCode": "fr",
+      "publicSelectable": true,
+      "antennaCompatible": true,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr"
+      ],
+      "defaultMapCenter": [
+        46.603354,
+        1.888334
+      ],
+      "defaultMapZoom": 6,
+      "capabilities": {
+        "archives": true,
+        "previsionnel": true,
+        "incidents": true,
+        "offline": true,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "SFR",
+          "label": "SFR",
+          "shortLabel": "SFR",
+          "color": "#E2001A",
+          "background": "rgba(226, 0, 26, 0.1)"
+        },
+        {
+          "key": "BOUYGUES",
+          "label": "Bouygues",
+          "shortLabel": "Bouygues",
+          "color": "#00A0DF",
+          "background": "rgba(0, 160, 223, 0.1)"
+        },
+        {
+          "key": "ORANGE",
+          "label": "Orange",
+          "shortLabel": "Orange",
+          "color": "#FF7900",
+          "background": "rgba(255, 121, 0, 0.12)"
+        },
+        {
+          "key": "FREE",
+          "label": "Free Mobile",
+          "shortLabel": "Free",
+          "color": "#52525B",
+          "background": "rgba(82, 82, 91, 0.12)"
+        },
+        {
+          "key": "ALL",
+          "label": "Tous",
+          "shortLabel": "Tous",
+          "color": "#7B2D8E",
+          "background": "rgba(123, 45, 142, 0.1)"
+        }
+      ],
+      "source": {
+        "label": "Open data antennes mobiles",
+        "authority": "ARCEP / ANFR",
+        "url": "https://data.arcep.fr/mobile/",
+        "status": "compatible",
+        "checkedAt": "2026-05-15",
+        "notes": "France métropolitaine et Outre-mer exposés via les jeux de données radio publics déjà normalisés par SignalQuest.",
+        "supports": {
+          "sites": true,
+          "details": true,
+          "api": true,
+          "download": true,
+          "coverage": true
+        }
+      },
+      "marketCode": "FR",
+      "mccs": [
+        208
+      ],
+      "sourceMode": "official",
+      "radioCapabilities": {
+        "officialAntennas": true,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": false,
+        "communityPhotos": true,
+        "offline": true
+      },
+      "radioOperators": [
+        {
+          "key": "SFR",
+          "label": "SFR",
+          "shortLabel": "SFR",
+          "mncs": [
+            8,
+            10,
+            11,
+            13
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#E60012",
+          "networkGroupKey": "SFR"
+        },
+        {
+          "key": "BOUYGUES",
+          "label": "Bouygues Telecom",
+          "shortLabel": "Bouygues",
+          "mncs": [
+            20,
+            21,
+            88
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Bouygues"
+          ],
+          "color": "#009DDC",
+          "networkGroupKey": "BOUYGUES"
+        },
+        {
+          "key": "ORANGE",
+          "label": "Orange",
+          "shortLabel": "Orange",
+          "mncs": [
+            1,
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#FF7900",
+          "networkGroupKey": "ORANGE"
+        },
+        {
+          "key": "FREE",
+          "label": "Free Mobile",
+          "shortLabel": "Free",
+          "mncs": [
+            15,
+            16
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Free"
+          ],
+          "color": "#6B7280",
+          "networkGroupKey": "FREE"
+        }
+      ]
+    },
+    {
+      "code": "DROM",
+      "label": "DROM",
+      "countryCode": "fr",
+      "publicSelectable": true,
+      "antennaCompatible": true,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr"
+      ],
+      "defaultMapCenter": [
+        0,
+        -3
+      ],
+      "defaultMapZoom": 9,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": true,
+        "incidents": true,
+        "offline": true,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "ALL",
+          "label": "Tous",
+          "shortLabel": "Tous",
+          "color": "#475569",
+          "background": "rgba(71, 85, 105, 0.12)"
+        },
+        {
+          "key": "ORANGE",
+          "label": "Orange",
+          "shortLabel": "Orange",
+          "color": "#F97316",
+          "background": "rgba(249, 115, 22, 0.12)"
+        },
+        {
+          "key": "FREE_CARAIBES",
+          "label": "Free Caraibes",
+          "shortLabel": "Free Caraibes",
+          "color": "#DC2626",
+          "background": "rgba(220, 38, 38, 0.12)"
+        },
+        {
+          "key": "DIGICEL",
+          "label": "Digicel",
+          "shortLabel": "Digicel",
+          "color": "#B91C1C",
+          "background": "rgba(185, 28, 28, 0.12)"
+        },
+        {
+          "key": "OUTREMER_TELECOM",
+          "label": "Outremer Telecom",
+          "shortLabel": "Outremer",
+          "color": "#8B5CF6",
+          "background": "rgba(139, 92, 246, 0.12)"
+        },
+        {
+          "key": "SRR",
+          "label": "SRR",
+          "shortLabel": "SRR",
+          "color": "#0EA5E9",
+          "background": "rgba(14, 165, 233, 0.12)"
+        },
+        {
+          "key": "TELCO_OI",
+          "label": "Telco OI",
+          "shortLabel": "Telco OI",
+          "color": "#22C55E",
+          "background": "rgba(34, 197, 94, 0.12)"
+        },
+        {
+          "key": "ZEOP",
+          "label": "Zeop",
+          "shortLabel": "Zeop",
+          "color": "#F59E0B",
+          "background": "rgba(245, 158, 11, 0.12)"
+        },
+        {
+          "key": "MAORE_MOBILE",
+          "label": "Maore Mobile",
+          "shortLabel": "Maore",
+          "color": "#0891B2",
+          "background": "rgba(8, 145, 178, 0.12)"
+        },
+        {
+          "key": "DROM_OTHER",
+          "label": "Autres",
+          "shortLabel": "Autres",
+          "color": "#64748B",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Open data antennes mobiles",
+        "authority": "ARCEP / ANFR",
+        "url": "https://data.arcep.fr/mobile/",
+        "status": "compatible",
+        "checkedAt": "2026-05-15",
+        "notes": "France métropolitaine et Outre-mer exposés via les jeux de données radio publics déjà normalisés par SignalQuest.",
+        "supports": {
+          "sites": true,
+          "details": true,
+          "api": true,
+          "download": true,
+          "coverage": true
+        }
+      },
+      "marketCode": "DROM",
+      "mccs": [
+        340,
+        647
+      ],
+      "sourceMode": "official",
+      "radioCapabilities": {
+        "officialAntennas": true,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": false,
+        "communityPhotos": true,
+        "offline": true
+      },
+      "radioOperators": [
+        {
+          "key": "ORANGE",
+          "label": "Orange",
+          "shortLabel": "Orange",
+          "mncs": [
+            0,
+            1
+          ],
+          "plmns": [
+            {
+              "mcc": 340,
+              "mnc": 1
+            },
+            {
+              "mcc": 647,
+              "mnc": 0
+            }
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#FF7900",
+          "networkGroupKey": "ORANGE"
+        },
+        {
+          "key": "FREE_CARAIBES",
+          "label": "Free Caraibe",
+          "shortLabel": "Free",
+          "mncs": [
+            4
+          ],
+          "plmns": [
+            {
+              "mcc": 340,
+              "mnc": 4
+            }
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Free Caraibes"
+          ],
+          "color": "#111827",
+          "networkGroupKey": "FREE_CARAIBES"
+        },
+        {
+          "key": "DIGICEL",
+          "label": "Digicel",
+          "shortLabel": "Digicel",
+          "mncs": [
+            20
+          ],
+          "plmns": [
+            {
+              "mcc": 340,
+              "mnc": 20
+            }
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#D71920",
+          "networkGroupKey": "DIGICEL"
+        },
+        {
+          "key": "OUTREMER_TELECOM",
+          "label": "Outremer Telecom",
+          "shortLabel": "Outremer",
+          "mncs": [
+            2
+          ],
+          "plmns": [
+            {
+              "mcc": 340,
+              "mnc": 2
+            }
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Only"
+          ],
+          "color": "#0099A8",
+          "networkGroupKey": "OUTREMER_TELECOM"
+        },
+        {
+          "key": "SRR",
+          "label": "SRR",
+          "shortLabel": "SRR",
+          "mncs": [
+            10
+          ],
+          "plmns": [
+            {
+              "mcc": 647,
+              "mnc": 10
+            }
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#E11D48",
+          "networkGroupKey": "SRR"
+        },
+        {
+          "key": "TELCO_OI",
+          "label": "Telco OI",
+          "shortLabel": "Telco OI",
+          "mncs": [
+            2,
+            3
+          ],
+          "plmns": [
+            {
+              "mcc": 647,
+              "mnc": 2
+            },
+            {
+              "mcc": 647,
+              "mnc": 3
+            }
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#0EA5E9",
+          "networkGroupKey": "TELCO_OI"
+        },
+        {
+          "key": "ZEOP",
+          "label": "Zeop",
+          "shortLabel": "Zeop",
+          "mncs": [
+            4
+          ],
+          "plmns": [
+            {
+              "mcc": 647,
+              "mnc": 4
+            }
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#10B981",
+          "networkGroupKey": "ZEOP"
+        },
+        {
+          "key": "MAORE_MOBILE",
+          "label": "Maore Mobile",
+          "shortLabel": "Maore",
+          "mncs": [
+            1
+          ],
+          "plmns": [
+            {
+              "mcc": 647,
+              "mnc": 1
+            }
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Maore"
+          ],
+          "color": "#F97316",
+          "networkGroupKey": "MAORE_MOBILE"
+        }
+      ]
+    },
+    {
+      "code": "CA",
+      "label": "Canada",
+      "countryCode": "ca",
+      "publicSelectable": true,
+      "antennaCompatible": true,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        56.130366,
+        -106.346771
+      ],
+      "defaultMapZoom": 4,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": true,
+        "incidents": true,
+        "offline": true,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "ALL",
+          "label": "Tous",
+          "shortLabel": "Tous",
+          "color": "#334155",
+          "background": "rgba(51, 65, 85, 0.12)"
+        },
+        {
+          "key": "BELL",
+          "label": "Bell",
+          "shortLabel": "Bell",
+          "color": "#0F5BDC",
+          "background": "rgba(15, 91, 220, 0.1)"
+        },
+        {
+          "key": "ROGERS",
+          "label": "Rogers",
+          "shortLabel": "Rogers",
+          "color": "#D62D20",
+          "background": "rgba(214, 45, 32, 0.1)"
+        },
+        {
+          "key": "TELUS",
+          "label": "TELUS",
+          "shortLabel": "TELUS",
+          "color": "#00A67E",
+          "background": "rgba(0, 166, 126, 0.1)"
+        },
+        {
+          "key": "VIDEOTRON_FREEDOM",
+          "label": "Videotron/Freedom",
+          "shortLabel": "Video/Freedom",
+          "color": "#7A3DF0",
+          "background": "rgba(122, 61, 240, 0.1)"
+        },
+        {
+          "key": "REGIONAL",
+          "label": "Regionaux",
+          "shortLabel": "Regionaux",
+          "color": "#D97706",
+          "background": "rgba(217, 119, 6, 0.1)"
+        }
+      ],
+      "source": {
+        "label": "Spectrum Management System public extracts",
+        "authority": "ISED Canada",
+        "url": "https://ised-isde.canada.ca/site/spectrum-management-system/en",
+        "status": "compatible",
+        "checkedAt": "2026-05-15",
+        "notes": "Registre public canadien déjà normalisé par SignalQuest pour les sites, fréquences et groupes radio.",
+        "supports": {
+          "sites": true,
+          "details": true,
+          "api": true,
+          "download": true,
+          "coverage": false
+        }
+      },
+      "marketCode": "CA",
+      "mccs": [
+        302
+      ],
+      "sourceMode": "official",
+      "radioCapabilities": {
+        "officialAntennas": true,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": false,
+        "communityPhotos": true,
+        "offline": true
+      },
+      "radioOperators": [
+        {
+          "key": "BELL",
+          "label": "Bell",
+          "shortLabel": "Bell",
+          "mncs": [
+            250,
+            610,
+            630,
+            640,
+            690,
+            880
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#0F5BDC",
+          "networkGroupKey": "BELL"
+        },
+        {
+          "key": "ROGERS",
+          "label": "Rogers",
+          "shortLabel": "Rogers",
+          "mncs": [
+            320,
+            370,
+            720,
+            721,
+            722,
+            723,
+            740,
+            741,
+            820
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#D62D20",
+          "networkGroupKey": "ROGERS"
+        },
+        {
+          "key": "TELUS",
+          "label": "TELUS",
+          "shortLabel": "TELUS",
+          "mncs": [
+            220,
+            221,
+            222,
+            360,
+            420,
+            760,
+            860
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#00A67E",
+          "networkGroupKey": "TELUS"
+        },
+        {
+          "key": "VIDEOTRON_FREEDOM",
+          "label": "Videotron / Freedom",
+          "shortLabel": "Video",
+          "mncs": [
+            490,
+            491,
+            500,
+            510,
+            520
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Videotron",
+            "Freedom",
+            "Fizz"
+          ],
+          "color": "#7A3DF0",
+          "networkGroupKey": "VIDEOTRON_FREEDOM"
+        }
+      ]
+    },
+    {
+      "code": "BE",
+      "label": "Belgique",
+      "countryCode": "be",
+      "publicSelectable": true,
+      "antennaCompatible": true,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "nl",
+        "de"
+      ],
+      "defaultMapCenter": [
+        50.503887,
+        4.469936
+      ],
+      "defaultMapZoom": 8,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "ALL",
+          "label": "Tous",
+          "shortLabel": "Tous",
+          "color": "#334155",
+          "background": "rgba(51, 65, 85, 0.12)"
+        },
+        {
+          "key": "PROXIMUS_BE",
+          "label": "Proximus",
+          "shortLabel": "Proximus",
+          "color": "#2563EB",
+          "background": "rgba(37, 99, 235, 0.1)"
+        },
+        {
+          "key": "CITYMESH_BE",
+          "label": "Citymesh",
+          "shortLabel": "Citymesh",
+          "color": "#16A34A",
+          "background": "rgba(22, 163, 74, 0.12)"
+        },
+        {
+          "key": "TELENET_BASE_BE",
+          "label": "Telenet/BASE",
+          "shortLabel": "BASE",
+          "color": "#F59E0B",
+          "background": "rgba(245, 158, 11, 0.12)"
+        },
+        {
+          "key": "ORANGE_BE",
+          "label": "Orange Belgium",
+          "shortLabel": "Orange",
+          "color": "#F97316",
+          "background": "rgba(249, 115, 22, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Kaart zendantennes",
+        "authority": "Departement Omgeving Vlaanderen",
+        "url": "https://www.omgeving.vlaanderen.be/nl/onderzoek-cijfers-en-geotoepassingen/cijfers-en-kaarten/kaart-zendantennes",
+        "status": "compatible",
+        "checkedAt": "2026-05-14",
+        "notes": "Source exploitable via WFS public Mercator Vlaanderen us:us_zndant_pnt avec sortie GeoJSON; metadata Linked Data publiee sous modellicentie gratis hergebruik, attribution requise.",
+        "supports": {
+          "sites": true,
+          "details": true,
+          "api": true,
+          "download": true,
+          "coverage": false
+        }
+      },
+      "sources": [
+        {
+          "label": "Kaart zendantennes",
+          "authority": "Departement Omgeving Vlaanderen",
+          "url": "https://www.omgeving.vlaanderen.be/nl/onderzoek-cijfers-en-geotoepassingen/cijfers-en-kaarten/kaart-zendantennes",
+          "status": "compatible",
+          "checkedAt": "2026-05-14",
+          "notes": "Source exploitable via WFS public Mercator Vlaanderen us:us_zndant_pnt avec sortie GeoJSON; metadata Linked Data publiee sous modellicentie gratis hergebruik, attribution requise.",
+          "supports": {
+            "sites": true,
+            "details": true,
+            "api": true,
+            "download": true,
+            "coverage": false
+          }
+        },
+        {
+          "label": "Carte des antennes emettrices de Bruxelles",
+          "authority": "Bruxelles Environnement",
+          "url": "https://environnement.brussels/citoyen/lenvironnement-bruxelles/proteger-sa-sante/ou-sont-les-antennes",
+          "status": "compatible",
+          "checkedAt": "2026-05-14",
+          "notes": "Source exploitable via API Geodata Bruxelles postgis/risk r_gsm_anten_indoor/outdoor; Bruxelles Environnement annonce ses donnees cartographiques OpenData sauf mention contraire, licence CC-BY avec attribution.",
+          "supports": {
+            "sites": true,
+            "details": true,
+            "api": true,
+            "download": true,
+            "coverage": false
+          }
+        },
+        {
+          "label": "Mobile Atlas",
+          "authority": "BIPT",
+          "url": "https://www.bipt-data.be/en/projects/atlas/mobile",
+          "status": "coverage-only",
+          "checkedAt": "2026-05-14",
+          "notes": "Couverture mobile par operateur, utile pour couche couverture mais pas comme inventaire antennes.",
+          "supports": {
+            "sites": false,
+            "details": false,
+            "api": false,
+            "download": false,
+            "coverage": true
+          }
+        }
+      ],
+      "marketCode": "BE",
+      "mccs": [
+        206
+      ],
+      "sourceMode": "hybrid",
+      "radioCapabilities": {
+        "officialAntennas": true,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": false,
+        "communityPhotos": true,
+        "offline": true
+      },
+      "radioOperators": [
+        {
+          "key": "PROXIMUS_BE",
+          "label": "Proximus",
+          "shortLabel": "Proximus",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#2563EB",
+          "networkGroupKey": "PROXIMUS_BE"
+        },
+        {
+          "key": "CITYMESH_BE",
+          "label": "Citymesh",
+          "shortLabel": "Citymesh",
+          "mncs": [
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#059669",
+          "networkGroupKey": "CITYMESH_BE"
+        },
+        {
+          "key": "TELENET_BASE_BE",
+          "label": "Telenet / BASE",
+          "shortLabel": "BASE",
+          "mncs": [
+            5,
+            20
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telenet",
+            "BASE"
+          ],
+          "color": "#F59E0B",
+          "networkGroupKey": "TELENET_BASE_BE"
+        },
+        {
+          "key": "ORANGE_BE",
+          "label": "Orange Belgium",
+          "shortLabel": "Orange",
+          "mncs": [
+            10
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Orange"
+          ],
+          "color": "#FF7900",
+          "networkGroupKey": "ORANGE_BE"
+        }
+      ],
+      "regionPolicies": [
+        {
+          "regionCode": "BE-WAL",
+          "label": "Wallonie",
+          "sourceMode": "community",
+          "capabilities": {
+            "officialAntennas": false,
+            "communitySpeedtests": true,
+            "communityCoverage": true,
+            "communityRatings": true,
+            "communityProbableSites": true,
+            "communityPhotos": true,
+            "offline": false
+          }
+        }
+      ]
+    },
+    {
+      "code": "CH",
+      "label": "Suisse",
+      "countryCode": "ch",
+      "publicSelectable": true,
+      "antennaCompatible": true,
+      "defaultLanguage": "de",
+      "supportedLanguages": [
+        "de",
+        "fr",
+        "it",
+        "rm"
+      ],
+      "defaultMapCenter": [
+        46.818188,
+        8.227512
+      ],
+      "defaultMapZoom": 8,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "ALL",
+          "label": "Tous",
+          "shortLabel": "Tous",
+          "color": "#334155",
+          "background": "rgba(51, 65, 85, 0.12)"
+        },
+        {
+          "key": "SWISSCOM_CH",
+          "label": "Swisscom",
+          "shortLabel": "Swisscom",
+          "color": "#2563EB",
+          "background": "rgba(37, 99, 235, 0.1)"
+        },
+        {
+          "key": "SUNRISE_CH",
+          "label": "Sunrise",
+          "shortLabel": "Sunrise",
+          "color": "#DC2626",
+          "background": "rgba(220, 38, 38, 0.12)"
+        },
+        {
+          "key": "SALT_CH",
+          "label": "Salt",
+          "shortLabel": "Salt",
+          "color": "#111827",
+          "background": "rgba(17, 24, 39, 0.1)"
+        }
+      ],
+      "source": {
+        "label": "Mobile phone base stations",
+        "authority": "OFCOM / BAKOM via geo.admin.ch",
+        "url": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.bakom.standorte-mobilfunkanlagen",
+        "status": "compatible",
+        "checkedAt": "2026-05-14",
+        "notes": "Collection STAC geo.admin ch.bakom.standorte-mobilfunkanlagen, asset GeoJSON EPSG:2056 converti cote serveur; rel=license terms_by, usage public et commercial permis avec citation de la source.",
+        "supports": {
+          "sites": true,
+          "details": true,
+          "api": true,
+          "download": true,
+          "coverage": false
+        }
+      },
+      "sources": [
+        {
+          "label": "Mobile phone base stations",
+          "authority": "OFCOM / BAKOM via geo.admin.ch",
+          "url": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.bakom.standorte-mobilfunkanlagen",
+          "status": "compatible",
+          "checkedAt": "2026-05-14",
+          "notes": "Collection STAC geo.admin ch.bakom.standorte-mobilfunkanlagen, asset GeoJSON EPSG:2056 converti cote serveur; rel=license terms_by, usage public et commercial permis avec citation de la source.",
+          "supports": {
+            "sites": true,
+            "details": true,
+            "api": true,
+            "download": true,
+            "coverage": false
+          }
+        },
+        {
+          "label": "Broadband atlas",
+          "authority": "OFCOM / BAKOM",
+          "url": "https://www.bakom.admin.ch/en/broadband-atlas",
+          "status": "coverage-only",
+          "checkedAt": "2026-05-14",
+          "notes": "Couverture mobile attendue par grille; complete les antennes mais ne remplace pas les sites.",
+          "supports": {
+            "sites": false,
+            "details": false,
+            "api": false,
+            "download": false,
+            "coverage": true
+          }
+        }
+      ],
+      "marketCode": "CH",
+      "mccs": [
+        228
+      ],
+      "sourceMode": "official",
+      "radioCapabilities": {
+        "officialAntennas": true,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": false,
+        "communityPhotos": true,
+        "offline": true
+      },
+      "radioOperators": [
+        {
+          "key": "SWISSCOM_CH",
+          "label": "Swisscom",
+          "shortLabel": "Swisscom",
+          "mncs": [
+            1,
+            11
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#2563EB",
+          "networkGroupKey": "SWISSCOM_CH"
+        },
+        {
+          "key": "SUNRISE_CH",
+          "label": "Sunrise",
+          "shortLabel": "Sunrise",
+          "mncs": [
+            2,
+            8,
+            12,
+            60
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#E60012",
+          "networkGroupKey": "SUNRISE_CH"
+        },
+        {
+          "key": "SALT_CH",
+          "label": "Salt",
+          "shortLabel": "Salt",
+          "mncs": [
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#111827",
+          "networkGroupKey": "SALT_CH"
+        }
+      ]
+    },
+    {
+      "code": "PT",
+      "label": "Portugal",
+      "countryCode": "pt",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        39.399872,
+        -8.224454
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "VODAFONE_PT",
+          "label": "Vodafone Portugal",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "DIGI_PT",
+          "label": "DIGI Portugal",
+          "shortLabel": "DIGI",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "NOS_PT",
+          "label": "NOS",
+          "shortLabel": "NOS",
+          "color": "#7C3AED",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "MEO_PT",
+          "label": "MEO",
+          "shortLabel": "MEO",
+          "color": "#16A34A",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "PT",
+      "mccs": [
+        268
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "VODAFONE_PT",
+          "label": "Vodafone Portugal",
+          "shortLabel": "Vodafone",
+          "mncs": [
+            1,
+            91,
+            92
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vodafone"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_PT"
+        },
+        {
+          "key": "DIGI_PT",
+          "label": "DIGI Portugal",
+          "shortLabel": "DIGI",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "DIGI"
+          ],
+          "color": "#2563EB",
+          "networkGroupKey": "DIGI_PT"
+        },
+        {
+          "key": "NOS_PT",
+          "label": "NOS",
+          "shortLabel": "NOS",
+          "mncs": [
+            3,
+            93
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#7C3AED",
+          "networkGroupKey": "NOS_PT"
+        },
+        {
+          "key": "MEO_PT",
+          "label": "MEO",
+          "shortLabel": "MEO",
+          "mncs": [
+            6,
+            8
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#16A34A",
+          "networkGroupKey": "MEO_PT"
+        }
+      ]
+    },
+    {
+      "code": "ES",
+      "label": "Espagne",
+      "countryCode": "es",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        40.463667,
+        -3.74922
+      ],
+      "defaultMapZoom": 6,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "VODAFONE_ES",
+          "label": "Vodafone Spain",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "ORANGE_ES",
+          "label": "Orange Spain",
+          "shortLabel": "Orange",
+          "color": "#F97316",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "YOIGO_ES",
+          "label": "Yoigo",
+          "shortLabel": "Yoigo",
+          "color": "#8B5CF6",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "MOVISTAR_ES",
+          "label": "Movistar",
+          "shortLabel": "Movistar",
+          "color": "#009FE3",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "ES",
+      "mccs": [
+        214
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "VODAFONE_ES",
+          "label": "Vodafone Spain",
+          "shortLabel": "Vodafone",
+          "mncs": [
+            1,
+            6,
+            24,
+            37
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vodafone"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_ES"
+        },
+        {
+          "key": "ORANGE_ES",
+          "label": "Orange Spain",
+          "shortLabel": "Orange",
+          "mncs": [
+            3,
+            9
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Orange"
+          ],
+          "color": "#F97316",
+          "networkGroupKey": "ORANGE_ES"
+        },
+        {
+          "key": "YOIGO_ES",
+          "label": "Yoigo",
+          "shortLabel": "Yoigo",
+          "mncs": [
+            4,
+            23
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Xfera"
+          ],
+          "color": "#8B5CF6",
+          "networkGroupKey": "YOIGO_ES"
+        },
+        {
+          "key": "MOVISTAR_ES",
+          "label": "Movistar",
+          "shortLabel": "Movistar",
+          "mncs": [
+            5,
+            7,
+            38
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telefonica"
+          ],
+          "color": "#009FE3",
+          "networkGroupKey": "MOVISTAR_ES"
+        }
+      ]
+    },
+    {
+      "code": "BA",
+      "label": "Bosnie-Herzégovine",
+      "countryCode": "ba",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        43.915886,
+        17.679076
+      ],
+      "defaultMapZoom": 8,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "HT_ERONET_BA",
+          "label": "HT-ERONET",
+          "shortLabel": "Eronet",
+          "color": "#DC2626",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "MTEL_BA",
+          "label": "m:tel",
+          "shortLabel": "m:tel",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "BH_MOBILE_BA",
+          "label": "BH Mobile",
+          "shortLabel": "BH Mobile",
+          "color": "#16A34A",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "BA",
+      "mccs": [
+        218
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "HT_ERONET_BA",
+          "label": "HT-ERONET",
+          "shortLabel": "Eronet",
+          "mncs": [
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Eronet"
+          ],
+          "color": "#DC2626",
+          "networkGroupKey": "HT_ERONET_BA"
+        },
+        {
+          "key": "MTEL_BA",
+          "label": "m:tel",
+          "shortLabel": "m:tel",
+          "mncs": [
+            5
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "MTEL"
+          ],
+          "color": "#2563EB",
+          "networkGroupKey": "MTEL_BA"
+        },
+        {
+          "key": "BH_MOBILE_BA",
+          "label": "BH Mobile",
+          "shortLabel": "BH Mobile",
+          "mncs": [
+            90
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#16A34A",
+          "networkGroupKey": "BH_MOBILE_BA"
+        }
+      ]
+    },
+    {
+      "code": "US",
+      "label": "États-Unis",
+      "countryCode": "us",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "en",
+      "supportedLanguages": [
+        "en",
+        "fr"
+      ],
+      "defaultMapCenter": [
+        39.8283,
+        -98.5795
+      ],
+      "defaultMapZoom": 4,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "ATT_US",
+          "label": "AT&T",
+          "shortLabel": "AT&T",
+          "color": "#00A8E0",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TMOBILE_US",
+          "label": "T-Mobile",
+          "shortLabel": "T-Mobile",
+          "color": "#E20074",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "VERIZON_US",
+          "label": "Verizon",
+          "shortLabel": "Verizon",
+          "color": "#E02020",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "DISH_US",
+          "label": "DISH Wireless",
+          "shortLabel": "DISH",
+          "color": "#F97316",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "US",
+      "mccs": [
+        310,
+        311,
+        312,
+        313,
+        314,
+        315,
+        316
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "ATT_US",
+          "label": "AT&T",
+          "shortLabel": "AT&T",
+          "mncs": [
+            70,
+            150,
+            170,
+            280,
+            380,
+            410,
+            560,
+            680
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "ATT",
+            "AT&T"
+          ],
+          "color": "#00A8E0",
+          "networkGroupKey": "ATT_US"
+        },
+        {
+          "key": "TMOBILE_US",
+          "label": "T-Mobile",
+          "shortLabel": "T-Mobile",
+          "mncs": [
+            160,
+            200,
+            210,
+            220,
+            230,
+            240,
+            250,
+            260,
+            270,
+            310,
+            490,
+            660,
+            800
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "TMobile",
+            "T-Mobile"
+          ],
+          "color": "#E20074",
+          "networkGroupKey": "TMOBILE_US"
+        },
+        {
+          "key": "VERIZON_US",
+          "label": "Verizon",
+          "shortLabel": "Verizon",
+          "mncs": [
+            4,
+            5,
+            6,
+            10,
+            12,
+            13,
+            350,
+            480,
+            481
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#E02020",
+          "networkGroupKey": "VERIZON_US"
+        },
+        {
+          "key": "DISH_US",
+          "label": "DISH Wireless",
+          "shortLabel": "DISH",
+          "mncs": [
+            340
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "DISH"
+          ],
+          "color": "#F97316",
+          "networkGroupKey": "DISH_US"
+        }
+      ]
+    },
+    {
+      "code": "AL",
+      "label": "Albanie",
+      "countryCode": "al",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        41.1533,
+        20.1683
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "ONE_AL",
+          "label": "ONE Albania",
+          "shortLabel": "ONE",
+          "color": "#E11D48",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "VODAFONE_AL",
+          "label": "Vodafone Albania",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "ALBTELECOM_AL",
+          "label": "ALBtelecom",
+          "shortLabel": "ALB",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "AL",
+      "mccs": [
+        276
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "ONE_AL",
+          "label": "ONE Albania",
+          "shortLabel": "ONE",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "ONE Telecommunications"
+          ],
+          "color": "#E11D48",
+          "networkGroupKey": "ONE_AL"
+        },
+        {
+          "key": "VODAFONE_AL",
+          "label": "Vodafone Albania",
+          "shortLabel": "Vodafone",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vodafone"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_AL"
+        },
+        {
+          "key": "ALBTELECOM_AL",
+          "label": "ALBtelecom",
+          "shortLabel": "ALB",
+          "mncs": [
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "ALBTELECOM"
+          ],
+          "color": "#2563EB",
+          "networkGroupKey": "ALBTELECOM_AL"
+        }
+      ]
+    },
+    {
+      "code": "AD",
+      "label": "Andorre",
+      "countryCode": "ad",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        42.5063,
+        1.5218
+      ],
+      "defaultMapZoom": 10,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "ANDORRA_TELECOM_AD",
+          "label": "Andorra Telecom",
+          "shortLabel": "Andorra",
+          "color": "#E11D48",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "AD",
+      "mccs": [
+        213
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "ANDORRA_TELECOM_AD",
+          "label": "Andorra Telecom",
+          "shortLabel": "Andorra",
+          "mncs": [
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Mobiland"
+          ],
+          "color": "#E11D48",
+          "networkGroupKey": "ANDORRA_TELECOM_AD"
+        }
+      ]
+    },
+    {
+      "code": "AT",
+      "label": "Autriche",
+      "countryCode": "at",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        47.5162,
+        14.5501
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "A1_AT",
+          "label": "A1 Telekom Austria",
+          "shortLabel": "A1",
+          "color": "#E30613",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "MAGENTA_AT",
+          "label": "Magenta Telekom",
+          "shortLabel": "Magenta",
+          "color": "#E20074",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "DREI_AT",
+          "label": "Drei Austria",
+          "shortLabel": "Drei",
+          "color": "#111827",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "AT",
+      "mccs": [
+        232
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "A1_AT",
+          "label": "A1 Telekom Austria",
+          "shortLabel": "A1",
+          "mncs": [
+            1,
+            2,
+            9,
+            11,
+            12
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "A1"
+          ],
+          "color": "#E30613",
+          "networkGroupKey": "A1_AT"
+        },
+        {
+          "key": "MAGENTA_AT",
+          "label": "Magenta Telekom",
+          "shortLabel": "Magenta",
+          "mncs": [
+            3,
+            4,
+            7
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "T-Mobile Austria"
+          ],
+          "color": "#E20074",
+          "networkGroupKey": "MAGENTA_AT"
+        },
+        {
+          "key": "DREI_AT",
+          "label": "Drei Austria",
+          "shortLabel": "Drei",
+          "mncs": [
+            5,
+            10,
+            14,
+            16
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Hutchison Drei"
+          ],
+          "color": "#111827",
+          "networkGroupKey": "DREI_AT"
+        }
+      ]
+    },
+    {
+      "code": "BG",
+      "label": "Bulgarie",
+      "countryCode": "bg",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        42.7339,
+        25.4858
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "A1_BG",
+          "label": "A1 Bulgaria",
+          "shortLabel": "A1",
+          "color": "#E30613",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "VIVACOM_BG",
+          "label": "Vivacom",
+          "shortLabel": "Vivacom",
+          "color": "#6D28D9",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "YETTEL_BG",
+          "label": "Yettel Bulgaria",
+          "shortLabel": "Yettel",
+          "color": "#00AEEF",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "BG",
+      "mccs": [
+        284
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "A1_BG",
+          "label": "A1 Bulgaria",
+          "shortLabel": "A1",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Mobiltel"
+          ],
+          "color": "#E30613",
+          "networkGroupKey": "A1_BG"
+        },
+        {
+          "key": "VIVACOM_BG",
+          "label": "Vivacom",
+          "shortLabel": "Vivacom",
+          "mncs": [
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "BTC"
+          ],
+          "color": "#6D28D9",
+          "networkGroupKey": "VIVACOM_BG"
+        },
+        {
+          "key": "YETTEL_BG",
+          "label": "Yettel Bulgaria",
+          "shortLabel": "Yettel",
+          "mncs": [
+            5
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Globul"
+          ],
+          "color": "#00AEEF",
+          "networkGroupKey": "YETTEL_BG"
+        }
+      ]
+    },
+    {
+      "code": "HR",
+      "label": "Croatie",
+      "countryCode": "hr",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        45.1,
+        15.2
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "HT_HR",
+          "label": "Hrvatski Telekom",
+          "shortLabel": "HT",
+          "color": "#E20074",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELEMACH_HR",
+          "label": "Telemach Croatia",
+          "shortLabel": "Telemach",
+          "color": "#16A34A",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "A1_HR",
+          "label": "A1 Croatia",
+          "shortLabel": "A1",
+          "color": "#E30613",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "HR",
+      "mccs": [
+        219
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "HT_HR",
+          "label": "Hrvatski Telekom",
+          "shortLabel": "HT",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "T-Mobile Croatia"
+          ],
+          "color": "#E20074",
+          "networkGroupKey": "HT_HR"
+        },
+        {
+          "key": "TELEMACH_HR",
+          "label": "Telemach Croatia",
+          "shortLabel": "Telemach",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Tele2 Croatia"
+          ],
+          "color": "#16A34A",
+          "networkGroupKey": "TELEMACH_HR"
+        },
+        {
+          "key": "A1_HR",
+          "label": "A1 Croatia",
+          "shortLabel": "A1",
+          "mncs": [
+            10
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "VIPnet"
+          ],
+          "color": "#E30613",
+          "networkGroupKey": "A1_HR"
+        }
+      ]
+    },
+    {
+      "code": "CY",
+      "label": "Chypre",
+      "countryCode": "cy",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        35.1264,
+        33.4299
+      ],
+      "defaultMapZoom": 8,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "CYTA_CY",
+          "label": "CYTA",
+          "shortLabel": "CYTA",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "EPIC_CY",
+          "label": "Epic Cyprus",
+          "shortLabel": "Epic",
+          "color": "#7C3AED",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "PRIMETEL_CY",
+          "label": "PrimeTel",
+          "shortLabel": "PrimeTel",
+          "color": "#F59E0B",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "CY",
+      "mccs": [
+        280
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "CYTA_CY",
+          "label": "CYTA",
+          "shortLabel": "CYTA",
+          "mncs": [
+            1,
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#2563EB",
+          "networkGroupKey": "CYTA_CY"
+        },
+        {
+          "key": "EPIC_CY",
+          "label": "Epic Cyprus",
+          "shortLabel": "Epic",
+          "mncs": [
+            10
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Scancom"
+          ],
+          "color": "#7C3AED",
+          "networkGroupKey": "EPIC_CY"
+        },
+        {
+          "key": "PRIMETEL_CY",
+          "label": "PrimeTel",
+          "shortLabel": "PrimeTel",
+          "mncs": [
+            20
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#F59E0B",
+          "networkGroupKey": "PRIMETEL_CY"
+        }
+      ]
+    },
+    {
+      "code": "CZ",
+      "label": "Tchéquie",
+      "countryCode": "cz",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        49.8175,
+        15.473
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "TMOBILE_CZ",
+          "label": "T-Mobile Czech Republic",
+          "shortLabel": "T-Mobile",
+          "color": "#E20074",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "O2_CZ",
+          "label": "O2 Czech Republic",
+          "shortLabel": "O2",
+          "color": "#0050A4",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "VODAFONE_CZ",
+          "label": "Vodafone Czech Republic",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "CZ",
+      "mccs": [
+        230
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "TMOBILE_CZ",
+          "label": "T-Mobile Czech Republic",
+          "shortLabel": "T-Mobile",
+          "mncs": [
+            1,
+            7
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "T-Mobile"
+          ],
+          "color": "#E20074",
+          "networkGroupKey": "TMOBILE_CZ"
+        },
+        {
+          "key": "O2_CZ",
+          "label": "O2 Czech Republic",
+          "shortLabel": "O2",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "O2"
+          ],
+          "color": "#0050A4",
+          "networkGroupKey": "O2_CZ"
+        },
+        {
+          "key": "VODAFONE_CZ",
+          "label": "Vodafone Czech Republic",
+          "shortLabel": "Vodafone",
+          "mncs": [
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vodafone"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_CZ"
+        }
+      ]
+    },
+    {
+      "code": "DK",
+      "label": "Danemark",
+      "countryCode": "dk",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        56.2639,
+        9.5018
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "TDC_DK",
+          "label": "TDC / YouSee",
+          "shortLabel": "TDC",
+          "color": "#0EA5E9",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELENOR_DK",
+          "label": "Telenor Denmark",
+          "shortLabel": "Telenor",
+          "color": "#009FE3",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "THREE_DK",
+          "label": "3 Denmark",
+          "shortLabel": "3",
+          "color": "#111827",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELIA_DK",
+          "label": "Telia Denmark",
+          "shortLabel": "Telia",
+          "color": "#7C3AED",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "DK",
+      "mccs": [
+        238
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "TDC_DK",
+          "label": "TDC / YouSee",
+          "shortLabel": "TDC",
+          "mncs": [
+            1,
+            10
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "YouSee"
+          ],
+          "color": "#0EA5E9",
+          "networkGroupKey": "TDC_DK"
+        },
+        {
+          "key": "TELENOR_DK",
+          "label": "Telenor Denmark",
+          "shortLabel": "Telenor",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telenor"
+          ],
+          "color": "#009FE3",
+          "networkGroupKey": "TELENOR_DK"
+        },
+        {
+          "key": "THREE_DK",
+          "label": "3 Denmark",
+          "shortLabel": "3",
+          "mncs": [
+            6
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Hi3G"
+          ],
+          "color": "#111827",
+          "networkGroupKey": "THREE_DK"
+        },
+        {
+          "key": "TELIA_DK",
+          "label": "Telia Denmark",
+          "shortLabel": "Telia",
+          "mncs": [
+            20,
+            96
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telia"
+          ],
+          "color": "#7C3AED",
+          "networkGroupKey": "TELIA_DK"
+        }
+      ]
+    },
+    {
+      "code": "EE",
+      "label": "Estonie",
+      "countryCode": "ee",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        58.5953,
+        25.0136
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "TELIA_EE",
+          "label": "Telia Estonia",
+          "shortLabel": "Telia",
+          "color": "#7C3AED",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "ELISA_EE",
+          "label": "Elisa Estonia",
+          "shortLabel": "Elisa",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELE2_EE",
+          "label": "Tele2 Estonia",
+          "shortLabel": "Tele2",
+          "color": "#F97316",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "EE",
+      "mccs": [
+        248
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "TELIA_EE",
+          "label": "Telia Estonia",
+          "shortLabel": "Telia",
+          "mncs": [
+            1,
+            13
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Eesti Telekom"
+          ],
+          "color": "#7C3AED",
+          "networkGroupKey": "TELIA_EE"
+        },
+        {
+          "key": "ELISA_EE",
+          "label": "Elisa Estonia",
+          "shortLabel": "Elisa",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "RLE"
+          ],
+          "color": "#2563EB",
+          "networkGroupKey": "ELISA_EE"
+        },
+        {
+          "key": "TELE2_EE",
+          "label": "Tele2 Estonia",
+          "shortLabel": "Tele2",
+          "mncs": [
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Tele2"
+          ],
+          "color": "#F97316",
+          "networkGroupKey": "TELE2_EE"
+        }
+      ]
+    },
+    {
+      "code": "FI",
+      "label": "Finlande",
+      "countryCode": "fi",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        61.9241,
+        25.7482
+      ],
+      "defaultMapZoom": 5,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "DNA_FI",
+          "label": "DNA",
+          "shortLabel": "DNA",
+          "color": "#E20074",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "ELISA_FI",
+          "label": "Elisa",
+          "shortLabel": "Elisa",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "ALCOM_FI",
+          "label": "Ålands Telekommunikation",
+          "shortLabel": "Ålcom",
+          "color": "#0F766E",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELIA_FI",
+          "label": "Telia Finland",
+          "shortLabel": "Telia",
+          "color": "#7C3AED",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "FI",
+      "mccs": [
+        244
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "DNA_FI",
+          "label": "DNA",
+          "shortLabel": "DNA",
+          "mncs": [
+            3,
+            4,
+            12,
+            13
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#E20074",
+          "networkGroupKey": "DNA_FI"
+        },
+        {
+          "key": "ELISA_FI",
+          "label": "Elisa",
+          "shortLabel": "Elisa",
+          "mncs": [
+            5,
+            6,
+            21
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#2563EB",
+          "networkGroupKey": "ELISA_FI"
+        },
+        {
+          "key": "ALCOM_FI",
+          "label": "Ålands Telekommunikation",
+          "shortLabel": "Ålcom",
+          "mncs": [
+            14
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Ålcom"
+          ],
+          "color": "#0F766E",
+          "networkGroupKey": "ALCOM_FI"
+        },
+        {
+          "key": "TELIA_FI",
+          "label": "Telia Finland",
+          "shortLabel": "Telia",
+          "mncs": [
+            36
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "TeliaSonera"
+          ],
+          "color": "#7C3AED",
+          "networkGroupKey": "TELIA_FI"
+        }
+      ]
+    },
+    {
+      "code": "DE",
+      "label": "Allemagne",
+      "countryCode": "de",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        51.1657,
+        10.4515
+      ],
+      "defaultMapZoom": 6,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "TELEKOM_DE",
+          "label": "Telekom Deutschland",
+          "shortLabel": "Telekom",
+          "color": "#E20074",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "VODAFONE_DE",
+          "label": "Vodafone Germany",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "O2_DE",
+          "label": "O2 Germany",
+          "shortLabel": "O2",
+          "color": "#0050A4",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "ONEANDONE_DE",
+          "label": "1&1",
+          "shortLabel": "1&1",
+          "color": "#111827",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "DE",
+      "mccs": [
+        262
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "TELEKOM_DE",
+          "label": "Telekom Deutschland",
+          "shortLabel": "Telekom",
+          "mncs": [
+            1,
+            6,
+            78
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telekom",
+            "T-Mobile"
+          ],
+          "color": "#E20074",
+          "networkGroupKey": "TELEKOM_DE"
+        },
+        {
+          "key": "VODAFONE_DE",
+          "label": "Vodafone Germany",
+          "shortLabel": "Vodafone",
+          "mncs": [
+            2,
+            4,
+            9,
+            42,
+            43
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vodafone"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_DE"
+        },
+        {
+          "key": "O2_DE",
+          "label": "O2 Germany",
+          "shortLabel": "O2",
+          "mncs": [
+            3,
+            5,
+            7,
+            8,
+            11,
+            12,
+            16,
+            17,
+            20,
+            77
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telefónica Germany",
+            "E-Plus"
+          ],
+          "color": "#0050A4",
+          "networkGroupKey": "O2_DE"
+        },
+        {
+          "key": "ONEANDONE_DE",
+          "label": "1&1",
+          "shortLabel": "1&1",
+          "mncs": [
+            23
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Drillisch"
+          ],
+          "color": "#111827",
+          "networkGroupKey": "ONEANDONE_DE"
+        }
+      ]
+    },
+    {
+      "code": "GI",
+      "label": "Gibraltar",
+      "countryCode": "gi",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        36.1408,
+        -5.3536
+      ],
+      "defaultMapZoom": 11,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "GIBTELECOM_GI",
+          "label": "Gibtelecom",
+          "shortLabel": "Gibtelecom",
+          "color": "#E11D48",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "LIMBA_GI",
+          "label": "Limba",
+          "shortLabel": "Limba",
+          "color": "#F97316",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "GI",
+      "mccs": [
+        266
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "GIBTELECOM_GI",
+          "label": "Gibtelecom",
+          "shortLabel": "Gibtelecom",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Gibtel"
+          ],
+          "color": "#E11D48",
+          "networkGroupKey": "GIBTELECOM_GI"
+        },
+        {
+          "key": "LIMBA_GI",
+          "label": "Limba",
+          "shortLabel": "Limba",
+          "mncs": [
+            9
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Eazi Telecom"
+          ],
+          "color": "#F97316",
+          "networkGroupKey": "LIMBA_GI"
+        }
+      ]
+    },
+    {
+      "code": "GR",
+      "label": "Grèce",
+      "countryCode": "gr",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        39.0742,
+        21.8243
+      ],
+      "defaultMapZoom": 6,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "COSMOTE_GR",
+          "label": "Cosmote",
+          "shortLabel": "Cosmote",
+          "color": "#16A34A",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "VODAFONE_GR",
+          "label": "Vodafone Greece",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "NOVA_GR",
+          "label": "Nova Greece",
+          "shortLabel": "Nova",
+          "color": "#111827",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "GR",
+      "mccs": [
+        202
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "COSMOTE_GR",
+          "label": "Cosmote",
+          "shortLabel": "Cosmote",
+          "mncs": [
+            1,
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#16A34A",
+          "networkGroupKey": "COSMOTE_GR"
+        },
+        {
+          "key": "VODAFONE_GR",
+          "label": "Vodafone Greece",
+          "shortLabel": "Vodafone",
+          "mncs": [
+            5
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vodafone"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_GR"
+        },
+        {
+          "key": "NOVA_GR",
+          "label": "Nova Greece",
+          "shortLabel": "Nova",
+          "mncs": [
+            9,
+            10
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Wind Hellas"
+          ],
+          "color": "#111827",
+          "networkGroupKey": "NOVA_GR"
+        }
+      ]
+    },
+    {
+      "code": "HU",
+      "label": "Hongrie",
+      "countryCode": "hu",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        47.1625,
+        19.5033
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "YETTEL_HU",
+          "label": "Yettel Hungary",
+          "shortLabel": "Yettel",
+          "color": "#00AEEF",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "DIGI_HU",
+          "label": "Digi Hungary",
+          "shortLabel": "Digi",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELEKOM_HU",
+          "label": "Magyar Telekom",
+          "shortLabel": "Telekom",
+          "color": "#E20074",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "VODAFONE_HU",
+          "label": "Vodafone Hungary",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "HU",
+      "mccs": [
+        216
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "YETTEL_HU",
+          "label": "Yettel Hungary",
+          "shortLabel": "Yettel",
+          "mncs": [
+            1,
+            20
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telenor Hungary"
+          ],
+          "color": "#00AEEF",
+          "networkGroupKey": "YETTEL_HU"
+        },
+        {
+          "key": "DIGI_HU",
+          "label": "Digi Hungary",
+          "shortLabel": "Digi",
+          "mncs": [
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "DIGI"
+          ],
+          "color": "#2563EB",
+          "networkGroupKey": "DIGI_HU"
+        },
+        {
+          "key": "TELEKOM_HU",
+          "label": "Magyar Telekom",
+          "shortLabel": "Telekom",
+          "mncs": [
+            30
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telekom"
+          ],
+          "color": "#E20074",
+          "networkGroupKey": "TELEKOM_HU"
+        },
+        {
+          "key": "VODAFONE_HU",
+          "label": "Vodafone Hungary",
+          "shortLabel": "Vodafone",
+          "mncs": [
+            70,
+            71
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vodafone"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_HU"
+        }
+      ]
+    },
+    {
+      "code": "IS",
+      "label": "Islande",
+      "countryCode": "is",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        64.9631,
+        -19.0208
+      ],
+      "defaultMapZoom": 6,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "SIMINN_IS",
+          "label": "Síminn",
+          "shortLabel": "Síminn",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "VODAFONE_IS",
+          "label": "Vodafone Iceland",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "ICECELL_IS",
+          "label": "IceCell",
+          "shortLabel": "IceCell",
+          "color": "#0F766E",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "IS",
+      "mccs": [
+        274
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "SIMINN_IS",
+          "label": "Síminn",
+          "shortLabel": "Síminn",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Iceland Telecom"
+          ],
+          "color": "#2563EB",
+          "networkGroupKey": "SIMINN_IS"
+        },
+        {
+          "key": "VODAFONE_IS",
+          "label": "Vodafone Iceland",
+          "shortLabel": "Vodafone",
+          "mncs": [
+            2,
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Og fjarskipti"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_IS"
+        },
+        {
+          "key": "ICECELL_IS",
+          "label": "IceCell",
+          "shortLabel": "IceCell",
+          "mncs": [
+            7
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#0F766E",
+          "networkGroupKey": "ICECELL_IS"
+        }
+      ]
+    },
+    {
+      "code": "IE",
+      "label": "Irlande",
+      "countryCode": "ie",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "en",
+      "supportedLanguages": [
+        "en",
+        "fr"
+      ],
+      "defaultMapCenter": [
+        53.1424,
+        -7.6921
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "VODAFONE_IE",
+          "label": "Vodafone Ireland",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "THREE_IE",
+          "label": "Three Ireland",
+          "shortLabel": "Three",
+          "color": "#111827",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "EIR_IE",
+          "label": "eir",
+          "shortLabel": "eir",
+          "color": "#7C3AED",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "VIRGIN_IE",
+          "label": "Virgin Media Ireland",
+          "shortLabel": "Virgin",
+          "color": "#E11D48",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "IE",
+      "mccs": [
+        272
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "VODAFONE_IE",
+          "label": "Vodafone Ireland",
+          "shortLabel": "Vodafone",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vodafone"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_IE"
+        },
+        {
+          "key": "THREE_IE",
+          "label": "Three Ireland",
+          "shortLabel": "Three",
+          "mncs": [
+            2,
+            5,
+            17
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Hutchison"
+          ],
+          "color": "#111827",
+          "networkGroupKey": "THREE_IE"
+        },
+        {
+          "key": "EIR_IE",
+          "label": "eir",
+          "shortLabel": "eir",
+          "mncs": [
+            3,
+            7,
+            8
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Eircom"
+          ],
+          "color": "#7C3AED",
+          "networkGroupKey": "EIR_IE"
+        },
+        {
+          "key": "VIRGIN_IE",
+          "label": "Virgin Media Ireland",
+          "shortLabel": "Virgin",
+          "mncs": [
+            15
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Virgin"
+          ],
+          "color": "#E11D48",
+          "networkGroupKey": "VIRGIN_IE"
+        }
+      ]
+    },
+    {
+      "code": "IT",
+      "label": "Italie",
+      "countryCode": "it",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        41.8719,
+        12.5674
+      ],
+      "defaultMapZoom": 6,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "TIM_IT",
+          "label": "TIM",
+          "shortLabel": "TIM",
+          "color": "#0050A4",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "VODAFONE_IT",
+          "label": "Vodafone Italy",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "ILIAD_IT",
+          "label": "Iliad Italy",
+          "shortLabel": "Iliad",
+          "color": "#E11D48",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "WINDTRE_IT",
+          "label": "WindTre",
+          "shortLabel": "WindTre",
+          "color": "#F97316",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "IT",
+      "mccs": [
+        222
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "TIM_IT",
+          "label": "TIM",
+          "shortLabel": "TIM",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telecom Italia Mobile"
+          ],
+          "color": "#0050A4",
+          "networkGroupKey": "TIM_IT"
+        },
+        {
+          "key": "VODAFONE_IT",
+          "label": "Vodafone Italy",
+          "shortLabel": "Vodafone",
+          "mncs": [
+            10
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vodafone"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_IT"
+        },
+        {
+          "key": "ILIAD_IT",
+          "label": "Iliad Italy",
+          "shortLabel": "Iliad",
+          "mncs": [
+            50
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Iliad"
+          ],
+          "color": "#E11D48",
+          "networkGroupKey": "ILIAD_IT"
+        },
+        {
+          "key": "WINDTRE_IT",
+          "label": "WindTre",
+          "shortLabel": "WindTre",
+          "mncs": [
+            88,
+            99
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Wind",
+            "H3G"
+          ],
+          "color": "#F97316",
+          "networkGroupKey": "WINDTRE_IT"
+        }
+      ]
+    },
+    {
+      "code": "XK",
+      "label": "Kosovo",
+      "countryCode": "xk",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        42.6026,
+        20.903
+      ],
+      "defaultMapZoom": 8,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "VALA_XK",
+          "label": "Vala",
+          "shortLabel": "Vala",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "IPKO_XK",
+          "label": "IPKO",
+          "shortLabel": "IPKO",
+          "color": "#16A34A",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "XK",
+      "mccs": [
+        221
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "VALA_XK",
+          "label": "Vala",
+          "shortLabel": "Vala",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telekom Kosovo"
+          ],
+          "color": "#2563EB",
+          "networkGroupKey": "VALA_XK"
+        },
+        {
+          "key": "IPKO_XK",
+          "label": "IPKO",
+          "shortLabel": "IPKO",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#16A34A",
+          "networkGroupKey": "IPKO_XK"
+        }
+      ]
+    },
+    {
+      "code": "LV",
+      "label": "Lettonie",
+      "countryCode": "lv",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        56.8796,
+        24.6032
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "LMT_LV",
+          "label": "Latvijas Mobilais Telefons",
+          "shortLabel": "LMT",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELE2_LV",
+          "label": "Tele2 Latvia",
+          "shortLabel": "Tele2",
+          "color": "#F97316",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "BITE_LV",
+          "label": "Bite Latvia",
+          "shortLabel": "Bite",
+          "color": "#16A34A",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "LV",
+      "mccs": [
+        247
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "LMT_LV",
+          "label": "Latvijas Mobilais Telefons",
+          "shortLabel": "LMT",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "LMT"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "LMT_LV"
+        },
+        {
+          "key": "TELE2_LV",
+          "label": "Tele2 Latvia",
+          "shortLabel": "Tele2",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Tele2"
+          ],
+          "color": "#F97316",
+          "networkGroupKey": "TELE2_LV"
+        },
+        {
+          "key": "BITE_LV",
+          "label": "Bite Latvia",
+          "shortLabel": "Bite",
+          "mncs": [
+            5
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Bite"
+          ],
+          "color": "#16A34A",
+          "networkGroupKey": "BITE_LV"
+        }
+      ]
+    },
+    {
+      "code": "LI",
+      "label": "Liechtenstein",
+      "countryCode": "li",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        47.166,
+        9.5554
+      ],
+      "defaultMapZoom": 11,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "SWISSCOM_LI",
+          "label": "Swisscom Liechtenstein",
+          "shortLabel": "Swisscom",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "SALT_LI",
+          "label": "Salt Liechtenstein",
+          "shortLabel": "Salt",
+          "color": "#111827",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELECOM_LI",
+          "label": "Telecom Liechtenstein",
+          "shortLabel": "Telecom Liechtenstein",
+          "color": "#0F766E",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "LI",
+      "mccs": [
+        295
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "SWISSCOM_LI",
+          "label": "Swisscom Liechtenstein",
+          "shortLabel": "Swisscom",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Swisscom"
+          ],
+          "color": "#2563EB",
+          "networkGroupKey": "SWISSCOM_LI"
+        },
+        {
+          "key": "SALT_LI",
+          "label": "Salt Liechtenstein",
+          "shortLabel": "Salt",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Salt"
+          ],
+          "color": "#111827",
+          "networkGroupKey": "SALT_LI"
+        },
+        {
+          "key": "TELECOM_LI",
+          "label": "Telecom Liechtenstein",
+          "shortLabel": "Telecom Liechtenstein",
+          "mncs": [
+            5
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#0F766E",
+          "networkGroupKey": "TELECOM_LI"
+        }
+      ]
+    },
+    {
+      "code": "LT",
+      "label": "Lituanie",
+      "countryCode": "lt",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        55.1694,
+        23.8813
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "TELIA_LT",
+          "label": "Telia Lithuania",
+          "shortLabel": "Telia",
+          "color": "#7C3AED",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "BITE_LT",
+          "label": "Bite Lithuania",
+          "shortLabel": "Bite",
+          "color": "#16A34A",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELE2_LT",
+          "label": "Tele2 Lithuania",
+          "shortLabel": "Tele2",
+          "color": "#F97316",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "LT",
+      "mccs": [
+        246
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "TELIA_LT",
+          "label": "Telia Lithuania",
+          "shortLabel": "Telia",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Omnitel"
+          ],
+          "color": "#7C3AED",
+          "networkGroupKey": "TELIA_LT"
+        },
+        {
+          "key": "BITE_LT",
+          "label": "Bite Lithuania",
+          "shortLabel": "Bite",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Bité"
+          ],
+          "color": "#16A34A",
+          "networkGroupKey": "BITE_LT"
+        },
+        {
+          "key": "TELE2_LT",
+          "label": "Tele2 Lithuania",
+          "shortLabel": "Tele2",
+          "mncs": [
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Tele2"
+          ],
+          "color": "#F97316",
+          "networkGroupKey": "TELE2_LT"
+        }
+      ]
+    },
+    {
+      "code": "LU",
+      "label": "Luxembourg",
+      "countryCode": "lu",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        49.8153,
+        6.1296
+      ],
+      "defaultMapZoom": 9,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "POST_LU",
+          "label": "POST Luxembourg",
+          "shortLabel": "POST",
+          "color": "#0050A4",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TANGO_LU",
+          "label": "Tango Luxembourg",
+          "shortLabel": "Tango",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "ORANGE_LU",
+          "label": "Orange Luxembourg",
+          "shortLabel": "Orange",
+          "color": "#FF7900",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "LUXEMBOURG_ONLINE_LU",
+          "label": "Luxembourg Online",
+          "shortLabel": "Lux Online",
+          "color": "#6B7280",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "LU",
+      "mccs": [
+        270
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "POST_LU",
+          "label": "POST Luxembourg",
+          "shortLabel": "POST",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "POST"
+          ],
+          "color": "#0050A4",
+          "networkGroupKey": "POST_LU"
+        },
+        {
+          "key": "TANGO_LU",
+          "label": "Tango Luxembourg",
+          "shortLabel": "Tango",
+          "mncs": [
+            77
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Proximus Luxembourg"
+          ],
+          "color": "#2563EB",
+          "networkGroupKey": "TANGO_LU"
+        },
+        {
+          "key": "ORANGE_LU",
+          "label": "Orange Luxembourg",
+          "shortLabel": "Orange",
+          "mncs": [
+            99
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Orange"
+          ],
+          "color": "#FF7900",
+          "networkGroupKey": "ORANGE_LU"
+        },
+        {
+          "key": "LUXEMBOURG_ONLINE_LU",
+          "label": "Luxembourg Online",
+          "shortLabel": "Lux Online",
+          "mncs": [
+            5
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "LOL",
+            "Luxembourg Online"
+          ],
+          "color": "#6B7280",
+          "networkGroupKey": "LUXEMBOURG_ONLINE_LU"
+        }
+      ]
+    },
+    {
+      "code": "MT",
+      "label": "Malte",
+      "countryCode": "mt",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        35.9375,
+        14.3754
+      ],
+      "defaultMapZoom": 10,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "EPIC_MT",
+          "label": "Epic Malta",
+          "shortLabel": "Epic",
+          "color": "#7C3AED",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "GO_MT",
+          "label": "GO Mobile",
+          "shortLabel": "GO",
+          "color": "#0050A4",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "MELITA_MT",
+          "label": "Melita",
+          "shortLabel": "Melita",
+          "color": "#F97316",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "MT",
+      "mccs": [
+        278
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "EPIC_MT",
+          "label": "Epic Malta",
+          "shortLabel": "Epic",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vodafone Malta"
+          ],
+          "color": "#7C3AED",
+          "networkGroupKey": "EPIC_MT"
+        },
+        {
+          "key": "GO_MT",
+          "label": "GO Mobile",
+          "shortLabel": "GO",
+          "mncs": [
+            21,
+            30
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "GO"
+          ],
+          "color": "#0050A4",
+          "networkGroupKey": "GO_MT"
+        },
+        {
+          "key": "MELITA_MT",
+          "label": "Melita",
+          "shortLabel": "Melita",
+          "mncs": [
+            77
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#F97316",
+          "networkGroupKey": "MELITA_MT"
+        }
+      ]
+    },
+    {
+      "code": "MD",
+      "label": "Moldavie",
+      "countryCode": "md",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        47.4116,
+        28.3699
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "ORANGE_MD",
+          "label": "Orange Moldova",
+          "shortLabel": "Orange",
+          "color": "#FF7900",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "MOLDCELL_MD",
+          "label": "Moldcell",
+          "shortLabel": "Moldcell",
+          "color": "#16A34A",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "MOLDTELECOM_MD",
+          "label": "Moldtelecom",
+          "shortLabel": "Moldtelecom",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "MD",
+      "mccs": [
+        259
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "ORANGE_MD",
+          "label": "Orange Moldova",
+          "shortLabel": "Orange",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Orange"
+          ],
+          "color": "#FF7900",
+          "networkGroupKey": "ORANGE_MD"
+        },
+        {
+          "key": "MOLDCELL_MD",
+          "label": "Moldcell",
+          "shortLabel": "Moldcell",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#16A34A",
+          "networkGroupKey": "MOLDCELL_MD"
+        },
+        {
+          "key": "MOLDTELECOM_MD",
+          "label": "Moldtelecom",
+          "shortLabel": "Moldtelecom",
+          "mncs": [
+            5,
+            99
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Unité"
+          ],
+          "color": "#2563EB",
+          "networkGroupKey": "MOLDTELECOM_MD"
+        }
+      ]
+    },
+    {
+      "code": "MC",
+      "label": "Monaco",
+      "countryCode": "mc",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        43.7384,
+        7.4246
+      ],
+      "defaultMapZoom": 12,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "MONACO_TELECOM_MC",
+          "label": "Monaco Telecom",
+          "shortLabel": "Monaco Telecom",
+          "color": "#E11D48",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "MC",
+      "mccs": [
+        212
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "MONACO_TELECOM_MC",
+          "label": "Monaco Telecom",
+          "shortLabel": "Monaco Telecom",
+          "mncs": [
+            10
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#E11D48",
+          "networkGroupKey": "MONACO_TELECOM_MC"
+        }
+      ]
+    },
+    {
+      "code": "ME",
+      "label": "Monténégro",
+      "countryCode": "me",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        42.7087,
+        19.3744
+      ],
+      "defaultMapZoom": 8,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "ONE_ME",
+          "label": "One Montenegro",
+          "shortLabel": "One",
+          "color": "#00AEEF",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELEKOM_ME",
+          "label": "Crnogorski Telekom",
+          "shortLabel": "Telekom",
+          "color": "#E20074",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "MTEL_ME",
+          "label": "m:tel Montenegro",
+          "shortLabel": "m:tel",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "ME",
+      "mccs": [
+        297
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "ONE_ME",
+          "label": "One Montenegro",
+          "shortLabel": "One",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telenor Montenegro"
+          ],
+          "color": "#00AEEF",
+          "networkGroupKey": "ONE_ME"
+        },
+        {
+          "key": "TELEKOM_ME",
+          "label": "Crnogorski Telekom",
+          "shortLabel": "Telekom",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telekom"
+          ],
+          "color": "#E20074",
+          "networkGroupKey": "TELEKOM_ME"
+        },
+        {
+          "key": "MTEL_ME",
+          "label": "m:tel Montenegro",
+          "shortLabel": "m:tel",
+          "mncs": [
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Mtel"
+          ],
+          "color": "#2563EB",
+          "networkGroupKey": "MTEL_ME"
+        }
+      ]
+    },
+    {
+      "code": "NL",
+      "label": "Pays-Bas",
+      "countryCode": "nl",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        52.1326,
+        5.2913
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "ODIDO_NL",
+          "label": "Odido",
+          "shortLabel": "Odido",
+          "color": "#E20074",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "VODAFONE_NL",
+          "label": "Vodafone Netherlands",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "KPN_NL",
+          "label": "KPN",
+          "shortLabel": "KPN",
+          "color": "#16A34A",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "NL",
+      "mccs": [
+        204
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "ODIDO_NL",
+          "label": "Odido",
+          "shortLabel": "Odido",
+          "mncs": [
+            2,
+            16,
+            20
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "T-Mobile Netherlands"
+          ],
+          "color": "#E20074",
+          "networkGroupKey": "ODIDO_NL"
+        },
+        {
+          "key": "VODAFONE_NL",
+          "label": "Vodafone Netherlands",
+          "shortLabel": "Vodafone",
+          "mncs": [
+            4,
+            15,
+            18
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vodafone",
+            "Ziggo"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_NL"
+        },
+        {
+          "key": "KPN_NL",
+          "label": "KPN",
+          "shortLabel": "KPN",
+          "mncs": [
+            8,
+            10,
+            12
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#16A34A",
+          "networkGroupKey": "KPN_NL"
+        }
+      ]
+    },
+    {
+      "code": "MK",
+      "label": "Macédoine du Nord",
+      "countryCode": "mk",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        41.6086,
+        21.7453
+      ],
+      "defaultMapZoom": 8,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "TELEKOM_MK",
+          "label": "Makedonski Telekom",
+          "shortLabel": "Telekom",
+          "color": "#E20074",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "A1_MK",
+          "label": "A1 Macedonia",
+          "shortLabel": "A1",
+          "color": "#E30613",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "MTEL_MK",
+          "label": "m:tel Macedonia",
+          "shortLabel": "m:tel",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "MK",
+      "mccs": [
+        294
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "TELEKOM_MK",
+          "label": "Makedonski Telekom",
+          "shortLabel": "Telekom",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "T-Mobile Macedonia"
+          ],
+          "color": "#E20074",
+          "networkGroupKey": "TELEKOM_MK"
+        },
+        {
+          "key": "A1_MK",
+          "label": "A1 Macedonia",
+          "shortLabel": "A1",
+          "mncs": [
+            2,
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Cosmofon",
+            "Nov Operator"
+          ],
+          "color": "#E30613",
+          "networkGroupKey": "A1_MK"
+        },
+        {
+          "key": "MTEL_MK",
+          "label": "m:tel Macedonia",
+          "shortLabel": "m:tel",
+          "mncs": [
+            12
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "MTEL"
+          ],
+          "color": "#2563EB",
+          "networkGroupKey": "MTEL_MK"
+        }
+      ]
+    },
+    {
+      "code": "NO",
+      "label": "Norvège",
+      "countryCode": "no",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        60.472,
+        8.4689
+      ],
+      "defaultMapZoom": 5,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "TELENOR_NO",
+          "label": "Telenor Norway",
+          "shortLabel": "Telenor",
+          "color": "#009FE3",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELIA_NO",
+          "label": "Telia Norway",
+          "shortLabel": "Telia",
+          "color": "#7C3AED",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "ICE_NO",
+          "label": "Ice Norway",
+          "shortLabel": "Ice",
+          "color": "#0EA5E9",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "NO",
+      "mccs": [
+        242
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "TELENOR_NO",
+          "label": "Telenor Norway",
+          "shortLabel": "Telenor",
+          "mncs": [
+            1,
+            12
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telenor"
+          ],
+          "color": "#009FE3",
+          "networkGroupKey": "TELENOR_NO"
+        },
+        {
+          "key": "TELIA_NO",
+          "label": "Telia Norway",
+          "shortLabel": "Telia",
+          "mncs": [
+            2,
+            5
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telia"
+          ],
+          "color": "#7C3AED",
+          "networkGroupKey": "TELIA_NO"
+        },
+        {
+          "key": "ICE_NO",
+          "label": "Ice Norway",
+          "shortLabel": "Ice",
+          "mncs": [
+            6,
+            14
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "ICE"
+          ],
+          "color": "#0EA5E9",
+          "networkGroupKey": "ICE_NO"
+        }
+      ]
+    },
+    {
+      "code": "PL",
+      "label": "Pologne",
+      "countryCode": "pl",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        51.9194,
+        19.1451
+      ],
+      "defaultMapZoom": 6,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "PLUS_PL",
+          "label": "Plus",
+          "shortLabel": "Plus",
+          "color": "#16A34A",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TMOBILE_PL",
+          "label": "T-Mobile Poland",
+          "shortLabel": "T-Mobile",
+          "color": "#E20074",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "ORANGE_PL",
+          "label": "Orange Poland",
+          "shortLabel": "Orange",
+          "color": "#FF7900",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "PLAY_PL",
+          "label": "Play",
+          "shortLabel": "Play",
+          "color": "#7C3AED",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "PL",
+      "mccs": [
+        260
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "PLUS_PL",
+          "label": "Plus",
+          "shortLabel": "Plus",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Polkomtel"
+          ],
+          "color": "#16A34A",
+          "networkGroupKey": "PLUS_PL"
+        },
+        {
+          "key": "TMOBILE_PL",
+          "label": "T-Mobile Poland",
+          "shortLabel": "T-Mobile",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "T-Mobile"
+          ],
+          "color": "#E20074",
+          "networkGroupKey": "TMOBILE_PL"
+        },
+        {
+          "key": "ORANGE_PL",
+          "label": "Orange Poland",
+          "shortLabel": "Orange",
+          "mncs": [
+            3,
+            5
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Orange"
+          ],
+          "color": "#FF7900",
+          "networkGroupKey": "ORANGE_PL"
+        },
+        {
+          "key": "PLAY_PL",
+          "label": "Play",
+          "shortLabel": "Play",
+          "mncs": [
+            6
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "P4"
+          ],
+          "color": "#7C3AED",
+          "networkGroupKey": "PLAY_PL"
+        }
+      ]
+    },
+    {
+      "code": "RO",
+      "label": "Roumanie",
+      "countryCode": "ro",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        45.9432,
+        24.9668
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "VODAFONE_RO",
+          "label": "Vodafone Romania",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELEKOM_RO",
+          "label": "Telekom Romania",
+          "shortLabel": "Telekom",
+          "color": "#E20074",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "DIGI_RO",
+          "label": "Digi Mobil",
+          "shortLabel": "Digi",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "ORANGE_RO",
+          "label": "Orange Romania",
+          "shortLabel": "Orange",
+          "color": "#FF7900",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "RO",
+      "mccs": [
+        226
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "VODAFONE_RO",
+          "label": "Vodafone Romania",
+          "shortLabel": "Vodafone",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vodafone"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_RO"
+        },
+        {
+          "key": "TELEKOM_RO",
+          "label": "Telekom Romania",
+          "shortLabel": "Telekom",
+          "mncs": [
+            2,
+            3,
+            4,
+            6
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Cosmote",
+            "Romtelecom"
+          ],
+          "color": "#E20074",
+          "networkGroupKey": "TELEKOM_RO"
+        },
+        {
+          "key": "DIGI_RO",
+          "label": "Digi Mobil",
+          "shortLabel": "Digi",
+          "mncs": [
+            5
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "RCS & RDS"
+          ],
+          "color": "#2563EB",
+          "networkGroupKey": "DIGI_RO"
+        },
+        {
+          "key": "ORANGE_RO",
+          "label": "Orange Romania",
+          "shortLabel": "Orange",
+          "mncs": [
+            10
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Orange"
+          ],
+          "color": "#FF7900",
+          "networkGroupKey": "ORANGE_RO"
+        }
+      ]
+    },
+    {
+      "code": "SM",
+      "label": "Saint-Marin",
+      "countryCode": "sm",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        43.9424,
+        12.4578
+      ],
+      "defaultMapZoom": 11,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "SAN_MARINO_TELECOM_SM",
+          "label": "San Marino Telecom",
+          "shortLabel": "SMT",
+          "color": "#0F766E",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "SM",
+      "mccs": [
+        292
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "SAN_MARINO_TELECOM_SM",
+          "label": "San Marino Telecom",
+          "shortLabel": "SMT",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Prima San Marino"
+          ],
+          "color": "#0F766E",
+          "networkGroupKey": "SAN_MARINO_TELECOM_SM"
+        }
+      ]
+    },
+    {
+      "code": "RS",
+      "label": "Serbie",
+      "countryCode": "rs",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        44.0165,
+        21.0059
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "YETTEL_RS",
+          "label": "Yettel Serbia",
+          "shortLabel": "Yettel",
+          "color": "#00AEEF",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "MTS_RS",
+          "label": "Telekom Srbija",
+          "shortLabel": "mts",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "A1_RS",
+          "label": "A1 Serbia",
+          "shortLabel": "A1",
+          "color": "#E30613",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "RS",
+      "mccs": [
+        220
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "YETTEL_RS",
+          "label": "Yettel Serbia",
+          "shortLabel": "Yettel",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telenor Serbia"
+          ],
+          "color": "#00AEEF",
+          "networkGroupKey": "YETTEL_RS"
+        },
+        {
+          "key": "MTS_RS",
+          "label": "Telekom Srbija",
+          "shortLabel": "mts",
+          "mncs": [
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "mts"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "MTS_RS"
+        },
+        {
+          "key": "A1_RS",
+          "label": "A1 Serbia",
+          "shortLabel": "A1",
+          "mncs": [
+            5
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vip mobile"
+          ],
+          "color": "#E30613",
+          "networkGroupKey": "A1_RS"
+        }
+      ]
+    },
+    {
+      "code": "SK",
+      "label": "Slovaquie",
+      "countryCode": "sk",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        48.669,
+        19.699
+      ],
+      "defaultMapZoom": 7,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "ORANGE_SK",
+          "label": "Orange Slovakia",
+          "shortLabel": "Orange",
+          "color": "#FF7900",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELEKOM_SK",
+          "label": "Slovak Telekom",
+          "shortLabel": "Telekom",
+          "color": "#E20074",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "SWAN_SK",
+          "label": "4ka",
+          "shortLabel": "4ka",
+          "color": "#16A34A",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "O2_SK",
+          "label": "O2 Slovakia",
+          "shortLabel": "O2",
+          "color": "#0050A4",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "SK",
+      "mccs": [
+        231
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "ORANGE_SK",
+          "label": "Orange Slovakia",
+          "shortLabel": "Orange",
+          "mncs": [
+            1,
+            5
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Orange"
+          ],
+          "color": "#FF7900",
+          "networkGroupKey": "ORANGE_SK"
+        },
+        {
+          "key": "TELEKOM_SK",
+          "label": "Slovak Telekom",
+          "shortLabel": "Telekom",
+          "mncs": [
+            2,
+            4
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Eurotel"
+          ],
+          "color": "#E20074",
+          "networkGroupKey": "TELEKOM_SK"
+        },
+        {
+          "key": "SWAN_SK",
+          "label": "4ka",
+          "shortLabel": "4ka",
+          "mncs": [
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "SWAN"
+          ],
+          "color": "#16A34A",
+          "networkGroupKey": "SWAN_SK"
+        },
+        {
+          "key": "O2_SK",
+          "label": "O2 Slovakia",
+          "shortLabel": "O2",
+          "mncs": [
+            6
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "O2"
+          ],
+          "color": "#0050A4",
+          "networkGroupKey": "O2_SK"
+        }
+      ]
+    },
+    {
+      "code": "SI",
+      "label": "Slovénie",
+      "countryCode": "si",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        46.1512,
+        14.9955
+      ],
+      "defaultMapZoom": 8,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "A1_SI",
+          "label": "A1 Slovenia",
+          "shortLabel": "A1",
+          "color": "#E30613",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELEKOM_SI",
+          "label": "Telekom Slovenije",
+          "shortLabel": "Telekom",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "T2_SI",
+          "label": "T-2",
+          "shortLabel": "T-2",
+          "color": "#F97316",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELEMACH_SI",
+          "label": "Telemach Slovenia",
+          "shortLabel": "Telemach",
+          "color": "#16A34A",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "SI",
+      "mccs": [
+        293
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "A1_SI",
+          "label": "A1 Slovenia",
+          "shortLabel": "A1",
+          "mncs": [
+            40
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "A1"
+          ],
+          "color": "#E30613",
+          "networkGroupKey": "A1_SI"
+        },
+        {
+          "key": "TELEKOM_SI",
+          "label": "Telekom Slovenije",
+          "shortLabel": "Telekom",
+          "mncs": [
+            41
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telekom"
+          ],
+          "color": "#2563EB",
+          "networkGroupKey": "TELEKOM_SI"
+        },
+        {
+          "key": "T2_SI",
+          "label": "T-2",
+          "shortLabel": "T-2",
+          "mncs": [
+            64
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#F97316",
+          "networkGroupKey": "T2_SI"
+        },
+        {
+          "key": "TELEMACH_SI",
+          "label": "Telemach Slovenia",
+          "shortLabel": "Telemach",
+          "mncs": [
+            70
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telemach"
+          ],
+          "color": "#16A34A",
+          "networkGroupKey": "TELEMACH_SI"
+        }
+      ]
+    },
+    {
+      "code": "SE",
+      "label": "Suède",
+      "countryCode": "se",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        60.1282,
+        18.6435
+      ],
+      "defaultMapZoom": 5,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "TELIA_SE",
+          "label": "Telia Sweden",
+          "shortLabel": "Telia",
+          "color": "#7C3AED",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "THREE_SE",
+          "label": "3 Sweden",
+          "shortLabel": "3",
+          "color": "#111827",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELENOR_SE",
+          "label": "Telenor Sweden",
+          "shortLabel": "Telenor",
+          "color": "#009FE3",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TELE2_SE",
+          "label": "Tele2 Sweden",
+          "shortLabel": "Tele2",
+          "color": "#F97316",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "SE",
+      "mccs": [
+        240
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "TELIA_SE",
+          "label": "Telia Sweden",
+          "shortLabel": "Telia",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telia"
+          ],
+          "color": "#7C3AED",
+          "networkGroupKey": "TELIA_SE"
+        },
+        {
+          "key": "THREE_SE",
+          "label": "3 Sweden",
+          "shortLabel": "3",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Hi3G"
+          ],
+          "color": "#111827",
+          "networkGroupKey": "THREE_SE"
+        },
+        {
+          "key": "TELENOR_SE",
+          "label": "Telenor Sweden",
+          "shortLabel": "Telenor",
+          "mncs": [
+            6,
+            8
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telenor"
+          ],
+          "color": "#009FE3",
+          "networkGroupKey": "TELENOR_SE"
+        },
+        {
+          "key": "TELE2_SE",
+          "label": "Tele2 Sweden",
+          "shortLabel": "Tele2",
+          "mncs": [
+            7,
+            10,
+            14
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Tele2"
+          ],
+          "color": "#F97316",
+          "networkGroupKey": "TELE2_SE"
+        }
+      ]
+    },
+    {
+      "code": "TR",
+      "label": "Turquie",
+      "countryCode": "tr",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        39.9334,
+        32.8597
+      ],
+      "defaultMapZoom": 6,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "TURKCELL_TR",
+          "label": "Turkcell",
+          "shortLabel": "Turkcell",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "VODAFONE_TR",
+          "label": "Vodafone Turkiye",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TURK_TELEKOM_TR",
+          "label": "Turk Telekom",
+          "shortLabel": "Turk Telekom",
+          "color": "#F59E0B",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "TR",
+      "mccs": [
+        286
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "TURKCELL_TR",
+          "label": "Turkcell",
+          "shortLabel": "Turkcell",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#2563EB",
+          "networkGroupKey": "TURKCELL_TR"
+        },
+        {
+          "key": "VODAFONE_TR",
+          "label": "Vodafone Turkiye",
+          "shortLabel": "Vodafone",
+          "mncs": [
+            2
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vodafone"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_TR"
+        },
+        {
+          "key": "TURK_TELEKOM_TR",
+          "label": "Turk Telekom",
+          "shortLabel": "Turk Telekom",
+          "mncs": [
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Avea",
+            "Aria"
+          ],
+          "color": "#F59E0B",
+          "networkGroupKey": "TURK_TELEKOM_TR"
+        }
+      ]
+    },
+    {
+      "code": "GB",
+      "label": "Royaume-Uni",
+      "countryCode": "gb",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "en",
+      "supportedLanguages": [
+        "en",
+        "fr"
+      ],
+      "defaultMapCenter": [
+        55.3781,
+        -3.436
+      ],
+      "defaultMapZoom": 6,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "EE_GB",
+          "label": "EE / BT",
+          "shortLabel": "EE",
+          "color": "#00AEEF",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "O2_GB",
+          "label": "O2 UK",
+          "shortLabel": "O2",
+          "color": "#0050A4",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "VODAFONE_GB",
+          "label": "Vodafone UK",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "THREE_GB",
+          "label": "Three UK",
+          "shortLabel": "Three",
+          "color": "#111827",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "GB",
+      "mccs": [
+        234,
+        235
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "EE_GB",
+          "label": "EE / BT",
+          "shortLabel": "EE",
+          "mncs": [],
+          "plmns": [
+            {
+              "mcc": 234,
+              "mnc": 0
+            },
+            {
+              "mcc": 234,
+              "mnc": 30
+            },
+            {
+              "mcc": 234,
+              "mnc": 31
+            },
+            {
+              "mcc": 234,
+              "mnc": 32
+            },
+            {
+              "mcc": 234,
+              "mnc": 33
+            },
+            {
+              "mcc": 234,
+              "mnc": 34
+            },
+            {
+              "mcc": 234,
+              "mnc": 76
+            },
+            {
+              "mcc": 234,
+              "mnc": 86
+            },
+            {
+              "mcc": 235,
+              "mnc": 1
+            },
+            {
+              "mcc": 235,
+              "mnc": 2
+            },
+            {
+              "mcc": 235,
+              "mnc": 77
+            }
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "EE",
+            "BT"
+          ],
+          "color": "#00AEEF",
+          "networkGroupKey": "EE_GB"
+        },
+        {
+          "key": "O2_GB",
+          "label": "O2 UK",
+          "shortLabel": "O2",
+          "mncs": [],
+          "plmns": [
+            {
+              "mcc": 234,
+              "mnc": 2
+            },
+            {
+              "mcc": 234,
+              "mnc": 10
+            },
+            {
+              "mcc": 234,
+              "mnc": 11
+            }
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Telefonica UK"
+          ],
+          "color": "#0050A4",
+          "networkGroupKey": "O2_GB"
+        },
+        {
+          "key": "VODAFONE_GB",
+          "label": "Vodafone UK",
+          "shortLabel": "Vodafone",
+          "mncs": [],
+          "plmns": [
+            {
+              "mcc": 234,
+              "mnc": 15
+            },
+            {
+              "mcc": 234,
+              "mnc": 77
+            },
+            {
+              "mcc": 235,
+              "mnc": 91
+            }
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Vodafone"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_GB"
+        },
+        {
+          "key": "THREE_GB",
+          "label": "Three UK",
+          "shortLabel": "Three",
+          "mncs": [],
+          "plmns": [
+            {
+              "mcc": 234,
+              "mnc": 20
+            },
+            {
+              "mcc": 235,
+              "mnc": 94
+            }
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "Hutchison 3G"
+          ],
+          "color": "#111827",
+          "networkGroupKey": "THREE_GB"
+        }
+      ]
+    },
+    {
+      "code": "UA",
+      "label": "Ukraine",
+      "countryCode": "ua",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        48.3794,
+        31.1656
+      ],
+      "defaultMapZoom": 6,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [
+        {
+          "key": "VODAFONE_UA",
+          "label": "Vodafone Ukraine",
+          "shortLabel": "Vodafone",
+          "color": "#E60000",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "KYIVSTAR_UA",
+          "label": "Kyivstar",
+          "shortLabel": "Kyivstar",
+          "color": "#2563EB",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "INTERTELECOM_UA",
+          "label": "Intertelecom",
+          "shortLabel": "Intertelecom",
+          "color": "#0F766E",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "LIFECELL_UA",
+          "label": "lifecell",
+          "shortLabel": "lifecell",
+          "color": "#F59E0B",
+          "background": "rgba(100, 116, 139, 0.12)"
+        },
+        {
+          "key": "TRIMOB_UA",
+          "label": "TriMob",
+          "shortLabel": "TriMob",
+          "color": "#7C3AED",
+          "background": "rgba(100, 116, 139, 0.12)"
+        }
+      ],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "UA",
+      "mccs": [
+        255
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": [
+        {
+          "key": "VODAFONE_UA",
+          "label": "Vodafone Ukraine",
+          "shortLabel": "Vodafone",
+          "mncs": [
+            1
+          ],
+          "kind": "MNO",
+          "aliases": [
+            "VF Ukraine"
+          ],
+          "color": "#E60000",
+          "networkGroupKey": "VODAFONE_UA"
+        },
+        {
+          "key": "KYIVSTAR_UA",
+          "label": "Kyivstar",
+          "shortLabel": "Kyivstar",
+          "mncs": [
+            2,
+            3
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#2563EB",
+          "networkGroupKey": "KYIVSTAR_UA"
+        },
+        {
+          "key": "INTERTELECOM_UA",
+          "label": "Intertelecom",
+          "shortLabel": "Intertelecom",
+          "mncs": [
+            4
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#0F766E",
+          "networkGroupKey": "INTERTELECOM_UA"
+        },
+        {
+          "key": "LIFECELL_UA",
+          "label": "lifecell",
+          "shortLabel": "lifecell",
+          "mncs": [
+            6
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#F59E0B",
+          "networkGroupKey": "LIFECELL_UA"
+        },
+        {
+          "key": "TRIMOB_UA",
+          "label": "TriMob",
+          "shortLabel": "TriMob",
+          "mncs": [
+            7
+          ],
+          "kind": "MNO",
+          "aliases": [],
+          "color": "#7C3AED",
+          "networkGroupKey": "TRIMOB_UA"
+        }
+      ]
+    },
+    {
+      "code": "VA",
+      "label": "Vatican",
+      "countryCode": "va",
+      "publicSelectable": true,
+      "antennaCompatible": false,
+      "defaultLanguage": "fr",
+      "supportedLanguages": [
+        "fr",
+        "en"
+      ],
+      "defaultMapCenter": [
+        41.9029,
+        12.4534
+      ],
+      "defaultMapZoom": 13,
+      "capabilities": {
+        "archives": false,
+        "previsionnel": false,
+        "incidents": false,
+        "offline": false,
+        "communityLayers": true
+      },
+      "operators": [],
+      "source": {
+        "label": "Réseau observé SignalQuest",
+        "authority": "Communauté SignalQuest",
+        "url": "https://www.itu.int/rec/T-REC-E.212/en",
+        "status": "coverage-only",
+        "checkedAt": "2026-05-18",
+        "notes": "Pays ouvert en mode communautaire prudent: speedtests, couverture, notes et sites probables sans source antennes officielle.",
+        "supports": {
+          "sites": false,
+          "details": false,
+          "api": false,
+          "download": false,
+          "coverage": true
+        }
+      },
+      "marketCode": "VA",
+      "mccs": [
+        225
+      ],
+      "sourceMode": "community",
+      "radioCapabilities": {
+        "officialAntennas": false,
+        "communitySpeedtests": true,
+        "communityCoverage": true,
+        "communityRatings": true,
+        "communityProbableSites": true,
+        "communityPhotos": true,
+        "offline": false
+      },
+      "radioOperators": []
+    }
+  ],
+  "auditedCountries": []
+}

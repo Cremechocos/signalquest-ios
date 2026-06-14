@@ -1,0 +1,243 @@
+import SwiftUI
+
+@MainActor
+final class SettingsViewModel: ObservableObject {
+    @Published var prefs: NotificationPreferences = NotificationPreferences(
+        notifyPhotoCommentsEmail: nil, notifyPhotoCommentsPush: nil, notifyPhotoCommentsInApp: nil,
+        notifyPhotoLikesEmail: nil, notifyPhotoLikesPush: nil, notifyPhotoLikesInApp: nil,
+        notifyPhotoMentionsEmail: nil, notifyPhotoMentionsPush: nil, notifyPhotoMentionsInApp: nil,
+        notifyPhotoRepliesEmail: nil, notifyPhotoRepliesPush: nil, notifyPhotoRepliesInApp: nil,
+        notifyMessagesEmail: nil, notifyMessagesPush: nil, notifyMessagesInApp: nil,
+        notifyAnfrUpdatesPush: nil, notifyAnfrUpdatesEmail: nil,
+        callsDoNotDisturb: nil
+    )
+    @Published var isBusy = false
+    @Published var errorMessage: String?
+
+    private let userService: UserServicing
+    private let authService: AuthServicing
+    init(userService: UserServicing, authService: AuthServicing) {
+        self.userService = userService
+        self.authService = authService
+    }
+
+    func load() async {
+        do { prefs = try await userService.notificationPreferences() } catch { errorMessage = error.localizedDescription }
+    }
+
+    func save() async {
+        isBusy = true
+        defer { isBusy = false }
+        do { prefs = try await userService.updateNotificationPreferences(prefs) } catch { errorMessage = error.localizedDescription }
+    }
+
+    func disable2FA(code: String) async {
+        do { try await authService.disable2FA(code: code) } catch { errorMessage = error.localizedDescription }
+    }
+
+    func deleteAccount(password: String) async -> Bool {
+        do { try await userService.deleteAccount(password: password); return true }
+        catch { errorMessage = error.localizedDescription; return false }
+    }
+}
+
+struct SettingsView: View {
+    @StateObject private var model: SettingsViewModel
+    @EnvironmentObject private var session: AuthSessionViewModel
+    @EnvironmentObject private var services: AppServices
+    @State private var show2FASetup = false
+    @State private var showDeleteConfirm = false
+    @State private var deletePassword = ""
+
+    init(userService: UserServicing, authService: AuthServicing) {
+        _model = StateObject(wrappedValue: SettingsViewModel(userService: userService, authService: authService))
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                Button {
+                    show2FASetup = true
+                } label: {
+                    settingsLabel("Activer la 2FA", systemImage: "lock.shield")
+                }
+                NavigationLink {
+                    ChangePasswordView()
+                } label: { settingsLabel("Changer le mot de passe", systemImage: "key.fill") }
+            } header: {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    Text("Préférences").sqKicker()
+                    Text("Sécurité")
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .listRowBackground(SQColor.surface)
+            Section("Notifications") {
+                Toggle("Messages (push)", isOn: bind(\.notifyMessagesPush))
+                Toggle("Messages (in-app)", isOn: bind(\.notifyMessagesInApp))
+                Toggle("Mises à jour ANFR (push)", isOn: bind(\.notifyAnfrUpdatesPush))
+                Toggle("Likes & commentaires (push)", isOn: bind(\.notifyPhotoLikesPush))
+            }
+            .tint(SQColor.brandRed)
+            .foregroundStyle(SQColor.label)
+            .listRowBackground(SQColor.surface)
+            Section("Appels") {
+                Toggle("Ne pas déranger", isOn: bind(\.callsDoNotDisturb))
+            }
+            .tint(SQColor.brandRed)
+            .foregroundStyle(SQColor.label)
+            .listRowBackground(SQColor.surface)
+            Section {
+                GradientButton("Enregistrer", systemImage: "checkmark.circle.fill", isBusy: model.isBusy) {
+                    Task { await model.save() }
+                }
+            }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
+            Section("Informations légales") {
+                Link(destination: AppConfig.current.termsURL) {
+                    settingsLabel("Conditions d’utilisation", systemImage: "doc.text")
+                }
+                Link(destination: AppConfig.current.privacyURL) {
+                    settingsLabel("Politique de confidentialité", systemImage: "hand.raised")
+                }
+                Link(destination: AppConfig.current.legalURL) {
+                    settingsLabel("Mentions légales", systemImage: "building.columns")
+                }
+                if let contact = AppConfig.current.contactMailtoURL {
+                    Link(destination: contact) {
+                        settingsLabel("Contact & signalement", systemImage: "envelope")
+                    }
+                }
+                if let dataRequest = AppConfig.current.dataRequestMailtoURL {
+                    Link(destination: dataRequest) {
+                        settingsLabel("Demander mes données (RGPD)", systemImage: "square.and.arrow.down")
+                    }
+                }
+            }
+            .foregroundStyle(SQColor.label)
+            .listRowBackground(SQColor.surface)
+            Section {
+                Button(role: .destructive) { showDeleteConfirm = true } label: {
+                    Label("Supprimer mon compte", systemImage: "trash")
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.danger)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .listRowBackground(SQColor.danger.opacity(0.10))
+            if let error = model.errorMessage {
+                Section { Text(error).foregroundStyle(SQColor.danger) }
+                    .listRowBackground(SQColor.danger.opacity(0.10))
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .signalQuestBackground()
+        .navigationTitle("Réglages")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await model.load() }
+        .sheet(isPresented: $show2FASetup) {
+            NavigationStack { TwoFactorSetupView(service: services.auth) }
+        }
+        .alert("Supprimer le compte ?", isPresented: $showDeleteConfirm) {
+            SecureField("Mot de passe", text: $deletePassword)
+                .textContentType(.password)
+            Button("Annuler", role: .cancel) { deletePassword = "" }
+            Button("Supprimer", role: .destructive) {
+                let password = deletePassword
+                deletePassword = ""
+                Task {
+                    if await model.deleteAccount(password: password) {
+                        await session.logout()
+                    }
+                }
+            }
+        } message: {
+            Text("Cette action est irréversible. Saisis ton mot de passe pour confirmer la suppression de ton compte.")
+        }
+    }
+
+    private func settingsLabel(_ title: String, systemImage: String) -> some View {
+        Label {
+            Text(title).foregroundStyle(SQColor.label)
+        } icon: {
+            Image(systemName: systemImage).foregroundStyle(SQColor.brandRed)
+        }
+    }
+
+    private func bind(_ keyPath: WritableKeyPath<NotificationPreferences, Bool?>) -> Binding<Bool> {
+        Binding(
+            get: { model.prefs[keyPath: keyPath] ?? false },
+            set: { newValue in
+                var copy = model.prefs
+                copy[keyPath: keyPath] = newValue
+                model.prefs = copy
+            }
+        )
+    }
+}
+
+struct ChangePasswordView: View {
+    @EnvironmentObject private var services: AppServices
+    @State private var current = ""
+    @State private var newValue = ""
+    @State private var confirm = ""
+    @State private var error: String?
+    @State private var isBusy = false
+    @State private var success = false
+
+    var body: some View {
+        Form {
+            Section("Mot de passe actuel") {
+                SecureField("Mot de passe", text: $current)
+                    .foregroundStyle(SQColor.label)
+            }
+            .listRowBackground(SQColor.surface)
+            Section("Nouveau mot de passe") {
+                SecureField("Au moins 8 caractères", text: $newValue)
+                    .foregroundStyle(SQColor.label)
+                SecureField("Confirmer", text: $confirm)
+                    .foregroundStyle(SQColor.label)
+            }
+            .listRowBackground(SQColor.surface)
+            if let error {
+                Section { Text(error).foregroundStyle(SQColor.danger) }
+                    .listRowBackground(SQColor.danger.opacity(0.10))
+            }
+            if success {
+                Section { Label("Mot de passe modifié", systemImage: "checkmark.circle").foregroundStyle(SQColor.success) }
+                    .listRowBackground(SQColor.success.opacity(0.10))
+            }
+            Section {
+                GradientButton("Mettre à jour", systemImage: "key.fill", isBusy: isBusy) {
+                    Task { await save() }
+                }
+                .disabled(!canSubmit)
+                .opacity(canSubmit ? 1 : 0.5)
+            }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
+        }
+        .scrollContentBackground(.hidden)
+        .signalQuestBackground()
+        .navigationTitle("Mot de passe")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var canSubmit: Bool {
+        newValue.count >= 8 && newValue == confirm && !current.isEmpty && !isBusy
+    }
+
+    private func save() async {
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            try await services.auth.changePassword(currentPassword: current, newPassword: newValue)
+            success = true
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+}
+
