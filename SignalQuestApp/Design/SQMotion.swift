@@ -3,9 +3,22 @@ import SwiftUI
 /// Centralised animation tokens. Use these instead of hand-tuned springs so the
 /// whole app feels coherent.
 enum SQMotion {
-    static let snappy: Animation = .snappy(duration: 0.32, extraBounce: 0.05)
-    static let smooth: Animation = .smooth(duration: 0.45)
-    static let bouncy: Animation = .bouncy(duration: 0.55, extraBounce: 0.15)
+    // Les courbes `.snappy/.smooth/.bouncy` et `spring(duration:bounce:)` sont
+    // iOS 17+. On les garde sur iOS 17+ et on retombe sur des springs iOS 16
+    // visuellement équivalentes (rétro-compat iOS 16, sans changer le ressenti
+    // sur iOS 17/18/26).
+    static var snappy: Animation {
+        if #available(iOS 17.0, *) { return .snappy(duration: 0.32, extraBounce: 0.05) }
+        return .spring(response: 0.32, dampingFraction: 0.80)
+    }
+    static var smooth: Animation {
+        if #available(iOS 17.0, *) { return .smooth(duration: 0.45) }
+        return .spring(response: 0.45, dampingFraction: 1.0)
+    }
+    static var bouncy: Animation {
+        if #available(iOS 17.0, *) { return .bouncy(duration: 0.55, extraBounce: 0.15) }
+        return .spring(response: 0.55, dampingFraction: 0.66)
+    }
     static let micro: Animation = .interpolatingSpring(stiffness: 320, damping: 24)
 
     /// A long, soft transition used for big screen changes (sheet → detail).
@@ -17,9 +30,15 @@ enum SQMotion {
     /// Transitions courantes : apparition de cards, fades (web 250 ms).
     static let standard: Animation = .easeInOut(duration: 0.25)
     /// Transitions accentuées : sheets, panneaux (web 400 ms, courbe emphasized).
-    static let emphasized: Animation = .spring(duration: 0.4, bounce: 0.12)
+    static var emphasized: Animation {
+        if #available(iOS 17.0, *) { return .spring(duration: 0.4, bounce: 0.12) }
+        return .spring(response: 0.4, dampingFraction: 0.82)
+    }
     /// Grandes entrées de scène (web 600 ms).
-    static let slow: Animation = .spring(duration: 0.6, bounce: 0.18)
+    static var slow: Animation {
+        if #available(iOS 17.0, *) { return .spring(duration: 0.6, bounce: 0.18) }
+        return .spring(response: 0.6, dampingFraction: 0.78)
+    }
 
     /// Returns the animation, or `nil` when Reduce Motion is enabled. Use inside
     /// `withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { ... }`.

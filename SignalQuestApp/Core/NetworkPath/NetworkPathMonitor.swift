@@ -234,27 +234,11 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
     }
 
     private func currentCarrierName() -> String? {
-        guard let providers = telephony.serviceSubscriberCellularProviders else {
-            return nil
-        }
-
-        if let dataServiceIdentifier = telephony.dataServiceIdentifier,
-           let carrierName = normalizedCarrierName(providers[dataServiceIdentifier]?.carrierName) {
-            return carrierName
-        }
-
-        for serviceIdentifier in providers.keys.sorted() {
-            if let carrierName = normalizedCarrierName(providers[serviceIdentifier]?.carrierName) {
-                return carrierName
-            }
-        }
-        return nil
-    }
-
-    private func normalizedCarrierName(_ value: String?) -> String? {
-        guard let value else { return nil }
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty || trimmed == "--" ? nil : trimmed
+        // `CTCarrier` / `serviceSubscriberCellularProviders` / `carrierName` sont
+        // dépréciés SANS remplacement depuis iOS 16 (Apple renvoie « -- » pour des
+        // raisons de confidentialité). On n'expose donc plus le nom d'opérateur via
+        // CoreTelephony — c'est intentionnel et conforme à la direction Apple.
+        nil
     }
 }
 

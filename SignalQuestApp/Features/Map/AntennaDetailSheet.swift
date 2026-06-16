@@ -129,7 +129,7 @@ struct AntennaDetailSheet: View {
         .fullScreenCover(item: $viewerPhoto) { photo in
             AntennaPhotoViewer(photos: model.details?.photos ?? [photo], initialId: photo.id)
         }
-        .onChange(of: photoPickerItem) { _, newValue in
+        .onChangeCompat(of: photoPickerItem) { _, newValue in
             guard let newValue else { return }
             Task {
                 await model.uploadPhoto(
@@ -148,16 +148,17 @@ struct AntennaDetailSheet: View {
     /// Carte « Ajouter une photo » : disponible quelle que soit la présence de
     /// photos existantes. Réutilise `PhotoService.uploadPhoto` (siteId/anfr/opérateur).
     private var addPhotoCard: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
+        let uploading = model.isUploadingPhoto
+        return VStack(alignment: .leading, spacing: SQSpace.sm) {
             AntennaSectionHeader(kicker: "Contribuer", title: "Ajouter une photo", systemImage: "camera")
             PhotosPicker(selection: $photoPickerItem, matching: .images) {
                 HStack(spacing: SQSpace.sm) {
-                    if model.isUploadingPhoto {
+                    if uploading {
                         ProgressView().tint(.white)
                     } else {
                         Image(systemName: "camera.fill").font(.system(size: 15, weight: .bold))
                     }
-                    Text(model.isUploadingPhoto ? "Envoi…" : "Choisir une photo du site")
+                    Text(uploading ? "Envoi…" : "Choisir une photo du site")
                         .font(SQType.button)
                 }
                 .frame(maxWidth: .infinity)
@@ -593,7 +594,7 @@ private struct AzimuthFanView: View {
             context.draw(
                 Text("N")
                     .font(.system(size: 10, weight: .heavy))
-                    .foregroundStyle(Color.secondary),
+                    .foregroundColor(Color.secondary),
                 at: CGPoint(x: center.x, y: center.y - radius + 11)
             )
 
@@ -622,7 +623,7 @@ private struct AzimuthFanView: View {
                 context.draw(
                     Text("\(Int(azimuth.rounded()))°")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(color),
+                        .foregroundColor(color),
                     at: CGPoint(
                         x: center.x + CGFloat(cos(radians)) * (radius + 12),
                         y: center.y + CGFloat(sin(radians)) * (radius + 12)

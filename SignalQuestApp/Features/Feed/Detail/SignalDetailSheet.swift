@@ -18,7 +18,6 @@ struct SignalDetailSheet: View {
 
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
-    @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var speedtestDetail: SpeedtestDetail?
     @State private var detailError: String?
 
@@ -248,21 +247,15 @@ struct SignalDetailSheet: View {
         if let lat = item.latitude ?? signal?.latitude ?? speedtestDetail?.latitude,
            let lng = item.longitude ?? signal?.longitude ?? speedtestDetail?.longitude {
             let center = CLLocationCoordinate2D(latitude: lat, longitude: lng)
-            Map(position: $cameraPosition) {
-                Marker(item.placeLabel ?? "Localisation", coordinate: center)
-                    .tint(accent)
+            let region = MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01))
+            SQRegionMap(region: .constant(region), items: [SQMapPin(coordinate: center)]) { pin in
+                MapMarker(coordinate: pin.coordinate, tint: accent)
             }
             .frame(height: 180)
             .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
                     .stroke(SQColor.separator, lineWidth: 1.5)
-            }
-            .onAppear {
-                cameraPosition = .region(MKCoordinateRegion(
-                    center: center,
-                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                ))
             }
         } else if item.kind.lowercased() == "speedtest" {
             Label("Localisation non partagée", systemImage: "location.slash")

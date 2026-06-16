@@ -2,6 +2,7 @@ import Foundation
 import CoreLocation
 import Network
 import UIKit
+import WidgetKit
 
 // MARK: - Service protocol
 
@@ -408,6 +409,20 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         values.insert(result, at: 0)
         if values.count > 20 { values = Array(values.prefix(20)) }
         try await historyCache.write(values, for: "history")
+        // Partage le dernier résultat avec le widget (App Group), rafraîchit le
+        // widget et indexe l'item Spotlight.
+        let snapshot = SpeedtestWidgetSnapshot(
+            downloadMbps: result.downloadMbps,
+            uploadMbps: result.uploadMbps,
+            pingMs: result.pingMinMs ?? result.pingMs,
+            jitterMs: result.jitterMs,
+            network: result.networkOperatorName ?? result.wifiSSID ?? "Réseau",
+            label: result.label,
+            date: result.createdAt
+        )
+        WidgetSharedStore.saveLastSpeedtest(snapshot)
+        WidgetCenter.shared.reloadAllTimelines()
+        SQSpotlight.donateLastSpeedtest(snapshot)
     }
 
     private struct PendingSpeedtestSave: Codable, Equatable, Sendable {

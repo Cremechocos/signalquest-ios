@@ -290,7 +290,7 @@ struct MapItemSheet: View {
         }
         .task(id: item.backendId) { await loadSpeedtestDetailIfNeeded() }
         .presentationDetents([.height(360), .medium, .large])
-        .presentationBackground(.ultraThinMaterial)
+        .presentationBackgroundCompat(.ultraThinMaterial)
     }
 
     private var speedtestContent: some View {

@@ -33,9 +33,9 @@ struct MessageSearchView: View {
             content
         }
         .navigationTitle("Rechercher")
-        .toolbarTitleDisplayMode(.inline)
+        .toolbarTitleInlineCompat()
         .signalQuestBackground()
-        .onChange(of: query) { _, _ in scheduleSearch() }
+        .onChangeCompat(of: query) { _, _ in scheduleSearch() }
     }
 
     @ViewBuilder

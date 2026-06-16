@@ -25,7 +25,7 @@ struct IncomingCallView: View {
                 Image(systemName: call.mode == "video" ? "video.fill" : "phone.fill")
                     .font(.system(size: 34))
                     .foregroundStyle(SQGradient.signal)
-                    .symbolEffect(.pulse, options: .repeating)
+                    .symbolEffectPulseCompat()
                 Spacer()
                 HStack(spacing: SQSpace.huge - 4) {
                     Button {

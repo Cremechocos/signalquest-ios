@@ -211,7 +211,7 @@ struct ExploreView: View {
                 SQSearchField(text: $model.searchText, placeholder: "Rechercher un utilisateur") {
                     model.scheduleSearch()
                 }
-                .onChange(of: model.searchText) { _, _ in
+                .onChangeCompat(of: model.searchText) { _, _ in
                     model.scheduleSearch()
                 }
 
@@ -239,13 +239,13 @@ struct ExploreView: View {
             .padding(.bottom, SQSpace.xxl)
         }
         .navigationTitle("Explorer")
-        .toolbarTitleDisplayMode(.large)
+        .toolbarTitleLargeCompat()
         .signalQuestBackground()
         .task {
             if model.trending.isEmpty && model.suggestions.isEmpty { await model.load() }
         }
         .refreshable { await model.load() }
-        .navigationDestination(item: $profileAuthor) { author in
+        .navigationDestinationItemCompat($profileAuthor) { author in
             UserProfileView(userId: author.id, prefill: author, service: service)
         }
         .sheet(item: $detailItem) { item in

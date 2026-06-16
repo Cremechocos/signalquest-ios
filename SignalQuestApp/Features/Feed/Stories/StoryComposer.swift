@@ -107,7 +107,7 @@ struct StoryComposer: View {
                         }
                     }
                     .buttonStyle(SQPressButtonStyle())
-                    .onChange(of: model.selectedItem) { _, _ in
+                    .onChangeCompat(of: model.selectedItem) { _, _ in
                         Task { await model.loadPickerImage() }
                     }
 

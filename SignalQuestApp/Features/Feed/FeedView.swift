@@ -287,7 +287,7 @@ struct FeedView: View {
         }
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 96) }
         .navigationTitle("Feed")
-        .toolbarTitleDisplayMode(.large)
+        .toolbarTitleLargeCompat()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -317,7 +317,7 @@ struct FeedView: View {
         .navigationDestination(isPresented: $showExplore) {
             ExploreView(service: services.feed)
         }
-        .navigationDestination(item: $profileAuthor) { author in
+        .navigationDestinationItemCompat($profileAuthor) { author in
             UserProfileView(
                 userId: author.id,
                 prefill: author,
@@ -325,10 +325,10 @@ struct FeedView: View {
                 service: services.feed
             )
         }
-        .navigationDestination(item: $routedProfileId) { id in
+        .navigationDestinationItemCompat($routedProfileId) { id in
             UserProfileView(userId: id, service: services.feed)
         }
-        .navigationDestination(item: $routedPostItem) { routed in
+        .navigationDestinationItemCompat($routedPostItem) { routed in
             PostDetailView(
                 item: routed.item,
                 feedService: services.feed,
@@ -336,12 +336,12 @@ struct FeedView: View {
                 reportsService: services.reports
             )
         }
-        .onChange(of: router.openUserProfileId) { _, id in
+        .onChangeCompat(of: router.openUserProfileId) { _, id in
             guard let id else { return }
             router.openUserProfileId = nil
             routedProfileId = id
         }
-        .onChange(of: router.openPostId) { _, id in
+        .onChangeCompat(of: router.openPostId) { _, id in
             guard let id else { return }
             router.openPostId = nil
             // On privilégie l'item déjà chargé dans le feed, sinon on le récupère.

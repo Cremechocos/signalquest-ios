@@ -3,13 +3,14 @@ import CoreLocation
 
 protocol MapSnapshotServicing: Sendable {
     func snapshot(bounds: MapBounds, zoom: Double, lightweight: Bool) async throws -> SocialMapSnapshot
-    func plannedSites(market: String, operatorName: String, territory: String?) async throws -> [PlannedSiteLive]
-    func outageSites(market: String, operatorName: String, territory: String?) async throws -> [OutageSiteLive]
-    func coveragePoints(bounds: MapBounds, market: String, operatorName: String, technology: String?) async throws -> [CoverageHeatPoint]
-    func antennaTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, withAzimuth: Bool) async throws -> [AndroidAntennaTileResponse]
-    func speedtestTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int) async throws -> [AndroidSpeedtestTileResponse]
-    func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int) async throws -> [AndroidCoverageTileResponse]
-    func communitySiteTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, includeObserved: Bool) async throws -> [AndroidCommunitySiteTileResponse]
+    func plannedSites(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> [PlannedSiteLive]
+    func outageSites(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> [OutageSiteLive]
+    func coveragePoints(bounds: MapBounds, market: String, operatorName: String, technology: String?, bands: Set<Int>) async throws -> [CoverageHeatPoint]
+    func publicPhotos(bounds: MapBounds, zoom: Double, market: String, operatorName: String, friendsOnly: Bool) async throws -> [MapPublicPhoto]
+    func antennaTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, withAzimuth: Bool, bands: Set<Int>) async throws -> [AndroidAntennaTileResponse]
+    func speedtestTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>) async throws -> [AndroidSpeedtestTileResponse]
+    func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>) async throws -> [AndroidCoverageTileResponse]
+    func communitySiteTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, includeObserved: Bool, bands: Set<Int>) async throws -> [AndroidCommunitySiteTileResponse]
 }
 
 struct MapBounds: Equatable, Sendable {
@@ -53,7 +54,7 @@ final class MapSnapshotService: MapSnapshotServicing {
         return snapshot
     }
 
-    func plannedSites(market: String, operatorName: String, territory: String? = nil) async throws -> [PlannedSiteLive] {
+    func plannedSites(market: String, operatorName: String, territory: String? = nil, bands: Set<Int> = []) async throws -> [PlannedSiteLive] {
         var query = [
             URLQueryItem(name: "market", value: market),
             URLQueryItem(name: "operator", value: operatorName)
@@ -61,6 +62,7 @@ final class MapSnapshotService: MapSnapshotServicing {
         if let territory, !territory.isEmpty {
             query.append(URLQueryItem(name: "territory", value: territory))
         }
+        query.append(contentsOf: Self.bandQueryItems(bands))
         let response: PlannedSitesResponse = try await api.request(
             APIEndpoint(path: "/api/map/planned-sites", query: query),
             as: PlannedSitesResponse.self
@@ -68,14 +70,9 @@ final class MapSnapshotService: MapSnapshotServicing {
         return response.sites
     }
 
-    func outageSites(market: String, operatorName: String, territory: String? = nil) async throws -> [OutageSiteLive] {
-        // En France, le backend ne supporte pas « ALL » pour les incidents : on
-        // agrège SFR + Bouygues. Les autres marchés (DROM, CA) acceptent ALL.
-        if operatorName == "ALL" && market == "FR" {
-            async let sfr = outageSites(market: market, operatorName: "SFR")
-            async let bouygues = outageSites(market: market, operatorName: "BOUYGUES")
-            return ((try? await sfr) ?? []) + ((try? await bouygues) ?? [])
-        }
+    func outageSites(market: String, operatorName: String, territory: String? = nil, bands: Set<Int> = []) async throws -> [OutageSiteLive] {
+        // `/api/android/map/incidents` accepte « ALL » pour FR (tous opérateurs
+        // confondus, ~800 incidents) comme pour DROM/CA — pas besoin d'agréger.
         var query = [
             URLQueryItem(name: "market", value: market),
             URLQueryItem(name: "operator", value: operatorName)
@@ -83,14 +80,19 @@ final class MapSnapshotService: MapSnapshotServicing {
         if let territory, !territory.isEmpty {
             query.append(URLQueryItem(name: "territory", value: territory))
         }
+        query.append(contentsOf: Self.bandQueryItems(bands))
+        // `/api/android/map/incidents` (le même endpoint qu'Android) renvoie des
+        // coordonnées `lat`/`lon` minuscules + un `issueType` exploitable, là où
+        // `/api/sites-hs` renvoyait `Lat`/`Lon` (majuscules) que iOS ne décodait
+        // pas → les pannes ne s'affichaient jamais.
         let response: OutageSitesResponse = try await api.request(
-            APIEndpoint(path: "/api/sites-hs", query: query),
+            APIEndpoint(path: "/api/android/map/incidents", query: query, authenticated: false),
             as: OutageSitesResponse.self
         )
         return response.sites
     }
 
-    func coveragePoints(bounds: MapBounds, market: String, operatorName: String, technology: String?) async throws -> [CoverageHeatPoint] {
+    func coveragePoints(bounds: MapBounds, market: String, operatorName: String, technology: String?, bands: Set<Int> = []) async throws -> [CoverageHeatPoint] {
         var query = [
             URLQueryItem(name: "north", value: "\(bounds.north)"),
             URLQueryItem(name: "south", value: "\(bounds.south)"),
@@ -104,6 +106,7 @@ final class MapSnapshotService: MapSnapshotServicing {
         if let technology, !technology.isEmpty {
             query.append(URLQueryItem(name: "technology", value: technology))
         }
+        query.append(contentsOf: Self.bandQueryItems(bands))
         let response: CoveragePointsResponse = try await api.request(
             APIEndpoint(path: "/api/coverage/points", query: query),
             as: CoveragePointsResponse.self
@@ -111,55 +114,132 @@ final class MapSnapshotService: MapSnapshotServicing {
         return response.points
     }
 
-    func antennaTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, withAzimuth: Bool = true) async throws -> [AndroidAntennaTileResponse] {
-        try await fetchTiles(
+    /// Photos publiques de tous les membres dans la zone (endpoint additif
+    /// `/api/map/photos`). Filtre par opérateur DE LA PHOTO ; `friendsOnly`
+    /// restreint aux amis (mode « Amis »). Coords résolues côté backend.
+    func publicPhotos(bounds: MapBounds, zoom: Double, market: String, operatorName: String, friendsOnly: Bool) async throws -> [MapPublicPhoto] {
+        let query = [
+            URLQueryItem(name: "north", value: "\(bounds.north)"),
+            URLQueryItem(name: "south", value: "\(bounds.south)"),
+            URLQueryItem(name: "east", value: "\(bounds.east)"),
+            URLQueryItem(name: "west", value: "\(bounds.west)"),
+            URLQueryItem(name: "zoom", value: "\(Int(zoom))"),
+            URLQueryItem(name: "market", value: market),
+            URLQueryItem(name: "operator", value: operatorName),
+            URLQueryItem(name: "friendsOnly", value: friendsOnly ? "1" : "0")
+        ]
+        let response: MapPublicPhotosResponse = try await api.request(
+            APIEndpoint(path: "/api/map/photos", query: query),
+            as: MapPublicPhotosResponse.self
+        )
+        return response.photos
+    }
+
+    func antennaTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, withAzimuth: Bool = true, bands: Set<Int> = []) async throws -> [AndroidAntennaTileResponse] {
+        let bandKey = Self.bandCacheKey(bands)
+        return try await fetchTiles(
             bounds: bounds,
             zoom: zoom,
             cacheKey: { tile in
-                "antennas:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):az=\(withAzimuth)"
+                "antennas:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):az=\(withAzimuth):bands=\(bandKey)"
             },
             endpoint: { tile in
-                APIEndpoint(
+                var query = [
+                    URLQueryItem(name: "market", value: market),
+                    URLQueryItem(name: "operator", value: operatorName),
+                    URLQueryItem(name: "withAzimuth", value: withAzimuth ? "true" : "false")
+                ]
+                query.append(contentsOf: Self.bandQueryItems(bands))
+                return APIEndpoint(
                     path: "/api/android/map/tiles/antennas/\(tile.z)/\(tile.x)/\(tile.y)",
-                    query: [
-                        URLQueryItem(name: "market", value: market),
-                        URLQueryItem(name: "operator", value: operatorName),
-                        URLQueryItem(name: "withAzimuth", value: withAzimuth ? "true" : "false")
-                    ]
+                    query: query
                 )
             }
         )
     }
 
-    func speedtestTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0) async throws -> [AndroidSpeedtestTileResponse] {
-        try await fetchTiles(
-            bounds: bounds,
-            zoom: zoom,
-            cacheKey: { tile in
-                "speedtests:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):days=\(days)"
-            },
-            endpoint: { tile in
-                APIEndpoint(
-                    path: "/api/android/map/tiles/speedtests/\(tile.z)/\(tile.x)/\(tile.y)",
-                    query: [
-                        URLQueryItem(name: "market", value: market),
-                        URLQueryItem(name: "operator", value: operatorName),
-                        URLQueryItem(name: "days", value: days <= 0 ? "all" : String(days))
-                    ],
-                    authenticated: false
-                )
+    func speedtestTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0, bands: Set<Int> = []) async throws -> [AndroidSpeedtestTileResponse] {
+        // Speedtests : TOUT afficher, sans cluster ni cap. Le backend plafonne
+        // chaque page à 5000 ; on pagine par `offset` (jusqu'à 4 pages = 20 000
+        // points/tuile, comme Android) et on fusionne en une seule réponse.
+        let tiles = Self.visibleTiles(bounds: bounds, zoom: zoom)
+        guard !tiles.isEmpty else { return [] }
+        return try await withThrowingTaskGroup(of: AndroidSpeedtestTileResponse?.self) { group in
+            for tile in tiles {
+                group.addTask { [api, tileCache] in
+                    try await Self.fetchSpeedtestTilePaged(
+                        api: api,
+                        tileCache: tileCache,
+                        tile: tile,
+                        market: market,
+                        operatorName: operatorName,
+                        days: days,
+                        bands: bands
+                    )
+                }
             }
-        )
+            var responses: [AndroidSpeedtestTileResponse] = []
+            for try await response in group {
+                if let response { responses.append(response) }
+            }
+            return responses
+        }
     }
 
-    func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0) async throws -> [AndroidCoverageTileResponse] {
-        try await fetchTiles(
+    private static let speedtestPageSize = 5000
+    private static let speedtestMaxPages = 4
+
+    private static func fetchSpeedtestTilePaged(
+        api: APIClient,
+        tileCache: TileCache,
+        tile: AndroidMapTile,
+        market: String,
+        operatorName: String,
+        days: Int,
+        bands: Set<Int>
+    ) async throws -> AndroidSpeedtestTileResponse? {
+        var merged: [AndroidSpeedtestMarker] = []
+        var tileMeta: AndroidMapTile?
+        var offset = 0
+        for _ in 0..<speedtestMaxPages {
+            let pageOffset = offset
+            let key = "speedtests:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):days=\(days):bands=\(bandCacheKey(bands)):off=\(pageOffset)"
+            let data = try await tileCache.data(for: key) {
+                var query = [
+                    URLQueryItem(name: "market", value: market),
+                    URLQueryItem(name: "operator", value: operatorName),
+                    URLQueryItem(name: "days", value: days <= 0 ? "all" : String(days)),
+                    URLQueryItem(name: "limit", value: String(speedtestPageSize)),
+                    URLQueryItem(name: "offset", value: String(pageOffset))
+                ]
+                query.append(contentsOf: bandQueryItems(bands))
+                return try await api.requestData(
+                    APIEndpoint(
+                        path: "/api/android/map/tiles/speedtests/\(tile.z)/\(tile.x)/\(tile.y)",
+                        query: query,
+                        authenticated: false
+                    )
+                )
+            }
+            let page = try JSONDecoder.signalQuest.decode(AndroidSpeedtestTileResponse.self, from: data)
+            tileMeta = page.tile
+            merged.append(contentsOf: page.markers)
+            guard page.stats?.hasMore == true, let next = page.stats?.nextOffset, next > pageOffset else { break }
+            offset = next
+        }
+        guard let tileMeta else { return nil }
+        return AndroidSpeedtestTileResponse(tile: tileMeta, clusters: [], markers: merged, stats: nil)
+    }
+
+    func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0, bands: Set<Int> = []) async throws -> [AndroidCoverageTileResponse] {
+        let bandKey = Self.bandCacheKey(bands)
+        return try await fetchTiles(
             bounds: bounds,
             zoom: zoom,
             cacheKey: { tile in
                 // Le z fait partie de la clé, donc detail/limit (dérivés du z)
-                // sont couverts ; seul days doit être explicité.
-                "coverage:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):days=\(days)"
+                // sont couverts ; days et bandes doivent être explicites.
+                "coverage:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):days=\(days):bands=\(bandKey)"
             },
             endpoint: { tile in
                 var query = [
@@ -167,6 +247,7 @@ final class MapSnapshotService: MapSnapshotServicing {
                     URLQueryItem(name: "operator", value: operatorName),
                     URLQueryItem(name: "days", value: days <= 0 ? "all" : String(days))
                 ]
+                query.append(contentsOf: Self.bandQueryItems(bands))
                 if tile.z < 13 {
                     query.append(URLQueryItem(name: "detail", value: "overview"))
                 } else {
@@ -181,23 +262,26 @@ final class MapSnapshotService: MapSnapshotServicing {
         )
     }
 
-    func communitySiteTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, includeObserved: Bool) async throws -> [AndroidCommunitySiteTileResponse] {
-        try await fetchTiles(
+    func communitySiteTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, includeObserved: Bool, bands: Set<Int> = []) async throws -> [AndroidCommunitySiteTileResponse] {
+        let bandKey = Self.bandCacheKey(bands)
+        return try await fetchTiles(
             bounds: bounds,
             zoom: zoom,
             cacheKey: { tile in
-                "community-sites:\(market):\(operatorName):obs\(includeObserved ? 1 : 0):\(tile.z)/\(tile.x)/\(tile.y)"
+                "community-sites:\(market):\(operatorName):obs\(includeObserved ? 1 : 0):bands=\(bandKey):\(tile.z)/\(tile.x)/\(tile.y)"
             },
             endpoint: { tile in
-                APIEndpoint(
+                var query = [
+                    URLQueryItem(name: "market", value: market),
+                    URLQueryItem(name: "operator", value: operatorName),
+                    // Le backend inclut les cellules observées par défaut ;
+                    // on ne restreint qu'en envoyant explicitement « false ».
+                    URLQueryItem(name: "includeObserved", value: includeObserved ? "true" : "false")
+                ]
+                query.append(contentsOf: Self.bandQueryItems(bands))
+                return APIEndpoint(
                     path: "/api/android/map/tiles/community-sites/\(tile.z)/\(tile.x)/\(tile.y)",
-                    query: [
-                        URLQueryItem(name: "market", value: market),
-                        URLQueryItem(name: "operator", value: operatorName),
-                        // Le backend inclut les cellules observées par défaut ;
-                        // on ne restreint qu'en envoyant explicitement « false ».
-                        URLQueryItem(name: "includeObserved", value: includeObserved ? "true" : "false")
-                    ]
+                    query: query
                 )
             }
         )
@@ -225,6 +309,39 @@ final class MapSnapshotService: MapSnapshotServicing {
                 responses.append(response)
             }
             return responses
+        }
+    }
+
+    private static func bandQueryItems(_ bands: Set<Int>) -> [URLQueryItem] {
+        let values = bands.sorted()
+        guard !values.isEmpty else { return [] }
+        let bandValue = values.map(String.init).joined(separator: ",")
+        var items = [
+            URLQueryItem(name: "bands", value: bandValue),
+            URLQueryItem(name: "band", value: bandValue),
+            URLQueryItem(name: "frequencyBands", value: bandValue)
+        ]
+        let frequencyValue = values.compactMap(frequencyMHz(forBand:)).map(String.init).joined(separator: ",")
+        if !frequencyValue.isEmpty {
+            items.append(URLQueryItem(name: "frequencies", value: frequencyValue))
+            items.append(URLQueryItem(name: "frequency", value: frequencyValue))
+        }
+        return items
+    }
+
+    private static func bandCacheKey(_ bands: Set<Int>) -> String {
+        bands.isEmpty ? "all" : bands.sorted().map(String.init).joined(separator: "-")
+    }
+
+    private static func frequencyMHz(forBand band: Int) -> Int? {
+        switch band {
+        case 1: return 2100
+        case 3: return 1800
+        case 7: return 2600
+        case 20: return 800
+        case 28: return 700
+        case 78: return 3500
+        default: return nil
         }
     }
 

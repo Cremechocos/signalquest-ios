@@ -17,6 +17,9 @@ final class AppServices: ObservableObject {
     let photos: PhotoServicing
     let messages: MessagesServicing
     let leaderboards: LeaderboardServicing
+    let sessions: SessionsServicing
+    let validations: ValidationsServicing
+    let identify: IdentifyServicing
     let e2ee: E2EEServicing
     let friends: FriendsServicing
     let gamification: GamificationServicing
@@ -56,6 +59,9 @@ final class AppServices: ObservableObject {
         photos = PhotoService(api: api)
         messages = MessagesService(api: api)
         leaderboards = LeaderboardService(api: api)
+        sessions = SessionsService(api: api)
+        validations = ValidationsService(api: api)
+        identify = IdentifyService(api: api)
         friends = FriendsService(api: api)
         gamification = GamificationService(api: api)
         notifications = NotificationsService(api: api)

@@ -147,7 +147,7 @@ struct MessagesView: View {
         }
         .scrollContentBackground(.hidden)
         .navigationTitle("Messages")
-        .toolbarTitleDisplayMode(.inline)
+        .toolbarTitleInlineCompat()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -169,12 +169,12 @@ struct MessagesView: View {
             await model.load()
             await model.decryptPreviews(e2ee: e2ee)
         }
-        .navigationDestination(item: $routedConversationId) { id in
+        .navigationDestinationItemCompat($routedConversationId) { id in
             if let conversation = model.conversations.first(where: { $0.id == id }) {
                 ConversationDetailView(conversation: conversation, service: service, e2ee: e2ee)
             }
         }
-        .onChange(of: router.openConversationId) { _, _ in
+        .onChangeCompat(of: router.openConversationId) { _, _ in
             Task { await openRoutedConversationIfNeeded() }
         }
         .sheet(isPresented: $showNewConversation) {
@@ -378,7 +378,7 @@ private struct NewConversationSheet: View {
                     .tint(SQColor.brandOrange)
                 }
             }
-            .onChange(of: query) { _, _ in
+            .onChangeCompat(of: query) { _, _ in
                 Task {
                     try? await Task.sleep(nanoseconds: 350_000_000)
                     await search()

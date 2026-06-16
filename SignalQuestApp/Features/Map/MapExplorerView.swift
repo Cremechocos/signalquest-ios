@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import ImageIO
 #if canImport(MapLibre)
 import MapLibre
 #endif
@@ -15,6 +16,9 @@ final class MapExplorerViewModel: ObservableObject {
     @Published var plannedSites: [PlannedSiteLive] = []
     @Published var outages: [OutageSiteLive] = []
     @Published var coverageHeat: [CoverageHeatPoint] = []
+    /// Photos publiques de tous les membres (couche Photos). Mode « Amis » =
+    /// restreint aux amis (rechargé avec friendsOnly).
+    @Published var publicPhotos: [MapPublicPhoto] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var marketFilter = "FR"
@@ -215,7 +219,7 @@ final class MapExplorerViewModel: ObservableObject {
         }
     }
 
-    /// À consommer dans `.onChange(of: marketFilter)` : vrai si le changement
+    /// À consommer dans `.onChangeCompat(of: marketFilter)` : vrai si le changement
     /// vient du switch automatique (la caméra ne doit alors pas bouger).
     func consumeAutoMarketSwitch() -> Bool {
         defer { autoMarketSwitchInProgress = false }
@@ -290,9 +294,10 @@ final class MapExplorerViewModel: ObservableObject {
         if AppEnvironment.usesDemoData {
             snapshot = .demo
             // QA (DEBUG) : injecte de vraies photos géolocalisées même en démo pour
-            // visualiser/capturer le rendu de la couche Photos sur la carte.
+            // visualiser/capturer le rendu de la couche Photos (publicPhotos).
             if ProcessInfo.processInfo.arguments.contains("--qa-demo-photos") {
                 snapshot = Self.snapshotInjectingQAPhotos(into: snapshot, around: bounds)
+                publicPhotos = Self.demoPublicPhotos(around: bounds)
             }
             errorMessage = nil
             return
@@ -332,10 +337,13 @@ final class MapExplorerViewModel: ObservableObject {
         let wantsOutage = filters.contains(.outage) && supportsPlannedOutage
         let wantsCoverage = filters.contains(.coverage)
 
-        // Le snapshot « lightweight » omet photos/validations/sessions (perf). Quand
-        // une de ces couches est active, on charge le snapshot COMPLET — sinon la
-        // carte n'affichait JAMAIS aucune photo (le backend renvoie photos: []).
-        let needsHeavySnapshot = filters.contains(.photo) || filters.contains(.validation) || filters.contains(.session)
+        // Photos : couche dédiée `/api/map/photos` (TOUS les membres), filtrée par
+        // opérateur de la photo + mode « Amis » (= filtre `.friend` actif).
+        let wantsPhoto = filters.contains(.photo)
+        let photosFriendsOnly = filters.contains(.friend)
+        // Le snapshot « lightweight » omet validations/sessions (perf). On ne charge
+        // le snapshot COMPLET que pour ces couches (les photos ont leur endpoint).
+        let needsHeavySnapshot = filters.contains(.validation) || filters.contains(.session)
         let snapshotLightweight = lightweight && !needsHeavySnapshot
         async let snapshotResult: (snapshot: SocialMapSnapshot?, error: String?) = {
             do { return (try await svc.snapshot(bounds: bounds, zoom: zoom, lightweight: snapshotLightweight), nil) }
@@ -344,7 +352,9 @@ final class MapExplorerViewModel: ObservableObject {
         // tiles non-nil → tuiles disponibles ; tiles nil → repli sur la liste bbox.
         async let antennaRaw: (tiles: [AndroidAntennaTileResponse]?, list: [AntennaSite]) = {
             guard wantsAntenna else { return (nil, []) }
-            if let tiles = try? await svc.antennaTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, withAzimuth: true) {
+            let usesAdvancedAntennaFilters = !techs.isEmpty || !bands.isEmpty || !sharing.isEmpty
+            if !usesAdvancedAntennaFilters,
+               let tiles = try? await svc.antennaTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, withAzimuth: true, bands: bands) {
                 return (tiles, [])
             }
             let list = (try? await antennasSvc.list(bbox: bounds.asBoundingBox, market: market, operatorName: op, technologies: techs, bands: bands, sharing: sharing)) ?? []
@@ -352,28 +362,38 @@ final class MapExplorerViewModel: ObservableObject {
         }()
         async let communityRaw: [AndroidCommunitySiteTileResponse] = {
             guard wantsCommunitySites else { return [] }
-            return (try? await svc.communitySiteTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, includeObserved: includeObserved)) ?? []
+            return (try? await svc.communitySiteTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, includeObserved: includeObserved, bands: bands)) ?? []
         }()
         async let speedtestRaw: [AndroidSpeedtestTileResponse] = {
             guard wantsSpeedtest else { return [] }
-            return (try? await svc.speedtestTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: stDays)) ?? []
+            return (try? await svc.speedtestTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: stDays, bands: bands)) ?? []
         }()
+        // Prévisionnels & pannes : respectent le filtre opérateur de la carte
+        // (l'opérateur sélectionné `op`, ou ALL quand « Tous » est choisi). Le
+        // backend FR accepte ALL comme un opérateur précis.
         async let plannedRaw: [PlannedSiteLive] = {
             guard wantsPlanned else { return [] }
-            return ((try? await svc.plannedSites(market: market, operatorName: op, territory: territory)) ?? []).filter { bounds.contains(lat: $0.lat, lon: $0.lon) }
+            return ((try? await svc.plannedSites(market: market, operatorName: op, territory: territory, bands: bands)) ?? []).filter { bounds.contains(lat: $0.lat, lon: $0.lon) }
         }()
         async let outageRaw: [OutageSiteLive] = {
             guard wantsOutage else { return [] }
-            return ((try? await svc.outageSites(market: market, operatorName: op, territory: territory)) ?? []).filter { bounds.contains(lat: $0.lat, lon: $0.lon) }
+            return ((try? await svc.outageSites(market: market, operatorName: op, territory: territory, bands: bands)) ?? []).filter { bounds.contains(lat: $0.lat, lon: $0.lon) }
         }()
         async let coverageRaw: (tiles: [AndroidCoverageTileResponse], heat: [CoverageHeatPoint]) = {
             guard wantsCoverage else { return ([], []) }
-            let tiles = (try? await svc.coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: covDays)) ?? []
+            let tiles = (try? await svc.coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: covDays, bands: bands)) ?? []
             if tiles.isEmpty {
-                let points = (try? await svc.coveragePoints(bounds: bounds, market: market, operatorName: op, technology: techs.sorted().first)) ?? []
+                let points = (try? await svc.coveragePoints(bounds: bounds, market: market, operatorName: op, technology: techs.sorted().first, bands: bands)) ?? []
                 return ([], points)
             }
             return (tiles, [])
+        }()
+        async let photosRaw: [MapPublicPhoto] = {
+            guard wantsPhoto else { return [] }
+            // Couche communautaire : on veut TOUTES les photos des membres, quel que
+            // soit le filtre opérateur des antennes → opérateur forcé à "ALL". Seul le
+            // mode « Amis » restreint l'ensemble.
+            return (try? await svc.publicPhotos(bounds: bounds, zoom: zoom, market: market, operatorName: "ALL", friendsOnly: photosFriendsOnly)) ?? []
         }()
 
         // --- On attend TOUS les résultats AVANT d'assigner ---
@@ -384,6 +404,7 @@ final class MapExplorerViewModel: ObservableObject {
         let planned = await plannedRaw
         let outage = await outageRaw
         let coverage = await coverageRaw
+        let photos = await photosRaw
 
         // Chargement REMPLACÉ (pan / changement de filtre / d'onglet suivant) : on
         // conserve les données déjà à l'écran au lieu de tout effacer et d'afficher
@@ -416,6 +437,34 @@ final class MapExplorerViewModel: ObservableObject {
         outages = outage
         coverageTiles = coverage.tiles
         coverageHeat = coverage.heat
+        // QA (DEBUG) : injecte des photos publiques de démo pour visualiser la
+        // couche (le compte de test n'a pas forcément de photos géolocalisées).
+        if ProcessInfo.processInfo.arguments.contains("--qa-demo-photos") {
+            publicPhotos = Self.demoPublicPhotos(around: bounds)
+        } else {
+            publicPhotos = photos
+        }
+    }
+
+    /// Photos publiques de démonstration (QA) réparties autour du viewport.
+    static func demoPublicPhotos(around bounds: MapBounds) -> [MapPublicPhoto] {
+        let lat = (bounds.north + bounds.south) / 2
+        let lon = (bounds.east + bounds.west) / 2
+        let seeds: [(String, String)] = [
+            ("cmqa1yaf40fne2fo5m3eucsd8", "https://s3.signalquest.fr/photos/thumbnails/615909_1781215890861_thumb.webp"),
+            ("cmqa1y8v30fna2fo5u3d9alkk", "https://s3.signalquest.fr/photos/thumbnails/615909_1781215888538_thumb.webp"),
+            ("cmqa1y6qs0fn62fo50yn9bx69", "https://s3.signalquest.fr/photos/thumbnails/615909_1781215885580_thumb.webp"),
+            ("cmqa1y4kd0fn22fo5ukn3xpdr", "https://s3.signalquest.fr/photos/thumbnails/615909_1781215883100_thumb.webp")
+        ]
+        let offsets: [(Double, Double)] = [(0.004, 0.004), (-0.004, 0.005), (0.005, -0.004), (-0.005, -0.005)]
+        return zip(seeds, offsets).map { seed, off in
+            MapPublicPhoto(
+                id: seed.0, siteId: "615909",
+                lat: lat + off.0, lng: lon + off.1,
+                thumbnailUrl: URL(string: seed.1), operator: "SFR",
+                authorId: nil, uploadedAt: Date(), isFriend: false
+            )
+        }
     }
 
     func search() async {
@@ -430,11 +479,11 @@ final class MapExplorerViewModel: ObservableObject {
 
     private static func antennas(from tiles: [AndroidAntennaTileResponse]) -> [AntennaSite] {
         var seen = Set<String>()
-        return tiles.flatMap(\.markers).compactMap { marker in
+        return tiles.flatMap(\.markers).compactMap { marker -> AntennaSite? in
             let key = marker.supId ?? marker.anfrCode ?? marker.id
             guard seen.insert(key).inserted else { return nil }
             let operators = (marker.operators.isEmpty ? [marker.operator].compactMap { $0 } : marker.operators)
-            return AntennaSite(
+            var site = AntennaSite(
                 id: marker.id,
                 siteId: marker.supId ?? marker.anfrCode,
                 anfrCode: marker.anfrCode,
@@ -450,6 +499,9 @@ final class MapExplorerViewModel: ObservableObject {
                 height: nil,
                 owner: marker.operator
             )
+            site.photoCount = marker.photoCount
+            site.validationCount = marker.validationCount
+            return site
         }
     }
 }
@@ -487,6 +539,13 @@ private struct MapAnnotationPayload: Identifiable, Equatable {
     /// Vignette à afficher directement sur la carte (couche Photos) : le marqueur
     /// devient une mini-photo « polaroïd » au lieu d'une pastille.
     var thumbnailURL: URL? = nil
+    /// Statut d'activation d'un site prévisionnel : pilote l'anneau + le badge
+    /// (actif ✓ / upgrade ↑ / déclaré / prévu).
+    var plannedStatus: PlannedActivationStatus? = nil
+    /// Glyphe SF Symbol forcé (ex. pannes colorées par type d'incident).
+    var glyphOverride: String? = nil
+    /// Nombre de photos publiques sur le site (antennes) → badge appareil-photo.
+    var contributionPhotos: Int = 0
 
     static func == (lhs: MapAnnotationPayload, rhs: MapAnnotationPayload) -> Bool {
         lhs.id == rhs.id &&
@@ -504,7 +563,38 @@ private struct MapAnnotationPayload: Identifiable, Equatable {
         lhs.showsAzimuths == rhs.showsAzimuths &&
         lhs.tint == rhs.tint &&
         lhs.communityObserved == rhs.communityObserved &&
-        lhs.thumbnailURL == rhs.thumbnailURL
+        lhs.thumbnailURL == rhs.thumbnailURL &&
+        lhs.plannedStatus == rhs.plannedStatus &&
+        lhs.glyphOverride == rhs.glyphOverride &&
+        lhs.contributionPhotos == rhs.contributionPhotos
+    }
+}
+
+/// Point speedtest rendu en couche GPU (`MLNCircleStyleLayer`). Distinct des
+/// annotations-vues : permet d'afficher TOUS les points (milliers) sans cluster
+/// ni cap, coloré par débit — comportement identique à Android.
+private struct SpeedtestFeature: Equatable {
+    let id: String
+    let coordinate: CLLocationCoordinate2D
+    let downloadMbps: Double
+    let uploadMbps: Double?
+    let pingMs: Double?
+    let tech: String?
+    let band: Int?
+    let frequency: String?
+    let timestamp: Date?
+
+    static func == (lhs: SpeedtestFeature, rhs: SpeedtestFeature) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.coordinate.latitude == rhs.coordinate.latitude &&
+        lhs.coordinate.longitude == rhs.coordinate.longitude &&
+        lhs.downloadMbps == rhs.downloadMbps &&
+        lhs.uploadMbps == rhs.uploadMbps &&
+        lhs.pingMs == rhs.pingMs &&
+        lhs.tech == rhs.tech &&
+        lhs.band == rhs.band &&
+        lhs.frequency == rhs.frequency &&
+        lhs.timestamp == rhs.timestamp
     }
 }
 
@@ -525,14 +615,6 @@ private struct CoverageHeatFeature: Equatable {
         lhs.weight == rhs.weight &&
             lhs.rsrp == rhs.rsrp
     }
-}
-
-private struct CoverageHaloStyle {
-    let auraRadius: Double
-    let auraOpacity: Double
-    let glowRadius: Double
-    let glowOpacity: Double
-    let glowBlur: Double
 }
 
 private enum CoverageQualityBand: String, CaseIterable, Identifiable {
@@ -610,6 +692,45 @@ private enum CoverageQualityBand: String, CaseIterable, Identifiable {
 #endif
 }
 
+/// Paliers de débit descendant pour colorer la couche GPU des speedtests —
+/// échelle identique au web (`speedColorUtils.ts`) et à Android : rouge → orange
+/// → jaune → vert clair → vert → cyan → bleu.
+private enum SpeedBand: String, CaseIterable {
+    case verySlow
+    case slow
+    case medium
+    case good
+    case veryGood
+    case excellent
+    case exceptional
+
+    static func band(forDownload mbps: Double) -> SpeedBand {
+        switch mbps {
+        case 1000...:    return .exceptional
+        case 600..<1000: return .excellent
+        case 300..<600:  return .veryGood
+        case 100..<300:  return .good
+        case 30..<100:   return .medium
+        case 10..<30:    return .slow
+        default:         return .verySlow
+        }
+    }
+
+#if canImport(MapLibre)
+    var uiColor: UIColor {
+        switch self {
+        case .exceptional: return UIColor(red: 0x3B / 255, green: 0x82 / 255, blue: 0xF6 / 255, alpha: 1.0)
+        case .excellent:   return UIColor(red: 0x06 / 255, green: 0xB6 / 255, blue: 0xD4 / 255, alpha: 1.0)
+        case .veryGood:    return UIColor(red: 0x22 / 255, green: 0xC5 / 255, blue: 0x5E / 255, alpha: 1.0)
+        case .good:        return UIColor(red: 0x84 / 255, green: 0xCC / 255, blue: 0x16 / 255, alpha: 1.0)
+        case .medium:      return UIColor(red: 0xEA / 255, green: 0xB3 / 255, blue: 0x08 / 255, alpha: 1.0)
+        case .slow:        return UIColor(red: 0xF9 / 255, green: 0x73 / 255, blue: 0x16 / 255, alpha: 1.0)
+        case .verySlow:    return UIColor(red: 0xEF / 255, green: 0x44 / 255, blue: 0x44 / 255, alpha: 1.0)
+        }
+    }
+#endif
+}
+
 /// Persists the last viewed map region so the app reopens where the user left
 /// off instead of a fixed location. (UserDefaults use is declared in
 /// PrivacyInfo.xcprivacy under reason CA92.1.)
@@ -650,13 +771,21 @@ struct MapExplorerView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    // Carte SwiftUI de secours (jamais compilée tant que MapLibre est présent).
+#if !canImport(MapLibre)
     @State private var position: MapCameraPosition
+#endif
     @State private var mapCenter: CLLocationCoordinate2D
     @State private var mapZoom: Double
-    @State private var filters: Set<MapDisplayItem.Kind> = [.antenna, .speedtest]
+    // Couches actives par défaut : antennes + speedtests + pannes (incidents),
+    // comme Android (où `incidents` est activé par défaut). Photos, couverture,
+    // prévisionnels et sites communautaires restent en opt-in via le panneau.
+    @State private var filters: Set<MapDisplayItem.Kind> = [.antenna, .speedtest, .outage]
     @State private var selectedItem: MapDisplayItem?
     @State private var selectedAntenna: AntennaSite?
     @State private var selectedPhoto: MapPhotoTarget?
+    @State private var selectedOutage: OutageSiteLive?
+    @State private var selectedPlanned: PlannedSiteLive?
     @State private var fetchTask: Task<Void, Never>?
     @State private var lastRegion: MKCoordinateRegion
     @State private var showFilterSheet = false
@@ -674,7 +803,9 @@ struct MapExplorerView: View {
         // Restore the last viewed region, otherwise fall back to a country-level
         // view of the default market — never a hard-coded city.
         let region = MapRegionStore.lastRegion() ?? Self.region(for: "FR")
+#if !canImport(MapLibre)
         _position = State(initialValue: .region(region))
+#endif
         _mapCenter = State(initialValue: region.center)
         _lastRegion = State(initialValue: region)
         _mapZoom = State(initialValue: Self.zoom(forSpan: region))
@@ -687,6 +818,12 @@ struct MapExplorerView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .sheet(item: $selectedItem) { item in MapItemSheet(item: item) }
+        .sheet(item: $selectedOutage) { site in
+            OutageDetailSheet(site: site)
+        }
+        .sheet(item: $selectedPlanned) { site in
+            PlannedDetailSheet(site: site, operatorLabel: model.operatorLabel(site.operator ?? "ALL"), operatorAccent: model.operatorAccent(site.operator ?? "ALL"))
+        }
         .sheet(item: $selectedAntenna) { site in
             AntennaDetailSheet(site: site, market: model.marketFilter, operatorName: model.operatorFilter, service: services.antennas)
         }
@@ -712,7 +849,7 @@ struct MapExplorerView: View {
                 allMarkets: model.registryMarkets
             )
             .presentationDetents([.medium, .large])
-            .presentationBackground(SQColor.bg)
+            .presentationBackgroundCompat(SQColor.bg)
         }
         .task {
             // QA (DEBUG) : pré-active les couches pour capturer leurs couleurs.
@@ -736,7 +873,7 @@ struct MapExplorerView: View {
             // QA (DEBUG) : ouvre le viewer de la première photo injectée.
             if ProcessInfo.processInfo.arguments.contains("--qa-open-photo") {
                 for _ in 0..<16 {
-                    if let first = model.snapshot.photos.first {
+                    if let first = model.publicPhotos.first {
                         selectedPhoto = MapPhotoTarget(id: first.id, thumbnailURL: first.thumbnailUrl)
                         break
                     }
@@ -744,10 +881,10 @@ struct MapExplorerView: View {
                 }
             }
         }
-        .onChange(of: filters) { _, _ in
+        .onChangeCompat(of: filters) { _, _ in
             scheduleLoad(region: lastRegion)
         }
-        .onChange(of: model.marketFilter) { _, newValue in
+        .onChangeCompat(of: model.marketFilter) { _, newValue in
             // Le switch automatique (caméra) et le picker manuel partagent ce
             // binding mais pas le même chemin : seul le manuel recentre.
             let isAutoSwitch = model.consumeAutoMarketSwitch()
@@ -760,15 +897,17 @@ struct MapExplorerView: View {
                 let region = region(forMarketCode: newValue)
                 mapCenter = region.center
                 mapZoom = Self.zoom(forSpan: region)
+#if !canImport(MapLibre)
                 position = .region(region)
+#endif
                 scheduleLoad(region: region)
             }
         }
-        .onChange(of: model.operatorFilter) { _, _ in scheduleLoad(region: lastRegion) }
-        .onChange(of: model.techFilters) { _, _ in scheduleLoad(region: lastRegion) }
-        .onChange(of: model.bandFilters) { _, _ in scheduleLoad(region: lastRegion) }
-        .onChange(of: model.sharingFilters) { _, _ in scheduleLoad(region: lastRegion) }
-        .onChange(of: model.includeObservedSites) { _, _ in scheduleLoad(region: lastRegion) }
+        .onChangeCompat(of: model.operatorFilter) { _, _ in scheduleLoad(region: lastRegion) }
+        .onChangeCompat(of: model.techFilters) { _, _ in scheduleLoad(region: lastRegion) }
+        .onChangeCompat(of: model.bandFilters) { _, _ in scheduleLoad(region: lastRegion) }
+        .onChangeCompat(of: model.sharingFilters) { _, _ in scheduleLoad(region: lastRegion) }
+        .onChangeCompat(of: model.includeObservedSites) { _, _ in scheduleLoad(region: lastRegion) }
     }
 
     @ViewBuilder
@@ -777,6 +916,7 @@ struct MapExplorerView: View {
         SQMapLibreMapView(
             annotations: annotationPayloads,
             coverageHeatFeatures: coverageHeatFeatures,
+            speedtestFeatures: speedtestFeatures,
             colorScheme: colorScheme,
             center: $mapCenter,
             zoom: $mapZoom,
@@ -1377,14 +1517,13 @@ struct MapExplorerView: View {
 
     private var activeFilterCount: Int {
         var count = 0
-        if model.marketFilter != "FR" { count += 1 }
         if model.operatorFilter != model.defaultOperatorKeyForCurrentMarket { count += 1 }
         if !model.techFilters.isEmpty { count += 1 }
         if !model.bandFilters.isEmpty { count += 1 }
         if !model.sharingFilters.isEmpty { count += 1 }
         if model.speedtestDays != 0 { count += 1 }
         if model.coverageDays != 0 { count += 1 }
-        if filters != [.antenna, .speedtest] { count += 1 }
+        if filters != [.antenna, .speedtest, .outage] { count += 1 }
         return count
     }
 
@@ -1394,10 +1533,12 @@ struct MapExplorerView: View {
                 let coordinate = location.coordinate
                 mapCenter = coordinate
                 mapZoom = 15
+#if !canImport(MapLibre)
                 position = .region(MKCoordinateRegion(
                     center: coordinate,
                     span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
                 ))
+#endif
                 scheduleLoad(region: MKCoordinateRegion(
                     center: coordinate,
                     span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
@@ -1446,10 +1587,12 @@ struct MapExplorerView: View {
                             let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
                             mapCenter = coordinate
                             mapZoom = 15
+#if !canImport(MapLibre)
                             position = .region(MKCoordinateRegion(
                                 center: coordinate,
                                 span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
                             ))
+#endif
                             model.searchResults = []
                             selectedAntenna = site
                         }
@@ -1526,6 +1669,7 @@ struct MapExplorerView: View {
                 )
             }
             let antennaPayloads: [MapAnnotationPayload] = model.antennas.compactMap { site in
+                guard matchesSelectedBands(site.bands) else { return nil }
                 guard let lat = site.latitude, let lng = site.longitude else { return nil }
                 return MapAnnotationPayload(
                     id: "antenna-\(site.id)",
@@ -1542,14 +1686,141 @@ struct MapExplorerView: View {
                     clusterCount: nil,
                     azimuths: site.azimuths,
                     showsAzimuths: mapZoom >= 14,
-                    tint: model.operatorAccent(site.operators.first ?? model.operatorFilter)
+                    tint: model.operatorAccent(site.operators.first ?? model.operatorFilter),
+                    contributionPhotos: site.photoCount
                 )
             }
-            payloads += clusteredAntennaPayloads(from: antennaPayloads)
+            payloads += clusteredPayloads(from: antennaPayloads, kind: .antenna, idPrefix: "antenna", minCount: 160, label: { "\($0) antennes" })
         }
         payloads += communitySitePayloads
         payloads += photoPayloads
+        payloads += plannedPayloads
+        payloads += outagePayloads
         return payloads
+    }
+
+    /// Sites prévisionnels : pastille à la couleur de l'opérateur + anneau et
+    /// badge de statut (croisement ANFR) — actif (vert ✓), upgrade en attente
+    /// (ambre ↑), déclaré / prévu (blanc), comme Android.
+    private var plannedPayloads: [MapAnnotationPayload] {
+        guard filters.contains(.planned) else { return [] }
+        let individual = model.plannedSites.compactMap { site -> MapAnnotationPayload? in
+            guard matchesSelectedBands(in: plannedBandSearchFields(site)) else { return nil }
+            guard let lat = site.lat, let lon = site.lon else { return nil }
+            let status = site.activation?.status ?? .planned
+            let techLine = site.technologies.joined(separator: " / ")
+            let pending = site.activation?.pendingTechnologies ?? []
+            let statusNote: String
+            switch status {
+            case .active: statusNote = "Site actif — toutes les technos prévues sont en service"
+            case .upgradePending:
+                statusNote = pending.isEmpty ? "Upgrade en cours" : "Upgrade en attente : \(pending.joined(separator: ", "))"
+            case .declared: statusNote = "Station déclarée à l'ANFR (pas encore en service)"
+            case .planned: statusNote = "Site prévu (non encore construit)"
+            }
+            return MapAnnotationPayload(
+                id: "planned-\(site.id)",
+                kind: .planned,
+                title: site.codeSite ?? "Site prévisionnel",
+                subtitle: [site.operator, site.commune].compactMap { $0 }.joined(separator: " · "),
+                coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
+                metric: techLine.isEmpty ? nil : techLine,
+                backendId: site.codeSite ?? site.id,
+                details: MapItemDetails(
+                    tech: techLine.isEmpty ? nil : techLine,
+                    operatorName: site.operator.map { model.operatorLabel($0) },
+                    note: statusNote
+                ),
+                antennaId: nil,
+                clusterCount: nil,
+                azimuths: [],
+                showsAzimuths: false,
+                tint: site.operator.map { model.operatorAccent($0) },
+                plannedStatus: status
+            )
+        }
+        return clusteredPayloads(from: individual, kind: .planned, idPrefix: "planned", minCount: 40, label: { "\($0) prévisionnels" })
+    }
+
+    /// Sites en panne (HS) : pastille colorée par type d'incident (panne rouge,
+    /// maintenance orange, dégradé jaune) avec le glyphe correspondant, comme Android.
+    private var outagePayloads: [MapAnnotationPayload] {
+        guard filters.contains(.outage) else { return [] }
+        let individual = model.outages.compactMap { site -> MapAnnotationPayload? in
+            guard matchesSelectedOutageBands(site) else { return nil }
+            guard let lat = site.lat, let lon = site.lon else { return nil }
+            let kindKey = (site.issueType ?? "down").lowercased()
+            return MapAnnotationPayload(
+                id: "outage-\(site.id)",
+                kind: .outage,
+                title: site.siteId ?? "Site en panne",
+                subtitle: [site.operator, site.commune].compactMap { $0 }.joined(separator: " · "),
+                coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
+                metric: site.status,
+                backendId: site.siteId ?? site.id,
+                details: MapItemDetails(
+                    operatorName: site.operator,
+                    note: [site.reason, site.estimatedEnd.map { "Rétabli prévu : \($0)" }].compactMap { $0 }.joined(separator: "\n")
+                ),
+                antennaId: nil,
+                clusterCount: nil,
+                azimuths: [],
+                showsAzimuths: false,
+                tint: Self.outageColor(for: kindKey),
+                glyphOverride: Self.outageGlyph(for: kindKey)
+            )
+        }
+        return clusteredPayloads(from: individual, kind: .outage, idPrefix: "outage", minCount: 30, label: { "\($0) sites HS" })
+    }
+
+    private static func outageColor(for issueType: String) -> Color {
+        switch issueType {
+        case "maintenance": return Color(hex: 0xF97316)
+        case "degraded": return Color(hex: 0xEAB308)
+        default: return Color(hex: 0xEF4444)
+        }
+    }
+
+    private static func outageGlyph(for issueType: String) -> String {
+        switch issueType {
+        case "maintenance": return "wrench.and.screwdriver.fill"
+        case "degraded": return "exclamationmark.circle.fill"
+        default: return "exclamationmark.triangle.fill"
+        }
+    }
+
+    /// Couche Speedtests rendue en GPU (`MLNCircleStyleLayer`) : TOUT s'affiche,
+    /// sans cluster ni cap, coloré par débit descendant. Les annotations-vues ne
+    /// pourraient pas tenir des milliers de points.
+    private var speedtestFeatures: [SpeedtestFeature] {
+        guard filters.contains(.speedtest) else { return [] }
+        let techs = model.techFilters
+        var seen = Set<String>()
+        var features: [SpeedtestFeature] = []
+        for tile in model.speedtestTiles {
+            for marker in tile.markers {
+                guard seen.insert(marker.id).inserted else { continue }
+                if !techs.isEmpty {
+                    let tech = (marker.tech ?? "").lowercased()
+                    guard techs.contains(where: { tech.contains($0.lowercased()) }) else { continue }
+                }
+                guard matchesSelectedBand(marker.band) || matchesSelectedBands(in: [marker.frequency, marker.tech].compactMap { $0 }) else { continue }
+                features.append(
+                    SpeedtestFeature(
+                        id: marker.id,
+                        coordinate: CLLocationCoordinate2D(latitude: marker.lat, longitude: marker.lng),
+                        downloadMbps: marker.downloadMbps,
+                        uploadMbps: marker.uploadMbps,
+                        pingMs: marker.pingMs,
+                        tech: marker.tech,
+                        band: marker.band,
+                        frequency: marker.frequency,
+                        timestamp: marker.timestamp
+                    )
+                )
+            }
+        }
+        return features
     }
 
     /// Marqueurs « sites communautaires » (sites probables / cellules
@@ -1595,29 +1866,78 @@ struct MapExplorerView: View {
     /// carte. Tap → `MapPhotoViewer` (photo en grand, infos antenne, like,
     /// commentaires). Les doublons de coordonnées sont conservés (MapLibre les
     /// décale légèrement) tant qu'ils ont un id distinct.
+    /// Couche Photos : vignettes des photos de TOUS les membres (`publicPhotos`),
+    /// clusterisées pour rester fluide (vignettes individuelles seulement quand
+    /// elles sont peu nombreuses / zoom élevé ; sinon bulle « N photos »).
     private var photoPayloads: [MapAnnotationPayload] {
         guard filters.contains(.photo) else { return [] }
         var seen = Set<String>()
-        return model.snapshot.photos.compactMap { photo -> MapAnnotationPayload? in
-            guard let lat = photo.lat, let lng = photo.lng else { return nil }
+        let individual = model.publicPhotos.compactMap { photo -> MapAnnotationPayload? in
             guard seen.insert(photo.id).inserted else { return nil }
             return MapAnnotationPayload(
                 id: "photo-\(photo.id)",
                 kind: .photo,
                 title: "Photo",
-                subtitle: photo.siteId ?? "Site",
-                coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng),
+                subtitle: photo.operator ?? photo.siteId ?? "Site",
+                coordinate: CLLocationCoordinate2D(latitude: photo.lat, longitude: photo.lng),
                 metric: nil,
                 backendId: photo.id,
                 details: MapItemDetails(
                     timestamp: photo.uploadedAt,
-                    note: photo.description
+                    operatorName: photo.operator
                 ),
                 antennaId: nil,
                 clusterCount: nil,
                 azimuths: [],
                 showsAzimuths: false,
-                thumbnailURL: photo.thumbnailUrl ?? photo.imageUrl
+                thumbnailURL: photo.thumbnailUrl
+            )
+        }
+        return clusteredPhotoPayloads(from: individual)
+    }
+
+    /// Regroupe les photos quand la carte est dézoomée OU qu'il y en a beaucoup
+    /// (> 120 dans le viewport) — borne le nombre de vignettes chargées (anti-lag).
+    /// Les bulles de cluster n'ont PAS de vignette (rendu en pastille « N photos »
+    /// rose) ; les photos isolées gardent leur vignette polaroïd.
+    private func clusteredPhotoPayloads(from payloads: [MapAnnotationPayload]) -> [MapAnnotationPayload] {
+        let shouldCluster = mapZoom < 13 || payloads.count > 120
+        guard shouldCluster, payloads.count > 1 else { return payloads }
+        let cellSize: Double
+        switch mapZoom {
+        case ..<11: cellSize = 0.06
+        case ..<12.5: cellSize = 0.03
+        case ..<13.5: cellSize = 0.015
+        default: cellSize = 0.008
+        }
+        struct Cell: Hashable { let lat: Int; let lng: Int }
+        let groups = Dictionary(grouping: payloads) { payload in
+            Cell(
+                lat: Int((payload.coordinate.latitude / cellSize).rounded(.down)),
+                lng: Int((payload.coordinate.longitude / cellSize).rounded(.down))
+            )
+        }
+        return groups.map { cell, group in
+            guard group.count > 1 else { return group[0] }
+            // Coordonnée = CENTRE de cellule (déterministe) plutôt que la moyenne des
+            // membres : l'id ET la position restent stables quand on pan (les photos
+            // entrant/sortant du viewport ne déplacent plus la pastille) → la couche
+            // n'est plus détruite/recréée à chaque déplacement (anti-lag).
+            let lat = (Double(cell.lat) + 0.5) * cellSize
+            let lng = (Double(cell.lng) + 0.5) * cellSize
+            return MapAnnotationPayload(
+                id: "photo-cluster-\(cell.lat)-\(cell.lng)",
+                kind: .photo,
+                title: "\(group.count) photos",
+                subtitle: "Zoomer pour le détail",
+                coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng),
+                metric: "cluster",
+                backendId: nil,
+                details: nil,
+                antennaId: nil,
+                clusterCount: group.count,
+                azimuths: [],
+                showsAzimuths: false
             )
         }
     }
@@ -1626,18 +1946,20 @@ struct MapExplorerView: View {
         guard filters.contains(.coverage) else { return [] }
         var features: [CoverageHeatFeature] = []
         for tile in model.coverageTiles {
-            features += tile.clusters.map { cluster in
-                CoverageHeatFeature(
-                    id: "coverage-heat-cluster-\(cluster.id)",
-                    coordinate: CLLocationCoordinate2D(latitude: cluster.lat, longitude: cluster.lng),
-                    weight: min(max(Double(cluster.count), 1), 40) / 8,
-                    rsrp: cluster.avgRsrp
-                )
+            if model.bandFilters.isEmpty {
+                features += tile.clusters.map { cluster in
+                    CoverageHeatFeature(
+                        id: "coverage-heat-cluster-\(cluster.id)",
+                        coordinate: CLLocationCoordinate2D(latitude: cluster.lat, longitude: cluster.lng),
+                        weight: min(max(Double(cluster.count), 1), 40) / 8,
+                        rsrp: cluster.avgRsrp
+                    )
+                }
             }
-            let shouldIncludeRawPoints = mapZoom >= 13 || tile.clusters.isEmpty
+            let shouldIncludeRawPoints = mapZoom >= 13 || tile.clusters.isEmpty || !model.bandFilters.isEmpty
             if shouldIncludeRawPoints {
                 let pointLimit = mapZoom >= 13 ? 900 : 250
-                features += tile.points.prefix(pointLimit).map { point in
+                features += tile.points.lazy.filter { matchesSelectedBand($0.band) }.prefix(pointLimit).map { point in
                     CoverageHeatFeature(
                         id: "coverage-heat-\(point.id)",
                         coordinate: CLLocationCoordinate2D(latitude: point.lat, longitude: point.lng),
@@ -1648,7 +1970,9 @@ struct MapExplorerView: View {
             }
         }
         if features.isEmpty {
-            features = model.coverageHeat.prefix(1200).map { point in
+            features = model.coverageHeat.lazy.filter { point in
+                matchesSelectedBand(point.band) || matchesSelectedBands(in: [point.frequency, point.technology, point.networkType].compactMap { $0 })
+            }.prefix(1200).map { point in
                 CoverageHeatFeature(
                     id: "coverage-heat-api-\(point.id)",
                     coordinate: CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude),
@@ -1658,6 +1982,78 @@ struct MapExplorerView: View {
             }
         }
         return features
+    }
+
+    private func matchesSelectedBand(_ band: Int?) -> Bool {
+        guard !model.bandFilters.isEmpty else { return true }
+        guard let band else { return false }
+        return model.bandFilters.contains(band)
+    }
+
+    private func matchesSelectedBands(_ bands: [Int]) -> Bool {
+        guard !model.bandFilters.isEmpty else { return true }
+        return !Set(bands).isDisjoint(with: model.bandFilters)
+    }
+
+    private func matchesSelectedBands(in values: [String]) -> Bool {
+        guard !model.bandFilters.isEmpty else { return true }
+        let normalizedValues = values.map(Self.normalizedBandSearchText)
+        return model.bandFilters.contains { band in
+            let tokens = Self.bandSearchTokens(for: band)
+            return normalizedValues.contains { value in
+                tokens.contains { token in value.contains(token) }
+            }
+        }
+    }
+
+    private func plannedBandSearchFields(_ site: PlannedSiteLive) -> [String] {
+        var fields = site.technologies
+        if let activation = site.activation {
+            fields += activation.activeTechnologies
+            fields += activation.plannedTechnologies
+            fields += activation.confirmedTechnologies
+            fields += activation.pendingTechnologies
+        }
+        return fields
+    }
+
+    private func matchesSelectedOutageBands(_ site: OutageSiteLive) -> Bool {
+        guard !model.bandFilters.isEmpty else { return true }
+        let serviceLabels = site.services.map(\.label)
+        guard !serviceLabels.isEmpty else { return false }
+        let generations = Set(model.bandFilters.flatMap(Self.generationLabels(forBand:)))
+        return serviceLabels.contains { label in
+            let normalized = Self.normalizedBandSearchText(label)
+            return generations.contains { normalized.contains($0) }
+        }
+    }
+
+    private static func normalizedBandSearchText(_ value: String) -> String {
+        value.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: "_", with: "")
+    }
+
+    private static func bandSearchTokens(for band: Int) -> [String] {
+        switch band {
+        case 1: return ["b1", "n1", "2100"]
+        case 3: return ["b3", "1800"]
+        case 7: return ["b7", "2600"]
+        case 20: return ["b20", "800"]
+        case 28: return ["b28", "n28", "700"]
+        case 78: return ["n78", "3500", "3.5", "35ghz"]
+        default: return ["b\(band)", "n\(band)"]
+        }
+    }
+
+    private static func generationLabels(forBand band: Int) -> [String] {
+        switch band {
+        case 1, 28: return ["4g", "5g"]
+        case 78: return ["5g"]
+        default: return ["4g"]
+        }
     }
 
     private func coverageHeatWeight(rsrp: Double?) -> Double {
@@ -1671,8 +2067,18 @@ struct MapExplorerView: View {
         }
     }
 
-    private func clusteredAntennaPayloads(from payloads: [MapAnnotationPayload]) -> [MapAnnotationPayload] {
-        guard mapZoom < 14, payloads.count > 160 else { return payloads }
+    /// Regroupe en clusters de grille (taille de cellule selon le zoom) une couche
+    /// de marqueurs trop dense pour des annotations-vues. Générique : antennes,
+    /// prévisionnels, pannes — évite que la carte rame. Au zoom ≥ 14 ou sous le
+    /// seuil `minCount`, renvoie les marqueurs individuels tels quels.
+    private func clusteredPayloads(
+        from payloads: [MapAnnotationPayload],
+        kind: MapDisplayItem.Kind,
+        idPrefix: String,
+        minCount: Int,
+        label: (Int) -> String
+    ) -> [MapAnnotationPayload] {
+        guard mapZoom < 14, payloads.count > minCount else { return payloads }
         let cellSize: Double
         switch mapZoom {
         case ..<11:
@@ -1697,12 +2103,11 @@ struct MapExplorerView: View {
             guard group.count > 1 else { return group[0] }
             let lat = group.reduce(0) { $0 + $1.coordinate.latitude } / Double(group.count)
             let lng = group.reduce(0) { $0 + $1.coordinate.longitude } / Double(group.count)
-            let operators = Set(group.map(\.subtitle).filter { !$0.isEmpty }).prefix(2).joined(separator: " · ")
             return MapAnnotationPayload(
-                id: "antenna-cluster-\(Int(lat / cellSize))-\(Int(lng / cellSize))",
-                kind: .antenna,
-                title: "\(group.count) antennes",
-                subtitle: operators.isEmpty ? "Zoomer pour les détails" : operators,
+                id: "\(idPrefix)-cluster-\(Int(lat / cellSize))-\(Int(lng / cellSize))",
+                kind: kind,
+                title: label(group.count),
+                subtitle: "Zoomer pour le détail",
                 coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng),
                 metric: "cluster",
                 backendId: nil,
@@ -1716,91 +2121,25 @@ struct MapExplorerView: View {
     }
 
     private var displayItems: [MapDisplayItem] {
-        // Les photos ont leur propre couche riche (vignettes) construite dans
-        // `photoPayloads` ; on les retire du mapping générique en pastille.
-        let socialFilters = filters.subtracting([.speedtest, .coverage, .antenna, .photo])
-        var items = model.snapshot.displayItems(include: socialFilters)
-        if filters.contains(.speedtest) {
-            items += model.speedtestTiles.flatMap { tile in
-                tile.clusters.map { cluster in
-                    MapDisplayItem(
-                        id: "speed-cluster-\(cluster.id)",
-                        kind: .speedtest,
-                        title: "\(cluster.count) speedtests",
-                        subtitle: model.operatorLabel(model.operatorFilter),
-                        coordinate: CLLocationCoordinate2D(latitude: cluster.lat, longitude: cluster.lng),
-                        metric: "cluster",
-                        details: MapItemDetails(
-                            tech: cluster.tech,
-                            timestamp: cluster.latestTimestamp,
-                            operatorName: model.operatorLabel(model.operatorFilter),
-                            clusterCount: cluster.count
-                        )
-                    )
-                } + tile.markers.map { marker in
-                    MapDisplayItem(
-                        id: "speed-\(marker.id)",
-                        kind: .speedtest,
-                        title: "\(Int(marker.downloadMbps.rounded())) Mbps",
-                        subtitle: [model.operatorLabel(model.operatorFilter), marker.tech].compactMap { $0 }.joined(separator: " · "),
-                        coordinate: CLLocationCoordinate2D(latitude: marker.lat, longitude: marker.lng),
-                        metric: marker.uploadMbps.map { "\(Int($0.rounded())) Mbps up" },
-                        backendId: marker.id,
-                        details: MapItemDetails(
-                            downloadMbps: marker.downloadMbps,
-                            uploadMbps: marker.uploadMbps,
-                            pingMs: marker.pingMs,
-                            tech: marker.tech,
-                            timestamp: marker.timestamp,
-                            operatorName: model.operatorLabel(model.operatorFilter),
-                            note: "Données Speedtest backend"
-                        )
-                    )
-                }
-            }
-        }
-        // Coverage intentionally stays out of annotation payloads: the visible
-        // layer is only the soft halo rendered by addCoverageQualityLayers.
-        if filters.contains(.planned) {
-            items += model.plannedSites.compactMap { site in
-                guard let lat = site.lat, let lon = site.lon else { return nil }
-                return MapDisplayItem(
-                    id: "planned-\(site.id)",
-                    kind: .planned,
-                    title: site.codeSite ?? "Site previsionnel",
-                    subtitle: [site.operator, site.commune].compactMap { $0 }.joined(separator: " · "),
-                    coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
-                    metric: site.technologies.joined(separator: " / ")
-                )
-            }
-        }
-        if filters.contains(.outage) {
-            items += model.outages.compactMap { site in
-                guard let lat = site.lat, let lon = site.lon else { return nil }
-                return MapDisplayItem(
-                    id: "outage-\(site.id)",
-                    kind: .outage,
-                    title: site.siteId ?? "Site en panne",
-                    subtitle: [site.operator, site.commune].compactMap { $0 }.joined(separator: " · "),
-                    coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
-                    metric: site.status
-                )
-            }
-        }
+        // Couches « riches » construites hors du mapping générique en pastille :
+        //  · photos → `photoPayloads` (vignettes)
+        //  · speedtests → couche GPU `speedtestFeatures` (tout afficher, sans cluster)
+        //  · couverture → couche GPU (dots RSRP type nPerf)
+        //  · prévisionnels/pannes → `plannedPayloads`/`outagePayloads` (statut + couleur)
+        // Ne reste ici que le social du snapshot (amis / validations / sessions).
+        let socialFilters = filters.subtracting([.speedtest, .coverage, .antenna, .photo, .planned, .outage])
+        let items = model.snapshot.displayItems(include: socialFilters)
         return items.filter(matches(filterItem:))
     }
 
-    private func matches(filterItem item: MapDisplayItem) -> Bool {
-        if item.kind == .antenna { return true }
-        let haystack = "\(item.title) \(item.subtitle) \(item.metric ?? "")".lowercased()
-        if model.operatorFilter != "ALL" && !haystack.contains(model.operatorFilter.lowercased()) {
-            return false
-        }
-        if !model.techFilters.isEmpty {
-            let any = model.techFilters.contains { haystack.contains($0.lowercased()) }
-            if !any { return false }
-        }
-        return true
+    /// Le filtrage opérateur/techno est désormais SERVEUR (paramètre `operator`
+    /// des endpoints tuiles + prévisionnels/pannes). On ne refiltre plus côté
+    /// client par sous-chaîne de texte — c'est ce qui masquait à tort des couches
+    /// dont la clé opérateur ne figure pas dans le libellé (photos, amis, sessions,
+    /// marchés hors-FR). On laisse passer : ces couches sociales sont propres aux
+    /// amis et restent volontairement tolérantes (politique identique à Android).
+    private func matches(filterItem _: MapDisplayItem) -> Bool {
+        true
     }
 
     private func selectAnnotation(_ annotation: MapAnnotationPayload) {
@@ -1810,7 +2149,8 @@ struct MapExplorerView: View {
             selectedAntenna = site
             return
         }
-        if annotation.id.hasPrefix("antenna-cluster-") {
+        // N'importe quel cluster (antennes / prévisionnels / pannes) : on zoome.
+        if annotation.clusterCount != nil {
             mapCenter = annotation.coordinate
             mapZoom = min(mapZoom + 1.7, 15.5)
             return
@@ -1819,6 +2159,22 @@ struct MapExplorerView: View {
         if annotation.kind == .photo, let photoId = annotation.backendId {
             selectedPhoto = MapPhotoTarget(id: photoId, thumbnailURL: annotation.thumbnailURL)
             return
+        }
+        // Panne (HS) : sheet dédiée détaillée (raison, services impactés, dates).
+        if annotation.kind == .outage {
+            let outageId = String(annotation.id.dropFirst("outage-".count))
+            if let site = model.outages.first(where: { $0.id == outageId }) {
+                selectedOutage = site
+                return
+            }
+        }
+        // Site prévisionnel : fiche dédiée (statut d'activation, technos, ANFR).
+        if annotation.kind == .planned {
+            let plannedId = String(annotation.id.dropFirst("planned-".count))
+            if let site = model.plannedSites.first(where: { $0.id == plannedId }) {
+                selectedPlanned = site
+                return
+            }
         }
         selectedItem = MapDisplayItem(
             id: annotation.id,
@@ -1948,19 +2304,6 @@ private struct MapAdvancedFilterSheet: View {
         }
     }
 
-    private var marketOptions: [(String, String)] {
-        guard !allMarkets.isEmpty else {
-            // Registre pas encore chargé : au moins la France reste sélectionnable.
-            return [("FR", "France")]
-        }
-        var seen = Set<String>()
-        return allMarkets.compactMap { entry in
-            let code = entry.marketCode.isEmpty ? entry.code : entry.marketCode
-            guard seen.insert(code.uppercased()).inserted else { return nil }
-            return (code, entry.label)
-        }
-    }
-
     private var operatorOptions: [String] {
         guard let entry = selectedEntry else { return ["ALL"] }
         var keys = entry.selectableOperators.map(\.key)
@@ -1999,16 +2342,6 @@ private struct MapAdvancedFilterSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: SQSpace.md + 2) {
-                    filterSection("Zone", icon: "globe.europe.africa.fill") {
-                        LazyVGrid(columns: filterColumns, spacing: 8) {
-                            ForEach(marketOptions, id: \.0) { code, label in
-                                filterChip(title: label, icon: "mappin.and.ellipse", active: market == code) {
-                                    market = code
-                                }
-                            }
-                        }
-                    }
-
                     filterSection("Opérateur", icon: "antenna.radiowaves.left.and.right") {
                         LazyVGrid(columns: filterColumns, spacing: 8) {
                         ForEach(operatorOptions, id: \.self) { op in
@@ -2114,7 +2447,7 @@ private struct MapAdvancedFilterSheet: View {
                         sharing.removeAll()
                         speedtestDays = 0
                         coverageDays = 0
-                        layers = [.antenna, .speedtest]
+                        layers = [.antenna, .speedtest, .outage]
                         includeObserved = true
                     }
                     .font(SQFont.archivo(15, .semibold))
@@ -2257,6 +2590,7 @@ private final class SQPointAnnotation: MLNPointAnnotation {
 private struct SQMapLibreMapView: UIViewRepresentable {
     let annotations: [MapAnnotationPayload]
     let coverageHeatFeatures: [CoverageHeatFeature]
+    let speedtestFeatures: [SpeedtestFeature]
     let colorScheme: ColorScheme
     @Binding var center: CLLocationCoordinate2D
     @Binding var zoom: Double
@@ -2275,6 +2609,12 @@ private struct SQMapLibreMapView: UIViewRepresentable {
         mapView.attributionButton.isHidden = false
         mapView.setCenter(center, zoomLevel: zoom, animated: false)
         mapView.tintColor = UIColor.systemOrange
+        // Les speedtests/couverture sont des couches GPU (pas des annotations-vues) :
+        // on intercepte le tap pour ouvrir le détail d'un point speedtest touché.
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleMapTap(_:)))
+        tap.delegate = context.coordinator
+        tap.cancelsTouchesInView = false
+        mapView.addGestureRecognizer(tap)
         return mapView
     }
 
@@ -2285,6 +2625,7 @@ private struct SQMapLibreMapView: UIViewRepresentable {
         }
 
         context.coordinator.setCoverageHeatFeatures(coverageHeatFeatures, mapView: mapView)
+        context.coordinator.setSpeedtestFeatures(speedtestFeatures, mapView: mapView)
         context.coordinator.applyAnnotations(annotations, mapView: mapView)
         if context.coordinator.shouldApplyCamera(center: center, zoom: zoom) {
             mapView.setCenter(center, zoomLevel: zoom, animated: true)
@@ -2300,12 +2641,16 @@ private struct SQMapLibreMapView: UIViewRepresentable {
             ?? URL(fileURLWithPath: "/")
     }
 
-    @MainActor final class Coordinator: NSObject, @preconcurrency MLNMapViewDelegate {
+    @MainActor final class Coordinator: NSObject, @preconcurrency MLNMapViewDelegate, UIGestureRecognizerDelegate {
         private let onMoveEnd: (MapBounds, Double) -> Void
         private let onSelect: (MapAnnotationPayload) -> Void
         private var lastCenter: CLLocationCoordinate2D?
         private var lastZoom: Double?
         private var latestCoverageHeatFeatures: [CoverageHeatFeature] = []
+        private var latestSpeedtestFeatures: [SpeedtestFeature] = []
+        /// Index id → point speedtest, pour résoudre le tap (couche GPU) en détail.
+        private var speedtestFeaturesById: [String: SpeedtestFeature] = [:]
+        private var lastStyledZoom: Double = .nan
         /// État de diff des annotations (id → annotation + payload appliqué), pour
         /// ne retirer/ajouter QUE le delta au lieu de tout détruire/recréer à chaque
         /// réévaluation de la vue (cf. audit PERF-01).
@@ -2366,83 +2711,164 @@ private struct SQMapLibreMapView: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
-            updateCoverageHeatmap(mapView: mapView, features: latestCoverageHeatFeatures)
+            // Un rechargement de style (bascule clair/sombre) efface sources et
+            // couches : on ré-applique couverture ET speedtests.
+            updateCoverageDots(mapView: mapView, features: latestCoverageHeatFeatures)
+            updateSpeedtestLayer(mapView: mapView, features: latestSpeedtestFeatures)
         }
+
+        // MARK: Couverture — champ de pastilles RSRP (type nPerf / Android)
 
         func updateCoverageHeatmap(mapView: MLNMapView, features: [CoverageHeatFeature]) {
+            updateCoverageDots(mapView: mapView, features: features)
+        }
+
+        /// Couverture rendue comme un champ dense de pastilles colorées par RSRP
+        /// (vert → rouge), comme nPerf / Android — au lieu de l'ancien halo flou,
+        /// jugé peu lisible. Une source + une couche cercle par bande de qualité.
+        private func updateCoverageDots(mapView: MLNMapView, features: [CoverageHeatFeature]) {
             guard let style = mapView.style else { return }
-            let featuresByQuality = Dictionary(grouping: features, by: \.quality)
+            let byBand = Dictionary(grouping: features, by: \.quality)
             for band in CoverageQualityBand.allCases {
-                let pointFeatures = (featuresByQuality[band] ?? []).map { feature -> MLNPointFeature in
+                let pts = (byBand[band] ?? []).map { feature -> MLNPointFeature in
                     let point = MLNPointFeature()
                     point.coordinate = feature.coordinate
-                    point.attributes = [
-                        "weight": max(0.2, min(feature.weight, 6.0)),
-                        "rsrp": feature.rsrp ?? -999
-                    ]
                     return point
                 }
-                let shape = MLNShapeCollectionFeature(shapes: pointFeatures)
                 let sourceId = coverageSourceId(for: band)
                 if let source = style.source(withIdentifier: sourceId) as? MLNShapeSource {
-                    source.shape = shape
+                    source.shape = MLNShapeCollectionFeature(shapes: pts)
                 } else {
-                    let source = MLNShapeSource(identifier: sourceId, features: pointFeatures, options: nil)
+                    let source = MLNShapeSource(identifier: sourceId, features: pts, options: nil)
                     style.addSource(source)
-                    addCoverageQualityLayers(for: band, source: source, style: style)
+                    let layer = MLNCircleStyleLayer(identifier: coverageDotLayerId(for: band), source: source)
+                    layer.circleColor = NSExpression(forConstantValue: band.uiColor)
+                    layer.circleStrokeWidth = NSExpression(forConstantValue: 0)
+                    style.addLayer(layer)
                 }
+                style.layer(withIdentifier: coverageDotLayerId(for: band))?.isVisible = !pts.isEmpty
+            }
+            styleCoverageDots(style: style, zoom: mapView.zoomLevel)
+        }
 
-                let hidden = pointFeatures.isEmpty
-                style.layer(withIdentifier: coverageAuraLayerId(for: band))?.isVisible = !hidden
-                style.layer(withIdentifier: coverageGlowLayerId(for: band))?.isVisible = !hidden
-                applyCoverageHaloStyle(for: band, style: style, zoom: mapView.zoomLevel)
+        private func styleCoverageDots(style: MLNStyle, zoom: Double) {
+            let radius = coverageDotRadius(forZoom: zoom)
+            for band in CoverageQualityBand.allCases {
+                guard let layer = style.layer(withIdentifier: coverageDotLayerId(for: band)) as? MLNCircleStyleLayer else { continue }
+                layer.circleRadius = NSExpression(forConstantValue: radius)
+                layer.circleOpacity = NSExpression(forConstantValue: band == .unknown ? 0.30 : 0.62)
+                layer.circleBlur = NSExpression(forConstantValue: 0.18)
             }
         }
 
-        private func addCoverageQualityLayers(for band: CoverageQualityBand, source: MLNShapeSource, style: MLNStyle) {
-            // Halo only: a broad aura keeps coverage legible when zoomed out,
-            // while the closer glow preserves signal-quality color at street level.
-            let auraLayer = MLNCircleStyleLayer(identifier: coverageAuraLayerId(for: band), source: source)
-            auraLayer.circleBlur = NSExpression(forConstantValue: 1.0)
-            auraLayer.circleColor = NSExpression(forConstantValue: band.uiColor)
-            style.addLayer(auraLayer)
-
-            let glowLayer = MLNCircleStyleLayer(identifier: coverageGlowLayerId(for: band), source: source)
-            glowLayer.circleColor = NSExpression(forConstantValue: band.uiColor)
-            style.addLayer(glowLayer)
-            applyCoverageHaloStyle(for: band, style: style, zoom: 11)
-        }
-
-        private func applyCoverageHaloStyle(for band: CoverageQualityBand, style: MLNStyle, zoom: Double) {
-            let halo = coverageHaloStyle(for: band, zoom: zoom)
-            if let auraLayer = style.layer(withIdentifier: coverageAuraLayerId(for: band)) as? MLNCircleStyleLayer {
-                auraLayer.circleRadius = NSExpression(forConstantValue: halo.auraRadius)
-                auraLayer.circleOpacity = NSExpression(forConstantValue: halo.auraOpacity)
-            }
-            if let glowLayer = style.layer(withIdentifier: coverageGlowLayerId(for: band)) as? MLNCircleStyleLayer {
-                glowLayer.circleRadius = NSExpression(forConstantValue: halo.glowRadius)
-                glowLayer.circleBlur = NSExpression(forConstantValue: halo.glowBlur)
-                glowLayer.circleOpacity = NSExpression(forConstantValue: halo.glowOpacity)
-            }
-        }
-
-        private func coverageHaloStyle(for band: CoverageQualityBand, zoom: Double) -> CoverageHaloStyle {
-            let zoomScale: Double
+        private func coverageDotRadius(forZoom zoom: Double) -> Double {
             switch zoom {
-            case ..<7: zoomScale = 2.25
-            case ..<9: zoomScale = 1.85
-            case ..<11: zoomScale = 1.45
-            case ..<13: zoomScale = 1.15
-            default: zoomScale = 0.92
+            case ..<8: return 5.6
+            case ..<11: return 5.0
+            case ..<13: return 4.5
+            case ..<15: return 4.2
+            default: return 4.8
             }
-            let unknownScale = band == .unknown ? 0.72 : 1
-            let lowZoomBoost = zoom < 9 ? 1.12 : 1
-            return CoverageHaloStyle(
-                auraRadius: 42 * zoomScale * unknownScale,
-                auraOpacity: (band == .unknown ? 0.08 : 0.15) * lowZoomBoost,
-                glowRadius: 24 * zoomScale * unknownScale,
-                glowOpacity: (band == .unknown ? 0.18 : 0.42) * lowZoomBoost,
-                glowBlur: zoom < 10 ? 0.97 : 0.9
+        }
+
+        // MARK: Speedtests — couche GPU (tout afficher, sans cluster ni cap)
+
+        func setSpeedtestFeatures(_ features: [SpeedtestFeature], mapView: MLNMapView) {
+            guard features != latestSpeedtestFeatures else { return }
+            latestSpeedtestFeatures = features
+            speedtestFeaturesById = Dictionary(features.map { ($0.id, $0) }, uniquingKeysWith: { current, _ in current })
+            updateSpeedtestLayer(mapView: mapView, features: features)
+        }
+
+        /// Un point = une pastille colorée par débit descendant (échelle 7 paliers,
+        /// alignée web/Android). Rendu GPU : tient des milliers de points sans
+        /// cluster ni cap, là où les annotations-vues s'effondreraient.
+        private func updateSpeedtestLayer(mapView: MLNMapView, features: [SpeedtestFeature]) {
+            guard let style = mapView.style else { return }
+            let byBand = Dictionary(grouping: features, by: { SpeedBand.band(forDownload: $0.downloadMbps) })
+            for band in SpeedBand.allCases {
+                let pts = (byBand[band] ?? []).map { feature -> MLNPointFeature in
+                    let point = MLNPointFeature()
+                    point.coordinate = feature.coordinate
+                    point.attributes = ["id": feature.id]
+                    return point
+                }
+                let sourceId = speedtestSourceId(for: band)
+                if let source = style.source(withIdentifier: sourceId) as? MLNShapeSource {
+                    source.shape = MLNShapeCollectionFeature(shapes: pts)
+                } else {
+                    let source = MLNShapeSource(identifier: sourceId, features: pts, options: nil)
+                    style.addSource(source)
+                    let layer = MLNCircleStyleLayer(identifier: speedtestLayerId(for: band), source: source)
+                    layer.circleColor = NSExpression(forConstantValue: band.uiColor)
+                    layer.circleStrokeColor = NSExpression(forConstantValue: UIColor.white.withAlphaComponent(0.55))
+                    style.addLayer(layer)
+                }
+                style.layer(withIdentifier: speedtestLayerId(for: band))?.isVisible = !pts.isEmpty
+            }
+            styleSpeedtestDots(style: style, zoom: mapView.zoomLevel)
+        }
+
+        private func styleSpeedtestDots(style: MLNStyle, zoom: Double) {
+            let radius = speedtestDotRadius(forZoom: zoom)
+            let stroke = zoom >= 13 ? 0.8 : 0.0
+            for band in SpeedBand.allCases {
+                guard let layer = style.layer(withIdentifier: speedtestLayerId(for: band)) as? MLNCircleStyleLayer else { continue }
+                layer.circleRadius = NSExpression(forConstantValue: radius)
+                layer.circleOpacity = NSExpression(forConstantValue: 0.9)
+                layer.circleStrokeWidth = NSExpression(forConstantValue: stroke)
+            }
+        }
+
+        private func speedtestDotRadius(forZoom zoom: Double) -> Double {
+            switch zoom {
+            case ..<7: return 2.2
+            case ..<9: return 2.8
+            case ..<11: return 3.4
+            case ..<13: return 4.2
+            case ..<15: return 5.0
+            default: return 6.0
+            }
+        }
+
+        private var speedtestLayerIdentifiers: Set<String> {
+            Set(SpeedBand.allCases.map { speedtestLayerId(for: $0) })
+        }
+
+        // MARK: Tap sur une pastille speedtest (couche GPU)
+
+        @objc func handleMapTap(_ recognizer: UITapGestureRecognizer) {
+            guard recognizer.state == .ended, let mapView = recognizer.view as? MLNMapView else { return }
+            let point = recognizer.location(in: mapView)
+            let rect = CGRect(x: point.x - 12, y: point.y - 12, width: 24, height: 24)
+            let hits = mapView.visibleFeatures(in: rect, styleLayerIdentifiers: speedtestLayerIdentifiers)
+            guard let feature = hits.first,
+                  let id = feature.attribute(forKey: "id") as? String,
+                  let speedtest = speedtestFeaturesById[id] else { return }
+            onSelect(speedtestPayload(from: speedtest))
+        }
+
+        private func speedtestPayload(from speedtest: SpeedtestFeature) -> MapAnnotationPayload {
+            MapAnnotationPayload(
+                id: "speed-\(speedtest.id)",
+                kind: .speedtest,
+                title: "\(Int(speedtest.downloadMbps.rounded())) Mbps",
+                subtitle: speedtest.tech ?? "Speedtest",
+                coordinate: speedtest.coordinate,
+                metric: speedtest.uploadMbps.map { "\(Int($0.rounded())) Mbps up" },
+                backendId: speedtest.id,
+                details: MapItemDetails(
+                    downloadMbps: speedtest.downloadMbps,
+                    uploadMbps: speedtest.uploadMbps,
+                    pingMs: speedtest.pingMs,
+                    tech: speedtest.tech,
+                    timestamp: speedtest.timestamp,
+                    note: "Données Speedtest"
+                ),
+                antennaId: nil,
+                clusterCount: nil,
+                azimuths: [],
+                showsAzimuths: false
             )
         }
 
@@ -2450,15 +2876,33 @@ private struct SQMapLibreMapView: UIViewRepresentable {
             "sq-coverage-quality-source-\(band.rawValue)"
         }
 
-        private func coverageAuraLayerId(for band: CoverageQualityBand) -> String {
-            "sq-coverage-quality-aura-\(band.rawValue)"
+        private func coverageDotLayerId(for band: CoverageQualityBand) -> String {
+            "sq-coverage-quality-dot-\(band.rawValue)"
         }
 
-        private func coverageGlowLayerId(for band: CoverageQualityBand) -> String {
-            "sq-coverage-quality-glow-\(band.rawValue)"
+        private func speedtestSourceId(for band: SpeedBand) -> String {
+            "sq-speedtest-source-\(band.rawValue)"
+        }
+
+        private func speedtestLayerId(for band: SpeedBand) -> String {
+            "sq-speedtest-layer-\(band.rawValue)"
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            true
         }
 
         func mapView(_ mapView: MLNMapView, regionDidChangeAnimated animated: Bool) {
+            // Redimensionne les pastilles GPU selon le zoom (sans attendre un
+            // changement de données), pour un rendu net à toutes les échelles.
+            if let style = mapView.style {
+                let zoom = mapView.zoomLevel
+                if lastStyledZoom.isNaN || abs(zoom - lastStyledZoom) > 0.25 {
+                    lastStyledZoom = zoom
+                    styleCoverageDots(style: style, zoom: zoom)
+                    styleSpeedtestDots(style: style, zoom: zoom)
+                }
+            }
             let bounds = mapView.visibleCoordinateBounds
             onMoveEnd(
                 MapBounds(
@@ -2497,12 +2941,17 @@ private final class SQAnnotationImageCache: @unchecked Sendable {
     static let shared = SQAnnotationImageCache()
     private let cache = NSCache<NSURL, UIImage>()
     private let session: URLSession
+    /// Côté max (px) de la vignette décodée. La pastille fait 60 pt (~180 px @3x) ;
+    /// on décode directement à cette taille → coût mémoire/CPU borné même si la
+    /// source est une image pleine résolution (repli `imageUrl`).
+    private let maxPixelSize: CGFloat = 200
 
     private init() {
-        cache.countLimit = 240
+        cache.countLimit = 600
+        cache.totalCostLimit = 48 * 1024 * 1024
         let config = URLSessionConfiguration.default
         config.requestCachePolicy = .returnCacheDataElseLoad
-        config.urlCache = URLCache(memoryCapacity: 16 * 1024 * 1024, diskCapacity: 64 * 1024 * 1024)
+        config.urlCache = URLCache(memoryCapacity: 16 * 1024 * 1024, diskCapacity: 128 * 1024 * 1024)
         session = URLSession(configuration: config)
     }
 
@@ -2510,13 +2959,31 @@ private final class SQAnnotationImageCache: @unchecked Sendable {
         cache.object(forKey: url as NSURL)
     }
 
-    /// Charge la vignette (cache → réseau). Retourne `nil` en cas d'échec.
+    /// Charge la vignette (cache → réseau) en la décodant à la taille d'affichage.
+    /// Retourne `nil` en cas d'échec.
     func loadImage(_ url: URL) async -> UIImage? {
         if let cached = cache.object(forKey: url as NSURL) { return cached }
-        guard let (data, _) = try? await session.data(from: url),
-              let image = UIImage(data: data) else { return nil }
-        cache.setObject(image, forKey: url as NSURL)
+        guard let (data, _) = try? await session.data(from: url) else { return nil }
+        guard let image = Self.downsample(data: data, maxPixelSize: maxPixelSize) ?? UIImage(data: data) else { return nil }
+        let cost = Int(image.size.width * image.size.height * 4)
+        cache.setObject(image, forKey: url as NSURL, cost: cost)
         return image
+    }
+
+    /// Décode l'image directement à `maxPixelSize` via ImageIO (pas de décodage
+    /// pleine résolution intermédiaire).
+    private static func downsample(data: Data, maxPixelSize: CGFloat) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary) else {
+            return nil
+        }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return UIImage(cgImage: cgImage)
     }
 }
 
@@ -2530,6 +2997,8 @@ private final class SQMapAnnotationView: MLNAnnotationView {
     private let photoPointerLayer = CAShapeLayer()
     /// Petit badge appareil-photo en coin de la vignette.
     private let photoBadgeView = UIImageView()
+    /// Badge de statut (sites prévisionnels) : ✓ actif / ↑ upgrade en attente.
+    private let statusBadgeView = UIImageView()
     /// URL de la vignette en cours de chargement, pour ignorer les réponses
     /// obsolètes lorsqu'une vue d'annotation est recyclée.
     private var pendingThumbnailURL: URL?
@@ -2548,6 +3017,13 @@ private final class SQMapAnnotationView: MLNAnnotationView {
         markerView.addSubview(label)
         markerView.addSubview(glyphView)
         markerView.addSubview(photoBadgeView)
+        markerView.addSubview(statusBadgeView)
+        statusBadgeView.contentMode = .center
+        statusBadgeView.isHidden = true
+        statusBadgeView.tintColor = .white
+        statusBadgeView.clipsToBounds = true
+        statusBadgeView.layer.borderColor = UIColor.white.cgColor
+        statusBadgeView.layer.borderWidth = 1
         markerView.layer.shadowColor = UIColor.black.cgColor
         markerView.layer.shadowOpacity = 0.28
         markerView.layer.shadowRadius = 6
@@ -2582,6 +3058,7 @@ private final class SQMapAnnotationView: MLNAnnotationView {
         glyphView.isHidden = true
         photoPointerLayer.isHidden = true
         photoBadgeView.isHidden = true
+        statusBadgeView.isHidden = true
     }
 
     func configure(with payload: MapAnnotationPayload) {
@@ -2616,6 +3093,14 @@ private final class SQMapAnnotationView: MLNAnnotationView {
         imageView.image = nil
         photoPointerLayer.isHidden = true
         photoBadgeView.isHidden = true
+        statusBadgeView.isHidden = true
+
+        // Site prévisionnel : anneau coloré par statut d'activation (croisement
+        // ANFR) — vert actif / ambre upgrade en attente / blanc déclaré ou prévu,
+        // avec un badge ✓ ou ↑ pour les sites déjà sur le terrain (comme Android).
+        if let status = payload.plannedStatus {
+            applyPlannedStatus(status, markerSize: markerSize)
+        }
 
         fanLayer.frame = bounds
         fanLayer.path = payload.showsAzimuths ? azimuthPath(azimuths: payload.azimuths, center: CGPoint(x: canvasSize / 2, y: canvasSize / 2), radius: canvasSize / 2 - 4).cgPath : nil
@@ -2635,9 +3120,46 @@ private final class SQMapAnnotationView: MLNAnnotationView {
         } else {
             label.isHidden = true
             glyphView.isHidden = false
-            glyphView.image = UIImage(systemName: payload.systemImageName)
+            glyphView.image = UIImage(systemName: payload.glyphOverride ?? payload.systemImageName)
             glyphView.frame = markerView.bounds.insetBy(dx: 6, dy: 6)
         }
+
+        // Badge « photos disponibles » sur les antennes (comme Android) : indique
+        // qu'au moins une photo publique existe sur le site (taper l'antenne →
+        // fiche avec la galerie).
+        if payload.kind == .antenna && payload.contributionPhotos > 0 {
+            let badge: CGFloat = 16
+            photoBadgeView.frame = CGRect(x: markerView.bounds.width - badge + 3, y: -4, width: badge, height: badge)
+            photoBadgeView.layer.cornerRadius = badge / 2
+            photoBadgeView.isHidden = false
+        }
+    }
+
+    /// Applique l'anneau + le badge de statut d'un site prévisionnel.
+    private func applyPlannedStatus(_ status: PlannedActivationStatus, markerSize: CGSize) {
+        let ringColor: UIColor
+        let badgeGlyph: String?
+        switch status {
+        case .active:
+            ringColor = UIColor(red: 0x16 / 255, green: 0xA3 / 255, blue: 0x4A / 255, alpha: 1.0)
+            badgeGlyph = "checkmark"
+        case .upgradePending:
+            ringColor = UIColor(red: 0xF5 / 255, green: 0x9E / 255, blue: 0x0B / 255, alpha: 1.0)
+            badgeGlyph = "arrow.up"
+        case .declared, .planned:
+            ringColor = UIColor.white.withAlphaComponent(0.9)
+            badgeGlyph = nil
+        }
+        markerView.layer.borderColor = ringColor.cgColor
+        markerView.layer.borderWidth = status.isOnAir ? 2.6 : 2.0
+
+        guard let badgeGlyph else { statusBadgeView.isHidden = true; return }
+        let badge: CGFloat = 15
+        statusBadgeView.frame = CGRect(x: markerSize.width - badge - 1, y: 1, width: badge, height: badge)
+        statusBadgeView.layer.cornerRadius = badge / 2
+        statusBadgeView.backgroundColor = ringColor
+        statusBadgeView.image = UIImage(systemName: badgeGlyph, withConfiguration: UIImage.SymbolConfiguration(pointSize: 8, weight: .heavy))
+        statusBadgeView.isHidden = false
     }
 
     /// Configure le marqueur en mini-photo et déclenche le chargement async de
@@ -2704,7 +3226,7 @@ private final class SQMapAnnotationView: MLNAnnotationView {
         thumbnailTask = Task { [weak self] in
             let image = await SQAnnotationImageCache.shared.loadImage(url)
             guard let image else { return }
-            await self?.applyThumbnail(image, for: url)
+            self?.applyThumbnail(image, for: url)
         }
     }
 
@@ -2848,3 +3370,193 @@ private extension MapAnnotationPayload {
     }
 }
 #endif
+
+/// Sheet détaillée d'un site en panne / maintenance : type d'incident, raison
+/// lisible, services impactés (voix/data par génération), dates de début et de
+/// rétablissement prévu, localisation.
+struct OutageDetailSheet: View {
+    let site: OutageSiteLive
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                SQSheetHandle()
+                header
+                if !site.services.isEmpty { servicesSection }
+                infoSection
+            }
+            .padding()
+        }
+        .presentationDetents([.height(440), .medium, .large])
+        .presentationBackgroundCompat(.ultraThinMaterial)
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: SQSpace.md) {
+            Image(systemName: issueGlyph)
+                .font(.title2.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 46, height: 46)
+                .background(issueColor, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(site.commune?.capitalized ?? site.siteId ?? "Site en panne")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(SQColor.label)
+                Text(issueLabel)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(issueColor)
+                if let op = site.operator {
+                    Text(op)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            Spacer()
+        }
+    }
+
+    private var servicesSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Services impactés")
+                .font(SQFont.archivo(12, .semibold))
+                .tracking(0.4)
+                .textCase(.uppercase)
+                .foregroundStyle(SQColor.labelSecondary)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
+                ForEach(site.services, id: \.label) { service in
+                    HStack(spacing: 6) {
+                        Circle().fill(serviceColor(service.status)).frame(width: 8, height: 8)
+                        Text(service.label)
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(SQColor.label)
+                        Spacer(minLength: 0)
+                        Text(serviceStatusLabel(service.status))
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(serviceColor(service.status))
+                    }
+                    .padding(.horizontal, SQSpace.sm + 2)
+                    .padding(.vertical, 7)
+                    .background(serviceColor(service.status).opacity(0.12), in: Capsule())
+                }
+            }
+        }
+    }
+
+    private var infoSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            infoRow("Raison", reasonText)
+            infoRow("Début", formattedDate(site.startedAt))
+            infoRow("Rétablissement prévu", formattedDate(site.estimatedEnd) ?? "Non communiqué")
+            infoRow("Commune", site.commune?.capitalized)
+            infoRow("Département", site.departement)
+            infoRow("Site", site.siteId)
+        }
+        .padding(.vertical, SQSpace.xs)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func infoRow(_ label: String, _ value: String?) -> some View {
+        if let value, !value.isEmpty {
+            HStack(alignment: .top) {
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundStyle(SQColor.labelSecondary)
+                Spacer()
+                Text(value)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .multilineTextAlignment(.trailing)
+            }
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm + 1)
+            Divider().padding(.leading, SQSpace.md)
+        }
+    }
+
+    // MARK: Présentation
+
+    private var issueKey: String { (site.issueType ?? "").lowercased() }
+
+    private var issueLabel: String {
+        switch issueKey {
+        case "maintenance": return "Maintenance programmée"
+        case "degraded": return "Service dégradé"
+        default: return "Panne / hors service"
+        }
+    }
+
+    private var issueColor: Color {
+        switch issueKey {
+        case "maintenance": return Color(hex: 0xF97316)
+        case "degraded": return Color(hex: 0xEAB308)
+        default: return Color(hex: 0xEF4444)
+        }
+    }
+
+    private var issueGlyph: String {
+        switch issueKey {
+        case "maintenance": return "wrench.and.screwdriver.fill"
+        case "degraded": return "exclamationmark.circle.fill"
+        default: return "exclamationmark.triangle.fill"
+        }
+    }
+
+    /// Code opérateur brut → libellé lisible (au lieu d'« INT » / « MAINT »).
+    private var reasonText: String {
+        switch (site.reason ?? "").uppercased() {
+        case "INT": return "Interruption de service"
+        case "MAINT": return "Maintenance programmée"
+        case "": return site.detail ?? issueLabel
+        default: return site.detail ?? (site.reason ?? issueLabel)
+        }
+    }
+
+    private func serviceStatusLabel(_ status: String) -> String {
+        switch status.uppercased() {
+        case "HS": return "Hors service"
+        case "DE": return "Dégradé"
+        case "OK": return "OK"
+        default: return status
+        }
+    }
+
+    private func serviceColor(_ status: String) -> Color {
+        switch status.uppercased() {
+        case "HS": return Color(hex: 0xEF4444)
+        case "DE": return Color(hex: 0xF59E0B)
+        case "OK": return Color(hex: 0x10B981)
+        default: return SQColor.labelSecondary
+        }
+    }
+
+    /// Parse une date backend (ISO avec/sans fraction, ou « jour seul ») et la
+    /// formate en français lisible.
+    private func formattedDate(_ raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        let date: Date?
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = iso.date(from: raw) {
+            date = d
+        } else {
+            let iso2 = ISO8601DateFormatter()
+            iso2.formatOptions = [.withInternetDateTime]
+            if let d = iso2.date(from: raw) {
+                date = d
+            } else {
+                let f = DateFormatter()
+                f.locale = Locale(identifier: "en_US_POSIX")
+                f.timeZone = TimeZone(secondsFromGMT: 0)
+                f.dateFormat = "yyyy-MM-dd"
+                date = f.date(from: raw)
+            }
+        }
+        guard let date else { return raw }
+        let out = DateFormatter()
+        out.locale = Locale(identifier: "fr_FR")
+        out.dateStyle = .medium
+        out.timeStyle = raw.contains("T") ? .short : .none
+        return out.string(from: date)
+    }
+}

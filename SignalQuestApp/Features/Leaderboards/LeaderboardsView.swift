@@ -70,7 +70,7 @@ struct LeaderboardsView: View {
             .padding(.bottom, 96)
         }
         .navigationTitle("Classement")
-        .toolbarTitleDisplayMode(.inline)
+        .toolbarTitleInlineCompat()
         .signalQuestBackground()
         .task {
             await model.load()
@@ -155,9 +155,9 @@ struct LeaderboardsView: View {
             }
         }
         .pickerStyle(.segmented)
-        .onChange(of: model.period) { _, _ in Task { await model.load() } }
-        .onChange(of: model.scope) { _, _ in Task { await model.load() } }
-        .onChange(of: model.category) { _, _ in Task { await model.load() } }
+        .onChangeCompat(of: model.period) { _, _ in Task { await model.load() } }
+        .onChangeCompat(of: model.scope) { _, _ in Task { await model.load() } }
+        .onChangeCompat(of: model.category) { _, _ in Task { await model.load() } }
     }
 
     private func myRankCard(_ rank: LeaderboardMyRank) -> some View {

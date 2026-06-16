@@ -73,7 +73,7 @@ final class AntennasService: AntennasServicing {
                 query.append(URLQueryItem(name: "technologies", value: technologies.sorted().joined(separator: ",")))
             }
             if !bands.isEmpty {
-                query.append(URLQueryItem(name: "bands", value: bands.sorted().map(String.init).joined(separator: ",")))
+                query.append(contentsOf: Self.bandQueryItems(bands))
             }
             if !sharing.isEmpty {
                 query.append(URLQueryItem(name: "sharing", value: sharing.sorted().joined(separator: ",")))
@@ -88,6 +88,35 @@ final class AntennasService: AntennasServicing {
         return merged.filter { site in
             let key = site.siteId ?? site.id
             return seen.insert(key).inserted
+        }
+    }
+
+    private static func bandQueryItems(_ bands: Set<Int>) -> [URLQueryItem] {
+        let values = bands.sorted()
+        guard !values.isEmpty else { return [] }
+        let bandValue = values.map(String.init).joined(separator: ",")
+        var items = [
+            URLQueryItem(name: "bands", value: bandValue),
+            URLQueryItem(name: "band", value: bandValue),
+            URLQueryItem(name: "frequencyBands", value: bandValue)
+        ]
+        let frequencyValue = values.compactMap(frequencyMHz(forBand:)).map(String.init).joined(separator: ",")
+        if !frequencyValue.isEmpty {
+            items.append(URLQueryItem(name: "frequencies", value: frequencyValue))
+            items.append(URLQueryItem(name: "frequency", value: frequencyValue))
+        }
+        return items
+    }
+
+    private static func frequencyMHz(forBand band: Int) -> Int? {
+        switch band {
+        case 1: return 2100
+        case 3: return 1800
+        case 7: return 2600
+        case 20: return 800
+        case 28: return 700
+        case 78: return 3500
+        default: return nil
         }
     }
 

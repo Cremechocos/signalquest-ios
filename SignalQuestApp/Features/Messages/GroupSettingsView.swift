@@ -18,6 +18,7 @@ struct GroupSettingsView: View {
     @State private var searchQuery = ""
     @State private var searchResults: [MessageSearchUser] = []
     @State private var photoItem: PhotosPickerItem?
+    @State private var showAvatarPicker = false
     @State private var isBusy = false
     @State private var errorMessage: String?
     @State private var confirmLeave = false
@@ -50,18 +51,7 @@ struct GroupSettingsView: View {
                 Section("Groupe") {
                     HStack(spacing: SQSpace.md) {
                         if isAdmin {
-                            PhotosPicker(selection: $photoItem, matching: .images) {
-                                groupAvatar
-                                    .overlay(alignment: .bottomTrailing) {
-                                        Image(systemName: "camera.fill")
-                                            .font(.system(size: 11, weight: .semibold))
-                                            .foregroundStyle(SQColor.label)
-                                            .padding(5)
-                                            .background(SQColor.surface, in: Circle())
-                                            .overlay { Circle().stroke(SQColor.bg, lineWidth: 2) }
-                                    }
-                                    .opacity(isBusy && pickedPreview != nil ? 0.6 : 1)
-                            }
+                            adminAvatarPicker
                         } else {
                             groupAvatar
                         }
@@ -155,13 +145,13 @@ struct GroupSettingsView: View {
             .confirmationDialog("Quitter le groupe ?", isPresented: $confirmLeave, titleVisibility: .visible) {
                 Button("Quitter", role: .destructive) { Task { await leave() } }
             }
-            .onChange(of: searchQuery) { _, _ in
+            .onChangeCompat(of: searchQuery) { _, _ in
                 Task {
                     try? await Task.sleep(for: .milliseconds(350))
                     await search()
                 }
             }
-            .onChange(of: photoItem) { _, newValue in
+            .onChangeCompat(of: photoItem) { _, newValue in
                 guard let newValue else { return }
                 Task { await uploadPhoto(item: newValue) }
             }
@@ -241,6 +231,26 @@ struct GroupSettingsView: View {
         } else {
             SQAvatar(url: groupPhotoURL, name: title.isEmpty ? "Groupe" : title, size: 52)
         }
+    }
+
+    /// Sélecteur d'avatar (admin) : un `Button` + `.photosPicker(isPresented:)`
+    /// (label MainActor classique) au lieu de `PhotosPicker { label }` dont le
+    /// closure est `@Sendable` et interdit de référencer l'état / capturer une View.
+    private var adminAvatarPicker: some View {
+        Button { showAvatarPicker = true } label: {
+            groupAvatar
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(SQColor.label)
+                        .padding(5)
+                        .background(SQColor.surface, in: Circle())
+                        .overlay { Circle().stroke(SQColor.bg, lineWidth: 2) }
+                }
+                .opacity(isBusy && pickedPreview != nil ? 0.6 : 1)
+        }
+        .buttonStyle(.plain)
+        .photosPicker(isPresented: $showAvatarPicker, selection: $photoItem, matching: .images)
     }
 
     private func uploadPhoto(item: PhotosPickerItem) async {

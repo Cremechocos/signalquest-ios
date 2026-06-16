@@ -80,7 +80,7 @@ struct ScheduleMessageSheet: View {
                 .padding()
             }
             .navigationTitle("Programmer l'envoi")
-            .toolbarTitleDisplayMode(.inline)
+            .toolbarTitleInlineCompat()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Annuler") { dismiss() }
@@ -165,7 +165,7 @@ struct AddReminderSheet: View {
                 .padding()
             }
             .navigationTitle("Nouveau rappel")
-            .toolbarTitleDisplayMode(.inline)
+            .toolbarTitleInlineCompat()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Annuler") { dismiss() }

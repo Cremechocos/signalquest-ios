@@ -51,7 +51,7 @@ struct ThreadView: View {
                 composer
             }
             .navigationTitle("Fil de discussion")
-            .toolbarTitleDisplayMode(.inline)
+            .toolbarTitleInlineCompat()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Fermer") { dismiss() }

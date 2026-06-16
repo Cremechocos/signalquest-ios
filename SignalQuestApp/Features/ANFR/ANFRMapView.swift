@@ -126,7 +126,7 @@ struct ANFRMapView: View {
             controlsLayer
         }
         .navigationTitle("Carte ANFR")
-        .toolbarTitleDisplayMode(.inline)
+        .toolbarTitleInlineCompat()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -144,12 +144,12 @@ struct ANFRMapView: View {
         .sheet(isPresented: $showFilters) {
             ANFRMapFilterSheet(model: model)
                 .presentationDetents([.medium, .large])
-                .presentationBackground(SQColor.bg)
+                .presentationBackgroundCompat(SQColor.bg)
         }
         .sheet(isPresented: $showDatePicker) {
             ANFRDatePickerSheet(model: model)
                 .presentationDetents([.medium, .large])
-                .presentationBackground(SQColor.bg)
+                .presentationBackgroundCompat(SQColor.bg)
         }
         .task { await model.load() }
     }

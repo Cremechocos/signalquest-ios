@@ -74,7 +74,7 @@ struct EditProfileView: View {
                     Button("Annuler") { dismiss() }.tint(SQColor.brandRed)
                 }
             }
-            .onChange(of: avatarItem) { _, newValue in
+            .onChangeCompat(of: avatarItem) { _, newValue in
                 guard let newValue else { return }
                 Task {
                     if let data = try? await newValue.loadTransferable(type: Data.self),

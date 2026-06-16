@@ -237,7 +237,7 @@ struct ANFRStatsView: View {
             .padding(.bottom, SQSpace.huge + SQSpace.huge)
         }
         .navigationTitle("Statistiques ANFR")
-        .toolbarTitleDisplayMode(.inline)
+        .toolbarTitleInlineCompat()
         .signalQuestBackground()
         .refreshable { await model.refresh() }
         .task { await model.load() }
@@ -777,7 +777,7 @@ private struct ANFRTrendChart: View {
             guard animate else { drawn = true; return }
             withAnimation(.easeInOut(duration: 0.9)) { drawn = true }
         }
-        .onChange(of: points.map(\.id)) { _, _ in
+        .onChangeCompat(of: points.map(\.id)) { _, _ in
             // Nouveau jeu de données (changement d'opérateur) : re-trace.
             drawn = false
             withAnimation(.easeInOut(duration: 0.7)) { drawn = true }

@@ -155,7 +155,7 @@ struct MapPhotoViewer: View {
                     Image(systemName: liked ? "heart.fill" : "heart")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(liked ? SQColor.brandRed : .white)
-                        .symbolEffect(.bounce, value: liked)
+                        .symbolEffectBounceCompat(value: liked)
                     Text("\(likeCount)")
                         .font(SQFont.archivo(14, .semibold))
                         .foregroundStyle(.white)

@@ -76,6 +76,16 @@ extension JSONDecoder {
             if let date = localNoFraction.date(from: value) {
                 return date
             }
+            // Dates « jour seul » (ex. `date5g` prévisionnel = "2026-06-30",
+            // `lastInServiceDate`). SANS ce format, un seul de ces champs faisait
+            // jeter TOUT le tableau (ex. ~1900 sites prévisionnels) → couche vide.
+            let dateOnly = DateFormatter()
+            dateOnly.locale = Locale(identifier: "en_US_POSIX")
+            dateOnly.timeZone = TimeZone(secondsFromGMT: 0)
+            dateOnly.dateFormat = "yyyy-MM-dd"
+            if let date = dateOnly.date(from: value) {
+                return date
+            }
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid ISO date: \(value)")
         }
         return decoder

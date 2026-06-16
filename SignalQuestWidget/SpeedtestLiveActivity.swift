@@ -88,6 +88,17 @@ private struct LockScreenSpeedtestActivity: View {
     private var progress: Double { clamped(state.progress) }
     private var tint: Color { state.finished ? SpeedtestLiveStyle.success : speedColor(state.downloadMbps) }
 
+    private var compactPhaseLabel: String {
+        if state.finished { return "OK" }
+        let label = state.phaseLabel.lowercased()
+        if label.contains("ping") { return "Ping" }
+        if label.contains("upload") || label.contains("envoi") { return "UL" }
+        if label.contains("download") || label.contains("réception") || label.contains("reception") { return "DL" }
+        if label.contains("sauvegarde") || label.contains("saving") || label.contains("sync") { return "Sync" }
+        if state.isBurst { return "Test \(state.runIndex)/\(state.runTotal)" }
+        return "Test"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
@@ -274,16 +285,29 @@ private struct IslandStatus: View {
 
     private var tint: Color { state.finished ? SpeedtestLiveStyle.success : speedColor(state.downloadMbps) }
 
+    private var compactPhaseLabel: String {
+        if state.finished { return "OK" }
+        let label = state.phaseLabel.lowercased()
+        if label.contains("ping") { return "Ping" }
+        if label.contains("upload") || label.contains("envoi") { return "UL" }
+        if label.contains("download") || label.contains("réception") || label.contains("reception") { return "DL" }
+        if label.contains("sauvegarde") || label.contains("saving") || label.contains("sync") { return "Sync" }
+        if state.isBurst { return "Test \(state.runIndex)/\(state.runTotal)" }
+        return "Test"
+    }
+
     var body: some View {
         VStack(spacing: 2) {
             HStack(spacing: 4) {
                 Circle()
                     .fill(tint)
                     .frame(width: 5, height: 5)
-                Text(state.phaseLabel)
-                    .font(.system(size: 11, weight: .semibold))
+                Text(compactPhaseLabel)
+                    .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .accessibilityLabel(state.phaseLabel)
             }
 
             if state.pingMs > 0 {

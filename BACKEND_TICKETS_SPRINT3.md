@@ -10,6 +10,14 @@ Légende priorité : **P0** bloquant lancement · **P1** avant lancement public 
 
 ---
 
+## BE-14 — Photos publiques par zone (carte « tous les membres »)  · P1 · réf carte juin 2026
+**Contexte.** La carte iOS doit afficher les photos de TOUS les membres (pas seulement les amis du snapshot). Aujourd'hui aucune route ne renvoie des photos publiques avec lat/lng par bbox (les photos n'ont pas de coords propres → résolues via le site).
+**Implémenté (additif, NON déployé/testé en prod).** Nouvelle route `GET /api/map/photos` ajoutée dans `map-nextjs/app/api/map/photos/route.ts` (n'altère aucune route existante). Réutilise `loadAndroidAntennaDataset('ALL')` pour résoudre les coords par `siteId`, scrape-guard `enforcePublicDataScrapeGuard` (profile tile, allowAndroidCompat), `getCurrentUser` optionnel pour le mode amis.
+**Contrat.** `GET /api/map/photos?north&south&east&west&zoom&operator(=ALL)&market(=FR)&friendsOnly(0|1)` → `{ photos: [{ id, siteId, lat, lng, thumbnailUrl, operator, authorId, uploadedAt, isFriend }], hasMore }`. `operator` filtre sur l'opérateur **de la photo** (`AntennaPhoto.operator`/`operatorKey`). `friendsOnly`/`isFriend` résolus quand authentifié (amitié `Friendship`). `approved:true` + `moderationStatus:'approved'` uniquement. Scan max 2000 récentes, retour max 500 après filtre bbox. Cache `private, max-age=60, swr=120`.
+**À faire backend.** Déployer + tester en prod ; vérifier perf du scan 2000 (index `uploadedAt`/`operator`) ; envisager une vraie requête géo si volumétrie élevée. Client iOS prêt ✅ (`MapSnapshotService.publicPhotos` + couche `publicPhotos`).
+
+---
+
 ## BE-1 — Pagination par curseur généralisée  · P0 · réfs BACKENDAPI-03, SCALABILITY-01
 **Problème.** Plusieurs collections renvoient un plafond dur (`take`/`limit`) + `truncated:true` SANS curseur → troncature silencieuse en zone dense, énumération impossible. Confirmé en prod (Paris Châtelet 1500 m → `{count:100, truncated:true}` sans `nextCursor`).
 **Endpoints concernés.**

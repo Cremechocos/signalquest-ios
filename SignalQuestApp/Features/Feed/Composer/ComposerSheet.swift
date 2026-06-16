@@ -354,7 +354,7 @@ struct ComposerSheet: View {
                         .frame(width: 40, height: 40)
                         .background(SQColor.fill, in: Circle())
                 }
-                .onChange(of: model.selectedItem) { _, _ in
+                .onChangeCompat(of: model.selectedItem) { _, _ in
                     Task { await model.loadPickerImage() }
                 }
                 

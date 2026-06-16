@@ -275,7 +275,6 @@ final class ANFRMarkerView: MLNAnnotationView {
         countLabel.isHidden = true
         badgeView.isHidden = true // L'utilisateur a explicitement demandé de ne pas afficher les badges 5G/4G.
 
-        let canvas = markerSize + badgeSize / 2
         // Le disque opérateur est centré dans le coin bas-gauche du canvas pour
         // laisser la place au badge génération en haut-droite.
         let markerFrame = CGRect(x: 0, y: badgeSize / 2, width: markerSize, height: markerSize)

@@ -52,6 +52,18 @@ struct ProfileView: View {
                     }
                     menuSeparator
                     NavigationLink {
+                        SessionsListView(service: services.sessions)
+                    } label: {
+                        menuRow(title: "Mes sessions / Logs", icon: "point.topleft.down.curvedto.point.bottomright.up")
+                    }
+                    menuSeparator
+                    NavigationLink {
+                        MyIdentificationsView(service: services.identify)
+                    } label: {
+                        menuRow(title: "Mes identifications", icon: "checkmark.seal")
+                    }
+                    menuSeparator
+                    NavigationLink {
                         ANFRMapView(service: services.anfr)
                     } label: {
                         menuRow(title: "Carte ANFR", icon: "antenna.radiowaves.left.and.right")
@@ -111,7 +123,7 @@ struct ProfileView: View {
             .padding(.bottom, SQSpace.huge + SQSpace.huge)
         }
         .navigationTitle("Profil")
-        .toolbarTitleDisplayMode(.inline)
+        .toolbarTitleInlineCompat()
         .signalQuestBackground()
         .sheet(isPresented: $showEdit) {
             EditProfileView(user: user)

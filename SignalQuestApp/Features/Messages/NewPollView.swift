@@ -101,7 +101,7 @@ struct NewPollView: View {
                 .padding()
             }
             .navigationTitle("Nouveau sondage")
-            .toolbarTitleDisplayMode(.inline)
+            .toolbarTitleInlineCompat()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Annuler") { dismiss() }

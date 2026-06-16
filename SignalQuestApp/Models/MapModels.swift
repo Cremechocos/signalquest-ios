@@ -265,6 +265,60 @@ struct SocialSpeedtestLive: Codable, Identifiable, Equatable {
     }
 }
 
+/// Statut d'activation d'un site prévisionnel, croisé côté backend avec le
+/// référentiel ANFR — identique au contrat Android (`activation.status`).
+/// `active` : toutes les technos prévues sont en service. `upgradePending` :
+/// site en service mais une bande prévue (ex. 5G 3500) pas encore allumée.
+/// `declared` : station enregistrée sans émetteur actif. `planned` : pas
+/// (encore) construit. Toute valeur inconnue retombe sur `.planned`.
+enum PlannedActivationStatus: String, Equatable, Sendable {
+    case active
+    case upgradePending
+    case declared
+    case planned
+
+    init(apiValue: String?) {
+        switch apiValue?.lowercased() {
+        case "active": self = .active
+        case "upgrade_pending", "upgradepending": self = .upgradePending
+        case "declared": self = .declared
+        default: self = .planned
+        }
+    }
+
+    /// Le site émet déjà (au moins partiellement) sur le terrain.
+    var isOnAir: Bool { self == .active || self == .upgradePending }
+}
+
+struct PlannedSiteActivation: Decodable, Equatable, Sendable {
+    let status: PlannedActivationStatus
+    let matchType: String?
+    let activeTechnologies: [String]
+    let plannedTechnologies: [String]
+    let confirmedTechnologies: [String]
+    let pendingTechnologies: [String]
+    /// Distance (m) entre le point prévisionnel et l'antenne ANFR appariée.
+    let distanceM: Double?
+    /// Dernière mise en service connue de l'antenne appariée (date jour-seul).
+    let lastInServiceDate: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case status, matchType, activeTechnologies, plannedTechnologies, confirmedTechnologies, pendingTechnologies, distanceM, lastInServiceDate
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        status = PlannedActivationStatus(apiValue: try? c.decodeIfPresent(String.self, forKey: .status))
+        matchType = c.decodeFlexibleString(forKey: .matchType)
+        activeTechnologies = c.decodeLossyArray([String].self, forKey: .activeTechnologies)
+        plannedTechnologies = c.decodeLossyArray([String].self, forKey: .plannedTechnologies)
+        confirmedTechnologies = c.decodeLossyArray([String].self, forKey: .confirmedTechnologies)
+        pendingTechnologies = c.decodeLossyArray([String].self, forKey: .pendingTechnologies)
+        distanceM = (try? c.decodeIfPresent(Double.self, forKey: .distanceM)) ?? nil
+        lastInServiceDate = (try? c.decodeIfPresent(Date.self, forKey: .lastInServiceDate)) ?? nil
+    }
+}
+
 struct PlannedSiteLive: Decodable, Identifiable, Equatable {
     let id: String
     let `operator`: String?
@@ -279,10 +333,12 @@ struct PlannedSiteLive: Decodable, Identifiable, Equatable {
     let date5g: Date?
     let sourceUpdatedAt: Date?
     let technologies: [String]
+    /// Croisement ANFR (active / upgrade en attente / déclarée / prévue), comme Android.
+    let activation: PlannedSiteActivation?
 
     enum CodingKeys: String, CodingKey {
         case `operator` = "operator"
-        case lat, lon, codeSite, idStation, plannedKey, referenceId, departement, commune, date5g, sourceUpdatedAt, technologies
+        case lat, lon, codeSite, idStation, plannedKey, referenceId, departement, commune, date5g, sourceUpdatedAt, technologies, activation
     }
 
     init(from decoder: Decoder) throws {
@@ -296,8 +352,10 @@ struct PlannedSiteLive: Decodable, Identifiable, Equatable {
         referenceId = c.decodeFlexibleString(forKey: .referenceId)
         departement = c.decodeFlexibleString(forKey: .departement)
         commune = try c.decodeIfPresent(String.self, forKey: .commune)
-        date5g = try c.decodeIfPresent(Date.self, forKey: .date5g)
-        sourceUpdatedAt = try c.decodeIfPresent(Date.self, forKey: .sourceUpdatedAt)
+        // Décodage TOLÉRANT : un format de date inattendu ne doit jamais faire
+        // échouer tout le tableau de sites prévisionnels (cf. bug couche vide).
+        date5g = (try? c.decodeIfPresent(Date.self, forKey: .date5g)) ?? nil
+        sourceUpdatedAt = (try? c.decodeIfPresent(Date.self, forKey: .sourceUpdatedAt)) ?? nil
         if let array = try? c.decodeIfPresent([String].self, forKey: .technologies) {
             technologies = array
         } else if let object = try? c.decodeIfPresent([String: Bool].self, forKey: .technologies) {
@@ -305,12 +363,20 @@ struct PlannedSiteLive: Decodable, Identifiable, Equatable {
         } else {
             technologies = []
         }
+        activation = try? c.decodeIfPresent(PlannedSiteActivation.self, forKey: .activation)
         id = plannedKey ?? referenceId ?? idStation ?? codeSite ?? UUID().uuidString
     }
 }
 
 struct PlannedSitesResponse: Decodable, Equatable {
     let sites: [PlannedSiteLive]
+}
+
+/// État d'un service réseau sur un site en panne (ex. « Data 4G » → « HS »).
+struct OutageService: Equatable, Sendable {
+    let label: String
+    /// Statut brut backend : "HS" (hors service), "DE" (dégradé), "OK".
+    let status: String
 }
 
 struct OutageSiteLive: Decodable, Identifiable, Equatable {
@@ -320,24 +386,66 @@ struct OutageSiteLive: Decodable, Identifiable, Equatable {
     let lat: Double?
     let lon: Double?
     let commune: String?
-    let status: String?
-    let updatedAt: Date?
+    let departement: String?
+    /// "down" | "maintenance" | "degraded" (contrat `/api/android/map/incidents`).
+    let issueType: String?
+    let reason: String?
+    let detail: String?
+    let startedAt: String?
+    let estimatedEnd: String?
+    /// Services impactés (voix/data 2G→5G) avec leur statut, pour la sheet.
+    let services: [OutageService]
+
+    /// Libellé court affiché en métrique du marqueur.
+    var status: String? { reason ?? issueType }
 
     enum CodingKeys: String, CodingKey {
-        case id, siteId, sup_id, codeSite, lat, latitude, lon, lng, longitude, commune, status, updatedAt
+        // Clés `/api/android/map/incidents` : lat/lon minuscules, code_site_op,
+        // issueType. On garde des replis (Lat/Lon majuscules, sup_id…) pour rester
+        // robuste si la source bascule sur `/api/sites-hs`.
+        case id, siteId, sup_id, codeSite, code_site_op
+        case lat, latitude, Lat, lon, lng, longitude, Lon
+        case commune, departement, issueType, raison, reason, detail, debut, fin_prev, status, updatedAt
+        case voix2g = "2Gvoix", voix3g = "3Gvoix", voix4g = "4Gvoix"
+        case data3g = "3Gdata", data4g = "4Gdata", data5g = "5Gdata"
         case `operator` = "operator"
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        siteId = c.decodeFlexibleString(forKey: .siteId) ?? c.decodeFlexibleString(forKey: .sup_id) ?? c.decodeFlexibleString(forKey: .codeSite)
+        siteId = c.decodeFlexibleString(forKey: .code_site_op)
+            ?? c.decodeFlexibleString(forKey: .siteId)
+            ?? c.decodeFlexibleString(forKey: .sup_id)
+            ?? c.decodeFlexibleString(forKey: .codeSite)
         id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? siteId ?? UUID().uuidString
         `operator` = try c.decodeIfPresent(String.self, forKey: .operator)
-        lat = (try? c.decodeIfPresent(Double.self, forKey: .lat)) ?? (try? c.decodeIfPresent(Double.self, forKey: .latitude))
-        lon = (try? c.decodeIfPresent(Double.self, forKey: .lon)) ?? (try? c.decodeIfPresent(Double.self, forKey: .lng)) ?? (try? c.decodeIfPresent(Double.self, forKey: .longitude))
+        lat = (try? c.decodeIfPresent(Double.self, forKey: .lat))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .latitude))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .Lat))
+        lon = (try? c.decodeIfPresent(Double.self, forKey: .lon))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .lng))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .longitude))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .Lon))
         commune = try c.decodeIfPresent(String.self, forKey: .commune)
-        status = try c.decodeIfPresent(String.self, forKey: .status)
-        updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt)
+        departement = c.decodeFlexibleString(forKey: .departement)
+        issueType = c.decodeFlexibleString(forKey: .issueType)
+        reason = c.decodeFlexibleString(forKey: .raison)
+            ?? c.decodeFlexibleString(forKey: .reason)
+            ?? c.decodeFlexibleString(forKey: .status)
+        detail = c.decodeFlexibleString(forKey: .detail)
+        startedAt = c.decodeFlexibleString(forKey: .debut)
+        estimatedEnd = c.decodeFlexibleString(forKey: .fin_prev)
+
+        let serviceFields: [(CodingKeys, String)] = [
+            (.voix2g, "Voix 2G"), (.voix3g, "Voix 3G"), (.voix4g, "Voix 4G"),
+            (.data3g, "Data 3G"), (.data4g, "Data 4G"), (.data5g, "Data 5G")
+        ]
+        services = serviceFields.compactMap { key, label in
+            guard let raw = c.decodeFlexibleString(forKey: key)?.uppercased() else { return nil }
+            // "NE" = non équipé ; on ne l'affiche pas.
+            guard raw != "NE" else { return nil }
+            return OutageService(label: label, status: raw)
+        }
     }
 }
 
@@ -349,6 +457,55 @@ struct CoveragePointsResponse: Decodable, Equatable {
     let points: [CoverageHeatPoint]
 }
 
+/// Photo publique d'un membre, placée sur la carte (coords résolues côté backend
+/// via le site). `operator` = opérateur DE LA PHOTO (sert le filtre opérateur) ;
+/// `isFriend` indique si l'auteur fait partie des amis (mode « Amis »).
+struct MapPublicPhoto: Decodable, Identifiable, Equatable {
+    let id: String
+    let siteId: String?
+    let lat: Double
+    let lng: Double
+    let thumbnailUrl: URL?
+    let `operator`: String?
+    let authorId: String?
+    let uploadedAt: Date?
+    let isFriend: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id, siteId, lat, lng, thumbnailUrl, authorId, uploadedAt, isFriend
+        case `operator` = "operator"
+    }
+
+    init(id: String, siteId: String?, lat: Double, lng: Double, thumbnailUrl: URL?, operator: String?, authorId: String?, uploadedAt: Date?, isFriend: Bool) {
+        self.id = id
+        self.siteId = siteId
+        self.lat = lat
+        self.lng = lng
+        self.thumbnailUrl = thumbnailUrl
+        self.`operator` = `operator`
+        self.authorId = authorId
+        self.uploadedAt = uploadedAt
+        self.isFriend = isFriend
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        siteId = c.decodeFlexibleString(forKey: .siteId)
+        lat = (try? c.decode(Double.self, forKey: .lat)) ?? 0
+        lng = (try? c.decode(Double.self, forKey: .lng)) ?? 0
+        thumbnailUrl = c.decodeLossyURL(forKey: .thumbnailUrl)
+        `operator` = c.decodeFlexibleString(forKey: .operator)
+        authorId = c.decodeFlexibleString(forKey: .authorId)
+        uploadedAt = (try? c.decodeIfPresent(Date.self, forKey: .uploadedAt)) ?? nil
+        isFriend = (try? c.decodeIfPresent(Bool.self, forKey: .isFriend)) ?? false
+    }
+}
+
+struct MapPublicPhotosResponse: Decodable, Equatable {
+    let photos: [MapPublicPhoto]
+}
+
 struct CoverageHeatPoint: Decodable, Identifiable, Equatable {
     let id: String
     let latitude: Double
@@ -356,6 +513,8 @@ struct CoverageHeatPoint: Decodable, Identifiable, Equatable {
     let signalStrength: Double?
     let technology: String?
     let networkType: String?
+    let band: Int?
+    let frequency: String?
     let timestamp: Date?
 }
 
@@ -422,9 +581,13 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
     let azimuts: [Double]
     let bands: [Int]
     let address: String?
+    /// Nombre de photos/validations publiques sur le site (ajouté par le backend
+    /// au zoom ≥ 13). Sert le badge « photos disponibles » sur le marqueur.
+    let photoCount: Int
+    let validationCount: Int
 
     enum CodingKeys: String, CodingKey {
-        case id, supId, anfrCode, lat, lng, `operator`, operators, sharingType, crozonLeader, zbLeader, technologies, azimuts, bands, address
+        case id, supId, anfrCode, lat, lng, `operator`, operators, sharingType, crozonLeader, zbLeader, technologies, azimuts, bands, address, photoCount, validationCount
     }
 
     init(from decoder: Decoder) throws {
@@ -443,6 +606,8 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
         azimuts = c.decodeLossyArray([Double].self, forKey: .azimuts)
         bands = c.decodeLossyArray([Int].self, forKey: .bands)
         address = c.decodeFlexibleString(forKey: .address)
+        photoCount = (try? c.decodeIfPresent(Int.self, forKey: .photoCount)) ?? 0
+        validationCount = (try? c.decodeIfPresent(Int.self, forKey: .validationCount)) ?? 0
     }
 }
 
@@ -450,6 +615,24 @@ struct AndroidSpeedtestTileResponse: Decodable, Equatable, Sendable {
     let tile: AndroidMapTile
     let clusters: [AndroidMapCluster]
     let markers: [AndroidSpeedtestMarker]
+    var stats: AndroidSpeedtestStats?
+
+    init(tile: AndroidMapTile, clusters: [AndroidMapCluster], markers: [AndroidSpeedtestMarker], stats: AndroidSpeedtestStats? = nil) {
+        self.tile = tile
+        self.clusters = clusters
+        self.markers = markers
+        self.stats = stats
+    }
+}
+
+/// Pagination des tuiles speedtest (`stats.hasMore` / `nextOffset`). Le backend
+/// plafonne chaque page à `limit` (5000) ; on enchaîne les offsets pour TOUT
+/// récupérer, sans cluster ni cap d'affichage (comportement Android).
+struct AndroidSpeedtestStats: Decodable, Equatable, Sendable {
+    let returnedCount: Int?
+    let hasMore: Bool?
+    let nextOffset: Int?
+    let truncated: Bool?
 }
 
 struct AndroidSpeedtestMarker: Decodable, Identifiable, Equatable, Sendable {
@@ -460,7 +643,15 @@ struct AndroidSpeedtestMarker: Decodable, Identifiable, Equatable, Sendable {
     let uploadMbps: Double?
     let pingMs: Double?
     let tech: String?
+    let band: Int?
+    let frequency: String?
     let timestamp: Date?
+    let `operator`: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, lat, lng, downloadMbps, uploadMbps, pingMs, tech, band, frequency, timestamp
+        case `operator` = "operator"
+    }
 }
 
 struct AndroidCoverageTileResponse: Decodable, Equatable, Sendable {

@@ -108,10 +108,10 @@ struct ConversationDetailView: View {
                 }
                 // On suit le DERNIER id (pas le count) : prepender d'anciens messages
                 // ne doit pas refaire défiler vers le bas.
-                .onChange(of: messages.last?.id) { _, _ in
+                .onChangeCompat(of: messages.last?.id) { _, _ in
                     if let last = messages.last { withAnimation(SQMotion.standard) { proxy.scrollTo(last.id, anchor: .bottom) } }
                 }
-                .onChange(of: scrollTargetId) { _, target in
+                .onChangeCompat(of: scrollTargetId) { _, target in
                     guard let target else { return }
                     withAnimation(SQMotion.standard) { proxy.scrollTo(target, anchor: .center) }
                     scrollTargetId = nil
@@ -121,7 +121,7 @@ struct ConversationDetailView: View {
             composer
         }
         .navigationTitle(conversationTitle)
-        .toolbarTitleDisplayMode(.inline)
+        .toolbarTitleInlineCompat()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -217,7 +217,7 @@ struct ConversationDetailView: View {
             startSync()
         }
         .onDisappear { stopSync() }
-        .onChange(of: scenePhase) { _, phase in
+        .onChangeCompat(of: scenePhase) { _, phase in
             // Le flux SSE ne survit pas à la mise en arrière-plan : on le coupe
             // proprement et on resynchronise au retour.
             if phase == .active {
@@ -238,11 +238,11 @@ struct ConversationDetailView: View {
                 }
             }
         }
-        .onChange(of: pickerItem) { _, newValue in
+        .onChangeCompat(of: pickerItem) { _, newValue in
             guard let newValue else { return }
             Task { await sendAttachment(item: newValue) }
         }
-        .onChange(of: draft) { _, newValue in
+        .onChangeCompat(of: draft) { _, newValue in
             guard !newValue.isEmpty, canSend else { return }
             signalTypingIfNeeded()
         }

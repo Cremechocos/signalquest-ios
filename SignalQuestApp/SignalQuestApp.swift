@@ -60,7 +60,7 @@ struct SignalQuestApp: App {
                     await session.bootstrap()
                     await registerPushIfAuthenticated(session.state)
                 }
-                .onChange(of: session.state) { _, newState in
+                .onChangeCompat(of: session.state) { _, newState in
                     // Un login effectué dans une session déjà lancée (cas nominal
                     // installation → premier login, ou après logout/login) doit lui
                     // aussi déclencher l'enregistrement push/VoIP — sinon l'utilisateur
@@ -68,7 +68,7 @@ struct SignalQuestApp: App {
                     // l'app à froid. Les deux appels sont idempotents.
                     Task { await registerPushIfAuthenticated(newState) }
                 }
-                .onChange(of: scenePhase) { _, phase in
+                .onChangeCompat(of: scenePhase) { _, phase in
                     if phase == .active {
                         UNUserNotificationCenter.current().setBadgeCount(0)
                     }
@@ -214,46 +214,71 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $router.selectedTab) {
-            Tab("Feed", systemImage: "sparkles", value: AppRouter.AppTab.feed) {
-                NavigationStack { FeedView(service: services.feed) }
-            }
+            NavigationStack { FeedView(service: services.feed) }
+                .tabItem { Label("Feed", systemImage: "sparkles") }
+                .tag(AppRouter.AppTab.feed)
 
-            Tab("Carte", systemImage: "map", value: AppRouter.AppTab.map) {
-                NavigationStack { MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets) }
-            }
+            NavigationStack { MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets) }
+                .tabItem { Label("Carte", systemImage: "map") }
+                .tag(AppRouter.AppTab.map)
 
-            Tab("Speed", systemImage: "speedometer", value: AppRouter.AppTab.speed) {
-                NavigationStack { SpeedtestView() }
-            }
+            NavigationStack { SpeedtestView() }
+                .tabItem { Label("Speed", systemImage: "speedometer") }
+                .tag(AppRouter.AppTab.speed)
 
-            Tab("Messages", systemImage: "bubble.left.and.bubble.right", value: AppRouter.AppTab.messages) {
-                NavigationStack { MessagesView(service: services.messages, e2ee: services.e2ee) }
-            }
-            .badge(services.unreadConversations)
+            NavigationStack { MessagesView(service: services.messages, e2ee: services.e2ee) }
+                .tabItem { Label("Messages", systemImage: "bubble.left.and.bubble.right") }
+                .tag(AppRouter.AppTab.messages)
+                .badge(services.unreadConversations)
 
-            Tab("Profil", systemImage: "person.crop.circle", value: AppRouter.AppTab.profile) {
-                NavigationStack {
-                    ProfileView(user: user)
+            NavigationStack {
+                ProfileView(user: user)
 #if DEBUG
-                        .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-map"))) {
-                            ANFRMapView(service: services.anfr)
-                        }
-                        .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-stats"))) {
-                            ANFRStatsView(service: services.anfr)
-                        }
+                    .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-map"))) {
+                        ANFRMapView(service: services.anfr)
+                    }
+                    .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-stats"))) {
+                        ANFRStatsView(service: services.anfr)
+                    }
 #endif
-                }
             }
+            .tabItem { Label("Profil", systemImage: "person.crop.circle") }
+            .tag(AppRouter.AppTab.profile)
         }
-        .tabViewStyle(.sidebarAdaptable)
+        // Style « sidebar adaptable » (iPad/large) seulement iOS 18+, sinon onglets standard.
+        .sqSidebarAdaptableTabStyle()
         .tint(SQColor.brandOrange)
         .toolbarBackground(.automatic, for: .tabBar)
-        .task { await services.refreshInboxBadge() }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await services.refreshInboxBadge() } }
+        .task { await services.refreshInboxBadge(); consumeIntentRoutes() }
+        .onChangeCompat(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await services.refreshInboxBadge() }
+                consumeIntentRoutes()
+            }
         }
-        .onChange(of: router.selectedTab) { _, _ in
+        .onChangeCompat(of: router.selectedTab) { _, _ in
             Task { await services.refreshInboxBadge() }
+        }
+        .onOpenURL { url in handleDeepLink(url) }
+    }
+
+    /// Applique une route demandée par un App Intent / raccourci Siri (onglet Speed/Carte).
+    private func consumeIntentRoutes() {
+        if SQIntentRoute.consumeSpeedtest() {
+            router.selectedTab = .speed
+        } else if SQIntentRoute.consumeMap() {
+            router.selectedTab = .map
+        }
+    }
+
+    /// Deep-link `signalquest://…` (widgets, raccourcis) → onglet correspondant.
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme == "signalquest" else { return }
+        switch url.host {
+        case "speedtest", "speed": router.selectedTab = .speed
+        case "map", "carte": router.selectedTab = .map
+        case "messages": router.selectedTab = .messages
+        default: break
         }
     }
 }

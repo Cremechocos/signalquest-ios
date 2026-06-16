@@ -15,6 +15,10 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
     let address: String?
     let height: Double?
     let owner: String?
+    /// Contributions publiques sur le site (photos/validations), ajoutées par le
+    /// backend au zoom ≥ 13. Pilotent le badge « photos » sur le marqueur.
+    var photoCount: Int = 0
+    var validationCount: Int = 0
 
     /// A site is mappable only with finite, in-range coordinates that aren't the
     /// 0,0 "null island" placeholder.

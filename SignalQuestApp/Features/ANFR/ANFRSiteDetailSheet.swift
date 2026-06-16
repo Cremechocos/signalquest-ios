@@ -64,7 +64,7 @@ struct ANFRSiteDetailSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .presentationBackground(SQColor.bg)
+        .presentationBackgroundCompat(SQColor.bg)
         .task { await model.load(supId: site.supId) }
         .onAppear {
             withAnimation(reduceMotion ? nil : SQMotion.standard.delay(0.05)) { appeared = true }

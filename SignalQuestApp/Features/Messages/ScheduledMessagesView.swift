@@ -44,7 +44,7 @@ struct ScheduledMessagesView: View {
             }
         }
         .navigationTitle("Messages programmés")
-        .toolbarTitleDisplayMode(.inline)
+        .toolbarTitleInlineCompat()
         .signalQuestBackground()
         .task { await load() }
     }

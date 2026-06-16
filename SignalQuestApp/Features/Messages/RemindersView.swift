@@ -47,7 +47,7 @@ struct RemindersView: View {
             }
         }
         .navigationTitle("Rappels")
-        .toolbarTitleDisplayMode(.inline)
+        .toolbarTitleInlineCompat()
         .signalQuestBackground()
         .task { await load() }
     }
