@@ -1,11 +1,14 @@
 {
   "images" : [
     {
-      "filename" : "sq-app-icon.png",
+      "filename" : "037cfcc8-5fed-4f02-9673-266c1e4cdcdd.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
     }
   ],
-  "info" : { "author" : "xcode", "version" : 1 }
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
 }
