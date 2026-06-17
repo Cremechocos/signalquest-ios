@@ -79,6 +79,7 @@ struct FriendsListView: View {
                         HStack(spacing: SQSpace.md) {
                             SQAvatar(url: user.avatarUrl, name: user.displayName)
                                 .opacity(0.55)
+                                .accessibilityHidden(true)
                             Text(user.displayName)
                                 .font(SQType.body)
                                 .foregroundStyle(SQColor.labelSecondary)
@@ -103,6 +104,7 @@ struct FriendsListView: View {
     private func requestRow(_ request: FriendRequest) -> some View {
         HStack(spacing: SQSpace.sm + 2) {
             SQAvatar(url: request.user?.avatarUrl, name: request.user?.displayName ?? "?")
+                .accessibilityHidden(true)
             Text(request.user?.displayName ?? "Utilisateur")
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.label)
@@ -147,6 +149,7 @@ struct FriendsListView: View {
                         .offset(x: 2, y: 2)
                 }
             }
+            .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(friend.displayName)
                     .font(SQType.subhead)

@@ -18,6 +18,7 @@ struct StoriesBar: View {
                         StoryBubble(story: story)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Story de \(story.author.displayName)")
                 }
             }
             .padding(.horizontal)
@@ -46,5 +47,6 @@ struct StoriesBar: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Ajouter à ta story")
     }
 }

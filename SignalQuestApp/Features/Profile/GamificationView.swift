@@ -124,6 +124,7 @@ struct GamificationView: View {
                 }
             }
             .frame(width: 52, height: 52)
+            .accessibilityHidden(true)
             Text(badge.title ?? "Badge")
                 .font(SQType.micro)
                 .multilineTextAlignment(.center)
@@ -149,6 +150,7 @@ struct GamificationView: View {
                         .foregroundStyle(SQColor.brandRed)
                         .frame(width: 32, height: 32)
                         .background(SQColor.brandRed.opacity(0.12), in: Circle())
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(event.kind ?? "Événement")
                             .font(SQType.subhead)

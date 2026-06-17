@@ -153,6 +153,7 @@ struct CardHeader: View {
                     if let place {
                         Image(systemName: "location.fill")
                             .font(.caption2)
+                            .accessibilityHidden(true)
                         Text(place)
                     }
                     if let createdAt {

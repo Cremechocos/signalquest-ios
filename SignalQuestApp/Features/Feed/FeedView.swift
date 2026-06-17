@@ -307,6 +307,7 @@ struct FeedView: View {
                     Image(systemName: "square.and.pencil")
                         .foregroundStyle(SQColor.brandRed)
                 }
+                .accessibilityLabel("Créer une publication")
             }
         }
         .signalQuestBackground()
@@ -532,6 +533,7 @@ private struct PostShareSheet: View {
                                 } else {
                                     Image(systemName: "paperplane.fill")
                                         .foregroundStyle(SQColor.brandRed)
+                                        .accessibilityHidden(true)
                                 }
                             }
                         }

@@ -106,6 +106,7 @@ struct LeaderboardsView: View {
                         Circle().stroke(SQColor.separator, lineWidth: 1.5)
                     }
                 }
+                .accessibilityHidden(true)
             Text(medal(for: entry.rank))
                 .font(isFirst ? .title2 : .title3)
             Text(entry.user.displayName)
@@ -199,6 +200,7 @@ struct LeaderboardsView: View {
                 .foregroundStyle(isMe ? SQColor.brandRed : SQColor.labelSecondary)
                 .frame(width: 44, alignment: .leading)
             SQAvatar(url: entry.user.avatarUrl, name: entry.user.displayName, size: 42)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
                 Text(entry.user.displayName)
                     .font(SQType.heading)

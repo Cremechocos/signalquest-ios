@@ -92,6 +92,7 @@ struct StoryComposer: View {
                                 VStack(spacing: SQSpace.sm) {
                                     Image(systemName: "photo.badge.plus")
                                         .font(.system(size: 40))
+                                        .accessibilityHidden(true)
                                     Text("Ajouter un média")
                                         .font(SQType.subhead)
                                 }

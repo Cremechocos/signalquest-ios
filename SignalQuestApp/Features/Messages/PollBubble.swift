@@ -92,6 +92,7 @@ struct PollBubble: View {
                     Image(systemName: votedByMe ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 13))
                         .foregroundStyle(votedByMe ? (mine ? .white : SQColor.brandRed) : (mine ? .white.opacity(0.7) : SQColor.labelTertiary))
+                        .accessibilityHidden(true)
                     Text(option.text.isEmpty ? option.id : option.text)
                         .font(SQType.caption.weight(votedByMe ? .semibold : .regular))
                         .foregroundStyle(mine ? .white : SQColor.label)

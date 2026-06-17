@@ -63,6 +63,7 @@ struct TwoFactorSetupView: View {
                                 .frame(width: 220, height: 220)
                                 .padding(SQSpace.sm)
                                 .background(Color.white, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                                .accessibilityLabel("QR code de configuration 2FA")
                         }
                         Text("Secret manuel").sqKicker()
                         Text(setup.secret)
@@ -149,6 +150,7 @@ struct TwoFactorSetupView: View {
                 .foregroundStyle(.white)
                 .frame(width: 56, height: 56)
                 .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 Text("Sécurité").sqKicker()
                 Text("Double authentification")

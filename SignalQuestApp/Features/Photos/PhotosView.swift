@@ -227,6 +227,7 @@ struct PhotosView: View {
                         .font(.body.weight(.semibold))
                         .foregroundStyle(SQColor.brandRed)
                 }
+                .accessibilityLabel("Ajouter une photo")
             }
         }
         .signalQuestBackground()
@@ -285,6 +286,7 @@ struct PhotosView: View {
                     Image(systemName: "camera.aperture")
                         .font(.title2)
                         .foregroundStyle(SQColor.brandRed)
+                        .accessibilityHidden(true)
                 }
             }
         }

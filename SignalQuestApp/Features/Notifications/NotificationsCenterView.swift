@@ -71,6 +71,7 @@ struct NotificationsCenterView: View {
                     Button("Tout marquer comme lu") { Task { await model.markAll() } }
                     Button("Tout supprimer", role: .destructive) { Task { await model.deleteAll() } }
                 } label: { Image(systemName: "ellipsis.circle").foregroundStyle(SQColor.label) }
+                .accessibilityLabel("Options")
             }
         }
         .task { await model.load() }
@@ -88,6 +89,7 @@ struct NotificationsCenterView: View {
                 .foregroundStyle(style.color)
                 .frame(width: 38, height: 38)
                 .background(style.color.opacity(0.15), in: Circle())
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: SQSpace.sm) {
                     Text(titleText)

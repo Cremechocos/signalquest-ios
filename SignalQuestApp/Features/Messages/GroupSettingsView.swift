@@ -64,6 +64,7 @@ struct GroupSettingsView: View {
                     ForEach(participants) { participant in
                         HStack {
                             SQAvatar(url: participant.user.avatarUrl, name: participant.user.displayName, size: 34)
+                                .accessibilityHidden(true)
                             VStack(alignment: .leading) {
                                 Text(participant.user.displayName)
                                 if participant.role == "admin" {
@@ -92,6 +93,7 @@ struct GroupSettingsView: View {
                                     Image(systemName: "ellipsis.circle")
                                         .foregroundStyle(SQColor.labelSecondary)
                                 }
+                                .accessibilityLabel("Options de \(participant.user.displayName)")
                             }
                         }
                     }
@@ -108,10 +110,12 @@ struct GroupSettingsView: View {
                             } label: {
                                 HStack {
                                     SQAvatar(url: user.avatarUrl, name: user.displayName, size: 34)
+                                        .accessibilityHidden(true)
                                     Text(user.displayName)
                                     Spacer()
                                     Image(systemName: "plus.circle")
                                         .foregroundStyle(SQColor.brandGreen)
+                                        .accessibilityHidden(true)
                                 }
                             }
                         }
@@ -228,8 +232,10 @@ struct GroupSettingsView: View {
                 .scaledToFill()
                 .frame(width: 52, height: 52)
                 .clipShape(Circle())
+                .accessibilityHidden(true)
         } else {
             SQAvatar(url: groupPhotoURL, name: title.isEmpty ? "Groupe" : title, size: 52)
+                .accessibilityHidden(true)
         }
     }
 
@@ -246,10 +252,12 @@ struct GroupSettingsView: View {
                         .padding(5)
                         .background(SQColor.surface, in: Circle())
                         .overlay { Circle().stroke(SQColor.bg, lineWidth: 2) }
+                        .accessibilityHidden(true)
                 }
                 .opacity(isBusy && pickedPreview != nil ? 0.6 : 1)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Changer la photo du groupe")
         .photosPicker(isPresented: $showAvatarPicker, selection: $photoItem, matching: .images)
     }
 

@@ -65,6 +65,7 @@ struct PostDetailView: View {
                         Label("Signaler", systemImage: "flag")
                     }
                 } label: { Image(systemName: "ellipsis.circle").tint(SQColor.brandRed) }
+                .accessibilityLabel("Plus d’options")
             }
         }
         .sheet(isPresented: $showSignalSheet) {

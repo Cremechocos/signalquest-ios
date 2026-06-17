@@ -104,6 +104,7 @@ struct LoginView: View {
                     RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
                         .stroke(SQColor.separator, lineWidth: 1)
                 }
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 Text("Réseau mobile, à nu").sqKicker()
                 Text("SignalQuest")

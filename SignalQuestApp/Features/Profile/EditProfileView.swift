@@ -102,6 +102,7 @@ struct EditProfileView: View {
             .overlay {
                 Circle().stroke(SQColor.brandRed, lineWidth: 3)
             }
+            .accessibilityHidden(true)
             PhotosPicker(selection: $avatarItem, matching: .images) {
                 Image(systemName: "camera.fill")
                     .font(.footnote.weight(.bold))
@@ -110,6 +111,7 @@ struct EditProfileView: View {
                     .background(SQColor.brandRed, in: Circle())
                     .overlay { Circle().stroke(SQColor.bg, lineWidth: 2) }
             }
+            .accessibilityLabel("Changer la photo de profil")
         }
         .frame(maxWidth: .infinity)
     }

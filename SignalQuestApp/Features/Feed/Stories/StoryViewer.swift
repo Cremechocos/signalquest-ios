@@ -140,6 +140,7 @@ struct StoryViewer: View {
                     .padding(SQSpace.sm + 2)
                     .background(.ultraThinMaterial, in: Circle())
             }
+            .accessibilityLabel("Fermer")
         }
         .padding(.horizontal, SQSpace.lg)
         .padding(.top, SQSpace.xs + 2)
@@ -169,6 +170,7 @@ struct StoryViewer: View {
                         Text(emoji).font(.system(size: 30))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Réagir avec \(emoji)")
                 }
             }
             // Champ de réponse texte.
@@ -191,6 +193,7 @@ struct StoryViewer: View {
                             .frame(width: 44, height: 44)
                             .background(SQColor.brandRed, in: Circle())
                     }
+                    .accessibilityLabel("Envoyer")
                     .transition(.scale.combined(with: .opacity))
                 }
             }

@@ -26,6 +26,7 @@ struct IncomingCallView: View {
                     .font(.system(size: 34))
                     .foregroundStyle(SQGradient.signal)
                     .symbolEffectPulseCompat()
+                    .accessibilityLabel(call.mode == "video" ? "Appel vidéo" : "Appel audio")
                 Spacer()
                 HStack(spacing: SQSpace.huge - 4) {
                     Button {

@@ -69,6 +69,7 @@ struct ThreadView: View {
         return VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
             HStack(spacing: SQSpace.sm) {
                 SQAvatar(url: source.sender?.avatarUrl, name: source.sender?.displayName ?? "?", size: 30)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(source.sender?.displayName ?? "Message")
                         .font(SQType.caption.weight(.semibold))
@@ -142,6 +143,7 @@ struct ThreadView: View {
                     .foregroundStyle(.white)
             }
             .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
+            .accessibilityLabel(isSending ? "Envoi en cours" : "Envoyer la réponse")
         }
         .padding()
         .background(SQColor.surface)

@@ -330,6 +330,7 @@ struct ConversationDetailView: View {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(SQColor.labelTertiary)
             }
+            .accessibilityLabel("Fermer")
         }
         .padding(.horizontal)
         .padding(.top, SQSpace.sm)
@@ -427,6 +428,7 @@ struct ConversationDetailView: View {
                 HStack(spacing: SQSpace.xs) {
                     Image(systemName: "bubble.left.and.bubble.right.fill")
                         .font(.system(size: 11))
+                        .accessibilityHidden(true)
                     Text("\(count) réponse\(count > 1 ? "s" : "")")
                         .font(SQType.micro)
                 }
@@ -446,6 +448,7 @@ struct ConversationDetailView: View {
             Image(systemName: "waveform")
                 .font(.system(size: 11))
                 .foregroundStyle(mine ? .white.opacity(0.75) : SQColor.labelSecondary)
+                .accessibilityHidden(true)
             Text(text)
                 .font(SQType.caption.italic())
                 .foregroundStyle(mine ? .white.opacity(0.9) : SQColor.labelSecondary)
@@ -585,6 +588,7 @@ struct ConversationDetailView: View {
                     Image(systemName: "pin.fill")
                         .font(.system(size: 11))
                         .foregroundStyle(SQColor.brandRed)
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(pinnedMessages.count > 1 ? "\(pinnedMessages.count) messages épinglés" : "Message épinglé")
                             .font(SQType.micro)
@@ -598,6 +602,7 @@ struct ConversationDetailView: View {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11))
                         .foregroundStyle(SQColor.labelTertiary)
+                        .accessibilityHidden(true)
                 }
                 .padding(.horizontal, SQSpace.md)
                 .padding(.vertical, SQSpace.sm)

@@ -80,6 +80,7 @@ struct SignalDetailSheet: View {
                         Image(systemName: "ellipsis.circle")
                             .tint(SQColor.brandRed)
                     }
+                    .accessibilityLabel("Plus d’options")
                 }
             }
         }
@@ -119,6 +120,7 @@ struct SignalDetailSheet: View {
                 HStack(spacing: 6) {
                     if let place = signal?.city ?? item.placeLabel {
                         Image(systemName: "mappin")
+                            .accessibilityHidden(true)
                         Text(place)
                     }
                     if let date = item.createdAt {
@@ -282,10 +284,18 @@ struct SignalDetailSheet: View {
     private var actionsRow: some View {
         HStack(spacing: SQSpace.sm) {
             actionButton(systemImage: item.likedByMe ? "heart.fill" : "heart", tint: item.likedByMe ? SQColor.like : SQColor.label, active: item.likedByMe, pop: item.likedByMe) { onLike() }
+                .accessibilityLabel("J’aime")
+                .accessibilityAddTraits(item.likedByMe ? .isSelected : [])
             actionButton(systemImage: "bubble.right", tint: SQColor.label, active: false) { onComment(); dismiss() }
+                .accessibilityLabel("Commenter")
             actionButton(systemImage: item.repostedByMe ? "arrow.2.squarepath.circle.fill" : "arrow.2.squarepath", tint: item.repostedByMe ? SQColor.success : SQColor.label, active: item.repostedByMe) { onRepost() }
+                .accessibilityLabel("Repartager")
+                .accessibilityAddTraits(item.repostedByMe ? .isSelected : [])
             actionButton(systemImage: item.favoritedByMe ? "bookmark.fill" : "bookmark", tint: item.favoritedByMe ? SQColor.brandRed : SQColor.label, active: item.favoritedByMe) { onFavorite() }
+                .accessibilityLabel(item.favoritedByMe ? "Retirer des favoris" : "Ajouter aux favoris")
+                .accessibilityAddTraits(item.favoritedByMe ? .isSelected : [])
             actionButton(systemImage: "paperplane", tint: SQColor.label, active: false) { onShare() }
+                .accessibilityLabel("Partager")
         }
         .frame(maxWidth: .infinity)
     }

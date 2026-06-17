@@ -141,6 +141,7 @@ struct ProfileView: View {
                 .overlay {
                     Circle().stroke(SQColor.brandRed, lineWidth: 3)
                 }
+                .accessibilityHidden(true)
             Text(user.displayName)
                 .font(SQType.display)
                 .foregroundStyle(SQColor.label)
@@ -215,6 +216,7 @@ struct ProfileView: View {
                 .font(.body.weight(.semibold))
                 .foregroundStyle(SQColor.brandRed)
                 .frame(width: 30, height: 30)
+                .accessibilityHidden(true)
             Text(title)
                 .font(SQFont.archivo(17, .medium, relativeTo: .body))
                 .foregroundStyle(SQColor.label)
@@ -222,6 +224,7 @@ struct ProfileView: View {
             Image(systemName: "chevron.right")
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(SQColor.labelTertiary)
+                .accessibilityHidden(true)
         }
         .padding(.horizontal, SQSpace.md + 2)
         .padding(.vertical, SQSpace.md)

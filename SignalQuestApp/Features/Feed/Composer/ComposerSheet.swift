@@ -255,6 +255,7 @@ struct ComposerSheet: View {
                                                 .padding(SQSpace.sm)
                                         }
                                         .buttonStyle(SQPressButtonStyle())
+                                        .accessibilityLabel("Retirer l’image")
                                     }
                                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
                             }
@@ -354,6 +355,7 @@ struct ComposerSheet: View {
                         .frame(width: 40, height: 40)
                         .background(SQColor.fill, in: Circle())
                 }
+                .accessibilityLabel("Ajouter une photo")
                 .onChangeCompat(of: model.selectedItem) { _, _ in
                     Task { await model.loadPickerImage() }
                 }
@@ -378,6 +380,7 @@ struct ComposerSheet: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Joindre un speedtest")
                     .disabled(model.isLoadingSpeedtest)
                 }
                 
@@ -420,6 +423,7 @@ struct ComposerSheet: View {
                             .frame(width: 40, height: 40)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Supprimer le brouillon")
                 }
                 
                 // Character counter
@@ -495,6 +499,7 @@ struct ComposerSheet: View {
             Image(systemName: "speedometer")
                 .font(.title3)
                 .foregroundStyle(SQGradient.signal)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Speedtest joint")
                     .font(.footnote.weight(.semibold))
@@ -547,6 +552,7 @@ struct PostPreviewCard: View {
                     HStack(spacing: 6) {
                         Image(systemName: visibility.icon)
                             .font(.caption2)
+                            .accessibilityHidden(true)
                         Text(visibility.label)
                         Text("·")
                         Text("Maintenant")
@@ -615,6 +621,7 @@ struct PostPreviewCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: "antenna.radiowaves.left.and.right")
                             .font(.caption2)
+                            .accessibilityHidden(true)
                         Text(op)
                             .font(SQType.caption)
                     }
@@ -644,6 +651,7 @@ struct PostPreviewCard: View {
             .foregroundStyle(SQColor.labelSecondary)
             .font(SQFont.archivo(14, .semibold))
             .padding(.top, SQSpace.xs)
+            .accessibilityHidden(true)
         }
         .padding(SQSpace.lg)
         .sqEditorialCard()

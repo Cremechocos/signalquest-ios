@@ -147,11 +147,14 @@ struct CommentsSheet: View {
                     HStack(spacing: SQSpace.xs + 1) {
                         Image(systemName: isLiked ? "heart.fill" : "heart")
                             .sqLikePop(trigger: isLiked)
+                            .accessibilityHidden(true)
                         Text("\(likes)")
                             .monospacedDigit()
                     }
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(isLiked ? SQColor.like : SQColor.labelSecondary)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(likes) j’aime")
                 }
             }
         }
@@ -195,6 +198,7 @@ struct CommentsSheet: View {
                     .sqAnimation(SQMotion.fast, value: isDisabled)
             }
             .buttonStyle(SQPressButtonStyle())
+            .accessibilityLabel("Envoyer le commentaire")
             .disabled(isDisabled)
         }
         .padding(SQSpace.md)

@@ -26,6 +26,7 @@ struct CallScreen: View {
                 HStack(spacing: SQSpace.sm) {
                     Image(systemName: (callManager.activeCall?.hasVideo ?? false) ? "video.fill" : "phone.fill")
                         .foregroundStyle(SQGradient.signal)
+                        .accessibilityHidden(true)
                     statusText
                 }
                 .font(.title3.weight(.semibold))

@@ -22,6 +22,7 @@ struct ReactionPicker: View {
                         .background(SQColor.surfaceMuted, in: Circle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Réagir avec \(emoji)")
             }
         }
         .padding(SQSpace.sm)

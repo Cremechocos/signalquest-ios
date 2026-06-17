@@ -124,6 +124,7 @@ struct SignupView: View {
                 .foregroundStyle(.white)
                 .frame(width: 56, height: 56)
                 .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 Text("Bienvenue").sqKicker()
                 Text("Rejoins SignalQuest")

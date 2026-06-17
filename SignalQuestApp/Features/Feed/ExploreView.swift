@@ -311,11 +311,13 @@ struct ExploreView: View {
                                 Image(systemName: "chevron.right")
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(SQColor.labelTertiary)
+                                    .accessibilityHidden(true)
                             }
                             .padding(SQSpace.md)
                             .sqEditorialCard()
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Voir le profil de \(result.displayName)")
                     }
                 }
             }
@@ -458,6 +460,7 @@ struct ExploreView: View {
                 }
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Voir le profil de \(author.displayName)")
 
             Spacer()
 
