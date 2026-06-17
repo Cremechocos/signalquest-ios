@@ -774,6 +774,7 @@ private enum MapRegionStore {
 struct MapExplorerView: View {
     @StateObject private var model: MapExplorerViewModel
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var router: AppRouter
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -893,6 +894,8 @@ struct MapExplorerView: View {
                     try? await Task.sleep(for: .milliseconds(500))
                 }
             }
+            // Notification/deep link antenne reçu avant l'apparition de la carte.
+            openSiteFromRouterIfNeeded()
         }
         .onChangeCompat(of: filters) { _, _ in
             // Affiche/masque une couche immédiatement, sans attendre le rechargement.
@@ -927,6 +930,8 @@ struct MapExplorerView: View {
         .onChangeCompat(of: model.dataVersion) { _, _ in refreshMapRender() }
         // Le zoom modifie les seuils (azimuts ≥ 14, clustering) : reconstruit aussi.
         .onChangeCompat(of: mapZoom) { _, _ in refreshMapRender() }
+        // Notification/deep link antenne : ouvre la fiche du site demandé.
+        .onChangeCompat(of: router.openSiteId) { _, _ in openSiteFromRouterIfNeeded() }
     }
 
     @ViewBuilder
@@ -1653,6 +1658,28 @@ struct MapExplorerView: View {
         renderedAnnotations = annotationPayloads
         renderedCoverageFeatures = coverageHeatFeatures
         renderedSpeedtestFeatures = speedtestFeatures
+    }
+
+    /// Ouvre la fiche du site demandé par le routeur (tap sur notification antenne
+    /// ou deep link). Cherche d'abord dans les antennes déjà chargées ; sinon le
+    /// récupère par recherche (le site peut être hors de la zone visible) et
+    /// recentre la carte dessus.
+    private func openSiteFromRouterIfNeeded() {
+        guard let siteId = router.openSiteId else { return }
+        router.openSiteId = nil
+        if let site = model.antennas.first(where: { $0.id == siteId || $0.siteId == siteId }) {
+            selectedAntenna = site
+            return
+        }
+        Task {
+            let results = (try? await services.antennas.search(query: siteId)) ?? []
+            guard let site = results.first(where: { $0.id == siteId || $0.siteId == siteId }) ?? results.first else { return }
+            selectedAntenna = site
+            if let lat = site.latitude, let lng = site.longitude {
+                mapCenter = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                mapZoom = max(mapZoom, 14)
+            }
+        }
     }
 
     private var annotationPayloads: [MapAnnotationPayload] {
