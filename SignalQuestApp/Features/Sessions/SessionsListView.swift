@@ -179,7 +179,7 @@ private struct SessionRow: View {
                     HStack(spacing: 5) {
                         ForEach(session.operators.prefix(4)) { op in
                             Text(op.label)
-                                .font(.system(size: 9, weight: .bold))
+                                .font(.system(size: 11, weight: .bold))
                                 .padding(.horizontal, 6).padding(.vertical, 2)
                                 .background(SessionDetailView.operatorColor(op.colorHex).opacity(0.18), in: Capsule())
                                 .foregroundStyle(SessionDetailView.operatorColor(op.colorHex))

@@ -355,7 +355,7 @@ struct PhotosView: View {
         .overlay(alignment: .topTrailing) {
             if let op = photo.operator, !op.isEmpty {
                 Text(op.uppercased())
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, SQSpace.sm + 2)
                     .padding(.vertical, SQSpace.xs)
@@ -395,16 +395,16 @@ struct PhotosView: View {
                         .frame(width: 6, height: 6)
                     if let op = photo.operator, !op.isEmpty {
                         Text(op)
-                            .font(.system(size: 9, weight: .medium))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.white.opacity(0.82))
                             .lineLimit(1)
                     }
                     Spacer()
                     Image(systemName: isLiked ? "heart.fill" : "heart")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(isLiked ? SQColor.like : .white.opacity(0.9))
                     Text("\(photo.likeCount ?? photo.likes ?? 0)")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.9))
                 }
             }

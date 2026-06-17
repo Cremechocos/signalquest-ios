@@ -203,7 +203,7 @@ struct ANFRSiteDetailSheet: View {
 
     private func modTypeBadge(_ type: ANFRModType) -> some View {
         Image(systemName: type.glyph)
-            .font(.system(size: 9, weight: .black))
+            .font(.system(size: 11, weight: .black))
             .foregroundStyle(.white)
             .frame(width: 18, height: 18)
             .background(type.color, in: Circle())
@@ -258,7 +258,7 @@ private struct ANFRTimelineRow: View {
                 ForEach(entry.changes) { change in
                     HStack(spacing: SQSpace.sm) {
                         Image(systemName: change.modType.glyph)
-                            .font(.system(size: 9, weight: .black))
+                            .font(.system(size: 11, weight: .black))
                             .foregroundStyle(.white)
                             .frame(width: 18, height: 18)
                             .background(change.modType.color, in: Circle())

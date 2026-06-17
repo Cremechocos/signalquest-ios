@@ -426,7 +426,7 @@ struct ConversationDetailView: View {
             } label: {
                 HStack(spacing: SQSpace.xs) {
                     Image(systemName: "bubble.left.and.bubble.right.fill")
-                        .font(.system(size: 9))
+                        .font(.system(size: 11))
                     Text("\(count) réponse\(count > 1 ? "s" : "")")
                         .font(SQType.micro)
                 }
@@ -596,7 +596,7 @@ struct ConversationDetailView: View {
                     }
                     Spacer()
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 10))
+                        .font(.system(size: 11))
                         .foregroundStyle(SQColor.labelTertiary)
                 }
                 .padding(.horizontal, SQSpace.md)
