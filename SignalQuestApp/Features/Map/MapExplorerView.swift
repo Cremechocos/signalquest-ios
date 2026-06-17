@@ -19,6 +19,10 @@ final class MapExplorerViewModel: ObservableObject {
     /// Photos publiques de tous les membres (couche Photos). Mode « Amis » =
     /// restreint aux amis (rechargé avec friendsOnly).
     @Published var publicPhotos: [MapPublicPhoto] = []
+    /// Incrémenté à chaque application de données (fin de `load`). Sert de signal
+    /// O(1) pour reconstruire le cache d'annotations de la vue uniquement quand
+    /// les données changent — et non à chaque invalidation de `body`.
+    @Published private(set) var dataVersion = 0
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var marketFilter = "FR"
@@ -300,6 +304,7 @@ final class MapExplorerViewModel: ObservableObject {
                 publicPhotos = Self.demoPublicPhotos(around: bounds)
             }
             errorMessage = nil
+            dataVersion &+= 1
             return
         }
         isLoading = true
@@ -444,6 +449,7 @@ final class MapExplorerViewModel: ObservableObject {
         } else {
             publicPhotos = photos
         }
+        dataVersion &+= 1
     }
 
     /// Photos publiques de démonstration (QA) réparties autour du viewport.
@@ -777,6 +783,12 @@ struct MapExplorerView: View {
 #endif
     @State private var mapCenter: CLLocationCoordinate2D
     @State private var mapZoom: Double
+    // Cache des couches lourdes de la carte : reconstruit uniquement quand les
+    // données (`model.dataVersion`) ou les couches actives (`filters`) changent,
+    // pour ne plus recalculer des milliers de structs à chaque invalidation de `body`.
+    @State private var renderedAnnotations: [MapAnnotationPayload] = []
+    @State private var renderedCoverageFeatures: [CoverageHeatFeature] = []
+    @State private var renderedSpeedtestFeatures: [SpeedtestFeature] = []
     // Couches actives par défaut : antennes + speedtests + pannes (incidents),
     // comme Android (où `incidents` est activé par défaut). Photos, couverture,
     // prévisionnels et sites communautaires restent en opt-in via le panneau.
@@ -861,6 +873,7 @@ struct MapExplorerView: View {
             }
             await model.loadRegistry()
             await model.load(region: lastRegion, zoom: mapZoom, filters: filters)
+            refreshMapRender()
             await runQAPanIfRequested()
             // QA (DEBUG) : ouvre la fiche de la première antenne (attend que le
             // niveau de zoom fasse apparaître des antennes individuelles).
@@ -882,6 +895,8 @@ struct MapExplorerView: View {
             }
         }
         .onChangeCompat(of: filters) { _, _ in
+            // Affiche/masque une couche immédiatement, sans attendre le rechargement.
+            refreshMapRender()
             scheduleLoad(region: lastRegion)
         }
         .onChangeCompat(of: model.marketFilter) { _, newValue in
@@ -908,15 +923,19 @@ struct MapExplorerView: View {
         .onChangeCompat(of: model.bandFilters) { _, _ in scheduleLoad(region: lastRegion) }
         .onChangeCompat(of: model.sharingFilters) { _, _ in scheduleLoad(region: lastRegion) }
         .onChangeCompat(of: model.includeObservedSites) { _, _ in scheduleLoad(region: lastRegion) }
+        // Données rechargées → reconstruit le cache des couches une seule fois.
+        .onChangeCompat(of: model.dataVersion) { _, _ in refreshMapRender() }
+        // Le zoom modifie les seuils (azimuts ≥ 14, clustering) : reconstruit aussi.
+        .onChangeCompat(of: mapZoom) { _, _ in refreshMapRender() }
     }
 
     @ViewBuilder
     private var mapLayer: some View {
 #if canImport(MapLibre)
         SQMapLibreMapView(
-            annotations: annotationPayloads,
-            coverageHeatFeatures: coverageHeatFeatures,
-            speedtestFeatures: speedtestFeatures,
+            annotations: renderedAnnotations,
+            coverageHeatFeatures: renderedCoverageFeatures,
+            speedtestFeatures: renderedSpeedtestFeatures,
             colorScheme: colorScheme,
             center: $mapCenter,
             zoom: $mapZoom,
@@ -940,7 +959,7 @@ struct MapExplorerView: View {
         .ignoresSafeArea(edges: .bottom)
 #else
         Map(position: $position) {
-            ForEach(annotationPayloads) { item in
+            ForEach(renderedAnnotations) { item in
                 Annotation(item.title, coordinate: item.coordinate) {
                     Button {
                         Haptics.light()
@@ -1270,7 +1289,7 @@ struct MapExplorerView: View {
     private var mapStatusToast: some View {
         if let error = model.errorMessage {
             mapToast(error, icon: "exclamationmark.triangle.fill", tint: SQColor.warning)
-        } else if annotationPayloads.isEmpty && coverageHeatFeatures.isEmpty && !model.isLoading {
+        } else if renderedAnnotations.isEmpty && renderedCoverageFeatures.isEmpty && !model.isLoading {
             mapToast("Aucune donnée dans cette zone", icon: "map", tint: SQColor.labelSecondary)
         }
     }
@@ -1625,6 +1644,15 @@ struct MapExplorerView: View {
             .padding(.top, SQSpace.xs)
         }
         .frame(maxHeight: 240)
+    }
+
+    /// Reconstruit le cache des couches lourdes. Appelé uniquement sur changement
+    /// de données (`model.dataVersion`), de couches actives (`filters`) ou de zoom
+    /// — jamais à chaque rendu de `body`.
+    private func refreshMapRender() {
+        renderedAnnotations = annotationPayloads
+        renderedCoverageFeatures = coverageHeatFeatures
+        renderedSpeedtestFeatures = speedtestFeatures
     }
 
     private var annotationPayloads: [MapAnnotationPayload] {
