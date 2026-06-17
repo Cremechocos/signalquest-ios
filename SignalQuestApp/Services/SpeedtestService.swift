@@ -417,19 +417,15 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         }
 
         return CellularOperatorContext(
-            mobileOperator: pathStatus.operatorName ?? resolvedOperator?.shortLabel ?? resolvedOperator?.label ?? cellularOperatorFallback(pathStatus),
+            // Plus de repli « Cellulaire {techno} » : il écrasait l'opérateur de
+            // l'API dépréciée et provoquait un doublon dans networkShareDisplayName.
+            // nil quand inconnu → l'UI retombe proprement sur la techno seule.
+            mobileOperator: pathStatus.operatorName ?? resolvedOperator?.shortLabel ?? resolvedOperator?.label,
             mcc: mcc,
             mnc: mnc,
             marketCode: market?.marketCode,
             operatorKey: resolvedOperator?.key
         )
-    }
-
-    private func cellularOperatorFallback(_ pathStatus: NetworkPathStatus) -> String {
-        if let technology = pathStatus.cellularTechnology?.displayName {
-            return "Cellulaire \(technology)"
-        }
-        return "Cellulaire"
     }
 
     // MARK: Persistence

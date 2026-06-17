@@ -14,6 +14,7 @@ final class AppServices: ObservableObject {
     let antennas: AntennasServicing
     let anfr: ANFRServicing
     let speedtest: SpeedtestService
+    let networkOperator: NetworkOperatorServicing
     let photos: PhotoServicing
     let messages: MessagesServicing
     let leaderboards: LeaderboardServicing
@@ -52,10 +53,12 @@ final class AppServices: ObservableObject {
         reports = ReportsService(api: api)
         privacy = PrivacyService(api: api)
         map = MapSnapshotService(api: api)
-        markets = MarketRegistryService(api: api)
+        let marketsService = MarketRegistryService(api: api)
+        markets = marketsService
         antennas = AntennasService(api: api)
         anfr = ANFRService(api: api)
-        speedtest = SpeedtestService(api: api)
+        speedtest = SpeedtestService(api: api, markets: marketsService)
+        networkOperator = NetworkOperatorService(api: api)
         photos = PhotoService(api: api)
         messages = MessagesService(api: api)
         leaderboards = LeaderboardService(api: api)

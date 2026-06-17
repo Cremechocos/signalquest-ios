@@ -135,6 +135,22 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(CellularRadioTechnology.map(CTRadioAccessTechnologyNR), .fiveGSA)
     }
 
+    func testNetworkShareDisplayNameFallsBackToTechnology() {
+        // Opérateur connu → « Orange 5G NSA ».
+        let withOperator = makeSpeedtestResult(downloadSeries: nil, uploadSeries: nil, connectionType: .cellular, cellularTechnology: .fiveGNSA, networkOperatorName: "Orange")
+        XCTAssertEqual(withOperator.networkShareDisplayName, "Orange 5G NSA")
+
+        // Opérateur indisponible (API iOS muette) → techno seule, JAMAIS le
+        // parasite « Cellulaire 5G NSA » de l'ancien fallback.
+        let noOperator = makeSpeedtestResult(downloadSeries: nil, uploadSeries: nil, connectionType: .cellular, cellularTechnology: .fiveGNSA, networkOperatorName: nil)
+        XCTAssertEqual(noOperator.networkShareDisplayName, "5G NSA")
+        XCTAssertFalse(noOperator.networkShareDisplayName.contains("Cellulaire"))
+
+        // Ni opérateur ni techno → « Cellulaire » seul.
+        let bare = makeSpeedtestResult(downloadSeries: nil, uploadSeries: nil, connectionType: .cellular, cellularTechnology: nil, networkOperatorName: nil)
+        XCTAssertEqual(bare.networkShareDisplayName, "Cellulaire")
+    }
+
     func testSpeedtestPayloadEncodesNullRadioFields() throws {
         let result = SpeedtestRunResult(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
@@ -208,6 +224,10 @@ final class SpeedtestTests: XCTestCase {
             connectionType: .cellular,
             cellularTechnology: .fiveGNSA,
             networkOperatorName: "SFR",
+            networkOperatorMcc: 208,
+            networkOperatorMnc: 10,
+            marketCode: "FR",
+            operatorKey: "SFR",
             wifiSSID: nil,
             city: nil,
             coordinate: nil,
@@ -225,6 +245,10 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(json["connectionType"] as? String, "5G NSA")
         XCTAssertEqual(json["networkType"] as? String, "CELLULAR")
         XCTAssertEqual(json["mobileOperator"] as? String, "SFR")
+        XCTAssertEqual(json["mcc"] as? Int, 208)
+        XCTAssertEqual(json["mnc"] as? Int, 10)
+        XCTAssertEqual(json["marketCode"] as? String, "FR")
+        XCTAssertEqual(json["operatorKey"] as? String, "SFR")
     }
 
     func testSpeedtestDetailDecodesBackendShape() throws {

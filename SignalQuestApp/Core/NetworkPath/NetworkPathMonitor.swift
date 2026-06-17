@@ -1,6 +1,8 @@
 import Foundation
 @preconcurrency import CoreTelephony
 import Network
+import os
+import CFNetwork
 
 enum CellularRadioTechnology: String, Codable, Equatable, CaseIterable, Sendable {
     case twoG = "2G"
@@ -174,6 +176,7 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
     private var latestPathSnapshot: NetworkPathSnapshot = .unknown
     private var radioObserver: NSObjectProtocol?
     private var isStarted = false
+    private static let logger = Logger(subsystem: "fr.signalquest.ios", category: "NetworkPath")
 
     override init() {
         super.init()
@@ -233,6 +236,7 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
     }
 
     private func refreshStatus() {
+        if latestPathSnapshot.usesCellular { logCarrierDiagnosticsIfNeeded() }
         let cellularTechnology = latestPathSnapshot.usesCellular ? currentCellularTechnology() : nil
         let operatorName = latestPathSnapshot.usesCellular ? currentCarrierName() : nil
         let plmn: (mcc: Int?, mnc: Int?) = latestPathSnapshot.usesCellular ? currentCellularPLMN() : (mcc: nil, mnc: nil)
@@ -279,6 +283,24 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
             }
         }
         return nil
+    }
+
+    /// Diagnostic (debug uniquement) : trace les valeurs BRUTES renvoyées par
+    /// l'API dépréciée CoreTelephony pour chaque service SIM. Permet de constater
+    /// sur l'appareil si `carrierName`/MCC/MNC remontent un vrai opérateur ou le
+    /// placeholder « -- » / 65535 introduit par iOS 16.4+. Rien n'est loggé hors
+    /// du flag `debugLogsEnabled`.
+    private func logCarrierDiagnosticsIfNeeded() {
+        #if DEBUG
+        let dataService = telephony.dataServiceIdentifier ?? "nil"
+        guard let providers = telephony.serviceSubscriberCellularProviders, !providers.isEmpty else {
+            Self.logger.notice("SQ_CARRIER providers=nil/empty dataService=\(dataService, privacy: .public)")
+            return
+        }
+        for (serviceId, carrier) in providers {
+            Self.logger.notice("SQ_CARRIER service=\(serviceId, privacy: .public) name=\(carrier.carrierName ?? "nil", privacy: .public) mcc=\(carrier.mobileCountryCode ?? "nil", privacy: .public) mnc=\(carrier.mobileNetworkCode ?? "nil", privacy: .public) iso=\(carrier.isoCountryCode ?? "nil", privacy: .public) dataService=\(dataService, privacy: .public)")
+        }
+        #endif
     }
 
     private func currentCellularPLMN() -> (mcc: Int?, mnc: Int?) {
@@ -346,5 +368,85 @@ extension NetworkConnectionKind {
         default:
             return false
         }
+    }
+}
+
+extension NetworkPathStatus {
+    /// Copie avec `operatorName` rempli par `fallback` quand l'API device
+    /// (CoreTelephony) n'a rien renvoyé. Sert à injecter l'opérateur résolu par IP
+    /// (backend) dans le résultat sans modifier le protocole du service.
+    func merging(operatorName fallback: String?) -> NetworkPathStatus {
+        guard operatorName == nil,
+              let fallback = fallback?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !fallback.isEmpty else {
+            return self
+        }
+        return NetworkPathStatus(
+            connection: connection,
+            cellularTechnology: cellularTechnology,
+            operatorName: fallback,
+            operatorMcc: operatorMcc,
+            operatorMnc: operatorMnc,
+            isExpensive: isExpensive,
+            isConstrained: isConstrained
+        )
+    }
+}
+
+/// Détecte un tunnel VPN / relais actif sur l'appareil.
+///
+/// Sur iOS, l'unique signal client fiable est la présence d'interfaces réseau
+/// « scoped » VPN (tap/tun/ppp/ipsec/utun) exposées par
+/// `CFNetworkCopySystemProxySettings`. On ne peut **pas** récupérer l'IP publique
+/// réelle derrière un VPN : le serveur ne voit que l'IP de sortie du tunnel, et
+/// l'app elle-même ne voit que son IP locale (privée). Ce drapeau sert donc à NE
+/// PAS faire confiance à la résolution opérateur par IP (l'IP refléterait le VPN,
+/// pas le réseau réel) ; l'app retombe alors sur l'opérateur lu par CoreTelephony
+/// ou sur la techno seule.
+enum VPNDetector {
+    private static let vpnInterfacePrefixes = ["tap", "tun", "ppp", "ipsec", "utun"]
+
+    static func isActive() -> Bool {
+        guard let proxies = CFNetworkCopySystemProxySettings()?.takeRetainedValue() else { return false }
+        let settings = proxies as NSDictionary
+        guard let scoped = settings["__SCOPED__"] as? [String: Any] else { return false }
+        return scoped.keys.contains { interface in
+            vpnInterfacePrefixes.contains { interface.hasPrefix($0) }
+        }
+    }
+}
+
+/// Opérateur résolu côté backend à partir de l'IP publique (lookup ASN), réponse
+/// de `GET /api/speedtest/operator`. Champs nuls si inconnu / sous VPN / base ASN
+/// absente.
+struct DetectedOperator: Decodable, Equatable, Sendable {
+    let operatorKey: String?
+    let label: String?
+    let shortLabel: String?
+    let color: String?
+    let viaVpn: Bool?
+}
+
+protocol NetworkOperatorServicing: Sendable {
+    /// Résout l'opérateur via l'IP publique (ASN) côté backend. `viaVpn` = état du
+    /// tunnel détecté sur l'appareil : sous VPN le backend renvoie un opérateur nul
+    /// (l'IP refléterait le VPN). Renvoie `nil` en cas d'échec réseau.
+    func resolve(viaVpn: Bool) async -> DetectedOperator?
+}
+
+final class NetworkOperatorService: NetworkOperatorServicing {
+    private let api: APIClient
+
+    init(api: APIClient) {
+        self.api = api
+    }
+
+    func resolve(viaVpn: Bool) async -> DetectedOperator? {
+        let endpoint = APIEndpoint(
+            path: "/api/speedtest/operator",
+            query: [URLQueryItem(name: "vpn", value: viaVpn ? "1" : "0")],
+            authenticated: false
+        )
+        return try? await api.request(endpoint, as: DetectedOperator.self)
     }
 }

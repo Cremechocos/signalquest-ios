@@ -202,10 +202,25 @@ private struct SpeedtestShareCard: View {
         return "\(model) • \(os)"
     }
 
+    private var dateLabel: String { Self.dateFormatter.string(from: result.createdAt) }
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.dateFormat = "d MMM yyyy · HH:mm"
+        return formatter
+    }()
+
     var body: some View {
+        // Mise en page répartie sur toute la hauteur : header épinglé en haut,
+        // footer épinglé en bas, bloc hero (cartes + latence) centré entre deux
+        // Spacers flexibles. Supprime le ~205 pt de vide qu'imposait l'ancien
+        // VStack à espacement nul aligné en haut.
         VStack(spacing: 0) {
             header
-            Rectangle().fill(border).frame(height: 1).padding(.top, 20)
+            Rectangle().fill(border).frame(height: 1).padding(.top, 22)
+
+            Spacer(minLength: 24)
 
             HStack(spacing: 30) {
                 statCard(
@@ -219,30 +234,39 @@ private struct SpeedtestShareCard: View {
                     series: ulSeries, gaugeMax: ulGaugeMax, graphId: "ul"
                 )
             }
-            .padding(.top, 34)
 
-            latencyStrip.padding(.top, 28)
+            latencyStrip.padding(.top, 24)
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 24)
 
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 12) {
-                    RoundedRectangle(cornerRadius: 3).fill(downloadAccent).frame(width: 100, height: 6)
-                    Text(device)
-                        .font(SQFont.body(15))
-                        .foregroundStyle(textSecondary)
-                        .lineLimit(1)
-                }
-                Spacer()
-                Text("signalquest.fr")
-                    .font(SQFont.archivo(16, .semibold))
-                    .foregroundStyle(textSecondary)
-            }
+            footer
         }
         .padding(50)
-        .frame(width: 1080, height: 720, alignment: .topLeading)
+        .frame(width: 1080, height: 720)
         .background(bg)
         .environment(\.colorScheme, .dark)
+    }
+
+    private var footer: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 10) {
+                RoundedRectangle(cornerRadius: 3).fill(downloadAccent).frame(width: 88, height: 6)
+                Text(device)
+                    .font(SQFont.body(15))
+                    .foregroundStyle(textSecondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 6) {
+                Text("signalquest.fr")
+                    .font(SQFont.archivo(17, .semibold))
+                    .foregroundStyle(textPrimary)
+                Text(dateLabel)
+                    .font(SQFont.body(13))
+                    .foregroundStyle(textSecondary)
+                    .lineLimit(1)
+            }
+        }
     }
 
     private var header: some View {
@@ -303,7 +327,7 @@ private struct SpeedtestShareCard: View {
                 gridColor: border,
                 emptyTextColor: textSecondary
             )
-            .frame(height: 112)
+            .frame(height: 128)
             .padding(.top, 18)
         }
         .padding(28)
@@ -316,104 +340,59 @@ private struct SpeedtestShareCard: View {
     }
 
     private var latencyStrip: some View {
-        HStack(spacing: 0) {
-            // À vide
-            VStack(alignment: .leading, spacing: 4) {
-                Text("À VIDE")
-                    .font(SQFont.archivo(12, .semibold))
-                    .tracking(1.5)
-                    .foregroundStyle(textSecondary)
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("\(pingValue)")
-                        .font(SQFont.archivo(26, .bold))
-                        .foregroundStyle(textPrimary)
-                    Text("ms")
-                        .font(SQFont.archivo(12, .semibold))
-                        .foregroundStyle(textSecondary)
-                    Text("•")
-                        .font(SQFont.body(14))
-                        .foregroundStyle(textSecondary)
-                    Text(String(format: "%.1f", jitter))
-                        .font(SQFont.archivo(17, .semibold))
-                        .foregroundStyle(textSecondary)
-                    Text("ms jitter")
-                        .font(SQFont.body(11))
-                        .foregroundStyle(textSecondary)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Rectangle()
-                .fill(border)
-                .frame(width: 1)
-                .padding(.vertical, 4)
-
-            // DL Chargé
-            VStack(alignment: .leading, spacing: 4) {
-                Text("DL CHARGÉ")
-                    .font(SQFont.archivo(12, .semibold))
-                    .tracking(1.5)
-                    .foregroundStyle(downloadAccent)
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(result.pingDlMs.map { "\(Int($0.rounded()))" } ?? "—")
-                        .font(SQFont.archivo(26, .bold))
-                        .foregroundStyle(textPrimary)
-                    Text("ms")
-                        .font(SQFont.archivo(12, .semibold))
-                        .foregroundStyle(textSecondary)
-                    Text("•")
-                        .font(SQFont.body(14))
-                        .foregroundStyle(textSecondary)
-                    Text(result.jitterDlMs.map { String(format: "%.1f", $0) } ?? "—")
-                        .font(SQFont.archivo(17, .semibold))
-                        .foregroundStyle(textSecondary)
-                    Text("ms jitter")
-                        .font(SQFont.body(11))
-                        .foregroundStyle(textSecondary)
-                }
-            }
-            .padding(.leading, 30)
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Rectangle()
-                .fill(border)
-                .frame(width: 1)
-                .padding(.vertical, 4)
-
-            // UL Chargé
-            VStack(alignment: .leading, spacing: 4) {
-                Text("UL CHARGÉ")
-                    .font(SQFont.archivo(12, .semibold))
-                    .tracking(1.5)
-                    .foregroundStyle(uploadAccent)
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(result.pingUlMs.map { "\(Int($0.rounded()))" } ?? "—")
-                        .font(SQFont.archivo(26, .bold))
-                        .foregroundStyle(textPrimary)
-                    Text("ms")
-                        .font(SQFont.archivo(12, .semibold))
-                        .foregroundStyle(textSecondary)
-                    Text("•")
-                        .font(SQFont.body(14))
-                        .foregroundStyle(textSecondary)
-                    Text(result.jitterUlMs.map { String(format: "%.1f", $0) } ?? "—")
-                        .font(SQFont.archivo(17, .semibold))
-                        .foregroundStyle(textSecondary)
-                    Text("ms jitter")
-                        .font(SQFont.body(11))
-                        .foregroundStyle(textSecondary)
-                }
-            }
-            .padding(.leading, 30)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(spacing: 12) {
+            latencyChip(
+                label: "Idle",
+                value: "\(pingValue)",
+                jitter: jitter,
+                tint: textSecondary
+            )
+            latencyChip(
+                label: "DL",
+                value: result.pingDlMs.map { "\(Int($0.rounded()))" } ?? "—",
+                jitter: result.jitterDlMs,
+                tint: downloadAccent
+            )
+            latencyChip(
+                label: "UL",
+                value: result.pingUlMs.map { "\(Int($0.rounded()))" } ?? "—",
+                jitter: result.jitterUlMs,
+                tint: uploadAccent
+            )
         }
-        .padding(.horizontal, 26)
-        .padding(.vertical, 18)
-        .background(surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: Color.black.opacity(theme.isDark ? 0.15 : 0.08), radius: 16, x: 0, y: 8)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(border, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(border, lineWidth: 1)
         }
+    }
+
+    private func latencyChip(label: String, value: String, jitter: Double?, tint: Color) -> some View {
+        HStack(spacing: 10) {
+            Text(label)
+                .font(SQFont.archivo(12, .bold))
+                .tracking(1.1)
+                .foregroundStyle(tint)
+                .frame(width: 40, alignment: .leading)
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(value)
+                    .font(SQFont.archivo(22, .bold))
+                    .foregroundStyle(textPrimary)
+                Text("ms")
+                    .font(SQFont.archivo(11, .semibold))
+                    .foregroundStyle(textSecondary)
+            }
+            Spacer(minLength: 0)
+            Text(jitter.map { "jitter \(String(format: "%.1f", $0))" } ?? "jitter —")
+                .font(SQFont.body(11))
+                .foregroundStyle(textSecondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(bg.opacity(theme.isDark ? 0.72 : 0.55), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func formatSpeed(_ value: Double) -> String {

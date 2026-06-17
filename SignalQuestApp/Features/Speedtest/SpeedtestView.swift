@@ -45,6 +45,9 @@ struct SpeedtestView: View {
     @State private var showSettings = false
     @State private var showLocationPriming = false
     @State private var currentNetworkStatus: NetworkPathStatus = .unknown
+    /// Opérateur résolu par IP (ASN) côté backend — repli quand CoreTelephony ne
+    /// renvoie rien (iOS 16.4+). Nul sous VPN (l'IP refléterait le tunnel).
+    @State private var detectedOperator: DetectedOperator?
     @State private var runStartConnection: NetworkConnectionKind?
     @State private var runStartNetworkDisplayName: String?
     @State private var networkAbortMessage: String?
@@ -60,6 +63,22 @@ struct SpeedtestView: View {
     private var isPreparingShare: Bool {
         if case .rendering = sharePreparation { return true }
         return false
+    }
+
+    /// Opérateur affiché dans le bandeau : priorité au résultat mesuré, puis à
+    /// l'API device (CoreTelephony), puis — en cellulaire uniquement — à
+    /// l'opérateur résolu par IP côté backend (le FAI WiFi n'a pas sa place ici).
+    private var headerOperatorName: String? {
+        if let measured = result?.networkOperatorName { return measured }
+        if let live = currentNetworkStatus.operatorName { return live }
+        if currentNetworkStatus.connection == .cellular { return detectedOperator?.label }
+        return nil
+    }
+
+    /// Résout l'opérateur via IP (ASN) côté backend, en transmettant l'état VPN
+    /// détecté localement. Silencieux en cas d'échec (repli sur l'API device).
+    private func resolveDetectedOperator() async {
+        detectedOperator = await services.networkOperator.resolve(viaVpn: VPNDetector.isActive())
     }
 
     var body: some View {
@@ -84,14 +103,14 @@ struct SpeedtestView: View {
                             .sqKicker()
                             .frame(maxWidth: .infinity, alignment: .leading)
                         SpeedtestServerBar(
-                            network: currentNetworkStatus.displayName,
-                            // Serveur de mesure (jamais la cible de download/CDN). Tiret
-                            // tant qu'aucune session n'a renvoyé de serveur sélectionné.
-                            measurementServer: liveProgress.serverName ?? result?.serverName ?? "—",
-                            // Source réelle des octets de download : le résultat une fois
-                            // mesuré, sinon la cible choisie pour qu'AWS apparaisse dès la
-                            // sélection (résout la confusion « je choisis AWS mais ça met SignalQuest »).
-                            downloadSource: result?.downloadServerName ?? downloadTarget.displayName
+                            // Opérateur : résultat mesuré → API device → repli IP
+                            // (cellulaire). Cf. headerOperatorName.
+                            operatorName: headerOperatorName,
+                            network: result?.networkDisplayName ?? currentNetworkStatus.displayName,
+                            // Serveur de download/ping ACTIF (AWS CloudFront par
+                            // défaut). On n'affiche plus le VPS de mesure : l'opérateur
+                            // prend sa place dans le bandeau.
+                            server: result?.downloadServerName ?? downloadTarget.displayName
                         )
                     }
 
@@ -160,7 +179,11 @@ struct SpeedtestView: View {
         .sqAnimation(.snappy(duration: 0.32), value: phase)
         .sqAnimation(.snappy(duration: 0.28), value: result)
         .task {
+            // Relecture fraîche de CoreTelephony (opérateur/techno) à l'ouverture
+            // de la page, plutôt que le dernier statut publié au démarrage.
+            services.networkPath.refreshNow()
             currentNetworkStatus = services.networkPath.status
+            await resolveDetectedOperator()
             await services.speedtest.retryPendingSaves()
             history = await services.speedtest.history()
             await runQASpeedtestIfNeeded()
@@ -704,6 +727,12 @@ struct SpeedtestView: View {
         currentNetworkStatus = status
         runStartConnection = status.connection
         runStartNetworkDisplayName = status.displayName
+        // Repli opérateur par IP (cellulaire) quand CoreTelephony est muet : injecté
+        // dans le pathStatus pour remonter dans le résultat + l'image de partage.
+        await resolveDetectedOperator()
+        let runStatus = status.connection == .cellular
+            ? status.merging(operatorName: detectedOperator?.label)
+            : status
         let settings = runSettings
 
         let location: Coordinates?
@@ -717,7 +746,7 @@ struct SpeedtestView: View {
         }
         phase = .download
         let measured = try await services.speedtest.run(
-            pathStatus: status,
+            pathStatus: runStatus,
             location: location,
             settings: settings,
             progress: { update in
@@ -1013,16 +1042,21 @@ struct SpeedtestBurstSummary {
 // MARK: - Server bar (discreet top strip)
 
 private struct SpeedtestServerBar: View {
+    /// Opérateur mobile (Orange, SFR…) lu via CoreTelephony. nil/vide en WiFi ou
+    /// quand l'API ne le renvoie pas (placeholder iOS 16.4+).
+    let operatorName: String?
+    /// Technologie d'accès (5G NSA, 4G, WiFi…).
     let network: String
-    /// Serveur de mesure (VPS qui réalise le ping + l'upload).
-    let measurementServer: String
-    /// Origine des octets de download (CDN AWS CloudFront, VPS…). Affichée comme
-    /// segment distinct quand elle diffère du serveur de mesure.
-    let downloadSource: String?
+    /// Serveur de download/ping actif (CDN AWS CloudFront par défaut).
+    let server: String
 
-    private var showsDownloadSource: Bool {
-        guard let downloadSource, !downloadSource.isEmpty else { return false }
-        return downloadSource != measurementServer
+    /// « Orange · 5G NSA » quand l'opérateur est connu, sinon la techno seule.
+    private var networkLabel: String {
+        if let op = operatorName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !op.isEmpty, op != network {
+            return "\(op) · \(network)"
+        }
+        return network
     }
 
     var body: some View {
@@ -1030,30 +1064,23 @@ private struct SpeedtestServerBar: View {
             Image(systemName: networkIcon)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(SQColor.brandRed)
-            Text(network)
+            Text(networkLabel)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(SQColor.label)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .layoutPriority(1)
             Circle()
                 .fill(SQColor.labelTertiary)
                 .frame(width: 3, height: 3)
             Image(systemName: "server.rack")
                 .font(.caption2)
                 .foregroundStyle(SQColor.labelSecondary)
-            Text(measurementServer)
+            Text(server)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(SQColor.labelSecondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
-            if showsDownloadSource, let downloadSource {
-                Image(systemName: "arrow.down.circle")
-                    .font(.caption2)
-                    .foregroundStyle(SQColor.brandRed)
-                Text(downloadSource)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, SQSpace.sm)
