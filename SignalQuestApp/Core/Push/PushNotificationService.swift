@@ -36,8 +36,10 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
         }
     }
 
-    func didRegister(deviceToken data: Data) {
-        let token = data.map { String(format: "%02x", $0) }.joined()
+    /// Enregistre le token de registration FCM (remonté par `MessagingDelegate`).
+    /// C'est ce token — et non le token APNs brut — que `firebase-admin` côté
+    /// backend sait cibler pour livrer les notifications.
+    func didRegister(fcmToken token: String) {
         lastToken.withLock { $0 = token }
         Task {
             do {
@@ -45,7 +47,7 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
                     "/api/user/fcm-token",
                     body: ["fcmToken": token, "platform": "ios"]
                 )
-                logger.info("FCM/APNs token registered with backend")
+                logger.info("FCM token registered with backend")
             } catch {
                 logger.error("Token registration failed: \(error.localizedDescription, privacy: .public)")
             }
