@@ -129,6 +129,7 @@ struct ProfileView: View {
             EditProfileView(user: user)
         }
         .task { await loadStats() }
+        .refreshable { await loadStats() }
     }
 
     private var profileHeader: some View {

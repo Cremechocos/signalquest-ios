@@ -195,6 +195,7 @@ private enum SpeedtestEngineError: LocalizedError {
 
 final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private let api: APIClient
+    private let markets: MarketRegistryServicing
     private let session: URLSession
     private let historyCache: DiskCache
     private let pendingCache: DiskCache
@@ -203,12 +204,14 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 
     init(
         api: APIClient,
+        markets: MarketRegistryServicing? = nil,
         session: URLSession? = nil,
         historyCache: DiskCache = DiskCache(folderName: "SignalQuestSpeedtestHistory"),
         pendingCache: DiskCache = DiskCache(folderName: "SignalQuestSpeedtestPending"),
         tcpProbe: SpeedtestTCPProbing = NetworkSpeedtestTCPProbe()
     ) {
         self.api = api
+        self.markets = markets ?? MarketRegistryService(api: api)
         // Use ephemeral config to bypass system caching of the download payload.
         let config = URLSessionConfiguration.ephemeral
         config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
@@ -241,13 +244,19 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 
         let downloadTarget = resolveDownloadTarget(settings: settings, sessionResponse: sessionResponse)
 
-        // Le serveur de MESURE est le VPS sélectionné par la session (il reçoit
-        // l'upload et sert de référence de latence). Le download peut provenir d'un
-        // CDN (CloudFront) : on ne doit jamais afficher/soumettre le CDN comme
-        // « serveur de test », ni mesurer le ping contre l'edge CDN.
+        // Le serveur de MESURE est le VPS sélectionné par la session : il reçoit
+        // toujours l'upload et reste le « serveur de test » affiché/soumis. Le
+        // download (et désormais le ping, voir plus bas) peut provenir du CDN
+        // CloudFront quand l'utilisateur le sélectionne.
+        // Hôte réel de mesure (le VPS qui sert l'upload), extrait des URL de
+        // session. Sert de repli honnête quand le backend ne renvoie pas de
+        // `selectedServer` nommé — au lieu du générique « Serveur SignalQuest ».
+        let measurementHost = sessionResponse.uploadUrl.host(percentEncoded: false)
+            ?? sessionResponse.downloadUrl.host(percentEncoded: false)
         let measurementServerName = sessionResponse.selectedServer?.name
             ?? sessionResponse.selectedServer?.location
             ?? sessionResponse.selectedServer?.host
+            ?? measurementHost
             ?? "Serveur SignalQuest"
 
         progress?(SpeedtestLiveProgress(
@@ -259,14 +268,18 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             ),
             serverName: measurementServerName
         ))
-        // Ping de référence contre le serveur de MESURE, pas contre la cible de
-        // download (edge CloudFront). On vise `sessionResponse.downloadUrl` : c'est
-        // l'endpoint de download émis par la session = l'hôte du VPS (l'override
-        // CloudFront vient de la config, pas de la session), et il répond au GET —
-        // ce que le repli HTTP du ping exige (l'endpoint d'upload rejette le GET).
+        // Cible du ping. Par défaut le VPS (`sessionResponse.downloadUrl`), qui
+        // répond au GET — ce que le repli HTTP du ping exige (l'endpoint d'upload
+        // rejette le GET). Mais quand le download provient réellement d'AWS
+        // CloudFront, on mesure la latence contre l'edge CloudFront pour refléter
+        // le chemin du download. `downloadTarget` encode déjà l'URL + le token
+        // (nil pour le CDN, qui sert le fichier en GET/HEAD avec Range).
+        let pingsAgainstCDN = downloadTarget.url != sessionResponse.downloadUrl
+        let pingURL = pingsAgainstCDN ? downloadTarget.url : sessionResponse.downloadUrl
+        let pingToken = pingsAgainstCDN ? downloadTarget.token : sessionResponse.sessionToken
         let pingOutcome = try await measurePings(
-            url: sessionResponse.downloadUrl,
-            token: sessionResponse.sessionToken,
+            url: pingURL,
+            token: pingToken,
             serverName: measurementServerName,
             progress: progress
         )
@@ -303,8 +316,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         )
 
         let duration = Date().timeIntervalSince(startedAt)
-        let resolvedCity = await reverseGeocodedCity(for: location)
+        let resolvedPlace = await reverseGeocodedPlace(for: location)
         let wifiSSID = await currentWiFiSSID(for: pathStatus)
+        let operatorContext = await resolveCellularOperatorContext(pathStatus: pathStatus, location: location)
         let result = SpeedtestRunResult(
             id: UUID(),
             label: "iOS speedtest",
@@ -331,9 +345,14 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             durationSeconds: duration,
             connectionType: pathStatus.connection,
             cellularTechnology: pathStatus.cellularTechnology,
-            networkOperatorName: pathStatus.operatorName,
+            networkOperatorName: operatorContext.mobileOperator ?? pathStatus.operatorName,
+            networkOperatorMcc: operatorContext.mcc,
+            networkOperatorMnc: operatorContext.mnc,
+            marketCode: operatorContext.marketCode,
+            operatorKey: operatorContext.operatorKey,
             wifiSSID: wifiSSID,
-            city: resolvedCity,
+            city: resolvedPlace.city,
+            address: resolvedPlace.address,
             coordinate: location,
             serverName: measurementServerName,
             downloadServerName: downloadTarget.serverName,
@@ -357,6 +376,60 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             serverName: measurementServerName
         ))
         return result
+    }
+
+    private struct CellularOperatorContext: Sendable {
+        let mobileOperator: String?
+        let mcc: Int?
+        let mnc: Int?
+        let marketCode: String?
+        let operatorKey: String?
+
+        static let empty = CellularOperatorContext(
+            mobileOperator: nil,
+            mcc: nil,
+            mnc: nil,
+            marketCode: nil,
+            operatorKey: nil
+        )
+    }
+
+    private func resolveCellularOperatorContext(
+        pathStatus: NetworkPathStatus,
+        location: Coordinates?
+    ) async -> CellularOperatorContext {
+        guard pathStatus.connection == .cellular else { return .empty }
+        let mcc = pathStatus.operatorMcc
+        let mnc = pathStatus.operatorMnc
+        let registry = await markets.registry()
+
+        var market = registry.markets.first { entry in
+            guard let mcc else { return false }
+            return entry.mccs.contains(mcc)
+        }
+        if market == nil, let location {
+            market = await markets.marketForLocation(latitude: location.latitude, longitude: location.longitude)
+        }
+
+        let resolvedOperator = market?.selectableOperators.first { op in
+            guard let mnc else { return false }
+            return op.mncs.contains(mnc)
+        }
+
+        return CellularOperatorContext(
+            mobileOperator: pathStatus.operatorName ?? resolvedOperator?.shortLabel ?? resolvedOperator?.label ?? cellularOperatorFallback(pathStatus),
+            mcc: mcc,
+            mnc: mnc,
+            marketCode: market?.marketCode,
+            operatorKey: resolvedOperator?.key
+        )
+    }
+
+    private func cellularOperatorFallback(_ pathStatus: NetworkPathStatus) -> String {
+        if let technology = pathStatus.cellularTechnology?.displayName {
+            return "Cellulaire \(technology)"
+        }
+        return "Cellulaire"
     }
 
     // MARK: Persistence
@@ -1240,29 +1313,54 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         return try await delegate.run(task: task)
     }
 
-    private func reverseGeocodedCity(for coordinate: Coordinates?) async -> String? {
-        guard let coordinate else { return nil }
+    struct ResolvedPlace: Sendable {
+        let city: String?
+        let address: String?
+    }
+
+    private func reverseGeocodedPlace(for coordinate: Coordinates?) async -> ResolvedPlace {
+        guard let coordinate else { return ResolvedPlace(city: nil, address: nil) }
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        return await withTaskGroup(of: String?.self) { group in
+        return await withTaskGroup(of: ResolvedPlace?.self) { group in
             group.addTask {
-                let placemarks = try? await CLGeocoder().reverseGeocodeLocation(location)
-                let placemark = placemarks?.first
-                return [
-                    placemark?.locality,
-                    placemark?.subAdministrativeArea,
-                    placemark?.administrativeArea
+                guard let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first else {
+                    return nil
+                }
+                let city = [
+                    placemark.locality,
+                    placemark.subAdministrativeArea,
+                    placemark.administrativeArea
                 ]
                     .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
                     .first { !$0.isEmpty }
+                return ResolvedPlace(
+                    city: city,
+                    address: Self.minimizedAddress(from: placemark, fallbackCity: city)
+                )
             }
             group.addTask {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 return nil
             }
-            let city = await group.next() ?? nil
+            let place = await group.next() ?? nil
             group.cancelAll()
-            return city
+            return place ?? ResolvedPlace(city: nil, address: nil)
         }
+    }
+
+    /// Compose une adresse « rue, code postal commune » à partir d'un placemark,
+    /// sans le numéro de voirie (`subThoroughfare`) pour rester cohérent avec la
+    /// minimisation des coordonnées (RGPD art. 5.1.c).
+    private static func minimizedAddress(from placemark: CLPlacemark, fallbackCity: String?) -> String? {
+        let street = placemark.thoroughfare?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let postalCode = placemark.postalCode?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let city = placemark.locality?.trimmingCharacters(in: .whitespacesAndNewlines) ?? fallbackCity
+        let locality = [postalCode, city]
+            .compactMap { $0?.isEmpty == false ? $0 : nil }
+            .joined(separator: " ")
+        let parts = [street, locality.isEmpty ? nil : locality]
+            .compactMap { $0?.isEmpty == false ? $0 : nil }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
     private func currentWiFiSSID(for pathStatus: NetworkPathStatus) async -> String? {

@@ -13,8 +13,15 @@ struct NewPollView: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    /// Option de sondage avec identité stable : indexer un `ForEach` éditable par
+    /// position (`indices`) décale le texte/focus lors d'une suppression au milieu.
+    private struct PollOption: Identifiable {
+        let id = UUID()
+        var text: String = ""
+    }
+
     @State private var question = ""
-    @State private var options: [String] = ["", ""]
+    @State private var options: [PollOption] = [PollOption(), PollOption()]
     @State private var multiSelect = false
     @State private var hasDeadline = false
     @State private var deadline = Date().addingTimeInterval(24 * 3600)
@@ -24,7 +31,12 @@ struct NewPollView: View {
     private let maxOptions = 6
 
     private var trimmedOptions: [String] {
-        options.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        options.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    }
+
+    private func optionPlaceholder(for option: PollOption) -> String {
+        let position = (options.firstIndex { $0.id == option.id } ?? 0) + 1
+        return "Option \(position)"
     }
 
     private var canCreate: Bool {
@@ -43,24 +55,27 @@ struct NewPollView: View {
 
                     section(title: "Options") {
                         VStack(spacing: SQSpace.sm) {
-                            ForEach(options.indices, id: \.self) { index in
+                            ForEach($options) { $option in
                                 HStack(spacing: SQSpace.sm) {
-                                    TextField("Option \(index + 1)", text: $options[index])
+                                    TextField(optionPlaceholder(for: option), text: $option.text)
                                         .textFieldStyle(SQTextFieldStyle())
                                     if options.count > 2 {
                                         Button {
-                                            options.remove(at: index)
+                                            options.removeAll { $0.id == option.id }
                                         } label: {
                                             Image(systemName: "minus.circle.fill")
                                                 .foregroundStyle(SQColor.labelTertiary)
+                                                .frame(width: 44, height: 44)
+                                                .contentShape(Rectangle())
                                         }
                                         .buttonStyle(.plain)
+                                        .accessibilityLabel("Supprimer l'option \(optionPlaceholder(for: option))")
                                     }
                                 }
                             }
                             if options.count < maxOptions {
                                 Button {
-                                    options.append("")
+                                    options.append(PollOption())
                                 } label: {
                                     Label("Ajouter une option", systemImage: "plus.circle")
                                         .font(SQType.caption.weight(.semibold))

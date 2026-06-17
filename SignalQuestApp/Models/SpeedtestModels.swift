@@ -85,8 +85,16 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     let connectionType: NetworkConnectionKind
     let cellularTechnology: CellularRadioTechnology?
     let networkOperatorName: String?
+    let networkOperatorMcc: Int?
+    let networkOperatorMnc: Int?
+    let marketCode: String?
+    let operatorKey: String?
     let wifiSSID: String?
     let city: String?
+    /// Adresse (rue + commune) reverse-géocodée du point de mesure. Envoyée au
+    /// backend pour situer le test ; volontairement sans numéro de voirie pour
+    /// rester cohérent avec la minimisation des coordonnées (RGPD art. 5.1.c).
+    let address: String?
     let coordinate: Coordinates?
     /// Serveur de MESURE (VPS sélectionné par la session). C'est lui qui réalise
     /// l'upload et sert de référence pour la latence/le partage.
@@ -129,8 +137,13 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         connectionType: NetworkConnectionKind,
         cellularTechnology: CellularRadioTechnology? = nil,
         networkOperatorName: String? = nil,
+        networkOperatorMcc: Int? = nil,
+        networkOperatorMnc: Int? = nil,
+        marketCode: String? = nil,
+        operatorKey: String? = nil,
         wifiSSID: String? = nil,
         city: String? = nil,
+        address: String? = nil,
         coordinate: Coordinates? = nil,
         serverName: String? = nil,
         downloadServerName: String? = nil,
@@ -167,8 +180,13 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         self.connectionType = connectionType
         self.cellularTechnology = cellularTechnology
         self.networkOperatorName = networkOperatorName
+        self.networkOperatorMcc = networkOperatorMcc
+        self.networkOperatorMnc = networkOperatorMnc
+        self.marketCode = marketCode
+        self.operatorKey = operatorKey
         self.wifiSSID = wifiSSID
         self.city = city
+        self.address = address
         self.coordinate = coordinate
         self.serverName = serverName
         self.downloadServerName = downloadServerName
@@ -253,6 +271,10 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         connectionType: .other,
         cellularTechnology: nil,
         networkOperatorName: nil,
+        networkOperatorMcc: nil,
+        networkOperatorMnc: nil,
+        marketCode: nil,
+        operatorKey: nil,
         wifiSSID: nil,
         city: nil,
         coordinate: nil,
@@ -321,6 +343,8 @@ struct SpeedtestSubmission: Encodable, Equatable {
     let mobileOperator: String?
     let mcc: Int?
     let mnc: Int?
+    let marketCode: String?
+    let operatorKey: String?
     let device: DeviceInfo
     let deviceType: String
     let deviceModel: String
@@ -329,7 +353,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
     let downloadServerName: String?
 
     enum CodingKeys: String, CodingKey {
-        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, device, deviceType, deviceModel, isVisibleOnMap, server, downloadServerName
+        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, server, downloadServerName
         case rsrp, rsrq, snr, cellId, pci, enb, gnb, radioSnapshots
         case pingDl, jitterDl, pingUl, jitterUl
     }
@@ -386,10 +410,12 @@ struct SpeedtestSubmission: Encodable, Equatable {
             networkType: result.connectionType.rawValue,
             coordinates: minimizedCoordinates(result.coordinate),
             city: result.city,
-            address: nil,
+            address: result.address,
             mobileOperator: mobileOperator ?? result.networkOperatorName,
-            mcc: nil,
-            mnc: nil,
+            mcc: result.networkOperatorMcc,
+            mnc: result.networkOperatorMnc,
+            marketCode: result.marketCode,
+            operatorKey: result.operatorKey,
             device: DeviceInfo(type: "iPhone", model: deviceModel),
             deviceType: "iPhone",
             deviceModel: deviceModel,
@@ -437,6 +463,8 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encodeIfPresent(mobileOperator, forKey: .mobileOperator)
         try c.encodeIfPresent(mcc, forKey: .mcc)
         try c.encodeIfPresent(mnc, forKey: .mnc)
+        try c.encodeIfPresent(marketCode, forKey: .marketCode)
+        try c.encodeIfPresent(operatorKey, forKey: .operatorKey)
         try c.encode(device, forKey: .device)
         try c.encode(deviceType, forKey: .deviceType)
         try c.encode(deviceModel, forKey: .deviceModel)

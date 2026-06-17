@@ -7,6 +7,16 @@ import os
 
 private let speedtestQALogger = Logger(subsystem: "fr.signalquest.ios", category: "SpeedtestQA")
 
+private struct SpeedtestSharePayload: Identifiable {
+    let id = UUID()
+    let items: [Any]
+}
+
+private enum SpeedtestSharePreparation: Equatable {
+    case idle
+    case rendering(UUID)
+}
+
 struct SpeedtestView: View {
     @EnvironmentObject private var services: AppServices
     @Environment(\.scenePhase) private var scenePhase
@@ -39,11 +49,18 @@ struct SpeedtestView: View {
     @State private var runStartNetworkDisplayName: String?
     @State private var networkAbortMessage: String?
     @State private var didRunQASpeedtest = false
-    // Partage : image pré-rendue dès qu'un résultat arrive, pour un tap instantané.
+    // Partage : image pré-rendue dès qu'un résultat arrive, puis présentée via
+    // un payload atomique pour éviter les feuilles Apple vides au premier tap.
     @State private var shareURL: URL?
-    @State private var shareItems: [Any] = []
-    @State private var showShareSheet = false
-    @State private var isPreparingShare = false
+    @State private var sharePayload: SpeedtestSharePayload?
+    @State private var sharePreparation: SpeedtestSharePreparation = .idle
+    @State private var shareRenderTask: Task<Void, Never>?
+    @State private var sharePrerenderTask: Task<Void, Never>?
+
+    private var isPreparingShare: Bool {
+        if case .rendering = sharePreparation { return true }
+        return false
+    }
 
     var body: some View {
         ZStack {
@@ -70,7 +87,11 @@ struct SpeedtestView: View {
                             network: currentNetworkStatus.displayName,
                             // Serveur de mesure (jamais la cible de download/CDN). Tiret
                             // tant qu'aucune session n'a renvoyé de serveur sélectionné.
-                            server: liveProgress.serverName ?? result?.serverName ?? "—"
+                            measurementServer: liveProgress.serverName ?? result?.serverName ?? "—",
+                            // Source réelle des octets de download : le résultat une fois
+                            // mesuré, sinon la cible choisie pour qu'AWS apparaisse dès la
+                            // sélection (résout la confusion « je choisis AWS mais ça met SignalQuest »).
+                            downloadSource: result?.downloadServerName ?? downloadTarget.displayName
                         )
                     }
 
@@ -158,7 +179,12 @@ struct SpeedtestView: View {
         .onChangeCompat(of: colorScheme) { _, _ in
             // L'image de partage suit le thème iOS : on la re-rend au changement.
             shareURL = nil
+            sharePrerenderTask?.cancel()
             if let result { prerenderShareImage(for: result) }
+        }
+        .onDisappear {
+            shareRenderTask?.cancel()
+            sharePrerenderTask?.cancel()
         }
     }
 
@@ -233,8 +259,9 @@ struct SpeedtestView: View {
             .shadow(color: SQBrand.signatureStart.opacity(0.35), radius: 12, y: 6)
         }
         .buttonStyle(SQPressButtonStyle())
-        .sheet(isPresented: $showShareSheet) {
-            ShareSheet(items: shareItems)
+        .disabled(isPreparingShare)
+        .sheet(item: $sharePayload) { payload in
+            ShareSheet(items: payload.items)
                 .presentationDetents([.medium, .large])
         }
     }
@@ -243,28 +270,35 @@ struct SpeedtestView: View {
     /// partage immédiatement. Si l'image n'est pas encore prête, on la rend à la
     /// volée (SpeedtestShareImageRenderer.render est asynchrone), sans bloquer l'UI.
     private func presentShare(for result: SpeedtestRunResult) {
+        guard !isPreparingShare else { return }
         let text = SpeedtestShareImageRenderer.shareText(for: result)
         let title = "Speedtest SignalQuest — \(Int(result.downloadAverageMbps.rounded())) Mbps"
         if let url = shareURL {
-            shareItems = [ImageAndTextShareItem(fileURL: url, text: text, title: title), text]
-            showShareSheet = true
+            sharePayload = SpeedtestSharePayload(items: shareItems(fileURL: url, text: text, title: title))
             return
         }
-        isPreparingShare = true
-        Task {
+        sharePreparation = .rendering(result.id)
+        shareRenderTask?.cancel()
+        shareRenderTask = Task {
             do {
                 let url = try await SpeedtestShareImageRenderer.render(result, theme: SpeedtestShareTheme.resolve(colorScheme))
                 await MainActor.run {
-                    self.isPreparingShare = false
+                    guard self.result?.id == result.id else {
+                        self.sharePreparation = .idle
+                        return
+                    }
+                    self.sharePreparation = .idle
                     self.shareURL = url
-                    self.shareItems = [ImageAndTextShareItem(fileURL: url, text: text, title: title), text]
-                    self.showShareSheet = true
+                    self.sharePayload = SpeedtestSharePayload(items: self.shareItems(fileURL: url, text: text, title: title))
                 }
             } catch {
                 await MainActor.run {
-                    self.isPreparingShare = false
-                    self.shareItems = [text]
-                    self.showShareSheet = true
+                    guard self.result?.id == result.id else {
+                        self.sharePreparation = .idle
+                        return
+                    }
+                    self.sharePreparation = .idle
+                    self.sharePayload = SpeedtestSharePayload(items: [text])
                 }
             }
         }
@@ -274,16 +308,31 @@ struct SpeedtestView: View {
     /// iOS courant.
     private func prerenderShareImage(for result: SpeedtestRunResult) {
         let theme = SpeedtestShareTheme.resolve(colorScheme)
-        Task {
+        sharePrerenderTask?.cancel()
+        sharePrerenderTask = Task {
             do {
                 let url = try await SpeedtestShareImageRenderer.render(result, theme: theme)
                 await MainActor.run {
-                    self.shareURL = url
+                    if self.result?.id == result.id {
+                        self.shareURL = url
+                    }
                 }
             } catch {
                 print("Failed to prerender share image: \(error)")
             }
         }
+    }
+
+    private func shareItems(fileURL: URL, text: String, title: String) -> [Any] {
+        [ImageAndTextShareItem(fileURL: fileURL, text: text, title: title), text]
+    }
+
+    private func resetShareState() {
+        shareRenderTask?.cancel()
+        sharePrerenderTask?.cancel()
+        shareURL = nil
+        sharePayload = nil
+        sharePreparation = .idle
     }
 
     // MARK: - Detail card (preserves UI test labels)
@@ -315,8 +364,11 @@ struct SpeedtestView: View {
                 detailItem(label: "Jitter DL", value: ms(result.jitterDlMs), color: Color(hex: 0x06B6D4))
                 detailItem(label: "Ping UL", value: ms(result.pingUlMs), color: Color(hex: 0x06B6D4))
                 detailItem(label: "Jitter UL", value: ms(result.jitterUlMs), color: Color(hex: 0x06B6D4))
-                detailItem(label: "Réseau", value: result.networkDisplayName, color: SQColor.label)
-                detailItem(label: "Serveur", value: result.serverName ?? "—", color: SQColor.label)
+                detailItem(label: "Réseau", value: result.networkShareDisplayName, color: SQColor.label)
+                detailItem(label: "Serveur mesure", value: result.serverName ?? "—", color: SQColor.label)
+                if let dl = result.downloadServerName, !dl.isEmpty, dl != result.serverName {
+                    detailItem(label: "Source DL", value: dl, color: SQColor.label)
+                }
             }
         }
         .padding(SQSpace.lg)
@@ -394,7 +446,15 @@ struct SpeedtestView: View {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
                     SQSheetHandle()
                     VStack(alignment: .leading, spacing: SQSpace.md + 2) {
-                        Picker("Cible DL", selection: Binding(
+                        VStack(alignment: .leading, spacing: SQSpace.xs) {
+                            Text("Source du téléchargement")
+                                .font(SQFont.archivo(15, .bold))
+                                .foregroundStyle(SQColor.label)
+                            Text("Origine des octets de download. La latence et l'upload restent mesurés sur le serveur SignalQuest.")
+                                .font(.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
+                        Picker("Source DL", selection: Binding(
                             get: { downloadTarget },
                             set: { downloadTargetRaw = $0.rawValue }
                         )) {
@@ -634,9 +694,12 @@ struct SpeedtestView: View {
     private func executeRun(requestLocation: Bool, runIndex: Int, runTotal: Int) async throws -> SpeedtestRunResult {
         phase = .ping
         result = nil
-        shareURL = nil
+        resetShareState()
         liveProgress = SpeedtestLiveProgress(phase: .ping)
         liveMbps = 0
+        // Relit l'opérateur/techno au moment du test, sans dépendre d'un statut
+        // potentiellement mis en cache (carrier CoreTelephony lu à la demande).
+        services.networkPath.refreshNow()
         let status = services.networkPath.status
         currentNetworkStatus = status
         runStartConnection = status.connection
@@ -677,6 +740,7 @@ struct SpeedtestView: View {
         try Task.checkCancellation()
         result = measured
         shareURL = nil
+        sharePayload = nil
         prerenderShareImage(for: measured)
         liveProgress = SpeedtestLiveProgress(
             phase: .saving,
@@ -950,7 +1014,16 @@ struct SpeedtestBurstSummary {
 
 private struct SpeedtestServerBar: View {
     let network: String
-    let server: String
+    /// Serveur de mesure (VPS qui réalise le ping + l'upload).
+    let measurementServer: String
+    /// Origine des octets de download (CDN AWS CloudFront, VPS…). Affichée comme
+    /// segment distinct quand elle diffère du serveur de mesure.
+    let downloadSource: String?
+
+    private var showsDownloadSource: Bool {
+        guard let downloadSource, !downloadSource.isEmpty else { return false }
+        return downloadSource != measurementServer
+    }
 
     var body: some View {
         HStack(spacing: SQSpace.sm) {
@@ -966,11 +1039,21 @@ private struct SpeedtestServerBar: View {
             Image(systemName: "server.rack")
                 .font(.caption2)
                 .foregroundStyle(SQColor.labelSecondary)
-            Text(server)
+            Text(measurementServer)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(SQColor.labelSecondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
+            if showsDownloadSource, let downloadSource {
+                Image(systemName: "arrow.down.circle")
+                    .font(.caption2)
+                    .foregroundStyle(SQColor.brandRed)
+                Text(downloadSource)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, SQSpace.sm)
@@ -1069,6 +1152,18 @@ private struct SignatureSpeedDial: View {
         return colorForRatio(normalized)
     }
 
+    /// Offset (depuis le centre du cadran 280×280) pour placer le dot indicateur
+    /// exactement au centre du trait à l'angle de fin de l'arc actif.
+    private var arcEndOffset: CGSize {
+        let endAngleDeg = 225.0 + 270.0 * normalized
+        let endAngleRad = endAngleDeg * Double.pi / 180.0
+        let r: CGFloat = 280.0 / 2  // rayon au centre du trait
+        return CGSize(
+            width: r * CGFloat(sin(endAngleRad)),
+            height: -r * CGFloat(cos(endAngleRad))
+        )
+    }
+
     /// Gradient de couleur multi-segment pour la jauge représentant la qualité.
     private var arcGradient: AngularGradient {
         AngularGradient(
@@ -1112,13 +1207,23 @@ private struct SignatureSpeedDial: View {
                 .stroke(SQColor.fill.opacity(colorScheme == .dark ? 0.6 : 0.8), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(135))
 
-            // Jauge active de vitesse
+            // Jauge active de vitesse (.butt : pas de capsule flottante en bout d'arc)
             Circle()
                 .trim(from: 0, to: arcSpan * normalized)
-                .stroke(arcGradient, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .stroke(arcGradient, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
                 .rotationEffect(.degrees(135))
                 .shadow(color: isLive ? accent.opacity(0.6) : .clear, radius: 12)
                 .sqAnimation(.snappy(duration: 0.32), value: normalized)
+
+            // Dot indicateur positionné exactement au bout de l'arc actif
+            if normalized > 0 {
+                Circle()
+                    .fill(accent)
+                    .frame(width: lineWidth, height: lineWidth)
+                    .shadow(color: isLive ? accent.opacity(0.8) : .clear, radius: 8)
+                    .offset(arcEndOffset)
+                    .sqAnimation(.snappy(duration: 0.32), value: normalized)
+            }
 
             // Anneau de progression fin interne
             Circle()

@@ -34,8 +34,14 @@ final class AntennaDetailViewModel: ObservableObject {
         photoUploadMessage = nil
         defer { isUploadingPhoto = false }
         do {
-            guard let raw = try await item.loadTransferable(type: Data.self),
-                  let jpeg = Self.preparedJPEG(from: raw) else {
+            guard let raw = try await item.loadTransferable(type: Data.self) else {
+                photoUploadMessage = "Image illisible."
+                return
+            }
+            // Recompression hors du main thread pour ne pas geler l'UI à l'upload.
+            guard let jpeg = await Task.detached(priority: .userInitiated, operation: {
+                Self.preparedJPEG(from: raw)
+            }).value else {
                 photoUploadMessage = "Image illisible."
                 return
             }
@@ -56,7 +62,7 @@ final class AntennaDetailViewModel: ObservableObject {
     }
 
     /// Recompresse en JPEG ≤ 1600 px qualité 0,85 (HEIC converti d'office).
-    private static func preparedJPEG(from data: Data) -> Data? {
+    nonisolated private static func preparedJPEG(from data: Data) -> Data? {
         guard let image = UIImage(data: data) else { return nil }
         let maxSide: CGFloat = 1600
         let largest = max(image.size.width, image.size.height)
@@ -71,7 +77,10 @@ final class AntennaDetailViewModel: ObservableObject {
 struct AntennaDetailSheet: View {
     let site: AntennaSite
     let market: String
-    let operatorName: String
+    /// Opérateur dont on affiche la fiche. Modifiable in-situ pour les sites
+    /// partagés (multi-opérateurs) : l'utilisateur passe de l'un à l'autre sans
+    /// rouvrir la carte.
+    @State private var selectedOperator: String
     @StateObject private var model: AntennaDetailViewModel
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
@@ -81,7 +90,8 @@ struct AntennaDetailSheet: View {
     init(site: AntennaSite, market: String = "FR", operatorName: String = "SFR", service: AntennasServicing) {
         self.site = site
         self.market = market
-        self.operatorName = operatorName == "ALL" ? (site.operators.first ?? "SFR") : operatorName
+        let resolved = operatorName == "ALL" ? (site.operators.first ?? "SFR") : operatorName
+        _selectedOperator = State(initialValue: resolved)
         _model = StateObject(wrappedValue: AntennaDetailViewModel(service: service))
     }
 
@@ -122,7 +132,13 @@ struct AntennaDetailSheet: View {
                         .tint(SQColor.brandRed)
                 }
             }
-            .task { await model.load(id: site.siteId ?? site.id, market: market, operatorName: operatorName, anfrCode: site.anfrCode) }
+            // `id: selectedOperator` → recharge la fiche quand l'utilisateur change
+            // d'opérateur sur un site partagé.
+            .task(id: selectedOperator) {
+                model.details = nil
+                model.error = nil
+                await model.load(id: site.siteId ?? site.id, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
+            }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
@@ -137,7 +153,7 @@ struct AntennaDetailSheet: View {
                     photos: services.photos,
                     siteId: site.siteId ?? site.id,
                     anfrCode: site.anfrCode,
-                    operatorName: operatorName,
+                    operatorName: selectedOperator,
                     market: market
                 )
                 photoPickerItem = nil
@@ -179,7 +195,7 @@ struct AntennaDetailSheet: View {
 
     /// Couleur de l'opérateur affiché (utilisée par l'éventail d'azimuts).
     private var operatorColor: Color {
-        SQBrand.operatorColor(operatorName)
+        SQBrand.operatorColor(selectedOperator)
     }
 
     private var header: some View {
@@ -205,10 +221,13 @@ struct AntennaDetailSheet: View {
                 }
                 Spacer()
             }
+            if site.operators.count > 1 {
+                Text("Opérateur du site").sqKicker()
+            }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: SQSpace.xs + 2) {
                     ForEach(site.operators, id: \.self) { op in
-                        SQEditorialTag(text: op, color: SQBrand.operatorColor(op))
+                        operatorTag(op)
                     }
                     ForEach(site.technologies, id: \.self) { tech in
                         SQEditorialTag(text: tech, color: SQBrand.techColor(tech))
@@ -216,6 +235,44 @@ struct AntennaDetailSheet: View {
                 }
                 .padding(.vertical, 1)
             }
+        }
+    }
+
+    /// Tag opérateur. Sur un site partagé, il devient un bouton de bascule :
+    /// l'opérateur actif est en plein (fond couleur, texte blanc), les autres en
+    /// version atténuée. Sur un site mono-opérateur, simple tag éditorial.
+    @ViewBuilder
+    private func operatorTag(_ op: String) -> some View {
+        let color = SQBrand.operatorColor(op)
+        let isSwitchable = site.operators.count > 1
+        let isActive = op == selectedOperator
+        if isSwitchable {
+            Button {
+                guard op != selectedOperator else { return }
+                Haptics.selection()
+                selectedOperator = op
+            } label: {
+                Text(op)
+                    .font(SQType.micro)
+                    .tracking(0.8)
+                    .textCase(.uppercase)
+                    .lineLimit(1)
+                    .padding(.horizontal, SQSpace.sm)
+                    .padding(.vertical, SQSpace.xs + 1)
+                    .foregroundStyle(isActive ? Color.white : color)
+                    .background(
+                        (isActive ? color : color.opacity(0.12)),
+                        in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                            .stroke(color.opacity(isActive ? 0 : 0.45), lineWidth: 1)
+                    }
+                    .opacity(isActive ? 1 : 0.85)
+            }
+            .buttonStyle(SQPressButtonStyle())
+        } else {
+            SQEditorialTag(text: op, color: color)
         }
     }
 

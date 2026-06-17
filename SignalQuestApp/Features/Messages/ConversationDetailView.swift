@@ -984,7 +984,11 @@ struct ConversationDetailView: View {
         defer { isSending = false }
         do {
             guard let raw = try await item.loadTransferable(type: Data.self) else { return }
-            guard let prepared = Self.preparedJPEG(from: raw) else {
+            // Décodage/redimensionnement/encodage hors du main thread pour ne pas
+            // geler l'UI pendant l'envoi (image plein format).
+            guard let prepared = await Task.detached(priority: .userInitiated, operation: {
+                Self.preparedJPEG(from: raw)
+            }).value else {
                 throw E2EEError.unsupported("Image illisible")
             }
             let uploaded = try await service.uploadAttachment(
@@ -1025,7 +1029,7 @@ struct ConversationDetailView: View {
 
     /// Recompresse l'image en JPEG ≤ 1280 px qualité 0,85 (HEIC converti
     /// d'office) — même normalisation qu'Android avant upload.
-    private static func preparedJPEG(from data: Data) -> (data: Data, width: Int, height: Int)? {
+    nonisolated private static func preparedJPEG(from data: Data) -> (data: Data, width: Int, height: Int)? {
         guard let image = UIImage(data: data) else { return nil }
         let maxSide: CGFloat = 1280
         let largest = max(image.size.width, image.size.height)

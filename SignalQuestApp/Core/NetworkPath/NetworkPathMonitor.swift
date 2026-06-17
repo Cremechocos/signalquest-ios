@@ -73,10 +73,20 @@ struct NetworkPathStatus: Equatable, Sendable {
     let connection: NetworkConnectionKind
     let cellularTechnology: CellularRadioTechnology?
     let operatorName: String?
+    let operatorMcc: Int?
+    let operatorMnc: Int?
     let isExpensive: Bool
     let isConstrained: Bool
 
-    static let unknown = NetworkPathStatus(connection: .other, cellularTechnology: nil, operatorName: nil, isExpensive: false, isConstrained: false)
+    static let unknown = NetworkPathStatus(
+        connection: .other,
+        cellularTechnology: nil,
+        operatorName: nil,
+        operatorMcc: nil,
+        operatorMnc: nil,
+        isExpensive: false,
+        isConstrained: false
+    )
 
     var displayName: String {
         switch connection {
@@ -119,7 +129,13 @@ struct NetworkPathStatus: Equatable, Sendable {
         }
     }
 
-    static func map(_ snapshot: NetworkPathSnapshot, cellularTechnology: CellularRadioTechnology? = nil, operatorName: String? = nil) -> NetworkPathStatus {
+    static func map(
+        _ snapshot: NetworkPathSnapshot,
+        cellularTechnology: CellularRadioTechnology? = nil,
+        operatorName: String? = nil,
+        operatorMcc: Int? = nil,
+        operatorMnc: Int? = nil
+    ) -> NetworkPathStatus {
         let connection: NetworkConnectionKind
         if snapshot.usesCellular {
             connection = .cellular
@@ -132,10 +148,14 @@ struct NetworkPathStatus: Equatable, Sendable {
         }
         let activeCellularTechnology = connection == .cellular ? cellularTechnology : nil
         let activeOperatorName = connection == .cellular ? operatorName : nil
+        let activeMcc = connection == .cellular ? operatorMcc : nil
+        let activeMnc = connection == .cellular ? operatorMnc : nil
         return NetworkPathStatus(
             connection: connection,
             cellularTechnology: activeCellularTechnology,
             operatorName: activeOperatorName,
+            operatorMcc: activeMcc,
+            operatorMnc: activeMnc,
             isExpensive: snapshot.isExpensive,
             isConstrained: snapshot.isConstrained
         )
@@ -205,13 +225,23 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
         }
     }
 
+    /// Force une relecture immédiate de l'opérateur/techno. Utile juste avant un
+    /// speedtest pour repartir d'une lecture fraîche de CoreTelephony plutôt que
+    /// du dernier statut publié.
+    func refreshNow() {
+        refreshStatus()
+    }
+
     private func refreshStatus() {
         let cellularTechnology = latestPathSnapshot.usesCellular ? currentCellularTechnology() : nil
         let operatorName = latestPathSnapshot.usesCellular ? currentCarrierName() : nil
+        let plmn: (mcc: Int?, mnc: Int?) = latestPathSnapshot.usesCellular ? currentCellularPLMN() : (mcc: nil, mnc: nil)
         status = NetworkPathStatus.map(
             latestPathSnapshot,
             cellularTechnology: cellularTechnology,
-            operatorName: operatorName
+            operatorName: operatorName,
+            operatorMcc: plmn.mcc,
+            operatorMnc: plmn.mnc
         )
     }
 
@@ -234,11 +264,77 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
     }
 
     private func currentCarrierName() -> String? {
-        // `CTCarrier` / `serviceSubscriberCellularProviders` / `carrierName` sont
-        // dépréciés SANS remplacement depuis iOS 16 (Apple renvoie « -- » pour des
-        // raisons de confidentialité). On n'expose donc plus le nom d'opérateur via
-        // CoreTelephony — c'est intentionnel et conforme à la direction Apple.
-        nil
+        guard let providers = telephony.serviceSubscriberCellularProviders else {
+            return nil
+        }
+
+        if let dataServiceIdentifier = telephony.dataServiceIdentifier,
+           let carrierName = Self.normalizedCarrierName(providers[dataServiceIdentifier]?.carrierName) {
+            return carrierName
+        }
+
+        for serviceIdentifier in providers.keys.sorted() {
+            if let carrierName = Self.normalizedCarrierName(providers[serviceIdentifier]?.carrierName) {
+                return carrierName
+            }
+        }
+        return nil
+    }
+
+    private func currentCellularPLMN() -> (mcc: Int?, mnc: Int?) {
+        guard let provider = currentCellularProvider(),
+              let plmn = Self.plmn(from: provider) else {
+            return (nil, nil)
+        }
+        return plmn
+    }
+
+    private func currentCellularProvider() -> CTCarrier? {
+        guard let providers = telephony.serviceSubscriberCellularProviders else {
+            return nil
+        }
+        if let dataServiceIdentifier = telephony.dataServiceIdentifier,
+           let provider = providers[dataServiceIdentifier] {
+            return provider
+        }
+
+        for serviceIdentifier in providers.keys.sorted() {
+            if let provider = providers[serviceIdentifier] {
+                return provider
+            }
+        }
+        return nil
+    }
+
+    private static func normalizedCarrierName(_ value: String?) -> String? {
+        guard let raw = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty,
+              raw != "--" else {
+            return nil
+        }
+        return raw
+    }
+
+    private static func plmn(from provider: CTCarrier) -> (mcc: Int?, mnc: Int?)? {
+        let mcc = parsePLMNComponent(provider.mobileCountryCode)
+        let mnc = parsePLMNComponent(provider.mobileNetworkCode)
+        guard mcc != nil || mnc != nil else { return nil }
+        return (mcc, mnc)
+    }
+
+    private static func parsePLMNComponent(_ value: String?) -> Int? {
+        guard let raw = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty,
+              raw != "--",
+              raw.allSatisfy(\.isNumber),
+              let parsed = Int(raw),
+              // 65535 (0xFFFF) est le placeholder renvoyé par iOS 16+ quand le code
+              // réseau n'est plus exposé : on ne le propage pas comme MCC/MNC réel.
+              parsed != 65535,
+              parsed > 0 else {
+            return nil
+        }
+        return parsed
     }
 }
 
