@@ -557,17 +557,8 @@ struct ConversationDetailView: View {
     private func attachmentsView(for message: MessageItem, mine: Bool) -> some View {
         ForEach(message.attachments.filter { $0.url != nil }) { attachment in
             if attachment.kind.uppercased() == "IMAGE" || (attachment.contentType?.hasPrefix("image/") ?? false) {
-                AsyncImage(url: attachment.url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    case .failure:
-                        Label("Image indisponible", systemImage: "photo")
-                            .font(SQType.caption)
-                            .padding(SQSpace.md)
-                    default:
-                        Rectangle().fill(SQColor.fill).sqShimmer()
-                    }
+                RemoteImage(url: attachment.url, maxDimension: 240, contentMode: .fill) {
+                    Rectangle().fill(SQColor.fill).sqShimmer()
                 }
                 .frame(maxWidth: 240, maxHeight: 240)
                 .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))

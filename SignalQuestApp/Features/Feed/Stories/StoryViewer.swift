@@ -71,13 +71,10 @@ struct StoryViewer: View {
     @ViewBuilder
     private func content(for story: SocialStory) -> some View {
         if let url = story.mediaUrl {
-            AsyncImage(url: url) { phase in
-                if let image = phase.image {
-                    image.resizable().scaledToFill().ignoresSafeArea()
-                } else {
-                    Color.black
-                }
+            RemoteImage(url: url, maxDimension: 1400, contentMode: .fill) {
+                Color.black
             }
+            .ignoresSafeArea()
         } else {
             ZStack {
                 SQGradient.signal.ignoresSafeArea()

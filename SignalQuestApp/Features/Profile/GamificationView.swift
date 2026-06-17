@@ -113,10 +113,8 @@ struct GamificationView: View {
 
     private func badgeTile(_ badge: GamificationBadge) -> some View {
         VStack(spacing: SQSpace.sm) {
-            AsyncImage(url: badge.iconUrl) { phase in
-                if let image = phase.image {
-                    image.resizable().scaledToFit()
-                } else if let icon = badge.icon {
+            RemoteImage(url: badge.iconUrl, maxDimension: 52, contentMode: .fit) {
+                if let icon = badge.icon {
                     Text(icon)
                         .font(.largeTitle)
                 } else {

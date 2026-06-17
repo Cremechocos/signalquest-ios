@@ -531,12 +531,8 @@ struct AntennaDetailSheet: View {
                                 Haptics.light()
                                 viewerPhoto = photo
                             } label: {
-                                AsyncImage(url: photo.thumbnailUrl ?? photo.imageUrl) { phase in
-                                    if let image = phase.image {
-                                        image.resizable().scaledToFill()
-                                    } else {
-                                        SQColor.fill
-                                    }
+                                RemoteImage(url: photo.thumbnailUrl ?? photo.imageUrl, maxDimension: 110, contentMode: .fill) {
+                                    SQColor.fill
                                 }
                                 .frame(width: 110, height: 84)
                                 .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
@@ -713,18 +709,9 @@ private struct AntennaPhotoViewer: View {
 
             TabView(selection: $selection) {
                 ForEach(photos) { photo in
-                    AsyncImage(url: photo.imageUrl ?? photo.thumbnailUrl) { phase in
-                        if let image = phase.image {
-                            image
-                                .resizable()
-                                .scaledToFit()
-                        } else if phase.error != nil {
-                            Label("Photo indisponible", systemImage: "photo.badge.exclamationmark")
-                                .foregroundStyle(.white.opacity(0.7))
-                        } else {
-                            ProgressView()
-                                .tint(.white)
-                        }
+                    RemoteImage(url: photo.imageUrl ?? photo.thumbnailUrl, maxDimension: 1400, contentMode: .fit) {
+                        ProgressView()
+                            .tint(.white)
                     }
                     .tag(photo.id)
                 }

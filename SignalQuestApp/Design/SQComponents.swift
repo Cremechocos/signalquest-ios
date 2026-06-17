@@ -480,12 +480,8 @@ struct PhotoTile: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            AsyncImage(url: photo.thumbnailUrl ?? photo.imageUrl) { phase in
-                if let image = phase.image {
-                    image.resizable().scaledToFill()
-                } else {
-                    Rectangle().fill(SQColor.fill)
-                }
+            RemoteImage(url: photo.thumbnailUrl ?? photo.imageUrl, maxDimension: 360, contentMode: .fill) {
+                Rectangle().fill(SQColor.fill)
             }
             .frame(height: 172)
             .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))

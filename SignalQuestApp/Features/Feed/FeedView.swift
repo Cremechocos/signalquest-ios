@@ -230,7 +230,7 @@ struct FeedView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.lg + 2) {
+            LazyVStack(alignment: .leading, spacing: SQSpace.lg + 2) {
                 Text("Le réseau, sans filtre")
                     .sqKicker()
                     .padding(.horizontal, SQSpace.xxs)
