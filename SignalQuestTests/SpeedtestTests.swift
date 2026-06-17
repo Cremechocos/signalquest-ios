@@ -149,6 +149,16 @@ final class SpeedtestTests: XCTestCase {
         // Ni opérateur ni techno → « Cellulaire » seul.
         let bare = makeSpeedtestResult(downloadSeries: nil, uploadSeries: nil, connectionType: .cellular, cellularTechnology: nil, networkOperatorName: nil)
         XCTAssertEqual(bare.networkShareDisplayName, "Cellulaire")
+
+        // WiFi : affiche le FAI (résolu par IP), pas le SSID (plus parlant + évite
+        // d'exposer le nom du réseau privé).
+        let wifi = makeSpeedtestResult(downloadSeries: nil, uploadSeries: nil, connectionType: .wifi, networkOperatorName: "Orange", wifiSSID: "Livebox-1234")
+        XCTAssertEqual(wifi.networkShareDisplayName, "Orange • WiFi")
+        XCTAssertFalse(wifi.networkShareDisplayName.contains("Livebox"))
+
+        // WiFi sans FAI résolu → « WiFi » seul (pas de SSID exposé).
+        let wifiNoFai = makeSpeedtestResult(downloadSeries: nil, uploadSeries: nil, connectionType: .wifi, networkOperatorName: nil, wifiSSID: "Livebox-1234")
+        XCTAssertEqual(wifiNoFai.networkShareDisplayName, "WiFi")
     }
 
     func testSpeedtestPayloadEncodesNullRadioFields() throws {

@@ -71,8 +71,8 @@ struct SpeedtestView: View {
     private var headerOperatorName: String? {
         if let measured = result?.networkOperatorName { return measured }
         if let live = currentNetworkStatus.operatorName { return live }
-        if currentNetworkStatus.connection == .cellular { return detectedOperator?.label }
-        return nil
+        // Repli IP : opérateur mobile en cellulaire, FAI en WiFi.
+        return detectedOperator?.label
     }
 
     /// Résout l'opérateur via IP (ASN) côté backend, en transmettant l'état VPN
@@ -727,12 +727,11 @@ struct SpeedtestView: View {
         currentNetworkStatus = status
         runStartConnection = status.connection
         runStartNetworkDisplayName = status.displayName
-        // Repli opérateur par IP (cellulaire) quand CoreTelephony est muet : injecté
-        // dans le pathStatus pour remonter dans le résultat + l'image de partage.
+        // Repli opérateur par IP quand l'API device est muette (carrier en
+        // cellulaire, FAI en WiFi) : injecté dans le pathStatus pour remonter dans
+        // le résultat + l'image de partage.
         await resolveDetectedOperator()
-        let runStatus = status.connection == .cellular
-            ? status.merging(operatorName: detectedOperator?.label)
-            : status
+        let runStatus = status.merging(operatorName: detectedOperator?.label)
         let settings = runSettings
 
         let location: Coordinates?
