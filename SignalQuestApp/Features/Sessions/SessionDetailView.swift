@@ -114,6 +114,8 @@ struct SessionDetailView: View {
                 Task {
                     await model.identify(antenna, service: services.identify, location: services.location)
                     pendingIdentify = nil
+                    // SESS-DETAIL-BUG-01 : rafraîchir la liste pour repasser l'antenne identifiée en vert.
+                    await model.load(service: services.sessions)
                 }
             }
             Button("Annuler", role: .cancel) { pendingIdentify = nil }
@@ -277,6 +279,7 @@ struct SessionDetailView: View {
                 .controlSize(.small)
                 .tint(SQColor.brandOrange)
                 .disabled(model.identifyingId != nil)
+                .accessibilityLabel("Valider l'antenne \(antenna.operatorName ?? antenna.displayName ?? "")")
             }
             if antenna.siteId != nil {
                 Image(systemName: "chevron.right").font(.caption2).foregroundStyle(SQColor.labelSecondary)
@@ -317,7 +320,9 @@ struct SessionDetailView: View {
 
     static func statusLabel(_ a: ServingAntenna) -> String {
         var parts: [String] = [a.status.label]
-        if a.status == .hypothesis || a.status == .proximity, let conf = a.confidenceFR {
+        // SESS-DETAIL-TELECOM-01 : la confiance n'a de sens que pour une hypothèse scorée ;
+        // pour une antenne de proximité, la distance suffit à exprimer l'incertitude.
+        if a.status == .hypothesis, let conf = a.confidenceFR {
             parts.append("confiance \(conf)")
         }
         if let d = a.distanceKm, d > 0 { parts.append("à \(formatKm(d))") }

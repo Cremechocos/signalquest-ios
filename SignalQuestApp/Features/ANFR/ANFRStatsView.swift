@@ -119,17 +119,6 @@ final class ANFRStatsViewModel: ObservableObject {
         .sorted { $0.value > $1.value }
     }
 
-    /// Répartition 4G / 5G (somme nationale toutes opérateurs sur bandes phares).
-    var generationBreakdown: [(generation: ANFRGeneration, value: Int)] {
-        guard let stats else { return [] }
-        var byGen: [ANFRGeneration: Int] = [:]
-        for row in stats.latest where headlineBands.contains(row.band) {
-            let gen: ANFRGeneration = row.technology == "5G" ? .g5 : .g4
-            byGen[gen, default: 0] += showProjected ? row.total : row.operational
-        }
-        return [ANFRGeneration.g4, .g5].compactMap { gen in byGen[gen].map { (gen, $0) } }
-    }
-
     /// Détail par bande (n78 / n1 / n28 / 4G…) pour l'opérateur sélectionné.
     var bandBreakdown: [ANFRStatsLatest] {
         guard let stats else { return [] }
@@ -448,52 +437,6 @@ struct ANFRStatsView: View {
         .animation(reduceMotion ? nil : SQMotion.standard, value: fraction)
     }
 
-    // MARK: Générations (donut)
-
-    private var generationSection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            sectionHeader("Par génération", systemImage: "chart.pie.fill")
-            HStack(spacing: SQSpace.xl) {
-                ANFRDonutChart(
-                    segments: model.generationBreakdown.map { (color: $0.generation.color, value: Double($0.value)) },
-                    progress: appeared ? 1 : 0
-                )
-                .frame(width: 116, height: 116)
-
-                VStack(alignment: .leading, spacing: SQSpace.md) {
-                    let total = max(model.generationBreakdown.reduce(0) { $0 + $1.value }, 1)
-                    ForEach(model.generationBreakdown, id: \.generation) { item in
-                        HStack(spacing: SQSpace.sm) {
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(item.generation.color)
-                                .frame(width: 12, height: 12)
-                            Text(item.generation.label)
-                                .font(SQFont.archivo(15, .bold))
-                                .foregroundStyle(SQColor.label)
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 0) {
-                                Text(item.value, format: .number.grouping(.automatic))
-                                    .font(SQFont.archivo(15, .bold))
-                                    .monospacedDigit()
-                                    .foregroundStyle(SQColor.label)
-                                    .contentTransition(.numericText())
-                                Text("\(Int((Double(item.value) / Double(total) * 100).rounded()))%")
-                                    .font(SQType.micro)
-                                    .foregroundStyle(SQColor.labelSecondary)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1.5)
-        }
-    }
-
     // MARK: Évolution (line chart)
 
     private var trendSection: some View {
@@ -678,39 +621,6 @@ struct ANFRStatsView: View {
                 .foregroundStyle(SQColor.labelSecondary)
         }
         .frame(maxWidth: .infinity)
-    }
-}
-
-// MARK: - Donut chart (Canvas, animé)
-
-private struct ANFRDonutChart: View {
-    let segments: [(color: Color, value: Double)]
-    /// 0 → 1 : fraction de l'anneau tracée (animation d'apparition).
-    var progress: Double
-
-    var body: some View {
-        Canvas { context, size in
-            let total = segments.reduce(0) { $0 + $1.value }
-            guard total > 0 else { return }
-            let lineWidth = size.width * 0.20
-            let rect = CGRect(origin: .zero, size: size).insetBy(dx: lineWidth / 2, dy: lineWidth / 2)
-            var start = -90.0
-            for segment in segments {
-                let sweep = (segment.value / total) * 360 * progress
-                var path = Path()
-                path.addArc(
-                    center: CGPoint(x: size.width / 2, y: size.height / 2),
-                    radius: rect.width / 2,
-                    startAngle: .degrees(start),
-                    endAngle: .degrees(start + sweep),
-                    clockwise: false
-                )
-                context.stroke(path, with: .color(segment.color), style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
-                start += (segment.value / total) * 360
-            }
-        }
-        .animation(.easeOut(duration: 0.7), value: progress)
-        .accessibilityHidden(true)
     }
 }
 
