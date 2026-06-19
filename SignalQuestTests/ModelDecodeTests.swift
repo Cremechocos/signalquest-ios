@@ -9,6 +9,21 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(page.stories.count, 1)
     }
 
+    private struct DateBox: Decodable { let d: Date }
+
+    /// DEC-DATE-EPOCH-01 : le décodeur tolère une date en epoch numérique
+    /// (secondes ou millisecondes) en plus des chaînes ISO — sinon un seul champ
+    /// date en epoch ferait jeter tout l'objet/tableau parent.
+    func testDateDecodingToleratesEpochAndISO() throws {
+        let dec = JSONDecoder.signalQuest
+        let ms = try dec.decode(DateBox.self, from: Data("{\"d\":1715421600000}".utf8))
+        XCTAssertEqual(ms.d.timeIntervalSince1970, 1715421600, accuracy: 0.001)
+        let s = try dec.decode(DateBox.self, from: Data("{\"d\":1715421600}".utf8))
+        XCTAssertEqual(s.d.timeIntervalSince1970, 1715421600, accuracy: 0.001)
+        let iso = try dec.decode(DateBox.self, from: Data("{\"d\":\"2024-05-11T10:00:00.000Z\"}".utf8))
+        XCTAssertEqual(iso.d.timeIntervalSince1970, 1715421600, accuracy: 1)
+    }
+
     func testMapSnapshotDecode() throws {
         let snapshot = try JSONDecoder.signalQuest.decode(SocialMapSnapshot.self, from: Data(Self.mapJSON.utf8))
         XCTAssertEqual(snapshot.speedtests.first?.averageSpeed, 210)

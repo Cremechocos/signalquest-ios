@@ -51,6 +51,16 @@ extension JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
+            // DEC-DATE-EPOCH-01 : tolère une date NUMÉRIQUE epoch (secondes ou
+            // millisecondes) en plus des chaînes ISO. Sans cette branche, un seul
+            // champ date renvoyé en epoch ferait jeter tout l'objet — et souvent
+            // tout le tableau parent (fil de messages vidé, stories disparues…).
+            if let epoch = try? container.decode(Double.self) {
+                // Heuristique ms vs s : un epoch ≥ 10^12 est en millisecondes
+                // (10^12 s = an 33658, invraisemblable comme date applicative).
+                let seconds = epoch >= 1_000_000_000_000 ? epoch / 1000 : epoch
+                return Date(timeIntervalSince1970: seconds)
+            }
             let value = try container.decode(String.self)
             let withFraction = ISO8601DateFormatter()
             withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

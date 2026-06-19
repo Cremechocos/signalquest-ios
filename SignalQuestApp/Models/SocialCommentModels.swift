@@ -67,4 +67,21 @@ struct CreateCommentRequest: Codable {
 
 struct CreateCommentResponse: Decodable {
     let comment: SocialComment
+
+    enum CodingKeys: String, CodingKey { case comment, data, result, item }
+
+    // DEC-COMMENT-WRAPPER-01 : tolère un commentaire renvoyé enveloppé
+    // (`{ comment }`, le format actuel web/Android) OU à plat / sous data/result/
+    // item — sinon un commentaire bel et bien créé fait croire à un échec d'envoi
+    // et l'utilisateur poste un doublon. Repli final : décodage à plat depuis la
+    // racine. `SocialComment.init` reste exigeant sur l'id → aucune régression.
+    init(from decoder: Decoder) throws {
+        if let c = try? decoder.container(keyedBy: CodingKeys.self) {
+            if let v = try? c.decode(SocialComment.self, forKey: .comment) { comment = v; return }
+            if let v = try? c.decode(SocialComment.self, forKey: .data) { comment = v; return }
+            if let v = try? c.decode(SocialComment.self, forKey: .result) { comment = v; return }
+            if let v = try? c.decode(SocialComment.self, forKey: .item) { comment = v; return }
+        }
+        comment = try SocialComment(from: decoder)
+    }
 }
