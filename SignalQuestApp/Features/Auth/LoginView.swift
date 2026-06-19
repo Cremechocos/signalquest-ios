@@ -2,11 +2,14 @@ import SwiftUI
 
 struct LoginView: View {
     @EnvironmentObject private var session: AuthSessionViewModel
+    @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var router: AppRouter
     @State private var email = ""
     @State private var password = ""
     @State private var code = ""
     @State private var showSignup = false
     @State private var showForgotPassword = false
+    @State private var showGuestMap = false
     @State private var appeared = false
 
     var body: some View {
@@ -74,6 +77,25 @@ struct LoginView: View {
                     }
                     .sqAuthAppear(appeared, delay: 0.08)
 
+                    Button {
+                        Haptics.light()
+                        showGuestMap = true
+                    } label: {
+                        Label("Explorer sans compte", systemImage: "map")
+                            .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, SQSpace.md)
+                            .foregroundStyle(SQColor.label)
+                            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                                    .stroke(SQColor.separator, lineWidth: 1.5)
+                            }
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                    .accessibilityLabel("Explorer la carte sans compte")
+                    .sqAuthAppear(appeared, delay: 0.11)
+
                     legalFooter
                         .sqAuthAppear(appeared, delay: 0.14)
                 }
@@ -87,6 +109,11 @@ struct LoginView: View {
             }
             .sheet(isPresented: $showForgotPassword) {
                 NavigationStack { ForgotPasswordView() }
+            }
+            .fullScreenCover(isPresented: $showGuestMap) {
+                GuestMapPreview()
+                    .environmentObject(services)
+                    .environmentObject(router)
             }
         }
     }
@@ -130,6 +157,30 @@ struct LoginView: View {
             }
         }
         .padding(.top, SQSpace.huge + SQSpace.sm)
+    }
+}
+
+/// Mode découverte (ONB-USER-01) : la carte communautaire accessible SANS compte.
+/// Les actions contributives nécessitent une connexion (échec géré côté services).
+/// Hérite de `services`/`router` de l'environnement (injectés sur RootView).
+private struct GuestMapPreview: View {
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        NavigationStack {
+            MapExplorerView()
+                .navigationTitle("Explorer")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Fermer") { dismiss() }.tint(SQColor.brandRed)
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Se connecter") { dismiss() }
+                            .font(SQFont.archivo(14, .bold))
+                            .tint(SQColor.brandRed)
+                    }
+                }
+        }
     }
 }
 
