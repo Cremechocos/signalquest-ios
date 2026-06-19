@@ -42,6 +42,11 @@ struct SignalQuestApp: App {
         guard case .authenticated = state else { return }
         await services.push.requestAuthorizationAndRegister()
         services.callManager.registerForVoIPPushes()
+        // CALL-VOIP-04 : un login dans une session déjà lancée (install→1er login,
+        // ou changement de compte) ne re-livre pas `didUpdate` (registry déjà créé) ;
+        // on ré-associe explicitement le token VoIP connu au nouvel utilisateur.
+        // No-op au tout premier login (token pas encore livré).
+        await services.callManager.registerVoIPTokenForSession()
         // Rattrape un appel entrant déjà en attente au moment où l'on devient authentifié.
         await services.callManager.reconcilePendingIncomingCall()
     }
@@ -141,6 +146,13 @@ struct RootView: View {
         }
         .overlay(alignment: .top) {
             OfflineBanner(isVisible: !networkPath.isOnline)
+        }
+        // CALL-VOIP-07 : au retour du réseau (sortie de tunnel/mode avion), si le
+        // dernier enregistrement du token VoIP avait échoué, on le rejoue — sinon
+        // l'utilisateur resterait injoignable jusqu'au prochain passage foreground.
+        .onChangeCompat(of: networkPath.isOnline) { _, online in
+            guard online, case .authenticated = session.state else { return }
+            Task { await callManager.retryVoIPTokenRegistrationIfNeeded() }
         }
     }
 }

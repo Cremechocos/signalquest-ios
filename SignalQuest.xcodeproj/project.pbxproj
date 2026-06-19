@@ -59,7 +59,6 @@
 		30E4F90E285454B66713BC38 /* PrivacyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EC5960ABF8C24952322E392 /* PrivacyService.swift */; };
 		323D3ADBAF7A05EE0C9EFA9B /* SpeedtestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70E4B6F01B0F4B916A069D31 /* SpeedtestTests.swift */; };
 		325514A5F1B701CBEA8A7AC1 /* CallHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A46F0D8DF52ED42DAFFC731 /* CallHistoryView.swift */; };
-		337DBB3718486B7A62216C9C /* IncomingCallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA279B35E0C99882D3C084A /* IncomingCallView.swift */; };
 		33C988E6EFCB2A0AD84D7D26 /* CredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AEDFB065EC3512D77D7569B /* CredentialStore.swift */; };
 		344AD863842861AB53EF46B3 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4F8B268ACB58F2F9B93795E /* KeychainStore.swift */; };
 		38D0EA9A66A425D012948A8E /* SpeedtestShareImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C011703B46C9CCF1394D3BA4 /* SpeedtestShareImageRenderer.swift */; };
@@ -444,7 +443,6 @@
 		FD5D954E6102D732D621D8E6 /* SessionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionModels.swift; sourceTree = "<group>"; };
 		FF6243FADB2D8B644F4E836E /* SpeedtestLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestLiveActivity.swift; sourceTree = "<group>"; };
 		FF71EBDA3DD738BAEF9242E3 /* GlassCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassCard.swift; sourceTree = "<group>"; };
-		FFA279B35E0C99882D3C084A /* IncomingCallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomingCallView.swift; sourceTree = "<group>"; };
 		FFB64D26D0A20143A4BE4181 /* SignalDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalDetailSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -846,7 +844,6 @@
 			children = (
 				7A46F0D8DF52ED42DAFFC731 /* CallHistoryView.swift */,
 				8366DB9AD97C6EFE27467176 /* CallSessionView.swift */,
-				FFA279B35E0C99882D3C084A /* IncomingCallView.swift */,
 			);
 			path = Calls;
 			sourceTree = "<group>";
@@ -1272,7 +1269,6 @@
 				0F93CA162732A4E9F82EC1AF /* Haptics.swift in Sources */,
 				572D48910C58A33FE265B57B /* IdentificationModels.swift in Sources */,
 				7D0BE4AFA8C517809583BFB1 /* IdentifyService.swift in Sources */,
-				337DBB3718486B7A62216C9C /* IncomingCallView.swift in Sources */,
 				B34CAE48D657CA2E1045EDD2 /* JSONValue.swift in Sources */,
 				344AD863842861AB53EF46B3 /* KeychainStore.swift in Sources */,
 				543116391555BF3BE77EDA7F /* LeaderboardModels.swift in Sources */,

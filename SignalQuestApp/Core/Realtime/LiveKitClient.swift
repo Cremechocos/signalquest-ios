@@ -1,5 +1,6 @@
 import Foundation
 import AVFAudio
+import Combine
 import os
 #if canImport(LiveKit)
 import LiveKit
@@ -16,6 +17,11 @@ final class LiveKitClient: ObservableObject {
     @Published private(set) var isMicMuted = false
     @Published private(set) var isCameraOn = false
 
+    /// CALL-RTC-01 : appelé sur le MainActor quand la room se déconnecte en cours
+    /// d'appel (l'autre participant part, room fermée, ou réseau tombé). Câblé par
+    /// CallManager pour clôturer l'appel CallKit.
+    var onRemoteDisconnect: (@MainActor () -> Void)?
+
     private let logger = Logger(subsystem: "fr.signalquest.ios", category: "LiveKit")
     private let session = AVAudioSession.sharedInstance()
     /// When false, the audio session lifecycle is owned by CallKit and we must
@@ -23,12 +29,25 @@ final class LiveKitClient: ObservableObject {
     private var managesAudioSession = true
     /// Observateur des interruptions audio (appel entrant, Siri, alarme…).
     private var interruptionObserver: NSObjectProtocol?
+    /// CALL-RTC-05 : invalidé à chaque disconnect()/nouvelle connect() pour fermer
+    /// une room devenue orpheline si un raccrochage survient pendant le connect.
+    private var connectGeneration = 0
+    /// CALL-RTC-01 : vrai pendant un disconnect() local, pour NE PAS traiter le
+    /// didDisconnect provoqué par notre propre raccrochage comme une fin distante.
+    private var isTearingDown = false
+    private var mediaCancellables = Set<AnyCancellable>()
 #if canImport(LiveKit)
     private var room: Room?
     private var localMedia: LocalMedia?
+    private var roomObserver: RoomConnectionObserver?
 #endif
 
     func connect(url: URL, token: String, room: String, video: Bool, managesAudioSession: Bool = true) async {
+        // CALL-RTC-05 : marque cette tentative ; un disconnect() concurrent
+        // incrémentera connectGeneration et on fermera la room au retour de l'await.
+        connectGeneration &+= 1
+        let myGeneration = connectGeneration
+        isTearingDown = false
         state = .connecting
         self.managesAudioSession = managesAudioSession
         startObservingInterruptions()
@@ -43,8 +62,25 @@ final class LiveKitClient: ObservableObject {
             }
             logger.info("Connecting to room=\(room, privacy: .public) video=\(video)")
 #if canImport(LiveKit)
-            let liveRoom = Room()
+            let observer = RoomConnectionObserver { [weak self] in
+                Task { @MainActor in
+                    guard let self, !self.isTearingDown, self.state == .connected else { return }
+                    // Déconnexion subie en cours d'appel (raccrochage distant / chute
+                    // réseau) — distincte de notre propre disconnect() (isTearingDown).
+                    self.state = .ended
+                    self.onRemoteDisconnect?()
+                }
+            }
+            self.roomObserver = observer
+            let liveRoom = Room(delegate: observer)
             try await liveRoom.connect(url: url.absoluteString, token: token)
+            // Un raccrochage est survenu pendant le connect : fermer la room orpheline
+            // au lieu de la marquer connectée (CALL-RTC-05).
+            if myGeneration != connectGeneration {
+                await liveRoom.disconnect()
+                state = .ended
+                return
+            }
             let media = LocalMedia(room: liveRoom)
             if !media.isMicrophoneEnabled {
                 await media.toggleMicrophone()
@@ -54,7 +90,17 @@ final class LiveKitClient: ObservableObject {
             }
             self.room = liveRoom
             self.localMedia = media
-            isCameraOn = video
+            // CALL-RTC-09 : isMicMuted / isCameraOn dérivent de l'état RÉEL du SDK
+            // (et non d'un toggle optimiste) → l'UI et CallKit restent honnêtes même
+            // si une bascule de track échoue.
+            media.$isMicrophoneEnabled
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] enabled in self?.isMicMuted = !enabled }
+                .store(in: &mediaCancellables)
+            media.$isCameraEnabled
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] on in self?.isCameraOn = on }
+                .store(in: &mediaCancellables)
             state = .connected
 #else
             throw LiveKitUnavailableError()
@@ -65,11 +111,18 @@ final class LiveKitClient: ObservableObject {
     }
 
     func disconnect() async {
+        // CALL-RTC-05 : invalide toute connect() en vol. CALL-RTC-01 : isTearingDown
+        // évite que le didDisconnect provoqué par CE disconnect soit traité comme
+        // une fin distante (pas de double clôture).
+        connectGeneration &+= 1
+        isTearingDown = true
+        mediaCancellables.removeAll()
         stopObservingInterruptions()
 #if canImport(LiveKit)
         await room?.disconnect()
         room = nil
         localMedia = nil
+        roomObserver = nil
 #endif
         if managesAudioSession {
             try? session.setActive(false, options: [.notifyOthersOnDeactivation])
@@ -149,11 +202,12 @@ final class LiveKitClient: ObservableObject {
     }
 
     func toggleMic() {
+        // CALL-RTC-09 : pas de bascule optimiste — isMicMuted est mis à jour par
+        // l'abonnement Combine sur l'état réel du track.
         Task {
 #if canImport(LiveKit)
             await localMedia?.toggleMicrophone()
 #endif
-            isMicMuted.toggle()
         }
     }
 
@@ -162,10 +216,24 @@ final class LiveKitClient: ObservableObject {
 #if canImport(LiveKit)
             await localMedia?.toggleCamera()
 #endif
-            isCameraOn.toggle()
         }
     }
 }
+
+#if canImport(LiveKit)
+/// Forwarder RoomDelegate : le SDK LiveKit livre ces callbacks hors du MainActor.
+/// On ne retient QUE la déconnexion (raccrochage distant / chute réseau) et on
+/// notifie LiveKitClient via le closure (qui hop sur le MainActor). CALL-RTC-01.
+private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked Sendable {
+    private let onDisconnect: @Sendable () -> Void
+    init(onDisconnect: @escaping @Sendable () -> Void) {
+        self.onDisconnect = onDisconnect
+        super.init()
+    }
+    func room(_ room: Room, didDisconnectWithError error: LiveKitError?) { onDisconnect() }
+    func room(_ room: Room, participantDidDisconnect participant: RemoteParticipant) { onDisconnect() }
+}
+#endif
 
 private struct LiveKitUnavailableError: LocalizedError {
     var errorDescription: String? {

@@ -311,6 +311,10 @@ final class AuthSessionViewModel: ObservableObject {
         // Revoke the push token (while the session is still valid) before the
         // service tears down credentials and E2EE keys.
         await AppDelegate.sharedPush?.unregister()
+        // CALL-VOIP-05 : révoque aussi le token VoIP côté serveur pour qu'un autre
+        // compte sur cet appareil ne reçoive pas les pushes VoIP de l'ancien
+        // utilisateur (best-effort, session encore valide ici).
+        await AppDelegate.sharedCallManager?.unregisterVoIPToken()
         try? await service.logout()
         state = .loggedOut
     }

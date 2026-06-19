@@ -9,6 +9,10 @@ struct ConversationDetailView: View {
 
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
+    /// Injecté à la racine (RootView) — observé ici pour griser l'appel hors-ligne
+    /// (CALL-OFFLINE-21). On ne lit PAS services.networkPath (simple `let`, ne
+    /// déclenche pas de re-render) : l'EnvironmentObject suit bien le @Published.
+    @EnvironmentObject private var networkPath: NetworkPathMonitor
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var messages: [MessageItem] = []
@@ -182,18 +186,26 @@ struct ConversationDetailView: View {
         .navigationTitle(conversationTitle)
         .toolbarTitleInlineCompat()
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button { startCall(mode: "audio") } label: {
-                        Label("Appel audio", systemImage: "phone.fill")
+            // CALL-SCOPE-17 : kill-switch de repli — masque toute initiation
+            // d'appel quand SQFeatures.callsEnabled est false (sans rebuild du reste).
+            if SQFeatures.callsEnabled {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button { startCall(mode: "audio") } label: {
+                            Label("Appel audio", systemImage: "phone.fill")
+                        }
+                        Button { startCall(mode: "video") } label: {
+                            Label("Appel vidéo", systemImage: "video.fill")
+                        }
+                    } label: {
+                        // CALL-OFFLINE-21 : grisé + désactivé hors-ligne (un appel
+                        // lancé sans réseau échouerait et ferait flasher l'écran).
+                        Image(systemName: "phone.circle")
+                            .foregroundStyle(networkPath.isOnline ? SQColor.brandOrange : SQColor.labelTertiary)
                     }
-                    Button { startCall(mode: "video") } label: {
-                        Label("Appel vidéo", systemImage: "video.fill")
-                    }
-                } label: {
-                    Image(systemName: "phone.circle").foregroundStyle(SQColor.brandOrange)
+                    .accessibilityLabel("Appeler")
+                    .disabled(!networkPath.isOnline)
                 }
-                .accessibilityLabel("Appeler")
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

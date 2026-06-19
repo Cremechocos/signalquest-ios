@@ -24,9 +24,7 @@ struct CallScreen: View {
                         .foregroundStyle(.white)
                 }
                 HStack(spacing: SQSpace.sm) {
-                    Image(systemName: (callManager.activeCall?.hasVideo ?? false) ? "video.fill" : "phone.fill")
-                        .foregroundStyle(SQGradient.signal)
-                        .accessibilityHidden(true)
+                    statusGlyph
                     statusText
                 }
                 .font(.title3.weight(.semibold))
@@ -71,6 +69,24 @@ struct CallScreen: View {
         case .connected: Text("En appel")
         case .failed(let message): Text("Erreur : \(message)")
         case .ended: Text("Appel terminé")
+        }
+    }
+
+    /// CALL-SESSION-23 : pendant l'établissement (idle/connexion), on montre un
+    /// indicateur de progression au lieu d'une icône statique — l'attente réseau
+    /// (initiate + handshake LiveKit) n'est pas instantanée. iOS-16-safe.
+    @ViewBuilder
+    private var statusGlyph: some View {
+        switch liveKit.state {
+        case .idle, .connecting:
+            ProgressView()
+                .controlSize(.small)
+                .tint(.white)
+                .accessibilityHidden(true)
+        default:
+            Image(systemName: (callManager.activeCall?.hasVideo ?? false) ? "video.fill" : "phone.fill")
+                .foregroundStyle(SQGradient.signal)
+                .accessibilityHidden(true)
         }
     }
 

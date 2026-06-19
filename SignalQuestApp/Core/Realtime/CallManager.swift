@@ -64,6 +64,9 @@ final class CallManager: NSObject, ObservableObject {
         provider = CXProvider(configuration: config)
         super.init()
         provider.setDelegate(self, queue: nil)
+        // CALL-RTC-01 : quand le média se termine côté distant (l'autre raccroche,
+        // room fermée, ou réseau tombé), LiveKit le signale → on clôt l'appel.
+        liveKit.onRemoteDisconnect = { [weak self] in self?.handleRemoteDisconnect() }
     }
 
     /// Registers for VoIP pushes. Safe to call multiple times.
@@ -115,13 +118,37 @@ final class CallManager: NSObject, ObservableObject {
     // MARK: Incoming
 
     func reportIncomingCall(uuid: UUID, callId: String?, conversationId: String?, handle: String, hasVideo: Bool, completion: (() -> Void)?) {
-        activeCall = ActiveCall(id: uuid, callId: callId, conversationId: conversationId, handle: handle, hasVideo: hasVideo, isOutgoing: false)
         let update = CXCallUpdate()
         update.remoteHandle = CXHandle(type: .generic, value: handle)
         update.localizedCallerName = handle
         update.hasVideo = hasVideo
         let completionBox = UnsafeMainActorBox(value: completion)
-        provider.reportNewIncomingCall(with: uuid, update: update) { _ in
+
+        // CALL-RTC-04 : un appel est déjà actif → on NE touche PAS activeCall ni la
+        // session LiveKit en cours. On satisfait quand même l'exigence PushKit (tout
+        // push VoIP doit être suivi d'un reportNewIncomingCall, sinon l'app est tuée)
+        // puis on décline immédiatement le nouvel UUID, sans impacter l'appel courant.
+        if activeCall != nil {
+            provider.reportNewIncomingCall(with: uuid, update: update) { [weak self] error in
+                if let error {
+                    self?.logger.error("2nd reportNewIncomingCall failed: \(error.localizedDescription, privacy: .public)")
+                } else {
+                    self?.provider.reportCall(with: uuid, endedAt: Date(), reason: .declinedElsewhere)
+                }
+                completionBox.value?()
+            }
+            return
+        }
+
+        activeCall = ActiveCall(id: uuid, callId: callId, conversationId: conversationId, handle: handle, hasVideo: hasVideo, isOutgoing: false)
+        provider.reportNewIncomingCall(with: uuid, update: update) { [weak self] error in
+            if let error {
+                // Échec du report du SEUL nouvel appel : nettoyage local (aucun appel
+                // n'était actif avant), pas de tearDown global.
+                self?.logger.error("reportNewIncomingCall failed: \(error.localizedDescription, privacy: .public)")
+                self?.activeCall = nil
+                self?.showCallScreen = false
+            }
             completionBox.value?()
         }
     }
@@ -166,7 +193,40 @@ final class CallManager: NSObject, ObservableObject {
         showCallScreen = false
     }
 
+    /// CALL-RTC-02 : retire de CallKit un appel déjà rapporté quand la fin n'est
+    /// PAS pilotée par un CXEndCallAction (échec de connexion média, fin distante).
+    /// À NE PAS appeler depuis providerDidReset (provider déjà purgé) ni après un
+    /// CXEndCallAction (action.fulfill() suffit).
+    private func reportCallEnded(_ id: UUID, reason: CXCallEndedReason) {
+        provider.reportCall(with: id, endedAt: Date(), reason: reason)
+    }
+
+    /// Notifie le backend de la fin de l'appel — best-effort, sémantique reject vs
+    /// end alignée sur CALL-BUG-02 (entrant jamais décroché = reject ; sortant ou
+    /// décroché = end). Réutilisé par CXEndCallAction et providerDidReset.
+    private func notifyBackendCallTerminated(_ call: ActiveCall) async {
+        guard let callId = call.callId else { return }
+        if call.isOutgoing == false && call.isAnswered == false {
+            try? await callsService.reject(callId: callId)
+        } else {
+            try? await callsService.end(callId: callId)
+        }
+    }
+
+    /// CALL-RTC-01/02 : le média s'est terminé côté distant (l'autre a raccroché,
+    /// room fermée, réseau tombé). On clôt l'appel CallKit natif (reportCall) puis
+    /// on nettoie. On NE rappelle PAS le backend : le distant a déjà clos la session.
+    private func handleRemoteDisconnect() {
+        guard let call = activeCall else { return }
+        reportCallEnded(call.id, reason: .remoteEnded)
+        Task { await tearDown() }
+    }
+
     private var lastVoipToken: String?
+    /// CALL-VOIP-07 : vrai uniquement quand le dernier POST du token VoIP a
+    /// échoué. On ne retente alors qu'au prochain foreground OU au retour réseau,
+    /// au lieu de re-POSTer inutilement un token déjà synchronisé.
+    private var voipTokenNeedsSync = false
 
     fileprivate func registerVoIPToken(_ token: String) async {
         lastVoipToken = token
@@ -175,17 +235,51 @@ final class CallManager: NSObject, ObservableObject {
                 "/api/user/voip-token",
                 body: ["voipToken": token, "platform": "ios"]
             )
+            voipTokenNeedsSync = false
         } catch {
-            // CALL-VOIP-04 : ne plus avaler l'échec silencieusement ; on garde le token
-            // pour le ré-enregistrer au prochain passage authentifié / foreground.
+            // CALL-VOIP-04 : ne plus avaler l'échec silencieusement ; on marque le
+            // token à resynchroniser et on le garde pour le ré-enregistrer au
+            // prochain passage authentifié / foreground / retour réseau.
+            voipTokenNeedsSync = true
             logger.error("VoIP token registration failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
-    /// Ré-enregistre le dernier token VoIP connu (retour foreground / après login).
+    /// Ré-enregistre le dernier token VoIP UNIQUEMENT s'il reste à synchroniser
+    /// (retour foreground / retour réseau). No-op si déjà à jour.
     func retryVoIPTokenRegistrationIfNeeded() async {
+        guard voipTokenNeedsSync, let token = lastVoipToken else { return }
+        await registerVoIPToken(token)
+    }
+
+    /// CALL-VOIP-04 : ré-associe le token VoIP à la SESSION authentifiée courante,
+    /// SANS condition de needsSync. Indispensable car `registerForVoIPPushes` est
+    /// gardé (registry déjà créé) → `didUpdate pushCredentials` n'est PAS re-livré
+    /// à un 2e login dans le même process (install→1er login, ou changement de
+    /// compte). No-op au tout premier login tant que le token n'a pas été livré
+    /// (le `didUpdate` initial fera alors le POST).
+    func registerVoIPTokenForSession() async {
         guard let token = lastVoipToken else { return }
         await registerVoIPToken(token)
+    }
+
+    /// CALL-VOIP-05 : révoque le token VoIP côté serveur au logout (best-effort)
+    /// pour qu'un autre compte sur cet appareil ne reçoive pas les pushes VoIP de
+    /// l'ancien utilisateur. On GARDE `lastVoipToken` en mémoire (c'est le token de
+    /// l'APPAREIL, pas du compte) : il sera ré-associé au prochain login via
+    /// `registerVoIPTokenForSession`, sans attendre un nouveau `didUpdate`.
+    func unregisterVoIPToken() async {
+        guard let token = lastVoipToken else { return }
+        do {
+            let _: SuccessResponse = try await api.requestJSON(
+                "/api/user/voip-token",
+                method: .delete,
+                body: ["voipToken": token, "platform": "ios"]
+            )
+        } catch {
+            // Best-effort : la route DELETE peut ne pas encore exister côté backend.
+            logger.error("VoIP token unregister failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     nonisolated fileprivate static func string(_ info: [AnyHashable: Any], _ keys: String...) -> String? {
@@ -209,7 +303,13 @@ private struct UnsafeMainActorBox<T>: @unchecked Sendable {
 // MainActor — boxing the non-Sendable action/completion — to touch our state.
 extension CallManager: CXProviderDelegate {
     nonisolated func providerDidReset(_ provider: CXProvider) {
-        Task { @MainActor in await self.tearDown() }
+        Task { @MainActor in
+            // CALL-RTC-06 : le système a réinitialisé le provider (crash CallKit,
+            // changement d'état système) → on signale la fin au serveur AVANT le
+            // teardown pour ne pas laisser de session fantôme, puis on nettoie.
+            if let call = self.activeCall { await self.notifyBackendCallTerminated(call) }
+            await self.tearDown()
+        }
     }
 
     nonisolated func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
@@ -247,6 +347,10 @@ extension CallManager: CXProviderDelegate {
                 action.fulfill()
             } catch {
                 self.logger.error("answer failed: \(error.localizedDescription, privacy: .public)")
+                // CALL-RTC-02 : l'appel a déjà été rapporté à CallKit (entrant) ;
+                // action.fail() ne le retire pas → on le clôt explicitement pour ne
+                // pas laisser une entrée d'appel fantôme côté système.
+                if let id = self.activeCall?.id { self.reportCallEnded(id, reason: .failed) }
                 action.fail()
                 await self.tearDown()
             }
@@ -259,15 +363,9 @@ extension CallManager: CXProviderDelegate {
             let action = box.value
             let call = self.activeCall
             await self.liveKit.disconnect()
-            if let callId = call?.callId {
-                // CALL-BUG-02 : un entrant jamais décroché = reject ; un appel décroché
-                // (ou sortant) qui raccroche = end.
-                if call?.isOutgoing == false && call?.isAnswered == false {
-                    try? await self.callsService.reject(callId: callId)
-                } else {
-                    try? await self.callsService.end(callId: callId)
-                }
-            }
+            // CALL-BUG-02 / CALL-RTC-06 : reject (entrant jamais décroché) vs end
+            // (sortant ou décroché), factorisé dans notifyBackendCallTerminated.
+            if let call { await self.notifyBackendCallTerminated(call) }
             self.activeCall = nil
             self.showCallScreen = false
             action.fulfill()
@@ -297,6 +395,17 @@ extension CallManager: PKPushRegistryDelegate {
         guard type == .voIP else { return }
         let token = pushCredentials.token.map { String(format: "%02x", $0) }.joined()
         Task { @MainActor in await self.registerVoIPToken(token) }
+    }
+
+    nonisolated func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {
+        guard type == .voIP else { return }
+        Task { @MainActor in
+            // CALL-VOIP-06 : iOS a invalidé le token VoIP — on l'oublie pour ne pas
+            // retenter d'enregistrer un token mort ; le prochain didUpdate en
+            // fournira un neuf.
+            self.lastVoipToken = nil
+            self.voipTokenNeedsSync = false
+        }
     }
 
     nonisolated func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {

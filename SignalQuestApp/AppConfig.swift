@@ -1,5 +1,16 @@
 import Foundation
 
+/// Indicateurs de fonctionnalité compilés — kill-switch de repli (App Store /
+/// prod). Volontairement des constantes : pas de toggle utilisateur ni de
+/// remote-config. Pour désactiver une fonctionnalité, passer le flag à `false`
+/// puis rebuild ; rien d'autre n'est requis (CALL-SCOPE-17).
+enum SQFeatures {
+    /// Appels VoIP/CallKit/LiveKit. À passer à `false` si la campagne de
+    /// validation device échoue : masque toute initiation d'appel sans bloquer
+    /// le reste de l'app (l'enregistrement push reste inchangé).
+    static let callsEnabled = true
+}
+
 struct AppConfig: Equatable {
     let appBaseURL: URL
     let apiBaseURL: URL
