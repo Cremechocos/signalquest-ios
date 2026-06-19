@@ -6,7 +6,7 @@ protocol PhotoServicing: Sendable {
     func comments(photoId: String) async throws -> [PhotoComment]
     func addComment(photoId: String, content: String) async throws -> PhotoComment?
     func toggleLike(photoId: String, reaction: String) async throws -> PhotoLikeResponse
-    func uploadPhoto(data: Data, siteId: String, description: String?, anfrCode: String?, operatorName: String?) async throws -> Photo
+    func uploadPhoto(data: Data, siteId: String, description: String?, anfrCode: String?, operatorName: String?, exifMetadata: String?) async throws -> Photo
 }
 
 final class PhotoService: PhotoServicing {
@@ -51,11 +51,14 @@ final class PhotoService: PhotoServicing {
         try await api.requestJSON("/api/photos/\(photoId)/like", body: ["reaction": reaction])
     }
 
-    func uploadPhoto(data: Data, siteId: String, description: String?, anfrCode: String?, operatorName: String?) async throws -> Photo {
+    func uploadPhoto(data: Data, siteId: String, description: String?, anfrCode: String?, operatorName: String?, exifMetadata: String?) async throws -> Photo {
         var fields = ["siteId": siteId]
         if let description, !description.isEmpty { fields["description"] = description }
         if let anfrCode, !anfrCode.isEmpty { fields["anfrCode"] = anfrCode }
         if let operatorName, !operatorName.isEmpty { fields["operator"] = operatorName }
+        // Métadonnées EXIF extraites côté client (GPS, date, appareil) — fusionnées par
+        // le backend (mergeClientPhotoExifMetadata), parité Android.
+        if let exifMetadata, !exifMetadata.isEmpty { fields["exifMetadata"] = exifMetadata }
         return try await api.uploadMultipart(
             path: "/api/photos",
             fields: fields,

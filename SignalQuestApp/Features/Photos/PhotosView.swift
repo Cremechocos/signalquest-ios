@@ -159,15 +159,17 @@ final class PhotosViewModel: ObservableObject {
         }
     }
 
-    func upload(data: Data, siteId: String, description: String, operatorName: String) async {
+    func upload(data: Data, siteId: String, description: String, operatorName: String, exifMetadata: String?) async -> Bool {
         do {
             let photo = try await service.uploadPhoto(
                 data: data, siteId: siteId, description: description,
-                anfrCode: nil, operatorName: operatorName
+                anfrCode: nil, operatorName: operatorName, exifMetadata: exifMetadata
             )
             photos.insert(photo, at: 0)
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -260,11 +262,8 @@ struct PhotosView: View {
             }
         }
         .sheet(isPresented: $showingUpload) {
-            PhotoUploadView(antennas: services.antennas) { data, siteId, desc, op in
-                Task {
-                    await model.upload(data: data, siteId: siteId, description: desc, operatorName: op)
-                    showingUpload = false
-                }
+            PhotoUploadView(antennas: services.antennas) { data, siteId, desc, op, exif in
+                await model.upload(data: data, siteId: siteId, description: desc, operatorName: op, exifMetadata: exif)
             }
             .presentationDetents([.large])
             .presentationBackgroundCompat(.ultraThinMaterial)
@@ -299,6 +298,10 @@ struct PhotosView: View {
         if let first = model.photos.first {
             featuredTile(first)
                 .onTapGesture { Task { await model.open(first) } }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityLabel("Photo \(first.displayCaption)")
+                .accessibilityAction { Task { await model.open(first) } }
                 .sqFadeUp()
         }
         if model.photos.count > 1 {
@@ -306,6 +309,10 @@ struct PhotosView: View {
                 ForEach(model.photos.dropFirst()) { photo in
                     gridTile(photo)
                         .onTapGesture { Task { await model.open(photo) } }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityLabel("Photo \(photo.displayCaption)")
+                        .accessibilityAction { Task { await model.open(photo) } }
                         .sqFadeUp()
                 }
             }
@@ -810,11 +817,16 @@ struct PhotoDetailView: View {
 @MainActor
 struct PhotoUploadView: View {
     let antennas: AntennasServicing
-    var onUpload: (Data, String, String, String) -> Void
+    /// Renvoie `true` si l'upload a réussi (la feuille se ferme alors). Le dernier
+    /// paramètre est le JSON `exifMetadata` extrait de l'original.
+    var onUpload: (Data, String, String, String, String?) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
     @State private var pickerItem: PhotosPickerItem?
     @State private var image: UIImage?
+    @State private var imageData: Data?
+    @State private var isUploading = false
+    @State private var uploadError: String?
     @State private var selectedSite: AntennaSite?
     @State private var description = ""
     @State private var showSitePicker = false
@@ -860,6 +872,7 @@ struct PhotoUploadView: View {
                         Task {
                             guard let data = try? await newItem?.loadTransferable(type: Data.self),
                                   let loaded = UIImage(data: data) else { return }
+                            imageData = data
                             image = loaded
                         }
                     }
@@ -898,13 +911,33 @@ struct PhotoUploadView: View {
                         .textFieldStyle(SQTextFieldStyle())
                         .lineLimit(2...5)
 
-                    GradientButton("Uploader", systemImage: "arrow.up.circle") {
-                        guard let data = image?.jpegData(compressionQuality: 0.82),
-                              let site = selectedSite else { return }
-                        onUpload(data, site.siteId ?? site.id, description, site.operators.first ?? "")
+                    GradientButton("Uploader", systemImage: "arrow.up.circle", isBusy: isUploading) {
+                        guard let original = imageData, let site = selectedSite else { return }
+                        Task {
+                            isUploading = true
+                            uploadError = nil
+                            // Extraction EXIF + downscale hors du main thread (PHOTO-PERF-01/SEC-01).
+                            let prepared = await Task.detached(priority: .userInitiated) {
+                                PhotoUploadPreparation.prepare(from: original)
+                            }.value
+                            guard let prepared else {
+                                isUploading = false
+                                uploadError = "Image illisible."
+                                return
+                            }
+                            let ok = await onUpload(prepared.jpeg, site.siteId ?? site.id, description, site.operators.first ?? "", prepared.exifJSON)
+                            isUploading = false
+                            if ok { dismiss() } else { uploadError = "Échec de l'envoi. Réessaie." }
+                        }
                     }
-                    .disabled(image == nil || selectedSite == nil)
-                    .opacity(image == nil || selectedSite == nil ? 0.5 : 1)
+                    .disabled(imageData == nil || selectedSite == nil || isUploading)
+                    .opacity(imageData == nil || selectedSite == nil ? 0.5 : 1)
+
+                    if let uploadError {
+                        Label(uploadError, systemImage: "exclamationmark.triangle")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.danger)
+                    }
                 }
                 .padding(SQSpace.lg)
             }

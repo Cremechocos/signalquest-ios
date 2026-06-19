@@ -38,19 +38,20 @@ final class AntennaDetailViewModel: ObservableObject {
                 photoUploadMessage = "Image illisible."
                 return
             }
-            // Recompression hors du main thread pour ne pas geler l'UI à l'upload.
-            guard let jpeg = await Task.detached(priority: .userInitiated, operation: {
-                Self.preparedJPEG(from: raw)
+            // Extraction EXIF + recompression hors du main thread (UI non gelée).
+            guard let prepared = await Task.detached(priority: .userInitiated, operation: {
+                PhotoUploadPreparation.prepare(from: raw)
             }).value else {
                 photoUploadMessage = "Image illisible."
                 return
             }
             _ = try await photos.uploadPhoto(
-                data: jpeg,
+                data: prepared.jpeg,
                 siteId: siteId,
                 description: nil,
                 anfrCode: anfrCode,
-                operatorName: operatorName == "ALL" ? nil : operatorName
+                operatorName: operatorName == "ALL" ? nil : operatorName,
+                exifMetadata: prepared.exifJSON
             )
             Haptics.success()
             photoUploadMessage = "Photo envoyée — merci ! Elle apparaîtra après validation."
@@ -61,17 +62,6 @@ final class AntennaDetailViewModel: ObservableObject {
         }
     }
 
-    /// Recompresse en JPEG ≤ 1600 px qualité 0,85 (HEIC converti d'office).
-    nonisolated private static func preparedJPEG(from data: Data) -> Data? {
-        guard let image = UIImage(data: data) else { return nil }
-        let maxSide: CGFloat = 1600
-        let largest = max(image.size.width, image.size.height)
-        let scale = largest > maxSide ? maxSide / largest : 1
-        let target = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-        let renderer = UIGraphicsImageRenderer(size: target)
-        let resized = renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: target)) }
-        return resized.jpegData(compressionQuality: 0.85)
-    }
 }
 
 struct AntennaDetailSheet: View {
