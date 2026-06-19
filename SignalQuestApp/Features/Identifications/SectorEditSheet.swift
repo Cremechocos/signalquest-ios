@@ -44,6 +44,11 @@ final class SectorEditViewModel: ObservableObject {
                 forStoredValue: first, azimuthCount: unique.count, operatorName: item.operatorName
             )
         }
+        // SECTOR-UX-04 : en France le secteur est imposé par le PCI — on l'annonce
+        // AVANT l'édition (et non plus après l'appel réseau, façon Android).
+        if market == "FR", !unique.isEmpty {
+            infoMessage = "En France, le secteur est déterminé automatiquement à partir du PCI. La sélection ci-dessous est indicative."
+        }
         if unique.isEmpty {
             errorMessage = "Ce site n'expose pas d'azimuts de secteur."
         }
