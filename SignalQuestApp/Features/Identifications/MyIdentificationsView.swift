@@ -243,7 +243,7 @@ private struct IdentificationNodeRow: View {
                 RoundedRectangle(cornerRadius: 11, style: .continuous)
                     .fill(is5G ? SQColor.brandOrange : SQColor.brandBlue)
                 Text(is5G ? "5G" : "4G")
-                    .font(.system(size: 12, weight: .heavy))
+                    .font(SQFont.archivo(12, .heavy))
                     .foregroundStyle(.white)
             }
             .frame(width: 44, height: 44)
@@ -256,7 +256,7 @@ private struct IdentificationNodeRow: View {
                         .lineLimit(1)
                     if group.conflict {
                         Text("conflit")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(SQType.micro)
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(SQColor.warning.opacity(0.18), in: Capsule())
                             .foregroundStyle(SQColor.warning)
@@ -436,7 +436,7 @@ private struct IdentificationDetailSheet: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 13, style: .continuous)
                     .fill(is5G ? SQColor.brandOrange : SQColor.brandBlue)
-                Text(item.techLabel).font(.system(size: 14, weight: .heavy)).foregroundStyle(.white)
+                Text(item.techLabel).font(SQFont.archivo(14, .heavy)).foregroundStyle(.white)
             }
             .frame(width: 52, height: 52)
             VStack(alignment: .leading, spacing: 2) {

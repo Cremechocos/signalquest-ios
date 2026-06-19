@@ -334,7 +334,7 @@ struct PhotosView: View {
                         .lineLimit(2)
                     if let address = photo.siteAddress, !address.isEmpty {
                         Label(address, systemImage: "mappin")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(SQFont.archivo(11, .medium))
                             .foregroundStyle(.white.opacity(0.78))
                             .lineLimit(1)
                     }
@@ -342,10 +342,10 @@ struct PhotosView: View {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
                     Label("\(photo.likeCount ?? photo.likes ?? 0)", systemImage: isLiked ? "heart.fill" : "heart")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(SQFont.archivo(12, .semibold))
                         .foregroundStyle(isLiked ? SQColor.like : .white)
                     Label("\(photo.commentCount ?? 0)", systemImage: "bubble.left")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(SQFont.archivo(12, .semibold))
                         .foregroundStyle(.white.opacity(0.85))
                 }
             }
@@ -357,7 +357,7 @@ struct PhotosView: View {
         .overlay(alignment: .topTrailing) {
             if let op = photo.operator, !op.isEmpty {
                 Text(op.uppercased())
-                    .font(.system(size: 11, weight: .bold))
+                    .font(SQType.micro)
                     .foregroundStyle(.white)
                     .padding(.horizontal, SQSpace.sm + 2)
                     .padding(.vertical, SQSpace.xs)
@@ -397,7 +397,7 @@ struct PhotosView: View {
                         .frame(width: 6, height: 6)
                     if let op = photo.operator, !op.isEmpty {
                         Text(op)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(SQFont.archivo(11, .medium))
                             .foregroundStyle(.white.opacity(0.82))
                             .lineLimit(1)
                     }
@@ -406,7 +406,7 @@ struct PhotosView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(isLiked ? SQColor.like : .white.opacity(0.9))
                     Text("\(photo.likeCount ?? photo.likes ?? 0)")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(SQFont.archivo(11, .semibold))
                         .foregroundStyle(.white.opacity(0.9))
                 }
             }
