@@ -41,12 +41,29 @@ final class FriendsViewModel: ObservableObject {
 
 struct FriendsListView: View {
     @StateObject private var model: FriendsViewModel
+    @EnvironmentObject private var services: AppServices
+    @State private var showAddFriend = false
     init(service: FriendsServicing) {
         _model = StateObject(wrappedValue: FriendsViewModel(service: service))
     }
 
+    private var isEverythingEmpty: Bool {
+        model.friends.isEmpty && model.requests.isEmpty && model.blocked.isEmpty
+    }
+
     var body: some View {
         List {
+            if model.isLoading && model.friends.isEmpty && model.requests.isEmpty {
+                ProgressView().frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+            } else if isEverythingEmpty && model.errorMessage == nil {
+                EmptyStateView(
+                    title: "Aucun ami",
+                    message: "Ajoute des membres pour partager ta position et comparer vos mesures.",
+                    systemImage: "person.2"
+                )
+                .listRowBackground(Color.clear)
+            }
             if !model.requests.isEmpty {
                 Section("Demandes") {
                     ForEach(model.requests) { request in
@@ -97,6 +114,19 @@ struct FriendsListView: View {
         .signalQuestBackground()
         .navigationTitle("Amis")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showAddFriend = true } label: {
+                    Image(systemName: "person.badge.plus").foregroundStyle(SQColor.brandRed)
+                }
+                .accessibilityLabel("Ajouter un ami")
+            }
+        }
+        .sheet(isPresented: $showAddFriend) {
+            AddFriendSheet(messages: services.messages, friends: services.friends) {
+                await model.load()
+            }
+        }
         .task { await model.load() }
         .refreshable { await model.load() }
     }
@@ -165,5 +195,93 @@ struct FriendsListView: View {
             Spacer()
         }
         .padding(.vertical, SQSpace.xxs)
+    }
+}
+
+/// FRND-UX-01 : recherche d'utilisateurs + envoi d'une demande d'ami.
+private struct AddFriendSheet: View {
+    let messages: MessagesServicing
+    let friends: FriendsServicing
+    let onSent: () async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+    @State private var results: [MessageSearchUser] = []
+    @State private var busyId: String?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    TextField("Nom, handle ou email", text: $query)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .listRowBackground(SQColor.surface)
+                    ForEach(results) { user in
+                        HStack(spacing: SQSpace.md) {
+                            SQAvatar(url: user.avatarUrl, name: user.displayName, size: 36)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(user.displayName).foregroundStyle(SQColor.label)
+                                Text(user.email).font(.caption).foregroundStyle(SQColor.labelSecondary)
+                            }
+                            Spacer()
+                            if busyId == user.id {
+                                ProgressView()
+                            } else {
+                                Button { Task { await send(user) } } label: {
+                                    Image(systemName: "person.badge.plus").foregroundStyle(SQColor.brandRed)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Envoyer une demande à \(user.displayName)")
+                            }
+                        }
+                        .listRowBackground(SQColor.surface)
+                    }
+                    if let errorMessage {
+                        Text(errorMessage).font(.caption).foregroundStyle(SQColor.danger)
+                            .listRowBackground(Color.clear)
+                    }
+                } header: { Text("Ajouter un ami").sqKicker() }
+            }
+            .scrollContentBackground(.hidden)
+            .signalQuestBackground()
+            .navigationTitle("Ajouter un ami")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Fermer") { dismiss() }.tint(SQColor.brandRed)
+                }
+            }
+            .onChangeCompat(of: query) { _, _ in
+                Task {
+                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    await search()
+                }
+            }
+        }
+        .presentationDetents([.large])
+    }
+
+    private func search() async {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { results = []; return }
+        results = (try? await messages.searchUsers(query: trimmed)) ?? []
+    }
+
+    private func send(_ user: MessageSearchUser) async {
+        busyId = user.id
+        errorMessage = nil
+        defer { busyId = nil }
+        do {
+            try await friends.sendRequest(toUserId: user.id)
+            Haptics.success()
+            await onSent()
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+            Haptics.error()
+        }
     }
 }

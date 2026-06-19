@@ -242,6 +242,15 @@ struct SelectableSectorRadar: View {
                         .padding(5)
                         .background(isSelected ? color : Color.clear, in: Circle())
                         .position(labelPosition(azimuth: azimuth, center: center, radius: radius))
+                        // SECTOR-A11Y-03 : chaque secteur est un élément accessible
+                        // sélectionnable (le radar tactile est sinon invisible à VoiceOver).
+                        .accessibilityElement()
+                        .accessibilityLabel("Secteur \(displayNumber(index)), azimut \(Int(azimuth.rounded())) degrés")
+                        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+                        .accessibilityAction {
+                            selectedIndex = index
+                            Haptics.selection()
+                        }
                 }
 
                 Text("N")

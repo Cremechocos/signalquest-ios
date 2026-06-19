@@ -74,9 +74,17 @@ struct SettingsView: View {
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var services: AppServices
     @State private var show2FASetup = false
+    @State private var show2FADisable = false
+    @State private var disable2FACode = ""
     @State private var showDeleteConfirm = false
     @State private var deletePassword = ""
     @AppStorage(MapBackdrop.storageKey) private var mapBackdropRaw = MapBackdrop.carto.rawValue
+
+    /// État 2FA de l'utilisateur courant (SETTINGS-SEC-01).
+    private var twoFactorEnabled: Bool {
+        if case .authenticated(let user) = session.state { return user.twoFactorEnabled == true }
+        return false
+    }
 
     init(userService: UserServicing, authService: AuthServicing) {
         _model = StateObject(wrappedValue: SettingsViewModel(userService: userService, authService: authService))
@@ -85,10 +93,18 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                Button {
-                    show2FASetup = true
-                } label: {
-                    settingsLabel("Activer la 2FA", systemImage: "lock.shield")
+                if twoFactorEnabled {
+                    Button(role: .destructive) {
+                        show2FADisable = true
+                    } label: {
+                        settingsLabel("Désactiver la 2FA", systemImage: "lock.open")
+                    }
+                } else {
+                    Button {
+                        show2FASetup = true
+                    } label: {
+                        settingsLabel("Activer la 2FA", systemImage: "lock.shield")
+                    }
                 }
                 NavigationLink {
                     ChangePasswordView()
@@ -211,6 +227,21 @@ struct SettingsView: View {
         .task { await model.load() }
         .sheet(isPresented: $show2FASetup) {
             NavigationStack { TwoFactorSetupView(service: services.auth) }
+        }
+        .alert("Désactiver la 2FA ?", isPresented: $show2FADisable) {
+            TextField("Code à 6 chiffres", text: $disable2FACode)
+                .keyboardType(.numberPad)
+            Button("Annuler", role: .cancel) { disable2FACode = "" }
+            Button("Désactiver", role: .destructive) {
+                let code = disable2FACode
+                disable2FACode = ""
+                Task {
+                    await model.disable2FA(code: code)
+                    await session.refreshUser()
+                }
+            }
+        } message: {
+            Text("Saisis un code de ton application d'authentification pour confirmer la désactivation.")
         }
         .sheet(item: $model.exportedFile) { file in
             ShareSheet(items: [file.url])
