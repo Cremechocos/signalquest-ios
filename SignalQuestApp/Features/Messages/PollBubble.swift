@@ -12,6 +12,9 @@ struct PollBubble: View {
     let onClose: () -> Void
 
     private var totalVotes: Int { max(1, poll.totalVotes) }
+    /// POLL-UX-01 : un sondage dont l'échéance est dépassée est traité comme clos.
+    private var isExpired: Bool { poll.endsAt.map { $0 < Date() } ?? false }
+    private var effectivelyClosed: Bool { poll.isClosed || isExpired }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
@@ -32,7 +35,7 @@ struct PollBubble: View {
                         .foregroundStyle(mine ? .white.opacity(0.7) : SQColor.labelTertiary)
                 }
                 Spacer(minLength: 0)
-                if poll.isClosed {
+                if effectivelyClosed {
                     Text("CLOS")
                         .font(SQType.micro)
                         .padding(.horizontal, SQSpace.xs + 2)
@@ -42,6 +45,7 @@ struct PollBubble: View {
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .combine)
 
             VStack(spacing: SQSpace.sm) {
                 ForEach(poll.options) { option in
@@ -49,7 +53,7 @@ struct PollBubble: View {
                 }
             }
 
-            if canClose && !poll.isClosed {
+            if canClose && !effectivelyClosed {
                 Button {
                     Haptics.light()
                     onClose()
@@ -67,7 +71,12 @@ struct PollBubble: View {
     private var metaLine: String {
         let mode = poll.multiSelect ? "Choix multiples" : "Choix unique"
         let count = "\(poll.totalVotes) vote\(poll.totalVotes > 1 ? "s" : "")"
-        return poll.isClosed ? "Clôturé · \(count)" : "\(mode) · \(count)"
+        if effectivelyClosed { return "Clôturé · \(count)" }
+        if let endsAt = poll.endsAt {
+            let when = endsAt.formatted(.dateTime.day().month(.abbreviated).hour().minute())
+            return "\(mode) · clôture le \(when) · \(count)"
+        }
+        return "\(mode) · \(count)"
     }
 
     private func optionRow(_ option: PollOption) -> some View {
@@ -78,7 +87,7 @@ struct PollBubble: View {
             ? (mine ? Color.white : SQColor.brandRed)
             : (mine ? Color.white.opacity(0.35) : SQColor.separator)
         return Button {
-            guard !poll.isClosed else { return }
+            guard !effectivelyClosed else { return }
             Haptics.selection()
             onVote(nextSelection(for: option.id))
         } label: {
@@ -112,7 +121,12 @@ struct PollBubble: View {
             }
         }
         .buttonStyle(.plain)
-        .disabled(poll.isClosed)
+        .disabled(effectivelyClosed)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(option.text.isEmpty ? option.id : option.text)
+        .accessibilityValue("\(option.count) vote\(option.count > 1 ? "s" : ""), \(Int((ratio * 100).rounded())) %\(votedByMe ? ", sélectionné" : "")")
+        .accessibilityAddTraits(votedByMe ? [.isButton, .isSelected] : .isButton)
+        .accessibilityHint(effectivelyClosed ? "" : "Toucher pour voter")
     }
 
     /// Calcule la sélection à envoyer au backend après tap : en choix unique on
