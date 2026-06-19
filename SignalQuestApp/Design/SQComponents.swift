@@ -7,7 +7,7 @@ struct TechBadge: View {
 
     var body: some View {
         Text(text.uppercased())
-            .font(.caption.weight(.semibold))
+            .font(SQType.micro)
             .padding(.horizontal, SQSpace.sm + 2)
             .padding(.vertical, SQSpace.xs + 2)
             .background(color.opacity(0.18), in: Capsule())
@@ -27,10 +27,10 @@ struct MetricPill: View {
                 .foregroundStyle(SQColor.brandOrange)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.caption2)
+                    .font(SQType.micro)
                     .foregroundStyle(SQColor.labelSecondary)
                 Text(value)
-                    .font(.subheadline.weight(.semibold))
+                    .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -66,7 +66,7 @@ struct SQAvatar: View {
 
     private var initials: some View {
         Text(String(name.prefix(1)).uppercased())
-            .font(.system(size: max(13, size * 0.38), weight: .bold))
+            .font(SQFont.archivo(max(13, size * 0.38), .bold))
             .foregroundStyle(.white)
     }
 }
@@ -88,7 +88,7 @@ struct StoryBubble: View {
                     }
                 }
             Text(story.author.displayName)
-                .font(.caption)
+                .font(SQType.caption)
                 .foregroundStyle(SQColor.label)
                 .lineLimit(1)
                 .frame(width: 74)
@@ -105,7 +105,7 @@ struct SignalBarsView: View {
             if summary?.rsrp == nil && summary?.technology == nil {
                 Image(systemName: "antenna.radiowaves.left.and.right.slash")
                 Text("Radio indisponible sur iOS")
-                    .font(.caption)
+                    .font(SQType.caption)
             } else {
                 ForEach(0..<4, id: \.self) { index in
                     RoundedRectangle(cornerRadius: 3)
@@ -114,7 +114,7 @@ struct SignalBarsView: View {
                 }
                 if let technology = summary?.technology {
                     Text(technology)
-                        .font(.caption.weight(.semibold))
+                        .font(SQType.micro)
                 }
             }
         }
@@ -139,7 +139,7 @@ struct SignalSummaryCard: View {
             VStack(alignment: .leading, spacing: SQSpace.md) {
                 HStack {
                     Label("Signal", systemImage: "antenna.radiowaves.left.and.right")
-                        .font(.subheadline.weight(.semibold))
+                        .font(SQType.heading)
                         .foregroundStyle(SQColor.label)
                     Spacer()
                     SignalBarsView(summary: summary)
@@ -153,7 +153,7 @@ struct SignalSummaryCard: View {
                     }
                 } else {
                     Text("Métriques radio communautaires")
-                        .font(.footnote)
+                        .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
             }
@@ -176,14 +176,14 @@ struct SpeedGaugeView: View {
                 .sqAnimation(.snappy(duration: 0.32), value: value)
             VStack(spacing: 6) {
                 Text("\(Int(value))")
-                    .font(.system(size: 54, weight: .bold, design: .rounded))
+                    .font(SQFont.display(54, .bold))
                     .foregroundStyle(SQColor.label)
                     .contentTransition(.numericText())
                 Text("Mbps")
-                    .font(.headline)
+                    .font(SQType.heading)
                     .foregroundStyle(SQColor.labelSecondary)
                 Text(phase.label)
-                    .font(.caption.weight(.semibold))
+                    .font(SQType.micro)
                     .foregroundStyle(SQColor.brandOrange)
             }
         }
@@ -198,7 +198,7 @@ struct SpeedtestResultCard: View {
         GlassCard {
             VStack(alignment: .leading, spacing: SQSpace.md) {
                 Label("Résultat", systemImage: "iphone")
-                    .font(.subheadline.weight(.semibold))
+                    .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: SQSpace.sm + 2) {
                     MetricPill(title: "DL moyen", value: "\(Int(result.downloadAverageMbps)) Mbps", systemImage: "arrow.down.circle")
@@ -242,7 +242,7 @@ struct MapFilterBar: View {
                         }
                     } label: {
                         Label(title, systemImage: icon)
-                            .font(.caption.weight(.semibold))
+                            .font(SQType.micro)
                             .padding(.horizontal, SQSpace.md - 1)
                             .padding(.vertical, SQSpace.sm)
                             .background(isOn ? SQColor.brandOrange.opacity(0.18) : SQColor.fill, in: Capsule())
@@ -308,10 +308,10 @@ struct MapItemSheet: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(SignalFormatters.speed(downloadAverage))
-                        .font(.largeTitle.weight(.black))
+                        .font(SQType.display)
                         .foregroundStyle(speedColor(downloadAverage))
                     Text("Speed Test")
-                        .font(.callout.weight(.semibold))
+                        .font(SQType.subhead)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
                 Spacer()
@@ -339,7 +339,7 @@ struct MapItemSheet: View {
             ])
             if let detailError {
                 Label(detailError, systemImage: "exclamationmark.triangle")
-                    .font(.footnote)
+                    .font(SQType.caption)
                     .foregroundStyle(SQColor.warning)
             }
         }
@@ -352,11 +352,11 @@ struct MapItemSheet: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(SignalFormatters.dbm(rsrp))
-                        .font(.largeTitle.weight(.black))
+                        .font(SQType.display)
                         .foregroundStyle(coverageColor(rsrp))
                     HStack(spacing: 6) {
                         Text(details?.clusterCount == nil ? "Couverture" : "Couverture agrégée")
-                            .font(.callout.weight(.semibold))
+                            .font(SQType.subhead)
                             .foregroundStyle(SQColor.labelSecondary)
                         if let tech = details?.tech {
                             TechBadge(text: tech, color: TechAccent.color(for: tech))
@@ -393,7 +393,7 @@ struct MapItemSheet: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(item.title)
-                        .font(.title3.weight(.bold))
+                        .font(SQType.title)
                         .foregroundStyle(SQColor.label)
                     Text(item.subtitle)
                         .foregroundStyle(SQColor.labelSecondary)
@@ -426,11 +426,11 @@ struct MapItemSheet: View {
             ForEach(Array(visibleRows.enumerated()), id: \.offset) { _, row in
                 HStack(alignment: .firstTextBaseline) {
                     Text(row.0)
-                        .font(.caption.weight(.semibold))
+                        .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
                         .foregroundStyle(SQColor.labelSecondary)
                     Spacer(minLength: 12)
                     Text(row.1 ?? "—")
-                        .font(.caption.weight(.semibold))
+                        .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
                         .foregroundStyle(SQColor.label)
                         .multilineTextAlignment(.trailing)
                 }
@@ -488,10 +488,10 @@ struct PhotoTile: View {
 
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 Text(photo.displayCaption)
-                    .font(.caption.weight(.semibold))
+                    .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
                     .lineLimit(2)
                 Text("\(photo.likeCount ?? photo.likes ?? 0) likes")
-                    .font(.caption2)
+                    .font(SQType.micro)
                     .foregroundStyle(.white.opacity(0.85))
             }
             .padding(SQSpace.sm + 2)
@@ -512,11 +512,11 @@ struct LeaderboardPodium: View {
                 VStack(spacing: SQSpace.sm) {
                     SQAvatar(url: entry.user.avatarUrl, name: entry.user.displayName, size: entry.rank == 1 ? 64 : 52)
                     Text(entry.user.displayName)
-                        .font(.caption.weight(.semibold))
+                        .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
                     Text("\(Int(entry.value)) \(entry.unit)")
-                        .font(.caption2)
+                        .font(SQType.micro)
                         .foregroundStyle(SQColor.labelSecondary)
                     RoundedRectangle(cornerRadius: SQRadius.md)
                         .fill(entry.rank == 1
@@ -525,7 +525,7 @@ struct LeaderboardPodium: View {
                         .frame(height: entry.rank == 1 ? 88 : 64)
                         .overlay(
                             Text("#\(entry.rank)")
-                                .font(.headline.weight(.bold))
+                                .font(SQFont.archivo(17, .bold, relativeTo: .headline))
                                 .foregroundStyle(entry.rank == 1 ? .white : SQColor.label)
                         )
                 }
@@ -554,10 +554,10 @@ struct EmptyStateView: View {
                 .font(.system(size: 44))
                 .foregroundStyle(SQGradient.signal)
             Text(title)
-                .font(.headline)
+                .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
             Text(message)
-                .font(.footnote)
+                .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .multilineTextAlignment(.center)
         }
@@ -578,10 +578,10 @@ struct ErrorStateView: View {
                     .font(.title)
                     .foregroundStyle(SQColor.warning)
                 Text(title)
-                    .font(.headline)
+                    .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
                 Text(message)
-                    .font(.footnote)
+                    .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)
                 if let retry {
@@ -745,7 +745,7 @@ struct SQSegmentedFilter<Value: Hashable>: View {
                             }
                             Text(option.label)
                         }
-                        .font(.subheadline.weight(.semibold))
+                        .font(SQFont.archivo(14, .semibold, relativeTo: .subheadline))
                         .padding(.horizontal, SQSpace.md + 2)
                         .padding(.vertical, SQSpace.sm)
                         .background(isSelected ? AnyShapeStyle(SQColor.brandOrange) : AnyShapeStyle(SQColor.fill), in: Capsule())
@@ -773,12 +773,12 @@ struct SQChipMetric: View {
                         .foregroundStyle(SQColor.brandOrange)
                 }
                 Text(value)
-                    .font(.headline.weight(.bold))
+                    .font(SQFont.archivo(17, .bold, relativeTo: .headline))
                     .foregroundStyle(SQColor.label)
             }
             if let label {
                 Text(label)
-                    .font(.caption2)
+                    .font(SQType.micro)
                     .foregroundStyle(SQColor.labelSecondary)
             }
         }
