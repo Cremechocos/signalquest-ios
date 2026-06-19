@@ -88,7 +88,8 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         _ path: String,
         method: HTTPMethod = .post,
         body: Body,
-        authenticated: Bool = true
+        authenticated: Bool = true,
+        idempotencyKey: String? = nil
     ) async throws -> T {
         let data = try encoder.encode(body)
         return try await request(
@@ -97,7 +98,8 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
                 method: method,
                 headers: ["Content-Type": "application/json"],
                 body: data,
-                authenticated: authenticated
+                authenticated: authenticated,
+                idempotencyKey: idempotencyKey
             ),
             as: T.self
         )
@@ -268,6 +270,15 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             try await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
             return try await performWithRefresh(endpoint, attempt: attempt + 1)
         }
+    }
+
+    /// Force un rafraîchissement du token d'accès (coalescé avec tout refresh en
+    /// cours via `refreshState`). Le flux SSE ne passe pas par
+    /// `performWithRefresh` : après un 401 il appelle ceci pour réactualiser le
+    /// token avant de rouvrir le flux (SSE-API-07). Silencieux : un échec de
+    /// refresh laisse simplement la reconnexion suivante échouer puis reboucler.
+    func refreshSession() async {
+        try? await ensureRefreshed()
     }
 
     private func ensureRefreshed() async throws {

@@ -45,8 +45,13 @@ final class SSEClient: Sendable {
                         let (bytes, response) = try await session.bytes(for: request)
                         guard let http = response as? HTTPURLResponse else { continue }
                         if http.statusCode == 401 {
-                            // Token expiré : un appel API standard rafraîchira le
-                            // token ; on retente après le backoff.
+                            // Token expiré : le flux SSE ne passe pas par
+                            // `performWithRefresh`, donc on déclenche explicitement
+                            // le refresh (coalescé) AVANT de reboucler. Sans cela la
+                            // conversation cesserait de recevoir le temps réel
+                            // jusqu'à ce qu'une autre requête API rafraîchisse le
+                            // token. (SSE-API-07)
+                            await api.refreshSession()
                             throw APIError.http(status: 401, code: nil, message: "SSE non autorisé", requestId: nil, retryAfter: nil)
                         }
                         guard (200..<300).contains(http.statusCode) else {
@@ -55,6 +60,7 @@ final class SSEClient: Sendable {
 
                         backoff = 1.5
                         var eventName: String?
+                        var sawData = false
                         for try await line in bytes.lines {
                             if Task.isCancelled { break }
                             if line.lowercased().hasPrefix("event:") {
@@ -62,12 +68,24 @@ final class SSEClient: Sendable {
                                     .trimmingCharacters(in: .whitespaces)
                                     .lowercased()
                             } else if line.lowercased().hasPrefix("data:") {
-                                let name = eventName ?? "update"
-                                if Self.knownEvents.contains(name) {
-                                    continuation.yield(name)
-                                }
+                                // On mémorise seulement qu'un payload est présent ;
+                                // l'émission a lieu à la fin de l'événement, pas ici.
+                                sawData = true
                             } else if line.isEmpty {
+                                // Fin d'événement SSE (ligne vide) : on émet le nom
+                                // UNE fois, quel que soit l'ordre event:/data: ou le
+                                // nombre de lignes data:, et seulement si un payload a
+                                // été reçu. Robuste aux variations de format. (SSE-BUG-08)
+                                if sawData {
+                                    let name = eventName ?? "update"
+                                    if Self.knownEvents.contains(name) {
+                                        continuation.yield(name)
+                                    } else {
+                                        logger.debug("SSE événement hors contrat: \(name, privacy: .public)")
+                                    }
+                                }
                                 eventName = nil
+                                sawData = false
                             }
                         }
                     } catch is CancellationError {

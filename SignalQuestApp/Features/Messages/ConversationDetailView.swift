@@ -25,6 +25,18 @@ struct ConversationDetailView: View {
     @State private var syncTask: Task<Void, Never>?
     @State private var isE2EEUnlocked = false
     @State private var decryptedMessages: [String: String] = [:]
+    /// MSG-API-01 — statut d'envoi optimiste, indexé par id LOCAL de bulle.
+    /// Absent = message confirmé (rendu normal). `.sending` pendant l'appel
+    /// réseau, `.failed` si l'envoi échoue (la bulle est conservée + action
+    /// « Réessayer » au tap).
+    @State private var sendStatus: [String: MessageSendStatus] = [:]
+    /// Données pour rejouer un envoi échoué sans doublon : la même
+    /// Idempotency-Key est réutilisée d'une tentative à l'autre.
+    @State private var pendingSends: [String: PendingSend] = [:]
+    /// E2EE-UX-04 — vrai quand une rotation de clé (staleKey/409) a été détectée :
+    /// affiche un bandeau « appuie pour resynchroniser » au lieu de bulles muettes.
+    @State private var needsKeyResync = false
+    @State private var isResyncingKey = false
     @State private var showReportUser = false
     @State private var showGroupSettings = false
     @State private var typingUntil: Date?
@@ -43,6 +55,10 @@ struct ConversationDetailView: View {
     @State private var transcriptions: [String: String] = [:]
     @State private var transcriptionRequested: Set<String> = []
     @State private var scrollTargetId: String?
+    /// MSG-FLUIDITY-01 — id du message qui était en tête AVANT un prepend ; sert
+    /// à réancrer le scroll dessus (sans animation) pour figer la position de
+    /// lecture quand on charge des messages plus anciens.
+    @State private var prependAnchorId: String?
     @State private var threadTarget: MessageItem?
     @State private var showSearch = false
     @State private var showScheduled = false
@@ -76,6 +92,25 @@ struct ConversationDetailView: View {
                         .foregroundStyle(SQColor.label)
                 }
                 .buttonStyle(.plain)
+            } else if needsKeyResync {
+                // E2EE-UX-04 : la clé a tourné côté autre plateforme.
+                Button {
+                    Haptics.medium()
+                    Task { await resyncKey() }
+                } label: {
+                    Label(
+                        isResyncingKey ? "Resynchronisation…" : "Clé mise à jour — appuie pour resynchroniser",
+                        systemImage: isResyncingKey ? "arrow.triangle.2.circlepath" : "key.viewfinder"
+                    )
+                    .font(SQType.caption.weight(.semibold))
+                    .padding(SQSpace.sm + 2)
+                    .frame(maxWidth: .infinity)
+                    .background(SQColor.warning.opacity(0.18))
+                    .foregroundStyle(SQColor.label)
+                }
+                .buttonStyle(.plain)
+                .disabled(isResyncingKey)
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
 
             pinnedBar
@@ -92,6 +127,16 @@ struct ConversationDetailView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 10) {
+                        // MSG-FLUIDITY-02 — Sentinelle de pagination en tête de liste :
+                        // se déclenche quand le haut de l'historique devient visible.
+                        // Plus fiable que l'onAppear du premier message (qui se
+                        // redéclenchait à chaque insertion). Le garde isLoadingOlder
+                        // + olderCursor (dans loadOlder) évite les appels en doublon.
+                        if olderCursor != nil {
+                            Color.clear
+                                .frame(height: 1)
+                                .onAppear { Task { await loadOlder() } }
+                        }
                         if isLoadingOlder {
                             ProgressView()
                                 .tint(SQColor.brandRed)
@@ -100,12 +145,6 @@ struct ConversationDetailView: View {
                         ForEach(messages) { message in
                             messageBubble(message)
                                 .id(message.id)
-                                .onAppear {
-                                    // Atteinte du plus ancien message visible → charge la page précédente.
-                                    if message.id == messages.first?.id {
-                                        Task { await loadOlder() }
-                                    }
-                                }
                         }
                         readReceiptFooter
                         typingIndicator
@@ -122,6 +161,14 @@ struct ConversationDetailView: View {
                 // ne doit pas refaire défiler vers le bas.
                 .onChangeCompat(of: messages.last?.id) { _, _ in
                     if let last = messages.last { withAnimation(SQMotion.standard) { proxy.scrollTo(last.id, anchor: .bottom) } }
+                }
+                // MSG-FLUIDITY-01 — Réancre sur le message qui était en tête avant
+                // le prepend, SANS animation, pour que charger d'anciens messages ne
+                // fasse pas « sauter » la position de lecture.
+                .onChangeCompat(of: prependAnchorId) { _, anchor in
+                    guard let anchor else { return }
+                    proxy.scrollTo(anchor, anchor: .top)
+                    prependAnchorId = nil
                 }
                 .onChangeCompat(of: scrollTargetId) { _, target in
                     guard let target else { return }
@@ -429,6 +476,7 @@ struct ConversationDetailView: View {
                                 .foregroundStyle(mine ? .white : SQColor.label)
                         }
                     }
+                    sendStatusIndicator(for: message)
                 }
             }
             .padding(SQSpace.md)
@@ -438,6 +486,37 @@ struct ConversationDetailView: View {
                 threadReplyBadge(for: message)
             }
             if !mine { Spacer(minLength: 48) }
+        }
+    }
+
+    /// Statut d'envoi optimiste sous la bulle (MSG-API-01). En cours : petite
+    /// horloge discrète. Échec : « Échec · Réessayer » tappable qui rejoue
+    /// l'envoi (même Idempotency-Key, donc sans doublon).
+    @ViewBuilder
+    private func sendStatusIndicator(for message: MessageItem) -> some View {
+        switch sendStatus[message.id] {
+        case .sending:
+            Image(systemName: "clock")
+                .font(.system(size: 10))
+                .foregroundStyle(.white.opacity(0.7))
+                .accessibilityLabel("Envoi en cours")
+        case .failed:
+            Button {
+                Haptics.medium()
+                Task { await performSend(localId: message.id) }
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "exclamationmark.arrow.circlepath")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("Échec · Réessayer")
+                        .font(SQType.micro.weight(.semibold))
+                }
+                .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Échec de l'envoi. Appuyer pour réessayer.")
+        case .none:
+            EmptyView()
         }
     }
 
@@ -741,8 +820,10 @@ struct ConversationDetailView: View {
             let known = Set(messages.map(\.id))
             let older = Self.normalized(page.messages).filter { !known.contains($0.id) }
             guard !older.isEmpty else { olderCursor = nil; return }
+            let anchorId = messages.first?.id              // tête AVANT insertion
             messages.insert(contentsOf: older, at: 0)
             olderCursor = (page.hasMore ?? (page.nextCursor != nil)) ? page.nextCursor : nil
+            prependAnchorId = anchorId                      // réancre le scroll (MSG-FLUIDITY-01)
             await decryptLoadedMessages()
             refreshPolls()
         } catch {
@@ -1013,29 +1094,101 @@ struct ConversationDetailView: View {
     private func send() async {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        isSending = true
-        defer { isSending = false }
-        do {
-            if let editTarget {
+
+        // L'édition n'est pas optimiste : on attend la confirmation serveur
+        // avant de remplacer le texte affiché (recharge pour réordonner).
+        if let editTarget {
+            isSending = true
+            defer { isSending = false }
+            do {
                 try await service.editMessage(messageId: editTarget.id, text: text, in: conversation, e2ee: e2ee)
                 decryptedMessages[editTarget.id] = text
                 self.editTarget = nil
                 draft = ""
                 await load()
-            } else {
-                let sent = try await service.sendText(text, in: conversation, replyToId: replyTarget?.id, e2ee: e2ee)
-                messages = Self.normalized(messages + [sent])
-                if sent.isEncrypted {
-                    decryptedMessages[sent.id] = text
-                }
-                replyTarget = nil
-                draft = ""
+                Haptics.success()
+            } catch {
+                errorMessage = error.localizedDescription
+                Haptics.error()
             }
+            return
+        }
+
+        // MSG-API-01 — Envoi optimiste : on insère une bulle locale (.sending)
+        // IMMÉDIATEMENT et on vide le champ, sans attendre le réseau. L'appel
+        // réel suit dans performSend, qui remplacera la bulle par la réponse
+        // serveur ou la marquera .failed (rejouable au tap).
+        let replyToId = replyTarget?.id
+        let localId = "local-\(UUID().uuidString)"
+        let optimistic = makeOptimisticMessage(id: localId, text: text, replyToId: replyToId)
+        pendingSends[localId] = PendingSend(text: text, replyToId: replyToId, idempotencyKey: UUID().uuidString)
+        sendStatus[localId] = .sending
+        messages = Self.normalized(messages + [optimistic])
+        draft = ""
+        replyTarget = nil
+        Haptics.light()
+        await performSend(localId: localId)
+    }
+
+    /// Réalise (ou rejoue) l'envoi d'une bulle optimiste. Réutilise la même
+    /// Idempotency-Key à chaque tentative pour qu'un rejeu après échec réseau ne
+    /// crée jamais de doublon côté serveur.
+    private func performSend(localId: String) async {
+        guard let pending = pendingSends[localId] else { return }
+        sendStatus[localId] = .sending
+        do {
+            let sent = try await service.sendText(
+                pending.text,
+                in: conversation,
+                replyToId: pending.replyToId,
+                e2ee: e2ee,
+                idempotencyKey: pending.idempotencyKey
+            )
+            // Remplace la bulle optimiste par la réponse serveur (id réel,
+            // horodatage serveur, état chiffré). On garde le texte déchiffré en
+            // cache pour un affichage immédiat sans aller-retour de décryptage.
+            var next = messages.filter { $0.id != localId }
+            next.append(sent)
+            messages = Self.normalized(next)
+            if sent.isEncrypted {
+                decryptedMessages[sent.id] = pending.text
+            }
+            sendStatus[localId] = nil
+            pendingSends[localId] = nil
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            // On conserve la bulle et les données de rejeu : l'utilisateur peut
+            // réessayer d'un tap. Pas de bannière d'erreur globale ici — le
+            // feedback est porté par la bulle elle-même.
+            withAnimation(SQMotion.fast) { sendStatus[localId] = .failed }
             Haptics.error()
         }
+    }
+
+    /// Construit une bulle locale en clair (jamais persistée) affichée le temps
+    /// de l'aller-retour serveur. Non chiffrée : `displayedContent` lit
+    /// directement `content`, ce qui évite tout décryptage pour la bulle locale.
+    private func makeOptimisticMessage(id: String, text: String, replyToId: String?) -> MessageItem {
+        MessageItem(
+            id: id,
+            conversationId: conversation.id,
+            senderId: currentUserId,
+            kind: "TEXT",
+            content: text,
+            e2eeVersion: nil,
+            e2eeIvB64: nil,
+            e2eeCiphertextB64: nil,
+            e2eeAadB64: nil,
+            metadata: nil,
+            createdAt: Date(),
+            editedAt: nil,
+            deletedAt: nil,
+            replyToId: replyToId,
+            threadReplyCount: nil,
+            sender: nil,
+            attachments: [],
+            reactions: []
+        )
     }
 
     private func sendAttachment(item: PhotosPickerItem) async {
@@ -1190,13 +1343,59 @@ struct ConversationDetailView: View {
             MessageSyncLog.logger.debug("decrypt skip e2ee=\(isE2EE) unlocked=\(isE2EEUnlocked)")
             return
         }
-        for message in messages where message.isEncrypted && decryptedMessages[message.id] == nil {
-            do {
-                decryptedMessages[message.id] = try await e2ee.decryptText(conversationId: conversation.id, message: message)
-            } catch {
-                MessageSyncLog.logger.error("decrypt \(message.id, privacy: .public) erreur: \(error.localizedDescription, privacy: .public)")
+        let pending = messages.filter { $0.isEncrypted && decryptedMessages[$0.id] == nil }
+        guard !pending.isEmpty else { return }
+
+        // MSG-PERF-01 — Le 1er message est déchiffré séquentiellement : il résout
+        // (et met en cache) la clé de conversation, ce qui évite N fetchs réseau
+        // concurrents. Cela permet aussi de détecter une rotation de clé (staleKey)
+        // une seule fois avant de paralléliser le reste.
+        var results: [String: String] = [:]
+        let conversationId = conversation.id
+        do {
+            results[pending[0].id] = try await e2ee.decryptText(conversationId: conversationId, message: pending[0])
+        } catch let error as E2EEError where error == .staleKey {
+            // E2EE-UX-04 : clé tournée côté autre plateforme → bandeau de resync
+            // au lieu de bulles muettes définitives.
+            withAnimation(SQMotion.fast) { needsKeyResync = true }
+            return
+        } catch {
+            MessageSyncLog.logger.error("decrypt \(pending[0].id, privacy: .public) erreur: \(error.localizedDescription, privacy: .private)")
+        }
+
+        // Le reste est déchiffré en parallèle (clé déjà en cache), puis appliqué
+        // en UNE seule mutation pour ne provoquer qu'un re-render.
+        let rest = Array(pending.dropFirst())
+        if !rest.isEmpty {
+            await withTaskGroup(of: (String, String?).self) { group in
+                for message in rest {
+                    group.addTask {
+                        let text = try? await e2ee.decryptText(conversationId: conversationId, message: message)
+                        return (message.id, text)
+                    }
+                }
+                for await (id, text) in group {
+                    if let text { results[id] = text }
+                }
             }
         }
+        guard !results.isEmpty else { return }
+        needsKeyResync = false
+        decryptedMessages.merge(results) { _, new in new }
+    }
+
+    /// E2EE-UX-04 — Resynchronise la clé de conversation après une rotation :
+    /// re-partage best-effort (si on détient encore la clé) puis re-tente le
+    /// décryptage. Le bandeau reste tant que les messages restent illisibles.
+    private func resyncKey() async {
+        guard let e2ee, !isResyncingKey else { return }
+        isResyncingKey = true
+        defer { isResyncingKey = false }
+        await e2ee.shareConversationKeyIfNeeded(conversationId: conversation.id)
+        await refreshE2EEState()
+        await decryptLoadedMessages()
+        await decryptPinnedIfNeeded()
+        if !needsKeyResync { Haptics.success() }
     }
 
     /// De-duplicates messages by id (latest copy wins, original position kept for
@@ -1231,6 +1430,17 @@ private struct MessageReactionSummary: Identifiable {
     let count: Int
 
     var id: String { emoji }
+}
+
+/// Statut d'une bulle envoyée de façon optimiste (MSG-API-01).
+private enum MessageSendStatus: Equatable { case sending, failed }
+
+/// Tout ce qu'il faut pour rejouer un envoi échoué à l'identique (sans
+/// régénérer l'Idempotency-Key, donc sans risque de doublon serveur).
+private struct PendingSend {
+    let text: String
+    let replyToId: String?
+    let idempotencyKey: String
 }
 
 /// Trois points qui ondulent doucement (indicateur « en train d'écrire »).

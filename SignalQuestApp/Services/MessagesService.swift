@@ -6,7 +6,7 @@ protocol MessagesServicing: Sendable {
     func searchUsers(query: String) async throws -> [MessageSearchUser]
     func messages(conversationId: String, cursor: String?) async throws -> MessagesPageResponse
     func messagesDelta(conversationId: String, since: Date) async throws -> [MessageItem]
-    func sendText(_ text: String, in conversation: MessageConversation, replyToId: String?, e2ee: E2EEServicing?) async throws -> MessageItem
+    func sendText(_ text: String, in conversation: MessageConversation, replyToId: String?, e2ee: E2EEServicing?, idempotencyKey: String?) async throws -> MessageItem
     func sendAttachments(
         _ attachments: [UploadedAttachment],
         caption: String,
@@ -121,7 +121,7 @@ final class MessagesService: MessagesServicing {
         ).messages
     }
 
-    func sendText(_ text: String, in conversation: MessageConversation, replyToId: String? = nil, e2ee: E2EEServicing?) async throws -> MessageItem {
+    func sendText(_ text: String, in conversation: MessageConversation, replyToId: String? = nil, e2ee: E2EEServicing?, idempotencyKey: String? = nil) async throws -> MessageItem {
         let payload: SendMessageRequest
         if conversation.e2eeEnabled == true {
             guard let e2ee else { throw E2EEError.locked }
@@ -139,7 +139,8 @@ final class MessagesService: MessagesServicing {
         }
         let response: CreatedMessageResponse = try await api.requestJSON(
             "/api/messages/conversations/\(conversation.id)/messages",
-            body: payload
+            body: payload,
+            idempotencyKey: idempotencyKey
         )
         return response.message
     }

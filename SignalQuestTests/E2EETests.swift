@@ -147,6 +147,56 @@ final class E2EETests: XCTestCase {
         XCTAssertTrue(E2EEService.privateJwk(decrypted, matchesPublicJwk: publicKeyJwk))
     }
 
+    /// E2EE-UX-03 — Un mot de passe erroné doit remonter `.wrongPassword`
+    /// (message FR clair), PAS une CryptoKitError technique. Réutilise le même
+    /// flux de génération que le test ci-dessus, puis tente un déchiffrement avec
+    /// un mauvais mot de passe.
+    func testWrongPasswordMapsToWrongPasswordError() async throws {
+        var capturedBody: Data?
+        MockURLProtocol.requestHandler = { request in
+            capturedBody = request.httpBody ?? request.httpBodyStream.flatMap { stream in
+                stream.open()
+                defer { stream.close() }
+                var data = Data()
+                var buffer = [UInt8](repeating: 0, count: 4096)
+                while stream.hasBytesAvailable {
+                    let read = stream.read(&buffer, maxLength: 4096)
+                    if read <= 0 { break }
+                    data.append(buffer, count: read)
+                }
+                return data
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            return (response, Data("{\"ok\":true}".utf8))
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+        let sessionConfig = URLSessionConfiguration.ephemeral
+        sessionConfig.protocolClasses = [MockURLProtocol.self]
+        let api = APIClient(
+            config: .test,
+            cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore()),
+            session: URLSession(configuration: sessionConfig)
+        )
+        let service = E2EEService(api: api, tokenStore: InMemoryTokenStore())
+        try await service.generateAndRegisterKey(userId: "u1", password: "s3cret-pass")
+
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(capturedBody)) as? [String: Any])
+        let encryptedPrivateJwk = try XCTUnwrap(payload["encryptedPrivateJwk"] as? String)
+        let kdfSaltB64 = try XCTUnwrap(payload["kdfSaltB64"] as? String)
+        let iterations = try XCTUnwrap(payload["kdfIterations"] as? Int)
+
+        XCTAssertThrowsError(
+            try E2EEService.decryptPrivateJWK(
+                password: "mauvais-mot-de-passe",
+                encryptedPrivateJwkB64: encryptedPrivateJwk,
+                kdfSaltB64: kdfSaltB64,
+                iterations: iterations
+            )
+        ) { error in
+            XCTAssertEqual(error as? E2EEError, .wrongPassword)
+        }
+    }
+
     func testE2EECleartextSendBlockedWithoutKey() async {
         let conversation = MessageConversation(
             id: "c1",

@@ -7,6 +7,7 @@ enum E2EEError: Error, LocalizedError, Equatable {
     case locked
     case unsupported(String)
     case invalidKey
+    case wrongPassword
     case decryptFailed
     case keyGenerationFailed
     case staleKey
@@ -19,6 +20,8 @@ enum E2EEError: Error, LocalizedError, Equatable {
             return value
         case .invalidKey:
             return "Clé E2EE invalide"
+        case .wrongPassword:
+            return "Mot de passe incorrect. Réessaie."
         case .decryptFailed:
             return "Déchiffrement impossible"
         case .keyGenerationFailed:
@@ -94,56 +97,63 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
         let trimmed = password.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw E2EEError.invalidKey }
 
-        let attributes: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
-            kSecAttrKeySizeInBits as String: 2048
-        ]
-        var error: Unmanaged<CFError>?
-        guard let privateKey = SecKeyCreateRandomKey(attributes as CFDictionary, &error),
-              let privateDER = SecKeyCopyExternalRepresentation(privateKey, &error) as Data? else {
-            throw E2EEError.keyGenerationFailed
-        }
+        // E2EE-PERF-06 : génération RSA-2048 + PBKDF2 210k = plusieurs centaines de
+        // ms de calcul. On l'exécute hors de l'acteur appelant (Task.detached,
+        // userInitiated) pour ne jamais figer le main thread ni le spinner du
+        // bouton pendant la création de la clé.
+        let (privateJwk, payload): (String, E2EEBootstrapInitRequest) = try await Task.detached(priority: .userInitiated) {
+            let attributes: [String: Any] = [
+                kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
+                kSecAttrKeySizeInBits as String: 2048
+            ]
+            var error: Unmanaged<CFError>?
+            guard let privateKey = SecKeyCreateRandomKey(attributes as CFDictionary, &error),
+                  let privateDER = SecKeyCopyExternalRepresentation(privateKey, &error) as Data? else {
+                throw E2EEError.keyGenerationFailed
+            }
 
-        // SecKeyCopyExternalRepresentation renvoie un RSAPrivateKey PKCS#1 :
-        // SEQUENCE { version, n, e, d, p, q, dp, dq, qi }.
-        let integers = try ASN1.parseSequenceOfIntegers(der: privateDER)
-        guard integers.count >= 9 else { throw E2EEError.keyGenerationFailed }
-        let fields = ["n", "e", "d", "p", "q", "dp", "dq", "qi"]
-        var privateObj: [String: String] = ["kty": "RSA"]
-        for (index, field) in fields.enumerated() {
-            privateObj[field] = integers[index + 1].base64URLEncodedNoPadding()
-        }
-        let publicObj: [String: String] = [
-            "kty": "RSA",
-            "n": privateObj["n"]!,
-            "e": privateObj["e"]!
-        ]
-        guard let privateJwkData = try? JSONSerialization.data(withJSONObject: privateObj),
-              let publicJwkData = try? JSONSerialization.data(withJSONObject: publicObj),
-              let privateJwk = String(data: privateJwkData, encoding: .utf8),
-              let publicJwk = String(data: publicJwkData, encoding: .utf8) else {
-            throw E2EEError.keyGenerationFailed
-        }
+            // SecKeyCopyExternalRepresentation renvoie un RSAPrivateKey PKCS#1 :
+            // SEQUENCE { version, n, e, d, p, q, dp, dq, qi }.
+            let integers = try ASN1.parseSequenceOfIntegers(der: privateDER)
+            guard integers.count >= 9 else { throw E2EEError.keyGenerationFailed }
+            let fields = ["n", "e", "d", "p", "q", "dp", "dq", "qi"]
+            var privateObj: [String: String] = ["kty": "RSA"]
+            for (index, field) in fields.enumerated() {
+                privateObj[field] = integers[index + 1].base64URLEncodedNoPadding()
+            }
+            let publicObj: [String: String] = [
+                "kty": "RSA",
+                "n": privateObj["n"]!,
+                "e": privateObj["e"]!
+            ]
+            guard let privateJwkData = try? JSONSerialization.data(withJSONObject: privateObj),
+                  let publicJwkData = try? JSONSerialization.data(withJSONObject: publicObj),
+                  let privateJwk = String(data: privateJwkData, encoding: .utf8),
+                  let publicJwk = String(data: publicJwkData, encoding: .utf8) else {
+                throw E2EEError.keyGenerationFailed
+            }
 
-        // Chiffrement de la clé privée : salt 16 o, IV 12 o, PBKDF2-HMAC-SHA256
-        // 210k itérations, AES-256-GCM — format Android/web (iv + ct + tag, b64 sans padding).
-        let iterations = 210_000
-        var salt = Data(count: 16)
-        var iv = Data(count: 12)
-        _ = salt.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 16, $0.baseAddress!) }
-        _ = iv.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 12, $0.baseAddress!) }
-        let wrapKey = SymmetricKey(data: Self.pbkdf2SHA256(password: trimmed, salt: salt, iterations: iterations, keyLength: 32))
-        let sealed = try AES.GCM.seal(Data(privateJwk.utf8), using: wrapKey, nonce: AES.GCM.Nonce(data: iv))
-        var combined = iv
-        combined.append(sealed.ciphertext)
-        combined.append(sealed.tag)
+            // Chiffrement de la clé privée : salt 16 o, IV 12 o, PBKDF2-HMAC-SHA256
+            // 210k itérations, AES-256-GCM — format Android/web (iv + ct + tag, b64 sans padding).
+            let iterations = 210_000
+            var salt = Data(count: 16)
+            var iv = Data(count: 12)
+            _ = salt.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 16, $0.baseAddress!) }
+            _ = iv.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 12, $0.baseAddress!) }
+            let wrapKey = SymmetricKey(data: Self.pbkdf2SHA256(password: trimmed, salt: salt, iterations: iterations, keyLength: 32))
+            let sealed = try AES.GCM.seal(Data(privateJwk.utf8), using: wrapKey, nonce: AES.GCM.Nonce(data: iv))
+            var combined = iv
+            combined.append(sealed.ciphertext)
+            combined.append(sealed.tag)
 
-        let payload = E2EEBootstrapInitRequest(
-            publicKeyJwk: publicJwk,
-            encryptedPrivateJwk: combined.base64EncodedNoPadding(),
-            kdfSaltB64: salt.base64EncodedNoPadding(),
-            kdfIterations: iterations
-        )
+            let payload = E2EEBootstrapInitRequest(
+                publicKeyJwk: publicJwk,
+                encryptedPrivateJwk: combined.base64EncodedNoPadding(),
+                kdfSaltB64: salt.base64EncodedNoPadding(),
+                kdfIterations: iterations
+            )
+            return (privateJwk, payload)
+        }.value
         do {
             let _: E2EEBootstrapInitResponse = try await api.requestJSON("/api/e2ee/bootstrap/init", body: payload)
         } catch APIError.http(let status, _, _, _, _) where status == 404 || status == 405 {
@@ -193,7 +203,7 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
             _ = try await conversationKey(conversationId: conversationId)
             return true
         } catch {
-            MessageSyncLog.logger.error("conversationKey \(conversationId, privacy: .public) erreur: \(String(describing: error), privacy: .public)")
+            MessageSyncLog.logger.error("conversationKey \(conversationId, privacy: .public) erreur: \(String(describing: error), privacy: .private)")
             return false
         }
     }
@@ -206,8 +216,8 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
         ciphertextAndTag.append(sealed.tag)
         return E2EEPayload(
             v: 1,
-            ivB64: nonce.data.base64EncodedString(),
-            ciphertextB64: ciphertextAndTag.base64EncodedString(),
+            ivB64: nonce.data.base64EncodedNoPadding(),
+            ciphertextB64: ciphertextAndTag.base64EncodedNoPadding(),
             aadB64: nil
         )
     }
@@ -220,9 +230,9 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
         ciphertextAndTag.append(sealed.tag)
         return E2EEPayload(
             v: 2,
-            ivB64: nonce.data.base64EncodedString(),
-            ciphertextB64: ciphertextAndTag.base64EncodedString(),
-            aadB64: aad.base64EncodedString()
+            ivB64: nonce.data.base64EncodedNoPadding(),
+            ciphertextB64: ciphertextAndTag.base64EncodedNoPadding(),
+            aadB64: aad.base64EncodedNoPadding()
         )
     }
 
@@ -304,7 +314,15 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
             ciphertext: ciphertextAndTag.prefix(ciphertextAndTag.count - 16),
             tag: ciphertextAndTag.suffix(16)
         )
-        let plain = try AES.GCM.open(box, using: key)
+        // Un mot de passe erroné dérive une mauvaise clé PBKDF2 : le tag GCM ne
+        // vérifie pas (authenticationFailure). On le traduit en wrongPassword
+        // pour un message FR clair et actionnable (E2EE-UX-03).
+        let plain: Data
+        do {
+            plain = try AES.GCM.open(box, using: key)
+        } catch {
+            throw E2EEError.wrongPassword
+        }
         guard let jwk = String(data: plain, encoding: .utf8) else { throw E2EEError.invalidKey }
         return jwk
     }

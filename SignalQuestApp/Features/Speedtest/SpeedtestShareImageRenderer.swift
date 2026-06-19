@@ -20,8 +20,8 @@ enum SpeedtestShareImageRenderer {
         let place = result.city?.trimmedNonEmpty
         let placePart = place.map { " à \($0)" } ?? ""
         return """
-        \(download) Mbps en download sur \(net)\(placePart), ping \(ping), \(upload) — mesuré avec SignalQuest 📡
-        https://signalquest.fr #SignalQuest
+        \(download) Mbps en download sur \(net)\(placePart), ping \(ping), \(upload) — mesuré avec SignalQuest.
+        signalquest.fr #SignalQuest
         """
     }
 
