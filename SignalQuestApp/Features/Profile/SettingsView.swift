@@ -77,7 +77,6 @@ struct SettingsView: View {
     @State private var show2FADisable = false
     @State private var disable2FACode = ""
     @State private var showDeleteConfirm = false
-    @State private var deletePassword = ""
     @AppStorage(MapBackdrop.storageKey) private var mapBackdropRaw = MapBackdrop.carto.rawValue
 
     /// État 2FA de l'utilisateur courant (SETTINGS-SEC-01).
@@ -246,21 +245,12 @@ struct SettingsView: View {
         .sheet(item: $model.exportedFile) { file in
             ShareSheet(items: [file.url])
         }
-        .alert("Supprimer le compte ?", isPresented: $showDeleteConfirm) {
-            SecureField("Mot de passe", text: $deletePassword)
-                .textContentType(.password)
-            Button("Annuler", role: .cancel) { deletePassword = "" }
-            Button("Supprimer", role: .destructive) {
-                let password = deletePassword
-                deletePassword = ""
-                Task {
-                    if await model.deleteAccount(password: password) {
-                        await session.logout()
-                    }
-                }
+        .sheet(isPresented: $showDeleteConfirm) {
+            DeleteAccountSheet { password in
+                let ok = await model.deleteAccount(password: password)
+                if ok { await session.logout() }
+                return ok
             }
-        } message: {
-            Text("Cette action est irréversible. Ton compte et tes données personnelles (e-mail, mot de passe, profil) seront supprimés. Tes contributions — speedtests, validations, photos — seront anonymisées et resteront sur la carte communautaire. Saisis ton mot de passe pour confirmer.")
         }
     }
 
@@ -344,6 +334,66 @@ struct ChangePasswordView: View {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+}
+
+/// Suppression de compte (PROFILE-UX-12) : feuille dédiée avec avertissement clair
+/// + champ mot de passe, au lieu d'un SecureField dans une alert.
+private struct DeleteAccountSheet: View {
+    /// Renvoie `true` si la suppression a réussi (la session se ferme alors d'elle-même).
+    let onDelete: (String) async -> Bool
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var password = ""
+    @State private var isBusy = false
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: SQSpace.lg) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.largeTitle)
+                        .foregroundStyle(SQColor.danger)
+                    Text("Supprimer ton compte")
+                        .font(SQType.title)
+                        .foregroundStyle(SQColor.label)
+                    Text("Cette action est irréversible. Ton compte et tes données personnelles (e-mail, mot de passe, profil) seront supprimés. Tes contributions — speedtests, validations, photos — seront anonymisées et resteront sur la carte communautaire.")
+                        .font(SQType.body)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    SecureField("Mot de passe", text: $password)
+                        .textContentType(.password)
+                        .textFieldStyle(SQTextFieldStyle())
+                    if let error {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.danger)
+                    }
+                    GradientButton("Supprimer définitivement", systemImage: "trash", isBusy: isBusy) {
+                        Task {
+                            isBusy = true
+                            error = nil
+                            let ok = await onDelete(password)
+                            isBusy = false
+                            if !ok { error = "Suppression impossible. Vérifie ton mot de passe." }
+                        }
+                    }
+                    .disabled(password.isEmpty || isBusy)
+                    .opacity(password.isEmpty ? 0.5 : 1)
+                }
+                .padding(SQSpace.xl)
+            }
+            .signalQuestBackground()
+            .navigationTitle("Suppression")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Annuler") { dismiss() }.tint(SQColor.brandRed)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 
