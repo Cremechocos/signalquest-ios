@@ -4,10 +4,21 @@ import MapLibre
 
 // MARK: - Annotation
 
+/// Identité stable d'une annotation pour le diff incrémental (PERF-MAP-02) :
+/// `stableKey` survit aux franchissements de bucket de zoom voisins ;
+/// `contentSignature` détecte un changement de contenu (membres d'un cluster).
+protocol ANFRKeyedAnnotation: MLNAnnotation {
+    var stableKey: String { get }
+    var contentSignature: Int { get }
+}
+
 /// Annotation MapLibre portant un site ANFR + son style résolu.
-final class ANFRSiteAnnotation: MLNPointAnnotation {
+final class ANFRSiteAnnotation: MLNPointAnnotation, ANFRKeyedAnnotation {
     let site: ANFRMapSite
     let style: ANFRMarkerStyle
+
+    var stableKey: String { "site-\(site.supId)" }
+    var contentSignature: Int { site.supId.hashValue }
 
     init(site: ANFRMapSite) {
         self.site = site
@@ -24,13 +35,21 @@ final class ANFRSiteAnnotation: MLNPointAnnotation {
 // MARK: - Cluster Annotation
 
 /// Annotation MapLibre portant un cluster de sites ANFR + son agrégation.
-final class ANFRClusterAnnotation: MLNPointAnnotation {
+final class ANFRClusterAnnotation: MLNPointAnnotation, ANFRKeyedAnnotation {
     let sites: [ANFRMapSite]
     let aggregate: ANFRClusterAggregate
+    let stableKey: String
+    let contentSignature: Int
 
-    init(sites: [ANFRMapSite]) {
+    init(sites: [ANFRMapSite], cellKey: String) {
         self.sites = sites
         self.aggregate = ANFRClusterAggregator.aggregate(sites)
+        // Clé = CELLULE (pas le centroïde) → stable quand le contenu bouge un peu.
+        self.stableKey = "cluster-\(cellKey)"
+        var hasher = Hasher()
+        hasher.combine(sites.count)
+        for site in sites { hasher.combine(site.supId) }
+        self.contentSignature = hasher.finalize()
         super.init()
         let lat = sites.reduce(0.0) { $0 + $1.latitude } / Double(sites.count)
         let lon = sites.reduce(0.0) { $0 + $1.longitude } / Double(sites.count)
@@ -95,6 +114,8 @@ struct ANFRMapLibreView: UIViewRepresentable {
         private var lastSites: [ANFRMapSite] = []
         private var lastSitesKey: Int = 0
         private var lastSyncZoomBucket: Int = -1
+        /// Diff incrémental des annotations par clé stable (PERF-MAP-02).
+        private var annotationsByKey: [String: ANFRKeyedAnnotation] = [:]
 
         var zoom: Binding<Double>?
         var center: Binding<CLLocationCoordinate2D>?
@@ -107,17 +128,44 @@ struct ANFRMapLibreView: UIViewRepresentable {
             self.lastSites = sites
             let key = Self.signature(of: sites)
             let bucket = zoomBucket(for: mapView.zoomLevel)
-            
+
             guard key != lastSitesKey || bucket != lastSyncZoomBucket else { return }
             lastSitesKey = key
             lastSyncZoomBucket = bucket
-            
-            if let existing = mapView.annotations {
-                mapView.removeAnnotations(existing)
+
+            // PERF-MAP-02 : diff stable par clé — on ne retire/ajoute QUE le delta au
+            // lieu d'un remove-all/add-all complet à chaque franchissement de bucket.
+            let incoming = Self.cluster(sites: sites, zoom: mapView.zoomLevel)
+            var incomingByKey: [String: ANFRKeyedAnnotation] = [:]
+            incomingByKey.reserveCapacity(incoming.count)
+            for annotation in incoming { incomingByKey[annotation.stableKey] = annotation }
+
+            var toRemove: [MLNAnnotation] = []
+            var removeKeys: [String] = []
+            for (existingKey, existing) in annotationsByKey {
+                if let inc = incomingByKey[existingKey], inc.contentSignature == existing.contentSignature {
+                    // Réutilisé : si le centroïde d'un cluster a glissé, on met la
+                    // coordonnée à jour in-place (pas de remove/add).
+                    if let pt = existing as? MLNPointAnnotation, let incPt = inc as? MLNPointAnnotation,
+                       abs(pt.coordinate.latitude - incPt.coordinate.latitude) > 1e-9 ||
+                       abs(pt.coordinate.longitude - incPt.coordinate.longitude) > 1e-9 {
+                        pt.coordinate = incPt.coordinate
+                    }
+                    incomingByKey[existingKey] = nil   // conservé → rien à ajouter
+                } else {
+                    toRemove.append(existing)
+                    removeKeys.append(existingKey)
+                }
             }
-            
-            let annotations = Self.cluster(sites: sites, zoom: mapView.zoomLevel)
-            mapView.addAnnotations(annotations)
+            for k in removeKeys { annotationsByKey[k] = nil }
+            if !toRemove.isEmpty { mapView.removeAnnotations(toRemove) }
+
+            var toAdd: [MLNAnnotation] = []
+            for (newKey, inc) in incomingByKey {
+                annotationsByKey[newKey] = inc
+                toAdd.append(inc)
+            }
+            if !toAdd.isEmpty { mapView.addAnnotations(toAdd) }
         }
 
         private func zoomBucket(for zoom: Double) -> Int {
@@ -129,11 +177,11 @@ struct ANFRMapLibreView: UIViewRepresentable {
             return 5
         }
 
-        private static func cluster(sites: [ANFRMapSite], zoom: Double) -> [MLNAnnotation] {
+        private static func cluster(sites: [ANFRMapSite], zoom: Double) -> [ANFRKeyedAnnotation] {
             guard zoom < 13 else {
-                return sites.map(ANFRSiteAnnotation.init(site:))
+                return sites.map { ANFRSiteAnnotation(site: $0) }
             }
-            
+
             let cellSize: Double
             switch zoom {
             case ..<6:
@@ -147,25 +195,26 @@ struct ANFRMapLibreView: UIViewRepresentable {
             default:
                 cellSize = 0.03
             }
-            
+
             struct Cell: Hashable {
                 let lat: Int
                 let lng: Int
             }
-            
+
             let groups = Dictionary(grouping: sites) { site in
                 Cell(
                     lat: Int((site.latitude / cellSize).rounded(.down)),
                     lng: Int((site.longitude / cellSize).rounded(.down))
                 )
             }
-            
-            var annotations: [MLNAnnotation] = []
-            for group in groups.values {
+
+            var annotations: [ANFRKeyedAnnotation] = []
+            annotations.reserveCapacity(groups.count)
+            for (cell, group) in groups {
                 if group.count == 1 {
                     annotations.append(ANFRSiteAnnotation(site: group[0]))
                 } else {
-                    annotations.append(ANFRClusterAnnotation(sites: group))
+                    annotations.append(ANFRClusterAnnotation(sites: group, cellKey: "\(cell.lat)-\(cell.lng)"))
                 }
             }
             return annotations
@@ -181,8 +230,18 @@ struct ANFRMapLibreView: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MLNMapView, regionDidChangeAnimated animated: Bool) {
-            zoom?.wrappedValue = mapView.zoomLevel
-            center?.wrappedValue = mapView.centerCoordinate
+            // PERF-MAP-01 : ces bindings ne pilotent pas la carte (cadrage initial
+            // seulement) mais leur écriture re-render le body SwiftUI. On n'écrit donc
+            // que sur un delta significatif — une animation de zoom (tap cluster) émet
+            // de nombreux events quasi identiques.
+            let z = mapView.zoomLevel
+            let c = mapView.centerCoordinate
+            if let zoom, abs(zoom.wrappedValue - z) > 0.05 { zoom.wrappedValue = z }
+            if let center,
+               abs(center.wrappedValue.latitude - c.latitude) > 1e-4 ||
+               abs(center.wrappedValue.longitude - c.longitude) > 1e-4 {
+                center.wrappedValue = c
+            }
             sync(sites: lastSites, on: mapView)
         }
 

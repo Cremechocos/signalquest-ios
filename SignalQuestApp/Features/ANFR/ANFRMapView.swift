@@ -8,13 +8,13 @@ import MapLibre
 
 @MainActor
 final class ANFRMapViewModel: ObservableObject {
-    @Published var sites: [ANFRMapSite] = []
+    @Published var sites: [ANFRMapSite] = [] { didSet { recomputeFilteredSites() } }
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var lastUpdate: String?
 
-    @Published var operatorFilters: Set<ANFROperator> = Set(ANFROperator.allCases)
-    @Published var selectedModTypes: Set<ANFRModType> = Set(ANFRModType.allCases)
+    @Published var operatorFilters: Set<ANFROperator> = Set(ANFROperator.allCases) { didSet { recomputeFilteredSites() } }
+    @Published var selectedModTypes: Set<ANFRModType> = Set(ANFRModType.allCases) { didSet { recomputeFilteredSites() } }
 
     @Published var availableDates: [String] = []
     @Published var currentSnapshotDate: String?
@@ -23,9 +23,14 @@ final class ANFRMapViewModel: ObservableObject {
     private let service: ANFRServicing
     init(service: ANFRServicing) { self.service = service }
 
-    /// Sites filtrés selon opérateurs / générations / types de modif actifs.
-    var filteredSites: [ANFRMapSite] {
-        sites.filter { site in
+    /// Sites filtrés (opérateurs / générations / types de modif actifs), MÉMOÏSÉS :
+    /// recalculés seulement sur changement de sites/filtres via didSet, pas à chaque
+    /// accès — le body de la carte les lit plusieurs fois par frame de pan/zoom
+    /// (PERF-MAP-01). Le dataset ANFR national fait des dizaines de milliers de sites.
+    @Published private(set) var filteredSites: [ANFRMapSite] = []
+
+    private func recomputeFilteredSites() {
+        filteredSites = sites.filter { site in
             // Au moins une antenne dont l'opérateur, la génération et le type
             // de modif passent les filtres actifs.
             site.antennas.contains { antenna in
