@@ -92,3 +92,18 @@ Fichiers **écrits** dans `map-nextjs` (non committés) :
 3. (Optionnel) backfill casse email : `UPDATE "User" SET email = lower(email)` — à ne
    lancer qu'après vérification d'absence de collisions (deux comptes ne différant que
    par la casse). Non fourni automatiquement (risque de violation d'unicité).
+
+## 10. AutoFill mot de passe (trousseau iCloud) — AASA `webcredentials`
+Pour qu'iOS propose d'**enregistrer le mot de passe** à l'inscription/connexion et
+l'**auto-remplisse** :
+- **iOS** (fait) : entitlement `com.apple.developer.associated-domains` =
+  `webcredentials:signalquest.fr` (provisionné auto au build device).
+- **Backend** (fait, **non committé**) : `app/.well-known/apple-app-site-association/route.ts`
+  sert désormais une section `webcredentials.apps` = `[<IOS_TEAM_ID>.fr.signalquest.ios,
+  835X2977R7.fr.signalquest.ios]` (équipe prod + équipe de signature dev, dédupliqué ;
+  surchargeable via `IOS_TEAM_ID_DEV`).
+- **À FAIRE** : déployer l'AASA mis à jour (servi en `application/json`, sans redirection,
+  à `https://signalquest.fr/.well-known/apple-app-site-association`). iOS le récupère via
+  le CDN Apple (cache jusqu'à ~24 h). **Pour tester tout de suite** sur l'iPhone :
+  Réglages → Développeur → activer **« Associated Domains Development »** (bypass du cache
+  CDN), puis relancer l'app. Vérifier que `IOS_TEAM_ID` en prod = l'équipe réelle de l'App ID.
