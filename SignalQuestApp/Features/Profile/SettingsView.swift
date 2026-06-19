@@ -76,6 +76,7 @@ struct SettingsView: View {
     @State private var show2FASetup = false
     @State private var showDeleteConfirm = false
     @State private var deletePassword = ""
+    @AppStorage(MapBackdrop.storageKey) private var mapBackdropRaw = MapBackdrop.carto.rawValue
 
     init(userService: UserServicing, authService: AuthServicing) {
         _model = StateObject(wrappedValue: SettingsViewModel(userService: userService, authService: authService))
@@ -115,6 +116,42 @@ struct SettingsView: View {
             }
             .tint(SQColor.brandRed)
             .foregroundStyle(SQColor.label)
+            .listRowBackground(SQColor.surface)
+            Section {
+                ForEach(MapBackdrop.allCases) { option in
+                    Button {
+                        mapBackdropRaw = option.rawValue
+                        Haptics.selection()
+                    } label: {
+                        HStack(spacing: SQSpace.md) {
+                            Image(systemName: option.systemImage)
+                                .foregroundStyle(SQColor.brandRed)
+                                .frame(width: 26)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(option.label).foregroundStyle(SQColor.label)
+                                Text(option.subtitle)
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                            }
+                            Spacer()
+                            if mapBackdropRaw == option.rawValue {
+                                Image(systemName: "checkmark")
+                                    .font(.body.weight(.bold))
+                                    .foregroundStyle(SQColor.brandRed)
+                                    .transition(.scale.combined(with: .opacity))
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            } header: {
+                Text("Fond de carte")
+            } footer: {
+                Text("OpenStreetMap, Relief et Satellite utilisent des serveurs de tuiles tiers : la zone de carte consultée leur est transmise.")
+                    .font(SQType.caption)
+            }
+            .sqAnimation(SQMotion.snappy, value: mapBackdropRaw)
             .listRowBackground(SQColor.surface)
             Section {
                 GradientButton("Enregistrer", systemImage: "checkmark.circle.fill", isBusy: model.isBusy) {

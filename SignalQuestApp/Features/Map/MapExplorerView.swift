@@ -2654,13 +2654,15 @@ private struct SQMapLibreMapView: UIViewRepresentable {
     @Binding var zoom: Double
     let onMoveEnd: (MapBounds, Double) -> Void
     let onSelect: (MapAnnotationPayload) -> Void
+    @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.carto.rawValue
+    private var backdrop: MapBackdrop { MapBackdrop(rawValue: backdropRaw) ?? .carto }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onMoveEnd: onMoveEnd, onSelect: onSelect)
     }
 
     func makeUIView(context: Context) -> MLNMapView {
-        let styleURL = Self.styleURL(for: colorScheme)
+        let styleURL = backdrop.styleURL(dark: colorScheme == .dark)
         let mapView = MLNMapView(frame: .zero, styleURL: styleURL)
         mapView.delegate = context.coordinator
         mapView.logoView.isHidden = false
@@ -2677,7 +2679,7 @@ private struct SQMapLibreMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ mapView: MLNMapView, context: Context) {
-        let expectedStyleURL = Self.styleURL(for: colorScheme)
+        let expectedStyleURL = backdrop.styleURL(dark: colorScheme == .dark)
         if mapView.styleURL != expectedStyleURL {
             mapView.styleURL = expectedStyleURL
         }
@@ -2688,15 +2690,6 @@ private struct SQMapLibreMapView: UIViewRepresentable {
         if context.coordinator.shouldApplyCamera(center: center, zoom: zoom) {
             mapView.setCenter(center, zoomLevel: zoom, animated: true)
         }
-    }
-
-    private static func styleURL(for colorScheme: ColorScheme) -> URL {
-        let style = colorScheme == .dark ? "dark-matter-gl-style" : "positron-gl-style"
-        if let url = URL(string: "https://basemaps.cartocdn.com/gl/\(style)/style.json") { return url }
-        if let bundled = Bundle.main.url(forResource: "MapLibreStyle", withExtension: "json") { return bundled }
-        // Constant fallback; URL(fileURLWithPath:) is non-failable so we never crash.
-        return URL(string: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json")
-            ?? URL(fileURLWithPath: "/")
     }
 
     @MainActor final class Coordinator: NSObject, @preconcurrency MLNMapViewDelegate, UIGestureRecognizerDelegate {

@@ -60,13 +60,15 @@ struct ANFRMapLibreView: UIViewRepresentable {
     @Binding var center: CLLocationCoordinate2D
     @Binding var zoom: Double
     let onSelectSite: (ANFRMapSite) -> Void
+    @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.carto.rawValue
+    private var backdrop: MapBackdrop { MapBackdrop(rawValue: backdropRaw) ?? .carto }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onSelectSite: onSelectSite)
     }
 
     func makeUIView(context: Context) -> MLNMapView {
-        let mapView = MLNMapView(frame: .zero, styleURL: Self.styleURL(for: colorScheme))
+        let mapView = MLNMapView(frame: .zero, styleURL: backdrop.styleURL(dark: colorScheme == .dark))
         mapView.delegate = context.coordinator
         mapView.logoView.isHidden = false
         mapView.attributionButton.isHidden = false
@@ -76,20 +78,13 @@ struct ANFRMapLibreView: UIViewRepresentable {
     }
 
     func updateUIView(_ mapView: MLNMapView, context: Context) {
-        let expected = Self.styleURL(for: colorScheme)
+        let expected = backdrop.styleURL(dark: colorScheme == .dark)
         if mapView.styleURL != expected {
             mapView.styleURL = expected
         }
         context.coordinator.zoom = $zoom
         context.coordinator.center = $center
         context.coordinator.sync(sites: sites, on: mapView)
-    }
-
-    private static func styleURL(for colorScheme: ColorScheme) -> URL {
-        let style = colorScheme == .dark ? "dark-matter-gl-style" : "positron-gl-style"
-        if let url = URL(string: "https://basemaps.cartocdn.com/gl/\(style)/style.json") { return url }
-        if let bundled = Bundle.main.url(forResource: "MapLibreStyle", withExtension: "json") { return bundled }
-        return URL(string: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json") ?? URL(fileURLWithPath: "/")
     }
 
     @MainActor
