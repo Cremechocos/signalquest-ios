@@ -33,18 +33,31 @@ final class AppLockController: ObservableObject {
     }
 
     func didEnterBackground() {
-        backgroundedAt = Date()
-    }
-
-    /// Retour au premier plan. Renvoie `true` si la session doit être **déconnectée**
-    /// (inactivité ≥ seuil auto-logout). Sinon verrouille si inactivité ≥ délai.
-    func willEnterForeground() -> Bool {
         guard AppLockSettings.enabled, BiometricAuth.isAvailable else {
             backgroundedAt = nil
-            return false
+            return
         }
-        let elapsed = backgroundedAt.map { Date().timeIntervalSince($0) } ?? .greatestFiniteMagnitude
-        backgroundedAt = nil
+        backgroundedAt = Date()
+        // Verrouillage immédiat : on masque le contenu DÈS la mise en arrière-plan
+        // (pas de flash au retour, et l'aperçu du sélecteur d'apps est masqué).
+        if AppLockSettings.lockGrace == 0 {
+            isLocked = true
+        }
+    }
+
+    /// Retour au premier plan APRÈS un vrai passage en arrière-plan. Renvoie `true`
+    /// si la session doit être déconnectée (inactivité ≥ auto-logout).
+    ///
+    /// ⚠️ Garde anti-boucle : si `backgroundedAt == nil`, on N'EST PAS revenu d'un
+    /// arrière-plan réel — c'est un simple `.active` (retour de l'invite Face ID,
+    /// du sélecteur d'apps…). Dans ce cas on ne (re)verrouille JAMAIS, sinon
+    /// l'invite biométrique qui fait osciller la scène crée une boucle
+    /// verrouille → Face ID → déverrouille → verrouille…
+    func willEnterForeground() -> Bool {
+        guard let backgroundedAt else { return false }
+        self.backgroundedAt = nil
+        guard AppLockSettings.enabled, BiometricAuth.isAvailable else { return false }
+        let elapsed = Date().timeIntervalSince(backgroundedAt)
         let autoLogout = AppLockSettings.autoLogout
         if autoLogout > 0, elapsed >= autoLogout {
             isLocked = true   // on verrouille aussi le temps que la déconnexion s'applique

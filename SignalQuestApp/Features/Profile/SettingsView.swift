@@ -132,7 +132,20 @@ struct SettingsView: View {
             .listRowBackground(SQColor.surface)
             if BiometricAuth.isAvailable {
                 Section {
-                    Toggle(isOn: $appLockEnabled) {
+                    Toggle(isOn: Binding(
+                        get: { appLockEnabled },
+                        set: { newValue in
+                            guard newValue else { appLockEnabled = false; return }
+                            // Confirme par biométrie avant d'activer (évite de se
+                            // verrouiller dehors si Face ID ne marche pas).
+                            Task {
+                                let ok = await BiometricAuth.authenticate(
+                                    reason: "Confirme \(BiometricAuth.kind.label) pour activer le verrouillage"
+                                )
+                                appLockEnabled = ok
+                            }
+                        }
+                    )) {
                         settingsLabel("Verrouiller avec \(BiometricAuth.kind.label)", systemImage: BiometricAuth.kind.systemImage)
                     }
                     if appLockEnabled {
