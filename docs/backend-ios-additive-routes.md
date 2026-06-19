@@ -68,11 +68,27 @@ autorisation), respecte la 2FA, puis `issueSession` + `buildAuthSuccessResponse`
 **Aucune migration Prisma** (match par email, pas de colonne `appleUserId`).
 Réutilise les helpers existants de `/login` et `/signup`.
 
-**Prérequis hors-code :**
-- Apple Developer : activer la capability **« Sign in with Apple »** sur l'App ID
-  `fr.signalquest.ios` (fait automatiquement par la signature Xcode au build
-  device — à confirmer dans le portail / pour la prod).
-- Déployer la route en prod (le bouton iOS appelle `/api/auth/apple` ; tant que la
-  route n'est pas en ligne, l'auth Apple renvoie 404).
-- (Optionnel, robustesse) ajouter plus tard une colonne `appleUserId String? @unique`
-  (SQL idempotent) pour lier les comptes même si l'email relais change.
+### Liaison de compte (associer / dissocier depuis les Réglages)
+Fichiers **écrits** dans `map-nextjs` (non committés) :
+- `lib/apple-auth.ts` — vérification JWKS factorisée (partagée auth + link).
+- `app/api/auth/apple/route.ts` — **durci** : match par `appleUserId` (claim `sub`)
+  puis par **email vérifié** (gate `email_verified`, sinon 409), stocke l'`appleUserId`.
+- `app/api/auth/apple/link/route.ts` (auth) — associe l'Apple ID au compte courant
+  (409 si déjà lié ailleurs).
+- `app/api/auth/apple/unlink/route.ts` (auth) — dissocie.
+- `app/api/auth/me/route.ts` + `app/api/auth/_shared.ts` — exposent `appleLinked`.
+- `lib/validation.ts` — `emailSchema` normalise (`trim` + `toLowerCase`) → corrige
+  les doublons de compte par casse (signup ne normalisait pas).
+- `prisma/schema.prisma` — `appleUserId String? @unique`.
+- `prisma/sql/2026-06-apple-user-id.sql` — **SQL idempotent** à exécuter sur la prod
+  AVANT déploiement (`ADD COLUMN IF NOT EXISTS` + index unique partiel).
+
+**Prérequis hors-code (À FAIRE) :**
+1. Apple Developer : confirmer la capability **« Sign in with Apple »** sur l'App ID
+   `fr.signalquest.ios` (ajoutée auto par la signature Xcode au build device).
+2. **Exécuter** `prisma/sql/2026-06-apple-user-id.sql` sur la base prod (idempotent),
+   PUIS `prisma generate`, PUIS déployer le code (l'ordre évite que le client Prisma
+   référence une colonne absente).
+3. (Optionnel) backfill casse email : `UPDATE "User" SET email = lower(email)` — à ne
+   lancer qu'après vérification d'absence de collisions (deux comptes ne différant que
+   par la casse). Non fourni automatiquement (risque de violation d'unicité).
