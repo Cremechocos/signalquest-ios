@@ -396,10 +396,11 @@ struct SpeedtestView: View {
                 detailItem(label: "Ping UL", value: ms(result.pingUlMs), color: Color(hex: 0x06B6D4))
                 detailItem(label: "Jitter UL", value: ms(result.jitterUlMs), color: Color(hex: 0x06B6D4))
                 detailItem(label: "Réseau", value: result.networkShareDisplayName, color: SQColor.label)
-                detailItem(label: "Serveur mesure", value: result.serverName ?? "—", color: SQColor.label)
-                if let dl = result.downloadServerName, !dl.isEmpty, dl != result.serverName {
-                    detailItem(label: "Source DL", value: dl, color: SQColor.label)
-                }
+                // Le ping ET le download sont mesurés contre la même source (le CDN
+                // sélectionné, AWS CloudFront par défaut). On affiche donc ce serveur
+                // unique au lieu du VPS de session/upload (qui n'est qu'un détail
+                // technique et induisait en erreur ici).
+                detailItem(label: "Serveur ping + DL", value: result.downloadServerName ?? result.serverName ?? "—", color: SQColor.label)
             }
         }
         .padding(SQSpace.lg)
@@ -481,7 +482,7 @@ struct SpeedtestView: View {
                             Text("Source du téléchargement")
                                 .font(SQFont.archivo(15, .bold))
                                 .foregroundStyle(SQColor.label)
-                            Text("Origine des octets de download. La latence et l'upload restent mesurés sur le serveur SignalQuest.")
+                            Text("Origine des octets de download. Le ping est mesuré contre cette même source ; seul l'upload reste sur le serveur SignalQuest (VPS).")
                                 .font(.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
@@ -1462,7 +1463,7 @@ private struct SpeedtestHistoryRow: View {
     let result: SpeedtestRunResult
 
     var body: some View {
-        HStack(alignment: .center, spacing: SQSpace.md) {
+        HStack(alignment: .top, spacing: SQSpace.md) {
             ZStack {
                 Circle()
                     .fill(SQColor.brandRed.opacity(0.14))
@@ -1472,42 +1473,49 @@ private struct SpeedtestHistoryRow: View {
                     .foregroundStyle(SQColor.brandRed)
             }
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                // L'adresse occupe désormais toute la largeur (les métriques sont
+                // passées sur leur propre rangée juste en dessous).
                 Text(locationLine)
                     .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
                     .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Text(relativeDate)
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .lineLimit(1)
-            }
 
-            Spacer(minLength: SQSpace.sm)
-
-            HStack(spacing: SQSpace.sm + 2) {
-                stat(icon: "arrow.down", value: shortSpeed(result.downloadAverageMbps))
-                stat(icon: "arrow.up", value: shortSpeed(result.uploadAverageMbps))
-                stat(icon: "timer", value: shortMs(result.pingMinMs ?? result.pingMs))
+                // Rangée dédiée DL · UL · ping (avec unités, plus de troncature de
+                // l'adresse pour leur faire de la place).
+                HStack(spacing: SQSpace.md) {
+                    stat(icon: "arrow.down", value: shortSpeed(result.downloadAverageMbps), unit: "Mbps")
+                    stat(icon: "arrow.up", value: shortSpeed(result.uploadAverageMbps), unit: "Mbps")
+                    stat(icon: "timer", value: shortMs(result.pingMinMs ?? result.pingMs), unit: "ms")
+                }
+                .padding(.top, 1)
             }
-            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.horizontal, SQSpace.lg)
         .padding(.vertical, SQSpace.md)
     }
 
-    private func stat(icon: String, value: String) -> some View {
+    private func stat(icon: String, value: String, unit: String) -> some View {
         HStack(spacing: 3) {
             Image(systemName: icon)
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(SQColor.labelSecondary)
+                .accessibilityHidden(true)
             Text(value)
                 .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
                 .monospacedDigit()
                 .foregroundStyle(SQColor.label)
                 .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
+            Text(unit)
+                .font(SQType.micro)
+                .foregroundStyle(SQColor.labelTertiary)
         }
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     /// Ligne principale : adresse (rue + commune) reverse-géocodée du point de
