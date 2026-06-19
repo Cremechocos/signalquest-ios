@@ -163,10 +163,6 @@ struct ProfileView: View {
             statCell(label: "Tests", value: stats.totalSpeedtests.map(String.init) ?? "—")
             statDivider
             statCell(label: "Niveau", value: stats.level.map(String.init) ?? "—")
-            if let photos = stats.totalPhotos {
-                statDivider
-                statCell(label: "Photos", value: String(photos))
-            }
             if let validations = stats.totalValidations {
                 statDivider
                 statCell(label: "Valid.", value: String(validations))
