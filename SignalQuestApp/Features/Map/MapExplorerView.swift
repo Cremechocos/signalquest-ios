@@ -214,7 +214,7 @@ final class MapExplorerViewModel: ObservableObject {
     /// Appelé à chaque fin de déplacement caméra. Debounce 600 ms puis
     /// résolution du marché sous le centre de la carte.
     func scheduleMarketDetection(center: CLLocationCoordinate2D) {
-        MessageSyncLog.logger.debug("market detect schedule lat=\(center.latitude) lng=\(center.longitude)")
+        MessageSyncLog.logger.debug("market detect schedule lat=\(center.latitude, privacy: .private) lng=\(center.longitude, privacy: .private)")
         marketDetectionTask?.cancel()
         marketDetectionTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 600_000_000)
@@ -239,7 +239,7 @@ final class MapExplorerViewModel: ObservableObject {
             return
         }
         guard let entry = await marketsService.marketForLocation(latitude: center.latitude, longitude: center.longitude) else {
-            MessageSyncLog.logger.debug("market detect: aucun marché à lat=\(center.latitude) lng=\(center.longitude)")
+            MessageSyncLog.logger.debug("market detect: aucun marché à lat=\(center.latitude, privacy: .private) lng=\(center.longitude, privacy: .private)")
             pendingAutoMarketCode = nil
             return
         }
@@ -661,12 +661,14 @@ private enum CoverageQualityBand: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Intervalle RSRP explicite (dBm) — l'unité est rappelée une fois dans le titre
+    /// de la légende (TEL-MAP-01 : un seul nombre par bande était ambigu).
     var rangeLabel: String {
         switch self {
         case .excellent: return "≥ -80"
-        case .good: return "-90"
-        case .fair: return "-100"
-        case .weak: return "-110"
+        case .good: return "-90 à -80"
+        case .fair: return "-100 à -90"
+        case .weak: return "-110 à -100"
         case .poor: return "< -110"
         case .unknown: return "n/a"
         }
@@ -1285,6 +1287,7 @@ struct MapExplorerView: View {
                     .stroke(isSelected ? Color.clear : SQColor.separator, lineWidth: 1.5)
             }
             .foregroundStyle(isSelected ? Color.white : SQColor.label)
+            .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle())
         .sqAnimation(SQMotion.fast, value: isSelected)
@@ -1576,7 +1579,7 @@ struct MapExplorerView: View {
     private var coverageQualityLegend: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
-                Text("Qualité RSRP").sqKicker()
+                Text("Qualité RSRP (dBm)").sqKicker()
 
                 ForEach(CoverageQualityBand.visibleBands) { band in
                     HStack(spacing: SQSpace.xs + 1) {
@@ -3355,9 +3358,10 @@ private extension MapAnnotationPayload {
         // (antennes, sites communautaires).
         if let tint { return tint }
         if kind == .antenna {
-            if subtitle.localizedCaseInsensitiveContains("Bouygues") { return Color(red: 0.0, green: 0.62, blue: 0.86) }
-            if subtitle.localizedCaseInsensitiveContains("SFR") { return .red }
-            return .red
+            // TEL-MAP-02 : couleur de marque via la résolution tolérante SQBrand
+            // (Orange/Free/SFR/Bouygues + ultramarins) au lieu d'une déduction par
+            // sous-chaîne qui renvoyait Orange ET Free en rouge.
+            return SQBrand.operatorColor(subtitle)
         }
         switch kind {
         case .speedtest:

@@ -275,16 +275,6 @@ struct MapItemSheet: View {
                 default:
                     genericContent
                 }
-                HStack {
-                    GradientButton("Partager", systemImage: "paperplane") {}
-                    Button {} label: {
-                        Image(systemName: "plus.bubble")
-                            .frame(width: 48, height: 48)
-                            .background(.thinMaterial, in: Circle())
-                            .foregroundStyle(SQColor.label)
-                    }
-                    .buttonStyle(.plain)
-                }
             }
             .padding()
         }
