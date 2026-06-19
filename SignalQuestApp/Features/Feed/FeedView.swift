@@ -352,6 +352,7 @@ struct FeedView: View {
         .signalQuestBackground()
         .task {
             if model.page == nil { await model.load() }
+            await consumeFeedRoutesIfNeeded()
         }
         .refreshable { await model.load() }
         .navigationDestination(isPresented: $showExplore) {
@@ -376,24 +377,11 @@ struct FeedView: View {
                 reportsService: services.reports
             )
         }
-        .onChangeCompat(of: router.openUserProfileId) { _, id in
-            guard let id else { return }
-            router.openUserProfileId = nil
-            routedProfileId = id
+        .onChangeCompat(of: router.openUserProfileId) { _, _ in
+            Task { await consumeFeedRoutesIfNeeded() }
         }
-        .onChangeCompat(of: router.openPostId) { _, id in
-            guard let id else { return }
-            router.openPostId = nil
-            // On privilégie l'item déjà chargé dans le feed, sinon on le récupère.
-            if let existing = model.page?.items.first(where: { $0.id == id || $0.backendPostId == id }) {
-                routedPostItem = RoutedPost(item: existing)
-            } else {
-                Task {
-                    if let fetched = try? await services.feed.post(id: id) {
-                        routedPostItem = RoutedPost(item: fetched)
-                    }
-                }
-            }
+        .onChangeCompat(of: router.openPostId) { _, _ in
+            Task { await consumeFeedRoutesIfNeeded() }
         }
         .sheet(item: $presentedSheet) { sheet in
             switch sheet {
@@ -459,6 +447,24 @@ struct FeedView: View {
         .sheet(isPresented: $showComposer) {
             ComposerSheet(service: services.feed, userService: services.users)
                 .onDisappear { Task { await model.load() } }
+        }
+    }
+
+    /// Consomme les routes de notification Feed (profil/post) — appelé au montage
+    /// (.task) ET sur changement du routeur, pour ne pas perdre une route au lancement
+    /// à froid (NAV-BUG-01).
+    private func consumeFeedRoutesIfNeeded() async {
+        if let id = router.openUserProfileId {
+            router.openUserProfileId = nil
+            routedProfileId = id
+        }
+        if let id = router.openPostId {
+            router.openPostId = nil
+            if let existing = model.page?.items.first(where: { $0.id == id || $0.backendPostId == id }) {
+                routedPostItem = RoutedPost(item: existing)
+            } else if let fetched = try? await services.feed.post(id: id) {
+                routedPostItem = RoutedPost(item: fetched)
+            }
         }
     }
 

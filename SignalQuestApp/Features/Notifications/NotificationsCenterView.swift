@@ -45,6 +45,7 @@ final class NotificationsCenterViewModel: ObservableObject {
 
 struct NotificationsCenterView: View {
     @StateObject private var model: NotificationsCenterViewModel
+    @EnvironmentObject private var router: AppRouter
     init(service: NotificationsServicing) {
         _model = StateObject(wrappedValue: NotificationsCenterViewModel(service: service))
     }
@@ -72,11 +73,17 @@ struct NotificationsCenterView: View {
             } else {
                 Section {
                     ForEach(model.items) { item in
-                        notificationRow(item)
-                            .listRowBackground(item.read != true ? SQColor.brandRed.opacity(0.08) : Color.clear)
-                            .swipeActions {
-                                Button("Lu") { Task { await model.markRead(item.id) } }.tint(SQColor.success)
-                            }
+                        Button {
+                            Task { await model.markRead(item.id) }
+                            route(item)
+                        } label: {
+                            notificationRow(item)
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(item.read != true ? SQColor.brandRed.opacity(0.08) : Color.clear)
+                        .swipeActions {
+                            Button("Lu") { Task { await model.markRead(item.id) } }.tint(SQColor.success)
+                        }
                     }
                 } header: {
                     Text("Activité").sqKicker()
@@ -131,6 +138,30 @@ struct NotificationsCenterView: View {
                 }
             }
         }
+    }
+
+    /// Route vers le contenu lié (NOTIF-UX-01) via l'AppRouter partagé.
+    private func route(_ item: AppNotification) {
+        let meta = item.metadata
+        router.handle(
+            type: item.type,
+            conversationId: metaString(meta, "conversationId", "conversation_id"),
+            postId: metaString(meta, "postId", "post_id"),
+            userId: metaString(meta, "userId", "user_id", "actorId", "actor_id"),
+            siteId: metaString(meta, "siteId", "site_id")
+        )
+    }
+
+    private func metaString(_ metadata: [String: JSONValue]?, _ keys: String...) -> String? {
+        guard let metadata else { return nil }
+        for key in keys {
+            switch metadata[key] {
+            case .string(let v) where !v.isEmpty: return v
+            case .number(let n): return String(Int(n))
+            default: continue
+            }
+        }
+        return nil
     }
 
     /// Icône + couleur de pastille par type de notification :

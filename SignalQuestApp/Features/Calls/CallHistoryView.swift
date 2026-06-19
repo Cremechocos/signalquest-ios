@@ -29,6 +29,16 @@ struct CallHistoryView: View {
     var body: some View {
         List {
             Section {
+                if model.isLoading && model.calls.isEmpty {
+                    ProgressView().tint(SQColor.brandRed).frame(maxWidth: .infinity)
+                        .listRowBackground(Color.clear)
+                } else if let error = model.errorMessage, model.calls.isEmpty {
+                    ErrorStateView(title: "Appels indisponibles", message: error) { Task { await model.load() } }
+                        .listRowBackground(Color.clear)
+                } else if model.calls.isEmpty {
+                    EmptyStateView(title: "Aucun appel", message: "Tes appels apparaîtront ici.", systemImage: "phone.badge.waveform")
+                        .listRowBackground(Color.clear)
+                }
                 ForEach(model.calls) { call in
                     let style = directionStyle(call)
                     HStack(spacing: SQSpace.md) {
@@ -65,6 +75,7 @@ struct CallHistoryView: View {
                             .accessibilityHidden(true)
                     }
                     .listRowBackground(SQColor.surface)
+                    .accessibilityElement(children: .combine)
                 }
             } header: {
                 Text("Journal").sqKicker()
@@ -78,14 +89,15 @@ struct CallHistoryView: View {
         .refreshable { await model.load() }
     }
 
-    /// Icône flèche + couleur selon l'issue de l'appel : manqué/refusé en
-    /// danger, terminé en succès, en cours/sonnerie en orange.
+    /// Icône + couleur selon l'ISSUE de l'appel (pas la direction : aucun champ
+    /// entrant/sortant fiable côté backend — CALL-HIST-07). Manqué/refusé en danger,
+    /// terminé en succès, en cours/sonnerie en rouge.
     private func directionStyle(_ call: CallSession) -> (icon: String, color: Color, isMissed: Bool) {
         switch call.status {
         case "missed", "rejected":
-            return ("phone.arrow.down.left.fill", SQColor.danger, true)
+            return ("phone.down.fill", SQColor.danger, true)
         case "ended", "accepted":
-            return ("phone.arrow.up.right.fill", SQColor.success, false)
+            return ("phone.fill", SQColor.success, false)
         default:
             return ("phone.fill", SQColor.brandRed, false)
         }

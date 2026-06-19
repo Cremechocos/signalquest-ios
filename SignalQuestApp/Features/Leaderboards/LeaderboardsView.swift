@@ -44,22 +44,30 @@ struct LeaderboardsView: View {
             VStack(alignment: .leading, spacing: 18) {
                 header
                 filters
-                if model.isLoading {
+                if model.isLoading && model.result.entries.isEmpty {
                     ProgressView()
                         .tint(SQColor.brandRed)
                         .frame(maxWidth: .infinity)
-                }
-                podium
-                    .padding(.vertical, 10)
-                    .sqFadeUp()
-                if let myRank = model.result.myRank {
-                    myRankCard(myRank)
+                        .padding(.vertical, SQSpace.xxl)
+                } else if model.result.entries.isEmpty && model.errorMessage == nil {
+                    EmptyStateView(
+                        title: "Pas encore de classement",
+                        message: model.scope == "friends" ? "Aucun ami classé pour cette période." : "Reviens après quelques mesures de la communauté.",
+                        systemImage: "trophy"
+                    )
+                } else {
+                    podium
+                        .padding(.vertical, 10)
                         .sqFadeUp()
-                }
-                VStack(spacing: SQSpace.sm + 2) {
-                    ForEach(model.result.entries) { entry in
-                        entryRow(entry)
+                    if let myRank = model.result.myRank {
+                        myRankCard(myRank)
                             .sqFadeUp()
+                    }
+                    VStack(spacing: SQSpace.sm + 2) {
+                        ForEach(model.result.entries) { entry in
+                            entryRow(entry)
+                                .sqFadeUp()
+                        }
                     }
                 }
                 if let error = model.errorMessage {
