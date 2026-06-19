@@ -44,6 +44,7 @@ struct SpeedtestView: View {
     @State private var runTask: Task<Void, Never>?
     @State private var showSettings = false
     @State private var showLocationPriming = false
+    @State private var primingDenied = false
     @State private var currentNetworkStatus: NetworkPathStatus = .unknown
     /// Opérateur résolu par IP (ASN) côté backend — repli quand CoreTelephony ne
     /// renvoie rien (iOS 16.4+). Nul sous VPN (l'IP refléterait le tunnel).
@@ -177,6 +178,7 @@ struct SpeedtestView: View {
         .sheet(isPresented: $showSettings) { settingsSheet }
         .sheet(isPresented: $showLocationPriming) {
             LocationPrimingSheet(
+                isDenied: primingDenied,
                 onAllow: { showLocationPriming = false; performRun(requestLocation: true) },
                 onSkip: { showLocationPriming = false; performRun(requestLocation: false) }
             )
@@ -707,6 +709,15 @@ struct SpeedtestView: View {
         // Priming des permissions : si la localisation n'a jamais été demandée, on
         // explique POURQUOI avant de déclencher le prompt système (cf. audit UX-01).
         if !AppEnvironment.runsSpeedtestQA, services.location.authorizationStatus == .notDetermined {
+            primingDenied = false
+            showLocationPriming = true
+            return
+        }
+        // ONB-SEC-01 : localisation refusée + publication carte active → proposer un
+        // retour vers les Réglages plutôt que de lancer sans position en silence.
+        if !AppEnvironment.runsSpeedtestQA, publishToMap,
+           services.location.authorizationStatus == .denied || services.location.authorizationStatus == .restricted {
+            primingDenied = true
             showLocationPriming = true
             return
         }
