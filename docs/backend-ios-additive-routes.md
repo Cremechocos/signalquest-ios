@@ -57,3 +57,22 @@ Décision iOS↔web↔Android à prendre ensemble avant tout changement de valeu
 
 ## 8. (Optionnel) `GET /_ios/social/posts?authorId=` (Lot 8)
 Feed par auteur, pour le filtrage local post-block. Complète le client.
+
+## 9. `POST /api/auth/apple` — Sign in with Apple (✅ route écrite)
+Fichier **déjà écrit** : `app/api/auth/apple/route.ts` (présent dans le working
+tree, **non committé** — à intégrer dans le refactor monorepo). Vérifie le jeton
+d'identité Apple (JWKS `appleid.apple.com/auth/keys` via `crypto.createPublicKey`
++ `jwt.verify`, `iss`/`aud=fr.signalquest.ios`), matche/crée l'utilisateur **par
+email vérifié** (mot de passe aléatoire si nouveau, nom = `fullName` de la 1re
+autorisation), respecte la 2FA, puis `issueSession` + `buildAuthSuccessResponse`.
+**Aucune migration Prisma** (match par email, pas de colonne `appleUserId`).
+Réutilise les helpers existants de `/login` et `/signup`.
+
+**Prérequis hors-code :**
+- Apple Developer : activer la capability **« Sign in with Apple »** sur l'App ID
+  `fr.signalquest.ios` (fait automatiquement par la signature Xcode au build
+  device — à confirmer dans le portail / pour la prod).
+- Déployer la route en prod (le bouton iOS appelle `/api/auth/apple` ; tant que la
+  route n'est pas en ligne, l'auth Apple renvoie 404).
+- (Optionnel, robustesse) ajouter plus tard une colonne `appleUserId String? @unique`
+  (SQL idempotent) pour lier les comptes même si l'email relais change.
