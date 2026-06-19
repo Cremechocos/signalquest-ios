@@ -18,6 +18,8 @@ struct AuthUser: Codable, Identifiable, Equatable {
     let notifyMessagesPush: Bool?
     let notifyMessagesInApp: Bool?
     let callsDoNotDisturb: Bool?
+    /// Vrai si un Apple ID est associé à ce compte (Sign in with Apple).
+    let appleLinked: Bool?
 
     var displayName: String {
         name ?? handle.map { "@\($0)" } ?? email.components(separatedBy: "@").first ?? "Utilisateur"
@@ -35,6 +37,10 @@ struct SignupRequest: Codable {
     let email: String
     let password: String
     let name: String
+}
+
+struct AppleLinkResponse: Decodable {
+    let appleLinked: Bool?
 }
 
 struct LoginResponse: Codable {

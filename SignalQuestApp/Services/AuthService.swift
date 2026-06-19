@@ -7,6 +7,10 @@ protocol AuthServicing: Sendable {
     /// Sign in with Apple : envoie le jeton d'identité Apple (JWT) + le nom
     /// (1re autorisation) ; le backend vérifie le jeton et crée/connecte l'utilisateur.
     func signInWithApple(identityToken: String, fullName: String?) async throws -> LoginResponse
+    /// Associe un Apple ID au compte authentifié courant (depuis les Réglages).
+    func linkApple(identityToken: String) async throws
+    /// Dissocie l'Apple ID du compte authentifié courant.
+    func unlinkApple() async throws
     func setup2FA() async throws -> TwoFactorSetupResponse
     func confirm2FA(secret: String, code: String) async throws
     func disable2FA(code: String) async throws
@@ -66,6 +70,21 @@ final class AuthService: AuthServicing {
             "/api/auth/apple",
             body: AppleSignInRequest(identityToken: identityToken, fullName: fullName),
             authenticated: false
+        )
+    }
+
+    func linkApple(identityToken: String) async throws {
+        struct AppleLinkRequest: Encodable { let identityToken: String }
+        let _: AppleLinkResponse = try await api.requestJSON(
+            "/api/auth/apple/link",
+            body: AppleLinkRequest(identityToken: identityToken)
+        )
+    }
+
+    func unlinkApple() async throws {
+        let _: AppleLinkResponse = try await api.request(
+            APIEndpoint(path: "/api/auth/apple/unlink", method: .post),
+            as: AppleLinkResponse.self
         )
     }
 
@@ -392,6 +411,7 @@ extension AuthUser {
         twoFactorEnabled: false,
         notifyMessagesPush: false,
         notifyMessagesInApp: true,
-        callsDoNotDisturb: false
+        callsDoNotDisturb: false,
+        appleLinked: false
     )
 }

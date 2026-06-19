@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 /// Enveloppe `Identifiable` autour de l'URL de l'archive exportée, pour piloter une
 /// `.sheet(item:)` (l'URL seule n'est pas `Identifiable`).
@@ -82,6 +83,14 @@ struct SettingsView: View {
     @AppStorage(AppLockSettings.lockGraceKey) private var lockGraceSeconds = 0.0
     @AppStorage(AppLockSettings.autoLogoutKey) private var autoLogoutSeconds = 0.0
     @AppStorage(E2EEBiometric.enabledKey) private var e2eeBiometricEnabled = false
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var appleError: String?
+    @State private var showUnlinkAppleConfirm = false
+
+    private var appleLinked: Bool {
+        if case .authenticated(let user) = session.state { return user.appleLinked == true }
+        return false
+    }
 
     /// État 2FA de l'utilisateur courant (SETTINGS-SEC-01).
     private var twoFactorEnabled: Bool {
@@ -163,6 +172,37 @@ struct SettingsView: View {
                 .foregroundStyle(SQColor.label)
                 .listRowBackground(SQColor.surface)
             }
+            Section {
+                if appleLinked {
+                    HStack(spacing: SQSpace.md) {
+                        settingsLabel("Compte Apple associé", systemImage: "applelogo")
+                        Spacer()
+                        Image(systemName: "checkmark.seal.fill").foregroundStyle(SQColor.success)
+                    }
+                    Button(role: .destructive) {
+                        showUnlinkAppleConfirm = true
+                    } label: { settingsLabel("Dissocier le compte Apple", systemImage: "minus.circle") }
+                } else {
+                    SignInWithAppleButton(.continue) { request in
+                        request.requestedScopes = [.fullName, .email]
+                    } onCompletion: { result in handleAppleLink(result) }
+                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                    .frame(height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                }
+                if let appleError {
+                    Text(appleError).font(.caption).foregroundStyle(SQColor.danger)
+                }
+            } header: {
+                Text("Compte Apple")
+            } footer: {
+                Text(appleLinked
+                     ? "Tu peux te connecter avec Apple, même en masquant ton e-mail."
+                     : "Associe ton Apple ID pour te connecter en un geste, même avec « Masquer mon e-mail ».")
+                    .font(SQType.caption)
+            }
+            .foregroundStyle(SQColor.label)
+            .listRowBackground(SQColor.surface)
             Section("Notifications") {
                 Toggle("Messages (push)", isOn: bind(\.notifyMessagesPush))
                 Toggle("Messages (in-app)", isOn: bind(\.notifyMessagesInApp))
@@ -288,6 +328,12 @@ struct SettingsView: View {
         } message: {
             Text("Saisis un code de ton application d'authentification pour confirmer la désactivation.")
         }
+        .alert("Dissocier le compte Apple ?", isPresented: $showUnlinkAppleConfirm) {
+            Button("Annuler", role: .cancel) {}
+            Button("Dissocier", role: .destructive) { unlinkApple() }
+        } message: {
+            Text("Tu ne pourras plus te connecter via Apple. Si ton compte a été créé avec Apple, définis d'abord un mot de passe via « Mot de passe oublié » pour ne pas perdre l'accès.")
+        }
         .sheet(item: $model.exportedFile) { file in
             ShareSheet(items: [file.url])
         }
@@ -305,6 +351,48 @@ struct SettingsView: View {
             Text(title).foregroundStyle(SQColor.label)
         } icon: {
             Image(systemName: systemImage).foregroundStyle(SQColor.brandRed)
+        }
+    }
+
+    /// Associe l'Apple ID : extrait le jeton du flux ASAuthorization et appelle
+    /// le backend, puis recharge l'utilisateur pour rafraîchir l'état « lié ».
+    private func handleAppleLink(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let auth):
+            guard let credential = auth.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = credential.identityToken,
+                  let token = String(data: tokenData, encoding: .utf8) else {
+                appleError = "Jeton Apple manquant. Réessaie."
+                return
+            }
+            Task {
+                appleError = nil
+                do {
+                    try await services.auth.linkApple(identityToken: token)
+                    await session.refreshUser()
+                    Haptics.success()
+                } catch {
+                    appleError = error.localizedDescription
+                    Haptics.error()
+                }
+            }
+        case .failure(let error):
+            if (error as? ASAuthorizationError)?.code == .canceled { return }
+            appleError = "Association Apple impossible. Réessaie."
+        }
+    }
+
+    private func unlinkApple() {
+        Task {
+            appleError = nil
+            do {
+                try await services.auth.unlinkApple()
+                await session.refreshUser()
+                Haptics.success()
+            } catch {
+                appleError = error.localizedDescription
+                Haptics.error()
+            }
         }
     }
 
