@@ -18,7 +18,6 @@ protocol NotificationsServicing: Sendable {
     func markRead(id: String) async throws
     func markAllRead() async throws
     func deleteAll() async throws
-    func subscribePush(fcmToken: String) async throws
 }
 
 final class NotificationsService: NotificationsServicing {
@@ -60,12 +59,4 @@ final class NotificationsService: NotificationsServicing {
         )
     }
 
-    func subscribePush(fcmToken: String) async throws {
-        // `/api/push/subscribe` est l'endpoint Web Push navigateur (pas iOS). On
-        // enregistre uniquement le token FCM, comme Android.
-        let _: SuccessResponse = try await api.requestJSON(
-            "/api/user/fcm-token",
-            body: ["fcmToken": fcmToken]
-        )
-    }
 }

@@ -131,7 +131,6 @@ protocol UserServicing: Sendable {
     func stats() async throws -> UserStats
     func notificationPreferences() async throws -> NotificationPreferences
     func updateNotificationPreferences(_ prefs: NotificationPreferences) async throws -> NotificationPreferences
-    func registerFCMToken(_ token: String) async throws
     func heartbeat() async throws
     func deleteAccount(password: String) async throws
     /// Archive RGPD complète (profil, mesures, contributions, messages…) au format
@@ -192,10 +191,6 @@ final class UserService: UserServicing {
 
     func updateNotificationPreferences(_ prefs: NotificationPreferences) async throws -> NotificationPreferences {
         try await api.requestJSON("/api/user/notification-preferences", method: .patch, body: prefs)
-    }
-
-    func registerFCMToken(_ token: String) async throws {
-        let _: SuccessResponse = try await api.requestJSON("/api/user/fcm-token", body: ["fcmToken": token])
     }
 
     func heartbeat() async throws {
