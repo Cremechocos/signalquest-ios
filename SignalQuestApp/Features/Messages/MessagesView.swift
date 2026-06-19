@@ -101,13 +101,19 @@ struct MessagesView: View {
                         routedConversationId = conversation.id
                     } label: {
                         HStack(spacing: SQSpace.sm) {
-                            conversationRow(conversation)
+                            conversationRow(conversation, unread: isUnread(conversation))
                             Spacer(minLength: 0)
                             VStack(alignment: .trailing, spacing: SQSpace.xs) {
+                                if isUnread(conversation) {
+                                    Circle()
+                                        .fill(SQColor.brandRed)
+                                        .frame(width: 9, height: 9)
+                                        .accessibilityLabel("Non lu")
+                                }
                                 if let date = conversation.lastMessageAt ?? conversation.updatedAt {
                                     Text(date, format: .relative(presentation: .named, unitsStyle: .abbreviated))
                                         .font(SQType.caption)
-                                        .foregroundStyle(SQColor.labelTertiary)
+                                        .foregroundStyle(isUnread(conversation) ? SQColor.brandRed : SQColor.labelTertiary)
                                 }
                                 Image(systemName: "chevron.right")
                                     .font(.footnote.weight(.semibold))
@@ -134,6 +140,16 @@ struct MessagesView: View {
                             Label("Quitter", systemImage: "rectangle.portrait.and.arrow.right")
                         }
                     }
+                }
+                if !model.isLoading && model.conversations.isEmpty && model.errorMessage == nil {
+                    EmptyStateView(
+                        title: "Aucune conversation",
+                        message: "Démarre une discussion avec un membre de la communauté.",
+                        systemImage: "bubble.left.and.bubble.right"
+                    )
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 }
             } header: { Text("Conversations") }
 
@@ -253,7 +269,7 @@ struct MessagesView: View {
             ?? conversation.participants.first
     }
 
-    private func conversationRow(_ conversation: MessageConversation) -> some View {
+    private func conversationRow(_ conversation: MessageConversation, unread: Bool = false) -> some View {
         let title = conversation.displayTitle(excluding: currentUserId)
         return HStack(spacing: SQSpace.md) {
             SQAvatar(
@@ -284,8 +300,8 @@ struct MessagesView: View {
                     }
                 }
                 Text(lastMessagePreview(conversation))
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .font(unread ? SQFont.archivo(13, .semibold, relativeTo: .footnote) : SQType.caption)
+                    .foregroundStyle(unread ? SQColor.label : SQColor.labelSecondary)
                     .lineLimit(1)
             }
         }
@@ -296,6 +312,15 @@ struct MessagesView: View {
     /// Pastille de présence : au moins un autre participant est en ligne.
     private func isOnline(_ conversation: MessageConversation) -> Bool {
         conversation.participants.contains { $0.presence?.isOnline == true }
+    }
+
+    /// Conversation non lue (MSG-UX-02) : dernier message reçu d'un autre, postérieur
+    /// au marqueur de lecture courant.
+    private func isUnread(_ conversation: MessageConversation) -> Bool {
+        guard let last = conversation.lastMessage, last.senderId != currentUserId,
+              let lastAt = conversation.lastMessageAt else { return false }
+        if let read = conversation.lastReadAt { return lastAt > read }
+        return true
     }
 }
 

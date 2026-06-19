@@ -409,6 +409,11 @@ struct ConversationDetailView: View {
                     }
                 }
                 HStack(spacing: SQSpace.xs) {
+                    if let created = message.createdAt {
+                        Text(created, format: .dateTime.hour().minute())
+                            .font(SQType.micro)
+                            .foregroundStyle(mine ? .white.opacity(0.6) : SQColor.labelTertiary)
+                    }
                     if message.editedAt != nil && message.deletedAt == nil {
                         Text("modifié")
                             .font(SQType.micro)
@@ -428,6 +433,7 @@ struct ConversationDetailView: View {
             }
             .padding(SQSpace.md)
             .background(mine ? AnyShapeStyle(SQGradient.signal) : AnyShapeStyle(SQColor.surface), in: bubbleShape(mine: mine))
+            .accessibilityElement(children: .combine)
             .contextMenu { contextMenu(for: message, mine: mine) }
                 threadReplyBadge(for: message)
             }
