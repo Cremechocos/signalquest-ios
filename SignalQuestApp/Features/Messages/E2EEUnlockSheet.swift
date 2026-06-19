@@ -13,6 +13,9 @@ struct E2EEUnlockSheet: View {
     @State private var isBusy = false
     @State private var error: String?
     @State private var needsCreation = false
+    /// Proposer de mémoriser le mot de passe E2EE derrière Face ID / Touch ID.
+    @State private var rememberWithBiometric = false
+    @State private var didAttemptBiometric = false
     /// Apparition douce du badge cadenas (scale 0.9 → 1, SQMotion.emphasized).
     @State private var badgeAppeared = false
     var onUnlock: () -> Void
@@ -53,6 +56,27 @@ struct E2EEUnlockSheet: View {
                                 .font(.caption2)
                                 .foregroundStyle(SQColor.labelTertiary)
                                 .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        // Proposer la mémorisation biométrique (1re fois, pas en création).
+                        if !needsCreation, BiometricAuth.isAvailable, !E2EEBiometric.isEnabled {
+                            Toggle(isOn: $rememberWithBiometric) {
+                                Label("Mémoriser avec \(BiometricAuth.kind.label)", systemImage: BiometricAuth.kind.systemImage)
+                                    .font(SQType.caption)
+                            }
+                            .tint(SQColor.brandRed)
+                        }
+
+                        // Déverrouillage biométrique direct (déjà mémorisé).
+                        if !needsCreation, E2EEBiometric.isEnabled, E2EEBiometric.hasStored {
+                            Button {
+                                Task { await biometricUnlock() }
+                            } label: {
+                                Label("Déverrouiller avec \(BiometricAuth.kind.label)", systemImage: BiometricAuth.kind.systemImage)
+                                    .font(SQType.caption.weight(.semibold))
+                                    .foregroundStyle(SQColor.brandRed)
+                            }
+                            .buttonStyle(.plain)
                         }
 
                         if let error {
@@ -96,7 +120,13 @@ struct E2EEUnlockSheet: View {
             }
             .task {
                 await checkExistingKey()
-                passwordFocused = true
+                // Déverrouillage biométrique automatique si déjà mémorisé.
+                if !needsCreation, E2EEBiometric.isEnabled, E2EEBiometric.hasStored, !didAttemptBiometric {
+                    didAttemptBiometric = true
+                    await biometricUnlock()
+                } else {
+                    passwordFocused = true
+                }
             }
         }
         .presentationDetents([.medium, .large])
@@ -142,6 +172,10 @@ struct E2EEUnlockSheet: View {
             } else {
                 try await service.generateAndRegisterKey(userId: userId, password: password)
             }
+            // Mémorise le mot de passe derrière la biométrie si demandé (unlock réussi).
+            if rememberWithBiometric, BiometricAuth.isAvailable {
+                E2EEBiometric.store(password: password)
+            }
             Haptics.success()
             onUnlock()
             dismiss()
@@ -149,5 +183,16 @@ struct E2EEUnlockSheet: View {
             self.error = error.localizedDescription
             Haptics.error()
         }
+    }
+
+    /// Déverrouillage E2EE via Face ID / Touch ID : lit le mot de passe mémorisé
+    /// (déclenche la biométrie) puis exécute le déverrouillage normal.
+    private func biometricUnlock() async {
+        guard let stored = await E2EEBiometric.retrieve(reason: "Déverrouille ta messagerie chiffrée") else {
+            passwordFocused = true
+            return
+        }
+        password = stored
+        await unlockOrCreate()
     }
 }

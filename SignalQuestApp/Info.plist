@@ -51,6 +51,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>SignalQuest utilise la caméra uniquement pendant les appels vidéo que tu démarres ou acceptes.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>SignalQuest utilise Face ID pour verrouiller l&apos;app et déverrouiller ta messagerie chiffrée.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SignalQuest utilise ta position uniquement si tu l&apos;autorises pour placer tes speedtests et contributions sur la carte.</string>
 	<key>NSMicrophoneUsageDescription</key>

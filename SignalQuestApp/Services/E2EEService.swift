@@ -196,6 +196,9 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
     func wipeLocalKeys() async {
         stateLock.withLock { unlockedPrivateJwk = nil }
         try? tokenStore.removeAll()
+        // Efface aussi le mot de passe E2EE mémorisé derrière la biométrie : c'est
+        // du matériel E2EE, il ne doit pas survivre à un logout / changement de compte.
+        E2EEBiometric.clear()
     }
 
     func isConversationUnlocked(conversationId: String) async -> Bool {

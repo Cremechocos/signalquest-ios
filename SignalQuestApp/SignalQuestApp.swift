@@ -9,6 +9,7 @@ struct SignalQuestApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var services: AppServices
     @StateObject private var session: AuthSessionViewModel
+    @StateObject private var appLock = AppLockController()
     @AppStorage("sq.hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     init() {
@@ -59,6 +60,7 @@ struct SignalQuestApp: App {
                 .environmentObject(services.router)
                 .environmentObject(services.callManager)
                 .environmentObject(services.networkPath)
+                .environmentObject(appLock)
                 .task {
                     services.networkPath.start()
                     AppDelegate.sharedPush = services.push
@@ -66,6 +68,8 @@ struct SignalQuestApp: App {
                     AppDelegate.sharedE2EE = services.e2ee
                     await session.bootstrap()
                     await registerPushIfAuthenticated(session.state)
+                    // Verrouillage biométrique à l'ouverture (si activé + authentifié).
+                    if case .authenticated = session.state { appLock.lockOnActivationIfNeeded() }
                 }
                 .onChangeCompat(of: session.state) { _, newState in
                     // Un login effectué dans une session déjà lancée (cas nominal
@@ -74,19 +78,32 @@ struct SignalQuestApp: App {
                     // ne reçoit ni notifications ni appels tant qu'il ne relance pas
                     // l'app à froid. Les deux appels sont idempotents.
                     Task { await registerPushIfAuthenticated(newState) }
+                    if case .authenticated = newState {
+                        appLock.lockOnActivationIfNeeded()
+                    } else {
+                        appLock.reset()   // jamais verrouillé par-dessus l'écran de login
+                    }
                 }
                 .onChangeCompat(of: scenePhase) { _, phase in
-                    if phase == .active {
+                    switch phase {
+                    case .active:
                         UNUserNotificationCenter.current().setBadgeCountCompat(0)
-                        // CALL-INCOMING-03 / CALL-VOIP-04 : au retour au premier plan,
-                        // ré-enregistrer le token VoIP et rattraper un appel entrant que
-                        // le push VoIP aurait manqué.
+                        // Verrouillage / déconnexion par inactivité au retour au 1er plan.
+                        if case .authenticated = session.state, appLock.willEnterForeground() {
+                            Task { await session.logout() }
+                        }
+                        // CALL-INCOMING-03 / CALL-VOIP-04 : ré-enregistrer le token VoIP
+                        // et rattraper un appel entrant que le push VoIP aurait manqué.
                         if case .authenticated = session.state {
                             Task {
                                 await services.callManager.retryVoIPTokenRegistrationIfNeeded()
                                 await services.callManager.reconcilePendingIncomingCall()
                             }
                         }
+                    case .background:
+                        appLock.didEnterBackground()
+                    default:
+                        break
                     }
                 }
                 .fullScreenCover(isPresented: Binding(
@@ -103,6 +120,7 @@ struct RootView: View {
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var callManager: CallManager
     @EnvironmentObject private var networkPath: NetworkPathMonitor
+    @EnvironmentObject private var appLock: AppLockController
 
     var body: some View {
         Group {
@@ -147,6 +165,14 @@ struct RootView: View {
         .overlay(alignment: .top) {
             OfflineBanner(isVisible: !networkPath.isOnline)
         }
+        // Verrouillage biométrique : masque tout le contenu authentifié tant que
+        // l'utilisateur ne s'est pas déverrouillé par Face ID / Touch ID.
+        .overlay {
+            if isAuthenticated, appLock.isLocked {
+                AppLockScreen(lock: appLock).transition(.opacity)
+            }
+        }
+        .sqAnimation(SQMotion.smooth, value: appLock.isLocked)
         // CALL-VOIP-07 : au retour du réseau (sortie de tunnel/mode avion), si le
         // dernier enregistrement du token VoIP avait échoué, on le rejoue — sinon
         // l'utilisateur resterait injoignable jusqu'au prochain passage foreground.
@@ -154,6 +180,11 @@ struct RootView: View {
             guard online, case .authenticated = session.state else { return }
             Task { await callManager.retryVoIPTokenRegistrationIfNeeded() }
         }
+    }
+
+    private var isAuthenticated: Bool {
+        if case .authenticated = session.state { return true }
+        return false
     }
 }
 

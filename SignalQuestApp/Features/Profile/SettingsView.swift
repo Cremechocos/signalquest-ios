@@ -78,6 +78,10 @@ struct SettingsView: View {
     @State private var disable2FACode = ""
     @State private var showDeleteConfirm = false
     @AppStorage(MapBackdrop.storageKey) private var mapBackdropRaw = MapBackdrop.carto.rawValue
+    @AppStorage(AppLockSettings.enabledKey) private var appLockEnabled = false
+    @AppStorage(AppLockSettings.lockGraceKey) private var lockGraceSeconds = 0.0
+    @AppStorage(AppLockSettings.autoLogoutKey) private var autoLogoutSeconds = 0.0
+    @AppStorage(E2EEBiometric.enabledKey) private var e2eeBiometricEnabled = false
 
     /// État 2FA de l'utilisateur courant (SETTINGS-SEC-01).
     private var twoFactorEnabled: Bool {
@@ -117,6 +121,48 @@ struct SettingsView: View {
                 }
             }
             .listRowBackground(SQColor.surface)
+            if BiometricAuth.isAvailable {
+                Section {
+                    Toggle(isOn: $appLockEnabled) {
+                        settingsLabel("Verrouiller avec \(BiometricAuth.kind.label)", systemImage: BiometricAuth.kind.systemImage)
+                    }
+                    if appLockEnabled {
+                        Picker(selection: $lockGraceSeconds) {
+                            Text("Immédiat").tag(0.0)
+                            Text("Après 1 min").tag(60.0)
+                            Text("Après 5 min").tag(300.0)
+                            Text("Après 15 min").tag(900.0)
+                        } label: { settingsLabel("Verrouillage", systemImage: "clock") }
+                        Picker(selection: $autoLogoutSeconds) {
+                            Text("Jamais").tag(0.0)
+                            Text("Après 15 min").tag(900.0)
+                            Text("Après 1 h").tag(3600.0)
+                            Text("Après 8 h").tag(28800.0)
+                        } label: { settingsLabel("Déconnexion auto", systemImage: "rectangle.portrait.and.arrow.right") }
+                    }
+                    // Désactivation de la mémorisation E2EE par biométrie (l'activation
+                    // se fait depuis la feuille de déverrouillage chiffré).
+                    if e2eeBiometricEnabled {
+                        Toggle(isOn: Binding(
+                            get: { e2eeBiometricEnabled },
+                            set: { newValue in
+                                e2eeBiometricEnabled = newValue
+                                if !newValue { E2EEBiometric.clear() }
+                            }
+                        )) {
+                            settingsLabel("Messagerie chiffrée via \(BiometricAuth.kind.label)", systemImage: "lock.shield")
+                        }
+                    }
+                } header: {
+                    Text("Verrouillage")
+                } footer: {
+                    Text("Exige \(BiometricAuth.kind.label) à l’ouverture après le délai d’inactivité choisi. La déconnexion automatique efface la session après une inactivité prolongée.")
+                        .font(SQType.caption)
+                }
+                .tint(SQColor.brandRed)
+                .foregroundStyle(SQColor.label)
+                .listRowBackground(SQColor.surface)
+            }
             Section("Notifications") {
                 Toggle("Messages (push)", isOn: bind(\.notifyMessagesPush))
                 Toggle("Messages (in-app)", isOn: bind(\.notifyMessagesInApp))
