@@ -33,11 +33,19 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
     let lastValidated: Date?
     /// Présent seulement sur les nœuds enb/gnb : un AUTRE site domine ce nœud.
     let conflict: Bool
+    /// Site « consensus » communautaire qui domine ce nœud en conflit (clés Android
+    /// `conflictSite*` de `mine?include=related`). Permet « Adopter le site communautaire ».
+    let conflictSiteId: String?
+    let conflictSiteAddress: String?
+    let conflictSiteValidations: Int?
+    let conflictSiteLat: Double?
+    let conflictSiteLng: Double?
 
     enum CodingKeys: String, CodingKey {
         case id, siteId, type, enb, gnb, cellId, pci, ci, tech, band
         case `operator`, operatorMcc, operatorMnc, marketCode, sectors, validations, source
         case createdAt, lastValidated, conflict
+        case conflictSiteId, conflictSiteAddress, conflictSiteValidations, conflictSiteLat, conflictSiteLng
     }
 
     init(from decoder: Decoder) throws {
@@ -63,6 +71,11 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         createdAt = (try? c.decodeIfPresent(Date.self, forKey: .createdAt)) ?? nil
         lastValidated = (try? c.decodeIfPresent(Date.self, forKey: .lastValidated)) ?? nil
         conflict = (try? c.decodeIfPresent(Bool.self, forKey: .conflict)) ?? false
+        conflictSiteId = c.decodeFlexibleString(forKey: .conflictSiteId)
+        conflictSiteAddress = c.decodeFlexibleString(forKey: .conflictSiteAddress)
+        conflictSiteValidations = try? c.decodeIfPresent(Int.self, forKey: .conflictSiteValidations)
+        conflictSiteLat = try? c.decodeIfPresent(Double.self, forKey: .conflictSiteLat)
+        conflictSiteLng = try? c.decodeIfPresent(Double.self, forKey: .conflictSiteLng)
     }
 
     /// Catégorie radio normalisée pour le filtrage / affichage.

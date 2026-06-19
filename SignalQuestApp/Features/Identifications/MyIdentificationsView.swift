@@ -331,6 +331,8 @@ private struct IdentificationDetailSheet: View {
     @State private var confirmingWithdraw = false
     @State private var showRemap = false
     @State private var showSector = false
+    @State private var adoptBusy = false
+    @State private var adoptError: String?
 
     private var is5G: Bool { item.kind == .gnb || item.techLabel == "5G" }
     /// Ré-attribution de site : seulement pour les nœuds eNB/gNB.
@@ -344,12 +346,7 @@ private struct IdentificationDetailSheet: View {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
                     header
                     if item.conflict {
-                        Label("Conflit : un autre site domine ce nœud en validations. Retire cette identification si elle est erronée.", systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundStyle(SQColor.warning)
-                            .padding(SQSpace.md)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(SQColor.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        conflictSection
                     }
                     detailsCard
                     editSection
@@ -384,6 +381,79 @@ private struct IdentificationDetailSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    /// Conflit de consensus (MYID-TELECOM-02) : avertissement + bloc « Site communautaire
+    /// (consensus) » avec bouton « Adopter le site communautaire » (parité Android).
+    @ViewBuilder
+    private var conflictSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Label("Conflit : un autre site domine ce nœud en validations.", systemImage: "exclamationmark.triangle.fill")
+                .font(.caption)
+                .foregroundStyle(SQColor.warning)
+            if let consensusId = item.conflictSiteId {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Site communautaire (consensus)")
+                        .font(SQType.micro)
+                        .foregroundStyle(SQColor.labelSecondary)
+                    Text(item.conflictSiteAddress ?? "Site \(consensusId)")
+                        .font(SQFont.archivo(14, .semibold))
+                        .foregroundStyle(SQColor.label)
+                    if let v = item.conflictSiteValidations {
+                        Text("\(v) validation\(v > 1 ? "s" : "")")
+                            .font(SQType.micro)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                }
+                Button {
+                    Task { await adoptConsensus(toSiteId: consensusId) }
+                } label: {
+                    HStack(spacing: SQSpace.xs + 2) {
+                        if adoptBusy { ProgressView().tint(.white) } else { Image(systemName: "checkmark.seal.fill") }
+                        Text("Adopter le site communautaire").font(SQType.caption.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, SQSpace.sm + 2)
+                    .foregroundStyle(.white)
+                    .background(SQColor.brandGreen, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(adoptBusy)
+                if let adoptError {
+                    Text(adoptError).font(.caption2).foregroundStyle(SQColor.danger)
+                }
+            } else {
+                Text("Retire cette identification si elle est erronée.")
+                    .font(.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+        .padding(SQSpace.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func adoptConsensus(toSiteId: String) async {
+        adoptBusy = true
+        adoptError = nil
+        defer { adoptBusy = false }
+        do {
+            let result = try await services.identify.editSite(
+                fromSiteId: item.siteId, toSiteId: toSiteId,
+                enb: item.enb, gnb: item.gnb, reason: "adopt-consensus"
+            )
+            if result.success || result.moved > 0 || result.noop {
+                Haptics.success()
+                onChanged()
+                dismiss()
+            } else {
+                adoptError = "Adoption non appliquée."
+                Haptics.error()
+            }
+        } catch {
+            adoptError = error.localizedDescription
+            Haptics.error()
+        }
     }
 
     @ViewBuilder
