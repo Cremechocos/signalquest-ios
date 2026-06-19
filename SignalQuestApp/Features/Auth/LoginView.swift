@@ -1,9 +1,11 @@
 import SwiftUI
+import AuthenticationServices
 
 struct LoginView: View {
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
+    @Environment(\.colorScheme) private var colorScheme
     @State private var email = ""
     @State private var password = ""
     @State private var code = ""
@@ -77,6 +79,19 @@ struct LoginView: View {
                     }
                     .sqAuthAppear(appeared, delay: 0.08)
 
+                    if !isTwoFactor {
+                        SignInWithAppleButton(.signIn) { request in
+                            request.requestedScopes = [.fullName, .email]
+                        } onCompletion: { result in
+                            handleAppleSignIn(result)
+                        }
+                        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                        .frame(height: 50)
+                        .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                        .accessibilityLabel("Continuer avec Apple")
+                        .sqAuthAppear(appeared, delay: 0.10)
+                    }
+
                     Button {
                         Haptics.light()
                         showGuestMap = true
@@ -135,6 +150,34 @@ struct LoginView: View {
     private var isTwoFactor: Bool {
         if case .requires2FA = session.state { return true }
         return false
+    }
+
+    /// Traite le résultat du bouton « Continuer avec Apple » : extrait le jeton
+    /// d'identité (JWT signé par Apple) + le nom (fourni UNIQUEMENT à la 1re
+    /// autorisation) et délègue au ViewModel.
+    private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let auth):
+            guard let credential = auth.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = credential.identityToken,
+                  let identityToken = String(data: tokenData, encoding: .utf8) else {
+                session.errorMessage = "Jeton Apple manquant. Réessaie."
+                return
+            }
+            let fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
+                .compactMap { $0 }
+                .joined(separator: " ")
+            Task {
+                await session.signInWithApple(
+                    identityToken: identityToken,
+                    fullName: fullName.isEmpty ? nil : fullName
+                )
+            }
+        case .failure(let error):
+            // Annulation utilisateur → silencieux ; autre erreur → message générique.
+            if (error as? ASAuthorizationError)?.code == .canceled { return }
+            session.errorMessage = "Connexion Apple impossible. Réessaie."
+        }
     }
 
     private var header: some View {

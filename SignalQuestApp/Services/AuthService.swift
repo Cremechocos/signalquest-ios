@@ -4,6 +4,9 @@ protocol AuthServicing: Sendable {
     func login(email: String, password: String) async throws -> LoginResponse
     func signup(email: String, password: String, name: String) async throws -> LoginResponse
     func verify2FA(tempToken: String, code: String) async throws -> LoginResponse
+    /// Sign in with Apple : envoie le jeton d'identité Apple (JWT) + le nom
+    /// (1re autorisation) ; le backend vérifie le jeton et crée/connecte l'utilisateur.
+    func signInWithApple(identityToken: String, fullName: String?) async throws -> LoginResponse
     func setup2FA() async throws -> TwoFactorSetupResponse
     func confirm2FA(secret: String, code: String) async throws
     func disable2FA(code: String) async throws
@@ -50,6 +53,18 @@ final class AuthService: AuthServicing {
         try await api.requestJSON(
             "/api/auth/signup",
             body: SignupRequest(email: email, password: password, name: name),
+            authenticated: false
+        )
+    }
+
+    func signInWithApple(identityToken: String, fullName: String?) async throws -> LoginResponse {
+        struct AppleSignInRequest: Encodable {
+            let identityToken: String
+            let fullName: String?
+        }
+        return try await api.requestJSON(
+            "/api/auth/apple",
+            body: AppleSignInRequest(identityToken: identityToken, fullName: fullName),
             authenticated: false
         )
     }
@@ -275,6 +290,24 @@ final class AuthSessionViewModel: ObservableObject {
                 state = .requires2FA(tempToken: tempToken)
             } else {
                 errorMessage = "Compte créé mais session non initialisée"
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func signInWithApple(identityToken: String, fullName: String?) async {
+        isBusy = true
+        errorMessage = nil
+        defer { isBusy = false }
+        do {
+            let response = try await service.signInWithApple(identityToken: identityToken, fullName: fullName)
+            if response.requires2FA == true, let tempToken = response.tempToken {
+                state = .requires2FA(tempToken: tempToken)
+            } else if let user = response.user {
+                await setAuthenticated(user)
+            } else {
+                errorMessage = "Réponse Apple invalide"
             }
         } catch {
             errorMessage = error.localizedDescription
