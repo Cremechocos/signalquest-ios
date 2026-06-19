@@ -268,6 +268,7 @@ struct ComposerSheet: View {
                         }
                         .padding(.horizontal, SQSpace.lg)
                         .padding(.top, SQSpace.md)
+                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
                     } else {
                         // Preview Mode
                         let author = model.previewAuthor
@@ -285,12 +286,15 @@ struct ComposerSheet: View {
 
                     if let error = model.errorMessage {
                         Label(error, systemImage: "exclamationmark.triangle")
-                            .font(.footnote)
+                            .font(SQType.caption)
                             .foregroundStyle(SQColor.danger)
                             .padding(.horizontal, SQSpace.lg)
+                            .transition(.move(edge: .top).combined(with: .opacity))
                     }
                 }
                 .padding(.bottom, SQSpace.xxl)
+                .sqAnimation(SQMotion.smooth, value: selectedMode)
+                .sqAnimation(SQMotion.snappy, value: model.errorMessage)
             }
             .signalQuestBackground()
             .navigationBarTitleDisplayMode(.inline)
@@ -449,8 +453,9 @@ struct ComposerSheet: View {
                     Text("\(limit - charCount)")
                         .font(SQFont.archivo(11, .bold))
                         .foregroundStyle(isOver ? SQColor.danger : SQColor.warning)
+                        .contentTransition(.numericText())
                 }
-                
+
                 Circle()
                     .stroke(SQColor.fill, lineWidth: 2.5)
                     .frame(width: 20, height: 20)
@@ -465,6 +470,7 @@ struct ComposerSheet: View {
                     }
             }
         }
+        .sqAnimation(SQMotion.snappy, value: charCount)
     }
 
     private var quickHashtagsBar: some View {
