@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreImage.CIFilterBuiltins
+import UniformTypeIdentifiers
 
 @MainActor
 final class TwoFactorSetupViewModel: ObservableObject {
@@ -72,8 +73,15 @@ struct TwoFactorSetupView: View {
                             .padding(.horizontal, SQSpace.md).padding(.vertical, SQSpace.sm)
                             .background(SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                             .contextMenu {
-                                Button("Copier") { UIPasteboard.general.string = setup.secret }
+                                Button("Copier") { copySecret(setup.secret) }
                             }
+                        // 2FA-SEC-01 : avertir que ce secret est sensible et que la
+                        // copie s'efface du presse-papier au bout d'une minute.
+                        Label("Secret sensible — copie effacée du presse-papier après 1 min.", systemImage: "exclamationmark.shield")
+                            .font(.caption2)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(SQSpace.xl)
@@ -172,5 +180,18 @@ struct TwoFactorSetupView: View {
         guard let output = filter.outputImage?.transformed(by: CGAffineTransform(scaleX: 8, y: 8)),
               let cg = context.createCGImage(output, from: output.extent) else { return nil }
         return UIImage(cgImage: cg)
+    }
+
+    /// 2FA-SEC-01 : copie le secret TOTP avec une expiration de presse-papier
+    /// (1 min) pour qu'il ne traîne pas indéfiniment, lisible par d'autres apps.
+    private func copySecret(_ secret: String) {
+        UIPasteboard.general.setItems(
+            [[UTType.utf8PlainText.identifier: secret]],
+            options: [
+                .localOnly: true,                                   // bloque Universal Clipboard (Handoff)
+                .expirationDate: Date().addingTimeInterval(60)      // purge auto après 1 min
+            ]
+        )
+        Haptics.success()
     }
 }

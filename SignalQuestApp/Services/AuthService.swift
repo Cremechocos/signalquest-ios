@@ -15,11 +15,16 @@ protocol AuthServicing: Sendable {
     func me() async throws -> AuthUser
     func hasStoredCredentials() -> Bool
     func installAuthTokenForDebugQA(_ token: String)
+    /// E2EE-WIPE-02 : purge les clés E2EE si l'utilisateur authentifié diffère du
+    /// dernier connu sur cet appareil (changement de compte sans logout, ex.
+    /// expiration de session). À appeler avant de passer en `.authenticated`.
+    func wipeE2EEIfIdentityChanged(to userId: String) async
 }
 
 extension AuthServicing {
     func installAuthTokenForDebugQA(_ token: String) {}
     func hasStoredCredentials() -> Bool { false }
+    func wipeE2EEIfIdentityChanged(to userId: String) async {}
 }
 
 final class AuthService: AuthServicing {
@@ -125,6 +130,18 @@ final class AuthService: AuthServicing {
         api.credentials.clearAll()
     }
 
+    func wipeE2EEIfIdentityChanged(to userId: String) async {
+        // `lastUserId` vit dans le Keychain AUTH ("fr.signalquest.ios"), distinct
+        // du store E2EE wipé → il survit au wipe et aux redémarrages, ce qui permet
+        // de détecter un changement de compte même après une expiration de session.
+        let store = KeychainStore()
+        let last = try? store.string(for: "lastUserId")
+        if let last, last != userId {
+            await e2ee?.wipeLocalKeys()
+        }
+        try? store.set(userId, for: "lastUserId")
+    }
+
     func me() async throws -> AuthUser {
         let response: AuthMeResponse = try await api.request(
             APIEndpoint(path: "/api/auth/me"),
@@ -174,6 +191,15 @@ final class AuthSessionViewModel: ObservableObject {
         }
     }
 
+    /// E2EE-WIPE-02 : centralise tous les passages RÉELS en `.authenticated`. Purge
+    /// les clés E2EE de l'ancien compte si l'identité a changé sur cet appareil
+    /// (changement de compte sans logout, ex. expiration de session). No-op pour le
+    /// même utilisateur → aucune ressaisie du mot de passe E2EE.
+    private func setAuthenticated(_ user: AuthUser) async {
+        await service.wipeE2EEIfIdentityChanged(to: user.id)
+        state = .authenticated(user)
+    }
+
     func bootstrap() async {
         if case .authenticated = state { return }
         guard !AppEnvironment.usesDemoData else { return }
@@ -187,7 +213,7 @@ final class AuthSessionViewModel: ObservableObject {
         }
         do {
             let user = try await service.me()
-            state = .authenticated(user)
+            await setAuthenticated(user)
         } catch let error as APIError {
             switch error {
             case .http(let status, _, _, _, _) where status == 401 || status == 403:
@@ -228,7 +254,7 @@ final class AuthSessionViewModel: ObservableObject {
             if response.requires2FA == true, let tempToken = response.tempToken {
                 state = .requires2FA(tempToken: tempToken)
             } else if let user = response.user {
-                state = .authenticated(user)
+                await setAuthenticated(user)
             } else {
                 errorMessage = "Réponse auth invalide"
             }
@@ -244,7 +270,7 @@ final class AuthSessionViewModel: ObservableObject {
         do {
             let response = try await service.signup(email: email, password: password, name: name)
             if let user = response.user {
-                state = .authenticated(user)
+                await setAuthenticated(user)
             } else if response.requires2FA == true, let tempToken = response.tempToken {
                 state = .requires2FA(tempToken: tempToken)
             } else {
@@ -263,7 +289,7 @@ final class AuthSessionViewModel: ObservableObject {
         do {
             let response = try await service.verify2FA(tempToken: tempToken, code: code)
             if let user = response.user {
-                state = .authenticated(user)
+                await setAuthenticated(user)
             } else {
                 errorMessage = "Code 2FA accepté mais utilisateur absent"
             }

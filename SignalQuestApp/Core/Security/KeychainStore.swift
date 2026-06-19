@@ -1,12 +1,39 @@
 import Foundation
 import Security
 
+/// Niveau d'accessibilité Keychain par type de secret (SEC-KEYCHAIN-01).
+enum KeychainAccessibility {
+    /// Lisible dès le 1er déverrouillage après démarrage, MÊME écran verrouillé —
+    /// requis pour le token d'auth (refresh en arrière-plan, réponse à un appel
+    /// VoIP sur écran verrouillé).
+    case afterFirstUnlock
+    /// Lisible UNIQUEMENT quand l'appareil est activement déverrouillé — pour les
+    /// secrets E2EE (clé privée, clés de conversation), jamais accédés en
+    /// arrière-plan (déchiffrement strictement en foreground).
+    case whenUnlocked
+
+    var cfValue: CFString {
+        switch self {
+        case .afterFirstUnlock: return kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        case .whenUnlocked: return kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        }
+    }
+}
+
 protocol TokenStore: Sendable {
     func string(for key: String) throws -> String?
-    func set(_ value: String, for key: String) throws
+    func set(_ value: String, for key: String, accessibility: KeychainAccessibility) throws
     func remove(_ key: String) throws
     /// Removes every item stored under this store's keychain service.
     func removeAll() throws
+}
+
+extension TokenStore {
+    /// Défaut historique : `afterFirstUnlock` (token d'auth). Les secrets E2EE
+    /// doivent explicitement passer `.whenUnlocked`.
+    func set(_ value: String, for key: String) throws {
+        try set(value, for: key, accessibility: .afterFirstUnlock)
+    }
 }
 
 enum KeychainError: Error, LocalizedError, Equatable {
@@ -45,12 +72,12 @@ final class KeychainStore: TokenStore, @unchecked Sendable {
         return value
     }
 
-    func set(_ value: String, for key: String) throws {
+    func set(_ value: String, for key: String, accessibility: KeychainAccessibility) throws {
         let data = Data(value.utf8)
         var query = baseQuery(key)
         let attributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            kSecAttrAccessible as String: accessibility.cfValue
         ]
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         if status == errSecSuccess { return }
@@ -95,7 +122,7 @@ final class InMemoryTokenStore: TokenStore, @unchecked Sendable {
         return values[key]
     }
 
-    func set(_ value: String, for key: String) throws {
+    func set(_ value: String, for key: String, accessibility: KeychainAccessibility) throws {
         lock.lock()
         defer { lock.unlock() }
         values[key] = value

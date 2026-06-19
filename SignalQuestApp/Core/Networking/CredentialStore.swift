@@ -62,6 +62,24 @@ final class CredentialStore: @unchecked Sendable {
         try? tokenStore.remove(Key.accessToken)
         try? tokenStore.remove(Key.refreshToken)
         setTempToken(nil)
+        // SEC-AUTH-02 : URLSession.shared stocke aussi le cookie `auth_token` reçu
+        // en Set-Cookie dans HTTPCookieStorage.shared et le ré-émet automatiquement.
+        // Sans cette purge, le cookie survit au logout (le token Keychain est
+        // pourtant effacé) et peut ré-authentifier des requêtes.
+        Self.purgeAuthCookies()
+    }
+
+    /// Supprime les cookies du domaine signalquest.fr de HTTPCookieStorage.shared.
+    /// Match STRICT du domaine (un `cookie.domain` peut débuter par un point) pour
+    /// ne pas confondre avec un domaine malveillant type `evil-signalquest.fr.x.com`.
+    static func purgeAuthCookies() {
+        let storage = HTTPCookieStorage.shared
+        for cookie in storage.cookies ?? [] {
+            let domain = cookie.domain.hasPrefix(".") ? String(cookie.domain.dropFirst()) : cookie.domain
+            if domain == "signalquest.fr" || domain.hasSuffix(".signalquest.fr") {
+                storage.deleteCookie(cookie)
+            }
+        }
     }
 
     // MARK: Capture from response

@@ -82,8 +82,8 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
         guard Self.privateJwk(privateJwk, matchesPublicJwk: bootstrapKey.publicKeyJwk) else {
             throw E2EEError.invalidKey
         }
-        try tokenStore.set(privateJwk, for: "privateJwk:\(userId)")
-        try tokenStore.set(privateJwk, for: "privateJwk:current")
+        try tokenStore.set(privateJwk, for: "privateJwk:\(userId)", accessibility: .whenUnlocked)
+        try tokenStore.set(privateJwk, for: "privateJwk:current", accessibility: .whenUnlocked)
         stateLock.withLock {
             unlockedPrivateJwk = privateJwk
         }
@@ -160,8 +160,8 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
             let _: E2EEBootstrapInitResponse = try await api.requestJSON("/api/e2ee/bootstrap", body: payload)
         }
 
-        try tokenStore.set(privateJwk, for: "privateJwk:\(userId)")
-        try tokenStore.set(privateJwk, for: "privateJwk:current")
+        try tokenStore.set(privateJwk, for: "privateJwk:\(userId)", accessibility: .whenUnlocked)
+        try tokenStore.set(privateJwk, for: "privateJwk:current", accessibility: .whenUnlocked)
         stateLock.withLock {
             unlockedPrivateJwk = privateJwk
         }
@@ -277,7 +277,7 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
         do {
             let response: ConversationKeyResponse = try await api.request(APIEndpoint(path: "/api/messages/conversations/\(conversationId)/key"), as: ConversationKeyResponse.self)
             let raw = try Self.unwrapConversationKey(wrappedKeyB64: response.wrappedKeyB64, privateJwk: privateJwk)
-            try tokenStore.set(raw.base64EncodedString(), for: "conversation:\(conversationId)")
+            try tokenStore.set(raw.base64EncodedString(), for: "conversation:\(conversationId)", accessibility: .whenUnlocked)
             return raw
         } catch APIError.http(let status, _, _, _, _) where status == 409 {
             // Rotation de clé E2EE côté serveur : la clé wrappée est obsolète.

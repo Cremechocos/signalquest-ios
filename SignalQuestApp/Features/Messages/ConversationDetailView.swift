@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct ConversationDetailView: View {
     let conversation: MessageConversation
@@ -606,7 +607,17 @@ struct ConversationDetailView: View {
         }
         if message.deletedAt == nil, !displayedContent(for: message).isEmpty {
             Button {
-                UIPasteboard.general.string = displayedContent(for: message)
+                let text = displayedContent(for: message)
+                if isE2EE {
+                    // MSG-PASTEBOARD-02 : texte déchiffré d'un message E2EE → copie
+                    // bornée (pas de synchro Universal Clipboard, purge auto 1 min).
+                    UIPasteboard.general.setItems(
+                        [[UTType.utf8PlainText.identifier: text]],
+                        options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(60)]
+                    )
+                } else {
+                    UIPasteboard.general.string = text
+                }
             } label: {
                 Label("Copier", systemImage: "doc.on.doc")
             }

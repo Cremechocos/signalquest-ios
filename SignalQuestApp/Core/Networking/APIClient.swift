@@ -347,10 +347,11 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
                 retryAfter: retryAfter
             )
         }
-        let message = String(data: data, encoding: .utf8)
-            .flatMap { $0.isEmpty ? nil : $0 }
-            ?? HTTPURLResponse.localizedString(forStatusCode: response.statusCode)
-        return .http(status: response.statusCode, code: nil, message: message, requestId: headerRequestId, retryAfter: retryAfter)
+        // SEC-ERR-03 : la réponse n'est pas un BackendErrorResponse structuré
+        // (ex. page HTML d'un proxy, 502 brut). On NE propage PAS le corps brut —
+        // `message` vide → APIError.userFacingMessage repliera sur un libellé FR par
+        // statut (statusFallback) au lieu d'exposer du contenu serveur arbitraire.
+        return .http(status: response.statusCode, code: nil, message: "", requestId: headerRequestId, retryAfter: retryAfter)
     }
 }
 
