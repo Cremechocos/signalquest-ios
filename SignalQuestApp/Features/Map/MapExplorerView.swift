@@ -95,6 +95,15 @@ final class MapExplorerViewModel: ObservableObject {
         if resetOperator || !validKeys.contains(operatorFilter.uppercased()) {
             operatorFilter = Self.defaultOperatorKey(for: entry)
         }
+        // Purge des bandes/partages devenus invalides pour le nouveau pays :
+        // sinon une sélection (ex. B20 en FR, ou « Crozon SFR ») resterait
+        // invisible dans la feuille (pas de chip) mais active dans la requête.
+        let validBands = Set(MapFilterCatalog.bands(forMarket: entry.marketCode).map(\.band))
+        let prunedBands = bandFilters.intersection(validBands)
+        if prunedBands != bandFilters { bandFilters = prunedBands }
+        let validSharing = Set(MapFilterCatalog.sharing(forMarket: entry.marketCode).map(\.value))
+        let prunedSharing = sharingFilters.intersection(validSharing)
+        if prunedSharing != sharingFilters { sharingFilters = prunedSharing }
     }
 
     var supportsCommunityLayers: Bool {
@@ -2371,6 +2380,13 @@ private struct MapAdvancedFilterSheet: View {
         return keys
     }
 
+    /// Code marché normalisé pour le catalogue de filtres : préfère le
+    /// `marketCode` du registre (robuste aux pays partageant un marché), sinon
+    /// le binding brut. Pilote les sections Technologies/Partage/Bandes.
+    private var catalogMarket: String {
+        selectedEntry?.marketCode ?? market
+    }
+
     /// Couches proposées : un marché communautaire se limite aux couches
     /// pertinentes (sites communautaires + speedtests).
     private var layerOptions: [(MapDisplayItem.Kind, String, String)] {
@@ -2419,38 +2435,36 @@ private struct MapAdvancedFilterSheet: View {
                             filterChip(title: "Toutes", icon: "sparkles", active: technologies.isEmpty) {
                                 technologies.removeAll()
                             }
-                            ForEach(["2G", "3G", "4G", "5G"], id: \.self) { tech in
-                                filterChip(title: tech, icon: "cellularbars", active: technologies.contains(tech)) {
-                                    toggleTechnology(tech)
+                            ForEach(MapFilterCatalog.technologies(forMarket: catalogMarket), id: \.value) { tech in
+                                filterChip(title: tech.label, icon: "cellularbars", active: technologies.contains(tech.value)) {
+                                    toggleTechnology(tech.value)
                                 }
                             }
                         }
                     }
 
-                if market == "FR" {
+                    // « Partage » (mutualisation d'antennes) : présent uniquement
+                    // pour les marchés qui l'exposent (FR/DROM). Masqué ailleurs.
+                    let sharingOptions = MapFilterCatalog.sharing(forMarket: catalogMarket)
+                    if !sharingOptions.isEmpty {
                         filterSection("Partage", icon: "point.3.connected.trianglepath.dotted") {
                             LazyVGrid(columns: filterColumns, spacing: 8) {
-                                filterChip(title: "ZB", icon: "antenna.radiowaves.left.and.right", active: sharing.contains("ZB")) {
-                                    toggleSharing("ZB")
-                                }
-                                filterChip(title: "Crozon SFR", icon: "arrow.triangle.branch", active: sharing.contains("CROZON_LEADER_SFR")) {
-                                    toggleSharing("CROZON_LEADER_SFR")
-                                }
-                                filterChip(title: "Crozon Bytel", icon: "arrow.triangle.branch", active: sharing.contains("CROZON_LEADER_BOUYGUES")) {
-                                    toggleSharing("CROZON_LEADER_BOUYGUES")
-                                }
-                                filterChip(title: "ZTD", icon: "building.2.fill", active: sharing.contains("ZTD")) {
-                                    toggleSharing("ZTD")
+                                ForEach(sharingOptions, id: \.value) { opt in
+                                    filterChip(title: opt.label, icon: opt.icon, active: sharing.contains(opt.value)) {
+                                        toggleSharing(opt.value)
+                                    }
                                 }
                             }
+                        }
                     }
 
-                        filterSection("Bandes", icon: "waveform.path.ecg") {
-                            LazyVGrid(columns: filterColumns, spacing: 8) {
-                        ForEach([(1, "B1 / n1 (2100)"), (3, "B3 (1800)"), (7, "B7 (2600)"), (20, "B20 (800)"), (28, "B28 (700)"), (78, "n78 (3500)")], id: \.0) { band, label in
-                                    filterChip(title: label, icon: "dot.radiowaves.left.and.right", active: bands.contains(band)) {
-                                        toggleBand(band)
-                                    }
+                    // « Bandes » : catalogue spécifique au pays (repli européen
+                    // pour les marchés sans définition dédiée).
+                    filterSection("Bandes", icon: "waveform.path.ecg") {
+                        LazyVGrid(columns: filterColumns, spacing: 8) {
+                            ForEach(MapFilterCatalog.bands(forMarket: catalogMarket), id: \.band) { opt in
+                                filterChip(title: opt.label, icon: "dot.radiowaves.left.and.right", active: bands.contains(opt.band)) {
+                                    toggleBand(opt.band)
                                 }
                             }
                         }
