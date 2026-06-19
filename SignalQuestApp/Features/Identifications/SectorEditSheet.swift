@@ -37,25 +37,35 @@ final class SectorEditViewModel: ObservableObject {
         let unique = Array(Set(raw.map { (($0.truncatingRemainder(dividingBy: 360)) + 360).truncatingRemainder(dividingBy: 360) }))
             .sorted()
         azimuths = unique
-        // Pré-sélection sur le secteur déjà enregistré (si présent et cohérent).
-        if let first = item.sectors.first, first >= 1, first <= unique.count {
-            selectedIndex = first - 1
+        // Pré-sélection sur le secteur déjà enregistré, selon la convention de
+        // numérotation de l'opérateur (SFR 0-based vs Orange/Bouygues/Free 1-based).
+        if let first = item.sectors.first {
+            selectedIndex = SectorNumbering.index(
+                forStoredValue: first, azimuthCount: unique.count, operatorName: item.operatorName
+            )
         }
         if unique.isEmpty {
             errorMessage = "Ce site n'expose pas d'azimuts de secteur."
         }
     }
 
+    /// Numéro de secteur affiché pour un index, dans la convention de l'opérateur.
+    func sectorLabel(forIndex index: Int) -> Int {
+        SectorNumbering.displayValue(index: index, operatorName: item.operatorName)
+    }
+
     func submit() async {
         guard let selectedIndex, selectedIndex < azimuths.count else { return }
-        let sectorNumber = selectedIndex + 1
+        // SECTOR-TELECOM-01 : valeur soumise dans la convention de l'opérateur
+        // (un `index + 1` naïf écrivait une valeur fausse pour SFR).
+        let sectorNumber = SectorNumbering.submissionValue(index: selectedIndex, operatorName: item.operatorName)
         isSubmitting = true
         defer { isSubmitting = false }
         do {
             let result = try await identify.editSectors(
                 siteId: item.siteId,
                 enb: item.enb, gnb: item.gnb,
-                pci: item.pci.map(String.init),
+                pci: item.pciValue,
                 cellId: item.cellId, ci: item.ci,
                 tech: item.tech,
                 operatorName: item.operatorName ?? "",
@@ -118,13 +128,14 @@ struct SectorEditSheet: View {
                         SelectableSectorRadar(
                             azimuths: model.azimuths,
                             selectedIndex: $model.selectedIndex,
-                            color: model.item.kind == .gnb ? SQColor.brandOrange : SQColor.brandBlue
+                            color: model.item.kind == .gnb ? SQColor.brandOrange : SQColor.brandBlue,
+                            displayNumber: { model.sectorLabel(forIndex: $0) }
                         )
                         .frame(height: 280)
                         .padding(SQSpace.md)
 
                         if let index = model.selectedIndex {
-                            Text("Secteur \(index + 1) · azimut \(Int(model.azimuths[index].rounded()))°")
+                            Text("Secteur \(model.sectorLabel(forIndex: index)) · azimut \(Int(model.azimuths[index].rounded()))°")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(SQColor.label)
                         } else {
@@ -195,6 +206,8 @@ struct SelectableSectorRadar: View {
     let azimuths: [Double]
     @Binding var selectedIndex: Int?
     var color: Color = SQColor.brandOrange
+    /// Numéro de secteur affiché pour un index (convention opérateur). 1-based par défaut.
+    var displayNumber: (Int) -> Int = { $0 + 1 }
 
     private let halfBeam: Double = 32.5
 
@@ -218,7 +231,7 @@ struct SelectableSectorRadar: View {
                         .fill(color.opacity(isSelected ? 0.55 : 0.16))
                     SectorWedge(azimuth: azimuth, halfBeam: halfBeam, radius: radius, center: center)
                         .stroke(color.opacity(isSelected ? 1 : 0.4), lineWidth: isSelected ? 2.5 : 1)
-                    Text("\(index + 1)")
+                    Text("\(displayNumber(index))")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(isSelected ? .white : color)
                         .padding(5)

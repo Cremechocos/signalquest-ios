@@ -73,6 +73,9 @@ struct LoginView: View {
                             .stroke(SQColor.label, lineWidth: 2)
                     }
                     .sqAuthAppear(appeared, delay: 0.08)
+
+                    legalFooter
+                        .sqAuthAppear(appeared, delay: 0.14)
                 }
                 .padding(SQSpace.xl)
             }
@@ -86,6 +89,20 @@ struct LoginView: View {
                 NavigationStack { ForgotPasswordView() }
             }
         }
+    }
+
+    /// Liens légaux discrets (FOCUS « lien légal sur login » — LOGIN-LEGAL-01),
+    /// réutilisant les URLs centralisées d'AppConfig comme SignupView.
+    private var legalFooter: some View {
+        HStack(spacing: SQSpace.xs) {
+            Link("Conditions d’utilisation", destination: AppConfig.current.termsURL)
+            Text("·").foregroundStyle(SQColor.labelTertiary)
+            Link("Confidentialité", destination: AppConfig.current.privacyURL)
+        }
+        .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
+        .tint(SQColor.brandRed)
+        .frame(maxWidth: .infinity)
+        .padding(.top, SQSpace.sm)
     }
 
     private var isTwoFactor: Bool {

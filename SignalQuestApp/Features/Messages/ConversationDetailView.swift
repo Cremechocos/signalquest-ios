@@ -31,6 +31,9 @@ struct ConversationDetailView: View {
     @State private var lastTypingSignal: Date = .distantPast
     /// Borne du dernier sync delta — max des dates créé/édité/supprimé vues.
     @State private var lastSync: Date = .distantPast
+    /// Présence « actif sur la conversation » : ids des participants regardant la conv.
+    @State private var conversationViewers: [String] = []
+    @State private var activePingTask: Task<Void, Never>?
 
     // Messagerie avancée
     @State private var pinnedMessages: [PinnedMessage] = []
@@ -76,6 +79,15 @@ struct ConversationDetailView: View {
             }
 
             pinnedBar
+
+            if otherIsViewing {
+                Text("Actif sur la conversation")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.brandRed)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 2)
+                    .transition(.opacity)
+            }
 
             ScrollViewReader { proxy in
                 ScrollView {
@@ -215,16 +227,22 @@ struct ConversationDetailView: View {
             await shareKeyIfNeeded()
             await loadPinned()
             startSync()
+            startActivePing()
         }
-        .onDisappear { stopSync() }
+        .onDisappear {
+            stopSync()
+            stopActivePing(sendLeave: true)
+        }
         .onChangeCompat(of: scenePhase) { _, phase in
             // Le flux SSE ne survit pas à la mise en arrière-plan : on le coupe
             // proprement et on resynchronise au retour.
             if phase == .active {
                 startSync()
+                startActivePing()
                 Task { await refreshDelta() }
             } else {
                 stopSync()
+                stopActivePing(sendLeave: true)
             }
         }
         .sheet(isPresented: $showUnlockSheet) {
@@ -751,6 +769,8 @@ struct ConversationDetailView: View {
                     await MainActor.run {
                         withAnimation(SQMotion.fast) { typingUntil = Date().addingTimeInterval(5) }
                     }
+                case .viewingEvent:
+                    await refreshViewers()
                 case .serverEvent, .polling:
                     await refreshDelta()
                 }
@@ -762,6 +782,44 @@ struct ConversationDetailView: View {
     private func stopSync() {
         syncTask?.cancel()
         syncTask = nil
+    }
+
+    /// Présence « actif sur la conversation » (parité Android) : on signale au
+    /// backend qu'on regarde la conv (ping 30 s) ; il diffuse l'event `viewing`
+    /// aux autres participants. Coupé en arrière-plan / à la fermeture.
+    private func startActivePing() {
+        guard !AppEnvironment.usesDemoData else { return }
+        activePingTask?.cancel()
+        let conversationId = conversation.id
+        activePingTask = Task {
+            while !Task.isCancelled {
+                await service.setConversationActive(conversationId: conversationId, active: true)
+                try? await Task.sleep(for: .seconds(30))
+            }
+        }
+    }
+
+    private func stopActivePing(sendLeave: Bool) {
+        activePingTask?.cancel()
+        activePingTask = nil
+        if sendLeave {
+            let conversationId = conversation.id
+            Task { await service.setConversationActive(conversationId: conversationId, active: false) }
+        }
+    }
+
+    private func refreshViewers() async {
+        let viewers = await service.conversationViewers(conversationId: conversation.id)
+        await MainActor.run {
+            withAnimation(SQMotion.fast) { conversationViewers = viewers }
+        }
+    }
+
+    /// Vrai quand l'autre participant (1:1) regarde actuellement la conversation.
+    private var otherIsViewing: Bool {
+        guard !conversation.isGroup, let uid = currentUserId else { return false }
+        guard let otherId = conversation.participants.first(where: { $0.userId != uid })?.userId else { return false }
+        return conversationViewers.contains(otherId)
     }
 
     private func refreshDelta() async {

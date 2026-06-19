@@ -16,7 +16,7 @@ final class SSEClient: Sendable {
         "update", "message", "read_state", "feature_sync", "thread_reply",
         "poll_created", "poll_voted", "poll_closed",
         "task_created", "task_updated", "task_completed",
-        "mention", "typing", "reaction"
+        "mention", "typing", "viewing", "reaction"
     ]
 
     init(api: APIClient) {

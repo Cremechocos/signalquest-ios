@@ -11,10 +11,12 @@ final class NotificationsCenterViewModel: ObservableObject {
 
     func load() async {
         isLoading = true
+        errorMessage = nil
         defer { isLoading = false }
         do {
             items = try await service.list(cursor: nil)
         } catch {
+            if error.isCancellation { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -49,16 +51,36 @@ struct NotificationsCenterView: View {
 
     var body: some View {
         List {
-            Section {
-                ForEach(model.items) { item in
-                    notificationRow(item)
-                        .listRowBackground(item.read != true ? SQColor.brandRed.opacity(0.08) : Color.clear)
-                        .swipeActions {
-                            Button("Lu") { Task { await model.markRead(item.id) } }.tint(SQColor.success)
-                        }
+            if let error = model.errorMessage, model.items.isEmpty {
+                Section {
+                    ErrorStateView(title: "Notifications indisponibles", message: error) {
+                        Task { await model.load() }
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
                 }
-            } header: {
-                Text("Activité").sqKicker()
+            } else if !model.isLoading, model.items.isEmpty {
+                Section {
+                    EmptyStateView(
+                        title: "Aucune notification",
+                        message: "Tes notifications d'activité apparaîtront ici.",
+                        systemImage: "bell"
+                    )
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                }
+            } else {
+                Section {
+                    ForEach(model.items) { item in
+                        notificationRow(item)
+                            .listRowBackground(item.read != true ? SQColor.brandRed.opacity(0.08) : Color.clear)
+                            .swipeActions {
+                                Button("Lu") { Task { await model.markRead(item.id) } }.tint(SQColor.success)
+                            }
+                    }
+                } header: {
+                    Text("Activité").sqKicker()
+                }
             }
         }
         .scrollContentBackground(.hidden)

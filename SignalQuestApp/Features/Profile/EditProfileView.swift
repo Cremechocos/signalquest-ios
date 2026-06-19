@@ -10,6 +10,9 @@ struct EditProfileView: View {
     @State private var currentHandle: String
     @State private var showHandleSheet = false
     @State private var bio: String
+    /// Bio telle que chargée du serveur — sert à n'envoyer la bio que si elle a
+    /// réellement changé (évite l'écrasement à vide d'une bio non rechargée — EDITPROFILE-BUG-01).
+    @State private var loadedBio: String
     @State private var avatarItem: PhotosPickerItem?
     @State private var avatarPreview: UIImage?
     @State private var isBusy = false
@@ -19,7 +22,8 @@ struct EditProfileView: View {
         self.user = user
         _name = State(initialValue: user.name ?? "")
         _currentHandle = State(initialValue: user.handle ?? "")
-        _bio = State(initialValue: "")
+        _bio = State(initialValue: user.bio ?? "")
+        _loadedBio = State(initialValue: user.bio ?? "")
     }
 
     var body: some View {
@@ -95,6 +99,17 @@ struct EditProfileView: View {
             .sheet(isPresented: $showHandleSheet) {
                 ChooseHandleSheet(onSuccess: { newHandle in currentHandle = newHandle })
             }
+            .task { await loadProfileBio() }
+        }
+    }
+
+    /// Recharge la bio depuis le serveur pour préremplir le champ sans l'écraser.
+    /// On ne l'applique que si l'utilisateur n'a pas déjà édité le champ.
+    private func loadProfileBio() async {
+        guard let fresh = try? await services.users.profile() else { return }
+        await MainActor.run {
+            if bio == loadedBio { bio = fresh.bio ?? bio }
+            loadedBio = fresh.bio ?? loadedBio
         }
     }
 
@@ -134,10 +149,15 @@ struct EditProfileView: View {
         do {
             // Le @handle se choisit/modifie via ChooseHandleSheet (vérif live + cooldown 30 j).
             // Ici on n'enregistre que le nom (partageable) et la bio.
+            // EDITPROFILE-BUG-01 : n'envoyer la bio que si elle a changé. Le backend
+            // fait un PUT ; envoyer une bio non rechargée l'écraserait à vide. `nil`
+            // est omis par l'encodeur (encodeIfPresent) → la bio existante est préservée.
+            let trimmedBio = bio.trimmingCharacters(in: .whitespacesAndNewlines)
+            let bioChanged = trimmedBio != loadedBio.trimmingCharacters(in: .whitespacesAndNewlines)
             _ = try await services.users.updateProfile(UserProfilePatch(
                 name: name.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
                 handle: nil,
-                bio: bio.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+                bio: bioChanged ? trimmedBio : nil,
                 avatarUrl: nil
             ))
             if let image = avatarPreview, let data = image.jpegData(compressionQuality: 0.85) {

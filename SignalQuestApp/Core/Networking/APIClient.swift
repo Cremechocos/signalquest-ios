@@ -157,6 +157,39 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
 
     // MARK: URL building
 
+    /// En-têtes d'identité client (X-Client-*) joints à chaque requête 1re partie,
+    /// pour que le registre des sessions affiche « iPhone15,3 · iOS 18 » au lieu de
+    /// « Navigateur ». Calculés une seule fois (valeurs constantes). On évite UIKit
+    /// (`UIDevice` est `@MainActor`) au profit de `ProcessInfo`/`uname`, sûrs hors
+    /// du main actor et compatibles concurrence stricte.
+    private static let clientInfoHeaders: [String: String] = {
+        var headers = ["X-Client-Platform": "ios"]
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersion
+        var osLabel = "iOS \(osVersion.majorVersion).\(osVersion.minorVersion)"
+        if osVersion.patchVersion > 0 { osLabel += ".\(osVersion.patchVersion)" }
+        headers["X-Client-Os"] = osLabel
+        if let model = hardwareModelIdentifier(), !model.isEmpty {
+            headers["X-Client-Model"] = model
+        }
+        if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+           !version.isEmpty {
+            headers["X-Client-App-Version"] = version
+        }
+        return headers
+    }()
+
+    /// Identifiant matériel (ex. « iPhone15,3 »), via `uname` — sûr hors main actor.
+    private static func hardwareModelIdentifier() -> String? {
+        var systemInfo = utsname()
+        uname(&systemInfo)
+        let identifier = Mirror(reflecting: systemInfo.machine).children.reduce(into: "") { result, element in
+            if let value = element.value as? Int8, value != 0 {
+                result.append(Character(UnicodeScalar(UInt8(value))))
+            }
+        }
+        return identifier.isEmpty ? nil : identifier
+    }
+
     func makeURLRequest(_ endpoint: APIEndpoint) throws -> URLRequest {
         let base = endpoint.baseURL ?? config.apiBaseURL
         guard var components = URLComponents(
@@ -175,6 +208,9 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("SignalQuest-iOS/1", forHTTPHeaderField: "User-Agent")
+        for (key, value) in Self.clientInfoHeaders {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
         endpoint.headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
         if let idempotencyKey = endpoint.idempotencyKey {
             request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
@@ -277,6 +313,12 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             throw APIError.cancelled
         } catch let error as APIError {
             throw error
+        } catch let urlError as URLError where urlError.code == .cancelled {
+            // URLSession lève `URLError(.cancelled)` (et NON `CancellationError`)
+            // quand une requête est annulée (pan de carte, changement d'onglet,
+            // rechargement). On la normalise en `.cancelled` pour qu'elle soit
+            // filtrée par `isCancellation` et JAMAIS affichée comme un échec.
+            throw APIError.cancelled
         } catch {
             throw APIError.transport(error.localizedDescription)
         }

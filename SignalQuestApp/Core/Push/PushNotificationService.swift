@@ -69,7 +69,7 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
         }
         await MainActor.run {
             UIApplication.shared.unregisterForRemoteNotifications()
-            UNUserNotificationCenter.current().setBadgeCount(0)
+            UNUserNotificationCenter.current().setBadgeCountCompat(0)
         }
         if let token {
             let _: SuccessResponse? = try? await api.requestJSON(
@@ -101,7 +101,7 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         let siteId = Self.string(info, "siteId", "site_id")
         await MainActor.run {
             self.router.handle(type: type, conversationId: conversationId, postId: postId, userId: userId, siteId: siteId)
-            UNUserNotificationCenter.current().setBadgeCount(0)
+            UNUserNotificationCenter.current().setBadgeCountCompat(0)
         }
     }
 }

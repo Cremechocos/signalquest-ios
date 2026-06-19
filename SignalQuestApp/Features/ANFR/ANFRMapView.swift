@@ -64,7 +64,7 @@ final class ANFRMapViewModel: ObservableObject {
             sites = snapshot.sites
             lastUpdate = snapshot.lastUpdate
         } catch {
-            errorMessage = error.localizedDescription
+            if !error.isCancellation { errorMessage = error.localizedDescription }
         }
     }
 
@@ -194,7 +194,7 @@ struct ANFRMapView: View {
                             .overlay { Circle().stroke(.white, lineWidth: 2) }
                             .overlay {
                                 Image(systemName: style.modType.glyph)
-                                    .font(.system(size: 9, weight: .black))
+                                    .font(.system(size: 11, weight: .black))
                                     .foregroundStyle(.white)
                             }
                     }

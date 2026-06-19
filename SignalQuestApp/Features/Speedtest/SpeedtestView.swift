@@ -146,8 +146,14 @@ struct SpeedtestView: View {
                     }
 
                     if let errorMessage {
-                        ErrorStateView(title: "Speedtest non synchronisé", message: errorMessage)
-                            .transition(.opacity)
+                        ErrorStateView(title: "Speedtest non synchronisé", message: errorMessage) {
+                            self.errorMessage = nil
+                            Task {
+                                await services.speedtest.retryPendingSaves()
+                                history = await services.speedtest.history()
+                            }
+                        }
+                        .transition(.opacity)
                     }
 
                     historySection
@@ -1456,10 +1462,10 @@ private struct SpeedtestHistoryRow: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(result.networkDisplayName)
+                Text(locationLine)
                     .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
+                    .lineLimit(2)
                 Text(relativeDate)
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
@@ -1491,6 +1497,19 @@ private struct SpeedtestHistoryRow: View {
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
         }
+    }
+
+    /// Ligne principale : adresse (rue + commune) reverse-géocodée du point de
+    /// mesure. Repli sur la commune seule, puis sur la techno réseau quand la
+    /// localisation manque (test sans autorisation, ancien historique).
+    private var locationLine: String {
+        if let address = result.address?.trimmingCharacters(in: .whitespacesAndNewlines), !address.isEmpty {
+            return address
+        }
+        if let city = result.city?.trimmingCharacters(in: .whitespacesAndNewlines), !city.isEmpty {
+            return city
+        }
+        return result.networkDisplayName
     }
 
     private var relativeDate: String {

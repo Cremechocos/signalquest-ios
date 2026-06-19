@@ -82,6 +82,7 @@ struct MessageSearchView: View {
         } label: {
             HStack(spacing: SQSpace.sm) {
                 SQAvatar(url: message.sender?.avatarUrl, name: message.sender?.displayName ?? "?", size: 34)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text(message.sender?.displayName ?? "Message")
@@ -158,7 +159,7 @@ struct MessageSearchView: View {
             errorMessage = nil
             await decryptResults()
         } catch {
-            errorMessage = error.localizedDescription
+            if !error.isCancellation { errorMessage = error.localizedDescription }
             hasSearched = true
         }
     }

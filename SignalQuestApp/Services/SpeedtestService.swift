@@ -693,14 +693,14 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 
         let total = warmupCount + measuredTarget
         for index in 0..<total {
-            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+            guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { continue }
             var query = components.queryItems ?? []
             if token != nil {
                 query.append(URLQueryItem(name: "bytes", value: "1"))
             }
             components.queryItems = query
             let start = Date()
-            try await performPingRequest(url: components.url!, token: token)
+            try await performPingRequest(url: components.url ?? url, token: token)
             attemptsUsed += 1
             let elapsed = Date().timeIntervalSince(start) * 1_000
             if index >= warmupCount {
@@ -786,13 +786,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                         values.append(elapsed)
                     }
                 } else {
-                    var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+                    guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { continue }
                     var query = components.queryItems ?? []
                     if token != nil {
                         query.append(URLQueryItem(name: "bytes", value: "1"))
                     }
                     components.queryItems = query
-                    try await performPingRequest(url: components.url!, token: token)
+                    try await performPingRequest(url: components.url ?? url, token: token)
                     if !Task.isCancelled {
                         let elapsed = Date().timeIntervalSince(start) * 1_000
                         values.append(elapsed)
@@ -1019,7 +1019,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         while Date() < deadline && !Task.isCancelled {
             if await stallMonitor.stalled { return }
 
-            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+            guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { continue }
             var query = components.queryItems ?? []
             query.append(URLQueryItem(name: "r", value: "\(UUID().uuidString)-\(streamIndex)"))
             if token != nil {
@@ -1174,7 +1174,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 group.addTask { [self] in
                     try await Task.sleep(nanoseconds: UInt64(Double(streamIndex) * SpeedtestEngineConfig.streamStaggerMs * 1_000_000))
                     while Date() < deadline && !Task.isCancelled {
-                        var components = URLComponents(url: uploadURL, resolvingAgainstBaseURL: false)!
+                        guard var components = URLComponents(url: uploadURL, resolvingAgainstBaseURL: false) else { continue }
                         var query = components.queryItems ?? []
                         query.append(URLQueryItem(name: "r", value: "\(UUID().uuidString)-\(streamIndex)"))
                         components.queryItems = query

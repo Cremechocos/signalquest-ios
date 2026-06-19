@@ -12,6 +12,7 @@ enum SyncTrigger: Sendable {
     case polling
     case serverEvent
     case typingEvent
+    case viewingEvent
 }
 
 struct MessageSyncEngine: Sendable {
@@ -30,7 +31,10 @@ struct MessageSyncEngine: Sendable {
         AsyncStream { continuation in
             let sseTask = Task {
                 for await eventName in sse.events(path: "/api/messages/conversations/\(conversationId)/events") {
-                    continuation.yield(eventName == "typing" ? .typingEvent : .serverEvent)
+                    let trigger: SyncTrigger = eventName == "typing"
+                        ? .typingEvent
+                        : (eventName == "viewing" ? .viewingEvent : .serverEvent)
+                    continuation.yield(trigger)
                 }
             }
             let pollTask = Task {

@@ -42,6 +42,8 @@ struct SignalQuestApp: App {
         guard case .authenticated = state else { return }
         await services.push.requestAuthorizationAndRegister()
         services.callManager.registerForVoIPPushes()
+        // Rattrape un appel entrant déjà en attente au moment où l'on devient authentifié.
+        await services.callManager.reconcilePendingIncomingCall()
     }
 
     var body: some Scene {
@@ -70,7 +72,16 @@ struct SignalQuestApp: App {
                 }
                 .onChangeCompat(of: scenePhase) { _, phase in
                     if phase == .active {
-                        UNUserNotificationCenter.current().setBadgeCount(0)
+                        UNUserNotificationCenter.current().setBadgeCountCompat(0)
+                        // CALL-INCOMING-03 / CALL-VOIP-04 : au retour au premier plan,
+                        // ré-enregistrer le token VoIP et rattraper un appel entrant que
+                        // le push VoIP aurait manqué.
+                        if case .authenticated = session.state {
+                            Task {
+                                await services.callManager.retryVoIPTokenRegistrationIfNeeded()
+                                await services.callManager.reconcilePendingIncomingCall()
+                            }
+                        }
                     }
                 }
                 .fullScreenCover(isPresented: Binding(

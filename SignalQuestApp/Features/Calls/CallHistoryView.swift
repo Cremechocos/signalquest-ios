@@ -15,7 +15,7 @@ final class CallHistoryViewModel: ObservableObject {
         do {
             calls = try await service.history()
         } catch {
-            errorMessage = error.localizedDescription
+            if !error.isCancellation { errorMessage = error.localizedDescription }
         }
     }
 }
@@ -37,6 +37,7 @@ struct CallHistoryView: View {
                             .foregroundStyle(style.color)
                             .frame(width: 38, height: 38)
                             .background(style.color.opacity(0.14), in: Circle())
+                            .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(call.participants?.joined(separator: ", ") ?? "Conversation")
                                 .font(SQType.subhead)
@@ -49,7 +50,7 @@ struct CallHistoryView: View {
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 2) {
-                            Text((call.status ?? "—").capitalized)
+                            Text(statusLabel(call.status))
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(style.isMissed ? SQColor.danger : SQColor.labelSecondary)
                             if let duration = durationText(call) {
@@ -61,6 +62,7 @@ struct CallHistoryView: View {
                         Image(systemName: call.mode == "video" ? "video.fill" : "phone.fill")
                             .font(.caption)
                             .foregroundStyle(SQColor.labelTertiary)
+                            .accessibilityHidden(true)
                     }
                     .listRowBackground(SQColor.surface)
                 }
@@ -86,6 +88,21 @@ struct CallHistoryView: View {
             return ("phone.arrow.up.right.fill", SQColor.success, false)
         default:
             return ("phone.fill", SQColor.brandRed, false)
+        }
+    }
+
+    /// Libellé FR du statut d'appel (l'app est 100 % francophone — CALL-HIST-06).
+    private func statusLabel(_ status: String?) -> String {
+        switch status {
+        case "ended": return "Terminé"
+        case "missed": return "Manqué"
+        case "rejected": return "Refusé"
+        case "accepted", "answered": return "Accepté"
+        case "ringing": return "Sonnerie"
+        case "pending": return "En attente"
+        case "cancelled", "canceled": return "Annulé"
+        case .some(let other) where !other.isEmpty: return other.capitalized
+        default: return "—"
         }
     }
 

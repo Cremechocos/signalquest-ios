@@ -23,6 +23,25 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(messages.messages.first?.content, "Salut")
     }
 
+    func testMyIdentificationDecodesPciStringAndGroupsByNode() throws {
+        let response = try JSONDecoder.signalQuest.decode(MyIdentificationsResponse.self, from: Data("""
+        {
+          "identifications": [
+            {"id":"n1","siteId":"site-1","type":"enb","enb":"12345","operator":"SFR","tech":"4G","validations":2,"sectors":[]},
+            {"id":"p1","siteId":"site-1","type":"pci","enb":"12345","pci":"078","ci":"3160321","operator":"SFR","tech":"4G","validations":1,"sectors":[2]}
+          ]
+        }
+        """.utf8))
+        let pci = try XCTUnwrap(response.identifications.first { $0.id == "p1" })
+        XCTAssertEqual(pci.pciValue, "078")
+        XCTAssertEqual(pci.pci, 78)
+
+        let groups = IdentifiedNodeGroup.group(response.identifications)
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(groups.first?.title, "eNB 12345")
+        XCTAssertEqual(groups.first?.cells.first?.label, "PCI 078")
+    }
+
     private static let feedJSON = """
     {"items":[{"id":"post-1","kind":"speedtest","createdAt":"2026-05-11T10:00:00.000Z","author":{"id":"u1","name":"Camille","handle":"camille","avatarUrl":null},"text":"Hello","attachments":[],"hashtags":["ios"],"reactions":[],"commentsCount":0,"repostsCount":0,"favoritesCount":0,"likedByMe":false,"favoritedByMe":false,"repostedByMe":false,"signal":{"downloadMbps":321,"detectedTechs":[]}}],"nextCursor":null,"stories":[{"id":"s1","author":{"id":"u1","name":"Camille","handle":"camille","avatarUrl":null},"text":"Story","mediaUrl":null,"thumbnailUrl":null,"mediaKind":"text","background":null,"metadata":null,"visibility":"public","status":"active","durationSeconds":5,"createdAt":"2026-05-11T10:00:00.000Z","expiresAt":null,"viewedByMe":false,"isMine":false}],"trendingHashtags":[],"suggestedUsers":[],"requestId":"req"}
     """
@@ -39,4 +58,3 @@ final class ModelDecodeTests: XCTestCase {
     {"hasMore":false,"nextCursor":null,"messages":[{"id":"m1","conversationId":"c1","senderId":"u1","kind":"TEXT","content":"Salut","createdAt":"2026-05-11T10:00:00.000Z","attachments":[],"reactions":[]}],"readReceipts":[]}
     """
 }
-

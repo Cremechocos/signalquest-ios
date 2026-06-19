@@ -146,9 +146,9 @@ struct ProfileView: View {
                 .font(SQType.display)
                 .foregroundStyle(SQColor.label)
                 .multilineTextAlignment(.center)
-            Text("@\(user.email.split(separator: "@").first.map(String.init) ?? user.email)")
+            Text(user.handle.flatMap { $0.isEmpty ? nil : "@\($0)" } ?? "Ajoute un nom d’utilisateur")
                 .font(SQType.subhead)
-                .foregroundStyle(SQColor.labelSecondary)
+                .foregroundStyle((user.handle?.isEmpty ?? true) ? SQColor.labelTertiary : SQColor.labelSecondary)
             if user.twoFactorEnabled == true {
                 SQEditorialTag(text: "2FA", color: SQColor.success)
             }

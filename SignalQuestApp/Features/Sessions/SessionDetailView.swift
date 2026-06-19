@@ -57,6 +57,7 @@ struct SessionDetailView: View {
     @EnvironmentObject private var services: AppServices
     @StateObject private var model: SessionDetailViewModel
     @State private var validationTarget: ValidationTarget?
+    @State private var pendingIdentify: ServingAntenna?
 
     struct ValidationTarget: Identifiable {
         let id = UUID()
@@ -103,6 +104,21 @@ struct SessionDetailView: View {
         .task { await model.load(service: services.sessions) }
         .sheet(item: $validationTarget) { target in
             ValidationsSheet(siteId: target.siteId, operatorName: target.operatorName, service: services.validations)
+        }
+        .confirmationDialog(
+            "Confirmer cette antenne ?",
+            isPresented: Binding(get: { pendingIdentify != nil }, set: { if !$0 { pendingIdentify = nil } }),
+            presenting: pendingIdentify
+        ) { antenna in
+            Button("Valider cette antenne", role: .none) {
+                Task {
+                    await model.identify(antenna, service: services.identify, location: services.location)
+                    pendingIdentify = nil
+                }
+            }
+            Button("Annuler", role: .cancel) { pendingIdentify = nil }
+        } message: { antenna in
+            Text("Cette antenne est indiquée comme \(Self.statusLabel(antenna)). Confirme uniquement si tu l'as sélectionnée comme antenne réelle.")
         }
     }
 
@@ -199,7 +215,7 @@ struct SessionDetailView: View {
             legendDot(0xF97316, "Faible")
             legendDot(0xEF4444, "Mauvais")
         }
-        .font(.system(size: 9, weight: .medium))
+        .font(.system(size: 11, weight: .medium))
         .foregroundStyle(SQColor.labelSecondary)
         .frame(maxWidth: .infinity)
     }
@@ -249,12 +265,12 @@ struct SessionDetailView: View {
             Spacer()
             if antenna.isUnconfirmed && (antenna.siteId != nil || antenna.enb != nil || antenna.gnb != nil) {
                 Button {
-                    Task { await model.identify(antenna, service: services.identify, location: services.location) }
+                    pendingIdentify = antenna
                 } label: {
                     if model.identifyingId == antenna.id {
                         ProgressView()
                     } else {
-                        Text("Identifier").font(.caption.weight(.bold))
+                        Text("Valider").font(.caption.weight(.bold))
                     }
                 }
                 .buttonStyle(.borderedProminent)

@@ -25,6 +25,20 @@ final class CallManager: NSObject, ObservableObject {
         let handle: String
         let hasVideo: Bool
         var isOutgoing: Bool
+        /// Passe à true quand un appel ENTRANT a été décroché — distingue
+        /// « jamais répondu » (reject) de « répondu puis raccroché » (end). CALL-BUG-02.
+        var isAnswered: Bool = false
+    }
+
+    enum CallError: LocalizedError {
+        case missingCredentials
+        case connectionFailed(String)
+        var errorDescription: String? {
+            switch self {
+            case .missingCredentials: return "Identifiants d'appel manquants."
+            case .connectionFailed(let m): return "Connexion à l'appel impossible : \(m)"
+            }
+        }
     }
 
     @Published private(set) var activeCall: ActiveCall?
@@ -112,14 +126,38 @@ final class CallManager: NSObject, ObservableObject {
         }
     }
 
+    /// CALL-INCOMING-03 : filet anti-perte de push VoIP. À appeler au retour au premier
+    /// plan (et après login) : demande au serveur les appels en attente et, si un appel
+    /// « ringing »/« pending » n'est pas déjà actif, le présente via CallKit.
+    func reconcilePendingIncomingCall() async {
+        guard activeCall == nil else { return }
+        guard let pending = try? await callsService.pending() else { return }
+        guard let call = pending.first(where: { $0.status == "ringing" || $0.status == "pending" }) else { return }
+        reportIncomingCall(
+            uuid: UUID(),
+            callId: call.id,
+            conversationId: call.conversationId,
+            handle: call.participants?.first ?? "Appel SignalQuest",
+            hasVideo: call.mode == "video",
+            completion: nil
+        )
+    }
+
     // MARK: Internals
 
-    private func connectLiveKit(for session: CallSession, video: Bool) async {
+    /// Se connecte au média LiveKit ET vérifie le succès. CALL-BUG-01 : on lève si les
+    /// identifiants manquent ou si LiveKit termine en `.failed`, pour que l'appelant
+    /// échoue proprement l'action CallKit au lieu de marquer l'appel « connecté ».
+    private func connectLiveKit(for session: CallSession, video: Bool) async throws {
         guard let url = session.liveKitUrl, let token = session.liveKitToken, let room = session.liveKitRoom else {
             logger.error("Call session missing LiveKit credentials")
-            return
+            throw CallError.missingCredentials
         }
         await liveKit.connect(url: url, token: token, room: room, video: video, managesAudioSession: false)
+        if case .failed(let message) = liveKit.state {
+            logger.error("LiveKit connect failed: \(message, privacy: .public)")
+            throw CallError.connectionFailed(message)
+        }
     }
 
     private func tearDown() async {
@@ -128,11 +166,26 @@ final class CallManager: NSObject, ObservableObject {
         showCallScreen = false
     }
 
+    private var lastVoipToken: String?
+
     fileprivate func registerVoIPToken(_ token: String) async {
-        let _: SuccessResponse? = try? await api.requestJSON(
-            "/api/user/voip-token",
-            body: ["voipToken": token, "platform": "ios"]
-        )
+        lastVoipToken = token
+        do {
+            let _: SuccessResponse = try await api.requestJSON(
+                "/api/user/voip-token",
+                body: ["voipToken": token, "platform": "ios"]
+            )
+        } catch {
+            // CALL-VOIP-04 : ne plus avaler l'échec silencieusement ; on garde le token
+            // pour le ré-enregistrer au prochain passage authentifié / foreground.
+            logger.error("VoIP token registration failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Ré-enregistre le dernier token VoIP connu (retour foreground / après login).
+    func retryVoIPTokenRegistrationIfNeeded() async {
+        guard let token = lastVoipToken else { return }
+        await registerVoIPToken(token)
     }
 
     nonisolated fileprivate static func string(_ info: [AnyHashable: Any], _ keys: String...) -> String? {
@@ -170,7 +223,7 @@ extension CallManager: CXProviderDelegate {
                 let session = try await self.callsService.initiate(conversationId: conversationId, mode: call.hasVideo ? "video" : "audio")
                 self.activeCall?.callId = session.id
                 self.provider.reportOutgoingCall(with: action.callUUID, startedConnectingAt: nil)
-                await self.connectLiveKit(for: session, video: call.hasVideo)
+                try await self.connectLiveKit(for: session, video: call.hasVideo)
                 self.provider.reportOutgoingCall(with: action.callUUID, connectedAt: nil)
                 action.fulfill()
             } catch {
@@ -188,7 +241,8 @@ extension CallManager: CXProviderDelegate {
             guard let call = self.activeCall, let callId = call.callId else { action.fail(); return }
             do {
                 let session = try await self.callsService.answer(callId: callId)
-                await self.connectLiveKit(for: session, video: call.hasVideo)
+                try await self.connectLiveKit(for: session, video: call.hasVideo)
+                self.activeCall?.isAnswered = true
                 self.showCallScreen = true
                 action.fulfill()
             } catch {
@@ -206,7 +260,9 @@ extension CallManager: CXProviderDelegate {
             let call = self.activeCall
             await self.liveKit.disconnect()
             if let callId = call?.callId {
-                if call?.isOutgoing == false {
+                // CALL-BUG-02 : un entrant jamais décroché = reject ; un appel décroché
+                // (ou sortant) qui raccroche = end.
+                if call?.isOutgoing == false && call?.isAnswered == false {
                     try? await self.callsService.reject(callId: callId)
                 } else {
                     try? await self.callsService.end(callId: callId)

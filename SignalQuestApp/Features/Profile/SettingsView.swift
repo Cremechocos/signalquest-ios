@@ -1,5 +1,12 @@
 import SwiftUI
 
+/// Enveloppe `Identifiable` autour de l'URL de l'archive exportée, pour piloter une
+/// `.sheet(item:)` (l'URL seule n'est pas `Identifiable`).
+struct ExportedDataFile: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 @MainActor
 final class SettingsViewModel: ObservableObject {
     @Published var prefs: NotificationPreferences = NotificationPreferences(
@@ -13,12 +20,33 @@ final class SettingsViewModel: ObservableObject {
     )
     @Published var isBusy = false
     @Published var errorMessage: String?
+    @Published var isExporting = false
+    /// Renseigné quand l'archive RGPD est prête → déclenche la feuille de partage.
+    @Published var exportedFile: ExportedDataFile?
 
     private let userService: UserServicing
     private let authService: AuthServicing
     init(userService: UserServicing, authService: AuthServicing) {
         self.userService = userService
         self.authService = authService
+    }
+
+    func exportData() async {
+        isExporting = true
+        errorMessage = nil
+        defer { isExporting = false }
+        do {
+            let data = try await userService.exportPersonalData()
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("signalquest-mes-donnees.json")
+            try data.write(to: url, options: .atomic)
+            exportedFile = ExportedDataFile(url: url)
+            Haptics.success()
+        } catch {
+            if error.isCancellation { return }
+            errorMessage = error.localizedDescription
+            Haptics.error()
+        }
     }
 
     func load() async {
@@ -110,11 +138,18 @@ struct SettingsView: View {
                         settingsLabel("Contact & signalement", systemImage: "envelope")
                     }
                 }
-                if let dataRequest = AppConfig.current.dataRequestMailtoURL {
-                    Link(destination: dataRequest) {
-                        settingsLabel("Demander mes données (RGPD)", systemImage: "square.and.arrow.down")
+                Button {
+                    Task { await model.exportData() }
+                } label: {
+                    HStack {
+                        settingsLabel("Télécharger mes données (RGPD)", systemImage: "square.and.arrow.down")
+                        if model.isExporting {
+                            Spacer()
+                            ProgressView().tint(SQColor.brandRed)
+                        }
                     }
                 }
+                .disabled(model.isExporting)
             }
             .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
@@ -140,6 +175,9 @@ struct SettingsView: View {
         .sheet(isPresented: $show2FASetup) {
             NavigationStack { TwoFactorSetupView(service: services.auth) }
         }
+        .sheet(item: $model.exportedFile) { file in
+            ShareSheet(items: [file.url])
+        }
         .alert("Supprimer le compte ?", isPresented: $showDeleteConfirm) {
             SecureField("Mot de passe", text: $deletePassword)
                 .textContentType(.password)
@@ -154,7 +192,7 @@ struct SettingsView: View {
                 }
             }
         } message: {
-            Text("Cette action est irréversible. Saisis ton mot de passe pour confirmer la suppression de ton compte.")
+            Text("Cette action est irréversible. Ton compte et tes données personnelles (e-mail, mot de passe, profil) seront supprimés. Tes contributions — speedtests, validations, photos — seront anonymisées et resteront sur la carte communautaire. Saisis ton mot de passe pour confirmer.")
         }
     }
 

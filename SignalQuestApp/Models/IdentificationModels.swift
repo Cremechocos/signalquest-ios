@@ -1,5 +1,12 @@
 import Foundation
 
+private extension String {
+    var nilIfBlank: String? {
+        let value = trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+}
+
 /// Une identification cellule→site faite par l'utilisateur (`GET /api/android/map/identify/mine`).
 /// Le compte étant partagé, on retrouve ici les identifications faites sur Android.
 /// Décodage tolérant.
@@ -10,6 +17,7 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
     let enb: String?
     let gnb: String?
     let cellId: String?
+    let pciValue: String?
     let pci: Int?
     let ci: String?
     let tech: String?
@@ -40,7 +48,8 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         enb = c.decodeFlexibleString(forKey: .enb)
         gnb = c.decodeFlexibleString(forKey: .gnb)
         cellId = c.decodeFlexibleString(forKey: .cellId)
-        pci = try? c.decodeIfPresent(Int.self, forKey: .pci)
+        pciValue = c.decodeFlexibleString(forKey: .pci)
+        pci = pciValue.flatMap(Int.init)
         ci = c.decodeFlexibleString(forKey: .ci)
         tech = c.decodeFlexibleString(forKey: .tech)
         band = try? c.decodeIfPresent(Int.self, forKey: .band)
@@ -65,7 +74,7 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         switch kind {
         case .enb: return "eNB \(enb ?? cellId ?? "—")"
         case .gnb: return "gNB \(gnb ?? cellId ?? "—")"
-        case .pci: return "PCI \(pci.map(String.init) ?? "—")"
+        case .pci: return "PCI \(pciValue ?? "—")"
         case .cellid: return "Cell \(cellId ?? "—")"
         case .other: return enb ?? gnb ?? cellId ?? siteId
         }
@@ -78,6 +87,115 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         case .gnb: return "5G"
         case .enb: return "4G"
         default: return "—"
+        }
+    }
+}
+
+enum IdentifiedNodeKind: String, Equatable {
+    case enb = "eNB"
+    case gnb = "gNB"
+}
+
+struct IdentifiedCell: Identifiable, Equatable {
+    let id: String
+    let source: MyIdentification
+    let pci: String?
+    let ci: String?
+    let cellId: String?
+    let sectors: [Int]
+
+    var label: String {
+        if let pci, !pci.isEmpty { return "PCI \(pci)" }
+        if let cellId, !cellId.isEmpty { return "Cell \(cellId)" }
+        if let ci, !ci.isEmpty { return "CI \(ci)" }
+        return "Cellule"
+    }
+}
+
+struct IdentifiedNodeGroup: Identifiable, Equatable {
+    let id: String
+    let kind: IdentifiedNodeKind
+    let nodeValue: String
+    let representative: MyIdentification
+    let cells: [IdentifiedCell]
+    let validations: Int
+    let sectorsUnion: [Int]
+    let conflict: Bool
+
+    var title: String { "\(kind.rawValue) \(nodeValue)" }
+    var subtitle: String {
+        let count = cells.count
+        let cellPart = count == 0 ? "aucune cellule" : "\(count) PCI/CI"
+        return "\(representative.operatorName ?? "Opérateur inconnu") · \(representative.techLabel) · \(cellPart)"
+    }
+
+    static func group(_ items: [MyIdentification]) -> [IdentifiedNodeGroup] {
+        struct Acc {
+            let kind: IdentifiedNodeKind
+            let nodeValue: String
+            var representative: MyIdentification
+            var cells: [IdentifiedCell] = []
+            var validations = 0
+            var sectors = Set<Int>()
+            var conflict = false
+        }
+
+        var values: [String: Acc] = [:]
+        for item in items {
+            let node: (IdentifiedNodeKind, String)?
+            if item.techLabel.uppercased().contains("5G"), let gnb = item.gnb?.nilIfBlank {
+                node = (.gnb, gnb)
+            } else if let enb = item.enb?.nilIfBlank {
+                node = (.enb, enb)
+            } else if let gnb = item.gnb?.nilIfBlank {
+                node = (.gnb, gnb)
+            } else {
+                node = nil
+            }
+            guard let (kind, nodeValue) = node else { continue }
+            let key = "\(kind.rawValue):\(nodeValue)"
+            var acc = values[key] ?? Acc(kind: kind, nodeValue: nodeValue, representative: item)
+            if (item.lastValidated ?? item.createdAt ?? .distantPast) > (acc.representative.lastValidated ?? acc.representative.createdAt ?? .distantPast) {
+                acc.representative = item
+            }
+            acc.validations = max(acc.validations, item.validations)
+            acc.sectors.formUnion(item.sectors)
+            acc.conflict = acc.conflict || item.conflict
+            if item.kind == .pci || item.kind == .cellid || item.pciValue != nil || item.ci != nil || item.cellId != nil {
+                let cellId = item.ci.map { "ci:\($0)" }
+                    ?? item.pciValue.map { "pci:\($0)" }
+                    ?? item.cellId.map { "cell:\($0)" }
+                    ?? item.id
+                let cell = IdentifiedCell(
+                    id: "\(key):\(cellId)",
+                    source: item,
+                    pci: item.pciValue,
+                    ci: item.ci,
+                    cellId: item.cellId,
+                    sectors: item.sectors
+                )
+                if !acc.cells.contains(where: { $0.id == cell.id }) {
+                    acc.cells.append(cell)
+                }
+            }
+            values[key] = acc
+        }
+
+        return values.map { key, acc in
+            IdentifiedNodeGroup(
+                id: key,
+                kind: acc.kind,
+                nodeValue: acc.nodeValue,
+                representative: acc.representative,
+                cells: acc.cells.sorted { $0.label < $1.label },
+                validations: acc.validations,
+                sectorsUnion: acc.sectors.sorted(),
+                conflict: acc.conflict
+            )
+        }
+        .sorted {
+            ($0.representative.lastValidated ?? $0.representative.createdAt ?? .distantPast) >
+            ($1.representative.lastValidated ?? $1.representative.createdAt ?? .distantPast)
         }
     }
 }

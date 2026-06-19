@@ -66,6 +66,10 @@ targets:
       # NB: doit rester dans project.yml — sinon `xcodegen generate` retire le lien.
       - package: Firebase
         product: FirebaseAnalytics
+      # FirebaseMessaging est importé dans AppDelegate (push FCM) — doit aussi être
+      # déclaré ici, sinon `xcodegen generate` retire le lien (module non résolu).
+      - package: Firebase
+        product: FirebaseMessaging
       # Extension widget (embarquée dans l'app).
       - target: SignalQuestWidget
         embed: true

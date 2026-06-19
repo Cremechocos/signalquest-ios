@@ -17,7 +17,11 @@ struct StoryViewer: View {
     @FocusState private var replyFocused: Bool
     @State private var sentConfirmation = false
 
-    private let duration: Double = 6
+    /// Durée d'affichage dérivée du choix de l'auteur (5/10/15 s côté backend),
+    /// bornée 5...15 (STORY-BUG-01 : la constante 6 s ignorait `durationSeconds`).
+    private var duration: Double {
+        Double(min(15, max(5, currentStory?.durationSeconds ?? 10)))
+    }
 
     var body: some View {
         ZStack {

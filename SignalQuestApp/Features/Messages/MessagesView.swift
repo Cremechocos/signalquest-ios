@@ -29,7 +29,7 @@ final class MessagesViewModel: ObservableObject {
             conversations = try await service.conversations()
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            if !error.isCancellation { errorMessage = error.localizedDescription }
         }
     }
 
@@ -112,6 +112,7 @@ struct MessagesView: View {
                                 Image(systemName: "chevron.right")
                                     .font(.footnote.weight(.semibold))
                                     .foregroundStyle(SQColor.labelTertiary)
+                                    .accessibilityHidden(true)
                             }
                         }
                         .contentShape(Rectangle())
@@ -156,6 +157,7 @@ struct MessagesView: View {
                     Image(systemName: "square.and.pencil")
                         .foregroundStyle(SQColor.label)
                 }
+                .accessibilityLabel("Nouvelle conversation")
             }
         }
         .signalQuestBackground()
@@ -259,6 +261,7 @@ struct MessagesView: View {
                 name: title.isEmpty ? "Conversation" : title,
                 size: 52
             )
+            .accessibilityHidden(true)
             .overlay(alignment: .bottomTrailing) {
                 if isOnline(conversation) {
                     Circle()
@@ -322,6 +325,7 @@ private struct NewConversationSheet: View {
                         ForEach(selected) { user in
                             HStack {
                                 SQAvatar(url: user.avatarUrl, name: user.displayName, size: 34)
+                                    .accessibilityHidden(true)
                                 Text(user.displayName)
                                 Spacer()
                                 Button {
@@ -329,6 +333,7 @@ private struct NewConversationSheet: View {
                                 } label: {
                                     Image(systemName: "xmark.circle.fill")
                                 }
+                                .accessibilityLabel("Retirer \(user.displayName)")
                             }
                         }
                     }
@@ -345,6 +350,7 @@ private struct NewConversationSheet: View {
                         } label: {
                             HStack {
                                 SQAvatar(url: user.avatarUrl, name: user.displayName, size: 34)
+                                    .accessibilityHidden(true)
                                 VStack(alignment: .leading) {
                                     Text(user.displayName)
                                     Text(user.email)
@@ -353,6 +359,7 @@ private struct NewConversationSheet: View {
                                 }
                                 Spacer()
                                 Image(systemName: "plus.circle")
+                                    .accessibilityHidden(true)
                             }
                         }
                     }

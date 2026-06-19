@@ -5,6 +5,7 @@ final class FeedViewModel: ObservableObject {
     @Published var page: SocialFeedPage?
     @Published var selectedHashtag: String?
     @Published var isLoading = false
+    @Published var isLoadingMore = false
     @Published var errorMessage: String?
 
     private let service: SocialFeedServicing
@@ -29,6 +30,33 @@ final class FeedViewModel: ObservableObject {
         }
         do {
             page = try await service.loadFeed(cursor: nil, hashtag: selectedHashtag)
+        } catch {
+            if !error.isCancellation { errorMessage = error.localizedDescription }
+        }
+    }
+
+    /// Pagination ascendante du fil (FEED-FUNC-01) : charge la page suivante via
+    /// `nextCursor` et append en dédoublonnant par id. Déclenchée à l'apparition de
+    /// la dernière carte. Le `refreshable` reste un reset complet (`load`).
+    func loadMore() async {
+        guard !isLoading, !isLoadingMore,
+              let current = page,
+              let cursor = current.nextCursor, !cursor.isEmpty else { return }
+        if AppEnvironment.usesDemoData { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+        do {
+            let next = try await service.loadFeed(cursor: cursor, hashtag: selectedHashtag)
+            var seen = Set(current.items.map { $0.id })
+            let appended = next.items.filter { seen.insert($0.id).inserted }
+            page = SocialFeedPage(
+                items: current.items + appended,
+                nextCursor: next.nextCursor,
+                stories: current.stories,
+                trendingHashtags: current.trendingHashtags,
+                suggestedUsers: current.suggestedUsers,
+                requestId: next.requestId ?? current.requestId
+            )
         } catch {
             if !error.isCancellation { errorMessage = error.localizedDescription }
         }
@@ -278,6 +306,16 @@ struct FeedView: View {
                             }
                         }
                         .sqFadeUp()
+                        .onAppear {
+                            if item.id == model.page?.items.last?.id {
+                                Task { await model.loadMore() }
+                            }
+                        }
+                    }
+                    if model.isLoadingMore {
+                        HStack { Spacer(); ProgressView().tint(SQColor.brandRed); Spacer() }
+                            .padding(.vertical, SQSpace.md)
+                            .frame(maxWidth: .infinity)
                     }
                 }
             }

@@ -20,6 +20,8 @@ protocol MessagesServicing: Sendable {
     func editMessage(messageId: String, text: String, in conversation: MessageConversation, e2ee: E2EEServicing?) async throws
     func deleteMessage(messageId: String, forEveryone: Bool) async throws
     func setTyping(conversationId: String) async
+    func setConversationActive(conversationId: String, active: Bool) async
+    func conversationViewers(conversationId: String) async -> [String]
     func uploadAttachment(conversationId: String, data: Data, filename: String, mimeType: String) async throws -> UploadedAttachment
     // Groupes
     func updateConversation(id: String, title: String?, addUserIds: [String], removeUserIds: [String]) async throws
@@ -245,6 +247,26 @@ final class MessagesService: MessagesServicing {
             "/api/messages/conversations/\(conversationId)/typing",
             body: [String: String]()
         )
+    }
+
+    func setConversationActive(conversationId: String, active: Bool) async {
+        // Présence « actif sur la conversation » — best-effort, échec silencieux
+        // (parité Android). POST = je regarde (ping 30 s) ; DELETE = je quitte.
+        let path = "/api/messages/conversations/\(conversationId)/active"
+        if active {
+            try? await api.requestJSON(path, body: [String: String]())
+        } else {
+            try? await api.request(APIEndpoint(path: path, method: .delete))
+        }
+    }
+
+    func conversationViewers(conversationId: String) async -> [String] {
+        struct ViewersResponse: Decodable { let viewers: [String] }
+        let response: ViewersResponse? = try? await api.request(
+            APIEndpoint(path: "/api/messages/conversations/\(conversationId)/active"),
+            as: ViewersResponse.self
+        )
+        return response?.viewers ?? []
     }
 
     func uploadAttachment(conversationId: String, data: Data, filename: String, mimeType: String) async throws -> UploadedAttachment {

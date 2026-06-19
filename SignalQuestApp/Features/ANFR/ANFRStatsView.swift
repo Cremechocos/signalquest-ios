@@ -53,7 +53,7 @@ final class ANFRStatsViewModel: ObservableObject {
         do {
             stats = try await service.stats()
         } catch {
-            errorMessage = error.localizedDescription
+            if !error.isCancellation { errorMessage = error.localizedDescription }
         }
     }
 
@@ -66,7 +66,7 @@ final class ANFRStatsViewModel: ObservableObject {
             stats = try await service.stats()
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            if !error.isCancellation { errorMessage = error.localizedDescription }
         }
     }
 
@@ -384,7 +384,7 @@ struct ANFRStatsView: View {
             let positive = delta > 0
             HStack(spacing: 2) {
                 Image(systemName: positive ? "arrow.up.right" : "arrow.down.right")
-                    .font(.system(size: 10, weight: .black))
+                    .font(.system(size: 11, weight: .black))
                 Text("\(abs(delta))")
                     .font(SQFont.archivo(13, .bold))
                     .monospacedDigit()

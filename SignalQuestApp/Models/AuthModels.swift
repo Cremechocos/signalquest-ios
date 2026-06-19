@@ -10,6 +10,9 @@ struct AuthUser: Codable, Identifiable, Equatable {
     /// de dates du décodeur.
     let handleChangedAt: String?
     let avatarUrl: URL?
+    /// Bio de profil. Peut être absente de `/api/auth/me` ; rechargée via
+    /// `/api/user/profile` pour préremplir l'édition sans l'écraser (EDITPROFILE-BUG-01).
+    let bio: String?
     let role: String
     let twoFactorEnabled: Bool?
     let notifyMessagesPush: Bool?

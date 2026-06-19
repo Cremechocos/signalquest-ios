@@ -32,6 +32,10 @@ final class MyIdentificationsViewModel: ObservableObject {
         }
     }
 
+    var filteredGroups: [IdentifiedNodeGroup] {
+        IdentifiedNodeGroup.group(filtered)
+    }
+
     var conflictCount: Int { items.filter(\.conflict).count }
 
     func load() async {
@@ -53,12 +57,12 @@ final class MyIdentificationsViewModel: ObservableObject {
             let result = try await service.withdraw(
                 siteId: item.siteId,
                 enb: item.enb, gnb: item.gnb,
-                pci: item.pci.map(String.init),
+                pci: item.pciValue,
                 cellId: item.cellId, ci: item.ci,
                 tech: item.tech, reason: nil
             )
             if result.success {
-                items.removeAll { $0.id == item.id }
+                await load()
                 toast = "Identification retirée"
                 Haptics.success()
             } else {
@@ -103,21 +107,48 @@ struct MyIdentificationsView: View {
                     .listRowBackground(Color.clear)
             }
 
-            if model.filtered.isEmpty && !model.isLoading {
+            if model.filteredGroups.isEmpty && !model.isLoading {
                 emptyState.listRowBackground(Color.clear)
             } else {
-                ForEach(model.filtered) { item in
-                    IdentificationRow(item: item, isWithdrawing: model.withdrawingId == item.id)
-                        .listRowBackground(SQColor.surface)
-                        .contentShape(Rectangle())
-                        .onTapGesture { selected = item }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                pendingWithdraw = item
-                            } label: {
-                                Label("Retirer", systemImage: "trash")
+                ForEach(model.filteredGroups) { group in
+                    Section {
+                        IdentificationNodeRow(group: group, isWithdrawing: model.withdrawingId == group.representative.id)
+                            .listRowBackground(SQColor.surface)
+                            .contentShape(Rectangle())
+                            .onTapGesture { selected = group.representative }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    pendingWithdraw = group.representative
+                                } label: {
+                                    Label("Retirer", systemImage: "trash")
+                                }
                             }
+
+                        ForEach(group.cells) { cell in
+                            IdentificationCellRow(cell: cell, isWithdrawing: model.withdrawingId == cell.source.id)
+                                .listRowBackground(SQColor.surface)
+                                .contentShape(Rectangle())
+                                .onTapGesture { selected = cell.source }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        pendingWithdraw = cell.source
+                                    } label: {
+                                        Label("Retirer", systemImage: "trash")
+                                    }
+                                }
                         }
+
+                        if group.cells.isEmpty {
+                            Text("Aucun PCI/CI associé pour ce nœud.")
+                                .font(.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .listRowBackground(SQColor.surface)
+                        }
+                    } header: {
+                        Text(group.title)
+                            .font(SQFont.archivo(12, .semibold))
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
                 }
             }
 
@@ -148,7 +179,7 @@ struct MyIdentificationsView: View {
             }
             Button("Annuler", role: .cancel) { pendingWithdraw = nil }
         } message: { item in
-            Text("« \(item.nodeLabel) » ne te sera plus attribuée. Action réversible en ré-identifiant.")
+            Text("« \(item.nodeLabel) » ne te sera plus attribuée. Les lignes liées sont rechargées depuis le serveur après retrait.")
         }
         .sheet(item: $selected) { item in
             IdentificationDetailSheet(
@@ -200,18 +231,18 @@ struct MyIdentificationsView: View {
     }
 }
 
-private struct IdentificationRow: View {
-    let item: MyIdentification
+private struct IdentificationNodeRow: View {
+    let group: IdentifiedNodeGroup
     let isWithdrawing: Bool
 
-    private var is5G: Bool { item.kind == .gnb || item.techLabel == "5G" }
+    private var is5G: Bool { group.kind == .gnb }
 
     var body: some View {
         HStack(spacing: SQSpace.md) {
             ZStack {
                 RoundedRectangle(cornerRadius: 11, style: .continuous)
                     .fill(is5G ? SQColor.brandOrange : SQColor.brandBlue)
-                Text(item.techLabel)
+                Text(is5G ? "5G" : "4G")
                     .font(.system(size: 12, weight: .heavy))
                     .foregroundStyle(.white)
             }
@@ -219,30 +250,27 @@ private struct IdentificationRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: SQSpace.sm) {
-                    Text(item.operatorName ?? "Opérateur ?")
-                        .font(.subheadline.weight(.semibold))
+                    Text(group.title)
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
-                    if item.conflict {
+                    if group.conflict {
                         Text("conflit")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.system(size: 11, weight: .bold))
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(SQColor.warning.opacity(0.18), in: Capsule())
                             .foregroundStyle(SQColor.warning)
                     }
                 }
-                Text(item.nodeLabel)
-                    .font(.caption.monospacedDigit())
+                Text(group.subtitle)
+                    .font(.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .lineLimit(1)
                 HStack(spacing: SQSpace.sm) {
-                    Label("validée \(item.validations)×", systemImage: "checkmark.seal.fill")
+                    Label("validée \(group.validations)×", systemImage: "checkmark.seal.fill")
                         .foregroundStyle(SQColor.brandGreen)
-                    if !item.sectors.isEmpty {
-                        Label("\(item.sectors.count) secteur\(item.sectors.count > 1 ? "s" : "")", systemImage: "dot.radiowaves.right")
-                    }
-                    if let date = item.lastValidated ?? item.createdAt {
-                        Text(date, format: .dateTime.day().month().year())
+                    if !group.sectorsUnion.isEmpty {
+                        Label("\(group.sectorsUnion.count) secteur\(group.sectorsUnion.count > 1 ? "s" : "")", systemImage: "dot.radiowaves.right")
                     }
                 }
                 .font(.caption2)
@@ -254,6 +282,40 @@ private struct IdentificationRow: View {
             Image(systemName: "chevron.right").font(.caption2).foregroundStyle(SQColor.labelSecondary)
         }
         .padding(.vertical, 4)
+    }
+}
+
+private struct IdentificationCellRow: View {
+    let cell: IdentifiedCell
+    let isWithdrawing: Bool
+
+    var body: some View {
+        HStack(spacing: SQSpace.md) {
+            Image(systemName: "dot.radiowaves.right")
+                .font(.headline)
+                .foregroundStyle(SQColor.brandOrange)
+                .frame(width: 44, height: 34)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(cell.label)
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(SQColor.label)
+                HStack(spacing: SQSpace.sm) {
+                    if let ci = cell.ci {
+                        Text("CI \(ci)")
+                    }
+                    if !cell.sectors.isEmpty {
+                        Text("Secteurs \(cell.sectors.map(String.init).joined(separator: ", "))")
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(SQColor.labelSecondary)
+                .lineLimit(1)
+            }
+            Spacer()
+            if isWithdrawing { ProgressView() }
+            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(SQColor.labelSecondary)
+        }
+        .padding(.vertical, 3)
     }
 }
 

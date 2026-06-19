@@ -799,7 +799,7 @@ struct SQSectionHeader<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(title)
-                .font(.title2.weight(.bold))
+                .font(SQType.title)
                 .foregroundStyle(SQColor.label)
             Spacer()
             trailing()

@@ -324,6 +324,7 @@ extension AuthUser {
         handle: "ios",
         handleChangedAt: nil,
         avatarUrl: nil,
+        bio: nil,
         role: "user",
         twoFactorEnabled: false,
         notifyMessagesPush: false,
