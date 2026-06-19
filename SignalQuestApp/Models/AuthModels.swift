@@ -5,6 +5,10 @@ struct AuthUser: Codable, Identifiable, Equatable {
     let email: String
     let name: String?
     let handle: String?
+    /// Horodatage ISO du dernier changement de @handle (null = jamais changé). Sert au
+    /// cooldown de 30 j côté UI. Décodé en String pour rester indépendant de la stratégie
+    /// de dates du décodeur.
+    let handleChangedAt: String?
     let avatarUrl: URL?
     let role: String
     let twoFactorEnabled: Bool?

@@ -7,7 +7,8 @@ struct EditProfileView: View {
     let user: AuthUser
 
     @State private var name: String
-    @State private var handle: String
+    @State private var currentHandle: String
+    @State private var showHandleSheet = false
     @State private var bio: String
     @State private var avatarItem: PhotosPickerItem?
     @State private var avatarPreview: UIImage?
@@ -17,7 +18,7 @@ struct EditProfileView: View {
     init(user: AuthUser) {
         self.user = user
         _name = State(initialValue: user.name ?? "")
-        _handle = State(initialValue: user.handle ?? "")
+        _currentHandle = State(initialValue: user.handle ?? "")
         _bio = State(initialValue: "")
     }
 
@@ -34,17 +35,25 @@ struct EditProfileView: View {
                         TextField("Nom", text: $name)
                             .textContentType(.name)
                             .textFieldStyle(SQTextFieldStyle())
-                        TextField("Nom d’utilisateur", text: $handle)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .textFieldStyle(SQTextFieldStyle())
-                            .disabled(handleLocked)
-                            .opacity(handleLocked ? 0.55 : 1)
-                        if handleLocked {
-                            Text("Le nom d’utilisateur ne peut être choisi qu’une seule fois.")
-                                .font(SQType.micro)
-                                .foregroundStyle(SQColor.labelTertiary)
+                        Button { showHandleSheet = true } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Nom d’utilisateur")
+                                        .font(SQType.micro)
+                                        .foregroundStyle(SQColor.labelTertiary)
+                                    Text(currentHandle.isEmpty ? "Choisir un nom d’utilisateur" : "@\(currentHandle)")
+                                        .font(SQType.body)
+                                        .foregroundStyle(SQColor.label)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(SQColor.labelTertiary)
+                            }
+                            .padding(SQSpace.md)
+                            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                         }
+                        .buttonStyle(.plain)
                         TextField("Bio", text: $bio, axis: .vertical)
                             .lineLimit(2...4)
                             .textFieldStyle(SQTextFieldStyle())
@@ -83,6 +92,9 @@ struct EditProfileView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showHandleSheet) {
+                ChooseHandleSheet(onSuccess: { newHandle in currentHandle = newHandle })
+            }
         }
     }
 
@@ -116,19 +128,15 @@ struct EditProfileView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// Le backend verrouille le nom d'utilisateur une fois défini.
-    private var handleLocked: Bool { !(user.handle ?? "").isEmpty }
-
     private func save() async {
         isBusy = true
         defer { isBusy = false }
         do {
-            // N'envoyer `handle` QUE s'il n'est pas encore défini : sinon le backend
-            // renvoie 409 USER_HANDLE_LOCKED et fait échouer tout le PUT (même le nom).
-            let handlePatch = handleLocked ? nil : handle.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            // Le @handle se choisit/modifie via ChooseHandleSheet (vérif live + cooldown 30 j).
+            // Ici on n'enregistre que le nom (partageable) et la bio.
             _ = try await services.users.updateProfile(UserProfilePatch(
                 name: name.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
-                handle: handlePatch,
+                handle: nil,
                 bio: bio.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
                 avatarUrl: nil
             ))

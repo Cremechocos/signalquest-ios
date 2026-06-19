@@ -209,6 +209,16 @@ final class AuthSessionViewModel: ObservableObject {
         await bootstrap()
     }
 
+    /// Recharge l'utilisateur courant (/api/auth/me) sans repasser par l'écran de chargement.
+    /// Utilisé après un changement de @handle pour rafraîchir l'état (et fermer la modale de
+    /// choix de handle). Conserve la session en cas d'échec réseau.
+    func refreshUser() async {
+        guard case .authenticated = state else { return }
+        if let user = try? await service.me() {
+            state = .authenticated(user)
+        }
+    }
+
     func login(email: String, password: String) async {
         isBusy = true
         errorMessage = nil
@@ -312,6 +322,7 @@ extension AuthUser {
         email: "ios@signalquest.fr",
         name: "SignalQuest iOS",
         handle: "ios",
+        handleChangedAt: nil,
         avatarUrl: nil,
         role: "user",
         twoFactorEnabled: false,

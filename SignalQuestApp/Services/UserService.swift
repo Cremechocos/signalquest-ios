@@ -7,6 +7,15 @@ struct UserProfilePatch: Codable {
     let avatarUrl: String?
 }
 
+/// Réponse de `GET /api/user/profile/handle-availability`.
+struct HandleAvailability: Codable {
+    let available: Bool
+    let current: Bool?
+    let cooldownActive: Bool?
+    let remainingDays: Int?
+    let code: String?
+}
+
 struct UserStats: Codable {
     let totalSpeedtests: Int?
     let totalPhotos: Int?
@@ -117,6 +126,7 @@ struct NotificationPreferences: Codable {
 protocol UserServicing: Sendable {
     func profile() async throws -> AuthUser
     func updateProfile(_ patch: UserProfilePatch) async throws -> AuthUser
+    func checkHandleAvailability(_ handle: String) async throws -> HandleAvailability
     func uploadAvatar(data: Data, filename: String, mimeType: String) async throws -> AuthUser
     func stats() async throws -> UserStats
     func notificationPreferences() async throws -> NotificationPreferences
@@ -124,6 +134,9 @@ protocol UserServicing: Sendable {
     func registerFCMToken(_ token: String) async throws
     func heartbeat() async throws
     func deleteAccount(password: String) async throws
+    /// Archive RGPD complète (profil, mesures, contributions, messages…) au format
+    /// JSON, telle que renvoyée par le backend `GET /api/export/my-data`.
+    func exportPersonalData() async throws -> Data
 }
 
 final class UserService: UserServicing {
@@ -141,6 +154,16 @@ final class UserService: UserServicing {
         // renvoyait 405 et AUCUNE modif (nom/handle) ne passait. Android utilise PUT.
         let response: Response = try await api.requestJSON("/api/user/profile", method: .put, body: patch)
         return response.user
+    }
+
+    func checkHandleAvailability(_ handle: String) async throws -> HandleAvailability {
+        try await api.request(
+            APIEndpoint(
+                path: "/api/user/profile/handle-availability",
+                query: [URLQueryItem(name: "handle", value: handle)]
+            ),
+            as: HandleAvailability.self
+        )
     }
 
     func uploadAvatar(data: Data, filename: String, mimeType: String) async throws -> AuthUser {
@@ -189,6 +212,12 @@ final class UserService: UserServicing {
             method: .delete,
             body: ["password": password, "confirmation": "SUPPRIMER MON COMPTE"]
         )
+    }
+
+    func exportPersonalData() async throws -> Data {
+        // Renvoie l'archive JSON brute pour que l'UI puisse l'écrire dans un fichier
+        // et la partager (droit d'accès RGPD, art. 15).
+        try await api.requestData(APIEndpoint(path: "/api/export/my-data"))
     }
 }
 

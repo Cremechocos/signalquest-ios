@@ -205,8 +205,10 @@ struct OfflineRetryView: View {
 struct MainTabView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var session: AuthSessionViewModel
     @Environment(\.scenePhase) private var scenePhase
     let user: AuthUser
+    @State private var showHandleGate = false
 
     init(user: AuthUser) {
         self.user = user
@@ -249,7 +251,15 @@ struct MainTabView: View {
         .sqSidebarAdaptableTabStyle()
         .tint(SQColor.brandOrange)
         .toolbarBackground(.automatic, for: .tabBar)
-        .task { await services.refreshInboxBadge(); consumeIntentRoutes() }
+        .task {
+            await services.refreshInboxBadge()
+            consumeIntentRoutes()
+            // À l'arrivée (Feed = onglet par défaut) sans @handle : inviter à en choisir un.
+            if (user.handle ?? "").isEmpty { showHandleGate = true }
+        }
+        .sheet(isPresented: $showHandleGate) {
+            ChooseHandleSheet(onSuccess: { _ in Task { await session.refreshUser() } })
+        }
         .onChangeCompat(of: scenePhase) { _, phase in
             if phase == .active {
                 Task { await services.refreshInboxBadge() }
