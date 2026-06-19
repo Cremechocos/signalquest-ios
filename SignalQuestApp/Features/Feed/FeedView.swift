@@ -294,7 +294,8 @@ struct FeedView: View {
                             onComment: { presentedSheet = .comments(item) },
                             onFavorite: { model.favorite(item) },
                             onShare: { presentedSheet = .share(item) },
-                            onAuthorTap: { profileAuthor = item.author }
+                            onAuthorTap: { profileAuthor = item.author },
+                            onReact: { emoji in model.react(item, emoji: emoji) }
                         )
                         .contextMenu {
                             Button { model.muteNotifications(item) } label: {

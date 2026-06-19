@@ -18,11 +18,12 @@ final class CommentsViewModel: ObservableObject {
 
     func load() async {
         isLoading = true
+        errorMessage = nil
         defer { isLoading = false }
         do {
             comments = try await service.list(postId: postId, cursor: nil).comments
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = "Impossible de charger les commentaires."
         }
     }
 
@@ -30,14 +31,16 @@ final class CommentsViewModel: ObservableObject {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         isSending = true
+        errorMessage = nil
         defer { isSending = false }
         do {
             let comment = try await service.add(postId: postId, text: text, parentId: nil)
-            comments.insert(comment, at: 0)
+            withAnimation(SQMotion.bouncy) { comments.insert(comment, at: 0) }
             draft = ""
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            // COMMENT-UX-01 : l'échec d'envoi est désormais affiché à l'utilisateur.
+            errorMessage = "Échec de l'envoi. Réessaie."
             Haptics.error()
         }
     }
@@ -61,8 +64,12 @@ struct CommentsSheet: View {
             VStack(spacing: 0) {
                 sheetHeader
                 content
+                if let error = model.errorMessage {
+                    errorBanner(error)
+                }
                 composer
             }
+            .sqAnimation(SQMotion.snappy, value: model.errorMessage)
             .signalQuestBackground()
             .navigationTitle("Commentaires")
             .navigationBarTitleDisplayMode(.inline)
@@ -178,6 +185,18 @@ struct CommentsSheet: View {
         } else {
             content()
         }
+    }
+
+    /// Bandeau d'erreur (COMMENT-UX-01) — l'échec n'est plus silencieux.
+    private func errorBanner(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.danger)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm)
+            .background(SQColor.danger.opacity(0.10))
+            .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
     private var composer: some View {

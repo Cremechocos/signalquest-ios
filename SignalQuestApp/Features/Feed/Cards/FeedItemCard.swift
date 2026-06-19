@@ -12,6 +12,8 @@ struct FeedItemCard: View {
     var onFavorite: () -> Void = {}
     var onShare: () -> Void = {}
     var onAuthorTap: (() -> Void)? = nil
+    /// Réaction emoji (appui long sur ❤️), transmise à la barre d'actions.
+    var onReact: ((String) -> Void)? = nil
 
     var body: some View {
         switch normalizedKind {
@@ -20,35 +22,35 @@ struct FeedItemCard: View {
                 item: item,
                 onTap: onTap, onLike: onLike, onRepost: onRepost,
                 onComment: onComment, onFavorite: onFavorite, onShare: onShare,
-                onAuthorTap: onAuthorTap
+                onAuthorTap: onAuthorTap, onReact: onReact
             )
         case "validation":
             ValidationCardView(
                 item: item,
                 onTap: onTap, onLike: onLike, onRepost: onRepost,
                 onComment: onComment, onFavorite: onFavorite, onShare: onShare,
-                onAuthorTap: onAuthorTap
+                onAuthorTap: onAuthorTap, onReact: onReact
             )
         case "coverage", "session", "drive_test":
             CoverageCardView(
                 item: item,
                 onTap: onTap, onLike: onLike, onRepost: onRepost,
                 onComment: onComment, onFavorite: onFavorite, onShare: onShare,
-                onAuthorTap: onAuthorTap
+                onAuthorTap: onAuthorTap, onReact: onReact
             )
         case "photo", "antenna_photo":
             PhotoCardView(
                 item: item,
                 onTap: onTap, onLike: onLike, onRepost: onRepost,
                 onComment: onComment, onFavorite: onFavorite, onShare: onShare,
-                onAuthorTap: onAuthorTap
+                onAuthorTap: onAuthorTap, onReact: onReact
             )
         default:
             PostCardView(
                 item: item,
                 onTap: onTap, onLike: onLike, onRepost: onRepost,
                 onComment: onComment, onFavorite: onFavorite, onShare: onShare,
-                onAuthorTap: onAuthorTap
+                onAuthorTap: onAuthorTap, onReact: onReact
             )
         }
     }

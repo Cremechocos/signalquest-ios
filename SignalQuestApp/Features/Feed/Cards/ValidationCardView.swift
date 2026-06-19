@@ -11,6 +11,8 @@ struct ValidationCardView: View {
     var onFavorite: () -> Void
     var onShare: () -> Void
     var onAuthorTap: (() -> Void)? = nil
+    /// Réaction emoji (appui long sur ❤️). Repli sur onLike si absent.
+    var onReact: ((String) -> Void)? = nil
 
     private var signal: SocialSignalSummary? { item.signal }
     private var accent: Color { TechAccent.color(for: signal?.technology) }
@@ -72,13 +74,14 @@ struct ValidationCardView: View {
                     onRepost: onRepost,
                     onComment: onComment,
                     onFavorite: onFavorite,
-                    onShare: onShare
+                    onShare: onShare,
+                    onReact: onReact
                 )
             }
             .padding(SQSpace.lg)
             .sqEditorialCard()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SQPressButtonStyle())
     }
 
     private var gridColumns: [GridItem] {

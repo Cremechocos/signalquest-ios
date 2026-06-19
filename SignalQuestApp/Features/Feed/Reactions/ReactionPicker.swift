@@ -9,9 +9,12 @@ struct ReactionPicker: View {
         self.onPick = onPick
     }
 
+    @State private var appeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         HStack(spacing: SQSpace.sm + 2) {
-            ForEach(emojis, id: \.self) { emoji in
+            ForEach(Array(emojis.enumerated()), id: \.element) { index, emoji in
                 Button {
                     Haptics.light()
                     onPick(emoji)
@@ -21,15 +24,18 @@ struct ReactionPicker: View {
                         .padding(SQSpace.sm + 2)
                         .background(SQColor.surfaceMuted, in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(SQPressButtonStyle())
                 .accessibilityLabel("Réagir avec \(emoji)")
+                // Entrée en cascade : chaque emoji « pop » avec un léger décalage.
+                .scaleEffect(appeared ? 1 : 0.1)
+                .opacity(appeared ? 1 : 0)
+                .animation(reduceMotion ? nil : SQMotion.bouncy.delay(Double(index) * 0.04), value: appeared)
             }
         }
         .padding(SQSpace.sm)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1.5)
-        }
+        .background(SQColor.surface, in: Capsule())
+        .overlay { Capsule().stroke(SQColor.separator, lineWidth: 1.5) }
+        .shadow(color: .black.opacity(0.28), radius: 16, x: 0, y: 8)
+        .onAppear { appeared = true }
     }
 }

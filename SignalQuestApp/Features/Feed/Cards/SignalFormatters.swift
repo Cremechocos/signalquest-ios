@@ -176,18 +176,15 @@ struct CardActionsBar: View {
     var onComment: () -> Void
     var onFavorite: () -> Void
     var onShare: () -> Void
+    /// Réaction emoji via l'appui long sur ❤️ (REACT-FEAT-01). Repli sur onLike.
+    var onReact: ((String) -> Void)? = nil
+
+    @State private var showReactionPicker = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: SQSpace.xl) {
-            actionButton(
-                count: reactionCount,
-                systemImage: item.likedByMe ? "heart.fill" : "heart",
-                tint: item.likedByMe ? SQColor.like : SQColor.labelSecondary,
-                label: "J’aime",
-                action: onLike
-            )
-            .accessibilityAddTraits(item.likedByMe ? .isSelected : [])
-            .sqLikePop(trigger: item.likedByMe)
+            likeButton
             actionButton(
                 count: item.commentsCount,
                 systemImage: "bubble.right",
@@ -218,6 +215,58 @@ struct CardActionsBar: View {
         }
         .buttonStyle(.plain)
         .font(SQFont.archivo(15, .semibold))
+        .overlay(alignment: .topLeading) {
+            if showReactionPicker {
+                ReactionPicker { emoji in
+                    (onReact ?? { _ in onLike() })(emoji)
+                    dismissPicker()
+                }
+                .offset(y: -56)
+                .transition(.scale(scale: 0.55, anchor: .bottomLeading).combined(with: .opacity))
+                .zIndex(2)
+            }
+        }
+    }
+
+    /// Bouton ❤️ : tap = like ; appui long = sélecteur de réactions animé.
+    /// Vue à gestes (pas un Button) pour que le tap court et l'appui long ne se
+    /// déclenchent pas tous les deux.
+    private var likeButton: some View {
+        HStack(spacing: 5) {
+            Image(systemName: item.likedByMe ? "heart.fill" : "heart")
+            if reactionCount > 0 {
+                Text(SignalFormatters.count(reactionCount))
+                    .contentTransition(.numericText())
+            }
+        }
+        .foregroundStyle(item.likedByMe ? SQColor.like : SQColor.labelSecondary)
+        .sqLikePop(trigger: item.likedByMe)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if showReactionPicker { dismissPicker() } else { onLike() }
+        }
+        .onLongPressGesture(minimumDuration: 0.3) {
+            guard onReact != nil else { onLike(); return }
+            Haptics.medium()
+            withAnimation(SQMotion.resolve(SQMotion.bouncy, reduceMotion)) { showReactionPicker = true }
+            scheduleAutoDismiss()
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("J’aime")
+        .accessibilityValue(reactionCount > 0 ? "\(reactionCount)" : "")
+        .accessibilityAddTraits(item.likedByMe ? [.isButton, .isSelected] : .isButton)
+        .accessibilityHint(onReact == nil ? "" : "Appui long pour choisir une réaction")
+        .accessibilityAction { onLike() }
+    }
+
+    private func dismissPicker() {
+        withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { showReactionPicker = false }
+    }
+
+    private func scheduleAutoDismiss() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
+            if showReactionPicker { dismissPicker() }
+        }
     }
 
     private var reactionCount: Int { item.reactions.reduce(0) { $0 + $1.count } }
@@ -251,6 +300,9 @@ extension View {
             .background(SQColor.surface, in: shape)
             .modifier(ConditionalClip(shape: shape, clip: clip))
             .overlay { shape.stroke(SQColor.separator, lineWidth: 1.5) }
+            // Profondeur discrète : on garde la signature « imprimée » (bordure + typo)
+            // mais on décolle la carte du fond avec une ombre douce (dark-mode friendly).
+            .shadow(color: .black.opacity(0.16), radius: 11, x: 0, y: 5)
     }
 }
 

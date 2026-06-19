@@ -11,6 +11,8 @@ struct PostCardView: View {
     var onFavorite: () -> Void = {}
     var onShare: () -> Void = {}
     var onAuthorTap: (() -> Void)? = nil
+    /// Réaction emoji (appui long sur ❤️). Repli sur onLike si absent.
+    var onReact: ((String) -> Void)? = nil
 
     var body: some View {
         Button(action: onTap) {
@@ -71,12 +73,13 @@ struct PostCardView: View {
                     onRepost: onRepost,
                     onComment: onComment,
                     onFavorite: onFavorite,
-                    onShare: onShare
+                    onShare: onShare,
+                    onReact: onReact
                 )
             }
             .padding(SQSpace.lg)
             .sqEditorialCard()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SQPressButtonStyle())
     }
 }

@@ -12,6 +12,8 @@ struct PhotoCardView: View {
     var onFavorite: () -> Void
     var onShare: () -> Void
     var onAuthorTap: (() -> Void)? = nil
+    /// Réaction emoji (appui long sur ❤️). Repli sur onLike si absent.
+    var onReact: ((String) -> Void)? = nil
 
     @State private var likeBurst = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -54,14 +56,15 @@ struct PhotoCardView: View {
                         onRepost: onRepost,
                         onComment: onComment,
                         onFavorite: onFavorite,
-                        onShare: onShare
+                        onShare: onShare,
+                        onReact: onReact
                     )
                 }
                 .padding(SQSpace.lg)
             }
             .sqEditorialCard(clip: true)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SQPressButtonStyle())
     }
 
     @ViewBuilder
