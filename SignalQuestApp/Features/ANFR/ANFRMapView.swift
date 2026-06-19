@@ -335,6 +335,9 @@ struct ANFRMapView: View {
                         .foregroundStyle(on ? Color.white : SQColor.label)
                     }
                     .buttonStyle(SQPressButtonStyle())
+                    .accessibilityLabel("Filtre \(op.label)")
+                    .accessibilityValue(on ? "activé" : "désactivé")
+                    .accessibilityAddTraits(on ? .isSelected : [])
                 }
             }
             .padding(.horizontal, SQSpace.xs)
@@ -368,19 +371,30 @@ struct ANFRMapView: View {
     }
 
     private func errorPill(_ message: String) -> some View {
-        Label(message, systemImage: "exclamationmark.triangle.fill")
-            .font(SQFont.archivo(13, .semibold))
-            .foregroundStyle(SQColor.label)
-            .lineLimit(2)
-            .padding(.horizontal, SQSpace.md)
-            .padding(.vertical, SQSpace.sm + 1)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                    .stroke(SQColor.warning.opacity(0.6), lineWidth: 1.5)
+        VStack(spacing: SQSpace.sm) {
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .font(SQFont.archivo(13, .semibold))
+                .foregroundStyle(SQColor.label)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+            Button {
+                Task { await model.loadSnapshot() }
+            } label: {
+                Label("Réessayer", systemImage: "arrow.clockwise")
+                    .font(SQFont.archivo(13, .bold))
+                    .foregroundStyle(SQColor.brandRed)
             }
-            .frame(maxWidth: 320)
-            .shadow(color: chromeShadow, radius: 12, y: 5)
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm + 1)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                .stroke(SQColor.warning.opacity(0.6), lineWidth: 1.5)
+        }
+        .frame(maxWidth: 320)
+        .shadow(color: chromeShadow, radius: 12, y: 5)
     }
 
     private var chromeShadow: Color {

@@ -129,6 +129,11 @@ struct ANFRSiteDetailSheet: View {
                 .padding(.horizontal, SQSpace.md)
                 .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
+            if site.antennas.isEmpty {
+                Text("Aucune antenne au relevé courant.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
         }
         .padding(SQSpace.lg)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
