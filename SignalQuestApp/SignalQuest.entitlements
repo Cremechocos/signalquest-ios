@@ -8,6 +8,10 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:signalquest.fr</string>
+	</array>
 	<key>com.apple.developer.group-session</key>
 	<true/>
 	<key>com.apple.developer.networking.wifi-info</key>
