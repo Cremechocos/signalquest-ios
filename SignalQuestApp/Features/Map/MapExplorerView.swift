@@ -1736,7 +1736,13 @@ struct MapExplorerView: View {
                 )
             }
             let antennaPayloads: [MapAnnotationPayload] = model.antennas.compactMap { site in
-                guard matchesSelectedBands(site.bands) else { return nil }
+                // La liste `/api/antennas` (mode minimal) ne renvoie PAS les
+                // bandes par site : le filtrage bande est fait CÔTÉ SERVEUR. On ne
+                // ré-applique le filtre client que si l'antenne porte réellement
+                // des bandes — sinon `site.bands` vide ferait disparaître TOUTES
+                // les antennes dès qu'une bande est sélectionnée (bug « le filtre
+                // bande masque tout »).
+                guard site.bands.isEmpty || matchesSelectedBands(site.bands) else { return nil }
                 guard let lat = site.latitude, let lng = site.longitude else { return nil }
                 return MapAnnotationPayload(
                     id: "antenna-\(site.id)",

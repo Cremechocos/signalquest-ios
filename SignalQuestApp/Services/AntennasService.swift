@@ -91,33 +91,31 @@ final class AntennasService: AntennasServicing {
         }
     }
 
+    // Le backend `/api/antennas` résout chaque valeur de bande via `getBand(id)`
+    // — un LOOKUP DIRECT dans le registre dont les clés sont des identifiants de
+    // bande ("B20", "n78"…), PAS des numéros. Envoyer un numéro nu ("20") ne
+    // résout rien → `bands.length === 0` → le filtre serveur est entièrement
+    // ignoré (toutes les antennes reviennent). Il faut donc émettre des IDs.
+    //
+    // On n'envoie PAS de paramètre `frequencies`/`frequency` (MHz) : côté backend
+    // c'est un filtre SÉPARÉ (en ET) au matching numérique approximatif qui
+    // exclurait à tort des antennes correctement retenues par le filtre de bande.
     private static func bandQueryItems(_ bands: Set<Int>) -> [URLQueryItem] {
-        let values = bands.sorted()
-        guard !values.isEmpty else { return [] }
-        let bandValue = values.map(String.init).joined(separator: ",")
-        var items = [
-            URLQueryItem(name: "bands", value: bandValue),
-            URLQueryItem(name: "band", value: bandValue),
-            URLQueryItem(name: "frequencyBands", value: bandValue)
+        let ids = Self.bandCatalogIds(bands)
+        guard !ids.isEmpty else { return [] }
+        let value = ids.joined(separator: ",")
+        return [
+            URLQueryItem(name: "bands", value: value),
+            URLQueryItem(name: "band", value: value)
         ]
-        let frequencyValue = values.compactMap(frequencyMHz(forBand:)).map(String.init).joined(separator: ",")
-        if !frequencyValue.isEmpty {
-            items.append(URLQueryItem(name: "frequencies", value: frequencyValue))
-            items.append(URLQueryItem(name: "frequency", value: frequencyValue))
-        }
-        return items
     }
 
-    private static func frequencyMHz(forBand band: Int) -> Int? {
-        switch band {
-        case 1: return 2100
-        case 3: return 1800
-        case 7: return 2600
-        case 20: return 800
-        case 28: return 700
-        case 78: return 3500
-        default: return nil
-        }
+    /// Numéros de bande → identifiants du registre backend : 4G `"B{n}"`,
+    /// 5G `"n{n}"`. On émet les DEUX variantes par bande (le backend ignore les
+    /// IDs inconnus via `getBand`→null), ce qui couvre « bande N, toutes
+    /// générations » sans sur-filtrer (ex. 7 → "B7"+"n7", 78 → "B78"(ignoré)+"n78").
+    static func bandCatalogIds(_ bands: Set<Int>) -> [String] {
+        bands.sorted().flatMap { ["B\($0)", "n\($0)"] }
     }
 
     func listLegacy(bbox: BoundingBox) async throws -> [AntennaSite] {
