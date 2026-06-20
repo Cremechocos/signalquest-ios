@@ -1743,6 +1743,7 @@ struct MapExplorerView: View {
                 // les antennes dès qu'une bande est sélectionnée (bug « le filtre
                 // bande masque tout »).
                 guard site.bands.isEmpty || matchesSelectedBands(site.bands) else { return nil }
+                guard matchesSelectedSharing(site) else { return nil }
                 guard let lat = site.latitude, let lng = site.longitude else { return nil }
                 return MapAnnotationPayload(
                     id: "antenna-\(site.id)",
@@ -1873,10 +1874,7 @@ struct MapExplorerView: View {
         for tile in model.speedtestTiles {
             for marker in tile.markers {
                 guard seen.insert(marker.id).inserted else { continue }
-                if !techs.isEmpty {
-                    let tech = (marker.tech ?? "").lowercased()
-                    guard techs.contains(where: { tech.contains($0.lowercased()) }) else { continue }
-                }
+                if !techs.isEmpty, !Self.speedtestMatchesTech(marker.tech, selected: techs) { continue }
                 guard matchesSelectedBand(marker.band) || matchesSelectedBands(in: [marker.frequency, marker.tech].compactMap { $0 }) else { continue }
                 features.append(
                     SpeedtestFeature(
@@ -2055,6 +2053,48 @@ struct MapExplorerView: View {
             }
         }
         return features
+    }
+
+    /// Filtre « Partage » (mutualisation FR/DROM) appliqué CÔTÉ CLIENT sur les
+    /// champs sharingType/crozonLeader/isZTD de l'antenne (parité Android :
+    /// le backend ne sait pas exprimer ce multi-select). Sémantique OU.
+    private func matchesSelectedSharing(_ site: AntennaSite) -> Bool {
+        let selected = model.sharingFilters
+        guard !selected.isEmpty else { return true }
+        let type = (site.sharingType ?? "").lowercased()
+        let leader = (site.crozonLeader ?? "").uppercased()
+        return selected.contains { value in
+            switch value {
+            case "ZB": return type == "zb"
+            case "CROZON_LEADER_SFR": return type == "crozon" && leader == "SFR"
+            case "CROZON_LEADER_BOUYGUES": return type == "crozon" && leader == "BOUYGUES"
+            case "ZTD": return site.isZTD
+            default: return false
+            }
+        }
+    }
+
+    /// Filtre techno appliqué à un marqueur speedtest. Le backend ne renvoie que
+    /// le TYPE de connexion ("CELLULAR"/"WIFI"/…), pas la génération (la donnée
+    /// vit en base mais le endpoint tuiles ne l'expose pas encore). On filtre donc
+    /// honnêtement : si `tech` encode une génération, on l'exige ; sinon un test
+    /// Wi-Fi/filaire est exclu quand une génération cellulaire est demandée, et un
+    /// test cellulaire/inconnu est conservé (au lieu de tout masquer comme avant).
+    private static func speedtestMatchesTech(_ raw: String?, selected: Set<String>) -> Bool {
+        let t = (raw ?? "").lowercased()
+        let generation: String? = {
+            if t.contains("5g") || t.contains(" nr") || t == "nr" { return "5G" }
+            if t.contains("4g") || t.contains("lte") { return "4G" }
+            if t.contains("3g") || t.contains("umts") || t.contains("wcdma") || t.contains("hspa") { return "3G" }
+            if t.contains("2g") || t.contains("gsm") || t.contains("edge") || t.contains("gprs") { return "2G" }
+            return nil
+        }()
+        if let generation { return selected.contains(generation) }
+        if t.contains("wifi") || t.contains("wi-fi") || t.contains("ethernet")
+            || t.contains("wired") || t.contains("filaire") {
+            return false
+        }
+        return true
     }
 
     private func matchesSelectedBand(_ band: Int?) -> Bool {
@@ -2408,10 +2448,15 @@ private struct MapAdvancedFilterSheet: View {
             (.photo, "Photos", "photo"),
             (.friend, "Amis", "person.2"),
             (.coverage, "Couverture backend", "dot.radiowaves.left.and.right"),
-            (.validation, "Validations", "checkmark.seal"),
-            (.outage, "Pannes", "exclamationmark.triangle"),
-            (.planned, "Prévisionnels", "calendar.badge.clock")
+            (.validation, "Validations", "checkmark.seal")
         ]
+        // Pannes & Prévisionnels : données ANFR FR/DROM uniquement (le backend ne
+        // répond que pour ces marchés ; ailleurs `load()` ne les charge jamais).
+        // On ne propose donc pas ces puces mortes hors FR/DROM.
+        if ["FR", "DROM"].contains(catalogMarket.uppercased()) {
+            options.append((.outage, "Pannes", "exclamationmark.triangle"))
+            options.append((.planned, "Prévisionnels", "calendar.badge.clock"))
+        }
         if selectedEntry?.capabilities.communityLayers == true {
             options.append((.communitySite, "Sites communautaires", "dot.radiowaves.up.forward"))
         }

@@ -75,9 +75,13 @@ final class AntennasService: AntennasServicing {
             if !bands.isEmpty {
                 query.append(contentsOf: Self.bandQueryItems(bands))
             }
-            if !sharing.isEmpty {
-                query.append(URLQueryItem(name: "sharing", value: sharing.sorted().joined(separator: ",")))
-            }
+            // NB : le filtre « Partage » (ZB/Crozon/ZTD) n'est PAS un paramètre de
+            // requête — le backend /api/antennas ne lit que `sharingType`/`leader`
+            // (valeur unique, FR), incapables d'exprimer un multi-select ni ZTD. Il
+            // est appliqué CÔTÉ CLIENT sur les champs sharingType/crozonLeader/isZTD
+            // de la réponse minimale (cf. MapExplorerView.matchesSelectedSharing),
+            // comme le client Android. On force le chemin liste quand `sharing` est
+            // actif (usesAdvancedAntennaFilters) pour disposer de ces champs.
             let response = try await api.request(
                 APIEndpoint(path: "/api/antennas", query: query),
                 as: AntennasListResponse.self

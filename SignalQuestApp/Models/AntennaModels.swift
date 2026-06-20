@@ -12,6 +12,9 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
     let azimuths: [Double]
     let sharingType: String?
     let crozonLeader: String?
+    /// Zone Très Dense (mutualisation FR) — nécessaire au filtre « Partage › ZTD »
+    /// (le backend renvoie ce booléen en mode minimal).
+    let isZTD: Bool
     let address: String?
     let height: Double?
     let owner: String?
@@ -35,7 +38,7 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
         case operators, operatorList
         case technologies, techs, emr_lb_systeme, generation
         case bands, bandes, azimuts, azimuths
-        case sharingType, crozonLeader
+        case sharingType, crozonLeader, isZTD
         case address, location, adr_lb_add1, adr_lb_lieu, adr_nm_cp, commune
         case height, sup_nm_haut, hauteur_antenne, structure_height
         case owner, proprietaire, sta_nm_anfr
@@ -53,6 +56,7 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
         azimuths: [Double],
         sharingType: String?,
         crozonLeader: String?,
+        isZTD: Bool = false,
         address: String?,
         height: Double?,
         owner: String?
@@ -68,6 +72,7 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
         self.azimuths = Self.normalizedAzimuths(azimuths)
         self.sharingType = sharingType
         self.crozonLeader = crozonLeader
+        self.isZTD = isZTD
         self.address = address
         self.height = height
         self.owner = owner
@@ -110,6 +115,7 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
         )
         sharingType = c.decodeFlexibleString(forKey: .sharingType)
         crozonLeader = c.decodeFlexibleString(forKey: .crozonLeader)
+        isZTD = (try? c.decodeIfPresent(Bool.self, forKey: .isZTD)) ?? false
         let addressParts = [
             try? c.decodeIfPresent(String.self, forKey: .adr_lb_add1),
             try? c.decodeIfPresent(String.self, forKey: .adr_lb_lieu),
