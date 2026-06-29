@@ -110,6 +110,10 @@ struct CardMetricTile: View {
             RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
                 .stroke(SQColor.separator, lineWidth: 1)
         }
+        // VoiceOver : « libellé : valeur » d'un bloc (Down 240 Mbps), pas 2 textes.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(label)
+        .accessibilityValue(value)
     }
 }
 

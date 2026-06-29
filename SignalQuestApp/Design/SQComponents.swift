@@ -40,6 +40,10 @@ struct MetricPill: View {
         .padding(.vertical, SQSpace.sm)
         .background(.thinMaterial, in: Capsule())
         .overlay { Capsule().stroke(SQColor.separator, lineWidth: 1) }
+        // VoiceOver : lire « titre : valeur » d'un bloc plutôt que l'icône + 2 textes.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .accessibilityValue(value)
     }
 }
 
