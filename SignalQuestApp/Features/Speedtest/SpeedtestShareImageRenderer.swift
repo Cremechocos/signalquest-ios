@@ -21,7 +21,7 @@ enum SpeedtestShareImageRenderer {
         let placePart = place.map { " à \($0)" } ?? ""
         return """
         \(download) Mbps en download sur \(net)\(placePart), ping \(ping), \(upload) — mesuré avec SignalQuest.
-        #SignalQuest
+        #SignalQuest · signalquest.fr
         """
     }
 
