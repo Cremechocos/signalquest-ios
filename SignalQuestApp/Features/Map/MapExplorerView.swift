@@ -25,8 +25,11 @@ final class MapExplorerViewModel: ObservableObject {
     @Published private(set) var dataVersion = 0
     @Published var isLoading = false
     @Published var errorMessage: String?
-    @Published var marketFilter = "FR"
-    @Published var operatorFilter = "SFR"
+    // Marché + opérateur initiaux : dernier choix persisté, sinon le pays de la
+    // locale appareil (jamais la France imposée). La détection fine (SIM/GPS) est
+    // appliquée ensuite dans `resolveInitialSelection`.
+    @Published var marketFilter = MapMarketStore.initialMarketCode()
+    @Published var operatorFilter = MapMarketStore.initialOperatorKey()
     @Published var techFilters: Set<String> = []
     @Published var bandFilters: Set<Int> = []
     @Published var sharingFilters: Set<String> = []
@@ -56,6 +59,10 @@ final class MapExplorerViewModel: ObservableObject {
     /// Vrai entre un switch automatique et sa consommation par la vue,
     /// pour court-circuiter le recentrage du picker manuel.
     private var autoMarketSwitchInProgress = false
+    /// Vrai pendant la sélection initiale (cascade marché/opérateur à
+    /// l'ouverture) : les `onChange` de marketFilter/operatorFilter doivent alors
+    /// court-circuiter recentrage + rechargement, car le `.task` les pilote lui-même.
+    private(set) var initialSelectionInProgress = false
 
     init(map: MapSnapshotServicing, antennas: AntennasServicing, markets: MarketRegistryServicing) {
         self.mapService = map
@@ -69,6 +76,89 @@ final class MapExplorerViewModel: ObservableObject {
         let payload = await marketsService.registry()
         registryMarkets = payload.markets.filter(\.publicSelectable)
         currentMarketEntry = payload.market(forCode: marketFilter)
+    }
+
+    /// Sélection initiale du marché + opérateur à l'ouverture de la carte, **sans
+    /// jamais imposer la France**. À appeler après `loadRegistry()`.
+    ///
+    /// Cascade : si l'utilisateur a déjà un choix persisté cohérent, on le
+    /// respecte. Sinon, marché via MCC (cellulaire) → GPS (si déjà autorisé) →
+    /// locale appareil → 1ʳᵉ entrée du registre ; opérateur via `operatorKey`
+    /// (IP/ASN, hors VPN) → MNC → **« Tous »**. Ne touche `marketFilter` /
+    /// `operatorFilter` que si la détection apporte une valeur différente, et pose
+    /// `initialSelectionInProgress` pour que les `onChange` ne rechargent pas en
+    /// double (le `.task` pilote le recentrage + l'unique `load`).
+    func resolveInitialSelection(
+        networkPath: NetworkPathMonitor,
+        networkOperator: NetworkOperatorServicing,
+        location: LocationService
+    ) async {
+        let payload = await marketsService.registry()
+        guard !payload.markets.isEmpty else { return }
+
+        networkPath.refreshNow()
+        let status = networkPath.status
+
+        // 1. Marché.
+        var entry: MarketRegistryEntry?
+        if status.connection == .cellular, let mcc = status.operatorMcc {
+            entry = payload.markets.first { $0.publicSelectable && $0.mccs.contains(mcc) }
+        }
+        if entry == nil,
+           location.authorizationStatus == .authorizedWhenInUse
+            || location.authorizationStatus == .authorizedAlways,
+           let loc = await location.currentLocation(timeoutSeconds: 4) {
+            let resolved = await marketsService.marketForLocation(
+                latitude: loc.coordinate.latitude,
+                longitude: loc.coordinate.longitude
+            )
+            entry = resolved?.publicSelectable == true ? resolved : nil
+        }
+        if entry == nil { entry = Self.localeMarketEntry(in: payload) }
+        if entry == nil { entry = payload.markets.first { $0.publicSelectable } }
+        guard let entry else { return }
+        let marketCode = entry.marketCode.isEmpty ? entry.code : entry.marketCode
+
+        // Choix persisté cohérent : on respecte la sélection de l'utilisateur.
+        if let persisted = MapMarketStore.lastMarket(),
+           persisted.uppercased() == marketCode.uppercased() {
+            currentMarketEntry = entry
+            return
+        }
+
+        // 2. Opérateur : « Tous » par défaut, affiné par l'opérateur réel détecté.
+        var operatorKey = "ALL"
+        if status.connection == .cellular {
+            if let detected = await networkOperator.resolve(viaVpn: VPNDetector.isActive()),
+               let key = detected.operatorKey,
+               entry.operatorEntry(forKey: key) != nil {
+                operatorKey = key
+            } else if let mnc = status.operatorMnc,
+                      let op = entry.selectableOperators.first(where: { $0.mncs.contains(mnc) }) {
+                operatorKey = op.key
+            }
+        }
+
+        // 3. Application (les onChange court-circuitent grâce au flag).
+        initialSelectionInProgress = true
+        currentMarketEntry = entry
+        if operatorFilter.uppercased() != operatorKey.uppercased() { operatorFilter = operatorKey }
+        if marketFilter.uppercased() != marketCode.uppercased() { marketFilter = marketCode }
+        MapMarketStore.save(market: marketCode, operator: operatorKey)
+    }
+
+    /// Fin de la phase de sélection initiale (réautorise recentrage + rechargement
+    /// dans les `onChange`). Appelé par la vue après l'unique `load`.
+    func endInitialSelection() { initialSelectionInProgress = false }
+
+    /// Entrée du registre correspondant au pays de la locale appareil (ISO), ou nil.
+    private static func localeMarketEntry(in payload: MarketRegistryPayload) -> MarketRegistryEntry? {
+        guard let region = Locale.current.region?.identifier.uppercased(), !region.isEmpty else { return nil }
+        return payload.markets.first {
+            $0.publicSelectable && ($0.countryCode.uppercased() == region
+                || $0.code.uppercased() == region
+                || $0.marketCode.uppercased() == region)
+        }
     }
 
     /// Recherche synchrone dans les marchés déjà chargés (picker, recentrage).
@@ -782,6 +872,54 @@ private enum MapRegionStore {
     }
 }
 
+/// Persiste le dernier marché + opérateur sélectionnés sur la carte, pour rouvrir
+/// sur le choix de l'utilisateur plutôt que sur un défaut codé en dur (France).
+/// (UserDefaults déclaré dans PrivacyInfo.xcprivacy sous la raison CA92.1.)
+/// Internal (pas `private`) : réutilisé par le mode Drive Test pour cibler le bon
+/// marché lors du chargement des antennes proches.
+enum MapMarketStore {
+    private static let marketKey = "map.lastMarket.v1"
+    private static let operatorKey = "map.lastOperator.v1"
+
+    /// QA `--reset-map` : oublie le marché/opérateur pour rejouer la détection.
+    static func reset() {
+        UserDefaults.standard.removeObject(forKey: marketKey)
+        UserDefaults.standard.removeObject(forKey: operatorKey)
+    }
+
+    static func save(market: String, operator op: String) {
+        let market = market.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !market.isEmpty else { return }
+        UserDefaults.standard.set(market, forKey: marketKey)
+        let op = op.trimmingCharacters(in: .whitespacesAndNewlines)
+        UserDefaults.standard.set(op.isEmpty ? "ALL" : op, forKey: operatorKey)
+    }
+
+    static func lastMarket() -> String? {
+        guard let value = UserDefaults.standard.string(forKey: marketKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
+        return value
+    }
+
+    static func lastOperator() -> String? {
+        guard let value = UserDefaults.standard.string(forKey: operatorKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
+        return value
+    }
+
+    /// Code marché utilisable AVANT le chargement du registre (init synchrone) :
+    /// dernier choix persisté, sinon pays de la locale appareil, sinon "FR".
+    static func initialMarketCode() -> String { lastMarket() ?? localeMarketCode() }
+
+    static func initialOperatorKey() -> String { lastOperator() ?? "ALL" }
+
+    /// Pays de la locale appareil (ISO, ex. "FR" / "CA"). Repli "FR" si absent —
+    /// jamais affiché tel quel : la détection registre le corrige juste après.
+    static func localeMarketCode() -> String {
+        Locale.current.region?.identifier.uppercased() ?? "FR"
+    }
+}
+
 struct MapExplorerView: View {
     @StateObject private var model: MapExplorerViewModel
     @EnvironmentObject private var services: AppServices
@@ -820,13 +958,14 @@ struct MapExplorerView: View {
          antennas: AntennasServicing = AntennasService(api: APIClient()),
          markets: MarketRegistryServicing = MarketRegistryService(api: APIClient())) {
         _model = StateObject(wrappedValue: MapExplorerViewModel(map: service, antennas: antennas, markets: markets))
-        // QA : `--reset-map` efface la région mémorisée pour repartir de France.
+        // QA : `--reset-map` oublie région + marché/opérateur pour rejouer la détection.
         if ProcessInfo.processInfo.arguments.contains("--reset-map") {
             MapRegionStore.reset()
+            MapMarketStore.reset()
         }
-        // Restore the last viewed region, otherwise fall back to a country-level
-        // view of the default market — never a hard-coded city.
-        let region = MapRegionStore.lastRegion() ?? Self.region(for: "FR")
+        // Restaure la dernière région, sinon vue pays du marché initial (dernier
+        // choix persisté ou pays de la locale) — jamais une ville ni la France imposée.
+        let region = MapRegionStore.lastRegion() ?? Self.region(for: MapMarketStore.initialMarketCode())
 #if !canImport(MapLibre)
         _position = State(initialValue: .region(region))
 #endif
@@ -884,7 +1023,25 @@ struct MapExplorerView: View {
                 filters = [.photo]
             }
             await model.loadRegistry()
+            // Sélection auto du marché + opérateur (SIM/GPS/locale) AVANT le 1er
+            // chargement : évite le flash « France/SFR puis Canada/Bell ».
+            await model.resolveInitialSelection(
+                networkPath: services.networkPath,
+                networkOperator: services.networkOperator,
+                location: services.location
+            )
+            // 1er lancement sans région mémorisée : recentre sur le marché résolu.
+            if MapRegionStore.lastRegion() == nil {
+                let region = region(forMarketCode: model.marketFilter)
+                mapCenter = region.center
+                mapZoom = Self.zoom(forSpan: region)
+#if !canImport(MapLibre)
+                position = .region(region)
+#endif
+                lastRegion = region
+            }
             await model.load(region: lastRegion, zoom: mapZoom, filters: filters)
+            model.endInitialSelection()
             refreshMapRender()
             await runQAPanIfRequested()
             // QA (DEBUG) : ouvre la fiche de la première antenne (attend que le
@@ -914,6 +1071,8 @@ struct MapExplorerView: View {
             scheduleLoad(region: lastRegion)
         }
         .onChangeCompat(of: model.marketFilter) { _, newValue in
+            // Pendant la sélection initiale, le `.task` pilote recentrage + load.
+            guard !model.initialSelectionInProgress else { return }
             // Le switch automatique (caméra) et le picker manuel partagent ce
             // binding mais pas le même chemin : seul le manuel recentre.
             let isAutoSwitch = model.consumeAutoMarketSwitch()
@@ -931,8 +1090,13 @@ struct MapExplorerView: View {
 #endif
                 scheduleLoad(region: region)
             }
+            MapMarketStore.save(market: model.marketFilter, operator: model.operatorFilter)
         }
-        .onChangeCompat(of: model.operatorFilter) { _, _ in scheduleLoad(region: lastRegion) }
+        .onChangeCompat(of: model.operatorFilter) { _, _ in
+            guard !model.initialSelectionInProgress else { return }
+            scheduleLoad(region: lastRegion)
+            MapMarketStore.save(market: model.marketFilter, operator: model.operatorFilter)
+        }
         .onChangeCompat(of: model.techFilters) { _, _ in scheduleLoad(region: lastRegion) }
         .onChangeCompat(of: model.bandFilters) { _, _ in scheduleLoad(region: lastRegion) }
         .onChangeCompat(of: model.sharingFilters) { _, _ in scheduleLoad(region: lastRegion) }

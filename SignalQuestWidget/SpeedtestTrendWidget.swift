@@ -33,6 +33,7 @@ struct SpeedtestTrendProvider: TimelineProvider {
 
 struct SpeedtestTrendEntryView: View {
     var entry: SpeedtestTrendEntry
+    @Environment(\.colorScheme) private var scheme
 
     private var series: [SpeedtestWidgetSnapshot] {
         // Du plus ancien au plus récent pour lire le graphique de gauche à droite.
@@ -49,59 +50,133 @@ struct SpeedtestTrendEntryView: View {
     var body: some View {
         Group {
             if series.isEmpty {
-                VStack(spacing: 6) {
-                    Image(systemName: "chart.bar.xaxis").font(.title2)
-                    Text("Aucun test").font(.caption).foregroundStyle(.secondary)
-                }
+                emptyState
             } else {
                 content
             }
         }
-        .sqHomeWidgetBackground()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sqWidgetBackground(tint: speedColor(best))
         .widgetURL(speedtestWidgetURL)
     }
 
+    private var emptyState: some View {
+        VStack(spacing: 7) {
+            Image(systemName: "chart.bar.xaxis")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(WidgetPalette.brand)
+            Text("Aucun test")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(WidgetPalette.label)
+                .lineLimit(1)
+            Text("Pas encore de tendance")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(WidgetPalette.labelSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+    }
+
     private var content: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Image(systemName: "chart.bar.xaxis").font(.caption2.weight(.bold)).foregroundStyle(speedColor(best))
-                Text("TENDANCE DÉBIT").font(.system(size: 9, weight: .heavy)).tracking(0.5).foregroundStyle(.secondary)
-                Spacer()
-                Text("\(entry.recent.count) tests").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 5) {
+                Image(systemName: "chart.bar.xaxis")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(speedColor(best))
+                Text("TENDANCE DÉBIT")
+                    .font(.system(size: 9.5, weight: .heavy))
+                    .tracking(0.6)
+                    .foregroundStyle(WidgetPalette.labelSecondary)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text("\(entry.recent.count) tests")
+                    .font(.system(size: 9.5, weight: .bold))
+                    .foregroundStyle(WidgetPalette.labelSecondary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
             }
 
-            GeometryReader { proxy in
-                let maxVal = max(best, 1)
-                HStack(alignment: .bottom, spacing: 3) {
-                    ForEach(series) { snap in
-                        RoundedRectangle(cornerRadius: 2, style: .continuous)
-                            .fill(speedColor(snap.downloadMbps))
-                            .frame(height: max(3, proxy.size.height * CGFloat(snap.downloadMbps / maxVal)))
+            chart
+
+            HStack(spacing: 10) {
+                stat("Moy.", avg)
+                stat("Record", best)
+                Text("Mbps")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(WidgetPalette.labelTertiary)
+                Spacer(minLength: 4)
+                if let last = entry.recent.first {
+                    Text(last.date, style: .relative)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(WidgetPalette.labelTertiary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .layoutPriority(-1)
+                }
+            }
+            .lineLimit(1)
+        }
+    }
+
+    private var chart: some View {
+        GeometryReader { proxy in
+            let maxVal = max(best, 1)
+            let avgRatio = min(1, avg / maxVal)
+
+            ZStack(alignment: .bottom) {
+                // Ligne de moyenne (pointillés, teinte de qualité de la moyenne).
+                if avg > 0 {
+                    Path { path in
+                        let y = proxy.size.height * (1 - CGFloat(avgRatio))
+                        path.move(to: CGPoint(x: 0, y: y))
+                        path.addLine(to: CGPoint(x: proxy.size.width, y: y))
+                    }
+                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    .foregroundStyle(speedColor(avg).opacity(0.55))
+                }
+
+                HStack(alignment: .bottom, spacing: 4) {
+                    ForEach(Array(series.enumerated()), id: \.element.id) { idx, snap in
+                        let isLast = idx == series.count - 1
+                        let color = speedColor(snap.downloadMbps)
+                        let h = max(4, proxy.size.height * CGFloat(min(1, snap.downloadMbps / maxVal)))
+
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            .fill(LinearGradient(
+                                colors: [color, color.opacity(0.32)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ))
+                            .frame(height: h)
+                            .opacity(isLast ? 1 : 0.62)
+                            .overlay {
+                                if isLast {
+                                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                        .stroke(color, lineWidth: 1.5)
+                                        .shadow(color: color.opacity(0.6), radius: 4)
+                                }
+                            }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
-            .frame(maxHeight: .infinity)
-
-            HStack(spacing: 14) {
-                stat("Moy.", avg)
-                stat("Record", best)
-                Spacer()
-                if let last = entry.recent.first {
-                    Text(last.date, style: .relative).font(.system(size: 9)).foregroundStyle(.tertiary)
-                }
-            }
         }
+        .frame(maxHeight: .infinity)
     }
 
     private func stat(_ label: String, _ value: Double) -> some View {
         HStack(spacing: 4) {
-            Text(label).font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
+            Text(label)
+                .font(.system(size: 9.5, weight: .bold))
+                .foregroundStyle(WidgetPalette.labelSecondary)
             Text("\(Int(value.rounded()))")
-                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .font(.system(size: 15, weight: .heavy, design: .rounded))
                 .foregroundStyle(speedColor(value))
-            Text("Mbps").font(.system(size: 8, weight: .semibold)).foregroundStyle(.tertiary)
+                .monospacedDigit()
         }
+        .lineLimit(1)
+        .fixedSize()
     }
 }
 

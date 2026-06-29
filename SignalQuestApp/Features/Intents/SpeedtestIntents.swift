@@ -28,6 +28,19 @@ struct OpenMapIntent: AppIntent {
     }
 }
 
+/// Raccourci « Ouvrir la messagerie ».
+struct OpenMessagesIntent: AppIntent {
+    static let title: LocalizedStringResource = "Ouvrir la messagerie SignalQuest"
+    static let description = IntentDescription("Ouvre la messagerie chiffrée SignalQuest.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        SQIntentRoute.requestMessages()
+        return .result()
+    }
+}
+
 struct SignalQuestShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -48,6 +61,15 @@ struct SignalQuestShortcuts: AppShortcutsProvider {
             shortTitle: "Carte",
             systemImageName: "map"
         )
+        AppShortcut(
+            intent: OpenMessagesIntent(),
+            phrases: [
+                "Ouvre la messagerie \(.applicationName)",
+                "Ouvre mes messages \(.applicationName)"
+            ],
+            shortTitle: "Messagerie",
+            systemImageName: "bubble.left.and.bubble.right"
+        )
     }
 }
 
@@ -56,12 +78,15 @@ struct SignalQuestShortcuts: AppShortcutsProvider {
 enum SQIntentRoute {
     private static let speedtestKey = "sq.intent.route.speedtest"
     private static let mapKey = "sq.intent.route.map"
+    private static let messagesKey = "sq.intent.route.messages"
 
     static func requestSpeedtest() { UserDefaults.standard.set(true, forKey: speedtestKey) }
     static func requestMap() { UserDefaults.standard.set(true, forKey: mapKey) }
+    static func requestMessages() { UserDefaults.standard.set(true, forKey: messagesKey) }
 
     static func consumeSpeedtest() -> Bool { consume(speedtestKey) }
     static func consumeMap() -> Bool { consume(mapKey) }
+    static func consumeMessages() -> Bool { consume(messagesKey) }
 
     private static func consume(_ key: String) -> Bool {
         guard UserDefaults.standard.bool(forKey: key) else { return false }

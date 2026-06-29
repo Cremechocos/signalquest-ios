@@ -6,7 +6,10 @@ protocol MessagesServicing: Sendable {
     func searchUsers(query: String) async throws -> [MessageSearchUser]
     func messages(conversationId: String, cursor: String?) async throws -> MessagesPageResponse
     func messagesDelta(conversationId: String, since: Date) async throws -> [MessageItem]
-    func sendText(_ text: String, in conversation: MessageConversation, replyToId: String?, e2ee: E2EEServicing?, idempotencyKey: String?) async throws -> MessageItem
+    func sendText(_ text: String, in conversation: MessageConversation, replyToId: String?, e2ee: E2EEServicing?, idempotencyKey: String?, ttlSeconds: Int) async throws -> MessageItem
+    /// Partage une position (kind LOCATION). Refusé par le backend en conversation
+    /// E2EE (allowedKinds) → l'appelant ne le propose qu'en conversation non chiffrée.
+    func sendLocation(latitude: Double, longitude: Double, place: String?, in conversation: MessageConversation) async throws -> MessageItem
     func sendAttachments(
         _ attachments: [UploadedAttachment],
         caption: String,
@@ -46,6 +49,10 @@ protocol MessagesServicing: Sendable {
     func votePoll(pollId: String, optionIds: [String]) async throws -> MessagePoll
     func closePoll(pollId: String) async throws -> MessagePoll
     func transcription(messageId: String) async throws -> VoiceTranscription?
+    // Messages enregistrés (favoris)
+    func savedMessages() async throws -> [SavedMessageEntry]
+    func saveMessage(messageId: String) async throws
+    func unsaveMessage(messageId: String) async throws
 }
 
 /// Pièce jointe déjà uploadée via `/api/messages/attachments`, prête à être
@@ -83,7 +90,7 @@ final class MessagesService: MessagesServicing {
         guard !q.isEmpty else { return [] }
         return try await api.request(
             APIEndpoint(
-                path: "/api/users/search",
+                path: "/users/search",
                 query: [
                     URLQueryItem(name: "q", value: q),
                     URLQueryItem(name: "limit", value: "20")
@@ -121,7 +128,10 @@ final class MessagesService: MessagesServicing {
         ).messages
     }
 
-    func sendText(_ text: String, in conversation: MessageConversation, replyToId: String? = nil, e2ee: E2EEServicing?, idempotencyKey: String? = nil) async throws -> MessageItem {
+    func sendText(_ text: String, in conversation: MessageConversation, replyToId: String? = nil, e2ee: E2EEServicing?, idempotencyKey: String? = nil, ttlSeconds: Int = 0) async throws -> MessageItem {
+        // Messages éphémères : ttlSeconds > 0 → le backend pose expiresAt (le TTL
+        // s'applique aussi en E2EE, c'est une métadonnée, pas le contenu).
+        let ttl: Int? = ttlSeconds > 0 ? ttlSeconds : nil
         let payload: SendMessageRequest
         if conversation.e2eeEnabled == true {
             guard let e2ee else { throw E2EEError.locked }
@@ -133,14 +143,36 @@ final class MessagesService: MessagesServicing {
             // pas l'envoi. (Le chiffrement ci-dessus garantit qu'on détient bien
             // la clé localement.)
             await e2ee.shareConversationKeyIfNeeded(conversationId: conversation.id)
-            payload = SendMessageRequest(kind: "TEXT", content: nil, e2ee: encrypted, replyToId: replyToId, attachments: nil)
+            payload = SendMessageRequest(kind: "TEXT", content: nil, e2ee: encrypted, replyToId: replyToId, attachments: nil, ttlSeconds: ttl)
         } else {
-            payload = SendMessageRequest(kind: "TEXT", content: text, e2ee: nil, replyToId: replyToId, attachments: nil)
+            payload = SendMessageRequest(kind: "TEXT", content: text, e2ee: nil, replyToId: replyToId, attachments: nil, ttlSeconds: ttl)
         }
         let response: CreatedMessageResponse = try await api.requestJSON(
             "/api/messages/conversations/\(conversation.id)/messages",
             body: payload,
             idempotencyKey: idempotencyKey
+        )
+        return response.message
+    }
+
+    func sendLocation(latitude: Double, longitude: Double, place: String?, in conversation: MessageConversation) async throws -> MessageItem {
+        struct LocationRequest: Encodable {
+            let kind = "LOCATION"
+            let content: String
+            let metadata: Meta
+            struct Meta: Encodable {
+                let location: Loc
+                struct Loc: Encodable { let lat: Double; let lng: Double; let place: String? }
+            }
+        }
+        let cleanPlace = place?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body = LocationRequest(
+            content: cleanPlace ?? "",
+            metadata: .init(location: .init(lat: latitude, lng: longitude, place: (cleanPlace?.isEmpty == false) ? cleanPlace : nil))
+        )
+        let response: CreatedMessageResponse = try await api.requestJSON(
+            "/api/messages/conversations/\(conversation.id)/messages",
+            body: body
         )
         return response.message
     }
@@ -604,6 +636,31 @@ final class MessagesService: MessagesServicing {
             APIEndpoint(path: "/api/messages/messages/\(messageId)/transcription"),
             as: TranscriptionResponse.self
         ).transcription
+    }
+
+    // MARK: Messages enregistrés (favoris)
+
+    func savedMessages() async throws -> [SavedMessageEntry] {
+        try await api.request(
+            APIEndpoint(path: "/api/messages/saved"),
+            as: SavedMessagesResponse.self
+        ).savedMessages
+    }
+
+    func saveMessage(messageId: String) async throws {
+        struct SaveResponse: Decodable {}
+        let _: SaveResponse = try await api.requestJSON(
+            "/api/messages/saved",
+            body: ["messageId": messageId]
+        )
+    }
+
+    func unsaveMessage(messageId: String) async throws {
+        let _: SuccessResponse = try await api.requestJSON(
+            "/api/messages/saved/\(messageId)",
+            method: .delete,
+            body: [String: String]()
+        )
     }
 }
 

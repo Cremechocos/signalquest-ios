@@ -144,7 +144,7 @@ final class LiveKitClient: ObservableObject {
             let info = note.userInfo
             let typeRaw = info?[AVAudioSessionInterruptionTypeKey] as? UInt
             let optionsRaw = info?[AVAudioSessionInterruptionOptionKey] as? UInt
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 self?.handleInterruption(typeRaw: typeRaw, optionsRaw: optionsRaw)
             }
         }

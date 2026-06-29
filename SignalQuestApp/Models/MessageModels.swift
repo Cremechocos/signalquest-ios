@@ -222,6 +222,10 @@ struct MessageItem: Decodable, Identifiable, Equatable {
     let createdAt: Date?
     let editedAt: Date?
     let deletedAt: Date?
+    /// Échéance d'auto-destruction (messages éphémères, parité Android). Le
+    /// backend ne renvoie plus les messages expirés ; ce champ sert à afficher
+    /// un indicateur « disparaît bientôt » sur un message encore vivant.
+    let expiresAt: Date?
     let replyToId: String?
     let threadReplyCount: Int?
     let sender: MessageUser?
@@ -234,7 +238,7 @@ struct MessageItem: Decodable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, conversationId, senderId, kind, content, e2eeVersion, e2eeIvB64, e2eeCiphertextB64, e2eeAadB64
-        case metadata, createdAt, editedAt, deletedAt, replyToId, threadReplyCount, sender, attachments, reactions
+        case metadata, createdAt, editedAt, deletedAt, expiresAt, replyToId, threadReplyCount, sender, attachments, reactions
     }
 
     init(
@@ -251,6 +255,7 @@ struct MessageItem: Decodable, Identifiable, Equatable {
         createdAt: Date?,
         editedAt: Date?,
         deletedAt: Date?,
+        expiresAt: Date? = nil,
         replyToId: String?,
         threadReplyCount: Int?,
         sender: MessageUser?,
@@ -270,6 +275,7 @@ struct MessageItem: Decodable, Identifiable, Equatable {
         self.createdAt = createdAt
         self.editedAt = editedAt
         self.deletedAt = deletedAt
+        self.expiresAt = expiresAt
         self.replyToId = replyToId
         self.threadReplyCount = threadReplyCount
         self.sender = sender
@@ -304,6 +310,7 @@ struct MessageItem: Decodable, Identifiable, Equatable {
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
         editedAt = try c.decodeIfPresent(Date.self, forKey: .editedAt)
         deletedAt = try c.decodeIfPresent(Date.self, forKey: .deletedAt)
+        expiresAt = try c.decodeIfPresent(Date.self, forKey: .expiresAt)
         replyToId = c.decodeFlexibleString(forKey: .replyToId)
         threadReplyCount = try c.decodeIfPresent(Int.self, forKey: .threadReplyCount)
         sender = try c.decodeIfPresent(MessageUser.self, forKey: .sender)
@@ -316,12 +323,46 @@ struct CreatedMessageResponse: Decodable {
     let message: MessageItem
 }
 
+// MARK: Messages enregistrés (favoris — parité Android)
+
+struct SavedMessagesResponse: Decodable {
+    let savedMessages: [SavedMessageEntry]
+}
+
+/// Une entrée « message enregistré » : le message + le contexte de sa
+/// conversation (imbriqué côté backend dans `message.conversation`) pour
+/// permettre la navigation depuis l'écran des favoris.
+struct SavedMessageEntry: Decodable, Identifiable, Equatable {
+    let savedAt: Date?
+    let message: MessageItem
+    let conversation: SearchConversationContext?
+
+    var id: String { message.id }
+
+    enum CodingKeys: String, CodingKey { case savedAt, message }
+    enum MessageKeys: String, CodingKey { case conversation }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        savedAt = try c.decodeIfPresent(Date.self, forKey: .savedAt)
+        message = try c.decode(MessageItem.self, forKey: .message)
+        if let mc = try? c.nestedContainer(keyedBy: MessageKeys.self, forKey: .message) {
+            conversation = try? mc.decodeIfPresent(SearchConversationContext.self, forKey: .conversation)
+        } else {
+            conversation = nil
+        }
+    }
+}
+
 struct SendMessageRequest: Encodable {
     let kind: String
     let content: String?
     let e2ee: E2EEPayload?
     let replyToId: String?
     let attachments: [UploadedAttachment]?
+    /// Durée de vie (messages éphémères, parité Android) → le backend en dérive
+    /// `expiresAt`. Optionnel : omis (nil) = message permanent.
+    var ttlSeconds: Int? = nil
 }
 
 struct E2EEPayload: Codable, Equatable {

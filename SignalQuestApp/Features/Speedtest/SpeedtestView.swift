@@ -37,12 +37,18 @@ struct SpeedtestView: View {
     @State private var liveActivity = SpeedtestLiveActivityController()
     @State private var background = BackgroundTaskScope()
     /// Progression d'une rafale (test courant, total) — nil hors rafale.
+    /// `total == 0` ⇒ session continue illimitée (drive test).
     @State private var burstProgress: (index: Int, total: Int)?
     @State private var burstSummary: SpeedtestBurstSummary?
+    /// Vrai pendant une session continue (∞) : adapte les libellés (pill, résumé).
+    @State private var sessionIsContinuous = false
+    /// Sentinelle `burstCount` = mode continu illimité (drive test).
+    private static let continuousBurst = 0
     @State private var history: [SpeedtestRunResult] = []
     @State private var errorMessage: String?
     @State private var runTask: Task<Void, Never>?
     @State private var showSettings = false
+    @State private var showDriveTest = false
     @State private var showLocationPriming = false
     @State private var primingDenied = false
     @State private var currentNetworkStatus: NetworkPathStatus = .unknown
@@ -52,6 +58,9 @@ struct SpeedtestView: View {
     @State private var runStartConnection: NetworkConnectionKind?
     @State private var runStartNetworkDisplayName: String?
     @State private var networkAbortMessage: String?
+    /// VPN actif : on masque la publication carte et on affiche un avertissement
+    /// (sous tunnel, l'opérateur réel n'est pas détectable).
+    @State private var isVPNActive = false
     @State private var didRunQASpeedtest = false
     // Partage : image pré-rendue dès qu'un résultat arrive, puis présentée via
     // un payload atomique pour éviter les feuilles Apple vides au premier tap.
@@ -99,6 +108,9 @@ struct SpeedtestView: View {
 
             ScrollView {
                 VStack(spacing: SQSpace.xl) {
+                    if isVPNActive {
+                        VPNWarningBanner()
+                    }
                     VStack(spacing: SQSpace.xs) {
                         Text("Mesure terrain")
                             .sqKicker()
@@ -167,12 +179,22 @@ struct SpeedtestView: View {
         .navigationTitle("Speedtest")
         .toolbarTitleInlineCompat()
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { showDriveTest = true } label: {
+                    Image(systemName: "location.north.line.fill")
+                        .foregroundStyle(SQColor.brandRed)
+                }
+                .accessibilityLabel("Mode Drive Test")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showSettings = true } label: {
                     Image(systemName: "slider.horizontal.3")
                         .foregroundStyle(SQColor.brandRed)
                 }
             }
+        }
+        .navigationDestination(isPresented: $showDriveTest) {
+            DriveTestView(services: services)
         }
         .signalQuestHeroBackground()
         .sheet(isPresented: $showSettings) { settingsSheet }
@@ -191,6 +213,7 @@ struct SpeedtestView: View {
             // de la page, plutôt que le dernier statut publié au démarrage.
             services.networkPath.refreshNow()
             currentNetworkStatus = services.networkPath.status
+            isVPNActive = VPNDetector.isActive()
             await resolveDetectedOperator()
             await services.speedtest.retryPendingSaves()
             history = await services.speedtest.history()
@@ -203,6 +226,7 @@ struct SpeedtestView: View {
             // Le test CONTINUE en arrière-plan (assertion `beginBackgroundTask`).
             // Au retour au premier plan, on resynchronise l'historique au cas où
             // un test/rafale se serait terminé pendant l'absence.
+            if newValue == .active { isVPNActive = VPNDetector.isActive() }
             if newValue == .active, runTask == nil {
                 Task { history = await services.speedtest.history() }
             }
@@ -230,28 +254,48 @@ struct SpeedtestView: View {
             if isRunning {
                 SpeedtestStopButton(title: "Arrêter", systemImage: "stop.fill", action: stop)
             } else {
-                GradientButton(primaryButtonTitle, systemImage: burstCount > 1 ? "bolt.fill" : "play.fill", action: start)
+                GradientButton(primaryButtonTitle, systemImage: primaryButtonIcon, action: start)
                     .shadow(color: SQBrand.signatureStart.opacity(0.32), radius: 16, y: 8)
             }
         }
     }
 
     private var primaryButtonTitle: String {
+        if burstCount == Self.continuousBurst {
+            return "Lancer en continu"
+        }
         if burstCount > 1 {
             return result == nil ? "Lancer la rafale ×\(burstCount)" : "Relancer la rafale ×\(burstCount)"
         }
         return result == nil ? "Lancer le test" : "Relancer le test"
     }
 
+    private var primaryButtonIcon: String {
+        if burstCount == Self.continuousBurst { return "infinity" }
+        return burstCount > 1 ? "bolt.fill" : "play.fill"
+    }
+
+    @ViewBuilder
     private func burstRunningPill(index: Int, total: Int) -> some View {
         HStack(spacing: SQSpace.sm) {
-            Image(systemName: "bolt.fill").foregroundStyle(SQColor.brandOrange)
-            Text("Rafale · test \(index)/\(total)")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(SQColor.label)
-            ProgressView(value: Double(index), total: Double(total))
-                .frame(width: 90)
-                .tint(SQColor.brandOrange)
+            if total == 0 {
+                // Session continue (drive test) : pas de total, progression indéterminée.
+                Image(systemName: "infinity").foregroundStyle(SQColor.brandOrange)
+                Text("Continu · test \(index)")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(SQColor.label)
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(SQColor.brandOrange)
+            } else {
+                Image(systemName: "bolt.fill").foregroundStyle(SQColor.brandOrange)
+                Text("Rafale · test \(index)/\(total)")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(SQColor.label)
+                ProgressView(value: Double(index), total: Double(total))
+                    .frame(width: 90)
+                    .tint(SQColor.brandOrange)
+            }
         }
         .padding(.horizontal, SQSpace.md).padding(.vertical, SQSpace.sm)
         .background(SQColor.surface.opacity(0.7), in: Capsule())
@@ -442,7 +486,10 @@ struct SpeedtestView: View {
     private func burstSummaryCard(_ s: SpeedtestBurstSummary) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack(alignment: .center) {
-                Label("Rafale — \(s.count) test\(s.count > 1 ? "s" : "")", systemImage: "bolt.fill")
+                Label(
+                    "\(sessionIsContinuous ? "Session continue" : "Rafale") — \(s.count) test\(s.count > 1 ? "s" : "")",
+                    systemImage: sessionIsContinuous ? "infinity" : "bolt.fill"
+                )
                     .font(SQFont.archivo(17, .bold))
                     .foregroundStyle(SQColor.label)
                 Spacer()
@@ -553,8 +600,21 @@ struct SpeedtestView: View {
                                     }
                                     .buttonStyle(.plain)
                                 }
+                                // Mode continu illimité (drive test) : sentinelle burstCount == 0.
+                                Button {
+                                    burstCount = Self.continuousBurst
+                                    Haptics.selection()
+                                } label: {
+                                    Image(systemName: "infinity")
+                                        .font(.caption.weight(.bold))
+                                        .frame(minWidth: 38)
+                                        .padding(.vertical, SQSpace.xs + 3)
+                                        .background(burstCount == Self.continuousBurst ? SQColor.brandRed : SQColor.fill, in: Capsule())
+                                        .foregroundStyle(burstCount == Self.continuousBurst ? .white : SQColor.label)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            Text("Enchaîne plusieurs tests d'affilée. La mesure continue en arrière-plan tant qu'iOS l'autorise, avec progression dans la Live Activity.")
+                            Text("Enchaîne plusieurs tests d'affilée. « ∞ » lance un mode continu (drive test) : tests illimités jusqu'à l'arrêt, position suivie en continu, poursuite écran verrouillé.")
                                 .font(.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -723,7 +783,9 @@ struct SpeedtestView: View {
             return
         }
         let requestLocation = !AppEnvironment.runsSpeedtestQA
-        if burstCount > 1 {
+        if burstCount == Self.continuousBurst {
+            performContinuousSession(requestLocation: requestLocation)
+        } else if burstCount > 1 {
             performBurst(count: burstCount, requestLocation: requestLocation)
         } else {
             performRun(requestLocation: requestLocation)
@@ -743,6 +805,7 @@ struct SpeedtestView: View {
         services.networkPath.refreshNow()
         let status = services.networkPath.status
         currentNetworkStatus = status
+        isVPNActive = VPNDetector.isActive()
         runStartConnection = status.connection
         runStartNetworkDisplayName = status.displayName
         // Repli opérateur par IP quand l'API device est muette (carrier en
@@ -800,7 +863,8 @@ struct SpeedtestView: View {
         )
         phase = .saving
         do {
-            try await services.speedtest.save(measured, streams: settings.streams, publishToMap: publishToMap)
+            // Sous VPN : jamais de publication carte (opérateur du tunnel non fiable).
+            try await services.speedtest.save(measured, streams: settings.streams, publishToMap: publishToMap && !isVPNActive)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -826,6 +890,7 @@ struct SpeedtestView: View {
         networkAbortMessage = nil
         burstProgress = nil
         burstSummary = nil
+        sessionIsContinuous = false
         background.begin(name: "speedtest")
         liveActivity.start(serverName: "SignalQuest", network: services.networkPath.status.displayName)
         runTask = Task {
@@ -864,6 +929,7 @@ struct SpeedtestView: View {
         errorMessage = nil
         networkAbortMessage = nil
         burstSummary = nil
+        sessionIsContinuous = false
         let total = max(2, min(count, 20))
         burstProgress = (1, total)
         background.begin(name: "speedtest-burst")
@@ -913,6 +979,65 @@ struct SpeedtestView: View {
                 )
                 Haptics.success()
             }
+            background.end()
+            burstProgress = nil
+            runTask = nil
+            runStartConnection = nil
+            runStartNetworkDisplayName = nil
+            networkAbortMessage = nil
+            exitAfterQASpeedtestIfNeeded()
+        }
+    }
+
+    /// Mode continu illimité (drive test) : enchaîne les speedtests jusqu'à l'arrêt
+    /// manuel, en re-géolocalisant à chaque test. Le suivi de localisation continu
+    /// maintient l'app active écran verrouillé. Agrège la session en O(1) (sans
+    /// retenir chaque résultat) et empêche la veille de l'écran au premier plan.
+    private func performContinuousSession(requestLocation: Bool) {
+        Haptics.light()
+        errorMessage = nil
+        networkAbortMessage = nil
+        burstSummary = nil
+        sessionIsContinuous = true
+        burstProgress = (1, 0) // total = 0 → session illimitée
+        background.begin(name: "speedtest-continuous")
+        if requestLocation { services.location.startTracking() }
+        UIApplication.shared.isIdleTimerDisabled = true
+        liveActivity.start(serverName: "SignalQuest", network: services.networkPath.status.displayName, runIndex: 1, runTotal: 0)
+        runTask = Task {
+            var accumulator = ContinuousSessionAccumulator()
+            var index = 0
+            loop: while !Task.isCancelled {
+                index += 1
+                burstProgress = (index, 0)
+                do {
+                    // Drive test : on re-géolocalise à CHAQUE test (pas seulement le 1er).
+                    let measured = try await executeRun(requestLocation: requestLocation, runIndex: index, runTotal: 0)
+                    accumulator.add(measured)
+                    burstSummary = accumulator.summary(truncatedAt: nil)
+                } catch is CancellationError {
+                    break loop
+                } catch {
+                    // Un test raté n'interrompt pas la session : on note et on continue.
+                    errorMessage = error.localizedDescription
+                    Haptics.warning()
+                }
+                // Pause entre tests ; en arrière-plan le suivi de localisation garde
+                // l'app active (on renouvelle l'assertion par sécurité).
+                if scenePhase == .active {
+                    try? await Task.sleep(nanoseconds: 700_000_000)
+                } else {
+                    background.renew(name: "speedtest-continuous")
+                }
+            }
+            if accumulator.count > 0 {
+                burstSummary = accumulator.summary(truncatedAt: nil)
+            }
+            // Une session continue se termine toujours par un arrêt (manuel/réseau).
+            liveActivity.cancel()
+            handleCancellation()
+            services.location.stopTracking()
+            UIApplication.shared.isIdleTimerDisabled = false
             background.end()
             burstProgress = nil
             runTask = nil
@@ -1053,6 +1178,53 @@ struct SpeedtestBurstSummary {
         let pings = results.compactMap { $0.pingMinMs ?? $0.pingMs }
         minPing = pings.min() ?? 0
         self.truncatedAt = truncatedAt
+    }
+
+    /// Init memberwise — alimenté par un accumulateur O(1) (mode continu illimité)
+    /// pour ne pas retenir tous les résultats en mémoire pendant une longue session.
+    init(count: Int, avgDownload: Double, maxDownload: Double, avgUpload: Double, minPing: Double, truncatedAt: Int?) {
+        self.count = count
+        self.avgDownload = avgDownload
+        self.maxDownload = maxDownload
+        self.avgUpload = avgUpload
+        self.minPing = minPing
+        self.truncatedAt = truncatedAt
+    }
+}
+
+/// Accumulateur O(1) pour une session de rafale continue : agrège les moyennes /
+/// max / min au fil des tests sans conserver chaque `SpeedtestRunResult`.
+/// Internal (pas `private`) : partagé avec le mode Drive Test.
+struct ContinuousSessionAccumulator {
+    private(set) var count = 0
+    private var sumDownload = 0.0
+    private var maxDownload = 0.0
+    private var sumUpload = 0.0
+    private var uploadCount = 0
+    private var minPing = Double.greatestFiniteMagnitude
+
+    mutating func add(_ result: SpeedtestRunResult) {
+        count += 1
+        sumDownload += result.downloadAverageMbps
+        maxDownload = max(maxDownload, result.downloadAverageMbps)
+        if let upload = result.uploadAverageMbps {
+            sumUpload += upload
+            uploadCount += 1
+        }
+        if let ping = result.pingMinMs ?? result.pingMs {
+            minPing = min(minPing, ping)
+        }
+    }
+
+    func summary(truncatedAt: Int?) -> SpeedtestBurstSummary {
+        SpeedtestBurstSummary(
+            count: count,
+            avgDownload: count == 0 ? 0 : sumDownload / Double(count),
+            maxDownload: maxDownload,
+            avgUpload: uploadCount == 0 ? 0 : sumUpload / Double(uploadCount),
+            minPing: minPing == .greatestFiniteMagnitude ? 0 : minPing,
+            truncatedAt: truncatedAt
+        )
     }
 }
 

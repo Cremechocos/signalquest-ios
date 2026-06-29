@@ -96,6 +96,9 @@
 		<string>audio</string>
 		<string>voip</string>
 		<string>remote-notification</string>
+		<!-- Mode rafale continu (drive test) : le suivi de localisation maintient
+		     l'app active écran verrouillé pour enchaîner les speedtests. -->
+		<string>location</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict/>

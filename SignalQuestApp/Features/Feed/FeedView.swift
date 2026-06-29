@@ -491,7 +491,7 @@ struct FeedView: View {
                 )
                 let conversations = try await services.messages.conversations()
                 guard let conversation = conversations.first(where: { $0.id == created.conversationId }) else { return }
-                _ = try await services.messages.sendText(trimmed, in: conversation, replyToId: nil, e2ee: services.e2ee, idempotencyKey: nil)
+                _ = try await services.messages.sendText(trimmed, in: conversation, replyToId: nil, e2ee: services.e2ee, idempotencyKey: nil, ttlSeconds: 0)
             } catch {
                 // Best-effort : la confirmation « Envoyé » du viewer est optimiste.
             }

@@ -2,6 +2,7 @@ import SwiftUI
 import PhotosUI
 import UIKit
 import UniformTypeIdentifiers
+import CoreLocation
 
 struct ConversationDetailView: View {
     let conversation: MessageConversation
@@ -68,6 +69,11 @@ struct ConversationDetailView: View {
     @State private var showSearch = false
     @State private var showScheduled = false
     @State private var showReminders = false
+    @State private var showSaved = false
+    /// Messages éphémères (parité Android) : quand actif, les textes envoyés
+    /// portent un TTL de 24 h (le backend pose `expiresAt`).
+    @State private var ephemeralEnabled = false
+    @State private var isSharingLocation = false
     @State private var showSchedulePicker = false
     @State private var showNewPoll = false
     @State private var reminderTarget: MessageItem?
@@ -219,6 +225,9 @@ struct ConversationDetailView: View {
                     Button { showReminders = true } label: {
                         Label("Rappels", systemImage: "bell")
                     }
+                    Button { showSaved = true } label: {
+                        Label("Messages enregistrés", systemImage: "bookmark")
+                    }
                     Divider()
                     if conversation.isGroup {
                         Button { showGroupSettings = true } label: {
@@ -279,6 +288,9 @@ struct ConversationDetailView: View {
         }
         .sheet(isPresented: $showGroupSettings) {
             GroupSettingsView(conversation: conversation, service: service, e2ee: e2ee)
+        }
+        .sheet(isPresented: $showSaved) {
+            SavedMessagesView(service: service, currentUserId: currentUserId)
         }
         .signalQuestBackground()
         .task {
@@ -342,6 +354,21 @@ struct ConversationDetailView: View {
                     draft = ""
                 }
             }
+            if ephemeralEnabled {
+                HStack(spacing: SQSpace.xs) {
+                    Image(systemName: "timer").font(.system(size: 11)).accessibilityHidden(true)
+                    Text("Messages éphémères · disparaissent après 24 h")
+                        .font(SQType.micro)
+                    Spacer(minLength: SQSpace.sm)
+                    Button("Désactiver") { ephemeralEnabled = false }
+                        .font(SQType.micro.weight(.semibold))
+                        .buttonStyle(.plain)
+                }
+                .foregroundStyle(SQColor.brandOrange)
+                .padding(.horizontal)
+                .padding(.top, SQSpace.sm)
+                .transition(.opacity)
+            }
             HStack(spacing: SQSpace.sm + 2) {
                 Menu {
                     Button { showNewPoll = true } label: {
@@ -350,13 +377,26 @@ struct ConversationDetailView: View {
                     Button { showSchedulePicker = true } label: {
                         Label("Programmer l'envoi", systemImage: "clock")
                     }
+                    // Localisation : refusée par le backend en E2EE → proposée
+                    // uniquement en conversation non chiffrée.
+                    if !isE2EE {
+                        Button {
+                            Task { await sendCurrentLocation() }
+                        } label: {
+                            Label("Partager ma position", systemImage: "location.fill")
+                        }
+                    }
+                    Divider()
+                    Toggle(isOn: $ephemeralEnabled) {
+                        Label("Messages éphémères (24 h)", systemImage: "timer")
+                    }
                 } label: {
                     Image(systemName: "plus")
                         .frame(width: 36, height: 36)
                         .background(SQColor.fill, in: Circle())
                         .foregroundStyle(SQColor.label)
                 }
-                .disabled(!canSend || isSending)
+                .disabled(!canSend || isSending || isSharingLocation)
                 .accessibilityLabel("Plus d'actions")
 
                 PhotosPicker(selection: $pickerItem, matching: .images) {
@@ -449,6 +489,15 @@ struct ConversationDetailView: View {
                     Text("Message supprimé")
                         .font(SQType.caption.italic())
                         .foregroundStyle(mine ? .white.opacity(0.7) : SQColor.labelTertiary)
+                } else if let shareCard = shareCard(for: message) {
+                    // Partage envoyé par Android (signal / speedtest / session…).
+                    if let signal = shareCard.signal {
+                        SignalCardBubble(card: shareCard, signal: signal, mine: mine)
+                    } else {
+                        ShareCardBubble(card: shareCard, mine: mine)
+                    }
+                } else if let location = location(for: message) {
+                    LocationBubble(location: location, mine: mine)
                 } else if let poll = pollsByMessageId[message.id] {
                     PollBubble(
                         poll: poll,
@@ -473,6 +522,12 @@ struct ConversationDetailView: View {
                         Text(created, format: .dateTime.hour().minute())
                             .font(SQType.micro)
                             .foregroundStyle(mine ? .white.opacity(0.6) : SQColor.labelTertiary)
+                    }
+                    if message.expiresAt != nil && message.deletedAt == nil {
+                        Image(systemName: "timer")
+                            .font(.system(size: 10))
+                            .foregroundStyle(mine ? .white.opacity(0.6) : SQColor.labelTertiary)
+                            .accessibilityLabel("Message éphémère")
                     }
                     if message.editedAt != nil && message.deletedAt == nil {
                         Text("modifié")
@@ -627,6 +682,11 @@ struct ConversationDetailView: View {
                 reminderTarget = message
             } label: {
                 Label("Me le rappeler", systemImage: "bell")
+            }
+            Button {
+                Task { await saveMessage(message) }
+            } label: {
+                Label("Enregistrer", systemImage: "bookmark")
             }
             if canPin {
                 if isPinned(message) {
@@ -801,6 +861,20 @@ struct ConversationDetailView: View {
         if message.deletedAt != nil { return "" }
         if message.isEncrypted { return decryptedMessages[message.id] ?? "🔒 Message chiffré" }
         return message.content ?? ""
+    }
+
+    /// Carte de partage (signal/speedtest/session/social) portée par le metadata —
+    /// envoyée par Android. Le metadata des cartes est en clair même en E2EE. La
+    /// garde `metadata != nil` évite tout parsing JSON sur les messages texte.
+    private func shareCard(for message: MessageItem) -> ShareCardData? {
+        guard message.deletedAt == nil, message.metadata != nil else { return nil }
+        return ShareCardData.parse(fromMetadataJSON: message.metadata)
+    }
+
+    /// Localisation partagée (kind LOCATION) portée par le metadata.
+    private func location(for message: MessageItem) -> MessageLocationData? {
+        guard message.deletedAt == nil, message.metadata != nil else { return nil }
+        return MessageLocationData.parse(fromMetadataJSON: message.metadata)
     }
 
     private var currentUserId: String? {
@@ -1143,8 +1217,9 @@ struct ConversationDetailView: View {
         // serveur ou la marquera .failed (rejouable au tap).
         let replyToId = replyTarget?.id
         let localId = "local-\(UUID().uuidString)"
-        let optimistic = makeOptimisticMessage(id: localId, text: text, replyToId: replyToId)
-        pendingSends[localId] = PendingSend(text: text, replyToId: replyToId, idempotencyKey: UUID().uuidString)
+        let ttl = ephemeralEnabled ? 86_400 : 0
+        let optimistic = makeOptimisticMessage(id: localId, text: text, replyToId: replyToId, ttlSeconds: ttl)
+        pendingSends[localId] = PendingSend(text: text, replyToId: replyToId, idempotencyKey: UUID().uuidString, ttlSeconds: ttl)
         sendStatus[localId] = .sending
         messages = Self.normalized(messages + [optimistic])
         draft = ""
@@ -1165,7 +1240,8 @@ struct ConversationDetailView: View {
                 in: conversation,
                 replyToId: pending.replyToId,
                 e2ee: e2ee,
-                idempotencyKey: pending.idempotencyKey
+                idempotencyKey: pending.idempotencyKey,
+                ttlSeconds: pending.ttlSeconds
             )
             // Remplace la bulle optimiste par la réponse serveur (id réel,
             // horodatage serveur, état chiffré). On garde le texte déchiffré en
@@ -1191,7 +1267,7 @@ struct ConversationDetailView: View {
     /// Construit une bulle locale en clair (jamais persistée) affichée le temps
     /// de l'aller-retour serveur. Non chiffrée : `displayedContent` lit
     /// directement `content`, ce qui évite tout décryptage pour la bulle locale.
-    private func makeOptimisticMessage(id: String, text: String, replyToId: String?) -> MessageItem {
+    private func makeOptimisticMessage(id: String, text: String, replyToId: String?, ttlSeconds: Int = 0) -> MessageItem {
         MessageItem(
             id: id,
             conversationId: conversation.id,
@@ -1206,6 +1282,7 @@ struct ConversationDetailView: View {
             createdAt: Date(),
             editedAt: nil,
             deletedAt: nil,
+            expiresAt: ttlSeconds > 0 ? Date().addingTimeInterval(TimeInterval(ttlSeconds)) : nil,
             replyToId: replyToId,
             threadReplyCount: nil,
             sender: nil,
@@ -1309,6 +1386,57 @@ struct ConversationDetailView: View {
     private func markRead() async {
         guard let last = messages.last else { return }
         try? await service.markRead(conversationId: conversation.id, lastMessageId: last.id)
+    }
+
+    // MARK: Partage de position (parité Android)
+
+    private func sendCurrentLocation() async {
+        guard !isSharingLocation else { return }
+        isSharingLocation = true
+        defer { isSharingLocation = false }
+        guard let location = await services.location.currentLocation() else {
+            errorMessage = "Position indisponible — autorise la localisation dans les réglages."
+            Haptics.error()
+            return
+        }
+        let place = await reverseGeocodedName(location)
+        do {
+            let sent = try await service.sendLocation(
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude,
+                place: place,
+                in: conversation
+            )
+            messages = Self.normalized(messages + [sent])
+            Haptics.success()
+        } catch {
+            errorMessage = error.localizedDescription
+            Haptics.error()
+        }
+    }
+
+    /// Géocodage inverse best-effort (« rue, ville ») pour libeller la position ;
+    /// nil si indisponible — la carte affichera alors les coordonnées.
+    private func reverseGeocodedName(_ location: CLLocation) async -> String? {
+        await withCheckedContinuation { continuation in
+            CLGeocoder().reverseGeocodeLocation(location) { placemarks, _ in
+                let placemark = placemarks?.first
+                let parts = [placemark?.thoroughfare, placemark?.locality].compactMap { $0 }
+                continuation.resume(returning: parts.isEmpty ? placemark?.name : parts.joined(separator: ", "))
+            }
+        }
+    }
+
+    // MARK: Messages enregistrés (favoris)
+
+    private func saveMessage(_ message: MessageItem) async {
+        do {
+            try await service.saveMessage(messageId: message.id)
+            Haptics.success()
+        } catch {
+            errorMessage = error.localizedDescription
+            Haptics.error()
+        }
     }
 
     private func shareKeyIfNeeded() async {
@@ -1464,6 +1592,7 @@ private struct PendingSend {
     let text: String
     let replyToId: String?
     let idempotencyKey: String
+    let ttlSeconds: Int
 }
 
 /// Trois points qui ondulent doucement (indicateur « en train d'écrire »).

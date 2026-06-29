@@ -585,6 +585,38 @@ struct ErrorStateView: View {
     }
 }
 
+/// Bandeau d'avertissement VPN affiché sur les écrans Speedtest et Drive Test.
+///
+/// Sous tunnel VPN, l'IP publique reflète le VPN et non le réseau réel : l'app ne
+/// peut pas détecter le vrai opérateur, et le test n'est donc PAS publié sur la
+/// carte communautaire (il fausserait les données). On le signale clairement.
+struct VPNWarningBanner: View {
+    var message = "VPN actif : ton opérateur ne peut pas être détecté, ce test ne sera pas publié sur la carte."
+
+    var body: some View {
+        HStack(alignment: .top, spacing: SQSpace.sm) {
+            Image(systemName: "lock.shield.fill")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(SQColor.warning)
+                .accessibilityHidden(true)
+            Text(message)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(SQSpace.sm + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
+                .stroke(SQColor.warning.opacity(0.35), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Avertissement. \(message)")
+    }
+}
+
 /// Squelette de chargement du feed : imite la structure réelle d'une
 /// `FeedItemCard` (avatar + auteur, média, texte, barre d'actions) pour éviter
 /// le saut de mise en page à l'arrivée des données. À combiner avec `sqShimmer()`.

@@ -419,7 +419,7 @@ extension CallManager: PKPushRegistryDelegate {
         // CallKit requires reporting the incoming call before `completion` runs;
         // the provider delivers on the main queue so we report synchronously.
         let completionBox = UnsafeMainActorBox(value: completion)
-        MainActor.assumeIsolated {
+        Task { @MainActor in
             self.reportIncomingCall(uuid: uuid, callId: callId, conversationId: conversationId, handle: handle, hasVideo: hasVideo, completion: completionBox.value)
         }
     }

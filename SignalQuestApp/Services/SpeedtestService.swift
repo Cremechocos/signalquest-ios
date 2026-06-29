@@ -196,6 +196,7 @@ private enum SpeedtestEngineError: LocalizedError {
 final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private let api: APIClient
     private let markets: MarketRegistryServicing
+    private let networkOperator: NetworkOperatorServicing
     private let session: URLSession
     private let historyCache: DiskCache
     private let pendingCache: DiskCache
@@ -205,6 +206,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     init(
         api: APIClient,
         markets: MarketRegistryServicing? = nil,
+        networkOperator: NetworkOperatorServicing? = nil,
         session: URLSession? = nil,
         historyCache: DiskCache = DiskCache(folderName: "SignalQuestSpeedtestHistory"),
         pendingCache: DiskCache = DiskCache(folderName: "SignalQuestSpeedtestPending"),
@@ -212,6 +214,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     ) {
         self.api = api
         self.markets = markets ?? MarketRegistryService(api: api)
+        self.networkOperator = networkOperator ?? NetworkOperatorService(api: api)
         // Use ephemeral config to bypass system caching of the download payload.
         let config = URLSessionConfiguration.ephemeral
         config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
@@ -394,37 +397,64 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         )
     }
 
+    /// Construit le contexte opérateur d'un test cellulaire.
+    ///
+    /// CoreTelephony (`CTCarrier`) ne renvoie plus MCC/MNC/nom depuis iOS 16.4+
+    /// (placeholders `--` / 65535, filtrés en amont → nil). On reconstruit donc le
+    /// contexte comme la carte : opérateur via IP/ASN (`/api/speedtest/operator`,
+    /// hors VPN), marché via la localisation, puis backfill MCC/MNC depuis le
+    /// registre. Sous VPN la résolution IP renvoie un opérateur nul : on
+    /// n'enregistre JAMAIS l'opérateur du tunnel.
     private func resolveCellularOperatorContext(
         pathStatus: NetworkPathStatus,
         location: Coordinates?
     ) async -> CellularOperatorContext {
         guard pathStatus.connection == .cellular else { return .empty }
-        let mcc = pathStatus.operatorMcc
-        let mnc = pathStatus.operatorMnc
+        let ctMcc = pathStatus.operatorMcc
+        let ctMnc = pathStatus.operatorMnc
         let registry = await markets.registry()
 
-        var market = registry.markets.first { entry in
-            guard let mcc else { return false }
-            return entry.mccs.contains(mcc)
-        }
+        // Marché : MCC de la SIM (si encore lisible) → localisation GPS.
+        var market = ctMcc.flatMap { mcc in registry.markets.first { $0.mccs.contains(mcc) } }
         if market == nil, let location {
             market = await markets.marketForLocation(latitude: location.latitude, longitude: location.longitude)
         }
 
-        let resolvedOperator = market?.selectableOperators.first { op in
-            guard let mnc else { return false }
-            return op.mncs.contains(mnc)
+        // Opérateur fiable sur iOS moderne : résolution IP/ASN côté backend.
+        // `viaVpn` → le backend renvoie un opérateur nul sous tunnel (l'IP
+        // refléterait le VPN), donc aucun faux opérateur n'est enregistré.
+        let detected = await networkOperator.resolve(viaVpn: VPNDetector.isActive())
+        let trusted = (detected?.viaVpn == true) ? nil : detected
+
+        var operatorEntry: MarketRegistryOperator?
+        if let key = trusted?.operatorKey {
+            operatorEntry = market?.operatorEntry(forKey: key)
+            // MCC muet (16.4+) : retrouve le marché via l'opérateur IP.
+            if market == nil {
+                market = registry.markets.first { $0.operatorEntry(forKey: key) != nil }
+                operatorEntry = market?.operatorEntry(forKey: key)
+            }
+        }
+        // Repli : opérateur via le MNC de la SIM (rare sur 16.4+, mais gratuit).
+        if operatorEntry == nil, let mnc = ctMnc {
+            operatorEntry = market?.selectableOperators.first { $0.mncs.contains(mnc) }
         }
 
+        // Backfill : MCC depuis le marché ; MNC = MNC principal (1er du registre) de
+        // l'opérateur résolu. Best-effort si l'opérateur a plusieurs MNC (ex. Orange
+        // 208-01/02) : l'operatorKey reste exact, le MNC sert d'indication.
+        let mcc = ctMcc ?? market?.mccs.first
+        let mnc = ctMnc ?? operatorEntry?.mncs.first
+
         return CellularOperatorContext(
-            // Plus de repli « Cellulaire {techno} » : il écrasait l'opérateur de
-            // l'API dépréciée et provoquait un doublon dans networkShareDisplayName.
             // nil quand inconnu → l'UI retombe proprement sur la techno seule.
-            mobileOperator: pathStatus.operatorName ?? resolvedOperator?.shortLabel ?? resolvedOperator?.label,
+            mobileOperator: pathStatus.operatorName
+                ?? trusted?.shortLabel ?? trusted?.label
+                ?? operatorEntry?.shortLabel ?? operatorEntry?.label,
             mcc: mcc,
             mnc: mnc,
             marketCode: market?.marketCode,
-            operatorKey: resolvedOperator?.key
+            operatorKey: operatorEntry?.key ?? trusted?.operatorKey
         )
     }
 

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "apex-design",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8421", "--directory", "/Users/alexandregermain/Site/Apex/design"],
+      "port": 8421
+    }
+  ]
+}

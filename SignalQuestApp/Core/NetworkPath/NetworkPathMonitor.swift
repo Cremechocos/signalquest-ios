@@ -235,6 +235,14 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
         refreshStatus()
     }
 
+    /// MCC/MNC de la SIM lus DIRECTEMENT (CoreTelephony), indépendamment du chemin
+    /// réseau actif. Utile pour cibler l'opérateur de la SIM même quand l'app est
+    /// sur WiFi (le `status` ne porte le PLMN que si le chemin actif est cellulaire).
+    /// Peut être (nil, nil) si iOS masque le code réseau (16.4+).
+    func simPLMN() -> (mcc: Int?, mnc: Int?) {
+        currentCellularPLMN()
+    }
+
     private func refreshStatus() {
         if latestPathSnapshot.usesCellular { logCarrierDiagnosticsIfNeeded() }
         let cellularTechnology = latestPathSnapshot.usesCellular ? currentCellularTechnology() : nil

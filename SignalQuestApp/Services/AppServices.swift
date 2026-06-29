@@ -57,8 +57,9 @@ final class AppServices: ObservableObject {
         markets = marketsService
         antennas = AntennasService(api: api)
         anfr = ANFRService(api: api)
-        speedtest = SpeedtestService(api: api, markets: marketsService)
-        networkOperator = NetworkOperatorService(api: api)
+        let networkOperatorService = NetworkOperatorService(api: api)
+        networkOperator = networkOperatorService
+        speedtest = SpeedtestService(api: api, markets: marketsService, networkOperator: networkOperatorService)
         photos = PhotoService(api: api)
         messages = MessagesService(api: api)
         leaderboards = LeaderboardService(api: api)

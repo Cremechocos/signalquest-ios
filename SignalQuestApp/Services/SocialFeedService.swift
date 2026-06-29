@@ -152,7 +152,7 @@ final class SocialFeedService: SocialFeedServicing {
 
     func userProfile(userId: String) async throws -> SocialUserProfile {
         let response: SocialUserProfileResponse = try await api.request(
-            APIEndpoint(path: "/api/users/\(userId)/profile"),
+            APIEndpoint(path: "/users/\(userId)/profile"),
             as: SocialUserProfileResponse.self
         )
         return response.profile
@@ -237,7 +237,7 @@ final class SocialFeedService: SocialFeedServicing {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
         return try await api.request(
-            APIEndpoint(path: "/api/users/search", query: [
+            APIEndpoint(path: "/users/search", query: [
                 URLQueryItem(name: "q", value: trimmed),
                 URLQueryItem(name: "limit", value: String(limit))
             ]),

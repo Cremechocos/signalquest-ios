@@ -10,6 +10,12 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     private let manager: CLLocationManager
     private var locationContinuation: CheckedContinuation<CLLocation?, Never>?
     private var authorizationContinuation: CheckedContinuation<CLAuthorizationStatus, Never>?
+    /// Suivi continu demandé (drive test) : permet de (re)démarrer le tracking dès
+    /// que l'autorisation est accordée, même si l'utilisateur valide le prompt après.
+    private var wantsTracking = false
+    /// Callback optionnel appelé à chaque position pendant un suivi continu.
+    /// Mis à nil par l'appelant en fin de session (drive test).
+    var onLocationUpdate: (@MainActor (CLLocation) -> Void)?
 
     override init() {
         manager = CLLocationManager()
@@ -21,6 +27,40 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 
     func requestWhenInUse() {
         manager.requestWhenInUseAuthorization()
+    }
+
+    /// Démarre un suivi de position CONTINU (mode rafale / drive test). Les updates
+    /// alimentent `lastLocation`, que `currentLocation()` renvoie immédiatement à
+    /// chaque test. `allowsBackgroundLocationUpdates` (avec le background mode
+    /// `location` de l'Info.plist) maintient l'app active écran verrouillé. À
+    /// n'appeler qu'au premier plan, autorisation « Pendant l'utilisation » accordée.
+    func startTracking() {
+        wantsTracking = true
+        switch authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            beginTrackingNow()
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization() // le tracking démarrera à l'octroi
+        default:
+            break // refusé : pas de tracking (le drive test tournera sans position)
+        }
+    }
+
+    private func beginTrackingNow() {
+        manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        manager.allowsBackgroundLocationUpdates = true
+        manager.pausesLocationUpdatesAutomatically = false
+        manager.startUpdatingLocation()
+    }
+
+    /// Arrête le suivi continu et restaure les réglages one-shot par défaut.
+    func stopTracking() {
+        wantsTracking = false
+        manager.stopUpdatingLocation()
+        if manager.allowsBackgroundLocationUpdates {
+            manager.allowsBackgroundLocationUpdates = false
+        }
+        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
     }
 
     func requestOneShotLocation() {
@@ -73,6 +113,10 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         let status = manager.authorizationStatus
         Task { @MainActor in
             authorizationStatus = status
+            // Suivi continu demandé avant l'octroi : on le (re)démarre maintenant.
+            if wantsTracking, status == .authorizedWhenInUse || status == .authorizedAlways {
+                beginTrackingNow()
+            }
             authorizationContinuation?.resume(returning: status)
             authorizationContinuation = nil
         }
@@ -82,6 +126,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         Task { @MainActor in
             lastLocation = locations.last
             errorMessage = nil
+            if let last = locations.last { onLocationUpdate?(last) }
             locationContinuation?.resume(returning: locations.last)
             locationContinuation = nil
         }
