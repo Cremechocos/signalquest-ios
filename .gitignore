@@ -36,3 +36,7 @@ GoogleService-Info.plist
 # Environment files
 .env
 .env.local
+
+# Identifiants de comptes de test — NE JAMAIS committer (rotation backend requise)
+TestArtifacts/.test-account-credentials
+TestArtifacts/.test-account-b-credentials

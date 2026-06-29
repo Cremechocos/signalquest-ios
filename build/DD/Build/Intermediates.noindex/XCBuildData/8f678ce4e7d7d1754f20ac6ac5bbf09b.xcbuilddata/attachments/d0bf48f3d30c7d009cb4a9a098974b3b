@@ -1,4 +1,0 @@
-module LKObjCHelpers {
-umbrella header "/Users/alexandregermain/Site/iOS/build/DD/SourcePackages/checkouts/client-sdk-swift/Sources/LKObjCHelpers/include/LKObjCHelpers.h"
-export *
-}
