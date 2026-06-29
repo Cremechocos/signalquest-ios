@@ -67,6 +67,12 @@ final class DriveTestViewModel: ObservableObject {
         marketEntry?.operatorColor(forKey: key) ?? SQBrand.operatorColor(key)
     }
 
+    /// Préfixe « Opérateur · » pour les libellés de la Live Activity (F2) — vide
+    /// tant que l'opérateur n'est pas résolu (WiFi/VPN au démarrage).
+    private var liveOperatorPrefix: String {
+        displayedOperatorLabel.map { "\($0) · " } ?? ""
+    }
+
     private let services: AppServices
     private var sessionTask: Task<Void, Never>?
     private var accumulator = ContinuousSessionAccumulator()
@@ -125,7 +131,7 @@ final class DriveTestViewModel: ObservableObject {
         // Assertion d'arrière-plan + Live Activity : enchaîne les tests écran
         // verrouillé et affiche la progression sur l'écran de verrouillage.
         background.begin(name: "drivetest")
-        liveActivity.start(serverName: "SignalQuest", network: services.networkPath.status.displayName, runIndex: 1, runTotal: 0)
+        liveActivity.start(serverName: displayedOperatorLabel ?? "SignalQuest", network: services.networkPath.status.displayName, runIndex: 1, runTotal: 0)
         sessionTask = Task { await runLoop() }
     }
 
@@ -362,7 +368,7 @@ final class DriveTestViewModel: ObservableObject {
         livePhaseFinalize(measured)
         // Affiche le résultat de ce test dans la Live Activity.
         liveActivity.update(
-            phaseLabel: "Test \(index) terminé",
+            phaseLabel: "\(liveOperatorPrefix)Test \(index) terminé",
             downloadMbps: measured.downloadAverageMbps,
             uploadMbps: measured.uploadAverageMbps ?? 0,
             pingMs: measured.pingMinMs ?? measured.pingMs ?? 0,
@@ -396,7 +402,7 @@ final class DriveTestViewModel: ObservableObject {
             liveUpload = upload
         }
         liveActivity.update(
-            phaseLabel: "Test \(testIndex) · \(Self.phaseLabel(live.phase))",
+            phaseLabel: "\(liveOperatorPrefix)Test \(testIndex) · \(Self.phaseLabel(live.phase))",
             downloadMbps: liveDownload,
             uploadMbps: liveUpload,
             pingMs: livePing,
