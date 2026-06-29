@@ -41,6 +41,20 @@ struct OpenMessagesIntent: AppIntent {
     }
 }
 
+/// Raccourci « Lancer un Drive Test » (F4). Ouvre l'app sur l'onglet Speed et
+/// présente le mode Drive Test (mesure continue + couverture le long du trajet).
+struct RunDriveTestIntent: AppIntent {
+    static let title: LocalizedStringResource = "Lancer un Drive Test"
+    static let description = IntentDescription("Ouvre SignalQuest et démarre le mode Drive Test (mesure en continu).")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        SQIntentRoute.requestDriveTest()
+        return .result()
+    }
+}
+
 struct SignalQuestShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -70,6 +84,15 @@ struct SignalQuestShortcuts: AppShortcutsProvider {
             shortTitle: "Messagerie",
             systemImageName: "bubble.left.and.bubble.right"
         )
+        AppShortcut(
+            intent: RunDriveTestIntent(),
+            phrases: [
+                "Lance un drive test avec \(.applicationName)",
+                "Démarre un drive test \(.applicationName)"
+            ],
+            shortTitle: "Drive Test",
+            systemImageName: "location.north.line.fill"
+        )
     }
 }
 
@@ -79,14 +102,17 @@ enum SQIntentRoute {
     private static let speedtestKey = "sq.intent.route.speedtest"
     private static let mapKey = "sq.intent.route.map"
     private static let messagesKey = "sq.intent.route.messages"
+    private static let driveTestKey = "sq.intent.route.drivetest"
 
     static func requestSpeedtest() { UserDefaults.standard.set(true, forKey: speedtestKey) }
     static func requestMap() { UserDefaults.standard.set(true, forKey: mapKey) }
     static func requestMessages() { UserDefaults.standard.set(true, forKey: messagesKey) }
+    static func requestDriveTest() { UserDefaults.standard.set(true, forKey: driveTestKey) }
 
     static func consumeSpeedtest() -> Bool { consume(speedtestKey) }
     static func consumeMap() -> Bool { consume(mapKey) }
     static func consumeMessages() -> Bool { consume(messagesKey) }
+    static func consumeDriveTest() -> Bool { consume(driveTestKey) }
 
     private static func consume(_ key: String) -> Bool {
         guard UserDefaults.standard.bool(forKey: key) else { return false }

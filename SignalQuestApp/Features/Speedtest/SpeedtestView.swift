@@ -196,6 +196,14 @@ struct SpeedtestView: View {
         .navigationDestination(isPresented: $showDriveTest) {
             DriveTestView(services: services)
         }
+        // F4 : « Lance un Drive Test » (Siri/Raccourcis) → présente Drive Test
+        // une fois l'onglet Speed actif.
+        .onReceive(services.router.$pendingDriveTest) { pending in
+            if pending {
+                showDriveTest = true
+                services.router.pendingDriveTest = false
+            }
+        }
         .signalQuestHeroBackground()
         .sheet(isPresented: $showSettings) { settingsSheet }
         .sheet(isPresented: $showLocationPriming) {

@@ -17,6 +17,9 @@ final class AppRouter: ObservableObject {
     @Published var openUserProfileId: String?
     /// Set to request opening a site sheet on the Map tab (deep link carte).
     @Published var openSiteId: String?
+    /// Demande de présentation du mode Drive Test (posée par l'App Intent F4 ;
+    /// consommée par SpeedtestView une fois l'onglet Speed actif).
+    @Published var pendingDriveTest = false
 
     init() {
         let args = ProcessInfo.processInfo.arguments

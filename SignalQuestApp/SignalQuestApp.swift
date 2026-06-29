@@ -334,6 +334,9 @@ struct MainTabView: View {
             router.selectedTab = .map
         } else if SQIntentRoute.consumeMessages() {
             router.selectedTab = .messages
+        } else if SQIntentRoute.consumeDriveTest() {
+            router.selectedTab = .speed
+            router.pendingDriveTest = true
         }
     }
 
