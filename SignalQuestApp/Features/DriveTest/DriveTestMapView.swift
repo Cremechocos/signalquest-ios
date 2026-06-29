@@ -13,6 +13,11 @@ struct DriveTestMapView: UIViewRepresentable {
     let highlightedSiteId: String?
     let userLocation: CLLocationCoordinate2D?
     let colorScheme: ColorScheme
+    /// Couleur (UIKit) par clé d'opérateur EN MAJUSCULES, pour colorer les marqueurs.
+    var operatorPalette: [String: UIColor] = [:]
+    /// Opérateur affiché : s'il est défini, tous les marqueurs prennent SA couleur ;
+    /// sinon chaque marqueur est coloré selon `site.operators.first` (cas « tous »).
+    var displayedOperatorKey: String?
     /// Tap sur une antenne → ouvre ses détails (la session speedtest n'est pas interrompue).
     var onSelectSite: (AntennaSite) -> Void = { _ in }
 
@@ -41,6 +46,8 @@ struct DriveTestMapView: UIViewRepresentable {
             trace: trace,
             highlightedSiteId: highlightedSiteId,
             userLocation: userLocation,
+            operatorPalette: operatorPalette,
+            displayedKey: displayedOperatorKey,
             on: mapView
         )
     }
@@ -67,27 +74,38 @@ struct DriveTestMapView: UIViewRepresentable {
             trace: [CLLocationCoordinate2D],
             highlightedSiteId: String?,
             userLocation: CLLocationCoordinate2D?,
+            operatorPalette: [String: UIColor],
+            displayedKey: String?,
             on mapView: MLNMapView
         ) {
-            syncSites(antennas, on: mapView)
+            syncSites(antennas, operatorPalette: operatorPalette, displayedKey: displayedKey, on: mapView)
             syncCones(antennas: antennas, highlightedSiteId: highlightedSiteId, userLocation: userLocation, on: mapView)
             syncTrace(trace, on: mapView)
         }
 
         // MARK: Antennes (points)
 
-        private func syncSites(_ antennas: [AntennaSite], on mapView: MLNMapView) {
+        private func syncSites(_ antennas: [AntennaSite], operatorPalette: [String: UIColor], displayedKey: String?, on mapView: MLNMapView) {
             var hasher = Hasher()
             hasher.combine(antennas.count)
+            // La palette/opérateur affiché fait partie de la signature : changer
+            // d'opérateur recolore les marqueurs même si les sites sont identiques.
+            hasher.combine(displayedKey ?? "ALL")
             for site in antennas.prefix(400) { hasher.combine(site.id) }
             let signature = hasher.finalize()
             guard signature != lastAntennaSignature else { return }
             lastAntennaSignature = signature
 
             if !siteAnnotations.isEmpty { mapView.removeAnnotations(siteAnnotations) }
-            let points: [MLNAnnotation] = antennas.compactMap { site in
+            let points: [MLNAnnotation] = antennas.compactMap { site -> MLNAnnotation? in
                 guard site.hasValidCoordinate, let lat = site.latitude, let lon = site.longitude else { return nil }
-                return DriveTestAntennaAnnotation(site: site, coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon))
+                let key = (displayedKey ?? site.operators.first ?? "").uppercased()
+                let color = operatorPalette[key] ?? UIColor(SQColor.brandRed)
+                return DriveTestAntennaAnnotation(
+                    site: site,
+                    coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
+                    dotColor: color
+                )
             }
             siteAnnotations = points
             if !points.isEmpty { mapView.addAnnotations(points) }
@@ -154,6 +172,10 @@ struct DriveTestMapView: UIViewRepresentable {
             let identifier = "drivetest-antenna"
             let view = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? DriveTestMarkerView
                 ?? DriveTestMarkerView(reuseIdentifier: identifier)
+            // Vue réutilisée → on (ré)applique la couleur de CETTE annotation.
+            if let antenna = annotation as? DriveTestAntennaAnnotation {
+                view.apply(color: antenna.dotColor)
+            }
             return view
         }
 
@@ -192,9 +214,11 @@ struct DriveTestMapView: UIViewRepresentable {
 /// Annotation antenne portant le `AntennaSite` pour la sélection (détails au tap).
 final class DriveTestAntennaAnnotation: MLNPointAnnotation {
     let site: AntennaSite
+    let dotColor: UIColor
 
-    init(site: AntennaSite, coordinate: CLLocationCoordinate2D) {
+    init(site: AntennaSite, coordinate: CLLocationCoordinate2D, dotColor: UIColor) {
         self.site = site
+        self.dotColor = dotColor
         super.init()
         self.coordinate = coordinate
     }
@@ -221,6 +245,11 @@ final class DriveTestMarkerView: MLNAnnotationView {
         dot.layer.shadowRadius = 3
         dot.layer.shadowOffset = CGSize(width: 0, height: 1.5)
         addSubview(dot)
+    }
+
+    /// Recolore le disque selon l'opérateur de l'antenne (vue réutilisée).
+    func apply(color: UIColor) {
+        dot.backgroundColor = color
     }
 
     required init?(coder: NSCoder) { nil }

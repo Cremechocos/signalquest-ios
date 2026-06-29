@@ -41,10 +41,31 @@ final class DriveTestViewModel: ObservableObject {
     /// ne sont pas publiés sur la carte. Pilote la bannière d'avertissement.
     @Published private(set) var isVPNActive = false
 
+    /// Opérateurs sélectionnables du marché courant (alimente le sélecteur manuel).
+    @Published private(set) var availableOperators: [MarketRegistryOperator] = []
+    /// Opérateur choisi manuellement (prioritaire sur l'auto-résolution) ; nil = auto.
+    /// Permet d'afficher SES antennes quand la SIM n'est pas résolue
+    /// (WiFi / VPN / SIM masquée iOS 16.4+) au lieu du fallback silencieux "ALL".
+    @Published private(set) var manualOperatorOverride: String?
+
     var nearestSiteId: String? { nearestSite?.id }
     /// Marché / opérateur pour la feuille de détails antenne (opérateur de la SIM si résolu).
     var antennaDetailMarket: String { resolvedSim?.market ?? MapMarketStore.lastMarket() ?? MapMarketStore.localeMarketCode() }
-    var antennaDetailOperator: String { resolvedSim?.operatorKey ?? "ALL" }
+    var antennaDetailOperator: String { displayedOperatorKey ?? "ALL" }
+
+    /// Opérateur effectivement affiché : choix manuel sinon auto-résolution.
+    var displayedOperatorKey: String? { manualOperatorOverride ?? resolvedSim?.operatorKey }
+
+    /// Libellé court de l'opérateur affiché, ou nil si indéterminé (→ feedback UI).
+    var displayedOperatorLabel: String? {
+        guard let key = displayedOperatorKey else { return nil }
+        return marketEntry?.operatorEntry(forKey: key)?.shortLabel ?? simOperatorLabel ?? key
+    }
+
+    /// Couleur d'un opérateur (registre, repli sur la palette SQBrand).
+    func operatorColor(_ key: String?) -> Color {
+        marketEntry?.operatorColor(forKey: key) ?? SQBrand.operatorColor(key)
+    }
 
     private let services: AppServices
     private var sessionTask: Task<Void, Never>?
@@ -57,6 +78,8 @@ final class DriveTestViewModel: ObservableObject {
     /// ou MNC). Drive test = cellulaire : on n'affiche que SES antennes.
     private var resolvedSim: (market: String, operatorKey: String)?
     private var simResolveInFlight = false
+    /// Entrée de marché courante (couleurs + libellés d'opérateur du sélecteur).
+    private var marketEntry: MarketRegistryEntry?
     // Mêmes mécanismes que le speedtest normal : Live Activity + assertion
     // d'arrière-plan pour enchaîner les tests écran verrouillé.
     private let liveActivity = SpeedtestLiveActivityController()
@@ -66,6 +89,8 @@ final class DriveTestViewModel: ObservableObject {
 
     func onAppear() {
         isVPNActive = VPNDetector.isActive()
+        // Pré-remplit le sélecteur d'opérateur sans attendre une position.
+        Task { await prepareOperatorSelector() }
         services.location.onLocationUpdate = { [weak self] location in
             self?.apply(coordinate: location.coordinate)
         }
@@ -163,8 +188,11 @@ final class DriveTestViewModel: ObservableObject {
     private func refreshAntennasIfNeeded(around coordinate: CLLocationCoordinate2D) async {
         // Résout l'opérateur de la SIM active (une fois) pour ne charger que SES antennes.
         await resolveSimOperatorIfNeeded()
-        let market = resolvedSim?.market ?? MapMarketStore.lastMarket() ?? MapMarketStore.localeMarketCode()
-        let op = resolvedSim?.operatorKey ?? "ALL"
+        let market = resolvedSim?.market
+            ?? marketEntry.map { $0.marketCode.isEmpty ? $0.code : $0.marketCode }
+            ?? MapMarketStore.lastMarket() ?? MapMarketStore.localeMarketCode()
+        // Priorité au choix manuel de l'utilisateur, sinon SIM résolue, sinon "ALL".
+        let op = manualOperatorOverride ?? resolvedSim?.operatorKey ?? "ALL"
 
         // Refetch si on a bougé (~400 m) OU si l'opérateur ciblé vient de changer
         // (ex. SIM résolue après un démarrage en WiFi).
@@ -234,10 +262,47 @@ final class DriveTestViewModel: ObservableObject {
             operatorKey = persistedOp
         }
 
+        // Renseigne le sélecteur manuel + la palette à partir du meilleur marché
+        // connu — MÊME si l'opérateur n'a pas pu être auto-résolu (WiFi/VPN/SIM
+        // masquée) : l'utilisateur peut alors choisir son opérateur à la main.
+        if let bestEntry = entry
+            ?? payload.market(forCode: MapMarketStore.lastMarket())
+            ?? payload.market(forCode: MapMarketStore.localeMarketCode()) {
+            marketEntry = bestEntry
+            availableOperators = bestEntry.selectableOperators.filter { $0.key.uppercased() != "ALL" }
+        }
+
         guard let operatorKey, let entry, entry.operatorEntry(forKey: operatorKey) != nil else { return }
         let market = entry.marketCode.isEmpty ? entry.code : entry.marketCode
         resolvedSim = (market, operatorKey)
         simOperatorLabel = entry.operatorEntry(forKey: operatorKey)?.shortLabel ?? operatorKey
+    }
+
+    /// L'utilisateur force un opérateur (ou revient en automatique avec `nil`).
+    /// Recharge immédiatement les antennes de cet opérateur autour de la position.
+    func selectOperator(_ key: String?) {
+        guard manualOperatorOverride != key else { return }
+        manualOperatorOverride = key
+        lastFetchCenter = nil
+        lastFetchOperator = nil
+        if let coordinate = userLocation {
+            Task { await refreshAntennasIfNeeded(around: coordinate) }
+        }
+    }
+
+    /// Pré-remplit le sélecteur d'opérateur dès l'apparition (sans attendre une
+    /// position) à partir du marché de la SIM / persisté / locale.
+    func prepareOperatorSelector() async {
+        guard availableOperators.isEmpty else { return }
+        let payload = await services.markets.registry()
+        let plmn = services.networkPath.simPLMN()
+        let entry = plmn.mcc.flatMap { mcc in payload.markets.first { $0.mccs.contains(mcc) } }
+            ?? payload.market(forCode: MapMarketStore.lastMarket())
+            ?? payload.market(forCode: MapMarketStore.localeMarketCode())
+        if let entry {
+            marketEntry = entry
+            availableOperators = entry.selectableOperators.filter { $0.key.uppercased() != "ALL" }
+        }
     }
 
     // MARK: Boucle speedtest continue
@@ -414,6 +479,8 @@ struct DriveTestView: View {
             highlightedSiteId: model.nearestSiteId,
             userLocation: model.userLocation,
             colorScheme: colorScheme,
+            operatorPalette: operatorPalette,
+            displayedOperatorKey: model.displayedOperatorKey,
             onSelectSite: { selectedAntenna = $0 }
         )
 #else
@@ -426,6 +493,7 @@ struct DriveTestView: View {
             if model.isVPNActive {
                 VPNWarningBanner(message: "VPN actif : opérateur non détectable, ces tests ne seront pas publiés sur la carte.")
             }
+            operatorRow
             sectorBanner
             if model.isRunning { liveReadout }
             Divider().overlay(SQColor.separator)
@@ -485,16 +553,68 @@ struct DriveTestView: View {
                 }
             }
             Spacer()
-            if let operatorLabel = model.simOperatorLabel {
-                Label(operatorLabel, systemImage: "antenna.radiowaves.left.and.right")
-                    .labelStyle(.titleAndIcon)
-                    .font(.caption2.weight(.bold))
-                    .padding(.horizontal, SQSpace.sm)
-                    .padding(.vertical, 4)
-                    .background(SQColor.fill, in: Capsule())
-                    .foregroundStyle(SQColor.label)
-            }
         }
+    }
+
+    /// Ligne « Opérateur affiché » + sélecteur manuel. Affiche un état explicite
+    /// quand l'opérateur n'est pas détecté (au lieu du fallback silencieux "ALL").
+    private var operatorRow: some View {
+        Menu {
+            Button { model.selectOperator(nil) } label: {
+                Label("Automatique", systemImage: model.manualOperatorOverride == nil ? "checkmark" : "wand.and.stars")
+            }
+            if !model.availableOperators.isEmpty { Divider() }
+            ForEach(model.availableOperators) { op in
+                Button { model.selectOperator(op.key) } label: {
+                    Label(op.label, systemImage: model.manualOperatorOverride == op.key ? "checkmark" : "antenna.radiowaves.left.and.right")
+                }
+            }
+        } label: {
+            HStack(spacing: SQSpace.sm) {
+                Circle()
+                    .fill(model.operatorColor(model.displayedOperatorKey))
+                    .frame(width: 10, height: 10)
+                    .opacity(model.displayedOperatorKey == nil ? 0 : 1)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(model.displayedOperatorLabel ?? "Opérateur non identifié")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(SQColor.label)
+                    Text(operatorRowSubtitle)
+                        .font(.caption2)
+                        .foregroundStyle(model.displayedOperatorLabel == nil ? SQColor.brandOrange : SQColor.labelSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            .padding(.horizontal, SQSpace.sm + 2)
+            .padding(.vertical, SQSpace.xs + 4)
+            .frame(maxWidth: .infinity)
+            .background(SQColor.fill.opacity(0.6), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        }
+        .accessibilityLabel("Opérateur affiché")
+        .accessibilityValue(model.displayedOperatorLabel ?? "non identifié")
+        .accessibilityHint("Touchez deux fois pour choisir l'opérateur dont vous voyez les antennes")
+    }
+
+    private var operatorRowSubtitle: String {
+        if model.displayedOperatorLabel != nil {
+            return model.manualOperatorOverride == nil ? "Détecté automatiquement" : "Choisi manuellement · modifier"
+        }
+        return "Touchez pour choisir votre opérateur"
+    }
+
+    /// Palette UIKit par clé d'opérateur (MAJ), pour colorer les marqueurs carte.
+    private var operatorPalette: [String: UIColor] {
+        var map: [String: UIColor] = [:]
+        for op in model.availableOperators {
+            map[op.key.uppercased()] = UIColor(model.operatorColor(op.key))
+        }
+        if let key = model.displayedOperatorKey {
+            map[key.uppercased()] = UIColor(model.operatorColor(key))
+        }
+        return map
     }
 
     private var sessionStats: some View {

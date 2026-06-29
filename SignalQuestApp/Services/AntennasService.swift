@@ -62,37 +62,60 @@ final class AntennasService: AntennasServicing {
             operators = [operatorName]
         }
 
-        var merged: [AntennaSite] = []
-        for op in operators {
-            var query = bbox.queryItems
-            query.append(URLQueryItem(name: "market", value: market))
-            query.append(URLQueryItem(name: "operator", value: op))
-            query.append(URLQueryItem(name: "minimal", value: "1"))
-            query.append(URLQueryItem(name: "limit", value: "1200"))
-            if !technologies.isEmpty {
-                query.append(URLQueryItem(name: "technologies", value: technologies.sorted().joined(separator: ",")))
+        // Le backend ne sait pas agréger `operator=ALL` (ticket BE-3) : on émet une
+        // requête PAR opérateur. Ces requêtes sont indépendantes → on les lance EN
+        // PARALLÈLE (au lieu d'en série, latence ×N) puis on fusionne + déduplique
+        // par siteId (une occurrence par site, quel que soit l'ordre d'arrivée).
+        let batches = try await withThrowingTaskGroup(of: [AntennaSite].self) { group -> [[AntennaSite]] in
+            for op in operators {
+                group.addTask {
+                    try await self.fetchAntennas(
+                        bbox: bbox, market: market, operatorName: op,
+                        technologies: technologies, bands: bands
+                    )
+                }
             }
-            if !bands.isEmpty {
-                query.append(contentsOf: Self.bandQueryItems(bands))
-            }
-            // NB : le filtre « Partage » (ZB/Crozon/ZTD) n'est PAS un paramètre de
-            // requête — le backend /api/antennas ne lit que `sharingType`/`leader`
-            // (valeur unique, FR), incapables d'exprimer un multi-select ni ZTD. Il
-            // est appliqué CÔTÉ CLIENT sur les champs sharingType/crozonLeader/isZTD
-            // de la réponse minimale (cf. MapExplorerView.matchesSelectedSharing),
-            // comme le client Android. On force le chemin liste quand `sharing` est
-            // actif (usesAdvancedAntennaFilters) pour disposer de ces champs.
-            let response = try await api.request(
-                APIEndpoint(path: "/api/antennas", query: query),
-                as: AntennasListResponse.self
-            )
-            merged.append(contentsOf: response.antennas)
+            var collected: [[AntennaSite]] = []
+            collected.reserveCapacity(operators.count)
+            for try await batch in group { collected.append(batch) }
+            return collected
         }
+
         var seen = Set<String>()
-        return merged.filter { site in
+        return batches.flatMap { $0 }.filter { site in
             let key = site.siteId ?? site.id
             return seen.insert(key).inserted
         }
+    }
+
+    /// Une requête `/api/antennas` pour UN opérateur (brique du fan-out parallèle).
+    private func fetchAntennas(
+        bbox: BoundingBox, market: String, operatorName op: String,
+        technologies: Set<String>, bands: Set<Int>
+    ) async throws -> [AntennaSite] {
+        var query = bbox.queryItems
+        query.append(URLQueryItem(name: "market", value: market))
+        query.append(URLQueryItem(name: "operator", value: op))
+        query.append(URLQueryItem(name: "minimal", value: "1"))
+        query.append(URLQueryItem(name: "limit", value: "1200"))
+        if !technologies.isEmpty {
+            query.append(URLQueryItem(name: "technologies", value: technologies.sorted().joined(separator: ",")))
+        }
+        if !bands.isEmpty {
+            query.append(contentsOf: Self.bandQueryItems(bands))
+        }
+        // NB : le filtre « Partage » (ZB/Crozon/ZTD) n'est PAS un paramètre de
+        // requête — le backend /api/antennas ne lit que `sharingType`/`leader`
+        // (valeur unique, FR), incapables d'exprimer un multi-select ni ZTD. Il
+        // est appliqué CÔTÉ CLIENT sur les champs sharingType/crozonLeader/isZTD
+        // de la réponse minimale (cf. MapExplorerView.matchesSelectedSharing),
+        // comme le client Android. On force le chemin liste quand `sharing` est
+        // actif (usesAdvancedAntennaFilters) pour disposer de ces champs.
+        let response = try await api.request(
+            APIEndpoint(path: "/api/antennas", query: query),
+            as: AntennasListResponse.self
+        )
+        return response.antennas
     }
 
     // Le backend `/api/antennas` résout chaque valeur de bande via `getBand(id)`
