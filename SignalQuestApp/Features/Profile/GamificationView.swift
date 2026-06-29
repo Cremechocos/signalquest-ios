@@ -4,6 +4,7 @@ import SwiftUI
 final class GamificationViewModel: ObservableObject {
     @Published var profile: GamificationProfile?
     @Published var events: [GamificationEvent] = []
+    @Published var catalog: [GamificationBadge] = []
     @Published var errorMessage: String?
 
     private let service: GamificationServicing
@@ -13,8 +14,11 @@ final class GamificationViewModel: ObservableObject {
         do {
             async let p = service.profile()
             async let e = service.events()
+            async let c = service.catalog()
             profile = try await p
             events = try await e
+            // Catalogue tolérant : un échec ici ne masque pas profil/activité.
+            catalog = (try? await c) ?? []
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -33,6 +37,7 @@ struct GamificationView: View {
                 levelCard
                     .sqFadeUp()
                 if !badgeList.isEmpty { badgesGrid.sqFadeUp() }
+                if !lockedBadges.isEmpty { questsSection.sqFadeUp() }
                 if !model.events.isEmpty { eventsList.sqFadeUp() }
                 if let error = model.errorMessage {
                     Label(error, systemImage: "exclamationmark.triangle")
@@ -110,6 +115,58 @@ struct GamificationView: View {
     }
 
     private var badgeList: [GamificationBadge] { model.profile?.badges ?? [] }
+
+    /// Badges du catalogue pas encore débloqués = « quêtes » à accomplir (F6),
+    /// branchées sur le même système de badges/points que la progression.
+    private var lockedBadges: [GamificationBadge] {
+        let earned = Set(badgeList.map(\.id))
+        return model.catalog.filter { !earned.contains($0.id) }
+    }
+
+    private var questsSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+            Text("Quêtes à débloquer").font(SQType.title).foregroundStyle(SQColor.label)
+            ForEach(lockedBadges) { badge in
+                HStack(spacing: SQSpace.md) {
+                    Group {
+                        if let icon = badge.icon {
+                            Text(icon).font(.title3)
+                        } else {
+                            Image(systemName: "lock.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
+                    }
+                    .frame(width: 32, height: 32)
+                    .background(SQColor.fill, in: Circle())
+                    .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(badge.title ?? "Badge")
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.label)
+                        if let desc = badge.description {
+                            Text(desc)
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .lineLimit(2)
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(SQSpace.md - 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                        .stroke(SQColor.separator, lineWidth: 1.5)
+                }
+                .opacity(0.75)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Quête : \(badge.title ?? "Badge")")
+                .accessibilityValue(badge.description ?? "À débloquer")
+            }
+        }
+    }
 
     private func badgeTile(_ badge: GamificationBadge) -> some View {
         VStack(spacing: SQSpace.sm) {
