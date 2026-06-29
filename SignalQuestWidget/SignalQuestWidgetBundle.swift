@@ -9,5 +9,8 @@ struct SignalQuestWidgetBundle: WidgetBundle {
         if #available(iOS 16.1, *) {
             SpeedtestLiveActivity()
         }
+        if #available(iOS 18.0, *) {
+            SpeedtestControl()
+        }
     }
 }

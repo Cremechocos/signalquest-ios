@@ -92,6 +92,7 @@
 		5B2767E6D1BEDB7E7038F402 /* SignalFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = F21195FC7BA83172FF32A3CC /* SignalFormatters.swift */; };
 		5B38BBB29FDA548CF294D48B /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5536589482E8FCA7F50D5797 /* AppRouter.swift */; };
 		5D4E6FA318972C48443A9F8A /* AntennaDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF3CB12A75C5483284BC5C7 /* AntennaDetailSheet.swift */; };
+		5DAFF235085F8497FC489578 /* SpeedtestControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 688909AB965601A75F6DC348 /* SpeedtestControl.swift */; };
 		5DCECE2C39F5BB5B5F65D5A0 /* MessagingFixesQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D29224A48769AB74981281AE /* MessagingFixesQATests.swift */; };
 		5F15D1940A0B15ACFD423499 /* ReactionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 366127FDD01986AEE70AE565 /* ReactionPicker.swift */; };
 		5F7AF0A6DEEB9A788A1199E7 /* AutoRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B7D91FD53A512C0A154BCFB /* AutoRefreshTests.swift */; };
@@ -332,6 +333,7 @@
 		63F121F16DC7FF76A1D7D6ED /* SQMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQMotion.swift; sourceTree = "<group>"; };
 		649AF22D91CC4ADD75073863 /* NetworkPathMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPathMonitor.swift; sourceTree = "<group>"; };
 		65CA75BF3F0519CFD6B732AE /* market_registry_fallback.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = market_registry_fallback.json; sourceTree = "<group>"; };
+		688909AB965601A75F6DC348 /* SpeedtestControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestControl.swift; sourceTree = "<group>"; };
 		6B56E287237E42CD44965DC6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		6C7FDA09EB9502659D0A0D15 /* ComposerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerSheet.swift; sourceTree = "<group>"; };
 		6DA29CF4FE66121B9C7C8ECC /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
@@ -1011,6 +1013,7 @@
 				6B56E287237E42CD44965DC6 /* Info.plist */,
 				AD8048DF32A4922952CF4D9B /* SignalQuestWidget.entitlements */,
 				9E54BD3EC5237CAE037E9ABB /* SignalQuestWidgetBundle.swift */,
+				688909AB965601A75F6DC348 /* SpeedtestControl.swift */,
 				FF6243FADB2D8B644F4E836E /* SpeedtestLiveActivity.swift */,
 				188B982997C559D0E38231B7 /* SpeedtestTrendWidget.swift */,
 				C026837131445322AC2E550D /* SpeedtestWidget.swift */,
@@ -1458,6 +1461,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CA0070E7B5A6E24C2DAC3D6C /* SignalQuestWidgetBundle.swift in Sources */,
+				5DAFF235085F8497FC489578 /* SpeedtestControl.swift in Sources */,
 				0A25EC5F92ED512E7A81C4DF /* SpeedtestLiveActivity.swift in Sources */,
 				E92941996F6D38DEF635810C /* SpeedtestTrendWidget.swift in Sources */,
 				BD9EB7DC0DA90AB8ED25D17A /* SpeedtestWidget.swift in Sources */,
