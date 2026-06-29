@@ -25,21 +25,6 @@ protocol AntennasServicing: Sendable {
     func details(id: String, market: String, operatorName: String, anfrCode: String?) async throws -> AntennaDetails
     func search(query: String) async throws -> [AntennaSite]
     func quickSearch(query: String) async throws -> [AntennaSite]
-    func validate(siteId: String, type: String, value: String, action: String) async throws
-    func reportIssue(siteId: String, reason: String, comment: String?) async throws
-}
-
-struct AntennaValidationRequest: Codable {
-    let siteId: String
-    let type: String
-    let value: String
-    let action: String
-}
-
-struct AntennaReportRequest: Codable {
-    let siteId: String
-    let reason: String
-    let comment: String?
 }
 
 final class AntennasService: AntennasServicing {
@@ -190,19 +175,5 @@ final class AntennasService: AntennasServicing {
             APIEndpoint(path: "/api/antennas/quick-search", query: [URLQueryItem(name: "q", value: query)]),
             as: AntennasListResponse.self
         ).antennas
-    }
-
-    func validate(siteId: String, type: String, value: String, action: String) async throws {
-        let _: SuccessResponse = try await api.requestJSON(
-            "/api/antennas/validate",
-            body: AntennaValidationRequest(siteId: siteId, type: type, value: value, action: action)
-        )
-    }
-
-    func reportIssue(siteId: String, reason: String, comment: String?) async throws {
-        let _: SuccessResponse = try await api.requestJSON(
-            "/api/antennas/reports",
-            body: AntennaReportRequest(siteId: siteId, reason: reason, comment: comment)
-        )
     }
 }
