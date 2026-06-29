@@ -222,5 +222,27 @@ final class E2EETests: XCTestCase {
             XCTFail("Unexpected error \(error)")
         }
     }
+
+    /// Invariant E2EE (réception) : un message marqué chiffré mais SANS iv/ciphertext
+    /// est malformé — `decryptText` doit lever `.decryptFailed` et ne JAMAIS retomber
+    /// sur le `content` en clair. On fournit volontairement un `content` clair pour
+    /// vérifier qu'il n'est jamais renvoyé.
+    func testDecryptTextNeverFallsBackToCleartextOnMissingFields() async throws {
+        let json = Data(#"{"id":"m1","conversationId":"c1","content":"hello-en-clair"}"#.utf8)
+        let message = try JSONDecoder().decode(MessageItem.self, from: json)
+        XCTAssertNil(message.e2eeIvB64)
+        XCTAssertNil(message.e2eeCiphertextB64)
+
+        let api = APIClient(config: .test, cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore()))
+        let service = E2EEService(api: api, tokenStore: InMemoryTokenStore())
+        do {
+            _ = try await service.decryptText(conversationId: "c1", message: message)
+            XCTFail("decryptText doit lever .decryptFailed, jamais renvoyer le clair")
+        } catch let error as E2EEError {
+            XCTAssertEqual(error, .decryptFailed)
+        } catch {
+            XCTFail("Erreur inattendue \(error)")
+        }
+    }
 }
 
