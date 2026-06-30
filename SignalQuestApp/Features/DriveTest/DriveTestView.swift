@@ -80,6 +80,11 @@ final class DriveTestViewModel: ObservableObject {
     private var lastFetchOperator: String?
     private var antennaFetchInFlight = false
     private let traceCap = 600
+    /// Points de couverture iOS le long du trajet (F1) : génération + débit/latence
+    /// aux points testés. PAS de signal radio (iOS ne l'expose pas).
+    private var coveragePoints: [CoveragePointUpload] = []
+    private var lastCoveragePointCoord: CLLocationCoordinate2D?
+    private let coveragePointCap = 3000
     /// Opérateur de la SIM active résolu une fois (MCC→marché, operatorKey via IP/ASN
     /// ou MNC). Drive test = cellulaire : on n'affiche que SES antennes.
     private var resolvedSim: (market: String, operatorKey: String)?
@@ -122,6 +127,8 @@ final class DriveTestViewModel: ObservableObject {
         accumulator = ContinuousSessionAccumulator()
         summary = nil
         testCount = 0
+        coveragePoints.removeAll()
+        lastCoveragePointCoord = nil
         liveMbps = 0
         livePhase = .idle
         isRunning = true
@@ -143,6 +150,7 @@ final class DriveTestViewModel: ObservableObject {
             UIApplication.shared.isIdleTimerDisabled = false
             liveActivity.cancel()
             background.end()
+            uploadCoverageSessionIfNeeded()
             statusLabel = "Arrêté"
         }
         isRunning = false
@@ -155,6 +163,7 @@ final class DriveTestViewModel: ObservableObject {
     private func apply(coordinate: CLLocationCoordinate2D) {
         userLocation = coordinate
         appendTrace(coordinate)
+        captureCoveragePoint(coordinate)
         recomputeNearest()
         Task { await refreshAntennasIfNeeded(around: coordinate) }
     }
@@ -167,6 +176,79 @@ final class DriveTestViewModel: ObservableObject {
         }
         trace.append(coordinate)
         if trace.count > traceCap { trace.removeFirst(trace.count - traceCap) }
+    }
+
+    // MARK: Couverture iOS (F1)
+
+    private static func nowMs() -> Int { Int(Date().timeIntervalSince1970 * 1000) }
+
+    /// Génération courante (CoreTelephony) ou "Aucun" si pas de cellulaire (zone sans réseau).
+    private var currentGeneration: String {
+        services.networkPath.status.cellularTechnology?.rawValue ?? "Aucun"
+    }
+
+    private func appendCoveragePoint(_ point: CoveragePointUpload, at coordinate: CLLocationCoordinate2D) {
+        lastCoveragePointCoord = coordinate
+        coveragePoints.append(point)
+        if coveragePoints.count > coveragePointCap {
+            coveragePoints.removeFirst(coveragePoints.count - coveragePointCap)
+        }
+    }
+
+    /// Capture un point « génération seule » si l'on a bougé d'au moins 20 m depuis
+    /// le dernier — borne le volume sur un long trajet.
+    private func captureCoveragePoint(_ coordinate: CLLocationCoordinate2D) {
+        if let last = lastCoveragePointCoord {
+            let moved = CLLocation(latitude: last.latitude, longitude: last.longitude)
+                .distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
+            if moved < 20 { return }
+        }
+        appendCoveragePoint(
+            CoveragePointUpload(latitude: coordinate.latitude, longitude: coordinate.longitude, timestamp: Self.nowMs(), technology: currentGeneration),
+            at: coordinate
+        )
+    }
+
+    /// Point de couverture PORTANT le débit/latence mesurés, à la position du test.
+    private func captureMeasuredCoveragePoint(_ result: SpeedtestRunResult) {
+        guard let coordinate = services.location.lastLocation?.coordinate ?? userLocation else { return }
+        appendCoveragePoint(
+            CoveragePointUpload(
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude,
+                timestamp: Self.nowMs(),
+                technology: currentGeneration,
+                downloadMbps: result.downloadAverageMbps,
+                uploadMbps: result.uploadAverageMbps,
+                pingMs: result.pingMinMs ?? result.pingMs
+            ),
+            at: coordinate
+        )
+    }
+
+    /// Téléverse la session de couverture en fin de drive (best-effort) — seulement
+    /// si l'utilisateur a consenti à la publication carte ET hors VPN (`publishToMap()`).
+    private func uploadCoverageSessionIfNeeded() {
+        let points = coveragePoints
+        coveragePoints.removeAll()
+        lastCoveragePointCoord = nil
+        guard publishToMap(), points.count >= 2,
+              let first = points.first, let last = points.last else { return }
+        let plmn = services.networkPath.simPLMN()
+        let market = resolvedSim?.market
+            ?? marketEntry.map { $0.marketCode.isEmpty ? $0.code : $0.marketCode }
+        let session = CoverageSessionUpload(
+            startTime: first.timestamp,
+            endTime: last.timestamp,
+            mcc: plmn.mcc,
+            mnc: plmn.mnc,
+            operatorKey: displayedOperatorKey,
+            marketCode: market,
+            showOnMap: true,
+            points: points
+        )
+        let sessions = services.sessions
+        Task { try? await sessions.createCoverageSession(session) }
     }
 
     private func recomputeNearest() {
@@ -366,6 +448,8 @@ final class DriveTestViewModel: ObservableObject {
         try? await services.speedtest.save(measured, streams: settings.streams, publishToMap: publishToMap())
         // Valeurs finales du test (restent affichées jusqu'au test suivant).
         livePhaseFinalize(measured)
+        // F1 : point de couverture portant le débit mesuré à cette position.
+        captureMeasuredCoveragePoint(measured)
         // Affiche le résultat de ce test dans la Live Activity.
         liveActivity.update(
             phaseLabel: "\(liveOperatorPrefix)Test \(index) terminé",
