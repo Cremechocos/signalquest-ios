@@ -161,10 +161,8 @@ struct ANFRMapView: View {
 
     // MARK: Map
 
-    @ViewBuilder
     private var mapLayer: some View {
-#if canImport(MapLibre)
-        ANFRMapLibreView(
+        ANFRMapKitView(
             sites: model.filteredSites,
             colorScheme: colorScheme,
             center: $mapCenter,
@@ -175,41 +173,7 @@ struct ANFRMapView: View {
             }
         )
         .ignoresSafeArea(edges: .bottom)
-#else
-        fallbackMap
-#endif
     }
-
-#if !canImport(MapLibre)
-    private var fallbackMap: some View {
-        Map(position: .constant(.region(MKCoordinateRegion(
-            center: mapCenter,
-            span: MKCoordinateSpan(latitudeDelta: 8, longitudeDelta: 8)
-        )))) {
-            ForEach(model.filteredSites) { site in
-                Annotation(site.city, coordinate: site.coordinate) {
-                    Button {
-                        Haptics.light()
-                        selectedSite = site
-                    } label: {
-                        let style = ANFRMarkerStyle(site: site)
-                        Circle()
-                            .fill(style.dominantOperator.color)
-                            .frame(width: 22, height: 22)
-                            .overlay { Circle().stroke(.white, lineWidth: 2) }
-                            .overlay {
-                                Image(systemName: style.modType.glyph)
-                                    .font(.system(size: 11, weight: .black))
-                                    .foregroundStyle(.white)
-                            }
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .ignoresSafeArea(edges: .bottom)
-    }
-#endif
 
     // MARK: Controls overlay
 
@@ -615,6 +579,129 @@ struct ANFRFlowLayout: Layout {
             }
             subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
             x += size.width + spacing
+        }
+    }
+}
+
+// MARK: - Carte ANFR MapKit (migration moteur unique)
+
+/// Annotation MapKit d'un site ANFR (style résolu : couleur opérateur + glyphe modif).
+final class ANFRSiteAnnotationMK: NSObject, MKAnnotation {
+    let site: ANFRMapSite
+    let style: ANFRMarkerStyle
+    var coordinate: CLLocationCoordinate2D { site.coordinate }
+    var title: String? { site.city }
+    init(site: ANFRMapSite) {
+        self.site = site
+        self.style = ANFRMarkerStyle(site: site)
+    }
+}
+
+/// Carte ANFR nationale rendue avec MapKit (Apple Plan natif). Marqueurs colorés par
+/// opérateur dominant + glyphe de type de modif ; clustering natif MapKit.
+struct ANFRMapKitView: UIViewRepresentable {
+    let sites: [ANFRMapSite]
+    let colorScheme: ColorScheme
+    @Binding var center: CLLocationCoordinate2D
+    @Binding var zoom: Double
+    let onSelectSite: (ANFRMapSite) -> Void
+
+    @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
+    private var backdrop: MapBackdrop { MapBackdrop(rawValue: backdropRaw) ?? .applePlan }
+
+    func makeCoordinator() -> Coordinator { Coordinator(center: $center, zoom: $zoom, onSelectSite: onSelectSite) }
+
+    func makeUIView(context: Context) -> MKMapView {
+        let map = MKMapView(frame: .zero)
+        map.delegate = context.coordinator
+        map.pointOfInterestFilter = .excludingAll
+        context.coordinator.applyBackdrop(backdrop, on: map)
+        map.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: "anfr-site")
+        map.setRegion(MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: 8, longitudeDelta: 8)), animated: false)
+        return map
+    }
+
+    func updateUIView(_ map: MKMapView, context: Context) {
+        context.coordinator.applyBackdrop(backdrop, on: map)
+        context.coordinator.sync(sites, on: map)
+    }
+
+    @MainActor final class Coordinator: NSObject, MKMapViewDelegate {
+        @Binding var center: CLLocationCoordinate2D
+        @Binding var zoom: Double
+        private let onSelectSite: (ANFRMapSite) -> Void
+        private var annotations: [ANFRSiteAnnotationMK] = []
+        private var lastSig = 0
+        private var appliedBackdrop: MapBackdrop?
+        private var tileOverlay: MKTileOverlay?
+
+        init(center: Binding<CLLocationCoordinate2D>, zoom: Binding<Double>, onSelectSite: @escaping (ANFRMapSite) -> Void) {
+            _center = center; _zoom = zoom; self.onSelectSite = onSelectSite
+        }
+
+        func applyBackdrop(_ backdrop: MapBackdrop, on map: MKMapView) {
+            guard backdrop != appliedBackdrop else { return }
+            appliedBackdrop = backdrop
+            if let old = tileOverlay { map.removeOverlay(old); tileOverlay = nil }
+            switch backdrop.mapKitKind {
+            case .applePlan:
+                let c = MKStandardMapConfiguration(elevationStyle: .flat); c.pointOfInterestFilter = .excludingAll
+                map.preferredConfiguration = c
+            case .imagery:
+                map.preferredConfiguration = MKImageryMapConfiguration(elevationStyle: .flat)
+            case .raster(let template, let maxZoom):
+                let c = MKStandardMapConfiguration(elevationStyle: .flat); c.pointOfInterestFilter = .excludingAll
+                map.preferredConfiguration = c
+                let o = MKTileOverlay(urlTemplate: template); o.canReplaceMapContent = true; o.maximumZ = maxZoom
+                map.insertOverlay(o, at: 0, level: .aboveLabels); tileOverlay = o
+            }
+        }
+
+        func sync(_ sites: [ANFRMapSite], on map: MKMapView) {
+            var hasher = Hasher(); hasher.combine(sites.count)
+            for s in sites.prefix(600) { hasher.combine(s.supId) }
+            let sig = hasher.finalize()
+            guard sig != lastSig else { return }
+            lastSig = sig
+            if !annotations.isEmpty { map.removeAnnotations(annotations) }
+            annotations = sites.map { ANFRSiteAnnotationMK(site: $0) }
+            if !annotations.isEmpty { map.addAnnotations(annotations) }
+        }
+
+        func mapView(_ map: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            guard let site = annotation as? ANFRSiteAnnotationMK else { return nil } // clusters → vue MapKit par défaut
+            let v = map.dequeueReusableAnnotationView(withIdentifier: "anfr-site", for: annotation) as? MKMarkerAnnotationView
+                ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: "anfr-site")
+            v.annotation = annotation
+            v.markerTintColor = UIColor(site.style.dominantOperator.color)
+            v.glyphImage = UIImage(systemName: site.style.modType.glyph)
+            v.clusteringIdentifier = "anfr"
+            v.displayPriority = .defaultLow
+            v.canShowCallout = false
+            return v
+        }
+
+        func mapView(_ map: MKMapView, didSelect view: MKAnnotationView) {
+            if let cluster = view.annotation as? MKClusterAnnotation {
+                let region = MKCoordinateRegion(
+                    center: cluster.coordinate,
+                    span: MKCoordinateSpan(
+                        latitudeDelta: max(map.region.span.latitudeDelta / 3, 0.01),
+                        longitudeDelta: max(map.region.span.longitudeDelta / 3, 0.01)
+                    )
+                )
+                map.setRegion(region, animated: true)
+            } else if let site = view.annotation as? ANFRSiteAnnotationMK {
+                onSelectSite(site.site)
+            }
+            map.deselectAnnotation(view.annotation, animated: false)
+        }
+
+        func mapView(_ map: MKMapView, regionDidChangeAnimated animated: Bool) {
+            center = map.centerCoordinate
+            let width = map.bounds.width > 0 ? map.bounds.width : 390
+            let lonDelta = max(map.region.span.longitudeDelta, 0.0000001)
+            zoom = log2(Double(width) * 360.0 / (256.0 * lonDelta))
         }
     }
 }

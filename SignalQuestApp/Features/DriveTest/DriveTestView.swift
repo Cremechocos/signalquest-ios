@@ -819,13 +819,12 @@ struct DriveTestView: View {
         }
     }
 
-    @ViewBuilder
     private var mapLayer: some View {
-#if canImport(MapLibre)
         DriveTestMapView(
             antennas: model.antennas,
             trace: model.trace,
             coverageTrail: model.coverageTrail,
+            speedtestTrail: model.speedtestTrail,
             highlightedSiteId: model.nearestSiteId,
             userLocation: model.userLocation,
             colorScheme: colorScheme,
@@ -834,9 +833,6 @@ struct DriveTestView: View {
             onSelectSite: { selectedAntenna = $0 },
             onSelectSpeedtest: { selectedSpeedtest = $0 }
         )
-#else
-        SQColor.bg
-#endif
     }
 
     private var controlPanel: some View {

@@ -1,12 +1,11 @@
-#if canImport(MapLibre)
 import SwiftUI
-import MapLibre
+import MapKit
 import CoreLocation
 
-/// Mini-carte MapLibre du mode Drive Test — calquée sur `ANFRMapLibreView` mais
-/// dédiée au temps réel : puck utilisateur (suivi), antennes proches en points,
-/// cônes de secteur de l'antenne la plus proche (vert = on est dans le lobe,
-/// orange = hors lobe) et polyline de la trace du parcours.
+/// Mini-carte MapKit du mode Drive Test (Apple Plan natif) : puck utilisateur (suivi),
+/// antennes proches, cônes de secteur de l'antenne la plus proche (vert = dans le lobe,
+/// orange = hors lobe), trace du parcours, couverture temps réel (par génération) et
+/// points speedtest tappables (par débit).
 struct DriveTestMapView: UIViewRepresentable {
     let antennas: [AntennaSite]
     let trace: [CLLocationCoordinate2D]
@@ -28,201 +27,145 @@ struct DriveTestMapView: UIViewRepresentable {
     var onSelectSpeedtest: (DriveSpeedtestPoint) -> Void = { _ in }
 
     @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
-    private var backdrop: MapBackdrop { MapBackdrop(rawValue: backdropRaw) ?? .carto }
+    private var backdrop: MapBackdrop { MapBackdrop(rawValue: backdropRaw) ?? .applePlan }
 
     func makeCoordinator() -> Coordinator { Coordinator(onSelectSite: onSelectSite, onSelectSpeedtest: onSelectSpeedtest) }
 
-    func makeUIView(context: Context) -> MLNMapView {
-        let mapView = MLNMapView(frame: .zero, styleURL: backdrop.styleURL(dark: colorScheme == .dark))
-        mapView.delegate = context.coordinator
-        mapView.showsUserLocation = true
-        mapView.userTrackingMode = .follow
-        mapView.tintColor = UIColor(SQColor.brandRed)
+    func makeUIView(context: Context) -> MKMapView {
+        let map = MKMapView(frame: .zero)
+        map.delegate = context.coordinator
+        map.showsUserLocation = true
+        map.userTrackingMode = .follow
+        map.pointOfInterestFilter = .excludingAll
+        context.coordinator.applyBackdrop(backdrop, on: map)
+        map.register(DriveAntennaMarkerView.self, forAnnotationViewWithReuseIdentifier: DriveAntennaMarkerView.reuseID)
+        map.register(DriveSpeedtestMarkerView.self, forAnnotationViewWithReuseIdentifier: DriveSpeedtestMarkerView.reuseID)
         if let userLocation {
-            mapView.setCenter(userLocation, zoomLevel: 15, animated: false)
+            map.setRegion(MKCoordinateRegion(center: userLocation, latitudinalMeters: 1500, longitudinalMeters: 1500), animated: false)
         }
-        return mapView
+        return map
     }
 
-    func updateUIView(_ mapView: MLNMapView, context: Context) {
-        let expected = backdrop.styleURL(dark: colorScheme == .dark)
-        if mapView.styleURL != expected { mapView.styleURL = expected }
+    func updateUIView(_ map: MKMapView, context: Context) {
+        context.coordinator.applyBackdrop(backdrop, on: map)
         context.coordinator.sync(
-            antennas: antennas,
-            trace: trace,
-            coverageTrail: coverageTrail,
-            speedtestTrail: speedtestTrail,
-            highlightedSiteId: highlightedSiteId,
-            userLocation: userLocation,
-            operatorPalette: operatorPalette,
-            displayedKey: displayedOperatorKey,
-            on: mapView
+            antennas: antennas, trace: trace, coverageTrail: coverageTrail, speedtestTrail: speedtestTrail,
+            highlightedSiteId: highlightedSiteId, userLocation: userLocation,
+            operatorPalette: operatorPalette, displayedKey: displayedOperatorKey, on: map
         )
     }
 
-    @MainActor
-    final class Coordinator: NSObject, @preconcurrency MLNMapViewDelegate {
-        private var siteAnnotations: [MLNAnnotation] = []
-        private var coneAnnotations: [MLNPolygon] = []
-        private var traceAnnotation: MLNPolyline?
-        private var lastAntennaSignature = 0
-        private var lastConeSignature = ""
-        private var lastTraceCount = -1
-        /// Couverture temps réel : dernier état + ids des couches GPU (1 par génération).
-        private var latestCoverageTrail: [DriveCoveragePoint] = []
-        private var coverageTrailCount = -1
-        private var coverageGenLayerIds: Set<String> = []
+    @MainActor final class Coordinator: NSObject, MKMapViewDelegate {
+        private var siteAnnotations: [DriveAntennaAnnotation] = []
         private var speedtestAnnotations: [DriveSpeedtestAnnotation] = []
-        private var lastSpeedtestCount = -1
-        /// Statut « dans le lobe » par cône (clé = identité de l'objet polygone).
+        private var conePolygons: [MKPolygon] = []
         private var coneInSector: [ObjectIdentifier: Bool] = [:]
+        private var tracePolyline: MKPolyline?
+        private var coverageOverlay: DriveDotsOverlay?
+        private var lastAntennaSig = 0
+        private var lastConeSig = ""
+        private var lastTraceCount = -1
+        private var lastSpeedtestCount = -1
+        private var coverageCount = -1
+        private var appliedBackdrop: MapBackdrop?
+        private var tileOverlay: MKTileOverlay?
         private let onSelectSite: (AntennaSite) -> Void
         private let onSelectSpeedtest: (DriveSpeedtestPoint) -> Void
 
-        init(onSelectSite: @escaping (AntennaSite) -> Void,
-             onSelectSpeedtest: @escaping (DriveSpeedtestPoint) -> Void) {
+        init(onSelectSite: @escaping (AntennaSite) -> Void, onSelectSpeedtest: @escaping (DriveSpeedtestPoint) -> Void) {
             self.onSelectSite = onSelectSite
             self.onSelectSpeedtest = onSelectSpeedtest
             super.init()
         }
 
-        func sync(
-            antennas: [AntennaSite],
-            trace: [CLLocationCoordinate2D],
-            coverageTrail: [DriveCoveragePoint],
-            speedtestTrail: [DriveSpeedtestPoint],
-            highlightedSiteId: String?,
-            userLocation: CLLocationCoordinate2D?,
-            operatorPalette: [String: UIColor],
-            displayedKey: String?,
-            on mapView: MLNMapView
-        ) {
-            latestCoverageTrail = coverageTrail
-            syncSites(antennas, operatorPalette: operatorPalette, displayedKey: displayedKey, on: mapView)
-            syncCones(antennas: antennas, highlightedSiteId: highlightedSiteId, userLocation: userLocation, on: mapView)
-            syncTrace(trace, on: mapView)
-            syncCoverageTrail(coverageTrail, on: mapView)
-            syncSpeedtests(speedtestTrail, on: mapView)
+        func applyBackdrop(_ backdrop: MapBackdrop, on map: MKMapView) {
+            guard backdrop != appliedBackdrop else { return }
+            appliedBackdrop = backdrop
+            if let old = tileOverlay { map.removeOverlay(old); tileOverlay = nil }
+            switch backdrop.mapKitKind {
+            case .applePlan:
+                let c = MKStandardMapConfiguration(elevationStyle: .flat); c.pointOfInterestFilter = .excludingAll
+                map.preferredConfiguration = c
+            case .imagery:
+                map.preferredConfiguration = MKImageryMapConfiguration(elevationStyle: .flat)
+            case .raster(let template, let maxZoom):
+                let c = MKStandardMapConfiguration(elevationStyle: .flat); c.pointOfInterestFilter = .excludingAll
+                map.preferredConfiguration = c
+                let o = MKTileOverlay(urlTemplate: template); o.canReplaceMapContent = true; o.maximumZ = maxZoom
+                map.insertOverlay(o, at: 0, level: .aboveLabels); tileOverlay = o
+            }
         }
 
-        // MARK: Antennes (points)
+        func sync(antennas: [AntennaSite], trace: [CLLocationCoordinate2D], coverageTrail: [DriveCoveragePoint], speedtestTrail: [DriveSpeedtestPoint], highlightedSiteId: String?, userLocation: CLLocationCoordinate2D?, operatorPalette: [String: UIColor], displayedKey: String?, on map: MKMapView) {
+            syncSites(antennas, operatorPalette: operatorPalette, displayedKey: displayedKey, on: map)
+            syncCones(antennas: antennas, highlightedSiteId: highlightedSiteId, userLocation: userLocation, on: map)
+            syncTrace(trace, on: map)
+            syncCoverage(coverageTrail, on: map)
+            syncSpeedtests(speedtestTrail, on: map)
+        }
 
-        private func syncSites(_ antennas: [AntennaSite], operatorPalette: [String: UIColor], displayedKey: String?, on mapView: MLNMapView) {
+        // MARK: Antennes
+        private func syncSites(_ antennas: [AntennaSite], operatorPalette: [String: UIColor], displayedKey: String?, on map: MKMapView) {
             var hasher = Hasher()
-            hasher.combine(antennas.count)
-            // La palette/opérateur affiché fait partie de la signature : changer
-            // d'opérateur recolore les marqueurs même si les sites sont identiques.
-            hasher.combine(displayedKey ?? "ALL")
-            for site in antennas.prefix(400) { hasher.combine(site.id) }
-            let signature = hasher.finalize()
-            guard signature != lastAntennaSignature else { return }
-            lastAntennaSignature = signature
-
-            if !siteAnnotations.isEmpty { mapView.removeAnnotations(siteAnnotations) }
-            let points: [MLNAnnotation] = antennas.compactMap { site -> MLNAnnotation? in
+            hasher.combine(antennas.count); hasher.combine(displayedKey ?? "ALL")
+            for s in antennas.prefix(400) { hasher.combine(s.id) }
+            let sig = hasher.finalize()
+            guard sig != lastAntennaSig else { return }
+            lastAntennaSig = sig
+            if !siteAnnotations.isEmpty { map.removeAnnotations(siteAnnotations) }
+            siteAnnotations = antennas.compactMap { site -> DriveAntennaAnnotation? in
                 guard site.hasValidCoordinate, let lat = site.latitude, let lon = site.longitude else { return nil }
                 let key = (displayedKey ?? site.operators.first ?? "").uppercased()
                 let color = operatorPalette[key] ?? UIColor(SQColor.brandRed)
-                return DriveTestAntennaAnnotation(
-                    site: site,
-                    coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
-                    dotColor: color
-                )
+                return DriveAntennaAnnotation(site: site, coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon), color: color)
             }
-            siteAnnotations = points
-            if !points.isEmpty { mapView.addAnnotations(points) }
+            if !siteAnnotations.isEmpty { map.addAnnotations(siteAnnotations) }
         }
 
         // MARK: Cônes de secteur de l'antenne la plus proche
-
-        private func syncCones(
-            antennas: [AntennaSite],
-            highlightedSiteId: String?,
-            userLocation: CLLocationCoordinate2D?,
-            on mapView: MLNMapView
-        ) {
-            // Re-trace uniquement si l'antenne ciblée ou la position bougent assez.
-            var signature = highlightedSiteId ?? "none"
-            if let userLocation {
-                signature += "@\(Int(userLocation.latitude * 5000))/\(Int(userLocation.longitude * 5000))"
-            }
-            guard signature != lastConeSignature else { return }
-            lastConeSignature = signature
-
-            if !coneAnnotations.isEmpty { mapView.removeAnnotations(coneAnnotations) }
-            coneAnnotations = []
+        private func syncCones(antennas: [AntennaSite], highlightedSiteId: String?, userLocation: CLLocationCoordinate2D?, on map: MKMapView) {
+            var sig = highlightedSiteId ?? "none"
+            if let u = userLocation { sig += "@\(Int(u.latitude * 5000))/\(Int(u.longitude * 5000))" }
+            guard sig != lastConeSig else { return }
+            lastConeSig = sig
+            if !conePolygons.isEmpty { map.removeOverlays(conePolygons); conePolygons.removeAll() }
             coneInSector.removeAll(keepingCapacity: true)
-
-            guard let highlightedSiteId,
-                  let user = userLocation,
+            guard let highlightedSiteId, let user = userLocation,
                   let site = antennas.first(where: { $0.id == highlightedSiteId }),
-                  site.hasValidCoordinate, let lat = site.latitude, let lon = site.longitude,
-                  !site.azimuths.isEmpty else { return }
-
+                  site.hasValidCoordinate, let lat = site.latitude, let lon = site.longitude, !site.azimuths.isEmpty else { return }
             let apex = CLLocationCoordinate2D(latitude: lat, longitude: lon)
-            for azimuth in site.azimuths {
-                var coordinates = AntennaSectorGeometry.sectorConeCoordinates(
-                    apex: apex, azimuth: azimuth, lengthMeters: 320
-                )
-                let polygon = MLNPolygon(coordinates: &coordinates, count: UInt(coordinates.count))
-                coneInSector[ObjectIdentifier(polygon)] = AntennaSectorGeometry.isWithinSector(
-                    antenna: apex, user: user, azimuth: azimuth
-                )
-                coneAnnotations.append(polygon)
+            for az in site.azimuths {
+                var coords = AntennaSectorGeometry.sectorConeCoordinates(apex: apex, azimuth: az, lengthMeters: 320)
+                guard coords.count >= 3 else { continue }
+                let poly = MKPolygon(coordinates: &coords, count: coords.count)
+                coneInSector[ObjectIdentifier(poly)] = AntennaSectorGeometry.isWithinSector(antenna: apex, user: user, azimuth: az)
+                conePolygons.append(poly)
             }
-            if !coneAnnotations.isEmpty { mapView.addAnnotations(coneAnnotations) }
+            if !conePolygons.isEmpty { map.addOverlays(conePolygons, level: .aboveRoads) }
         }
 
         // MARK: Trace du parcours
-
-        private func syncTrace(_ trace: [CLLocationCoordinate2D], on mapView: MLNMapView) {
+        private func syncTrace(_ trace: [CLLocationCoordinate2D], on map: MKMapView) {
             guard trace.count != lastTraceCount else { return }
             lastTraceCount = trace.count
-            if let traceAnnotation { mapView.removeAnnotation(traceAnnotation) }
-            guard trace.count >= 2 else { traceAnnotation = nil; return }
-            var coordinates = trace
-            let line = MLNPolyline(coordinates: &coordinates, count: UInt(coordinates.count))
-            traceAnnotation = line
-            mapView.addAnnotation(line)
+            if let t = tracePolyline { map.removeOverlay(t); tracePolyline = nil }
+            guard trace.count >= 2 else { return }
+            var coords = trace
+            let line = MKPolyline(coordinates: &coords, count: coords.count)
+            tracePolyline = line
+            map.addOverlay(line, level: .aboveLabels)
         }
 
-        // MARK: Couverture temps réel (points colorés par génération)
-
-        /// Affiche les points de couverture capturés, colorés par génération. Couche GPU
-        /// (une source + une couche cercle par génération) → tient des centaines de
-        /// points sans coût d'annotations. Diff par compte pour éviter les rebuilds.
-        private func syncCoverageTrail(_ trail: [DriveCoveragePoint], on mapView: MLNMapView) {
-            guard trail.count != coverageTrailCount else { return }
-            coverageTrailCount = trail.count
-            guard let style = mapView.style else { return }
-            let byGen = Dictionary(grouping: trail, by: { Self.generationKey($0.generation) })
-            var active = Set<String>()
-            for (key, points) in byGen {
-                let sourceId = "sq-dt-cov-source-\(key)"
-                let layerId = "sq-dt-cov-layer-\(key)"
-                active.insert(layerId)
-                let features = points.map { p -> MLNPointFeature in
-                    let f = MLNPointFeature(); f.coordinate = p.coordinate; return f
-                }
-                if let source = style.source(withIdentifier: sourceId) as? MLNShapeSource {
-                    source.shape = MLNShapeCollectionFeature(shapes: features)
-                } else {
-                    let source = MLNShapeSource(identifier: sourceId, features: features, options: nil)
-                    style.addSource(source)
-                    let layer = MLNCircleStyleLayer(identifier: layerId, source: source)
-                    layer.circleColor = NSExpression(forConstantValue: Self.generationColor(key))
-                    layer.circleRadius = NSExpression(forConstantValue: 4)
-                    layer.circleOpacity = NSExpression(forConstantValue: 0.85)
-                    layer.circleStrokeWidth = NSExpression(forConstantValue: 1)
-                    layer.circleStrokeColor = NSExpression(forConstantValue: UIColor.white.withAlphaComponent(0.7))
-                    style.addLayer(layer)
-                }
-                style.layer(withIdentifier: layerId)?.isVisible = !features.isEmpty
-                coverageGenLayerIds.insert(layerId)
-            }
-            for layerId in coverageGenLayerIds where !active.contains(layerId) {
-                style.layer(withIdentifier: layerId)?.isVisible = false
-            }
+        // MARK: Couverture temps réel (overlay Core Graphics, coloré par génération)
+        private func syncCoverage(_ trail: [DriveCoveragePoint], on map: MKMapView) {
+            guard trail.count != coverageCount else { return }
+            coverageCount = trail.count
+            if let old = coverageOverlay { map.removeOverlay(old); coverageOverlay = nil }
+            guard !trail.isEmpty else { return }
+            let dots = trail.map { DriveDotsOverlay.Dot(point: MKMapPoint($0.coordinate), color: Self.generationColor(Self.generationKey($0.generation)).cgColor) }
+            let o = DriveDotsOverlay(dots: dots)
+            coverageOverlay = o
+            map.addOverlay(o, level: .aboveRoads)
         }
 
         private static func generationKey(_ tech: String?) -> String {
@@ -233,8 +176,6 @@ struct DriveTestMapView: UIViewRepresentable {
             if t.contains("2G") || t.contains("GSM") || t.contains("EDGE") || t.contains("GPRS") { return "2g" }
             return "none"
         }
-
-        /// Couleur par génération (alignée carte principale / « Mes mesures »).
         private static func generationColor(_ key: String) -> UIColor {
             let hex: UInt32
             switch key {
@@ -244,30 +185,17 @@ struct DriveTestMapView: UIViewRepresentable {
             case "2g": hex = 0xF59E0B
             default: hex = 0x94A3B8
             }
-            return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255,
-                           green: CGFloat((hex >> 8) & 0xFF) / 255,
-                           blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+            return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
         }
 
         // MARK: Speedtests (annotations tappables colorées par débit)
-
-        /// Peu nombreux (1 par test) → annotations natives, donc tappables (→ détails).
-        private func syncSpeedtests(_ points: [DriveSpeedtestPoint], on mapView: MLNMapView) {
+        private func syncSpeedtests(_ points: [DriveSpeedtestPoint], on map: MKMapView) {
             guard points.count != lastSpeedtestCount else { return }
             lastSpeedtestCount = points.count
-            if !speedtestAnnotations.isEmpty { mapView.removeAnnotations(speedtestAnnotations) }
-            let annotations = points.map { point in
-                DriveSpeedtestAnnotation(
-                    point: point,
-                    coordinate: point.coordinate,
-                    color: Self.speedColor(point.result.downloadAverageMbps)
-                )
-            }
-            speedtestAnnotations = annotations
-            if !annotations.isEmpty { mapView.addAnnotations(annotations) }
+            if !speedtestAnnotations.isEmpty { map.removeAnnotations(speedtestAnnotations) }
+            speedtestAnnotations = points.map { DriveSpeedtestAnnotation(point: $0, coordinate: $0.coordinate, color: Self.speedColor($0.result.downloadAverageMbps)) }
+            if !speedtestAnnotations.isEmpty { map.addAnnotations(speedtestAnnotations) }
         }
-
-        /// Couleur par débit descendant (échelle alignée web/Android, 7 paliers).
         private static func speedColor(_ mbps: Double) -> UIColor {
             let hex: UInt32
             switch mbps {
@@ -279,103 +207,81 @@ struct DriveTestMapView: UIViewRepresentable {
             case 10..<30: hex = 0xF97316
             default: hex = 0xEF4444
             }
-            return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255,
-                           green: CGFloat((hex >> 8) & 0xFF) / 255,
-                           blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+            return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
         }
 
-        // MARK: Délégué — style des overlays
-
-        func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
-            // Un rechargement de style (clair/sombre) efface sources & couches GPU :
-            // on force la ré-application au prochain sync et on re-pose la couverture.
-            lastAntennaSignature = 0
-            lastConeSignature = ""
-            lastTraceCount = -1
-            lastSpeedtestCount = -1
-            coverageTrailCount = -1
-            coverageGenLayerIds.removeAll()
-            syncCoverageTrail(latestCoverageTrail, on: mapView)
-        }
-
-        func mapView(_ mapView: MLNMapView, viewFor annotation: MLNAnnotation) -> MLNAnnotationView? {
-            // Point speedtest : losange coloré par débit (tappable → détails).
-            if let speedtest = annotation as? DriveSpeedtestAnnotation {
-                let id = "drivetest-speedtest"
-                let view = mapView.dequeueReusableAnnotationView(withIdentifier: id) as? DriveSpeedtestMarkerView
-                    ?? DriveSpeedtestMarkerView(reuseIdentifier: id)
-                view.apply(color: speedtest.color)
-                return view
+        // MARK: Délégué
+        func mapView(_ map: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let tile = overlay as? MKTileOverlay { return MKTileOverlayRenderer(tileOverlay: tile) }
+            if let dots = overlay as? DriveDotsOverlay { return DriveDotsRenderer(overlay: dots) }
+            if let line = overlay as? MKPolyline {
+                let r = MKPolylineRenderer(polyline: line)
+                r.strokeColor = UIColor(SQColor.brandOrange).withAlphaComponent(0.95)
+                r.lineWidth = 4; r.lineJoin = .round; r.lineCap = .round
+                return r
             }
-            // Points antennes (la polyline/les polygones sont rendus natifs).
-            guard annotation is MLNPointAnnotation else { return nil }
-            let identifier = "drivetest-antenna"
-            let view = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? DriveTestMarkerView
-                ?? DriveTestMarkerView(reuseIdentifier: identifier)
-            // Vue réutilisée → on (ré)applique la couleur de CETTE annotation.
-            if let antenna = annotation as? DriveTestAntennaAnnotation {
-                view.apply(color: antenna.dotColor)
+            if let poly = overlay as? MKPolygon {
+                let r = MKPolygonRenderer(polygon: poly)
+                let color: UIColor = (coneInSector[ObjectIdentifier(poly)] ?? false) ? .systemGreen : .systemOrange
+                r.fillColor = color.withAlphaComponent(0.20)
+                r.strokeColor = color.withAlphaComponent(0.6)
+                r.lineWidth = 1
+                return r
             }
-            return view
+            return MKOverlayRenderer(overlay: overlay)
         }
 
-        func mapView(_ mapView: MLNMapView, fillColorForPolygonAnnotation annotation: MLNPolygon) -> UIColor {
-            (coneInSector[ObjectIdentifier(annotation)] ?? false) ? .systemGreen : .systemOrange
-        }
-
-        func mapView(_ mapView: MLNMapView, strokeColorForShapeAnnotation annotation: MLNShape) -> UIColor {
-            if annotation is MLNPolyline { return UIColor(SQColor.brandOrange) }
-            return (coneInSector[ObjectIdentifier(annotation)] ?? false) ? .systemGreen : .systemOrange
-        }
-
-        func mapView(_ mapView: MLNMapView, alphaForShapeAnnotation annotation: MLNShape) -> CGFloat {
-            annotation is MLNPolyline ? 0.95 : 0.20
-        }
-
-        func mapView(_ mapView: MLNMapView, lineWidthForPolylineAnnotation annotation: MLNPolyline) -> CGFloat {
-            4
-        }
-
-        // Pas de bulle native : on présente notre propre feuille de détails.
-        func mapView(_ mapView: MLNMapView, annotationCanShowCallout annotation: MLNAnnotation) -> Bool {
-            false
-        }
-
-        // Tap → détails (la session speedtest continue en fond).
-        func mapView(_ mapView: MLNMapView, didSelect annotation: MLNAnnotation) {
-            if let speedtest = annotation as? DriveSpeedtestAnnotation {
-                onSelectSpeedtest(speedtest.point)
-            } else if let antenna = annotation as? DriveTestAntennaAnnotation {
-                onSelectSite(antenna.site)
+        func mapView(_ map: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            if let st = annotation as? DriveSpeedtestAnnotation {
+                let v = map.dequeueReusableAnnotationView(withIdentifier: DriveSpeedtestMarkerView.reuseID, for: annotation) as? DriveSpeedtestMarkerView
+                    ?? DriveSpeedtestMarkerView(annotation: annotation, reuseIdentifier: DriveSpeedtestMarkerView.reuseID)
+                v.annotation = annotation; v.canShowCallout = false; v.apply(color: st.color)
+                return v
             }
-            mapView.deselectAnnotation(annotation, animated: false)
+            if let ant = annotation as? DriveAntennaAnnotation {
+                let v = map.dequeueReusableAnnotationView(withIdentifier: DriveAntennaMarkerView.reuseID, for: annotation) as? DriveAntennaMarkerView
+                    ?? DriveAntennaMarkerView(annotation: annotation, reuseIdentifier: DriveAntennaMarkerView.reuseID)
+                v.annotation = annotation; v.canShowCallout = false; v.apply(color: ant.color)
+                return v
+            }
+            return nil // position utilisateur → puck par défaut
+        }
+
+        func mapView(_ map: MKMapView, didSelect view: MKAnnotationView) {
+            if let st = view.annotation as? DriveSpeedtestAnnotation { onSelectSpeedtest(st.point) }
+            else if let ant = view.annotation as? DriveAntennaAnnotation { onSelectSite(ant.site) }
+            map.deselectAnnotation(view.annotation, animated: false)
         }
     }
 }
 
-/// Annotation antenne portant le `AntennaSite` pour la sélection (détails au tap).
-final class DriveTestAntennaAnnotation: MLNPointAnnotation {
+/// Annotation antenne portant le `AntennaSite` (détails au tap).
+final class DriveAntennaAnnotation: NSObject, MKAnnotation {
     let site: AntennaSite
-    let dotColor: UIColor
-
-    init(site: AntennaSite, coordinate: CLLocationCoordinate2D, dotColor: UIColor) {
-        self.site = site
-        self.dotColor = dotColor
-        super.init()
-        self.coordinate = coordinate
+    let coordinate: CLLocationCoordinate2D
+    let color: UIColor
+    init(site: AntennaSite, coordinate: CLLocationCoordinate2D, color: UIColor) {
+        self.site = site; self.coordinate = coordinate; self.color = color
     }
-
-    required init?(coder: NSCoder) { nil }
 }
 
-/// Marqueur d'antenne minimal (petit disque) pour la mini-carte Drive Test.
-final class DriveTestMarkerView: MLNAnnotationView {
-    private let dot = UIView()
+/// Annotation d'un point speedtest portant son résultat (détails au tap).
+final class DriveSpeedtestAnnotation: NSObject, MKAnnotation {
+    let point: DriveSpeedtestPoint
+    let coordinate: CLLocationCoordinate2D
+    let color: UIColor
+    init(point: DriveSpeedtestPoint, coordinate: CLLocationCoordinate2D, color: UIColor) {
+        self.point = point; self.coordinate = coordinate; self.color = color
+    }
+}
 
-    override init(reuseIdentifier: String?) {
-        super.init(reuseIdentifier: reuseIdentifier)
+/// Marqueur d'antenne minimal (petit disque coloré par opérateur).
+final class DriveAntennaMarkerView: MKAnnotationView {
+    static let reuseID = "drivetest-antenna"
+    private let dot = UIView()
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
         frame = CGRect(x: 0, y: 0, width: 14, height: 14)
-        isOpaque = false
         backgroundColor = .clear
         dot.frame = bounds
         dot.layer.cornerRadius = 7
@@ -388,38 +294,17 @@ final class DriveTestMarkerView: MLNAnnotationView {
         dot.layer.shadowOffset = CGSize(width: 0, height: 1.5)
         addSubview(dot)
     }
-
-    /// Recolore le disque selon l'opérateur de l'antenne (vue réutilisée).
-    func apply(color: UIColor) {
-        dot.backgroundColor = color
-    }
-
     required init?(coder: NSCoder) { nil }
-}
-
-/// Annotation d'un point speedtest portant son résultat (détails au tap).
-final class DriveSpeedtestAnnotation: MLNPointAnnotation {
-    let point: DriveSpeedtestPoint
-    let color: UIColor
-
-    init(point: DriveSpeedtestPoint, coordinate: CLLocationCoordinate2D, color: UIColor) {
-        self.point = point
-        self.color = color
-        super.init()
-        self.coordinate = coordinate
-    }
-
-    required init?(coder: NSCoder) { nil }
+    func apply(color: UIColor) { dot.backgroundColor = color }
 }
 
 /// Marqueur speedtest : losange coloré par débit (distinct des pastilles antennes).
-final class DriveSpeedtestMarkerView: MLNAnnotationView {
+final class DriveSpeedtestMarkerView: MKAnnotationView {
+    static let reuseID = "drivetest-speedtest"
     private let diamond = UIView()
-
-    override init(reuseIdentifier: String?) {
-        super.init(reuseIdentifier: reuseIdentifier)
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
         frame = CGRect(x: 0, y: 0, width: 16, height: 16)
-        isOpaque = false
         backgroundColor = .clear
         diamond.frame = bounds
         diamond.layer.cornerRadius = 3
@@ -432,11 +317,42 @@ final class DriveSpeedtestMarkerView: MLNAnnotationView {
         diamond.layer.shadowOffset = CGSize(width: 0, height: 1.5)
         addSubview(diamond)
     }
-
-    func apply(color: UIColor) {
-        diamond.backgroundColor = color
-    }
-
     required init?(coder: NSCoder) { nil }
+    func apply(color: UIColor) { diamond.backgroundColor = color }
 }
-#endif
+
+/// Overlay « nuage de points » dense (couverture trail) — passe Core Graphics + culling.
+final class DriveDotsOverlay: NSObject, MKOverlay {
+    struct Dot { let point: MKMapPoint; let color: CGColor }
+    let dots: [Dot]
+    let boundingMapRect: MKMapRect
+    let coordinate: CLLocationCoordinate2D
+    init(dots: [Dot]) {
+        self.dots = dots
+        var rect = MKMapRect.null
+        for d in dots { rect = rect.union(MKMapRect(origin: d.point, size: MKMapSize(width: 0.5, height: 0.5))) }
+        let bounding = rect.isNull ? MKMapRect.world : rect.insetBy(dx: -rect.size.width * 0.1 - 50, dy: -rect.size.height * 0.1 - 50)
+        boundingMapRect = bounding
+        coordinate = MKMapPoint(x: bounding.midX, y: bounding.midY).coordinate
+    }
+}
+
+final class DriveDotsRenderer: MKOverlayRenderer {
+    override func draw(_ mapRect: MKMapRect, zoomScale: MKZoomScale, in context: CGContext) {
+        guard let overlay = overlay as? DriveDotsOverlay else { return }
+        let radius = max(2.0, 4.0 / zoomScale)
+        let pad = radius * 3
+        let cull = mapRect.insetBy(dx: -pad, dy: -pad)
+        context.setLineWidth(radius * 0.4)
+        let stroke = UIColor.white.withAlphaComponent(0.7).cgColor
+        for dot in overlay.dots {
+            guard cull.contains(dot.point) else { continue }
+            let p = point(for: dot.point)
+            let r = CGRect(x: p.x - radius, y: p.y - radius, width: radius * 2, height: radius * 2)
+            context.setFillColor(dot.color)
+            context.fillEllipse(in: r)
+            context.setStrokeColor(stroke)
+            context.strokeEllipse(in: r)
+        }
+    }
+}
