@@ -33,6 +33,20 @@ struct DriveCoveragePoint: Equatable {
     }
 }
 
+/// Point speedtest géolocalisé affiché sur la mini-carte Drive Test : coloré par
+/// débit, tappable → ouvre la feuille de détails. Porte le résultat complet.
+struct DriveSpeedtestPoint: Identifiable, Equatable {
+    let id: UUID
+    let coordinate: CLLocationCoordinate2D
+    let result: SpeedtestRunResult
+
+    static func == (lhs: DriveSpeedtestPoint, rhs: DriveSpeedtestPoint) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.coordinate.latitude == rhs.coordinate.latitude &&
+        lhs.coordinate.longitude == rhs.coordinate.longitude
+    }
+}
+
 /// Mode Drive Test : enchaîne des speedtests en continu (rafale illimitée) tout en
 /// suivant la position, en affichant les antennes proches sur une carte et en
 /// indiquant si l'on est « dans le secteur » de l'antenne la plus proche. Réutilise
@@ -123,6 +137,8 @@ final class DriveTestViewModel: ObservableObject {
     @Published private(set) var coveragePointCount = 0
     /// Points de couverture pour l'affichage TEMPS RÉEL sur la carte (par génération).
     @Published private(set) var coverageTrail: [DriveCoveragePoint] = []
+    /// Points speedtest géolocalisés (carte Drive Test) — colorés par débit, tappables.
+    @Published private(set) var speedtestTrail: [DriveSpeedtestPoint] = []
     /// Opérateur de la SIM active résolu une fois (MCC→marché, operatorKey via IP/ASN
     /// ou MNC). Drive test = cellulaire : on n'affiche que SES antennes.
     private var resolvedSim: (market: String, operatorKey: String)?
@@ -170,6 +186,7 @@ final class DriveTestViewModel: ObservableObject {
         testCount = 0
         coveragePoints.removeAll()
         coverageTrail.removeAll()
+        speedtestTrail.removeAll()
         lastCoveragePointCoord = nil
         coveragePointCount = 0
         sessionMode = DriveTestMode.current
@@ -247,6 +264,12 @@ final class DriveTestViewModel: ObservableObject {
             coverageTrail.removeFirst(coverageTrail.count - coveragePointCap)
         }
         coveragePointCount = coveragePoints.count
+    }
+
+    /// Mémorise un point speedtest géolocalisé pour la carte (borné).
+    private func appendSpeedtestPoint(_ result: SpeedtestRunResult, at coordinate: CLLocationCoordinate2D) {
+        speedtestTrail.append(DriveSpeedtestPoint(id: result.id, coordinate: coordinate, result: result))
+        if speedtestTrail.count > 500 { speedtestTrail.removeFirst(speedtestTrail.count - 500) }
     }
 
     /// Capture un point « génération seule » si l'on a bougé d'au moins 20 m depuis
@@ -557,6 +580,8 @@ final class DriveTestViewModel: ObservableObject {
         livePhaseFinalize(measured)
         // F1 : point de couverture portant le débit mesuré à cette position.
         captureMeasuredCoveragePoint(measured)
+        // Point speedtest géolocalisé (carte Drive Test, tappable → détails).
+        if let coordinate { appendSpeedtestPoint(measured, at: coordinate) }
         // Affiche le résultat de ce test dans la Live Activity.
         liveActivity.update(
             phaseLabel: "\(liveOperatorPrefix)Test \(index) terminé",
@@ -641,6 +666,8 @@ struct DriveTestView: View {
     @EnvironmentObject private var services: AppServices
     @StateObject private var model: DriveTestViewModel
     @State private var selectedAntenna: AntennaSite?
+    @State private var selectedSpeedtest: DriveSpeedtestPoint?
+    @State private var showMapLegend = false
     /// Mode du Drive Test, persisté localement. Défaut « Les deux » → la couverture
     /// est enregistrée par défaut (le choix d'un mode couverture vaut consentement).
     @AppStorage(DriveTestMode.storageKey) private var driveTestModeRaw = DriveTestMode.both.rawValue
@@ -657,6 +684,7 @@ struct DriveTestView: View {
             controlPanel
                 .padding(SQSpace.md)
         }
+        .overlay(alignment: .topTrailing) { mapLegendControl }
         .navigationTitle("Drive Test")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { model.onAppear() }
@@ -669,6 +697,64 @@ struct DriveTestView: View {
                 operatorName: model.antennaDetailOperator,
                 service: services.antennas
             )
+        }
+        .sheet(item: $selectedSpeedtest) { point in
+            DriveSpeedtestDetailSheet(point: point)
+        }
+    }
+
+    /// Bouton de légende (masquée par défaut) + légende compacte génération/débit.
+    private var mapLegendControl: some View {
+        VStack(alignment: .trailing, spacing: SQSpace.xs) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { showMapLegend.toggle() }
+            } label: {
+                Image(systemName: showMapLegend ? "xmark" : "list.bullet")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(SQColor.label)
+                    .frame(width: 34, height: 34)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .overlay { Circle().stroke(SQColor.separator, lineWidth: 1) }
+            }
+            .accessibilityLabel(showMapLegend ? "Masquer la légende" : "Afficher la légende")
+            if showMapLegend { mapLegend }
+        }
+        .padding(.trailing, SQSpace.md)
+        .padding(.top, SQSpace.sm)
+    }
+
+    private var mapLegend: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            legendSection("Génération", items: [
+                ("5G", Color(hex: 0x8B5CF6)), ("4G", Color(hex: 0x3B82F6)),
+                ("3G", Color(hex: 0x14B8A6)), ("2G", Color(hex: 0xF59E0B))
+            ], diamond: false)
+            legendSection("Débit speedtest", items: [
+                ("Rapide", Color(hex: 0x22C55E)), ("Moyen", Color(hex: 0xEAB308)),
+                ("Lent", Color(hex: 0xEF4444))
+            ], diamond: true)
+        }
+        .padding(SQSpace.sm + 2)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).stroke(SQColor.separator, lineWidth: 1) }
+        .frame(width: 146)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+        .accessibilityHidden(true)
+    }
+
+    private func legendSection(_ title: String, items: [(String, Color)], diamond: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.caption2.weight(.bold)).foregroundStyle(SQColor.labelSecondary)
+            ForEach(items, id: \.0) { label, color in
+                HStack(spacing: 6) {
+                    if diamond {
+                        Rectangle().fill(color).frame(width: 8, height: 8).rotationEffect(.degrees(45))
+                    } else {
+                        Circle().fill(color).frame(width: 9, height: 9)
+                    }
+                    Text(label).font(.caption2).foregroundStyle(SQColor.label)
+                }
+            }
         }
     }
 
@@ -684,7 +770,8 @@ struct DriveTestView: View {
             colorScheme: colorScheme,
             operatorPalette: operatorPalette,
             displayedOperatorKey: model.displayedOperatorKey,
-            onSelectSite: { selectedAntenna = $0 }
+            onSelectSite: { selectedAntenna = $0 },
+            onSelectSpeedtest: { selectedSpeedtest = $0 }
         )
 #else
         SQColor.bg

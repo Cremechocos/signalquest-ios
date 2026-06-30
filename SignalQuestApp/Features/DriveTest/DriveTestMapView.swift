@@ -12,6 +12,8 @@ struct DriveTestMapView: UIViewRepresentable {
     let trace: [CLLocationCoordinate2D]
     /// Points de couverture capturés, affichés EN TEMPS RÉEL et colorés par génération.
     var coverageTrail: [DriveCoveragePoint] = []
+    /// Points speedtest capturés, colorés par débit et tappables (→ détails).
+    var speedtestTrail: [DriveSpeedtestPoint] = []
     let highlightedSiteId: String?
     let userLocation: CLLocationCoordinate2D?
     let colorScheme: ColorScheme
@@ -22,11 +24,13 @@ struct DriveTestMapView: UIViewRepresentable {
     var displayedOperatorKey: String?
     /// Tap sur une antenne → ouvre ses détails (la session speedtest n'est pas interrompue).
     var onSelectSite: (AntennaSite) -> Void = { _ in }
+    /// Tap sur un point speedtest → ouvre la feuille de détails.
+    var onSelectSpeedtest: (DriveSpeedtestPoint) -> Void = { _ in }
 
     @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.carto.rawValue
     private var backdrop: MapBackdrop { MapBackdrop(rawValue: backdropRaw) ?? .carto }
 
-    func makeCoordinator() -> Coordinator { Coordinator(onSelectSite: onSelectSite) }
+    func makeCoordinator() -> Coordinator { Coordinator(onSelectSite: onSelectSite, onSelectSpeedtest: onSelectSpeedtest) }
 
     func makeUIView(context: Context) -> MLNMapView {
         let mapView = MLNMapView(frame: .zero, styleURL: backdrop.styleURL(dark: colorScheme == .dark))
@@ -47,6 +51,7 @@ struct DriveTestMapView: UIViewRepresentable {
             antennas: antennas,
             trace: trace,
             coverageTrail: coverageTrail,
+            speedtestTrail: speedtestTrail,
             highlightedSiteId: highlightedSiteId,
             userLocation: userLocation,
             operatorPalette: operatorPalette,
@@ -67,12 +72,17 @@ struct DriveTestMapView: UIViewRepresentable {
         private var latestCoverageTrail: [DriveCoveragePoint] = []
         private var coverageTrailCount = -1
         private var coverageGenLayerIds: Set<String> = []
+        private var speedtestAnnotations: [DriveSpeedtestAnnotation] = []
+        private var lastSpeedtestCount = -1
         /// Statut « dans le lobe » par cône (clé = identité de l'objet polygone).
         private var coneInSector: [ObjectIdentifier: Bool] = [:]
         private let onSelectSite: (AntennaSite) -> Void
+        private let onSelectSpeedtest: (DriveSpeedtestPoint) -> Void
 
-        init(onSelectSite: @escaping (AntennaSite) -> Void) {
+        init(onSelectSite: @escaping (AntennaSite) -> Void,
+             onSelectSpeedtest: @escaping (DriveSpeedtestPoint) -> Void) {
             self.onSelectSite = onSelectSite
+            self.onSelectSpeedtest = onSelectSpeedtest
             super.init()
         }
 
@@ -80,6 +90,7 @@ struct DriveTestMapView: UIViewRepresentable {
             antennas: [AntennaSite],
             trace: [CLLocationCoordinate2D],
             coverageTrail: [DriveCoveragePoint],
+            speedtestTrail: [DriveSpeedtestPoint],
             highlightedSiteId: String?,
             userLocation: CLLocationCoordinate2D?,
             operatorPalette: [String: UIColor],
@@ -91,6 +102,7 @@ struct DriveTestMapView: UIViewRepresentable {
             syncCones(antennas: antennas, highlightedSiteId: highlightedSiteId, userLocation: userLocation, on: mapView)
             syncTrace(trace, on: mapView)
             syncCoverageTrail(coverageTrail, on: mapView)
+            syncSpeedtests(speedtestTrail, on: mapView)
         }
 
         // MARK: Antennes (points)
@@ -237,6 +249,41 @@ struct DriveTestMapView: UIViewRepresentable {
                            blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
         }
 
+        // MARK: Speedtests (annotations tappables colorées par débit)
+
+        /// Peu nombreux (1 par test) → annotations natives, donc tappables (→ détails).
+        private func syncSpeedtests(_ points: [DriveSpeedtestPoint], on mapView: MLNMapView) {
+            guard points.count != lastSpeedtestCount else { return }
+            lastSpeedtestCount = points.count
+            if !speedtestAnnotations.isEmpty { mapView.removeAnnotations(speedtestAnnotations) }
+            let annotations = points.map { point in
+                DriveSpeedtestAnnotation(
+                    point: point,
+                    coordinate: point.coordinate,
+                    color: Self.speedColor(point.result.downloadAverageMbps)
+                )
+            }
+            speedtestAnnotations = annotations
+            if !annotations.isEmpty { mapView.addAnnotations(annotations) }
+        }
+
+        /// Couleur par débit descendant (échelle alignée web/Android, 7 paliers).
+        private static func speedColor(_ mbps: Double) -> UIColor {
+            let hex: UInt32
+            switch mbps {
+            case 1000...: hex = 0x3B82F6
+            case 600..<1000: hex = 0x06B6D4
+            case 300..<600: hex = 0x22C55E
+            case 100..<300: hex = 0x84CC16
+            case 30..<100: hex = 0xEAB308
+            case 10..<30: hex = 0xF97316
+            default: hex = 0xEF4444
+            }
+            return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255,
+                           green: CGFloat((hex >> 8) & 0xFF) / 255,
+                           blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+        }
+
         // MARK: Délégué — style des overlays
 
         func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
@@ -245,13 +292,22 @@ struct DriveTestMapView: UIViewRepresentable {
             lastAntennaSignature = 0
             lastConeSignature = ""
             lastTraceCount = -1
+            lastSpeedtestCount = -1
             coverageTrailCount = -1
             coverageGenLayerIds.removeAll()
             syncCoverageTrail(latestCoverageTrail, on: mapView)
         }
 
         func mapView(_ mapView: MLNMapView, viewFor annotation: MLNAnnotation) -> MLNAnnotationView? {
-            // Points antennes uniquement (la polyline/les polygones sont rendus natifs).
+            // Point speedtest : losange coloré par débit (tappable → détails).
+            if let speedtest = annotation as? DriveSpeedtestAnnotation {
+                let id = "drivetest-speedtest"
+                let view = mapView.dequeueReusableAnnotationView(withIdentifier: id) as? DriveSpeedtestMarkerView
+                    ?? DriveSpeedtestMarkerView(reuseIdentifier: id)
+                view.apply(color: speedtest.color)
+                return view
+            }
+            // Points antennes (la polyline/les polygones sont rendus natifs).
             guard annotation is MLNPointAnnotation else { return nil }
             let identifier = "drivetest-antenna"
             let view = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? DriveTestMarkerView
@@ -285,9 +341,11 @@ struct DriveTestMapView: UIViewRepresentable {
             false
         }
 
-        // Tap sur une antenne → détails (la session speedtest continue en fond).
+        // Tap → détails (la session speedtest continue en fond).
         func mapView(_ mapView: MLNMapView, didSelect annotation: MLNAnnotation) {
-            if let antenna = annotation as? DriveTestAntennaAnnotation {
+            if let speedtest = annotation as? DriveSpeedtestAnnotation {
+                onSelectSpeedtest(speedtest.point)
+            } else if let antenna = annotation as? DriveTestAntennaAnnotation {
                 onSelectSite(antenna.site)
             }
             mapView.deselectAnnotation(annotation, animated: false)
@@ -334,6 +392,49 @@ final class DriveTestMarkerView: MLNAnnotationView {
     /// Recolore le disque selon l'opérateur de l'antenne (vue réutilisée).
     func apply(color: UIColor) {
         dot.backgroundColor = color
+    }
+
+    required init?(coder: NSCoder) { nil }
+}
+
+/// Annotation d'un point speedtest portant son résultat (détails au tap).
+final class DriveSpeedtestAnnotation: MLNPointAnnotation {
+    let point: DriveSpeedtestPoint
+    let color: UIColor
+
+    init(point: DriveSpeedtestPoint, coordinate: CLLocationCoordinate2D, color: UIColor) {
+        self.point = point
+        self.color = color
+        super.init()
+        self.coordinate = coordinate
+    }
+
+    required init?(coder: NSCoder) { nil }
+}
+
+/// Marqueur speedtest : losange coloré par débit (distinct des pastilles antennes).
+final class DriveSpeedtestMarkerView: MLNAnnotationView {
+    private let diamond = UIView()
+
+    override init(reuseIdentifier: String?) {
+        super.init(reuseIdentifier: reuseIdentifier)
+        frame = CGRect(x: 0, y: 0, width: 16, height: 16)
+        isOpaque = false
+        backgroundColor = .clear
+        diamond.frame = bounds
+        diamond.layer.cornerRadius = 3
+        diamond.layer.borderWidth = 2
+        diamond.layer.borderColor = UIColor.white.cgColor
+        diamond.transform = CGAffineTransform(rotationAngle: .pi / 4)
+        diamond.layer.shadowColor = UIColor.black.cgColor
+        diamond.layer.shadowOpacity = 0.25
+        diamond.layer.shadowRadius = 3
+        diamond.layer.shadowOffset = CGSize(width: 0, height: 1.5)
+        addSubview(diamond)
+    }
+
+    func apply(color: UIColor) {
+        diamond.backgroundColor = color
     }
 
     required init?(coder: NSCoder) { nil }
