@@ -10,6 +10,8 @@ import CoreLocation
 struct DriveTestMapView: UIViewRepresentable {
     let antennas: [AntennaSite]
     let trace: [CLLocationCoordinate2D]
+    /// Points de couverture capturés, affichés EN TEMPS RÉEL et colorés par génération.
+    var coverageTrail: [DriveCoveragePoint] = []
     let highlightedSiteId: String?
     let userLocation: CLLocationCoordinate2D?
     let colorScheme: ColorScheme
@@ -44,6 +46,7 @@ struct DriveTestMapView: UIViewRepresentable {
         context.coordinator.sync(
             antennas: antennas,
             trace: trace,
+            coverageTrail: coverageTrail,
             highlightedSiteId: highlightedSiteId,
             userLocation: userLocation,
             operatorPalette: operatorPalette,
@@ -60,6 +63,10 @@ struct DriveTestMapView: UIViewRepresentable {
         private var lastAntennaSignature = 0
         private var lastConeSignature = ""
         private var lastTraceCount = -1
+        /// Couverture temps réel : dernier état + ids des couches GPU (1 par génération).
+        private var latestCoverageTrail: [DriveCoveragePoint] = []
+        private var coverageTrailCount = -1
+        private var coverageGenLayerIds: Set<String> = []
         /// Statut « dans le lobe » par cône (clé = identité de l'objet polygone).
         private var coneInSector: [ObjectIdentifier: Bool] = [:]
         private let onSelectSite: (AntennaSite) -> Void
@@ -72,15 +79,18 @@ struct DriveTestMapView: UIViewRepresentable {
         func sync(
             antennas: [AntennaSite],
             trace: [CLLocationCoordinate2D],
+            coverageTrail: [DriveCoveragePoint],
             highlightedSiteId: String?,
             userLocation: CLLocationCoordinate2D?,
             operatorPalette: [String: UIColor],
             displayedKey: String?,
             on mapView: MLNMapView
         ) {
+            latestCoverageTrail = coverageTrail
             syncSites(antennas, operatorPalette: operatorPalette, displayedKey: displayedKey, on: mapView)
             syncCones(antennas: antennas, highlightedSiteId: highlightedSiteId, userLocation: userLocation, on: mapView)
             syncTrace(trace, on: mapView)
+            syncCoverageTrail(coverageTrail, on: mapView)
         }
 
         // MARK: Antennes (points)
@@ -164,7 +174,81 @@ struct DriveTestMapView: UIViewRepresentable {
             mapView.addAnnotation(line)
         }
 
+        // MARK: Couverture temps réel (points colorés par génération)
+
+        /// Affiche les points de couverture capturés, colorés par génération. Couche GPU
+        /// (une source + une couche cercle par génération) → tient des centaines de
+        /// points sans coût d'annotations. Diff par compte pour éviter les rebuilds.
+        private func syncCoverageTrail(_ trail: [DriveCoveragePoint], on mapView: MLNMapView) {
+            guard trail.count != coverageTrailCount else { return }
+            coverageTrailCount = trail.count
+            guard let style = mapView.style else { return }
+            let byGen = Dictionary(grouping: trail, by: { Self.generationKey($0.generation) })
+            var active = Set<String>()
+            for (key, points) in byGen {
+                let sourceId = "sq-dt-cov-source-\(key)"
+                let layerId = "sq-dt-cov-layer-\(key)"
+                active.insert(layerId)
+                let features = points.map { p -> MLNPointFeature in
+                    let f = MLNPointFeature(); f.coordinate = p.coordinate; return f
+                }
+                if let source = style.source(withIdentifier: sourceId) as? MLNShapeSource {
+                    source.shape = MLNShapeCollectionFeature(shapes: features)
+                } else {
+                    let source = MLNShapeSource(identifier: sourceId, features: features, options: nil)
+                    style.addSource(source)
+                    let layer = MLNCircleStyleLayer(identifier: layerId, source: source)
+                    layer.circleColor = NSExpression(forConstantValue: Self.generationColor(key))
+                    layer.circleRadius = NSExpression(forConstantValue: 4)
+                    layer.circleOpacity = NSExpression(forConstantValue: 0.85)
+                    layer.circleStrokeWidth = NSExpression(forConstantValue: 1)
+                    layer.circleStrokeColor = NSExpression(forConstantValue: UIColor.white.withAlphaComponent(0.7))
+                    style.addLayer(layer)
+                }
+                style.layer(withIdentifier: layerId)?.isVisible = !features.isEmpty
+                coverageGenLayerIds.insert(layerId)
+            }
+            for layerId in coverageGenLayerIds where !active.contains(layerId) {
+                style.layer(withIdentifier: layerId)?.isVisible = false
+            }
+        }
+
+        private static func generationKey(_ tech: String?) -> String {
+            let t = (tech ?? "").uppercased()
+            if t.contains("5G") || t.contains("NR") { return "5g" }
+            if t.contains("4G") || t.contains("LTE") { return "4g" }
+            if t.contains("3G") || t.contains("UMTS") || t.contains("HSPA") || t.contains("WCDMA") { return "3g" }
+            if t.contains("2G") || t.contains("GSM") || t.contains("EDGE") || t.contains("GPRS") { return "2g" }
+            return "none"
+        }
+
+        /// Couleur par génération (alignée carte principale / « Mes mesures »).
+        private static func generationColor(_ key: String) -> UIColor {
+            let hex: UInt32
+            switch key {
+            case "5g": hex = 0x8B5CF6
+            case "4g": hex = 0x3B82F6
+            case "3g": hex = 0x14B8A6
+            case "2g": hex = 0xF59E0B
+            default: hex = 0x94A3B8
+            }
+            return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255,
+                           green: CGFloat((hex >> 8) & 0xFF) / 255,
+                           blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+        }
+
         // MARK: Délégué — style des overlays
+
+        func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
+            // Un rechargement de style (clair/sombre) efface sources & couches GPU :
+            // on force la ré-application au prochain sync et on re-pose la couverture.
+            lastAntennaSignature = 0
+            lastConeSignature = ""
+            lastTraceCount = -1
+            coverageTrailCount = -1
+            coverageGenLayerIds.removeAll()
+            syncCoverageTrail(latestCoverageTrail, on: mapView)
+        }
 
         func mapView(_ mapView: MLNMapView, viewFor annotation: MLNAnnotation) -> MLNAnnotationView? {
             // Points antennes uniquement (la polyline/les polygones sont rendus natifs).

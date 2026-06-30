@@ -20,6 +20,19 @@ enum DriveTestMode: String, CaseIterable, Identifiable {
     var runsSpeedtest: Bool { self != .coverage }
 }
 
+/// Point de couverture affiché EN TEMPS RÉEL sur la mini-carte Drive Test
+/// (coordonnée + génération, coloré comme la carte principale).
+struct DriveCoveragePoint: Equatable {
+    let coordinate: CLLocationCoordinate2D
+    let generation: String?
+
+    static func == (lhs: DriveCoveragePoint, rhs: DriveCoveragePoint) -> Bool {
+        lhs.coordinate.latitude == rhs.coordinate.latitude &&
+        lhs.coordinate.longitude == rhs.coordinate.longitude &&
+        lhs.generation == rhs.generation
+    }
+}
+
 /// Mode Drive Test : enchaîne des speedtests en continu (rafale illimitée) tout en
 /// suivant la position, en affichant les antennes proches sur une carte et en
 /// indiquant si l'on est « dans le secteur » de l'antenne la plus proche. Réutilise
@@ -108,10 +121,15 @@ final class DriveTestViewModel: ObservableObject {
     private var sessionMode: DriveTestMode = .both
     /// Nombre de points de couverture capturés (affiché en mode couverture).
     @Published private(set) var coveragePointCount = 0
+    /// Points de couverture pour l'affichage TEMPS RÉEL sur la carte (par génération).
+    @Published private(set) var coverageTrail: [DriveCoveragePoint] = []
     /// Opérateur de la SIM active résolu une fois (MCC→marché, operatorKey via IP/ASN
     /// ou MNC). Drive test = cellulaire : on n'affiche que SES antennes.
     private var resolvedSim: (market: String, operatorKey: String)?
     private var simResolveInFlight = false
+    /// Dernier PLMN (MCC/MNC) vu sur la SIM : un changement en cours de session
+    /// (échange SIM/eSIM) re-résout l'opérateur SANS arrêter la session (point 5).
+    private var lastSimPLMN: (mcc: Int?, mnc: Int?)?
     /// Entrée de marché courante (couleurs + libellés d'opérateur du sélecteur).
     private var marketEntry: MarketRegistryEntry?
     // Mêmes mécanismes que le speedtest normal : Live Activity + assertion
@@ -151,6 +169,7 @@ final class DriveTestViewModel: ObservableObject {
         summary = nil
         testCount = 0
         coveragePoints.removeAll()
+        coverageTrail.removeAll()
         lastCoveragePointCoord = nil
         coveragePointCount = 0
         sessionMode = DriveTestMode.current
@@ -194,7 +213,10 @@ final class DriveTestViewModel: ObservableObject {
         captureCoveragePoint(coordinate)
         recomputeNearest()
         writeNetworkGlance()
-        Task { await refreshAntennasIfNeeded(around: coordinate) }
+        Task {
+            await detectSimChangeIfNeeded()
+            await refreshAntennasIfNeeded(around: coordinate)
+        }
     }
 
     private func appendTrace(_ coordinate: CLLocationCoordinate2D) {
@@ -219,8 +241,10 @@ final class DriveTestViewModel: ObservableObject {
     private func appendCoveragePoint(_ point: CoveragePointUpload, at coordinate: CLLocationCoordinate2D) {
         lastCoveragePointCoord = coordinate
         coveragePoints.append(point)
+        coverageTrail.append(DriveCoveragePoint(coordinate: coordinate, generation: point.technology))
         if coveragePoints.count > coveragePointCap {
             coveragePoints.removeFirst(coveragePoints.count - coveragePointCap)
+            coverageTrail.removeFirst(coverageTrail.count - coveragePointCap)
         }
         coveragePointCount = coveragePoints.count
     }
@@ -298,7 +322,12 @@ final class DriveTestViewModel: ObservableObject {
     }
 
     private func recomputeNearest() {
-        guard let user = userLocation,
+        // Secteur UNIQUEMENT si l'opérateur est identifié (résolu ou choisi) : sinon les
+        // antennes chargées sont « ALL » (multi-opérateurs) et désigner « ton secteur »
+        // serait faux (ex. SIM Orange en WiFi → secteur SFR). Sans opérateur identifié,
+        // aucun secteur n'est affiché (pas de cône sur la carte, bandeau d'invite).
+        guard displayedOperatorKey != nil,
+              let user = userLocation,
               let nearest = AntennaSectorGeometry.nearest(to: user, among: antennas) else {
             nearestSite = nil; nearestDistanceMeters = nil; inSector = false; sectorOffsetDegrees = nil
             return
@@ -399,9 +428,14 @@ final class DriveTestViewModel: ObservableObject {
         // Renseigne le sélecteur manuel + la palette à partir du meilleur marché
         // connu — MÊME si l'opérateur n'a pas pu être auto-résolu (WiFi/VPN/SIM
         // masquée) : l'utilisateur peut alors choisir son opérateur à la main.
-        if let bestEntry = entry
-            ?? payload.market(forCode: MapMarketStore.lastMarket())
-            ?? payload.market(forCode: MapMarketStore.localeMarketCode()) {
+        // Marché du sélecteur : MCC SIM / opérateur résolu déjà calculés ci-dessus,
+        // sinon repli PAYS via le GPS (position réelle), puis locale du téléphone.
+        var bestEntry = entry ?? payload.market(forCode: MapMarketStore.lastMarket())
+        if bestEntry == nil, let user = userLocation,
+           let iso = await reverseGeocodeISOCountry(user) {
+            bestEntry = payload.markets.first { $0.countryCode.uppercased() == iso.uppercased() }
+        }
+        if let bestEntry = bestEntry ?? payload.market(forCode: MapMarketStore.localeMarketCode()) {
             marketEntry = bestEntry
             availableOperators = bestEntry.selectableOperators.filter { $0.key.uppercased() != "ALL" }
         }
@@ -410,6 +444,33 @@ final class DriveTestViewModel: ObservableObject {
         let market = entry.marketCode.isEmpty ? entry.code : entry.marketCode
         resolvedSim = (market, operatorKey)
         simOperatorLabel = entry.operatorEntry(forKey: operatorKey)?.shortLabel ?? operatorKey
+    }
+
+    /// Détecte un changement de SIM (PLMN) en cours de session et re-résout l'opérateur
+    /// SANS interrompre la boucle speedtest / l'enregistrement de couverture (point 5).
+    /// Le choix manuel reste prioritaire pour l'affichage.
+    private func detectSimChangeIfNeeded() async {
+        let plmn = services.networkPath.simPLMN()
+        defer { lastSimPLMN = (plmn.mcc, plmn.mnc) }
+        guard let previous = lastSimPLMN else { return } // 1er passage : on mémorise seulement
+        guard previous.mcc != plmn.mcc || previous.mnc != plmn.mnc else { return }
+        // Nouvelle SIM : on oublie l'ancienne résolution et on relance la détection + le
+        // refetch des antennes (la session continue, rien n'est arrêté).
+        resolvedSim = nil
+        simOperatorLabel = nil
+        lastFetchOperator = nil
+        await resolveSimOperatorIfNeeded()
+    }
+
+    /// Code pays ISO (ex. « FR ») de la position GPS — repli pour peupler le sélecteur
+    /// d'opérateur quand la SIM est masquée (point 4).
+    private func reverseGeocodeISOCountry(_ coordinate: CLLocationCoordinate2D) async -> String? {
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        return await withCheckedContinuation { continuation in
+            CLGeocoder().reverseGeocodeLocation(location) { placemarks, _ in
+                continuation.resume(returning: placemarks?.first?.isoCountryCode)
+            }
+        }
     }
 
     /// L'utilisateur force un opérateur (ou revient en automatique avec `nil`).
@@ -617,6 +678,7 @@ struct DriveTestView: View {
         DriveTestMapView(
             antennas: model.antennas,
             trace: model.trace,
+            coverageTrail: model.coverageTrail,
             highlightedSiteId: model.nearestSiteId,
             userLocation: model.userLocation,
             colorScheme: colorScheme,
@@ -635,13 +697,19 @@ struct DriveTestView: View {
                 VPNWarningBanner(message: "VPN actif : opérateur non détectable, ces tests ne seront pas publiés sur la carte.")
             }
             operatorRow
-            if !model.isRunning { modePicker }
-            sectorBanner
-            if model.isRunning && driveTestMode.runsSpeedtest { liveReadout }
-            if model.isRunning && driveTestMode.recordsCoverage { coverageStatusRow }
-            if driveTestMode.runsSpeedtest {
-                Divider().overlay(SQColor.separator)
-                sessionStats
+            if model.isRunning {
+                // Panneau COMPACT pendant l'enregistrement : opérateur + résultats
+                // (speedtest) ou nombre de points (couverture) + arrêt. Pas de secteur
+                // ni de sélecteur de mode (figé au démarrage).
+                if driveTestMode.runsSpeedtest {
+                    liveReadout
+                    sessionStats
+                }
+                if driveTestMode.recordsCoverage { coverageStatusRow }
+            } else {
+                // Panneau complet avant démarrage : mode + secteur (si opérateur identifié).
+                modePicker
+                if model.displayedOperatorLabel != nil { sectorBanner }
             }
             if let errorMessage = model.errorMessage {
                 Text(errorMessage)
