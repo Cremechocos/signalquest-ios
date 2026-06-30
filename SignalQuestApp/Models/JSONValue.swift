@@ -46,8 +46,59 @@ enum JSONValue: Codable, Equatable, Sendable {
     }
 }
 
+/// Formatters de date partagés, créés **une seule fois**.
+///
+/// PERF-DEC-01 : l'ancienne stratégie de décodage instanciait jusqu'à 5
+/// `DateFormatter`/`ISO8601DateFormatter` **par champ date décodé** — soit des
+/// dizaines de milliers d'allocations sur un tableau de plusieurs milliers
+/// d'éléments (carte par tuile, feed, ANFR, messages). Ces formatters sont
+/// configurés à l'initialisation puis **seulement lus** (parsing). `DateFormatter`
+/// est thread-safe depuis iOS 7 ; `nonisolated(unsafe)` documente ce partage
+/// concurrent sûr (les types Foundation ne sont pas `Sendable`).
+private enum SQDateParsing {
+    nonisolated(unsafe) private static let isoWithFraction: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    nonisolated(unsafe) private static let isoNoFraction: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    private static let localWithFraction = makeLocal("yyyy-MM-dd'T'HH:mm:ss.SSS")
+    private static let localNoFraction = makeLocal("yyyy-MM-dd'T'HH:mm:ss")
+    private static let dateOnly = makeLocal("yyyy-MM-dd")
+
+    private static func makeLocal(_ format: String) -> DateFormatter {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        f.dateFormat = format
+        return f
+    }
+
+    /// Essaie les formats dans le MÊME ordre que l'ancienne stratégie : ISO avec
+    /// puis sans fraction, local avec puis sans fraction, enfin « jour seul »
+    /// (ex. `date5g` prévisionnel = "2026-06-30", `lastInServiceDate`). Comportement
+    /// de parsing strictement identique.
+    static func parse(_ value: String) -> Date? {
+        if let date = isoWithFraction.date(from: value) { return date }
+        if let date = isoNoFraction.date(from: value) { return date }
+        if let date = localWithFraction.date(from: value) { return date }
+        if let date = localNoFraction.date(from: value) { return date }
+        if let date = dateOnly.date(from: value) { return date }
+        return nil
+    }
+}
+
 extension JSONDecoder {
-    static var signalQuest: JSONDecoder {
+    /// Décodeur partagé de l'app (instance unique réutilisée — cf. PERF-DEC-01).
+    /// `JSONDecoder` n'est pas `Sendable`, mais une instance configurée une seule
+    /// fois et seulement *lue* (décodages concurrents) est sûre.
+    static let signalQuest: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
@@ -62,52 +113,20 @@ extension JSONDecoder {
                 return Date(timeIntervalSince1970: seconds)
             }
             let value = try container.decode(String.self)
-            let withFraction = ISO8601DateFormatter()
-            withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            if let date = withFraction.date(from: value) {
-                return date
-            }
-            let noFraction = ISO8601DateFormatter()
-            noFraction.formatOptions = [.withInternetDateTime]
-            if let date = noFraction.date(from: value) {
-                return date
-            }
-            let localWithFraction = DateFormatter()
-            localWithFraction.locale = Locale(identifier: "en_US_POSIX")
-            localWithFraction.timeZone = TimeZone(secondsFromGMT: 0)
-            localWithFraction.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
-            if let date = localWithFraction.date(from: value) {
-                return date
-            }
-            let localNoFraction = DateFormatter()
-            localNoFraction.locale = Locale(identifier: "en_US_POSIX")
-            localNoFraction.timeZone = TimeZone(secondsFromGMT: 0)
-            localNoFraction.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-            if let date = localNoFraction.date(from: value) {
-                return date
-            }
-            // Dates « jour seul » (ex. `date5g` prévisionnel = "2026-06-30",
-            // `lastInServiceDate`). SANS ce format, un seul de ces champs faisait
-            // jeter TOUT le tableau (ex. ~1900 sites prévisionnels) → couche vide.
-            let dateOnly = DateFormatter()
-            dateOnly.locale = Locale(identifier: "en_US_POSIX")
-            dateOnly.timeZone = TimeZone(secondsFromGMT: 0)
-            dateOnly.dateFormat = "yyyy-MM-dd"
-            if let date = dateOnly.date(from: value) {
-                return date
-            }
+            if let date = SQDateParsing.parse(value) { return date }
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid ISO date: \(value)")
         }
         return decoder
-    }
+    }()
 }
 
 extension JSONEncoder {
-    static var signalQuest: JSONEncoder {
+    /// Encodeur partagé de l'app (instance unique réutilisée — cf. PERF-DEC-01).
+    static let signalQuest: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         return encoder
-    }
+    }()
 }
 
 extension KeyedDecodingContainer {

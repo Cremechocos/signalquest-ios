@@ -8,7 +8,9 @@ struct StoriesBar: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SQSpace.md + 2) {
+            // LazyHStack : ne matérialise que les bulles visibles du rail (les stories
+            // hors écran ne sont pas construites) — cf. PERF-RING-01.
+            LazyHStack(spacing: SQSpace.md + 2) {
                 composeBubble
                 ForEach(stories) { story in
                     Button {

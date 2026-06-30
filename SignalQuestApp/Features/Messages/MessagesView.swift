@@ -330,6 +330,7 @@ private struct NewConversationSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
+    @State private var searchTask: Task<Void, Never>?
     @State private var title = ""
     @State private var e2ee = true
     @State private var results: [MessageSearchUser] = []
@@ -411,8 +412,13 @@ private struct NewConversationSheet: View {
                 }
             }
             .onChangeCompat(of: query) { _, _ in
-                Task {
+                // Debounce annulable : annule la requête précédente avant d'en relancer
+                // une et abandonne si annulée pendant l'attente — évite les rafales
+                // réseau et les réponses périmées qui écrasent les récentes.
+                searchTask?.cancel()
+                searchTask = Task {
                     try? await Task.sleep(nanoseconds: 350_000_000)
+                    guard !Task.isCancelled else { return }
                     await search()
                 }
             }

@@ -6,22 +6,29 @@ import SwiftUI
 
 /// Anneau conique orange→rose qui tourne lentement (web `.sq-ring`, 3 s).
 /// Utilisé autour des avatars de stories non vues.
+///
+/// PERF-RING-01 : la rotation est pilotée par une animation Core Animation
+/// `repeatForever` (render server, GPU) et NON par un `TimelineView` 30 fps. Un
+/// `TimelineView` par anneau forçait SwiftUI à réévaluer la vue 30×/s pour CHAQUE
+/// story non vue du rail (écran d'accueil) — drain CPU permanent. Le rendu est
+/// identique (rotation linéaire, période 3 s), mais le coût CPU/SwiftUI est nul.
 struct SQStoryRing: View {
     var lineWidth: CGFloat = 3
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var spinning = false
 
     var body: some View {
-        if reduceMotion {
-            ring(rotation: .zero)
-        } else {
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
-                let t = context.date.timeIntervalSinceReferenceDate
-                ring(rotation: .degrees((t.truncatingRemainder(dividingBy: 3)) / 3 * 360))
+        ring
+            .rotationEffect(.degrees(spinning ? 360 : 0))
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+                    spinning = true
+                }
             }
-        }
     }
 
-    private func ring(rotation: Angle) -> some View {
+    private var ring: some View {
         Circle()
             .strokeBorder(
                 AngularGradient(
@@ -30,7 +37,6 @@ struct SQStoryRing: View {
                 ),
                 lineWidth: lineWidth
             )
-            .rotationEffect(rotation)
     }
 }
 

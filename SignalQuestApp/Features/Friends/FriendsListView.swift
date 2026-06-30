@@ -206,6 +206,7 @@ private struct AddFriendSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
+    @State private var searchTask: Task<Void, Never>?
     @State private var results: [MessageSearchUser] = []
     @State private var busyId: String?
     @State private var errorMessage: String?
@@ -255,8 +256,13 @@ private struct AddFriendSheet: View {
                 }
             }
             .onChangeCompat(of: query) { _, _ in
-                Task {
+                // Debounce annulable : annule la requête précédente avant d'en relancer
+                // une et abandonne si annulée pendant l'attente — évite les rafales
+                // réseau et les réponses périmées qui écrasent les récentes.
+                searchTask?.cancel()
+                searchTask = Task {
                     try? await Task.sleep(nanoseconds: 350_000_000)
+                    guard !Task.isCancelled else { return }
                     await search()
                 }
             }

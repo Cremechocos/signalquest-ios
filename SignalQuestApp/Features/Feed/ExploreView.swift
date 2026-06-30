@@ -278,7 +278,7 @@ struct ExploreView: View {
                     systemImage: "person.crop.circle.badge.questionmark"
                 )
             } else {
-                VStack(spacing: SQSpace.sm) {
+                LazyVStack(spacing: SQSpace.sm) {
                     ForEach(model.searchResults) { result in
                         Button {
                             Haptics.light()

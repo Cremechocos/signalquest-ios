@@ -63,7 +63,7 @@ struct LeaderboardsView: View {
                         myRankCard(myRank)
                             .sqFadeUp()
                     }
-                    VStack(spacing: SQSpace.sm + 2) {
+                    LazyVStack(spacing: SQSpace.sm + 2) {
                         ForEach(model.result.entries) { entry in
                             entryRow(entry)
                                 .sqFadeUp()
