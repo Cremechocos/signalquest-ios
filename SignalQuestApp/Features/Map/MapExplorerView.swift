@@ -703,6 +703,29 @@ private struct SpeedtestFeature: Equatable {
     }
 }
 
+/// Politique de rendu de la couche couverture selon le zoom (pure & testable).
+/// Points bruts dès le « zoom ville » (~z11) ; clusters seulement au niveau région/pays.
+/// Caps relevés pour ne plus tronquer les points (bug « points qui disparaissent au zoom »).
+enum CoverageRenderPolicy {
+    /// Seuil « zoom ville » : à partir d'ici on affiche tous les points bruts.
+    static let cityZoom = 11.0
+    /// Plafond de points bruts par tuile (= max renvoyé par le backend). Unifié quel que
+    /// soit le zoom — fini la dégradation 900→250 qui masquait ~75 % des points au dézoom.
+    static let pointCapPerTile = 2500
+    /// Plafond du repli `/api/coverage/points` (bbox, sans tuiles).
+    static let fallbackCap = 6000
+
+    /// Décide, pour un zoom donné, si l'on rend les CLUSTERS (région/pays) et/ou les
+    /// POINTS bruts. Mutuellement exclusifs : clusters seulement sous le zoom ville.
+    static func mode(zoom: Double, hasClusters: Bool, hasBandFilter: Bool) -> (useClusters: Bool, useRawPoints: Bool) {
+        // Points bruts dès le zoom ville, ou s'il n'y a pas de clusters, ou si un filtre
+        // bande est actif (le filtre bande s'applique côté client sur les points bruts).
+        let useRawPoints = zoom >= cityZoom || !hasClusters || hasBandFilter
+        let useClusters = hasClusters && !hasBandFilter && !useRawPoints
+        return (useClusters, useRawPoints)
+    }
+}
+
 private struct CoverageHeatFeature: Equatable {
     let id: String
     let coordinate: CLLocationCoordinate2D
@@ -2299,11 +2322,15 @@ struct MapExplorerView: View {
 
     private var coverageHeatFeatures: [CoverageHeatFeature] {
         guard filters.contains(.coverage) else { return [] }
+        let hasBandFilter = !model.bandFilters.isEmpty
         var features: [CoverageHeatFeature] = []
         for tile in model.coverageTiles {
-            if model.bandFilters.isEmpty {
+            let render = CoverageRenderPolicy.mode(
+                zoom: mapZoom, hasClusters: !tile.clusters.isEmpty, hasBandFilter: hasBandFilter
+            )
+            if render.useClusters {
                 features += tile.clusters.map { cluster in
-                    // Clusters : génération dominante (`cluster.tech`) en mode génération.
+                    // Clusters (région/pays) : génération dominante (`cluster.tech`) en mode génération.
                     let parts = coverageColorParts(rsrp: cluster.avgRsrp, tech: cluster.tech)
                     return CoverageHeatFeature(
                         id: "coverage-heat-cluster-\(cluster.id)",
@@ -2313,10 +2340,9 @@ struct MapExplorerView: View {
                     )
                 }
             }
-            let shouldIncludeRawPoints = mapZoom >= 13 || tile.clusters.isEmpty || !model.bandFilters.isEmpty
-            if shouldIncludeRawPoints {
-                let pointLimit = mapZoom >= 13 ? 900 : 250
-                features += tile.points.lazy.filter { matchesSelectedBand($0.band) }.prefix(pointLimit).map { point in
+            if render.useRawPoints {
+                // Tous les points bruts (cap élevé unifié) — le rendu GPU MapLibre les tient.
+                features += tile.points.lazy.filter { matchesSelectedBand($0.band) }.prefix(CoverageRenderPolicy.pointCapPerTile).map { point in
                     let parts = coverageColorParts(rsrp: point.rsrp, tech: point.tech)
                     return CoverageHeatFeature(
                         id: "coverage-heat-\(point.id)",
@@ -2330,7 +2356,7 @@ struct MapExplorerView: View {
         if features.isEmpty {
             features = model.coverageHeat.lazy.filter { point in
                 matchesSelectedBand(point.band) || matchesSelectedBands(in: [point.frequency, point.technology, point.networkType].compactMap { $0 })
-            }.prefix(1200).map { point in
+            }.prefix(CoverageRenderPolicy.fallbackCap).map { point in
                 let parts = coverageColorParts(rsrp: point.signalStrength, tech: point.technology ?? point.networkType)
                 return CoverageHeatFeature(
                     id: "coverage-heat-api-\(point.id)",

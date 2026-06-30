@@ -88,6 +88,7 @@
 		543116391555BF3BE77EDA7F /* LeaderboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 554B78FC0A0A68C411BAD689 /* LeaderboardModels.swift */; };
 		56EC777B107E81B428F7F1B5 /* ValidationsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 885DAE78D34639CBB592A710 /* ValidationsService.swift */; };
 		572D48910C58A33FE265B57B /* IdentificationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D89B6EA883CAE3151D38ABEB /* IdentificationModels.swift */; };
+		59319D5732AB2088D06F5F8D /* CoverageRenderPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9B5640F38ED77C1C34D499 /* CoverageRenderPolicyTests.swift */; };
 		5955D80A5D353C3E3A5D63D9 /* SQCompatMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD900A2339E497AAAE14BF6 /* SQCompatMap.swift */; };
 		598103B3A8E554B580FBDC13 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84745B05E3B0A5A31B7C2D06 /* OnboardingView.swift */; };
 		5B2767E6D1BEDB7E7038F402 /* SignalFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = F21195FC7BA83172FF32A3CC /* SignalFormatters.swift */; };
@@ -260,6 +261,7 @@
 		01A136AAB9556457EEA80A8F /* BackgroundTaskScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTaskScope.swift; sourceTree = "<group>"; };
 		0412AAD8AE4FABC8AFE66ADE /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		0447B79F47CDC0258E0BEA27 /* SQFont.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQFont.swift; sourceTree = "<group>"; };
+		0B9B5640F38ED77C1C34D499 /* CoverageRenderPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageRenderPolicyTests.swift; sourceTree = "<group>"; };
 		0BBEF6D66A51142E104DBD6B /* SignalQuestUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SignalQuestUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0CE1FA9C0AE5C296806B4C08 /* SQCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQCompat.swift; sourceTree = "<group>"; };
 		0E223D37F2AA33DF68928E05 /* WiFiSSIDProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiSSIDProvider.swift; sourceTree = "<group>"; };
@@ -994,6 +996,7 @@
 				5C14BE7BE1D4056FB4421D16 /* APIClientTests.swift */,
 				830D7ECFA820F2E774487EC0 /* AuthCookieStoreTests.swift */,
 				1B7D91FD53A512C0A154BCFB /* AutoRefreshTests.swift */,
+				0B9B5640F38ED77C1C34D499 /* CoverageRenderPolicyTests.swift */,
 				1483D87FE8E1D946F88F7C05 /* E2EETests.swift */,
 				74CF7E1DDA21B03198307ED6 /* Info.plist */,
 				D6FFA250C4BE27D4200678E2 /* ModelDecodeTests.swift */,
@@ -1456,6 +1459,7 @@
 				FD8C8A4E55F6F7F937636C0E /* APIClientTests.swift in Sources */,
 				4A54B72BCBA77DBCE0F62CD9 /* AuthCookieStoreTests.swift in Sources */,
 				5F7AF0A6DEEB9A788A1199E7 /* AutoRefreshTests.swift in Sources */,
+				59319D5732AB2088D06F5F8D /* CoverageRenderPolicyTests.swift in Sources */,
 				A9AA093F88B7A4E23A7EE3A7 /* E2EETests.swift in Sources */,
 				15606EDE03FC5483778DB980 /* ModelDecodeTests.swift in Sources */,
 				8027C2DE7425912942340D4B /* NewModelDecodeTests.swift in Sources */,
