@@ -955,6 +955,28 @@ private enum MapRegionStore {
 /// (UserDefaults déclaré dans PrivacyInfo.xcprivacy sous la raison CA92.1.)
 /// Internal (pas `private`) : réutilisé par le mode Drive Test pour cibler le bon
 /// marché lors du chargement des antennes proches.
+/// Persistance locale des couches actives de la carte (mémorisées entre navigations /
+/// relances). Défaut : antennes seule — l'utilisateur active le reste à la demande.
+enum MapFilterStore {
+    private static let key = "map.lastFilters.v1"
+
+    /// Couches par défaut : antennes seule.
+    static let defaultFilters: Set<MapDisplayItem.Kind> = [.antenna]
+
+    static func save(_ filters: Set<MapDisplayItem.Kind>) {
+        UserDefaults.standard.set(filters.map(\.rawValue), forKey: key)
+    }
+
+    /// Couches mémorisées (éventuellement vide si tout désactivé), ou `nil` si jamais
+    /// enregistrées → l'appelant retombe sur `defaultFilters`.
+    static func lastFilters() -> Set<MapDisplayItem.Kind>? {
+        guard let raw = UserDefaults.standard.array(forKey: key) as? [String] else { return nil }
+        return Set(raw.compactMap(MapDisplayItem.Kind.init(rawValue:)))
+    }
+
+    static func reset() { UserDefaults.standard.removeObject(forKey: key) }
+}
+
 enum MapMarketStore {
     private static let marketKey = "map.lastMarket.v1"
     private static let operatorKey = "map.lastOperator.v1"
@@ -1017,10 +1039,9 @@ struct MapExplorerView: View {
     @State private var renderedAnnotations: [MapAnnotationPayload] = []
     @State private var renderedCoverageFeatures: [CoverageHeatFeature] = []
     @State private var renderedSpeedtestFeatures: [SpeedtestFeature] = []
-    // Couches actives par défaut : antennes + speedtests + pannes (incidents),
-    // comme Android (où `incidents` est activé par défaut). Photos, couverture,
-    // prévisionnels et sites communautaires restent en opt-in via le panneau.
-    @State private var filters: Set<MapDisplayItem.Kind> = [.antenna, .speedtest, .outage]
+    // Couches mémorisées localement (restaurées entre navigations / relances). Défaut :
+    // antennes seule — l'utilisateur active les autres couches à la demande.
+    @State private var filters: Set<MapDisplayItem.Kind> = MapFilterStore.lastFilters() ?? MapFilterStore.defaultFilters
     /// Couche Couverture : coloration par génération (5G/4G/…) plutôt que par RSRP.
     /// Persisté localement. Modes mutuellement exclusifs (jamais mélangés).
     @AppStorage("map_coverage_by_generation") private var coverageByGeneration = false
@@ -1146,7 +1167,9 @@ struct MapExplorerView: View {
             // Notification/deep link antenne reçu avant l'apparition de la carte.
             openSiteFromRouterIfNeeded()
         }
-        .onChangeCompat(of: filters) { _, _ in
+        .onChangeCompat(of: filters) { _, newValue in
+            // Mémorise les couches localement (restaurées au prochain affichage / relance).
+            MapFilterStore.save(newValue)
             // Affiche/masque une couche immédiatement, sans attendre le rechargement.
             refreshMapRender()
             scheduleLoad(region: lastRegion)
@@ -1811,7 +1834,7 @@ struct MapExplorerView: View {
         if !model.sharingFilters.isEmpty { count += 1 }
         if model.speedtestDays != 0 { count += 1 }
         if model.coverageDays != 0 { count += 1 }
-        if filters != [.antenna, .speedtest, .outage] { count += 1 }
+        if filters != MapFilterStore.defaultFilters { count += 1 }
         return count
     }
 
@@ -2883,7 +2906,7 @@ private struct MapAdvancedFilterSheet: View {
                         sharing.removeAll()
                         speedtestDays = 0
                         coverageDays = 0
-                        layers = [.antenna, .speedtest, .outage]
+                        layers = MapFilterStore.defaultFilters
                         includeObserved = true
                     }
                     .font(SQFont.archivo(15, .semibold))

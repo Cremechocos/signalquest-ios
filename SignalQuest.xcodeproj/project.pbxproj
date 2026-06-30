@@ -93,6 +93,7 @@
 		598103B3A8E554B580FBDC13 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84745B05E3B0A5A31B7C2D06 /* OnboardingView.swift */; };
 		5B2767E6D1BEDB7E7038F402 /* SignalFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = F21195FC7BA83172FF32A3CC /* SignalFormatters.swift */; };
 		5B38BBB29FDA548CF294D48B /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5536589482E8FCA7F50D5797 /* AppRouter.swift */; };
+		5BB7F333FAEBC17CD67A33C2 /* MapFilterStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F4DC14B58C08DADF46E158 /* MapFilterStoreTests.swift */; };
 		5D4E6FA318972C48443A9F8A /* AntennaDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF3CB12A75C5483284BC5C7 /* AntennaDetailSheet.swift */; };
 		5DAFF235085F8497FC489578 /* SpeedtestControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 688909AB965601A75F6DC348 /* SpeedtestControl.swift */; };
 		5DCECE2C39F5BB5B5F65D5A0 /* MessagingFixesQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D29224A48769AB74981281AE /* MessagingFixesQATests.swift */; };
@@ -408,6 +409,7 @@
 		AEF301566BC00073B5C158FA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B0078226636E735A7665D8A3 /* SQComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQComponents.swift; sourceTree = "<group>"; };
 		B011EC6077C3E8E806D4F94C /* SpeedtestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestView.swift; sourceTree = "<group>"; };
+		B1F4DC14B58C08DADF46E158 /* MapFilterStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapFilterStoreTests.swift; sourceTree = "<group>"; };
 		B30DE70BD37C3FD603849259 /* MockURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockURLProtocol.swift; sourceTree = "<group>"; };
 		B3E12C14EC03895F48D39245 /* CallManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallManager.swift; sourceTree = "<group>"; };
 		B5CA16A2D1341E0245F06DB9 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
@@ -999,6 +1001,7 @@
 				0B9B5640F38ED77C1C34D499 /* CoverageRenderPolicyTests.swift */,
 				1483D87FE8E1D946F88F7C05 /* E2EETests.swift */,
 				74CF7E1DDA21B03198307ED6 /* Info.plist */,
+				B1F4DC14B58C08DADF46E158 /* MapFilterStoreTests.swift */,
 				D6FFA250C4BE27D4200678E2 /* ModelDecodeTests.swift */,
 				4A30FBE643735E6E375B3948 /* NewModelDecodeTests.swift */,
 				0EC633C9F535F07BBC79CB8E /* PollDecodingTests.swift */,
@@ -1461,6 +1464,7 @@
 				5F7AF0A6DEEB9A788A1199E7 /* AutoRefreshTests.swift in Sources */,
 				59319D5732AB2088D06F5F8D /* CoverageRenderPolicyTests.swift in Sources */,
 				A9AA093F88B7A4E23A7EE3A7 /* E2EETests.swift in Sources */,
+				5BB7F333FAEBC17CD67A33C2 /* MapFilterStoreTests.swift in Sources */,
 				15606EDE03FC5483778DB980 /* ModelDecodeTests.swift in Sources */,
 				8027C2DE7425912942340D4B /* NewModelDecodeTests.swift in Sources */,
 				50E49C94546FE494CB10E1F4 /* PollDecodingTests.swift in Sources */,
