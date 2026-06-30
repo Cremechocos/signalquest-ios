@@ -248,10 +248,12 @@ final class MapSnapshotService: MapSnapshotServicing {
                     URLQueryItem(name: "days", value: days <= 0 ? "all" : String(days))
                 ]
                 query.append(contentsOf: Self.bandQueryItems(bands))
-                if tile.z < 13 {
+                // Points bruts dès le « zoom ville » (z11) ; clusters (overview) en
+                // dessous. Seuil iOS uniquement — Android garde sa propre constante (z13).
+                if tile.z < CoverageRenderPolicy.rawPointsFromZoom {
                     query.append(URLQueryItem(name: "detail", value: "overview"))
                 } else {
-                    query.append(URLQueryItem(name: "limit", value: "2500"))
+                    query.append(URLQueryItem(name: "limit", value: String(CoverageRenderPolicy.pointCapPerTile)))
                 }
                 return APIEndpoint(
                     path: "/api/android/map/tiles/coverage/\(tile.z)/\(tile.x)/\(tile.y)",

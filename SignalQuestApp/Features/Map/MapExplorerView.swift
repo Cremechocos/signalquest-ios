@@ -707,21 +707,22 @@ private struct SpeedtestFeature: Equatable {
 /// Points bruts dès le « zoom ville » (~z11) ; clusters seulement au niveau région/pays.
 /// Caps relevés pour ne plus tronquer les points (bug « points qui disparaissent au zoom »).
 enum CoverageRenderPolicy {
-    /// Seuil « zoom ville » : à partir d'ici on affiche tous les points bruts.
-    static let cityZoom = 11.0
-    /// Plafond de points bruts par tuile (= max renvoyé par le backend). Unifié quel que
+    /// Zoom à partir duquel le CLIENT demande les points bruts (`detail=points`) ; en
+    /// dessous, des clusters (`detail=overview`). « Zoom ville ». Seuil iOS uniquement —
+    /// Android a sa propre constante (z13), qu'on ne touche pas.
+    static let rawPointsFromZoom = 11
+    /// Plafond de points bruts par tuile (= `limit` demandé au backend). Unifié quel que
     /// soit le zoom — fini la dégradation 900→250 qui masquait ~75 % des points au dézoom.
     static let pointCapPerTile = 2500
     /// Plafond du repli `/api/coverage/points` (bbox, sans tuiles).
     static let fallbackCap = 6000
 
-    /// Décide, pour un zoom donné, si l'on rend les CLUSTERS (région/pays) et/ou les
-    /// POINTS bruts. Mutuellement exclusifs : clusters seulement sous le zoom ville.
-    static func mode(zoom: Double, hasClusters: Bool, hasBandFilter: Bool) -> (useClusters: Bool, useRawPoints: Bool) {
-        // Points bruts dès le zoom ville, ou s'il n'y a pas de clusters, ou si un filtre
-        // bande est actif (le filtre bande s'applique côté client sur les points bruts).
-        let useRawPoints = zoom >= cityZoom || !hasClusters || hasBandFilter
-        let useClusters = hasClusters && !hasBandFilter && !useRawPoints
+    /// Rendu piloté par la DONNÉE reçue (robuste quel que soit le zoom / le seuil de
+    /// fetch) : on affiche les points bruts s'il y en a (ou si un filtre bande est actif),
+    /// sinon les clusters. Mutuellement exclusifs.
+    static func mode(hasPoints: Bool, hasClusters: Bool, hasBandFilter: Bool) -> (useClusters: Bool, useRawPoints: Bool) {
+        let useRawPoints = hasPoints || hasBandFilter
+        let useClusters = hasClusters && !useRawPoints
         return (useClusters, useRawPoints)
     }
 }
@@ -2112,7 +2113,7 @@ struct MapExplorerView: View {
         var features: [CoverageHeatFeature] = []
         for tile in model.coverageTiles {
             let render = CoverageRenderPolicy.mode(
-                zoom: mapZoom, hasClusters: !tile.clusters.isEmpty, hasBandFilter: hasBandFilter
+                hasPoints: !tile.points.isEmpty, hasClusters: !tile.clusters.isEmpty, hasBandFilter: hasBandFilter
             )
             if render.useClusters {
                 features += tile.clusters.map { cluster in
