@@ -21,12 +21,17 @@ struct ConversationDetailView: View {
     @State private var olderCursor: String?
     @State private var isLoadingOlder = false
     @State private var readReceipts: [ReadReceipt] = []
-    @State private var draft = ""
+    // PERF-MSG-01 : le texte saisi vit dans `MessageComposerBar` (sous-vue) pour que la
+    // frappe n'invalide plus le corps de cette vue (et donc la liste des messages) à
+    // chaque caractère. Le parent y POUSSE du texte (pré-remplissage édition, vidage
+    // après envoi) via ce couple seed/token, et REÇOIT le texte courant via closures.
+    @State private var composerSeed = ""
+    @State private var composerSeedToken = 0
+    @State private var scheduleSeedText = ""
     @State private var replyTarget: MessageItem?
     @State private var editTarget: MessageItem?
     @State private var errorMessage: String?
     @State private var isSending = false
-    @State private var pickerItem: PhotosPickerItem?
     @State private var showUnlockSheet = false
     @State private var syncTask: Task<Void, Never>?
     @State private var isE2EEUnlocked = false
@@ -263,7 +268,7 @@ struct ConversationDetailView: View {
             ThreadView(parentMessage: target, conversation: conversation, service: service, e2ee: e2ee)
         }
         .sheet(isPresented: $showSchedulePicker) {
-            ScheduleMessageSheet(conversation: conversation, service: service, e2ee: e2ee, initialText: draft) {
+            ScheduleMessageSheet(conversation: conversation, service: service, e2ee: e2ee, initialText: scheduleSeedText) {
                 Haptics.success()
             }
         }
@@ -328,14 +333,6 @@ struct ConversationDetailView: View {
                 }
             }
         }
-        .onChangeCompat(of: pickerItem) { _, newValue in
-            guard let newValue else { return }
-            Task { await sendAttachment(item: newValue) }
-        }
-        .onChangeCompat(of: draft) { _, newValue in
-            guard !newValue.isEmpty, canSend else { return }
-            signalTypingIfNeeded()
-        }
     }
 
     // MARK: Composer
@@ -351,7 +348,7 @@ struct ConversationDetailView: View {
             if let editTarget {
                 quoteBar(title: "Modifier le message", text: displayedContent(for: editTarget)) {
                     self.editTarget = nil
-                    draft = ""
+                    clearComposer()
                 }
             }
             if ephemeralEnabled {
@@ -369,62 +366,27 @@ struct ConversationDetailView: View {
                 .padding(.top, SQSpace.sm)
                 .transition(.opacity)
             }
-            HStack(spacing: SQSpace.sm + 2) {
-                Menu {
-                    Button { showNewPoll = true } label: {
-                        Label("Créer un sondage", systemImage: "chart.bar")
-                    }
-                    Button { showSchedulePicker = true } label: {
-                        Label("Programmer l'envoi", systemImage: "clock")
-                    }
-                    // Localisation : refusée par le backend en E2EE → proposée
-                    // uniquement en conversation non chiffrée.
-                    if !isE2EE {
-                        Button {
-                            Task { await sendCurrentLocation() }
-                        } label: {
-                            Label("Partager ma position", systemImage: "location.fill")
-                        }
-                    }
-                    Divider()
-                    Toggle(isOn: $ephemeralEnabled) {
-                        Label("Messages éphémères (24 h)", systemImage: "timer")
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                        .frame(width: 36, height: 36)
-                        .background(SQColor.fill, in: Circle())
-                        .foregroundStyle(SQColor.label)
-                }
-                .disabled(!canSend || isSending || isSharingLocation)
-                .accessibilityLabel("Plus d'actions")
-
-                PhotosPicker(selection: $pickerItem, matching: .images) {
-                    Image(systemName: "paperclip")
-                        .frame(width: 36, height: 36)
-                        .background(SQColor.fill, in: Circle())
-                        .foregroundStyle(SQColor.label)
-                }
-                .disabled(!canSend || isSending)
-                .accessibilityLabel("Joindre une photo")
-
-                TextField(canSend ? "Message" : "Chiffrement à déverrouiller", text: $draft, axis: .vertical)
-                    .lineLimit(1...4)
-                    .textFieldStyle(SQTextFieldStyle())
-                    .disabled(!canSend)
-
-                Button {
-                    Task { await send() }
-                } label: {
-                    Image(systemName: isSending ? "hourglass" : "paperplane.fill")
-                        .frame(width: 44, height: 44)
-                        .background(SQGradient.signal, in: Circle())
-                        .foregroundStyle(.white)
-                }
-                .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending || !canSend)
-                .accessibilityLabel(isSending ? "Envoi en cours" : "Envoyer le message")
-            }
-            .padding()
+            MessageComposerBar(
+                canSend: canSend,
+                isSending: isSending,
+                isSharingLocation: isSharingLocation,
+                isE2EE: isE2EE,
+                seedText: composerSeed,
+                seedToken: composerSeedToken,
+                ephemeralEnabled: $ephemeralEnabled,
+                onTyping: { newValue in
+                    guard !newValue.isEmpty, canSend else { return }
+                    signalTypingIfNeeded()
+                },
+                onSend: { text in Task { await send(text) } },
+                onPoll: { showNewPoll = true },
+                onSchedule: { text in
+                    scheduleSeedText = text
+                    showSchedulePicker = true
+                },
+                onShareLocation: { Task { await sendCurrentLocation() } },
+                onPickPhoto: { item, caption in Task { await sendAttachment(item: item, caption: caption) } }
+            )
         }
         .sqGlass(cornerRadius: 0)
     }
@@ -715,7 +677,7 @@ struct ConversationDetailView: View {
             Button {
                 replyTarget = nil
                 editTarget = message
-                draft = displayedContent(for: message)
+                seedComposer(displayedContent(for: message))
             } label: {
                 Label("Modifier", systemImage: "pencil")
             }
@@ -1188,8 +1150,20 @@ struct ConversationDetailView: View {
 
     // MARK: Actions
 
-    private func send() async {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Vide le champ de saisie de la sous-vue composer (PERF-MSG-01) via le canal seed.
+    private func clearComposer() {
+        composerSeed = ""
+        composerSeedToken &+= 1
+    }
+
+    /// Pré-remplit le champ de saisie de la sous-vue composer (édition d'un message).
+    private func seedComposer(_ value: String) {
+        composerSeed = value
+        composerSeedToken &+= 1
+    }
+
+    private func send(_ rawText: String) async {
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
         // L'édition n'est pas optimiste : on attend la confirmation serveur
@@ -1201,7 +1175,7 @@ struct ConversationDetailView: View {
                 try await service.editMessage(messageId: editTarget.id, text: text, in: conversation, e2ee: e2ee)
                 decryptedMessages[editTarget.id] = text
                 self.editTarget = nil
-                draft = ""
+                clearComposer()
                 await load()
                 Haptics.success()
             } catch {
@@ -1222,7 +1196,7 @@ struct ConversationDetailView: View {
         pendingSends[localId] = PendingSend(text: text, replyToId: replyToId, idempotencyKey: UUID().uuidString, ttlSeconds: ttl)
         sendStatus[localId] = .sending
         messages = Self.normalized(messages + [optimistic])
-        draft = ""
+        clearComposer()
         replyTarget = nil
         Haptics.light()
         await performSend(localId: localId)
@@ -1291,8 +1265,7 @@ struct ConversationDetailView: View {
         )
     }
 
-    private func sendAttachment(item: PhotosPickerItem) async {
-        defer { pickerItem = nil }
+    private func sendAttachment(item: PhotosPickerItem, caption rawCaption: String) async {
         isSending = true
         defer { isSending = false }
         do {
@@ -1319,7 +1292,7 @@ struct ConversationDetailView: View {
                 width: uploaded.width ?? prepared.width,
                 height: uploaded.height ?? prepared.height
             )
-            let caption = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+            let caption = rawCaption.trimmingCharacters(in: .whitespacesAndNewlines)
             let sent = try await service.sendAttachments(
                 [attachment],
                 caption: caption,
@@ -1331,7 +1304,7 @@ struct ConversationDetailView: View {
             if sent.isEncrypted, !caption.isEmpty {
                 decryptedMessages[sent.id] = caption
             }
-            draft = ""
+            clearComposer()
             replyTarget = nil
             Haptics.success()
         } catch {
@@ -1573,6 +1546,94 @@ struct ConversationDetailView: View {
                 }
             }
             .map(\.item)
+    }
+}
+
+/// Barre de saisie isolée (PERF-MSG-01) : possède son propre `@State text` afin que la
+/// frappe n'invalide PAS le corps de `ConversationDetailView` (et donc la liste des
+/// messages) à chaque caractère. Le parent POUSSE du texte (pré-remplissage édition,
+/// vidage après envoi) via `seedText`/`seedToken` (appliqué au seul changement de
+/// token) ; il REÇOIT le texte courant via les closures d'action.
+private struct MessageComposerBar: View {
+    let canSend: Bool
+    let isSending: Bool
+    let isSharingLocation: Bool
+    let isE2EE: Bool
+    let seedText: String
+    let seedToken: Int
+    @Binding var ephemeralEnabled: Bool
+    let onTyping: (String) -> Void
+    let onSend: (String) -> Void
+    let onPoll: () -> Void
+    let onSchedule: (String) -> Void
+    let onShareLocation: () -> Void
+    let onPickPhoto: (PhotosPickerItem, String) -> Void
+
+    @State private var text = ""
+    @State private var pickerItem: PhotosPickerItem?
+
+    var body: some View {
+        HStack(spacing: SQSpace.sm + 2) {
+            Menu {
+                Button { onPoll() } label: {
+                    Label("Créer un sondage", systemImage: "chart.bar")
+                }
+                Button { onSchedule(text) } label: {
+                    Label("Programmer l'envoi", systemImage: "clock")
+                }
+                // Localisation : refusée par le backend en E2EE → proposée
+                // uniquement en conversation non chiffrée.
+                if !isE2EE {
+                    Button { onShareLocation() } label: {
+                        Label("Partager ma position", systemImage: "location.fill")
+                    }
+                }
+                Divider()
+                Toggle(isOn: $ephemeralEnabled) {
+                    Label("Messages éphémères (24 h)", systemImage: "timer")
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .frame(width: 36, height: 36)
+                    .background(SQColor.fill, in: Circle())
+                    .foregroundStyle(SQColor.label)
+            }
+            .disabled(!canSend || isSending || isSharingLocation)
+            .accessibilityLabel("Plus d'actions")
+
+            PhotosPicker(selection: $pickerItem, matching: .images) {
+                Image(systemName: "paperclip")
+                    .frame(width: 36, height: 36)
+                    .background(SQColor.fill, in: Circle())
+                    .foregroundStyle(SQColor.label)
+            }
+            .disabled(!canSend || isSending)
+            .accessibilityLabel("Joindre une photo")
+
+            TextField(canSend ? "Message" : "Chiffrement à déverrouiller", text: $text, axis: .vertical)
+                .lineLimit(1...4)
+                .textFieldStyle(SQTextFieldStyle())
+                .disabled(!canSend)
+
+            Button {
+                onSend(text)
+            } label: {
+                Image(systemName: isSending ? "hourglass" : "paperplane.fill")
+                    .frame(width: 44, height: 44)
+                    .background(SQGradient.signal, in: Circle())
+                    .foregroundStyle(.white)
+            }
+            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending || !canSend)
+            .accessibilityLabel(isSending ? "Envoi en cours" : "Envoyer le message")
+        }
+        .padding()
+        .onChangeCompat(of: text) { _, newValue in onTyping(newValue) }
+        .onChangeCompat(of: seedToken) { _, _ in text = seedText }
+        .onChangeCompat(of: pickerItem) { _, item in
+            guard let item else { return }
+            onPickPhoto(item, text)
+            pickerItem = nil
+        }
     }
 }
 
