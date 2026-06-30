@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import Combine
 
 /// Ce qu'un Drive Test enregistre. Choix persisté localement (`@AppStorage`),
 /// défaut « Les deux » → la couverture est enregistrée par défaut (le choix d'un
@@ -139,6 +140,9 @@ final class DriveTestViewModel: ObservableObject {
     @Published private(set) var coverageTrail: [DriveCoveragePoint] = []
     /// Points speedtest géolocalisés (carte Drive Test) — colorés par débit, tappables.
     @Published private(set) var speedtestTrail: [DriveSpeedtestPoint] = []
+    /// Session en pause car le téléphone est en WiFi (réseau non représentatif du
+    /// mobile) : reprise automatique au retour en cellulaire / zone réelle.
+    @Published private(set) var isPausedForWiFi = false
     /// Opérateur de la SIM active résolu une fois (MCC→marché, operatorKey via IP/ASN
     /// ou MNC). Drive test = cellulaire : on n'affiche que SES antennes.
     private var resolvedSim: (market: String, operatorKey: String)?
@@ -146,6 +150,8 @@ final class DriveTestViewModel: ObservableObject {
     /// Dernier PLMN (MCC/MNC) vu sur la SIM : un changement en cours de session
     /// (échange SIM/eSIM) re-résout l'opérateur SANS arrêter la session (point 5).
     private var lastSimPLMN: (mcc: Int?, mnc: Int?)?
+    /// Abonnement au type de connexion (pause auto en WiFi / reprise en cellulaire).
+    private var pathCancellable: AnyCancellable?
     /// Entrée de marché courante (couleurs + libellés d'opérateur du sélecteur).
     private var marketEntry: MarketRegistryEntry?
     // Mêmes mécanismes que le speedtest normal : Live Activity + assertion
@@ -193,7 +199,12 @@ final class DriveTestViewModel: ObservableObject {
         liveMbps = 0
         livePhase = .idle
         isRunning = true
-        statusLabel = sessionMode.runsSpeedtest ? "Démarrage…" : "Enregistrement couverture…"
+        // En WiFi (réseau non représentatif du mobile), la session démarre EN PAUSE et
+        // reprend automatiquement au retour en cellulaire.
+        isPausedForWiFi = Self.isWiFiConnection(services.networkPath.status.connection)
+        statusLabel = isPausedForWiFi
+            ? "En pause — WiFi détecté"
+            : (sessionMode.runsSpeedtest ? "Démarrage…" : "Enregistrement couverture…")
         services.location.startTracking()
         UIApplication.shared.isIdleTimerDisabled = true
         // Assertion d'arrière-plan ; la boucle speedtest + Live Activity ne tournent
@@ -202,13 +213,16 @@ final class DriveTestViewModel: ObservableObject {
         background.begin(name: "drivetest")
         if sessionMode.runsSpeedtest {
             liveActivity.start(serverName: displayedOperatorLabel ?? "SignalQuest", network: services.networkPath.status.displayName, runIndex: 1, runTotal: 0)
-            sessionTask = Task { await runLoop() }
+            if !isPausedForWiFi { sessionTask = Task { await runLoop() } }
         }
+        observeConnectionForPause()
     }
 
     func stop() {
         sessionTask?.cancel()
         sessionTask = nil
+        pathCancellable?.cancel()
+        pathCancellable = nil
         if isRunning {
             services.location.stopTracking()
             UIApplication.shared.isIdleTimerDisabled = false
@@ -218,8 +232,55 @@ final class DriveTestViewModel: ObservableObject {
             statusLabel = "Arrêté"
         }
         isRunning = false
+        isPausedForWiFi = false
         liveMbps = 0
         livePhase = .idle
+    }
+
+    // MARK: Pause auto en WiFi / reprise en cellulaire
+
+    private static func isWiFiConnection(_ connection: NetworkConnectionKind) -> Bool {
+        connection == .wifi || connection == .wired
+    }
+
+    /// Observe le type de connexion : en WiFi, la session se met en pause (réseau non
+    /// représentatif du mobile) ; elle reprend dès le retour en cellulaire / zone réelle.
+    /// Une vraie zone blanche (`.other`) n'est PAS une pause : « Aucun signal » est une
+    /// mesure de couverture valide.
+    private func observeConnectionForPause() {
+        pathCancellable = services.networkPath.$status
+            .map(\.connection)
+            .removeDuplicates()
+            .sink { [weak self] connection in
+                Task { @MainActor in self?.handleConnectionChange(connection) }
+            }
+    }
+
+    private func handleConnectionChange(_ connection: NetworkConnectionKind) {
+        guard isRunning else { return }
+        let onWiFi = Self.isWiFiConnection(connection)
+        if onWiFi && !isPausedForWiFi {
+            pauseForWiFi()
+        } else if !onWiFi && isPausedForWiFi {
+            resumeAfterWiFi()
+        }
+    }
+
+    private func pauseForWiFi() {
+        isPausedForWiFi = true
+        sessionTask?.cancel()
+        sessionTask = nil
+        liveMbps = 0
+        livePhase = .idle
+        statusLabel = "En pause — WiFi détecté"
+    }
+
+    private func resumeAfterWiFi() {
+        isPausedForWiFi = false
+        statusLabel = sessionMode.runsSpeedtest ? "Reprise…" : "Enregistrement couverture…"
+        if sessionMode.runsSpeedtest && sessionTask == nil {
+            sessionTask = Task { await runLoop() }
+        }
     }
 
     // MARK: Position / antennes / secteur
@@ -275,7 +336,7 @@ final class DriveTestViewModel: ObservableObject {
     /// Capture un point « génération seule » si l'on a bougé d'au moins 20 m depuis
     /// le dernier — borne le volume sur un long trajet.
     private func captureCoveragePoint(_ coordinate: CLLocationCoordinate2D) {
-        guard sessionMode.recordsCoverage else { return }
+        guard sessionMode.recordsCoverage, !isPausedForWiFi else { return }
         if let last = lastCoveragePointCoord {
             let moved = CLLocation(latitude: last.latitude, longitude: last.longitude)
                 .distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
@@ -289,7 +350,7 @@ final class DriveTestViewModel: ObservableObject {
 
     /// Point de couverture PORTANT le débit/latence mesurés, à la position du test.
     private func captureMeasuredCoveragePoint(_ result: SpeedtestRunResult) {
-        guard sessionMode.recordsCoverage,
+        guard sessionMode.recordsCoverage, !isPausedForWiFi,
               let coordinate = services.location.lastLocation?.coordinate ?? userLocation else { return }
         appendCoveragePoint(
             CoveragePointUpload(
@@ -788,7 +849,8 @@ struct DriveTestView: View {
                 // Panneau COMPACT pendant l'enregistrement : opérateur + résultats
                 // (speedtest) ou nombre de points (couverture) + arrêt. Pas de secteur
                 // ni de sélecteur de mode (figé au démarrage).
-                if driveTestMode.runsSpeedtest {
+                if model.isPausedForWiFi { pauseBanner }
+                if driveTestMode.runsSpeedtest && !model.isPausedForWiFi {
                     liveReadout
                     sessionStats
                 }
@@ -863,6 +925,30 @@ struct DriveTestView: View {
         .background(SQColor.fill.opacity(0.6), in: Capsule())
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Couverture enregistrée : \(model.coveragePointCount) points")
+    }
+
+    /// Bandeau « en pause WiFi » (reprise auto en cellulaire) pendant l'enregistrement.
+    private var pauseBanner: some View {
+        HStack(spacing: SQSpace.sm) {
+            Image(systemName: "pause.circle.fill")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(SQColor.brandOrange)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("En pause — WiFi détecté")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(SQColor.label)
+                Text("Reprise automatique en cellulaire")
+                    .font(.caption2)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, SQSpace.sm + 2)
+        .padding(.vertical, SQSpace.xs + 2)
+        .frame(maxWidth: .infinity)
+        .background(SQColor.brandOrange.opacity(0.12), in: Capsule())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Session en pause : WiFi détecté, reprise automatique en cellulaire")
     }
 
     private var liveReadout: some View {
