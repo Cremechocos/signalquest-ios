@@ -1023,12 +1023,19 @@ struct MapExplorerView: View {
 
     @State private var mapCenter: CLLocationCoordinate2D
     @State private var mapZoom: Double
+    /// Dernier palier de zoom qui affecte le RENDU des couches (clustering/cônes).
+    /// Tant qu'il ne change pas, un changement de `mapZoom` ne reconstruit PAS les
+    /// couches (PERF-MAP-01) : entre deux frontières, `annotationPayloads` est identique.
+    @State private var lastZoomRenderBucket: Int = 0
     // Cache des couches lourdes de la carte : reconstruit uniquement quand les
     // données (`model.dataVersion`) ou les couches actives (`filters`) changent,
     // pour ne plus recalculer des milliers de structs à chaque invalidation de `body`.
     @State private var renderedAnnotations: [MapAnnotationPayload] = []
     @State private var renderedCoverageFeatures: [CoverageHeatFeature] = []
     @State private var renderedSpeedtestFeatures: [SpeedtestFeature] = []
+    /// Version monotone incrémentée à chaque `refreshMapRender()` (PERF-MAP-03) :
+    /// signale au MKMapView que les couches ont changé (vs simple déplacement caméra).
+    @State private var renderVersion = 0
     // Couches mémorisées localement (restaurées entre navigations / relances). Défaut :
     // antennes seule — l'utilisateur active les autres couches à la demande.
     @State private var filters: Set<MapDisplayItem.Kind> = MapFilterStore.lastFilters() ?? MapFilterStore.defaultFilters
@@ -1056,9 +1063,11 @@ struct MapExplorerView: View {
         // Restaure la dernière région, sinon vue pays du marché initial (dernier
         // choix persisté ou pays de la locale) — jamais une ville ni la France imposée.
         let region = MapRegionStore.lastRegion() ?? Self.region(for: MapMarketStore.initialMarketCode())
+        let initialZoom = Self.zoom(forSpan: region)
         _mapCenter = State(initialValue: region.center)
         _lastRegion = State(initialValue: region)
-        _mapZoom = State(initialValue: Self.zoom(forSpan: region))
+        _mapZoom = State(initialValue: initialZoom)
+        _lastZoomRenderBucket = State(initialValue: Self.zoomRenderBucket(for: initialZoom))
     }
 
     var body: some View {
@@ -1191,7 +1200,15 @@ struct MapExplorerView: View {
         // Données rechargées → reconstruit le cache des couches une seule fois.
         .onChangeCompat(of: model.dataVersion) { _, _ in refreshMapRender() }
         // Le zoom modifie les seuils (azimuts ≥ 14, clustering) : reconstruit aussi.
-        .onChangeCompat(of: mapZoom) { _, _ in refreshMapRender() }
+        .onChangeCompat(of: mapZoom) { _, _ in
+            // Ne reconstruire les couches que si le zoom franchit une frontière de
+            // rendu (clustering/cônes). Un pinch/pan continu ne recompose plus des
+            // milliers de structs à chaque cran sur le main thread — PERF-MAP-01.
+            let bucket = Self.zoomRenderBucket(for: mapZoom)
+            guard bucket != lastZoomRenderBucket else { return }
+            lastZoomRenderBucket = bucket
+            refreshMapRender()
+        }
         // Notification/deep link antenne : ouvre la fiche du site demandé.
         .onChangeCompat(of: router.openSiteId) { _, _ in openSiteFromRouterIfNeeded() }
     }
@@ -1202,6 +1219,7 @@ struct MapExplorerView: View {
             annotations: renderedAnnotations,
             coverageHeatFeatures: renderedCoverageFeatures,
             speedtestFeatures: renderedSpeedtestFeatures,
+            renderVersion: renderVersion,
             colorScheme: colorScheme,
             center: $mapCenter,
             zoom: $mapZoom,
@@ -1693,10 +1711,27 @@ struct MapExplorerView: View {
     /// Reconstruit le cache des couches lourdes. Appelé uniquement sur changement
     /// de données (`model.dataVersion`), de couches actives (`filters`) ou de zoom
     /// — jamais à chaque rendu de `body`.
+    /// Palier de zoom affectant le RENDU des annotations (clustering + cônes).
+    /// Frontières : 11, 12,5, 13, 13,5, 14 — exactement les seuils utilisés par
+    /// `clusteredPayloads`/`clusteredPhotoPayloads` (taille de cellule, `shouldCluster`)
+    /// et `showsAzimuths` (cônes ≥ z14). Entre deux frontières, `annotationPayloads`
+    /// est identique pour des données constantes → reconstruction inutile.
+    private static func zoomRenderBucket(for zoom: Double) -> Int {
+        switch zoom {
+        case ..<11:    return 0
+        case ..<12.5:  return 1
+        case ..<13:    return 2
+        case ..<13.5:  return 3
+        case ..<14:    return 4
+        default:       return 5
+        }
+    }
+
     private func refreshMapRender() {
         renderedAnnotations = annotationPayloads
         renderedCoverageFeatures = coverageHeatFeatures
         renderedSpeedtestFeatures = speedtestFeatures
+        renderVersion &+= 1
     }
 
     /// Ouvre la fiche du site demandé par le routeur (tap sur notification antenne
@@ -2869,6 +2904,10 @@ private struct MapKitMapView: UIViewRepresentable {
     let annotations: [MapAnnotationPayload]
     let coverageHeatFeatures: [CoverageHeatFeature]   // Phase 2
     let speedtestFeatures: [SpeedtestFeature]          // Phase 2
+    /// Incrémenté à chaque reconstruction des couches `rendered*` (PERF-MAP-03).
+    /// Permet à `updateUIView` de distinguer « les données ont changé » de « seule la
+    /// caméra a bougé » et d'éviter le hash/compare O(n) des couches à chaque pan.
+    let renderVersion: Int
     let colorScheme: ColorScheme
     @Binding var center: CLLocationCoordinate2D
     @Binding var zoom: Double
@@ -2904,10 +2943,16 @@ private struct MapKitMapView: UIViewRepresentable {
 
     func updateUIView(_ map: MKMapView, context: Context) {
         context.coordinator.applyBackdrop(backdrop, on: map)
-        context.coordinator.setCones(from: annotations, on: map)
-        context.coordinator.setCoverage(coverageHeatFeatures, on: map)
-        context.coordinator.setSpeedtest(speedtestFeatures, on: map)
-        context.coordinator.apply(annotations: annotations, on: map)
+        // PERF-MAP-03 : ne resynchroniser les couches que si les données ont changé.
+        // Un simple déplacement caméra (pan/zoom) réévalue `updateUIView` mais ne doit
+        // plus re-hasher/comparer des milliers d'éléments — seule la caméra est appliquée.
+        if context.coordinator.lastRenderVersion != renderVersion {
+            context.coordinator.lastRenderVersion = renderVersion
+            context.coordinator.setCones(from: annotations, on: map)
+            context.coordinator.setCoverage(coverageHeatFeatures, on: map)
+            context.coordinator.setSpeedtest(speedtestFeatures, on: map)
+            context.coordinator.apply(annotations: annotations, on: map)
+        }
         context.coordinator.applyCameraIfNeeded(center: center, zoom: zoom, on: map)
     }
 
@@ -2929,6 +2974,7 @@ private struct MapKitMapView: UIViewRepresentable {
         private var coneSignature = 0
         private var appliedBackdrop: MapBackdrop?
         private var tileOverlay: MKTileOverlay?
+        var lastRenderVersion = -1
 
         init(center: Binding<CLLocationCoordinate2D>, zoom: Binding<Double>,
              onMoveEnd: @escaping (MapBounds, Double) -> Void,

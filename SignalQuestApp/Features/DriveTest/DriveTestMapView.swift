@@ -62,6 +62,7 @@ struct DriveTestMapView: UIViewRepresentable {
         private var coneInSector: [ObjectIdentifier: Bool] = [:]
         private var tracePolyline: MKPolyline?
         private var coverageOverlay: DriveDotsOverlay?
+        private weak var coverageRenderer: DriveDotsRenderer?
         private var lastAntennaSig = 0
         private var lastConeSig = ""
         private var lastTraceCount = -1
@@ -160,12 +161,21 @@ struct DriveTestMapView: UIViewRepresentable {
         private func syncCoverage(_ trail: [DriveCoveragePoint], on map: MKMapView) {
             guard trail.count != coverageCount else { return }
             coverageCount = trail.count
-            if let old = coverageOverlay { map.removeOverlay(old); coverageOverlay = nil }
-            guard !trail.isEmpty else { return }
+            guard !trail.isEmpty else {
+                if let old = coverageOverlay { map.removeOverlay(old); coverageOverlay = nil; coverageRenderer = nil }
+                return
+            }
             let dots = trail.map { DriveDotsOverlay.Dot(point: MKMapPoint($0.coordinate), color: Self.generationColor(Self.generationKey($0.generation)).cgColor) }
-            let o = DriveDotsOverlay(dots: dots)
-            coverageOverlay = o
-            map.addOverlay(o, level: .aboveRoads)
+            // PERF-MAP-02 : mise à jour EN PLACE de l'overlay existant (pas de remove+add
+            // ni de recalcul d'union à chaque fix GPS). Tous les points restent affichés.
+            if let existing = coverageOverlay {
+                existing.dots = dots
+                coverageRenderer?.setNeedsDisplay()
+            } else {
+                let o = DriveDotsOverlay(dots: dots)
+                coverageOverlay = o
+                map.addOverlay(o, level: .aboveRoads)
+            }
         }
 
         private static func generationKey(_ tech: String?) -> String {
@@ -213,7 +223,11 @@ struct DriveTestMapView: UIViewRepresentable {
         // MARK: Délégué
         func mapView(_ map: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let tile = overlay as? MKTileOverlay { return MKTileOverlayRenderer(tileOverlay: tile) }
-            if let dots = overlay as? DriveDotsOverlay { return DriveDotsRenderer(overlay: dots) }
+            if let dots = overlay as? DriveDotsOverlay {
+                let r = DriveDotsRenderer(overlay: dots)
+                coverageRenderer = r
+                return r
+            }
             if let line = overlay as? MKPolyline {
                 let r = MKPolylineRenderer(polyline: line)
                 r.strokeColor = UIColor(SQColor.brandOrange).withAlphaComponent(0.95)
@@ -324,16 +338,16 @@ final class DriveSpeedtestMarkerView: MKAnnotationView {
 /// Overlay « nuage de points » dense (couverture trail) — passe Core Graphics + culling.
 final class DriveDotsOverlay: NSObject, MKOverlay {
     struct Dot { let point: MKMapPoint; let color: CGColor }
-    let dots: [Dot]
-    let boundingMapRect: MKMapRect
-    let coordinate: CLLocationCoordinate2D
+    var dots: [Dot]
+    // PERF-MAP-02 : `boundingMapRect` figé au monde entier. L'overlay couverture est
+    // mis à jour EN PLACE pendant l'enregistrement (les `dots` changent sans détruire/
+    // recréer l'overlay), ce qui évite (a) le recalcul d'union à chaque fix GPS et
+    // (b) le churn MapKit remove/add ; et garantit que les nouveaux points hors de
+    // l'emprise initiale restent dessinés. Le renderer découpe au viewport.
+    let boundingMapRect: MKMapRect = .world
+    let coordinate = CLLocationCoordinate2D(latitude: 0, longitude: 0)
     init(dots: [Dot]) {
         self.dots = dots
-        var rect = MKMapRect.null
-        for d in dots { rect = rect.union(MKMapRect(origin: d.point, size: MKMapSize(width: 0.5, height: 0.5))) }
-        let bounding = rect.isNull ? MKMapRect.world : rect.insetBy(dx: -rect.size.width * 0.1 - 50, dy: -rect.size.height * 0.1 - 50)
-        boundingMapRect = bounding
-        coordinate = MKMapPoint(x: bounding.midX, y: bounding.midY).coordinate
     }
 }
 
