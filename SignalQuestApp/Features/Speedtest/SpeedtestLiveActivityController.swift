@@ -10,6 +10,10 @@ import ActivityKit
 @MainActor
 final class SpeedtestLiveActivityController {
 
+    // PERF-LA-01 : throttle des pushes ActivityKit (le moteur speedtest émet ~7/s).
+    private var lastPushDate: Date?
+    private var lastPhaseLabel: String?
+
     /// Vrai si les Live Activities sont autorisées (réglages système) et l'API dispo.
     var isAvailable: Bool {
         guard #available(iOS 16.2, *) else { return false }
@@ -21,6 +25,7 @@ final class SpeedtestLiveActivityController {
     func start(serverName: String, network: String, runIndex: Int = 1, runTotal: Int = 1) {
         guard #available(iOS 16.2, *) else { return }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        lastPushDate = nil; lastPhaseLabel = nil   // nouveau test : la 1re mise à jour pousse
         let state = SpeedtestActivityAttributes.ContentState(
             phaseLabel: runTotal > 1 ? "Test \(runIndex)/\(runTotal)" : "Démarrage",
             downloadMbps: 0, uploadMbps: 0, pingMs: 0, progress: 0.04,
@@ -47,6 +52,16 @@ final class SpeedtestLiveActivityController {
         runTotal: Int = 1
     ) {
         guard #available(iOS 16.2, *) else { return }
+        // Ne pousse à ActivityKit que sur changement de phase ou toutes les ~800 ms :
+        // SpringBoard re-render l'écran verrouillé + l'Île dynamique à chaque push, et
+        // ~7 pushes/s en continu (rafale Drive Test) chauffent l'appareil. La jauge du
+        // panneau SwiftUI ne passe pas par ici → elle reste à pleine cadence.
+        let now = Date()
+        if phaseLabel == lastPhaseLabel, let last = lastPushDate, now.timeIntervalSince(last) < 0.8 {
+            return
+        }
+        lastPushDate = now
+        lastPhaseLabel = phaseLabel
         push(SpeedtestActivityAttributes.ContentState(
             phaseLabel: phaseLabel,
             downloadMbps: downloadMbps, uploadMbps: uploadMbps, pingMs: pingMs,
@@ -57,6 +72,7 @@ final class SpeedtestLiveActivityController {
     /// Termine la Live Activity en affichant le résultat final un court instant.
     func end(downloadMbps: Double = 0, uploadMbps: Double = 0, pingMs: Double = 0, runIndex: Int = 1, runTotal: Int = 1) {
         guard #available(iOS 16.2, *) else { return }
+        lastPushDate = nil; lastPhaseLabel = nil
         let content = ActivityContent(
             state: SpeedtestActivityAttributes.ContentState(
                 phaseLabel: runTotal > 1 ? "Rafale terminée" : "Terminé",
@@ -75,6 +91,7 @@ final class SpeedtestLiveActivityController {
     /// Termine immédiatement toute activité résiduelle (annulation, erreur).
     func cancel() {
         guard #available(iOS 16.2, *) else { return }
+        lastPushDate = nil; lastPhaseLabel = nil
         Task {
             for activity in Activity<SpeedtestActivityAttributes>.activities {
                 await activity.end(nil, dismissalPolicy: .immediate)

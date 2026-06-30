@@ -20,16 +20,30 @@ final class CredentialStore: @unchecked Sendable {
 
     // MARK: Access token
 
+    // PERF-KEY-02 : cache mémoire du token d'accès. `accessToken()` est appelé pour
+    // CHAQUE requête authentifiée (des dizaines par pan de carte) ; sans cache, chaque
+    // appel faisait une lecture Keychain (IPC securityd). Le Keychain reste la source
+    // persistante ; le cache est tenu à jour sur TOUS les chemins d'écriture.
+    private var _cachedAccessToken: String?
+    private var accessTokenLoaded = false
+
     func accessToken() -> String? {
-        try? tokenStore.string(for: Key.accessToken)
+        lock.lock(); defer { lock.unlock() }
+        if accessTokenLoaded { return _cachedAccessToken }
+        let token = try? tokenStore.string(for: Key.accessToken)
+        _cachedAccessToken = token
+        accessTokenLoaded = true
+        return token
     }
 
     func setAccessToken(_ token: String) throws {
         try tokenStore.set(token, for: Key.accessToken)
+        lock.lock(); _cachedAccessToken = token; accessTokenLoaded = true; lock.unlock()
     }
 
     func clearAccessToken() {
         try? tokenStore.remove(Key.accessToken)
+        lock.lock(); _cachedAccessToken = nil; accessTokenLoaded = true; lock.unlock()
     }
 
     // MARK: Refresh token (reserved)
@@ -61,6 +75,7 @@ final class CredentialStore: @unchecked Sendable {
     func clearAll() {
         try? tokenStore.remove(Key.accessToken)
         try? tokenStore.remove(Key.refreshToken)
+        lock.lock(); _cachedAccessToken = nil; accessTokenLoaded = true; lock.unlock()
         setTempToken(nil)
         // SEC-AUTH-02 : URLSession.shared stocke aussi le cookie `auth_token` reçu
         // en Set-Cookie dans HTTPCookieStorage.shared et le ré-émet automatiquement.

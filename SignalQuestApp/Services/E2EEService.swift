@@ -62,6 +62,10 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
     private let tokenStore: TokenStore
     private let stateLock = NSLock()
     private var unlockedPrivateJwk: String?
+    /// Cache mémoire des clés symétriques de conversation (PERF-KEY-01) : évite une
+    /// lecture Keychain (IPC securityd) à CHAQUE message déchiffré. Source persistante =
+    /// Keychain ; invalidé sur rotation de clé (409) et à `wipeLocalKeys()`.
+    private var conversationKeyCache: [String: Data] = [:]
 
     init(api: APIClient, tokenStore: TokenStore = KeychainStore(service: "fr.signalquest.ios.e2ee")) {
         self.api = api
@@ -194,7 +198,7 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
     }
 
     func wipeLocalKeys() async {
-        stateLock.withLock { unlockedPrivateJwk = nil }
+        stateLock.withLock { unlockedPrivateJwk = nil; conversationKeyCache.removeAll() }
         try? tokenStore.removeAll()
         // Efface aussi le mot de passe E2EE mémorisé derrière la biométrie : c'est
         // du matériel E2EE, il ne doit pas survivre à un logout / changement de compte.
@@ -268,9 +272,14 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
     }
 
     private func conversationKeyData(conversationId: String) async throws -> Data {
+        // Cache mémoire d'abord (PERF-KEY-01) — évite l'aller-retour Keychain par message.
+        if let mem = stateLock.withLock({ conversationKeyCache[conversationId] }) {
+            return mem
+        }
         if let cached = try tokenStore.string(for: "conversation:\(conversationId)"),
            let data = Data(base64Encoded: cached),
            data.count == 32 {
+            stateLock.withLock { conversationKeyCache[conversationId] = data }
             return data
         }
 
@@ -281,11 +290,14 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
             let response: ConversationKeyResponse = try await api.request(APIEndpoint(path: "/api/messages/conversations/\(conversationId)/key"), as: ConversationKeyResponse.self)
             let raw = try Self.unwrapConversationKey(wrappedKeyB64: response.wrappedKeyB64, privateJwk: privateJwk)
             try tokenStore.set(raw.base64EncodedString(), for: "conversation:\(conversationId)", accessibility: .whenUnlocked)
+            stateLock.withLock { conversationKeyCache[conversationId] = raw }
             return raw
         } catch APIError.http(let status, _, _, _, _) where status == 409 {
-            // Rotation de clé E2EE côté serveur : la clé wrappée est obsolète.
-            // On purge le cache local ; le prochain accès re-fetchera après re-partage.
+            // Rotation de clé E2EE côté serveur : la clé wrappée est obsolète. On purge
+            // le cache local (mémoire + Keychain) ; le prochain accès re-fetchera après
+            // re-partage.
             try? tokenStore.remove("conversation:\(conversationId)")
+            stateLock.withLock { _ = conversationKeyCache.removeValue(forKey: conversationId) }
             throw E2EEError.staleKey
         }
     }

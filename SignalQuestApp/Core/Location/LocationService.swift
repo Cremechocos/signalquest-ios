@@ -48,6 +48,11 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 
     private func beginTrackingNow() {
         manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        // PERF-GPS-01 : ne livrer un fix que tous les 8 m (= le seuil applicatif de la
+        // trace). Supprime les fixes redondants à l'arrêt / basse vitesse, qui
+        // déclenchaient sinon à chaque fois recomputeNearest (O(antennes)) + écriture
+        // App Group + tâches sur le main thread. Densité de trace inchangée (seuil 8 m).
+        manager.distanceFilter = 8
         manager.allowsBackgroundLocationUpdates = true
         manager.pausesLocationUpdatesAutomatically = false
         manager.startUpdatingLocation()
@@ -61,6 +66,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
             manager.allowsBackgroundLocationUpdates = false
         }
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        manager.distanceFilter = kCLDistanceFilterNone
     }
 
     func requestOneShotLocation() {
