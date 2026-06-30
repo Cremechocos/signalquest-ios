@@ -1,5 +1,5 @@
 {
-  "originHash" : "22104d5ae238bc004a03097956656e036a21afb0bf6aa7d180bb9a32f41bb37b",
+  "originHash" : "86c454b53c626c8b2883a9ece7ab0122de0a0a11640b335d84b2d680c25f52db",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -116,15 +116,6 @@
       "state" : {
         "revision" : "7c161254ce7cd55debc48023f69a917076b12a26",
         "version" : "0.0.6"
-      }
-    },
-    {
-      "identity" : "maplibre-gl-native-distribution",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/maplibre/maplibre-gl-native-distribution.git",
-      "state" : {
-        "revision" : "be0696007ca8b350faa0e5968c0d6397d59db415",
-        "version" : "6.26.0"
       }
     },
     {

@@ -38,7 +38,6 @@
 		1EC17F2A5E383435467A6EB1 /* SQBrand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 342AD252F576AA2664A4C655 /* SQBrand.swift */; };
 		1EF63FFE668545D35C37E403 /* MyMeasurementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA556BEE2D1EA6BAA5FB0800 /* MyMeasurementsView.swift */; };
 		2178A64BBFDCF36192FACCD4 /* AppleDeviceDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F5CFE5CCBA408F62BDCC840 /* AppleDeviceDescriptor.swift */; };
-		21EDBBF70A91AEDE041F8298 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 6EAEE5F367C7CB8690FF7147 /* FirebaseMessaging */; };
 		223A9CEC6280B585F98FB578 /* AntennaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DA025CCAC0DF6A4A8AD5A6E /* AntennaModels.swift */; };
 		2516E3C8A6050766B3839034 /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55CF1B9AC2B2537FE31D0FED /* SignupView.swift */; };
 		252D00D6A738321EA3312FBA /* MessagesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6C44B8774426189E2CBF50 /* MessagesService.swift */; };
@@ -70,7 +69,7 @@
 		44A5E6AD4F34996E15C73224 /* SessionsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24B43573690B59F5B6ECA05C /* SessionsListView.swift */; };
 		457C2A59F2A7938C086C2669 /* FeedItemCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F4F7435470D7B186E080C8E /* FeedItemCard.swift */; };
 		479DAA09F0F70F020AB8CA4F /* ANFRSiteDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8327BBD2C2D10A320833EC79 /* ANFRSiteDetailSheet.swift */; };
-		48C419E3E4CA1E519CB37A9B /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = F2EF657BC1E07920DD9BF7DA /* FirebaseAnalytics */; };
+		48C419E3E4CA1E519CB37A9B /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 6EAEE5F367C7CB8690FF7147 /* FirebaseMessaging */; };
 		4A25941995D0EC7FD14AEC6C /* SQRadius.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FB22F5DE6B092A44B9F7A91 /* SQRadius.swift */; };
 		4A47DAD1AD56717BCE3405C7 /* PhotoUploadPreparation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1D216600CE3DCF8B267BD70 /* PhotoUploadPreparation.swift */; };
 		4A54B72BCBA77DBCE0F62CD9 /* AuthCookieStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 830D7ECFA820F2E774487EC0 /* AuthCookieStoreTests.swift */; };
@@ -127,7 +126,7 @@
 		7D587A943F3C2B6675722262 /* SignalQuestUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230A19DCE27F22F952273493 /* SignalQuestUITests.swift */; };
 		7E8B1CCCA9F6BE070514C050 /* SpeedtestIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6A9E12FB0C1755E79A6216 /* SpeedtestIntents.swift */; };
 		8027C2DE7425912942340D4B /* NewModelDecodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A30FBE643735E6E375B3948 /* NewModelDecodeTests.swift */; };
-		80E825877A511351EBDCAE08 /* MapLibre in Frameworks */ = {isa = PBXBuildFile; productRef = E6CB4F379D35DE4EDCBA0013 /* MapLibre */; };
+		80E825877A511351EBDCAE08 /* LiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = BB84BCC804AE4D6D0E2FF2FF /* LiveKit */; };
 		81672BA3E386570C6398A008 /* CoverageCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91DE6C62E4954951C0A2419C /* CoverageCardView.swift */; };
 		820491F93E8015B6ECDD7D2D /* CallSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8366DB9AD97C6EFE27467176 /* CallSessionView.swift */; };
 		836D76211D8B12F2E56901A8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AD04EAFD67FBCB63533321A0 /* Assets.xcassets */; };
@@ -203,7 +202,7 @@
 		E0941F020DD3319E69F428FE /* SessionTraceMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31D4A2FC853B46DC0196738 /* SessionTraceMapView.swift */; };
 		E156E1B5171E02B1878DA63A /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F378A97EE08A97DD345A432F /* FeedView.swift */; };
 		E4D3352BEA88542E42F96E7B /* ValidationsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8738D9A09B93678F37E5A510 /* ValidationsSheet.swift */; };
-		E53F5CF267D21D6EBCBBB070 /* LiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = BB84BCC804AE4D6D0E2FF2FF /* LiveKit */; };
+		E53F5CF267D21D6EBCBBB070 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = F2EF657BC1E07920DD9BF7DA /* FirebaseAnalytics */; };
 		E92941996F6D38DEF635810C /* SpeedtestTrendWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 188B982997C559D0E38231B7 /* SpeedtestTrendWidget.swift */; };
 		E996989B13437E3678AA43BA /* SQEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B3B3E33665A0D12EB2183E /* SQEffects.swift */; };
 		EB9551322B0DE0869A0B7E2C /* ReportsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF5C473D670B7B2938ABCB45 /* ReportsService.swift */; };
@@ -214,7 +213,6 @@
 		F5B1F063472CD474A7C9E2A1 /* E2EEBiometric.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E3C9707438A21F39B4C8A70 /* E2EEBiometric.swift */; };
 		F65CE0D7B751228A5B147A0A /* SQSpace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A073CAEDF99975C220519FB1 /* SQSpace.swift */; };
 		F6BC5F6AB5F5BC1D5D2B282E /* SectorNumbering.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3132D23393CBFB7001BC1C1D /* SectorNumbering.swift */; };
-		F7308C60E309E15CD9A34A14 /* ANFRMapLibreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22E17AAB0DBE686BAA3FB197 /* ANFRMapLibreView.swift */; };
 		FC56E7C3FFDFBDBD65E65037 /* SQComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0078226636E735A7665D8A3 /* SQComponents.swift */; };
 		FD652D6B4802405CA11E6A2E /* ArchivoExpanded-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8D019C806054A39837556C09 /* ArchivoExpanded-Bold.ttf */; };
 		FD8C8A4E55F6F7F937636C0E /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C14BE7BE1D4056FB4421D16 /* APIClientTests.swift */; };
@@ -283,7 +281,6 @@
 		1E3C9707438A21F39B4C8A70 /* E2EEBiometric.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEBiometric.swift; sourceTree = "<group>"; };
 		1F4F7435470D7B186E080C8E /* FeedItemCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedItemCard.swift; sourceTree = "<group>"; };
 		1FF3CB12A75C5483284BC5C7 /* AntennaDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaDetailSheet.swift; sourceTree = "<group>"; };
-		22E17AAB0DBE686BAA3FB197 /* ANFRMapLibreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRMapLibreView.swift; sourceTree = "<group>"; };
 		230A19DCE27F22F952273493 /* SignalQuestUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalQuestUITests.swift; sourceTree = "<group>"; };
 		24B43573690B59F5B6ECA05C /* SessionsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsListView.swift; sourceTree = "<group>"; };
 		26BF4AF46D1515F881E4DF50 /* CommentsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsService.swift; sourceTree = "<group>"; };
@@ -483,10 +480,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				80E825877A511351EBDCAE08 /* MapLibre in Frameworks */,
-				E53F5CF267D21D6EBCBBB070 /* LiveKit in Frameworks */,
-				48C419E3E4CA1E519CB37A9B /* FirebaseAnalytics in Frameworks */,
-				21EDBBF70A91AEDE041F8298 /* FirebaseMessaging in Frameworks */,
+				80E825877A511351EBDCAE08 /* LiveKit in Frameworks */,
+				E53F5CF267D21D6EBCBBB070 /* FirebaseAnalytics in Frameworks */,
+				48C419E3E4CA1E519CB37A9B /* FirebaseMessaging in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -497,7 +493,6 @@
 			isa = PBXGroup;
 			children = (
 				8C94749CE21617DB555FC5D6 /* ANFRDemoData.swift */,
-				22E17AAB0DBE686BAA3FB197 /* ANFRMapLibreView.swift */,
 				2C527B3C2A1021E22E74D4D2 /* ANFRMapView.swift */,
 				8327BBD2C2D10A320833EC79 /* ANFRSiteDetailSheet.swift */,
 				805212969955D9E456D8238A /* ANFRStatsView.swift */,
@@ -1145,7 +1140,6 @@
 			);
 			name = SignalQuest;
 			packageProductDependencies = (
-				E6CB4F379D35DE4EDCBA0013 /* MapLibre */,
 				BB84BCC804AE4D6D0E2FF2FF /* LiveKit */,
 				F2EF657BC1E07920DD9BF7DA /* FirebaseAnalytics */,
 				6EAEE5F367C7CB8690FF7147 /* FirebaseMessaging */,
@@ -1229,7 +1223,6 @@
 			packageReferences = (
 				59BFF4E1C888AF084679F42B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				3E25BD558BD33779E7879F1F /* XCRemoteSwiftPackageReference "client-sdk-swift" */,
-				81CDEC0D70D26E2850DCD72E /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5FF01791C8007B706913F656 /* Products */;
@@ -1275,7 +1268,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				8A4136A5D87AAEDAB5407344 /* ANFRDemoData.swift in Sources */,
-				F7308C60E309E15CD9A34A14 /* ANFRMapLibreView.swift in Sources */,
 				09DB4065C92DDC2E681B4950 /* ANFRMapView.swift in Sources */,
 				066B6DDEB1907946214C4A5C /* ANFRModels.swift in Sources */,
 				CB8D5E02EEF4BDE6C61A5B90 /* ANFRService.swift in Sources */,
@@ -2004,14 +1996,6 @@
 				version = 12.13.0;
 			};
 		};
-		81CDEC0D70D26E2850DCD72E /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/maplibre/maplibre-gl-native-distribution.git";
-			requirement = {
-				kind = exactVersion;
-				version = 6.26.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -2024,11 +2008,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 3E25BD558BD33779E7879F1F /* XCRemoteSwiftPackageReference "client-sdk-swift" */;
 			productName = LiveKit;
-		};
-		E6CB4F379D35DE4EDCBA0013 /* MapLibre */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 81CDEC0D70D26E2850DCD72E /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */;
-			productName = MapLibre;
 		};
 		F2EF657BC1E07920DD9BF7DA /* FirebaseAnalytics */ = {
 			isa = XCSwiftPackageProductDependency;

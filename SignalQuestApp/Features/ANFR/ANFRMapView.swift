@@ -1,8 +1,5 @@
 import SwiftUI
 import MapKit
-#if canImport(MapLibre)
-import MapLibre
-#endif
 
 // MARK: - ViewModel
 

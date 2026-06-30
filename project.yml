@@ -16,9 +16,6 @@ settings:
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: "835X2977R7"
 packages:
-  MapLibre:
-    url: https://github.com/maplibre/maplibre-gl-native-distribution.git
-    exactVersion: 6.26.0
   LiveKit:
     url: https://github.com/livekit/client-sdk-swift.git
     exactVersion: 2.14.0
@@ -58,8 +55,6 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_USER_SCRIPT_SANDBOXING: YES
     dependencies:
-      - package: MapLibre
-        product: MapLibre
       - package: LiveKit
         product: LiveKit
       # Firebase (Analytics inclut FirebaseCore, importé dans AppDelegate/SignalQuestApp).

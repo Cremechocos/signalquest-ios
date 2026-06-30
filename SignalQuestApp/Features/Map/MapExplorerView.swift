@@ -1,9 +1,6 @@
 import SwiftUI
 import MapKit
 import ImageIO
-#if canImport(MapLibre)
-import MapLibre
-#endif
 
 @MainActor
 final class MapExplorerViewModel: ObservableObject {
@@ -675,7 +672,7 @@ private struct MapAnnotationPayload: Identifiable, Equatable {
     }
 }
 
-/// Point speedtest rendu en couche GPU (`MLNCircleStyleLayer`). Distinct des
+/// Point speedtest rendu en couche dense (MKOverlay Core Graphics). Distinct des
 /// annotations-vues : permet d'afficher TOUS les points (milliers) sans cluster
 /// ni cap, coloré par débit — comportement identique à Android.
 private struct SpeedtestFeature: Equatable {
@@ -731,7 +728,7 @@ private struct CoverageHeatFeature: Equatable {
     let id: String
     let coordinate: CLLocationCoordinate2D
     let weight: Double
-    /// Clé de regroupement GPU — une source/couche par clé (bande RSRP ou génération).
+    /// Clé de regroupement — une source/couche par clé (bande RSRP ou génération).
     let colorKey: String
     /// Couleur de la pastille (0xRRGGBB), figée selon le mode de coloration courant.
     let colorHex: UInt32
@@ -822,7 +819,6 @@ private enum CoverageQualityBand: String, CaseIterable, Identifiable {
         }
     }
 
-#if canImport(MapLibre)
     var uiColor: UIColor {
         switch self {
         case .excellent: return UIColor(red: 0x10 / 255, green: 0xB9 / 255, blue: 0x81 / 255, alpha: 1.0)
@@ -833,7 +829,6 @@ private enum CoverageQualityBand: String, CaseIterable, Identifiable {
         case .unknown: return UIColor(red: 0x94 / 255, green: 0xA3 / 255, blue: 0xB8 / 255, alpha: 1.0)
         }
     }
-#endif
 }
 
 /// Bandes de GÉNÉRATION pour la couche couverture (mode « génération », distinct du
@@ -878,7 +873,7 @@ private enum CoverageGenerationBand: String, CaseIterable, Identifiable {
     var swiftUIColor: Color { Color(hex: colorHex) }
 }
 
-/// Paliers de débit descendant pour colorer la couche GPU des speedtests —
+/// Paliers de débit descendant pour colorer la couche dense des speedtests —
 /// échelle identique au web (`speedColorUtils.ts`) et à Android : rouge → orange
 /// → jaune → vert clair → vert → cyan → bleu.
 private enum SpeedBand: String, CaseIterable {
@@ -902,7 +897,6 @@ private enum SpeedBand: String, CaseIterable {
         }
     }
 
-#if canImport(MapLibre)
     var uiColor: UIColor {
         switch self {
         case .exceptional: return UIColor(red: 0x3B / 255, green: 0x82 / 255, blue: 0xF6 / 255, alpha: 1.0)
@@ -914,7 +908,6 @@ private enum SpeedBand: String, CaseIterable {
         case .verySlow:    return UIColor(red: 0xEF / 255, green: 0x44 / 255, blue: 0x44 / 255, alpha: 1.0)
         }
     }
-#endif
 }
 
 /// Persists the last viewed map region so the app reopens where the user left
@@ -1028,10 +1021,6 @@ struct MapExplorerView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    // Carte SwiftUI de secours (jamais compilée tant que MapLibre est présent).
-#if !canImport(MapLibre)
-    @State private var position: MapCameraPosition
-#endif
     @State private var mapCenter: CLLocationCoordinate2D
     @State private var mapZoom: Double
     // Cache des couches lourdes de la carte : reconstruit uniquement quand les
@@ -1067,9 +1056,6 @@ struct MapExplorerView: View {
         // Restaure la dernière région, sinon vue pays du marché initial (dernier
         // choix persisté ou pays de la locale) — jamais une ville ni la France imposée.
         let region = MapRegionStore.lastRegion() ?? Self.region(for: MapMarketStore.initialMarketCode())
-#if !canImport(MapLibre)
-        _position = State(initialValue: .region(region))
-#endif
         _mapCenter = State(initialValue: region.center)
         _lastRegion = State(initialValue: region)
         _mapZoom = State(initialValue: Self.zoom(forSpan: region))
@@ -1136,9 +1122,6 @@ struct MapExplorerView: View {
                 let region = region(forMarketCode: model.marketFilter)
                 mapCenter = region.center
                 mapZoom = Self.zoom(forSpan: region)
-#if !canImport(MapLibre)
-                position = .region(region)
-#endif
                 lastRegion = region
             }
             await model.load(region: lastRegion, zoom: mapZoom, filters: filters)
@@ -1192,9 +1175,6 @@ struct MapExplorerView: View {
                 let region = region(forMarketCode: newValue)
                 mapCenter = region.center
                 mapZoom = Self.zoom(forSpan: region)
-#if !canImport(MapLibre)
-                position = .region(region)
-#endif
                 scheduleLoad(region: region)
             }
             MapMarketStore.save(market: model.marketFilter, operator: model.operatorFilter)
@@ -1216,11 +1196,8 @@ struct MapExplorerView: View {
         .onChangeCompat(of: router.openSiteId) { _, _ in openSiteFromRouterIfNeeded() }
     }
 
-    @ViewBuilder
     private var mapLayer: some View {
-#if canImport(MapLibre)
-        // Migration moteur unique : rendu MapKit (Apple Plan natif). Même interface
-        // que l'ancien SQMapLibreMapView (mêmes payloads).
+        // Moteur unique : rendu MapKit (Apple Plan natif).
         MapKitMapView(
             annotations: renderedAnnotations,
             coverageHeatFeatures: renderedCoverageFeatures,
@@ -1246,32 +1223,11 @@ struct MapExplorerView: View {
             onSelect: selectAnnotation
         )
         .ignoresSafeArea(edges: .bottom)
-#else
-        Map(position: $position) {
-            ForEach(renderedAnnotations) { item in
-                Annotation(item.title, coordinate: item.coordinate) {
-                    Button {
-                        Haptics.light()
-                        selectAnnotation(item)
-                    } label: {
-                        annotation(for: item.kind)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .including([.publicTransport])))
-        .ignoresSafeArea(edges: .bottom)
-        .onMapCameraChange(frequency: .onEnd) { context in
-            model.scheduleMarketDetection(center: context.region.center)
-            scheduleLoad(region: context.region)
-        }
-#endif
     }
 
     /// Hook QA (DEBUG) : `SQ_QA_PAN_TO="lat,lng[,zoom]"` déplace la caméra
     /// après stabilisation, comme la fin d'un pan utilisateur — le delegate
-    /// MapLibre déclenche alors la chaîne réelle de détection de marché.
+    /// MapKit déclenche alors la chaîne réelle de détection de marché.
     private func runQAPanIfRequested() async {
         #if DEBUG
         guard let raw = ProcessInfo.processInfo.environment["SQ_QA_PAN_TO"] else { return }
@@ -1610,12 +1566,6 @@ struct MapExplorerView: View {
                 let coordinate = location.coordinate
                 mapCenter = coordinate
                 mapZoom = 15
-#if !canImport(MapLibre)
-                position = .region(MKCoordinateRegion(
-                    center: coordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
-                ))
-#endif
                 scheduleLoad(region: MKCoordinateRegion(
                     center: coordinate,
                     span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
@@ -1706,12 +1656,6 @@ struct MapExplorerView: View {
                             let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
                             mapCenter = coordinate
                             mapZoom = 15
-#if !canImport(MapLibre)
-                            position = .region(MKCoordinateRegion(
-                                center: coordinate,
-                                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                            ))
-#endif
                             model.searchResults = []
                             selectedAntenna = site
                         }
@@ -1946,7 +1890,7 @@ struct MapExplorerView: View {
         }
     }
 
-    /// Couche Speedtests rendue en GPU (`MLNCircleStyleLayer`) : TOUT s'affiche,
+    /// Couche Speedtests rendue en couche dense (MKOverlay) : TOUT s'affiche,
     /// sans cluster ni cap, coloré par débit descendant. Les annotations-vues ne
     /// pourraient pas tenir des milliers de points.
     private var speedtestFeatures: [SpeedtestFeature] {
@@ -2018,7 +1962,7 @@ struct MapExplorerView: View {
 
     /// Couche Photos : vignettes géolocalisées affichées directement sur la
     /// carte. Tap → `MapPhotoViewer` (photo en grand, infos antenne, like,
-    /// commentaires). Les doublons de coordonnées sont conservés (MapLibre les
+    /// commentaires). Les doublons de coordonnées sont conservés (le rendu dense les
     /// décale légèrement) tant qu'ils ont un id distinct.
     /// Couche Photos : vignettes des photos de TOUS les membres (`publicPhotos`),
     /// clusterisées pour rester fluide (vignettes individuelles seulement quand
@@ -2130,7 +2074,7 @@ struct MapExplorerView: View {
                 }
             }
             if render.useRawPoints {
-                // Tous les points bruts (cap élevé unifié) — le rendu GPU MapLibre les tient.
+                // Tous les points bruts (cap élevé unifié) — le rendu MKOverlay les tient.
                 features += tile.points.lazy.filter { matchesSelectedBand($0.band) }.prefix(CoverageRenderPolicy.pointCapPerTile).map { point in
                     let parts = coverageColorParts(rsrp: point.rsrp, tech: point.tech)
                     return CoverageHeatFeature(
@@ -2339,8 +2283,8 @@ struct MapExplorerView: View {
     private var displayItems: [MapDisplayItem] {
         // Couches « riches » construites hors du mapping générique en pastille :
         //  · photos → `photoPayloads` (vignettes)
-        //  · speedtests → couche GPU `speedtestFeatures` (tout afficher, sans cluster)
-        //  · couverture → couche GPU (dots RSRP type nPerf)
+        //  · speedtests → couche dense `speedtestFeatures` (tout afficher, sans cluster)
+        //  · couverture → couche dense (dots RSRP type nPerf)
         //  · prévisionnels/pannes → `plannedPayloads`/`outagePayloads` (statut + couleur)
         // Ne reste ici que le social du snapshot (amis / validations / sessions).
         let socialFilters = filters.subtracting([.speedtest, .coverage, .antenna, .photo, .planned, .outage])
@@ -2795,11 +2739,7 @@ private struct MapAdvancedFilterSheet: View {
     }
 }
 
-#if canImport(MapLibre)
-// MARK: - Carte MapKit (migration vers moteur unique — remplace SQMapLibreMapView)
-// NB : placé sous `#if canImport(MapLibre)` UNIQUEMENT pour accéder à `markerColor`
-// pendant la transition. Ce code n'utilise AUCUN type MapLibre ; la phase finale
-// retirera le gating et le rendra inconditionnel.
+// MARK: - Carte MapKit (moteur unique)
 
 /// Annotation MapKit portant le payload (pour le dispatch tap → fiche).
 private final class SQMapKitAnnotation: NSObject, MKAnnotation {
@@ -2924,7 +2864,7 @@ private final class SQMapKitDotsRenderer: MKOverlayRenderer {
 }
 
 /// Carte principale rendue avec MapKit (Apple Plan natif). Consomme les MÊMES
-/// payloads que l'ancien moteur MapLibre (`renderedAnnotations`, etc.).
+/// payloads que le moteur de rendu (`renderedAnnotations`, etc.).
 private struct MapKitMapView: UIViewRepresentable {
     let annotations: [MapAnnotationPayload]
     let coverageHeatFeatures: [CoverageHeatFeature]   // Phase 2
@@ -3237,745 +3177,9 @@ private struct MapKitMapView: UIViewRepresentable {
     }
 }
 
-private final class SQPointAnnotation: MLNPointAnnotation {
-    let payload: MapAnnotationPayload
-
-    init(payload: MapAnnotationPayload) {
-        self.payload = payload
-        super.init()
-        coordinate = payload.coordinate
-        title = payload.title
-        subtitle = payload.subtitle
-    }
-
-    required init?(coder: NSCoder) {
-        return nil
-    }
-}
-
-private struct SQMapLibreMapView: UIViewRepresentable {
-    let annotations: [MapAnnotationPayload]
-    let coverageHeatFeatures: [CoverageHeatFeature]
-    let speedtestFeatures: [SpeedtestFeature]
-    let colorScheme: ColorScheme
-    @Binding var center: CLLocationCoordinate2D
-    @Binding var zoom: Double
-    let onMoveEnd: (MapBounds, Double) -> Void
-    let onSelect: (MapAnnotationPayload) -> Void
-    @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
-    private var backdrop: MapBackdrop { MapBackdrop(rawValue: backdropRaw) ?? .carto }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onMoveEnd: onMoveEnd, onSelect: onSelect)
-    }
-
-    func makeUIView(context: Context) -> MLNMapView {
-        let styleURL = backdrop.styleURL(dark: colorScheme == .dark)
-        let mapView = MLNMapView(frame: .zero, styleURL: styleURL)
-        mapView.delegate = context.coordinator
-        mapView.logoView.isHidden = false
-        mapView.attributionButton.isHidden = false
-        mapView.setCenter(center, zoomLevel: zoom, animated: false)
-        mapView.tintColor = UIColor.systemOrange
-        // Les speedtests/couverture sont des couches GPU (pas des annotations-vues) :
-        // on intercepte le tap pour ouvrir le détail d'un point speedtest touché.
-        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleMapTap(_:)))
-        tap.delegate = context.coordinator
-        tap.cancelsTouchesInView = false
-        mapView.addGestureRecognizer(tap)
-        return mapView
-    }
-
-    func updateUIView(_ mapView: MLNMapView, context: Context) {
-        let expectedStyleURL = backdrop.styleURL(dark: colorScheme == .dark)
-        if mapView.styleURL != expectedStyleURL {
-            mapView.styleURL = expectedStyleURL
-        }
-
-        context.coordinator.setCoverageHeatFeatures(coverageHeatFeatures, mapView: mapView)
-        context.coordinator.setSpeedtestFeatures(speedtestFeatures, mapView: mapView)
-        context.coordinator.applyAnnotations(annotations, mapView: mapView)
-        if context.coordinator.shouldApplyCamera(center: center, zoom: zoom) {
-            mapView.setCenter(center, zoomLevel: zoom, animated: true)
-        }
-    }
-
-    @MainActor final class Coordinator: NSObject, @preconcurrency MLNMapViewDelegate, UIGestureRecognizerDelegate {
-        private let onMoveEnd: (MapBounds, Double) -> Void
-        private let onSelect: (MapAnnotationPayload) -> Void
-        private var lastCenter: CLLocationCoordinate2D?
-        private var lastZoom: Double?
-        private var latestCoverageHeatFeatures: [CoverageHeatFeature] = []
-        // Couches couverture dynamiques (clé = bande RSRP « q-… » ou génération « g-… »).
-        // On retient les ids créés pour vider/cacher ceux de l'autre mode à la bascule.
-        private var coverageDotLayerIds: Set<String> = []
-        private var coverageDotSourceByLayer: [String: String] = [:]
-        private var coverageDotDimmedByLayer: [String: Bool] = [:]
-        private var latestSpeedtestFeatures: [SpeedtestFeature] = []
-        /// Index id → point speedtest, pour résoudre le tap (couche GPU) en détail.
-        private var speedtestFeaturesById: [String: SpeedtestFeature] = [:]
-        private var lastStyledZoom: Double = .nan
-        /// État de diff des annotations (id → annotation + payload appliqué), pour
-        /// ne retirer/ajouter QUE le delta au lieu de tout détruire/recréer à chaque
-        /// réévaluation de la vue (cf. audit PERF-01).
-        private var annotationsById: [MapAnnotationPayload.ID: SQPointAnnotation] = [:]
-        private var annotationPayloadsById: [MapAnnotationPayload.ID: MapAnnotationPayload] = [:]
-
-        init(onMoveEnd: @escaping (MapBounds, Double) -> Void, onSelect: @escaping (MapAnnotationPayload) -> Void) {
-            self.onMoveEnd = onMoveEnd
-            self.onSelect = onSelect
-        }
-
-        func shouldApplyCamera(center: CLLocationCoordinate2D, zoom: Double) -> Bool {
-            defer {
-                lastCenter = center
-                lastZoom = zoom
-            }
-            guard let lastCenter, let lastZoom else { return true }
-            return abs(lastCenter.latitude - center.latitude) > 0.0001 ||
-                abs(lastCenter.longitude - center.longitude) > 0.0001 ||
-                abs(lastZoom - zoom) > 0.01
-        }
-
-        func setCoverageHeatFeatures(_ features: [CoverageHeatFeature], mapView: MLNMapView) {
-            // Ne reconstruire la heatmap que si les features ont changé (le rechargement
-            // de style ré-applique de son côté via didFinishLoading).
-            guard features != latestCoverageHeatFeatures else { return }
-            latestCoverageHeatFeatures = features
-            updateCoverageHeatmap(mapView: mapView, features: features)
-        }
-
-        /// Diff stable des annotations par id : retire les disparues/modifiées et
-        /// n'ajoute que les nouvelles, au lieu d'un remove-all/add-all qui faisait
-        /// clignoter les marqueurs à chaque update (audit PERF-01).
-        func applyAnnotations(_ payloads: [MapAnnotationPayload], mapView: MLNMapView) {
-            var incomingById: [MapAnnotationPayload.ID: MapAnnotationPayload] = [:]
-            incomingById.reserveCapacity(payloads.count)
-            for payload in payloads { incomingById[payload.id] = payload }
-
-            var toRemove: [SQPointAnnotation] = []
-            for (id, annotation) in annotationsById {
-                let incoming = incomingById[id]
-                if incoming == nil || incoming != annotationPayloadsById[id] {
-                    toRemove.append(annotation)
-                    annotationsById[id] = nil
-                    annotationPayloadsById[id] = nil
-                }
-            }
-            if !toRemove.isEmpty { mapView.removeAnnotations(toRemove) }
-
-            var toAdd: [SQPointAnnotation] = []
-            for payload in payloads where annotationsById[payload.id] == nil {
-                let annotation = SQPointAnnotation(payload: payload)
-                annotationsById[payload.id] = annotation
-                annotationPayloadsById[payload.id] = payload
-                toAdd.append(annotation)
-            }
-            if !toAdd.isEmpty { mapView.addAnnotations(toAdd) }
-        }
-
-        func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
-            // Un rechargement de style (bascule clair/sombre) efface sources et
-            // couches : on ré-applique couverture ET speedtests.
-            updateCoverageDots(mapView: mapView, features: latestCoverageHeatFeatures)
-            updateSpeedtestLayer(mapView: mapView, features: latestSpeedtestFeatures)
-        }
-
-        // MARK: Couverture — champ de pastilles RSRP (type nPerf / Android)
-
-        func updateCoverageHeatmap(mapView: MLNMapView, features: [CoverageHeatFeature]) {
-            updateCoverageDots(mapView: mapView, features: features)
-        }
-
-        /// Couverture rendue comme un champ dense de pastilles colorées par RSRP
-        /// (vert → rouge), comme nPerf / Android — au lieu de l'ancien halo flou,
-        /// jugé peu lisible. Une source + une couche cercle par bande de qualité.
-        private func updateCoverageDots(mapView: MLNMapView, features: [CoverageHeatFeature]) {
-            guard let style = mapView.style else { return }
-            // Regroupement par clé de couleur (bande RSRP « q-… » OU génération « g-… ») :
-            // une source + une couche cercle par clé. Le mode est encodé dans la feature
-            // (couleur figée) → aucun flag à propager jusqu'au coordinator.
-            let byKey = Dictionary(grouping: features, by: \.colorKey)
-            var activeLayerIds = Set<String>()
-            for (key, group) in byKey {
-                guard let first = group.first else { continue }
-                let sourceId = "sq-coverage-dot-source-\(key)"
-                let layerId = "sq-coverage-dot-layer-\(key)"
-                activeLayerIds.insert(layerId)
-                let pts = group.map { feature -> MLNPointFeature in
-                    let point = MLNPointFeature()
-                    point.coordinate = feature.coordinate
-                    return point
-                }
-                if let source = style.source(withIdentifier: sourceId) as? MLNShapeSource {
-                    source.shape = MLNShapeCollectionFeature(shapes: pts)
-                } else {
-                    let source = MLNShapeSource(identifier: sourceId, features: pts, options: nil)
-                    style.addSource(source)
-                    let layer = MLNCircleStyleLayer(identifier: layerId, source: source)
-                    layer.circleColor = NSExpression(forConstantValue: Self.coverageUIColor(hex: first.colorHex))
-                    layer.circleStrokeWidth = NSExpression(forConstantValue: 0)
-                    style.addLayer(layer)
-                }
-                style.layer(withIdentifier: layerId)?.isVisible = !pts.isEmpty
-                coverageDotLayerIds.insert(layerId)
-                coverageDotSourceByLayer[layerId] = sourceId
-                coverageDotDimmedByLayer[layerId] = first.dimmed
-            }
-            // Bascule de mode : vide + cache les couches de l'autre mode (clés absentes).
-            for layerId in coverageDotLayerIds where !activeLayerIds.contains(layerId) {
-                if let sourceId = coverageDotSourceByLayer[layerId],
-                   let source = style.source(withIdentifier: sourceId) as? MLNShapeSource {
-                    source.shape = MLNShapeCollectionFeature(shapes: [])
-                }
-                style.layer(withIdentifier: layerId)?.isVisible = false
-            }
-            styleCoverageDots(style: style, zoom: mapView.zoomLevel)
-        }
-
-        private static func coverageUIColor(hex: UInt32) -> UIColor {
-            UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255,
-                    green: CGFloat((hex >> 8) & 0xFF) / 255,
-                    blue: CGFloat(hex & 0xFF) / 255,
-                    alpha: 1.0)
-        }
-
-        private func styleCoverageDots(style: MLNStyle, zoom: Double) {
-            let radius = coverageDotRadius(forZoom: zoom)
-            for layerId in coverageDotLayerIds {
-                guard let layer = style.layer(withIdentifier: layerId) as? MLNCircleStyleLayer else { continue }
-                layer.circleRadius = NSExpression(forConstantValue: radius)
-                layer.circleOpacity = NSExpression(forConstantValue: (coverageDotDimmedByLayer[layerId] ?? false) ? 0.30 : 0.62)
-                layer.circleBlur = NSExpression(forConstantValue: 0.18)
-            }
-        }
-
-        private func coverageDotRadius(forZoom zoom: Double) -> Double {
-            switch zoom {
-            case ..<8: return 5.6
-            case ..<11: return 5.0
-            case ..<13: return 4.5
-            case ..<15: return 4.2
-            default: return 4.8
-            }
-        }
-
-        // MARK: Speedtests — couche GPU (tout afficher, sans cluster ni cap)
-
-        func setSpeedtestFeatures(_ features: [SpeedtestFeature], mapView: MLNMapView) {
-            guard features != latestSpeedtestFeatures else { return }
-            latestSpeedtestFeatures = features
-            speedtestFeaturesById = Dictionary(features.map { ($0.id, $0) }, uniquingKeysWith: { current, _ in current })
-            updateSpeedtestLayer(mapView: mapView, features: features)
-        }
-
-        /// Un point = une pastille colorée par débit descendant (échelle 7 paliers,
-        /// alignée web/Android). Rendu GPU : tient des milliers de points sans
-        /// cluster ni cap, là où les annotations-vues s'effondreraient.
-        private func updateSpeedtestLayer(mapView: MLNMapView, features: [SpeedtestFeature]) {
-            guard let style = mapView.style else { return }
-            let byBand = Dictionary(grouping: features, by: { SpeedBand.band(forDownload: $0.downloadMbps) })
-            for band in SpeedBand.allCases {
-                let pts = (byBand[band] ?? []).map { feature -> MLNPointFeature in
-                    let point = MLNPointFeature()
-                    point.coordinate = feature.coordinate
-                    point.attributes = ["id": feature.id]
-                    return point
-                }
-                let sourceId = speedtestSourceId(for: band)
-                if let source = style.source(withIdentifier: sourceId) as? MLNShapeSource {
-                    source.shape = MLNShapeCollectionFeature(shapes: pts)
-                } else {
-                    let source = MLNShapeSource(identifier: sourceId, features: pts, options: nil)
-                    style.addSource(source)
-                    let layer = MLNCircleStyleLayer(identifier: speedtestLayerId(for: band), source: source)
-                    layer.circleColor = NSExpression(forConstantValue: band.uiColor)
-                    layer.circleStrokeColor = NSExpression(forConstantValue: UIColor.white.withAlphaComponent(0.55))
-                    style.addLayer(layer)
-                }
-                style.layer(withIdentifier: speedtestLayerId(for: band))?.isVisible = !pts.isEmpty
-            }
-            styleSpeedtestDots(style: style, zoom: mapView.zoomLevel)
-        }
-
-        private func styleSpeedtestDots(style: MLNStyle, zoom: Double) {
-            let radius = speedtestDotRadius(forZoom: zoom)
-            let stroke = zoom >= 13 ? 0.8 : 0.0
-            for band in SpeedBand.allCases {
-                guard let layer = style.layer(withIdentifier: speedtestLayerId(for: band)) as? MLNCircleStyleLayer else { continue }
-                layer.circleRadius = NSExpression(forConstantValue: radius)
-                layer.circleOpacity = NSExpression(forConstantValue: 0.9)
-                layer.circleStrokeWidth = NSExpression(forConstantValue: stroke)
-            }
-        }
-
-        private func speedtestDotRadius(forZoom zoom: Double) -> Double {
-            switch zoom {
-            case ..<7: return 2.2
-            case ..<9: return 2.8
-            case ..<11: return 3.4
-            case ..<13: return 4.2
-            case ..<15: return 5.0
-            default: return 6.0
-            }
-        }
-
-        private var speedtestLayerIdentifiers: Set<String> {
-            Set(SpeedBand.allCases.map { speedtestLayerId(for: $0) })
-        }
-
-        // MARK: Tap sur une pastille speedtest (couche GPU)
-
-        @objc func handleMapTap(_ recognizer: UITapGestureRecognizer) {
-            guard recognizer.state == .ended, let mapView = recognizer.view as? MLNMapView else { return }
-            let point = recognizer.location(in: mapView)
-            let rect = CGRect(x: point.x - 12, y: point.y - 12, width: 24, height: 24)
-            let hits = mapView.visibleFeatures(in: rect, styleLayerIdentifiers: speedtestLayerIdentifiers)
-            guard let feature = hits.first,
-                  let id = feature.attribute(forKey: "id") as? String,
-                  let speedtest = speedtestFeaturesById[id] else { return }
-            onSelect(speedtestPayload(from: speedtest))
-        }
-
-        private func speedtestPayload(from speedtest: SpeedtestFeature) -> MapAnnotationPayload {
-            MapAnnotationPayload(
-                id: "speed-\(speedtest.id)",
-                kind: .speedtest,
-                title: "\(Int(speedtest.downloadMbps.rounded())) Mbps",
-                subtitle: speedtest.tech ?? "Speedtest",
-                coordinate: speedtest.coordinate,
-                metric: speedtest.uploadMbps.map { "\(Int($0.rounded())) Mbps up" },
-                backendId: speedtest.id,
-                details: MapItemDetails(
-                    downloadMbps: speedtest.downloadMbps,
-                    uploadMbps: speedtest.uploadMbps,
-                    pingMs: speedtest.pingMs,
-                    tech: speedtest.tech,
-                    timestamp: speedtest.timestamp,
-                    note: "Données Speedtest"
-                ),
-                antennaId: nil,
-                clusterCount: nil,
-                azimuths: [],
-                showsAzimuths: false
-            )
-        }
-
-        private func speedtestSourceId(for band: SpeedBand) -> String {
-            "sq-speedtest-source-\(band.rawValue)"
-        }
-
-        private func speedtestLayerId(for band: SpeedBand) -> String {
-            "sq-speedtest-layer-\(band.rawValue)"
-        }
-
-        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-            true
-        }
-
-        func mapView(_ mapView: MLNMapView, regionDidChangeAnimated animated: Bool) {
-            // Redimensionne les pastilles GPU selon le zoom (sans attendre un
-            // changement de données), pour un rendu net à toutes les échelles.
-            if let style = mapView.style {
-                let zoom = mapView.zoomLevel
-                if lastStyledZoom.isNaN || abs(zoom - lastStyledZoom) > 0.25 {
-                    lastStyledZoom = zoom
-                    styleCoverageDots(style: style, zoom: zoom)
-                    styleSpeedtestDots(style: style, zoom: zoom)
-                }
-            }
-            let bounds = mapView.visibleCoordinateBounds
-            onMoveEnd(
-                MapBounds(
-                    north: bounds.ne.latitude,
-                    south: bounds.sw.latitude,
-                    east: bounds.ne.longitude,
-                    west: bounds.sw.longitude
-                ),
-                mapView.zoomLevel
-            )
-        }
-
-        func mapView(_ mapView: MLNMapView, viewFor annotation: MLNAnnotation) -> MLNAnnotationView? {
-            guard let point = annotation as? SQPointAnnotation else { return nil }
-            let identifier = "sq-\(point.payload.kind.rawValue)"
-            let view = (mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? SQMapAnnotationView)
-                ?? SQMapAnnotationView(reuseIdentifier: identifier)
-            view.configure(with: point.payload)
-            return view
-        }
-
-        func mapView(_ mapView: MLNMapView, didSelect annotation: MLNAnnotation) {
-            if let point = annotation as? SQPointAnnotation {
-                onSelect(point.payload)
-            }
-            mapView.deselectAnnotation(annotation, animated: true)
-        }
-    }
-}
-
-/// Cache mémoire + chargement des vignettes photo affichées sur la carte.
-/// Partagé entre toutes les vues d'annotation recyclées par MapLibre.
-/// `@unchecked Sendable` : NSCache et URLSession sont déjà thread-safe et les
-/// deux propriétés sont immuables (`let`).
-private final class SQAnnotationImageCache: @unchecked Sendable {
-    static let shared = SQAnnotationImageCache()
-    private let cache = NSCache<NSURL, UIImage>()
-    private let session: URLSession
-    /// Côté max (px) de la vignette décodée. La pastille fait 60 pt (~180 px @3x) ;
-    /// on décode directement à cette taille → coût mémoire/CPU borné même si la
-    /// source est une image pleine résolution (repli `imageUrl`).
-    private let maxPixelSize: CGFloat = 200
-
-    private init() {
-        cache.countLimit = 600
-        cache.totalCostLimit = 48 * 1024 * 1024
-        let config = URLSessionConfiguration.default
-        config.requestCachePolicy = .returnCacheDataElseLoad
-        config.urlCache = URLCache(memoryCapacity: 16 * 1024 * 1024, diskCapacity: 128 * 1024 * 1024)
-        session = URLSession(configuration: config)
-    }
-
-    func image(for url: URL) -> UIImage? {
-        cache.object(forKey: url as NSURL)
-    }
-
-    /// Charge la vignette (cache → réseau) en la décodant à la taille d'affichage.
-    /// Retourne `nil` en cas d'échec.
-    func loadImage(_ url: URL) async -> UIImage? {
-        if let cached = cache.object(forKey: url as NSURL) { return cached }
-        guard let (data, _) = try? await session.data(from: url) else { return nil }
-        guard let image = Self.downsample(data: data, maxPixelSize: maxPixelSize) ?? UIImage(data: data) else { return nil }
-        let cost = Int(image.size.width * image.size.height * 4)
-        cache.setObject(image, forKey: url as NSURL, cost: cost)
-        return image
-    }
-
-    /// Décode l'image directement à `maxPixelSize` via ImageIO (pas de décodage
-    /// pleine résolution intermédiaire).
-    private static func downsample(data: Data, maxPixelSize: CGFloat) -> UIImage? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary) else {
-            return nil
-        }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
-        ]
-        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
-        return UIImage(cgImage: cgImage)
-    }
-}
-
-private final class SQMapAnnotationView: MLNAnnotationView {
-    private let fanLayer = CAShapeLayer()
-    private let markerView = UIView()
-    private let imageView = UIImageView()
-    private let label = UILabel()
-    private let glyphView = UIImageView()
-    /// Pointe (triangle) sous la carte-photo pour l'ancrer à sa position.
-    private let photoPointerLayer = CAShapeLayer()
-    /// Petit badge appareil-photo en coin de la vignette.
-    private let photoBadgeView = UIImageView()
-    /// Badge de statut (sites prévisionnels) : ✓ actif / ↑ upgrade en attente.
-    private let statusBadgeView = UIImageView()
-    /// URL de la vignette en cours de chargement, pour ignorer les réponses
-    /// obsolètes lorsqu'une vue d'annotation est recyclée.
-    private var pendingThumbnailURL: URL?
-    private var thumbnailTask: Task<Void, Never>?
-
-    override init(reuseIdentifier: String?) {
-        super.init(reuseIdentifier: reuseIdentifier)
-        isOpaque = false
-        backgroundColor = .clear
-        // La pointe se dessine SOUS la carte (insérée avant markerView).
-        photoPointerLayer.isHidden = true
-        layer.addSublayer(photoPointerLayer)
-        layer.addSublayer(fanLayer)
-        addSubview(markerView)
-        markerView.addSubview(imageView)
-        markerView.addSubview(label)
-        markerView.addSubview(glyphView)
-        markerView.addSubview(photoBadgeView)
-        markerView.addSubview(statusBadgeView)
-        statusBadgeView.contentMode = .center
-        statusBadgeView.isHidden = true
-        statusBadgeView.tintColor = .white
-        statusBadgeView.clipsToBounds = true
-        statusBadgeView.layer.borderColor = UIColor.white.cgColor
-        statusBadgeView.layer.borderWidth = 1
-        markerView.layer.shadowColor = UIColor.black.cgColor
-        markerView.layer.shadowOpacity = 0.28
-        markerView.layer.shadowRadius = 6
-        markerView.layer.shadowOffset = CGSize(width: 0, height: 3)
-        imageView.contentMode = .scaleAspectFill
-        imageView.clipsToBounds = true
-        glyphView.contentMode = .scaleAspectFit
-        glyphView.tintColor = .white
-        photoBadgeView.contentMode = .center
-        photoBadgeView.isHidden = true
-        photoBadgeView.tintColor = .white
-        photoBadgeView.image = UIImage(systemName: "camera.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 9, weight: .bold))
-        photoBadgeView.backgroundColor = UIColor(SQColor.brandPink)
-        photoBadgeView.layer.cornerRadius = 9
-        photoBadgeView.clipsToBounds = true
-        label.textAlignment = .center
-        label.font = .systemFont(ofSize: 12, weight: .bold)
-        label.textColor = .white
-    }
-
-    required init?(coder: NSCoder) {
-        nil
-    }
-
-    override func prepareForReuse() {
-        super.prepareForReuse()
-        thumbnailTask?.cancel()
-        thumbnailTask = nil
-        pendingThumbnailURL = nil
-        imageView.image = nil
-        imageView.isHidden = true
-        glyphView.isHidden = true
-        photoPointerLayer.isHidden = true
-        photoBadgeView.isHidden = true
-        statusBadgeView.isHidden = true
-    }
-
-    func configure(with payload: MapAnnotationPayload) {
-        let markerSize = payload.markerSize
-        let canvasSize: CGFloat = payload.showsAzimuths && !payload.azimuths.isEmpty ? 82 : max(markerSize.width, markerSize.height)
-        frame = CGRect(x: 0, y: 0, width: canvasSize, height: canvasSize)
-        centerOffset = CGVector(dx: 0, dy: 0)
-
-        let markerFrame = CGRect(
-            x: (canvasSize - markerSize.width) / 2,
-            y: (canvasSize - markerSize.height) / 2,
-            width: markerSize.width,
-            height: markerSize.height
-        )
-        markerView.frame = markerFrame
-
-        // Couche Photos : marqueur « polaroïd » carré arrondi avec vignette.
-        if payload.kind == .photo, let url = payload.thumbnailURL {
-            configurePhoto(url: url, markerSize: markerSize)
-            return
-        }
-
-        markerView.layer.cornerRadius = markerSize.width / 2
-        markerView.layer.borderWidth = payload.markerStrokeWidth
-        // Cellule seulement observée : anneau et fond plus translucides pour
-        // signaler une confiance moindre qu'un site probable consolidé.
-        markerView.layer.borderColor = UIColor.white.withAlphaComponent(payload.communityObserved ? 0.55 : 0.86).cgColor
-        markerView.backgroundColor = UIColor(payload.markerColor).withAlphaComponent(payload.communityObserved ? 0.55 : 1.0)
-        thumbnailTask?.cancel()
-        pendingThumbnailURL = nil
-        imageView.isHidden = true
-        imageView.image = nil
-        photoPointerLayer.isHidden = true
-        photoBadgeView.isHidden = true
-        statusBadgeView.isHidden = true
-
-        // Site prévisionnel : anneau coloré par statut d'activation (croisement
-        // ANFR) — vert actif / ambre upgrade en attente / blanc déclaré ou prévu,
-        // avec un badge ✓ ou ↑ pour les sites déjà sur le terrain (comme Android).
-        if let status = payload.plannedStatus {
-            applyPlannedStatus(status, markerSize: markerSize)
-        }
-
-        fanLayer.frame = bounds
-        fanLayer.path = payload.showsAzimuths ? azimuthPath(azimuths: payload.azimuths, center: CGPoint(x: canvasSize / 2, y: canvasSize / 2), radius: canvasSize / 2 - 4).cgPath : nil
-        fanLayer.fillColor = UIColor(payload.markerColor).withAlphaComponent(0.18).cgColor
-        fanLayer.strokeColor = UIColor(payload.markerColor).withAlphaComponent(0.72).cgColor
-        fanLayer.lineWidth = 1
-
-        if payload.rendersAsPlainCircle {
-            glyphView.isHidden = true
-            label.isHidden = true
-            label.text = nil
-        } else if let clusterCount = payload.clusterCount {
-            glyphView.isHidden = true
-            label.isHidden = false
-            label.text = clusterCount > 99 ? "99+" : String(clusterCount)
-            label.frame = markerView.bounds
-        } else {
-            label.isHidden = true
-            glyphView.isHidden = false
-            glyphView.image = UIImage(systemName: payload.glyphOverride ?? payload.systemImageName)
-            glyphView.frame = markerView.bounds.insetBy(dx: 6, dy: 6)
-        }
-
-        // Badge « photos disponibles » sur les antennes (comme Android) : indique
-        // qu'au moins une photo publique existe sur le site (taper l'antenne →
-        // fiche avec la galerie).
-        if payload.kind == .antenna && payload.contributionPhotos > 0 {
-            let badge: CGFloat = 16
-            photoBadgeView.frame = CGRect(x: markerView.bounds.width - badge + 3, y: -4, width: badge, height: badge)
-            photoBadgeView.layer.cornerRadius = badge / 2
-            photoBadgeView.isHidden = false
-        }
-    }
-
-    /// Applique l'anneau + le badge de statut d'un site prévisionnel.
-    private func applyPlannedStatus(_ status: PlannedActivationStatus, markerSize: CGSize) {
-        let ringColor: UIColor
-        let badgeGlyph: String?
-        switch status {
-        case .active:
-            ringColor = UIColor(red: 0x16 / 255, green: 0xA3 / 255, blue: 0x4A / 255, alpha: 1.0)
-            badgeGlyph = "checkmark"
-        case .upgradePending:
-            ringColor = UIColor(red: 0xF5 / 255, green: 0x9E / 255, blue: 0x0B / 255, alpha: 1.0)
-            badgeGlyph = "arrow.up"
-        case .declared, .planned:
-            ringColor = UIColor.white.withAlphaComponent(0.9)
-            badgeGlyph = nil
-        }
-        markerView.layer.borderColor = ringColor.cgColor
-        markerView.layer.borderWidth = status.isOnAir ? 2.6 : 2.0
-
-        guard let badgeGlyph else { statusBadgeView.isHidden = true; return }
-        let badge: CGFloat = 15
-        statusBadgeView.frame = CGRect(x: markerSize.width - badge - 1, y: 1, width: badge, height: badge)
-        statusBadgeView.layer.cornerRadius = badge / 2
-        statusBadgeView.backgroundColor = ringColor
-        statusBadgeView.image = UIImage(systemName: badgeGlyph, withConfiguration: UIImage.SymbolConfiguration(pointSize: 8, weight: .heavy))
-        statusBadgeView.isHidden = false
-    }
-
-    /// Configure le marqueur en mini-photo et déclenche le chargement async de
-    /// la vignette (avec cache mémoire et garde anti-recyclage).
-    private func configurePhoto(url: URL, markerSize: CGSize) {
-        fanLayer.path = nil
-        label.isHidden = true
-        glyphView.isHidden = true
-        imageView.isHidden = false
-
-        let side = markerSize.width
-        let pointerHeight: CGFloat = 9
-        let totalHeight = side + pointerHeight
-        // Recadre la vue pour inclure la pointe et ancre la POINTE à la position
-        // (la carte « flotte » au-dessus du point exact, comme une épingle photo).
-        frame = CGRect(x: 0, y: 0, width: side, height: totalHeight)
-        centerOffset = CGVector(dx: 0, dy: -totalHeight / 2)
-
-        // Carte blanche arrondie (squircle) avec un liseré rose discret.
-        let cardRect = CGRect(x: 0, y: 0, width: side, height: side)
-        markerView.frame = cardRect
-        markerView.backgroundColor = .white
-        markerView.layer.cornerRadius = 16
-        markerView.layer.borderWidth = 1.5
-        markerView.layer.borderColor = UIColor(SQColor.brandPink).withAlphaComponent(0.9).cgColor
-        markerView.layer.shadowOpacity = 0.32
-        markerView.layer.shadowRadius = 7
-        markerView.layer.shadowOffset = CGSize(width: 0, height: 4)
-
-        let inset: CGFloat = 3.5
-        imageView.frame = cardRect.insetBy(dx: inset, dy: inset)
-        imageView.layer.cornerRadius = 13
-        imageView.backgroundColor = UIColor(white: 0.93, alpha: 1)
-
-        // Badge appareil-photo, coin bas-droit de la vignette.
-        let badge: CGFloat = 18
-        photoBadgeView.frame = CGRect(x: side - badge - 3, y: side - badge - 3, width: badge, height: badge)
-        photoBadgeView.isHidden = false
-
-        // Pointe blanche sous la carte, ancrée au point.
-        let pointer = UIBezierPath()
-        pointer.move(to: CGPoint(x: side / 2 - 8, y: side - 2))
-        pointer.addLine(to: CGPoint(x: side / 2, y: totalHeight))
-        pointer.addLine(to: CGPoint(x: side / 2 + 8, y: side - 2))
-        pointer.close()
-        photoPointerLayer.frame = bounds
-        photoPointerLayer.path = pointer.cgPath
-        photoPointerLayer.fillColor = UIColor.white.cgColor
-        photoPointerLayer.shadowColor = UIColor.black.cgColor
-        photoPointerLayer.shadowOpacity = 0.26
-        photoPointerLayer.shadowRadius = 4
-        photoPointerLayer.shadowOffset = CGSize(width: 0, height: 3)
-        photoPointerLayer.isHidden = false
-
-        if let cached = SQAnnotationImageCache.shared.image(for: url) {
-            imageView.image = cached
-            pendingThumbnailURL = nil
-            return
-        }
-
-        imageView.image = nil
-        pendingThumbnailURL = url
-        thumbnailTask?.cancel()
-        thumbnailTask = Task { [weak self] in
-            let image = await SQAnnotationImageCache.shared.loadImage(url)
-            guard let image else { return }
-            self?.applyThumbnail(image, for: url)
-        }
-    }
-
-    /// Applique la vignette chargée si elle correspond toujours à l'annotation
-    /// courante (garde anti-recyclage). Isolée main actor : accès UIKit sûr.
-    @MainActor
-    private func applyThumbnail(_ image: UIImage, for url: URL) {
-        guard pendingThumbnailURL == url else { return }
-        pendingThumbnailURL = nil
-        UIView.transition(with: imageView, duration: 0.25, options: .transitionCrossDissolve) {
-            self.imageView.image = image
-        }
-    }
-
-    private func azimuthPath(azimuths: [Double], center: CGPoint, radius: CGFloat) -> UIBezierPath {
-        let path = UIBezierPath()
-        for azimuth in azimuths.prefix(6) {
-            let halfBeam = 32.5
-            let start = CGFloat((azimuth - 90 - halfBeam) * .pi / 180)
-            let end = CGFloat((azimuth - 90 + halfBeam) * .pi / 180)
-            path.move(to: center)
-            path.addArc(withCenter: center, radius: radius, startAngle: start, endAngle: end, clockwise: true)
-            path.close()
-        }
-        return path
-    }
-}
+// MARK: - Style des marqueurs MapKit (couleur / taille / glyphe par type)
 
 private extension MapAnnotationPayload {
-    var rendersAsPlainCircle: Bool {
-        kind == .speedtest || kind == .coverage
-    }
-
-    var markerSize: CGSize {
-        if let clusterCount {
-            let side = clusterCount >= 100 ? 42.0 : clusterCount >= 25 ? 36.0 : 30.0
-            return CGSize(width: side, height: side)
-        }
-        switch kind {
-        case .speedtest:
-            let speed = firstNumber(in: title) ?? 0
-            let side = speed >= 500 ? 16.0 : speed >= 200 ? 14.5 : speed >= 100 ? 13.2 : 11.5
-            return CGSize(width: side, height: side)
-        case .coverage:
-            return CGSize(width: 11.6, height: 11.6)
-        case .antenna:
-            return CGSize(width: 28, height: 28)
-        case .communitySite:
-            return CGSize(width: 24, height: 24)
-        case .photo:
-            // Carte-photo « épingle » : assez grande pour reconnaître la photo.
-            return CGSize(width: 60, height: 60)
-        default:
-            return CGSize(width: 30, height: 30)
-        }
-    }
-
-    var markerStrokeWidth: CGFloat {
-        switch kind {
-        case .speedtest:
-            return 1.2
-        case .coverage:
-            return 0
-        default:
-            return 2
-        }
-    }
-
     var markerColor: Color {
         // La couleur registry de l'opérateur prime quand elle est connue
         // (antennes, sites communautaires).
@@ -4035,23 +3239,7 @@ private extension MapAnnotationPayload {
         default:              return Color(hex: 0xEF4444) // très faible
         }
     }
-
-    var systemImageName: String {
-        switch kind {
-        case .friend: return "person.fill"
-        case .photo: return "camera.fill"
-        case .validation: return "checkmark.seal.fill"
-        case .session: return "figure.walk"
-        case .coverage: return "dot.radiowaves.left.and.right"
-        case .speedtest: return "speedometer"
-        case .outage: return "exclamationmark.triangle.fill"
-        case .planned: return "calendar.badge.clock"
-        case .antenna: return "antenna.radiowaves.left.and.right"
-        case .communitySite: return "dot.radiowaves.up.forward"
-        }
-    }
 }
-#endif
 
 /// Sheet détaillée d'un site en panne / maintenance : type d'incident, raison
 /// lisible, services impactés (voix/data par génération), dates de début et de
