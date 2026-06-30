@@ -58,15 +58,9 @@ struct ProfileView: View {
                     }
                     menuSeparator
                     NavigationLink {
-                        MyMeasurementsView(service: services.sessions, coloring: .rsrp, title: "Mes mesures")
+                        MyMeasurementsView(service: services.sessions)
                     } label: {
-                        menuRow(title: "Mes mesures · signal", icon: "mappin.and.ellipse")
-                    }
-                    menuSeparator
-                    NavigationLink {
-                        MyMeasurementsView(service: services.sessions, coloring: .generation, title: "Couverture génération")
-                    } label: {
-                        menuRow(title: "Couverture · génération", icon: "antenna.radiowaves.left.and.right")
+                        menuRow(title: "Mes mesures", icon: "mappin.and.ellipse")
                     }
                     menuSeparator
                     NavigationLink {

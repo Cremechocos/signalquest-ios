@@ -40,12 +40,14 @@ final class MyMeasurementsViewModel: ObservableObject {
 }
 
 struct MyMeasurementsView: View {
-    private let coloring: SessionPointColoring
+    /// Coloration courante, basculable Signal (RSRP) ↔ Génération. Défaut génération
+    /// (iOS ne fournit pas de RSRP → la couleur signal est peu informative en iOS pur).
+    @State private var coloring: SessionPointColoring
     private let mapTitle: String
     @StateObject private var model: MyMeasurementsViewModel
 
-    init(service: SessionsServicing, coloring: SessionPointColoring = .rsrp, title: String = "Mes mesures") {
-        self.coloring = coloring
+    init(service: SessionsServicing, initialColoring: SessionPointColoring = .generation, title: String = "Mes mesures") {
+        _coloring = State(initialValue: initialColoring)
         self.mapTitle = title
         _model = StateObject(wrappedValue: MyMeasurementsViewModel(service: service))
     }
@@ -66,10 +68,28 @@ struct MyMeasurementsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
         .refreshable { await model.load() }
-        .overlay(alignment: .top) { statsBar }
+        .overlay(alignment: .top) {
+            VStack(spacing: SQSpace.sm) {
+                statsBar
+                if !model.points.isEmpty { coloringPicker }
+            }
+            .padding(.top, SQSpace.sm)
+        }
         .overlay(alignment: .bottomLeading) {
             if coloring == .generation && !model.points.isEmpty { generationLegend }
         }
+    }
+
+    /// Bascule de coloration de la carte : Signal (RSRP) ↔ Génération.
+    private var coloringPicker: some View {
+        Picker("Coloration", selection: $coloring) {
+            Text("Signal").tag(SessionPointColoring.rsrp)
+            Text("Génération").tag(SessionPointColoring.generation)
+        }
+        .pickerStyle(.segmented)
+        .frame(maxWidth: 260)
+        .padding(.horizontal, SQSpace.md)
+        .accessibilityLabel("Coloration de la carte : signal ou génération")
     }
 
     /// Légende de la carte de couverture GÉNÉRATION (couleurs = `SessionGenerationColor`).
@@ -106,7 +126,6 @@ struct MyMeasurementsView: View {
                 .padding(.vertical, SQSpace.sm)
                 .background(.ultraThinMaterial, in: Capsule())
                 .overlay { Capsule().stroke(SQColor.separator, lineWidth: 1) }
-                .padding(.top, SQSpace.sm)
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(model.points.count) points de mesure sur \(model.sessionCount) sessions")
         }

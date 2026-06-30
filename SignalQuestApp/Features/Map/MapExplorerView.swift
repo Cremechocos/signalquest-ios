@@ -707,18 +707,20 @@ private struct CoverageHeatFeature: Equatable {
     let id: String
     let coordinate: CLLocationCoordinate2D
     let weight: Double
-    let rsrp: Double?
-
-    var quality: CoverageQualityBand {
-        CoverageQualityBand.band(for: rsrp)
-    }
+    /// Clé de regroupement GPU — une source/couche par clé (bande RSRP ou génération).
+    let colorKey: String
+    /// Couleur de la pastille (0xRRGGBB), figée selon le mode de coloration courant.
+    let colorHex: UInt32
+    /// Opacité réduite pour les bandes « inconnu » (RSRP) / « aucun » (génération).
+    let dimmed: Bool
 
     static func == (lhs: CoverageHeatFeature, rhs: CoverageHeatFeature) -> Bool {
         lhs.id == rhs.id &&
         lhs.coordinate.latitude == rhs.coordinate.latitude &&
         lhs.coordinate.longitude == rhs.coordinate.longitude &&
         lhs.weight == rhs.weight &&
-            lhs.rsrp == rhs.rsrp
+        lhs.colorKey == rhs.colorKey &&
+        lhs.colorHex == rhs.colorHex
     }
 }
 
@@ -774,6 +776,17 @@ private enum CoverageQualityBand: String, CaseIterable, Identifiable {
     }
 
     // Couleurs QUALITY_HEX du web : #10b981 / #84cc16 / #f59e0b / #f97316 / #ef4444.
+    var colorHex: UInt32 {
+        switch self {
+        case .excellent: return 0x10B981
+        case .good: return 0x84CC16
+        case .fair: return 0xF59E0B
+        case .weak: return 0xF97316
+        case .poor: return 0xEF4444
+        case .unknown: return 0x94A3B8
+        }
+    }
+
     var swiftUIColor: Color {
         switch self {
         case .excellent: return Color(hex: 0x10B981)
@@ -797,6 +810,48 @@ private enum CoverageQualityBand: String, CaseIterable, Identifiable {
         }
     }
 #endif
+}
+
+/// Bandes de GÉNÉRATION pour la couche couverture (mode « génération », distinct du
+/// RSRP). Couleurs alignées sur la carte « Mes mesures » (SessionGenerationColor) :
+/// 5G violet · 4G bleu · 3G teal · 2G ambre · gris (aucun/inconnu).
+private enum CoverageGenerationBand: String, CaseIterable, Identifiable {
+    case g5, g4, g3, g2, none
+
+    var id: String { rawValue }
+
+    static var visibleBands: [CoverageGenerationBand] { [.g5, .g4, .g3, .g2, .none] }
+
+    static func band(for tech: String?) -> CoverageGenerationBand {
+        let t = (tech ?? "").uppercased()
+        if t.contains("5G") || t.contains("NR") { return .g5 }
+        if t.contains("4G") || t.contains("LTE") { return .g4 }
+        if t.contains("3G") || t.contains("UMTS") || t.contains("HSPA") || t.contains("WCDMA") { return .g3 }
+        if t.contains("2G") || t.contains("GSM") || t.contains("EDGE") || t.contains("GPRS") { return .g2 }
+        return .none
+    }
+
+    var title: String {
+        switch self {
+        case .g5: return "5G"
+        case .g4: return "4G"
+        case .g3: return "3G"
+        case .g2: return "2G"
+        case .none: return "Aucun"
+        }
+    }
+
+    var colorHex: UInt32 {
+        switch self {
+        case .g5: return 0x8B5CF6
+        case .g4: return 0x3B82F6
+        case .g3: return 0x14B8A6
+        case .g2: return 0xF59E0B
+        case .none: return 0x94A3B8
+        }
+    }
+
+    var swiftUIColor: Color { Color(hex: colorHex) }
 }
 
 /// Paliers de débit descendant pour colorer la couche GPU des speedtests —
@@ -943,6 +998,9 @@ struct MapExplorerView: View {
     // comme Android (où `incidents` est activé par défaut). Photos, couverture,
     // prévisionnels et sites communautaires restent en opt-in via le panneau.
     @State private var filters: Set<MapDisplayItem.Kind> = [.antenna, .speedtest, .outage]
+    /// Couche Couverture : coloration par génération (5G/4G/…) plutôt que par RSRP.
+    /// Persisté localement. Modes mutuellement exclusifs (jamais mélangés).
+    @AppStorage("map_coverage_by_generation") private var coverageByGeneration = false
     @State private var selectedItem: MapDisplayItem?
     @State private var selectedAntenna: AntennaSite?
     @State private var selectedPhoto: MapPhotoTarget?
@@ -1069,6 +1127,10 @@ struct MapExplorerView: View {
             // Affiche/masque une couche immédiatement, sans attendre le rechargement.
             refreshMapRender()
             scheduleLoad(region: lastRegion)
+        }
+        .onChangeCompat(of: coverageByGeneration) { _, _ in
+            // Bascule Signal ↔ Génération : recolore la couche sans recharger le réseau.
+            refreshMapRender()
         }
         .onChangeCompat(of: model.marketFilter) { _, newValue in
             // Pendant la sélection initiale, le `.task` pilote recentrage + load.
@@ -1200,7 +1262,12 @@ struct MapExplorerView: View {
                     mapTopControlBar
                     operatorQuickStrip
                     if filters.contains(.coverage) {
-                        coverageQualityLegend
+                        coverageColoringToggle
+                        if coverageByGeneration {
+                            coverageGenerationLegend
+                        } else {
+                            coverageQualityLegend
+                        }
                     }
                     if !model.searchResults.isEmpty {
                         searchSuggestions
@@ -1695,17 +1762,15 @@ struct MapExplorerView: View {
                 (.speedtest, "Speed", "speedometer")
             ]
         }
-        var options: [(MapDisplayItem.Kind, String, String)] = [
+        // Validations retirée (UI minimale, peu utile). Sites communautaires déplacé
+        // vers les filtres avancés (reste accessible là-bas, hors marchés community-only).
+        let options: [(MapDisplayItem.Kind, String, String)] = [
             (.antenna, "Antennes", "antenna.radiowaves.left.and.right"),
             (.speedtest, "Speed", "speedometer"),
             (.coverage, "Couverture", "dot.radiowaves.left.and.right"),
             (.photo, "Photos", "photo"),
-            (.validation, "Valid.", "checkmark.seal"),
             (.friend, "Amis", "person.2")
         ]
-        if model.supportsCommunityLayers {
-            options.append((.communitySite, "Sites comm.", "dot.radiowaves.up.forward"))
-        }
         return options
     }
 
@@ -1760,6 +1825,48 @@ struct MapExplorerView: View {
                             .fill(band.swiftUIColor)
                             .frame(width: 9, height: 9)
                         Text("\(band.title) \(band.rangeLabel)")
+                            .font(SQFont.archivo(11, .semibold))
+                            .foregroundStyle(SQColor.label)
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, SQSpace.sm)
+                    .padding(.vertical, SQSpace.xs + 1)
+                    .background(mapSubtlePillFill, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                            .stroke(SQColor.separator, lineWidth: 1.5)
+                    }
+                }
+            }
+            .padding(.horizontal, SQSpace.md)
+        }
+        .frame(height: 36)
+    }
+
+    /// Bascule de coloration de la couche Couverture : Signal (RSRP) ↔ Génération.
+    private var coverageColoringToggle: some View {
+        Picker("Coloration couverture", selection: $coverageByGeneration) {
+            Text("Signal").tag(false)
+            Text("Génération").tag(true)
+        }
+        .pickerStyle(.segmented)
+        .frame(maxWidth: 280)
+        .padding(.horizontal, SQSpace.md)
+        .accessibilityLabel("Coloration de la couverture : signal ou génération")
+    }
+
+    /// Légende de la couche Couverture en mode GÉNÉRATION (distincte du RSRP).
+    private var coverageGenerationLegend: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: SQSpace.sm) {
+                Text("Génération").sqKicker()
+
+                ForEach(CoverageGenerationBand.visibleBands) { band in
+                    HStack(spacing: SQSpace.xs + 1) {
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .fill(band.swiftUIColor)
+                            .frame(width: 9, height: 9)
+                        Text(band.title)
                             .font(SQFont.archivo(11, .semibold))
                             .foregroundStyle(SQColor.label)
                             .lineLimit(1)
@@ -2177,17 +2284,32 @@ struct MapExplorerView: View {
         }
     }
 
+    /// Couleur + clé de regroupement d'un point de couverture selon le mode courant :
+    /// par RSRP (signal) ou par génération réseau. Modes mutuellement exclusifs
+    /// (jamais mélangés) — la légende suit `coverageByGeneration`.
+    private func coverageColorParts(rsrp: Double?, tech: String?) -> (key: String, hex: UInt32, dimmed: Bool) {
+        if coverageByGeneration {
+            let band = CoverageGenerationBand.band(for: tech)
+            return ("g-\(band.rawValue)", band.colorHex, band == .none)
+        } else {
+            let band = CoverageQualityBand.band(for: rsrp)
+            return ("q-\(band.rawValue)", band.colorHex, band == .unknown)
+        }
+    }
+
     private var coverageHeatFeatures: [CoverageHeatFeature] {
         guard filters.contains(.coverage) else { return [] }
         var features: [CoverageHeatFeature] = []
         for tile in model.coverageTiles {
             if model.bandFilters.isEmpty {
                 features += tile.clusters.map { cluster in
-                    CoverageHeatFeature(
+                    // Clusters : génération dominante (`cluster.tech`) en mode génération.
+                    let parts = coverageColorParts(rsrp: cluster.avgRsrp, tech: cluster.tech)
+                    return CoverageHeatFeature(
                         id: "coverage-heat-cluster-\(cluster.id)",
                         coordinate: CLLocationCoordinate2D(latitude: cluster.lat, longitude: cluster.lng),
                         weight: min(max(Double(cluster.count), 1), 40) / 8,
-                        rsrp: cluster.avgRsrp
+                        colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed
                     )
                 }
             }
@@ -2195,11 +2317,12 @@ struct MapExplorerView: View {
             if shouldIncludeRawPoints {
                 let pointLimit = mapZoom >= 13 ? 900 : 250
                 features += tile.points.lazy.filter { matchesSelectedBand($0.band) }.prefix(pointLimit).map { point in
-                    CoverageHeatFeature(
+                    let parts = coverageColorParts(rsrp: point.rsrp, tech: point.tech)
+                    return CoverageHeatFeature(
                         id: "coverage-heat-\(point.id)",
                         coordinate: CLLocationCoordinate2D(latitude: point.lat, longitude: point.lng),
                         weight: coverageHeatWeight(rsrp: point.rsrp),
-                        rsrp: point.rsrp
+                        colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed
                     )
                 }
             }
@@ -2208,11 +2331,12 @@ struct MapExplorerView: View {
             features = model.coverageHeat.lazy.filter { point in
                 matchesSelectedBand(point.band) || matchesSelectedBands(in: [point.frequency, point.technology, point.networkType].compactMap { $0 })
             }.prefix(1200).map { point in
-                CoverageHeatFeature(
+                let parts = coverageColorParts(rsrp: point.signalStrength, tech: point.technology ?? point.networkType)
+                return CoverageHeatFeature(
                     id: "coverage-heat-api-\(point.id)",
                     coordinate: CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude),
                     weight: coverageHeatWeight(rsrp: point.signalStrength),
-                    rsrp: point.signalStrength
+                    colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed
                 )
             }
         }
@@ -2611,8 +2735,7 @@ private struct MapAdvancedFilterSheet: View {
             (.speedtest, "Speedtests", "speedometer"),
             (.photo, "Photos", "photo"),
             (.friend, "Amis", "person.2"),
-            (.coverage, "Couverture backend", "dot.radiowaves.left.and.right"),
-            (.validation, "Validations", "checkmark.seal")
+            (.coverage, "Couverture backend", "dot.radiowaves.left.and.right")
         ]
         // Pannes & Prévisionnels : données ANFR FR/DROM uniquement (le backend ne
         // répond que pour ces marchés ; ailleurs `load()` ne les charge jamais).
@@ -2927,6 +3050,11 @@ private struct SQMapLibreMapView: UIViewRepresentable {
         private var lastCenter: CLLocationCoordinate2D?
         private var lastZoom: Double?
         private var latestCoverageHeatFeatures: [CoverageHeatFeature] = []
+        // Couches couverture dynamiques (clé = bande RSRP « q-… » ou génération « g-… »).
+        // On retient les ids créés pour vider/cacher ceux de l'autre mode à la bascule.
+        private var coverageDotLayerIds: Set<String> = []
+        private var coverageDotSourceByLayer: [String: String] = [:]
+        private var coverageDotDimmedByLayer: [String: Bool] = [:]
         private var latestSpeedtestFeatures: [SpeedtestFeature] = []
         /// Index id → point speedtest, pour résoudre le tap (couche GPU) en détail.
         private var speedtestFeaturesById: [String: SpeedtestFeature] = [:]
@@ -3008,35 +3136,60 @@ private struct SQMapLibreMapView: UIViewRepresentable {
         /// jugé peu lisible. Une source + une couche cercle par bande de qualité.
         private func updateCoverageDots(mapView: MLNMapView, features: [CoverageHeatFeature]) {
             guard let style = mapView.style else { return }
-            let byBand = Dictionary(grouping: features, by: \.quality)
-            for band in CoverageQualityBand.allCases {
-                let pts = (byBand[band] ?? []).map { feature -> MLNPointFeature in
+            // Regroupement par clé de couleur (bande RSRP « q-… » OU génération « g-… ») :
+            // une source + une couche cercle par clé. Le mode est encodé dans la feature
+            // (couleur figée) → aucun flag à propager jusqu'au coordinator.
+            let byKey = Dictionary(grouping: features, by: \.colorKey)
+            var activeLayerIds = Set<String>()
+            for (key, group) in byKey {
+                guard let first = group.first else { continue }
+                let sourceId = "sq-coverage-dot-source-\(key)"
+                let layerId = "sq-coverage-dot-layer-\(key)"
+                activeLayerIds.insert(layerId)
+                let pts = group.map { feature -> MLNPointFeature in
                     let point = MLNPointFeature()
                     point.coordinate = feature.coordinate
                     return point
                 }
-                let sourceId = coverageSourceId(for: band)
                 if let source = style.source(withIdentifier: sourceId) as? MLNShapeSource {
                     source.shape = MLNShapeCollectionFeature(shapes: pts)
                 } else {
                     let source = MLNShapeSource(identifier: sourceId, features: pts, options: nil)
                     style.addSource(source)
-                    let layer = MLNCircleStyleLayer(identifier: coverageDotLayerId(for: band), source: source)
-                    layer.circleColor = NSExpression(forConstantValue: band.uiColor)
+                    let layer = MLNCircleStyleLayer(identifier: layerId, source: source)
+                    layer.circleColor = NSExpression(forConstantValue: Self.coverageUIColor(hex: first.colorHex))
                     layer.circleStrokeWidth = NSExpression(forConstantValue: 0)
                     style.addLayer(layer)
                 }
-                style.layer(withIdentifier: coverageDotLayerId(for: band))?.isVisible = !pts.isEmpty
+                style.layer(withIdentifier: layerId)?.isVisible = !pts.isEmpty
+                coverageDotLayerIds.insert(layerId)
+                coverageDotSourceByLayer[layerId] = sourceId
+                coverageDotDimmedByLayer[layerId] = first.dimmed
+            }
+            // Bascule de mode : vide + cache les couches de l'autre mode (clés absentes).
+            for layerId in coverageDotLayerIds where !activeLayerIds.contains(layerId) {
+                if let sourceId = coverageDotSourceByLayer[layerId],
+                   let source = style.source(withIdentifier: sourceId) as? MLNShapeSource {
+                    source.shape = MLNShapeCollectionFeature(shapes: [])
+                }
+                style.layer(withIdentifier: layerId)?.isVisible = false
             }
             styleCoverageDots(style: style, zoom: mapView.zoomLevel)
         }
 
+        private static func coverageUIColor(hex: UInt32) -> UIColor {
+            UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255,
+                    green: CGFloat((hex >> 8) & 0xFF) / 255,
+                    blue: CGFloat(hex & 0xFF) / 255,
+                    alpha: 1.0)
+        }
+
         private func styleCoverageDots(style: MLNStyle, zoom: Double) {
             let radius = coverageDotRadius(forZoom: zoom)
-            for band in CoverageQualityBand.allCases {
-                guard let layer = style.layer(withIdentifier: coverageDotLayerId(for: band)) as? MLNCircleStyleLayer else { continue }
+            for layerId in coverageDotLayerIds {
+                guard let layer = style.layer(withIdentifier: layerId) as? MLNCircleStyleLayer else { continue }
                 layer.circleRadius = NSExpression(forConstantValue: radius)
-                layer.circleOpacity = NSExpression(forConstantValue: band == .unknown ? 0.30 : 0.62)
+                layer.circleOpacity = NSExpression(forConstantValue: (coverageDotDimmedByLayer[layerId] ?? false) ? 0.30 : 0.62)
                 layer.circleBlur = NSExpression(forConstantValue: 0.18)
             }
         }
@@ -3150,14 +3303,6 @@ private struct SQMapLibreMapView: UIViewRepresentable {
                 azimuths: [],
                 showsAzimuths: false
             )
-        }
-
-        private func coverageSourceId(for band: CoverageQualityBand) -> String {
-            "sq-coverage-quality-source-\(band.rawValue)"
-        }
-
-        private func coverageDotLayerId(for band: CoverageQualityBand) -> String {
-            "sq-coverage-quality-dot-\(band.rawValue)"
         }
 
         private func speedtestSourceId(for band: SpeedBand) -> String {

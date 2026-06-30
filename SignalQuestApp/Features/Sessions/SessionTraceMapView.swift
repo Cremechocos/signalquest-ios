@@ -135,7 +135,9 @@ final class SessionPointsRenderer: MKOverlayRenderer {
 /// Couleurs RSRP — mêmes seuils que la couche couverture de la carte principale.
 enum SessionRSRPColor {
     static func ui(_ rsrp: Double?) -> UIColor {
-        guard let rsrp else { return hex(0x94A3B8) } // aucun signal
+        // Sentinelle iOS (0) ou valeur non physique → « aucun signal » : le RSRP réel
+        // est toujours négatif (≤ -40 dBm). Évite de colorer un point iOS en « excellent ».
+        guard let rsrp, rsrp < -1 else { return hex(0x94A3B8) }
         switch rsrp {
         case (-80)...:      return hex(0x10B981) // excellent
         case -90..<(-80):   return hex(0x84CC16) // bon
