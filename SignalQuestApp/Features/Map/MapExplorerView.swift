@@ -2817,6 +2817,7 @@ private final class SQMapKitMarkerView: MKAnnotationView {
     static let reuseID = "sq-mapkit-marker"
     private let dot = UIView()
     private let countLabel = UILabel()
+    private let glyph = UIImageView()
 
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
@@ -2830,7 +2831,10 @@ private final class SQMapKitMarkerView: MKAnnotationView {
         countLabel.textColor = .white
         countLabel.font = .systemFont(ofSize: 12, weight: .bold)
         countLabel.textAlignment = .center
+        glyph.tintColor = .white
+        glyph.contentMode = .scaleAspectFit
         addSubview(dot)
+        dot.addSubview(glyph)
         dot.addSubview(countLabel)
     }
     required init?(coder: NSCoder) { nil }
@@ -2847,14 +2851,35 @@ private final class SQMapKitMarkerView: MKAnnotationView {
             countLabel.frame = dot.bounds
             countLabel.text = count > 999 ? "999+" : "\(count)"
             countLabel.isHidden = false
+            glyph.isHidden = true
         } else {
-            let size: CGFloat = 16
+            let size: CGFloat = 22
             frame = CGRect(x: 0, y: 0, width: size, height: size)
             dot.frame = bounds
             dot.layer.cornerRadius = size / 2
             dot.backgroundColor = color
-            dot.alpha = payload.communityObserved ? 0.55 : 1
+            dot.alpha = payload.communityObserved ? 0.6 : 1
             countLabel.isHidden = true
+            glyph.frame = dot.bounds.insetBy(dx: 4, dy: 4)
+            glyph.image = UIImage(systemName: Self.glyphName(for: payload))?
+                .withConfiguration(UIImage.SymbolConfiguration(pointSize: 10, weight: .bold))
+            glyph.isHidden = false
+        }
+    }
+
+    private static func glyphName(for p: MapAnnotationPayload) -> String {
+        if let g = p.glyphOverride { return g }
+        switch p.kind {
+        case .antenna: return "antenna.radiowaves.left.and.right"
+        case .photo: return "camera.fill"
+        case .friend: return "person.fill"
+        case .validation: return "checkmark.seal.fill"
+        case .session: return "figure.walk"
+        case .outage: return "exclamationmark.triangle.fill"
+        case .planned: return "calendar.badge.clock"
+        case .communitySite: return "dot.radiowaves.up.forward"
+        case .speedtest: return "speedometer"
+        case .coverage: return "dot.radiowaves.left.and.right"
         }
     }
 }
@@ -2940,6 +2965,7 @@ private struct MapKitMapView: UIViewRepresentable {
     func updateUIView(_ map: MKMapView, context: Context) {
         context.coordinator.setCoverage(coverageHeatFeatures, on: map)
         context.coordinator.setSpeedtest(speedtestFeatures, on: map)
+        context.coordinator.setCones(from: annotations, on: map)
         context.coordinator.apply(annotations: annotations, on: map)
         context.coordinator.applyCameraIfNeeded(center: center, zoom: zoom, on: map)
     }
@@ -2957,6 +2983,9 @@ private struct MapKitMapView: UIViewRepresentable {
         private var latestSpeedtestFeatures: [SpeedtestFeature] = []
         private var coverageOverlay: SQMapKitDotsOverlay?
         private var speedtestOverlay: SQMapKitDotsOverlay?
+        private var conePolygons: [MKPolygon] = []
+        private var coneColors: [ObjectIdentifier: UIColor] = [:]
+        private var coneSignature = 0
 
         init(center: Binding<CLLocationCoordinate2D>, zoom: Binding<Double>,
              onMoveEnd: @escaping (MapBounds, Double) -> Void,
@@ -3029,9 +3058,43 @@ private struct MapKitMapView: UIViewRepresentable {
             map.addOverlay(overlay, level: .aboveLabels)
         }
 
+        /// Cônes de secteur des antennes (affichés z≥14) → polygones MapKit, colorés
+        /// par opérateur. Reconstruits seulement quand l'ensemble change.
+        func setCones(from annotations: [MapAnnotationPayload], on map: MKMapView) {
+            var hasher = Hasher()
+            for p in annotations where p.showsAzimuths && !p.azimuths.isEmpty {
+                hasher.combine(p.id); hasher.combine(p.coordinate.latitude); hasher.combine(p.coordinate.longitude)
+                for a in p.azimuths { hasher.combine(a) }
+            }
+            let sig = hasher.finalize()
+            guard sig != coneSignature else { return }
+            coneSignature = sig
+            if !conePolygons.isEmpty { map.removeOverlays(conePolygons); conePolygons.removeAll() }
+            coneColors.removeAll()
+            for p in annotations where p.showsAzimuths && !p.azimuths.isEmpty {
+                let color = UIColor(p.markerColor)
+                for az in p.azimuths {
+                    var coords = AntennaSectorGeometry.sectorConeCoordinates(apex: p.coordinate, azimuth: az, lengthMeters: 320)
+                    guard coords.count >= 3 else { continue }
+                    let poly = MKPolygon(coordinates: &coords, count: coords.count)
+                    coneColors[ObjectIdentifier(poly)] = color
+                    conePolygons.append(poly)
+                }
+            }
+            if !conePolygons.isEmpty { map.addOverlays(conePolygons, level: .aboveRoads) }
+        }
+
         func mapView(_ map: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let dots = overlay as? SQMapKitDotsOverlay {
                 return SQMapKitDotsRenderer(overlay: dots)
+            }
+            if let poly = overlay as? MKPolygon {
+                let r = MKPolygonRenderer(polygon: poly)
+                let color = coneColors[ObjectIdentifier(poly)] ?? .systemOrange
+                r.fillColor = color.withAlphaComponent(0.18)
+                r.strokeColor = color.withAlphaComponent(0.5)
+                r.lineWidth = 1
+                return r
             }
             return MKOverlayRenderer(overlay: overlay)
         }
