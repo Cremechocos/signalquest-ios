@@ -40,9 +40,13 @@ final class MyMeasurementsViewModel: ObservableObject {
 }
 
 struct MyMeasurementsView: View {
+    private let coloring: SessionPointColoring
+    private let mapTitle: String
     @StateObject private var model: MyMeasurementsViewModel
 
-    init(service: SessionsServicing) {
+    init(service: SessionsServicing, coloring: SessionPointColoring = .rsrp, title: String = "Mes mesures") {
+        self.coloring = coloring
+        self.mapTitle = title
         _model = StateObject(wrappedValue: MyMeasurementsViewModel(service: service))
     }
 
@@ -51,18 +55,45 @@ struct MyMeasurementsView: View {
             if model.points.isEmpty && !model.isLoading {
                 emptyState
             } else {
-                SessionTraceMapView(points: model.points, antennas: [], drawPath: false)
+                SessionTraceMapView(points: model.points, antennas: [], drawPath: false, coloring: coloring)
                     .ignoresSafeArea(edges: .bottom)
             }
             if model.isLoading {
                 ProgressView().controlSize(.large).tint(SQColor.brandRed)
             }
         }
-        .navigationTitle("Mes mesures")
+        .navigationTitle(mapTitle)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
         .refreshable { await model.load() }
         .overlay(alignment: .top) { statsBar }
+        .overlay(alignment: .bottomLeading) {
+            if coloring == .generation && !model.points.isEmpty { generationLegend }
+        }
+    }
+
+    /// Légende de la carte de couverture GÉNÉRATION (couleurs = `SessionGenerationColor`).
+    private var generationLegend: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Génération").font(.caption2.weight(.bold)).foregroundStyle(SQColor.labelSecondary)
+            legendRow(Color(red: 0.545, green: 0.361, blue: 0.965), "5G")
+            legendRow(Color(red: 0.231, green: 0.510, blue: 0.965), "4G")
+            legendRow(Color(red: 0.078, green: 0.722, blue: 0.651), "3G")
+            legendRow(Color(red: 0.961, green: 0.620, blue: 0.043), "2G")
+            legendRow(Color(red: 0.580, green: 0.639, blue: 0.722), "Aucun")
+        }
+        .padding(SQSpace.sm + 2)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).stroke(SQColor.separator, lineWidth: 1) }
+        .padding(SQSpace.md)
+        .accessibilityHidden(true)
+    }
+
+    private func legendRow(_ color: Color, _ label: String) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(color).frame(width: 10, height: 10)
+            Text(label).font(.caption2).foregroundStyle(SQColor.label)
+        }
     }
 
     @ViewBuilder

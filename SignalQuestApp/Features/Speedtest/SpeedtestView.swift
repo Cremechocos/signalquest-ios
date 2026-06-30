@@ -25,9 +25,10 @@ struct SpeedtestView: View {
     @AppStorage("speedtest_duration_seconds") private var durationSeconds = 10
     @AppStorage("speedtest_streams") private var streams = 16
     @AppStorage("speedtest_reliability_mode") private var reliabilityMode = true
-    /// Publication sur la carte communautaire publique. Opt-in explicite, OFF par
-    /// défaut (RGPD : pas de diffusion de position sans consentement).
-    @AppStorage("speedtest_publish_to_map") private var publishToMap = false
+    /// Publication sur la carte communautaire publique. Activé par défaut (choix
+    /// mémorisé localement) ; position arrondie à ~100 m et jamais publié sous VPN.
+    /// L'utilisateur peut se retirer à tout moment via ce réglage.
+    @AppStorage("speedtest_publish_to_map") private var publishToMap = true
     /// Nombre de tests enchaînés en rafale (1 = test simple).
     @AppStorage("speedtest_burst_count") private var burstCount = 1
     @State private var phase: SpeedtestPhase = .idle
@@ -644,7 +645,7 @@ struct SpeedtestView: View {
                                     .foregroundStyle(SQColor.label)
                             }
                             .tint(SQColor.brandRed)
-                            Text("Ta position (arrondie à ~100 m) et ton opérateur seront visibles publiquement. Désactivé par défaut.")
+                            Text("Ta position (arrondie à ~100 m) et ton opérateur seront visibles publiquement. Activé par défaut ; ton choix est mémorisé.")
                                 .font(.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
                                 .fixedSize(horizontal: false, vertical: true)

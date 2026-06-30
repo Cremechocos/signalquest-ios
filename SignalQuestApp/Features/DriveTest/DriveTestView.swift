@@ -1,6 +1,25 @@
 import SwiftUI
 import CoreLocation
 
+/// Ce qu'un Drive Test enregistre. Choix persisté localement (`@AppStorage`),
+/// défaut « Les deux » → la couverture est enregistrée par défaut (le choix d'un
+/// mode couverture vaut consentement de publication ; jamais sous VPN).
+enum DriveTestMode: String, CaseIterable, Identifiable {
+    case coverage, speedtest, both
+    var id: String { rawValue }
+    static let storageKey = "drivetest_mode"
+    static var current: DriveTestMode { DriveTestMode(rawValue: UserDefaults.standard.string(forKey: storageKey) ?? "") ?? .both }
+    var short: String {
+        switch self {
+        case .coverage: return "Couverture"
+        case .speedtest: return "Speedtest"
+        case .both: return "Les deux"
+        }
+    }
+    var recordsCoverage: Bool { self != .speedtest }
+    var runsSpeedtest: Bool { self != .coverage }
+}
+
 /// Mode Drive Test : enchaîne des speedtests en continu (rafale illimitée) tout en
 /// suivant la position, en affichant les antennes proches sur une carte et en
 /// indiquant si l'on est « dans le secteur » de l'antenne la plus proche. Réutilise
@@ -85,6 +104,10 @@ final class DriveTestViewModel: ObservableObject {
     private var coveragePoints: [CoveragePointUpload] = []
     private var lastCoveragePointCoord: CLLocationCoordinate2D?
     private let coveragePointCap = 3000
+    /// Mode figé au démarrage de la session (couverture / speedtest / les deux).
+    private var sessionMode: DriveTestMode = .both
+    /// Nombre de points de couverture capturés (affiché en mode couverture).
+    @Published private(set) var coveragePointCount = 0
     /// Opérateur de la SIM active résolu une fois (MCC→marché, operatorKey via IP/ASN
     /// ou MNC). Drive test = cellulaire : on n'affiche que SES antennes.
     private var resolvedSim: (market: String, operatorKey: String)?
@@ -129,17 +152,22 @@ final class DriveTestViewModel: ObservableObject {
         testCount = 0
         coveragePoints.removeAll()
         lastCoveragePointCoord = nil
+        coveragePointCount = 0
+        sessionMode = DriveTestMode.current
         liveMbps = 0
         livePhase = .idle
         isRunning = true
-        statusLabel = "Démarrage…"
+        statusLabel = sessionMode.runsSpeedtest ? "Démarrage…" : "Enregistrement couverture…"
         services.location.startTracking()
         UIApplication.shared.isIdleTimerDisabled = true
-        // Assertion d'arrière-plan + Live Activity : enchaîne les tests écran
-        // verrouillé et affiche la progression sur l'écran de verrouillage.
+        // Assertion d'arrière-plan ; la boucle speedtest + Live Activity ne tournent
+        // qu'en mode « speedtest » ou « les deux » (mode « couverture seule » = suivi
+        // position + génération, sans test de débit).
         background.begin(name: "drivetest")
-        liveActivity.start(serverName: displayedOperatorLabel ?? "SignalQuest", network: services.networkPath.status.displayName, runIndex: 1, runTotal: 0)
-        sessionTask = Task { await runLoop() }
+        if sessionMode.runsSpeedtest {
+            liveActivity.start(serverName: displayedOperatorLabel ?? "SignalQuest", network: services.networkPath.status.displayName, runIndex: 1, runTotal: 0)
+            sessionTask = Task { await runLoop() }
+        }
     }
 
     func stop() {
@@ -194,11 +222,13 @@ final class DriveTestViewModel: ObservableObject {
         if coveragePoints.count > coveragePointCap {
             coveragePoints.removeFirst(coveragePoints.count - coveragePointCap)
         }
+        coveragePointCount = coveragePoints.count
     }
 
     /// Capture un point « génération seule » si l'on a bougé d'au moins 20 m depuis
     /// le dernier — borne le volume sur un long trajet.
     private func captureCoveragePoint(_ coordinate: CLLocationCoordinate2D) {
+        guard sessionMode.recordsCoverage else { return }
         if let last = lastCoveragePointCoord {
             let moved = CLLocation(latitude: last.latitude, longitude: last.longitude)
                 .distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
@@ -212,7 +242,8 @@ final class DriveTestViewModel: ObservableObject {
 
     /// Point de couverture PORTANT le débit/latence mesurés, à la position du test.
     private func captureMeasuredCoveragePoint(_ result: SpeedtestRunResult) {
-        guard let coordinate = services.location.lastLocation?.coordinate ?? userLocation else { return }
+        guard sessionMode.recordsCoverage,
+              let coordinate = services.location.lastLocation?.coordinate ?? userLocation else { return }
         appendCoveragePoint(
             CoveragePointUpload(
                 latitude: coordinate.latitude,
@@ -228,12 +259,14 @@ final class DriveTestViewModel: ObservableObject {
     }
 
     /// Téléverse la session de couverture en fin de drive (best-effort) — seulement
-    /// si l'utilisateur a consenti à la publication carte ET hors VPN (`publishToMap()`).
+    /// si le mode enregistre la couverture (= consentement) ET hors VPN (opérateur non
+    /// fiable sous VPN). Le choix d'un mode couverture vaut publication.
     private func uploadCoverageSessionIfNeeded() {
         let points = coveragePoints
         coveragePoints.removeAll()
         lastCoveragePointCoord = nil
-        guard publishToMap(), points.count >= 2,
+        guard sessionMode.recordsCoverage, !VPNDetector.isActive(),
+              points.count >= 2,
               let first = points.first, let last = points.last else { return }
         let plmn = services.networkPath.simPLMN()
         let market = resolvedSim?.market
@@ -537,7 +570,8 @@ final class DriveTestViewModel: ObservableObject {
     private func publishToMap() -> Bool {
         // Sous VPN : jamais de publication carte (opérateur du tunnel non fiable).
         guard !VPNDetector.isActive() else { return false }
-        return (UserDefaults.standard.object(forKey: "speedtest_publish_to_map") as? Bool) ?? false
+        // Activé par défaut ; le choix de l'utilisateur (réglages speedtest) est mémorisé.
+        return (UserDefaults.standard.object(forKey: "speedtest_publish_to_map") as? Bool) ?? true
     }
 }
 
@@ -546,6 +580,10 @@ struct DriveTestView: View {
     @EnvironmentObject private var services: AppServices
     @StateObject private var model: DriveTestViewModel
     @State private var selectedAntenna: AntennaSite?
+    /// Mode du Drive Test, persisté localement. Défaut « Les deux » → la couverture
+    /// est enregistrée par défaut (le choix d'un mode couverture vaut consentement).
+    @AppStorage(DriveTestMode.storageKey) private var driveTestModeRaw = DriveTestMode.both.rawValue
+    private var driveTestMode: DriveTestMode { DriveTestMode(rawValue: driveTestModeRaw) ?? .both }
 
     init(services: AppServices) {
         _model = StateObject(wrappedValue: DriveTestViewModel(services: services))
@@ -597,10 +635,14 @@ struct DriveTestView: View {
                 VPNWarningBanner(message: "VPN actif : opérateur non détectable, ces tests ne seront pas publiés sur la carte.")
             }
             operatorRow
+            if !model.isRunning { modePicker }
             sectorBanner
-            if model.isRunning { liveReadout }
-            Divider().overlay(SQColor.separator)
-            sessionStats
+            if model.isRunning && driveTestMode.runsSpeedtest { liveReadout }
+            if model.isRunning && driveTestMode.recordsCoverage { coverageStatusRow }
+            if driveTestMode.runsSpeedtest {
+                Divider().overlay(SQColor.separator)
+                sessionStats
+            }
             if let errorMessage = model.errorMessage {
                 Text(errorMessage)
                     .font(.caption)
@@ -617,6 +659,55 @@ struct DriveTestView: View {
                 .stroke(SQColor.separator, lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.12), radius: 14, y: 6)
+    }
+
+    /// Sélecteur du contenu du Drive Test (avant démarrage) : couverture / speedtest /
+    /// les deux. Persisté via `@AppStorage`. « Couverture » enregistre la génération le
+    /// long du trajet sans lancer de test de débit.
+    private var modePicker: some View {
+        VStack(spacing: SQSpace.xs) {
+            Picker("Mode du Drive Test", selection: $driveTestModeRaw) {
+                ForEach(DriveTestMode.allCases) { mode in
+                    Text(mode.short).tag(mode.rawValue)
+                }
+            }
+            .pickerStyle(.segmented)
+            Text(driveTestModeHint)
+                .font(.caption2)
+                .foregroundStyle(SQColor.labelSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Mode du Drive Test")
+        .accessibilityHint("Choisissez d'enregistrer la couverture, de lancer des speedtests, ou les deux")
+    }
+
+    private var driveTestModeHint: String {
+        switch driveTestMode {
+        case .coverage: return "Enregistre la génération (5G/4G/…) le long du trajet, sans test de débit."
+        case .speedtest: return "Enchaîne des speedtests en continu, sans enregistrer la couverture."
+        case .both: return "Speedtests en continu + enregistrement de la couverture le long du trajet."
+        }
+    }
+
+    /// Compteur de points de couverture capturés (visible pendant un mode couverture).
+    private var coverageStatusRow: some View {
+        HStack(spacing: SQSpace.sm) {
+            Image(systemName: "point.3.connected.trianglepath.dotted")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(SQColor.brandRed)
+            Text("Couverture · \(model.coveragePointCount) point\(model.coveragePointCount > 1 ? "s" : "")")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(SQColor.label)
+                .monospacedDigit()
+            Spacer()
+        }
+        .padding(.horizontal, SQSpace.sm + 2)
+        .padding(.vertical, SQSpace.xs + 2)
+        .frame(maxWidth: .infinity)
+        .background(SQColor.fill.opacity(0.6), in: Capsule())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Couverture enregistrée : \(model.coveragePointCount) points")
     }
 
     private var liveReadout: some View {
@@ -770,7 +861,15 @@ struct DriveTestView: View {
             }
             .buttonStyle(.plain)
         } else {
-            GradientButton("Démarrer le drive test", systemImage: "play.fill") { model.start() }
+            GradientButton(startButtonTitle, systemImage: "play.fill") { model.start() }
+        }
+    }
+
+    private var startButtonTitle: String {
+        switch driveTestMode {
+        case .coverage: return "Démarrer l'enregistrement couverture"
+        case .speedtest: return "Démarrer le speedtest continu"
+        case .both: return "Démarrer le drive test"
         }
     }
 

@@ -10,6 +10,8 @@ struct SessionTraceMapView: UIViewRepresentable {
     let points: [CoverageSessionPoint]
     let antennas: [ServingAntenna]
     var drawPath: Bool = false
+    /// Mode de coloration des points : par signal (RSRP) ou par génération (carte couverture).
+    var coloring: SessionPointColoring = .rsrp
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -35,7 +37,7 @@ struct SessionTraceMapView: UIViewRepresentable {
         }
         // Nuage de points coloré par RSRP.
         if !validPoints.isEmpty {
-            map.addOverlay(SessionPointsOverlay(points: validPoints), level: .aboveLabels)
+            map.addOverlay(SessionPointsOverlay(points: validPoints, coloring: coloring), level: .aboveLabels)
         }
         // Antennes desservantes géolocalisées.
         let locatedAntennas = antennas.filter(\.hasValidCoordinate)
@@ -95,12 +97,13 @@ final class SessionPointsOverlay: NSObject, MKOverlay {
     let boundingMapRect: MKMapRect
     let coordinate: CLLocationCoordinate2D
 
-    init(points: [CoverageSessionPoint]) {
+    init(points: [CoverageSessionPoint], coloring: SessionPointColoring = .rsrp) {
         var rect = MKMapRect.null
         dots = points.map { p in
             let mp = MKMapPoint(p.coordinate)
             rect = rect.union(MKMapRect(origin: mp, size: MKMapSize(width: 0.5, height: 0.5)))
-            return Dot(point: mp, color: SessionRSRPColor.cg(p.signalStrength))
+            let color = coloring == .generation ? SessionGenerationColor.cg(p.tech) : SessionRSRPColor.cg(p.signalStrength)
+            return Dot(point: mp, color: color)
         }
         let bounding = rect.isNull ? MKMapRect.world : rect.insetBy(dx: -rect.size.width * 0.1 - 50, dy: -rect.size.height * 0.1 - 50)
         boundingMapRect = bounding
@@ -143,6 +146,33 @@ enum SessionRSRPColor {
     }
 
     static func cg(_ rsrp: Double?) -> CGColor { ui(rsrp).cgColor }
+
+    private static func hex(_ v: UInt32) -> UIColor {
+        UIColor(
+            red: CGFloat((v >> 16) & 0xFF) / 255,
+            green: CGFloat((v >> 8) & 0xFF) / 255,
+            blue: CGFloat(v & 0xFF) / 255,
+            alpha: 1
+        )
+    }
+}
+
+/// Mode de coloration du nuage de points : RSRP (signal) ou GÉNÉRATION.
+/// IMPORTANT : carte RSRP et carte génération sont deux cartes DISTINCTES.
+enum SessionPointColoring { case rsrp, generation }
+
+/// Couleurs par GÉNÉRATION (carte de couverture génération, distincte du RSRP).
+enum SessionGenerationColor {
+    static func ui(_ tech: String?) -> UIColor {
+        let t = (tech ?? "").uppercased()
+        if t.contains("5G") { return hex(0x8B5CF6) }            // 5G — violet
+        if t.contains("4G") || t == "LTE" { return hex(0x3B82F6) } // 4G — bleu
+        if t.contains("3G") { return hex(0x14B8A6) }            // 3G — teal
+        if t.contains("2G") { return hex(0xF59E0B) }            // 2G — ambre
+        return hex(0x94A3B8)                                     // Aucun / inconnu — gris
+    }
+
+    static func cg(_ tech: String?) -> CGColor { ui(tech).cgColor }
 
     private static func hex(_ v: UInt32) -> UIColor {
         UIColor(
