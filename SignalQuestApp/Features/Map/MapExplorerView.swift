@@ -2859,6 +2859,45 @@ private final class SQMapKitMarkerView: MKAnnotationView {
     }
 }
 
+/// Overlay « nuage de points » dense (couverture / speedtests) dessiné en une passe
+/// Core Graphics avec culling viewport — tient des milliers de points (pattern repris
+/// de SessionTraceMapView, le moteur de « Mes mesures »).
+private final class SQMapKitDotsOverlay: NSObject, MKOverlay {
+    struct Dot { let point: MKMapPoint; let color: CGColor }
+    let dots: [Dot]
+    let boundingMapRect: MKMapRect
+    let coordinate: CLLocationCoordinate2D
+
+    init(dots: [Dot]) {
+        self.dots = dots
+        var rect = MKMapRect.null
+        for d in dots { rect = rect.union(MKMapRect(origin: d.point, size: MKMapSize(width: 0.5, height: 0.5))) }
+        let bounding = rect.isNull ? MKMapRect.world : rect.insetBy(dx: -rect.size.width * 0.1 - 50, dy: -rect.size.height * 0.1 - 50)
+        boundingMapRect = bounding
+        coordinate = MKMapPoint(x: bounding.midX, y: bounding.midY).coordinate
+    }
+}
+
+private final class SQMapKitDotsRenderer: MKOverlayRenderer {
+    override func draw(_ mapRect: MKMapRect, zoomScale: MKZoomScale, in context: CGContext) {
+        guard let overlay = overlay as? SQMapKitDotsOverlay else { return }
+        let radius = max(2.0, 3.0 / zoomScale)
+        let pad = radius * 3
+        let cull = mapRect.insetBy(dx: -pad, dy: -pad)
+        context.setLineWidth(radius * 0.35)
+        let stroke = UIColor.black.withAlphaComponent(0.22).cgColor
+        for dot in overlay.dots {
+            guard cull.contains(dot.point) else { continue }
+            let p = point(for: dot.point)
+            let r = CGRect(x: p.x - radius, y: p.y - radius, width: radius * 2, height: radius * 2)
+            context.setFillColor(dot.color)
+            context.fillEllipse(in: r)
+            context.setStrokeColor(stroke)
+            context.strokeEllipse(in: r)
+        }
+    }
+}
+
 /// Carte principale rendue avec MapKit (Apple Plan natif). Consomme les MÊMES
 /// payloads que l'ancien moteur MapLibre (`renderedAnnotations`, etc.).
 private struct MapKitMapView: UIViewRepresentable {
@@ -2886,6 +2925,11 @@ private struct MapKitMapView: UIViewRepresentable {
         config.pointOfInterestFilter = .excludingAll
         map.preferredConfiguration = config
         map.register(SQMapKitMarkerView.self, forAnnotationViewWithReuseIdentifier: SQMapKitMarkerView.reuseID)
+        // Tap pour les points speedtest (overlay non-tappable nativement) → hit-test.
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSpeedtestTap(_:)))
+        tap.delegate = context.coordinator
+        tap.cancelsTouchesInView = false
+        map.addGestureRecognizer(tap)
         let region = MKCoordinateRegion(center: center, span: Coordinator.span(forZoom: zoom, width: Self.referenceWidth))
         map.setRegion(region, animated: false)
         context.coordinator.lastAppliedCenter = center
@@ -2894,11 +2938,13 @@ private struct MapKitMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ map: MKMapView, context: Context) {
+        context.coordinator.setCoverage(coverageHeatFeatures, on: map)
+        context.coordinator.setSpeedtest(speedtestFeatures, on: map)
         context.coordinator.apply(annotations: annotations, on: map)
         context.coordinator.applyCameraIfNeeded(center: center, zoom: zoom, on: map)
     }
 
-    @MainActor final class Coordinator: NSObject, MKMapViewDelegate {
+    @MainActor final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
         @Binding var center: CLLocationCoordinate2D
         @Binding var zoom: Double
         private let onMoveEnd: (MapBounds, Double) -> Void
@@ -2907,6 +2953,10 @@ private struct MapKitMapView: UIViewRepresentable {
         private var payloadsById: [String: MapAnnotationPayload] = [:]
         var lastAppliedCenter: CLLocationCoordinate2D?
         var lastAppliedZoom: Double?
+        private var latestCoverageFeatures: [CoverageHeatFeature] = []
+        private var latestSpeedtestFeatures: [SpeedtestFeature] = []
+        private var coverageOverlay: SQMapKitDotsOverlay?
+        private var speedtestOverlay: SQMapKitDotsOverlay?
 
         init(center: Binding<CLLocationCoordinate2D>, zoom: Binding<Double>,
              onMoveEnd: @escaping (MapBounds, Double) -> Void,
@@ -2949,6 +2999,98 @@ private struct MapKitMapView: UIViewRepresentable {
                 toAdd.append(ann)
             }
             if !toAdd.isEmpty { map.addAnnotations(toAdd) }
+        }
+
+        // MARK: Couches denses (couverture + speedtests) — overlay Core Graphics
+        func setCoverage(_ features: [CoverageHeatFeature], on map: MKMapView) {
+            guard features != latestCoverageFeatures else { return }
+            latestCoverageFeatures = features
+            if let old = coverageOverlay { map.removeOverlay(old); coverageOverlay = nil }
+            guard !features.isEmpty else { return }
+            let dots = features.map { f -> SQMapKitDotsOverlay.Dot in
+                let alpha: CGFloat = f.dimmed ? 0.32 : 0.78
+                return .init(point: MKMapPoint(f.coordinate), color: Self.uiColor(hex: f.colorHex).withAlphaComponent(alpha).cgColor)
+            }
+            let overlay = SQMapKitDotsOverlay(dots: dots)
+            coverageOverlay = overlay
+            map.addOverlay(overlay, level: .aboveRoads)
+        }
+
+        func setSpeedtest(_ features: [SpeedtestFeature], on map: MKMapView) {
+            guard features != latestSpeedtestFeatures else { return }
+            latestSpeedtestFeatures = features
+            if let old = speedtestOverlay { map.removeOverlay(old); speedtestOverlay = nil }
+            guard !features.isEmpty else { return }
+            let dots = features.map { f -> SQMapKitDotsOverlay.Dot in
+                .init(point: MKMapPoint(f.coordinate), color: Self.speedColor(f.downloadMbps).withAlphaComponent(0.9).cgColor)
+            }
+            let overlay = SQMapKitDotsOverlay(dots: dots)
+            speedtestOverlay = overlay
+            map.addOverlay(overlay, level: .aboveLabels)
+        }
+
+        func mapView(_ map: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let dots = overlay as? SQMapKitDotsOverlay {
+                return SQMapKitDotsRenderer(overlay: dots)
+            }
+            return MKOverlayRenderer(overlay: overlay)
+        }
+
+        @objc func handleSpeedtestTap(_ recognizer: UITapGestureRecognizer) {
+            guard recognizer.state == .ended, let map = recognizer.view as? MKMapView,
+                  !latestSpeedtestFeatures.isEmpty else { return }
+            let tap = recognizer.location(in: map)
+            var best: SpeedtestFeature?
+            var bestDist: CGFloat = 22
+            for f in latestSpeedtestFeatures {
+                let p = map.convert(f.coordinate, toPointTo: map)
+                let d = hypot(p.x - tap.x, p.y - tap.y)
+                if d < bestDist { bestDist = d; best = f }
+            }
+            if let best { onSelect(speedtestPayload(from: best)) }
+        }
+
+        private func speedtestPayload(from speedtest: SpeedtestFeature) -> MapAnnotationPayload {
+            MapAnnotationPayload(
+                id: "speed-\(speedtest.id)",
+                kind: .speedtest,
+                title: "\(Int(speedtest.downloadMbps.rounded())) Mbps",
+                subtitle: speedtest.tech ?? "Speedtest",
+                coordinate: speedtest.coordinate,
+                metric: speedtest.uploadMbps.map { "\(Int($0.rounded())) Mbps up" },
+                backendId: speedtest.id,
+                details: MapItemDetails(
+                    downloadMbps: speedtest.downloadMbps,
+                    uploadMbps: speedtest.uploadMbps,
+                    pingMs: speedtest.pingMs,
+                    tech: speedtest.tech,
+                    timestamp: speedtest.timestamp,
+                    note: "Données Speedtest"
+                ),
+                antennaId: nil,
+                clusterCount: nil,
+                azimuths: [],
+                showsAzimuths: false
+            )
+        }
+
+        func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+
+        static func uiColor(hex: UInt32) -> UIColor {
+            UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+        }
+        static func speedColor(_ mbps: Double) -> UIColor {
+            let hex: UInt32
+            switch mbps {
+            case 1000...: hex = 0x3B82F6
+            case 600..<1000: hex = 0x06B6D4
+            case 300..<600: hex = 0x22C55E
+            case 100..<300: hex = 0x84CC16
+            case 30..<100: hex = 0xEAB308
+            case 10..<30: hex = 0xF97316
+            default: hex = 0xEF4444
+            }
+            return uiColor(hex: hex)
         }
 
         // MARK: Caméra — n'applique QUE les changements programmatiques (GPS, cluster).
