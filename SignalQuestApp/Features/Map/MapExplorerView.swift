@@ -1053,8 +1053,6 @@ struct MapExplorerView: View {
     @State private var fetchTask: Task<Void, Never>?
     @State private var lastRegion: MKCoordinateRegion
     @State private var showFilterSheet = false
-    @State private var showLayerSwitch = false
-    @State private var showQuickActions = false
 
     init(service: MapSnapshotServicing = MapSnapshotService(api: APIClient()),
          antennas: AntennasServicing = AntennasService(api: APIClient()),
@@ -1306,7 +1304,6 @@ struct MapExplorerView: View {
             ZStack {
                 VStack(spacing: SQSpace.sm + 2) {
                     mapTopControlBar
-                    operatorQuickStrip
                     if filters.contains(.coverage) {
                         coverageColoringToggle
                         if coverageByGeneration {
@@ -1324,22 +1321,26 @@ struct MapExplorerView: View {
                 .frame(maxWidth: 640)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
+                // Bas-gauche : sélecteur d'opérateur compact + statut.
                 VStack {
                     Spacer()
-                    HStack {
-                        mapStatusToast
+                    HStack(alignment: .bottom) {
+                        VStack(alignment: .leading, spacing: SQSpace.sm) {
+                            mapStatusToast
+                            operatorPill
+                        }
                         Spacer()
                     }
                     .padding(.leading, SQSpace.md)
-                    .padding(.bottom, 70)
+                    .padding(.bottom, SQSpace.lg + 2)
                 }
 
+                // Bas-droite : 2 boutons flottants (localiser + rafraîchir).
                 VStack {
                     Spacer()
-                    HStack(alignment: .bottom, spacing: SQSpace.md) {
+                    HStack {
                         Spacer()
-                        mapFloatingPanel
-                        mapActionRail
+                        mapFabStack
                     }
                     .padding(.trailing, SQSpace.md)
                     .padding(.bottom, SQSpace.lg + 2)
@@ -1403,7 +1404,6 @@ struct MapExplorerView: View {
 
     private var mapTopControlBar: some View {
         HStack(spacing: SQSpace.sm) {
-            marketPicker
             mapSearchField
             filterButton
         }
@@ -1413,42 +1413,6 @@ struct MapExplorerView: View {
         .background(mapChromeBackground, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         .overlay { mapChromeBorder(SQRadius.lg) }
         .shadow(color: mapChromeShadow, radius: 14, y: 6)
-    }
-
-    /// Pastille marché : point rouge opérateur + libellé pays/opérateur en
-    /// Archivo. Bloc encadré 2px encre, coins nets (signature éditoriale).
-    private var marketPicker: some View {
-        Button {
-            Haptics.light()
-            showFilterSheet = true
-        } label: {
-            HStack(spacing: SQSpace.sm - 1) {
-                Circle()
-                    .fill(model.operatorAccent(model.operatorFilter))
-                    .frame(width: 9, height: 9)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(model.currentMarketLabel)
-                        .font(SQFont.archivo(11, .bold))
-                        .tracking(0.6)
-                        .textCase(.uppercase)
-                        .foregroundStyle(SQColor.labelTertiary)
-                        .accessibilityLabel(model.currentMarketLabel)
-                        .accessibilityIdentifier(model.currentMarketLabel)
-                    Text(model.operatorShortLabel(model.operatorFilter))
-                        .font(SQFont.archivo(15, .bold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                }
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(SQColor.labelSecondary)
-            }
-            .padding(.horizontal, SQSpace.md - 2)
-            .frame(width: 124, height: 48, alignment: .leading)
-            .background(mapControlFill, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .overlay { mapChromeBorder(SQRadius.md, strong: true) }
-        }
-        .buttonStyle(SQPressButtonStyle())
     }
 
     /// Champ de recherche net : loupe rouge, fond surface contrasté, coin net.
@@ -1505,6 +1469,74 @@ struct MapExplorerView: View {
         .accessibilityLabel("Filtres")
     }
 
+    /// Sélecteur d'opérateur compact (bas-gauche) : menu des opérateurs du marché
+    /// courant. Remplace la bande d'opérateurs permanente (désencombrement).
+    private var operatorPill: some View {
+        Menu {
+            ForEach(model.operatorOptions, id: \.self) { op in
+                Button {
+                    Haptics.selection()
+                    model.operatorFilter = op
+                } label: {
+                    Label(
+                        model.operatorShortLabel(op),
+                        systemImage: model.operatorFilter == op ? "checkmark"
+                            : (op.uppercased() == "ALL" ? "circle.grid.2x2" : "dot.radiowaves.left.and.right")
+                    )
+                }
+            }
+        } label: {
+            HStack(spacing: SQSpace.sm - 1) {
+                Circle()
+                    .fill(model.operatorFilter.uppercased() == "ALL" ? SQColor.brandRed : model.operatorAccent(model.operatorFilter))
+                    .frame(width: 9, height: 9)
+                Text(model.operatorShortLabel(model.operatorFilter))
+                    .font(SQFont.archivo(14, .bold))
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            .padding(.horizontal, SQSpace.md - 2)
+            .frame(height: 42)
+            .foregroundStyle(SQColor.label)
+            .background(mapChromeBackground, in: Capsule())
+            .overlay { Capsule().stroke(SQColor.separator, lineWidth: 1.5) }
+            .shadow(color: mapChromeShadow, radius: 12, y: 5)
+        }
+        .accessibilityLabel("Opérateur affiché : \(model.operatorShortLabel(model.operatorFilter))")
+    }
+
+    /// Pile de 2 boutons flottants (bas-droite) : recentrage GPS + rafraîchissement.
+    /// Remplace le rail de 4 boutons + les panneaux flottants (désencombrement).
+    private var mapFabStack: some View {
+        VStack(spacing: SQSpace.sm) {
+            mapFab(icon: "location", label: "Recentrer sur ma position") {
+                centerOnCurrentLocation()
+            }
+            mapFab(icon: "arrow.clockwise", label: "Rafraîchir la carte") {
+                scheduleLoad(region: lastRegion)
+            }
+        }
+    }
+
+    private func mapFab(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .bold))
+                .frame(width: 48, height: 48)
+                .foregroundStyle(SQColor.label)
+                .background(mapChromeBackground, in: Circle())
+                .overlay { Circle().stroke(SQColor.separator, lineWidth: 1.5) }
+                .shadow(color: mapChromeShadow, radius: 12, y: 5)
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(label)
+    }
+
     // MARK: Chrome éditorial (à plat, opaque, bordé — pas de glassmorphism)
 
     /// Conteneur des contrôles superposés : surface opaque crème/encre, jamais
@@ -1528,55 +1560,6 @@ struct MapExplorerView: View {
     private func mapChromeBorder(_ radius: CGFloat, strong: Bool = false) -> some View {
         RoundedRectangle(cornerRadius: radius, style: .continuous)
             .stroke(strong ? SQColor.label : SQColor.separator, lineWidth: strong ? 2 : 1.5)
-    }
-
-    private var operatorQuickStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SQSpace.sm - 1) {
-                ForEach(model.operatorOptions, id: \.self) { op in
-                    operatorChip(op)
-                }
-            }
-            .padding(.horizontal, SQSpace.xs)
-        }
-        .frame(height: 40)
-    }
-
-    /// Tag opérateur éditorial : sélectionné = fond plein couleur opérateur
-    /// (rouge pour « Tous »), texte blanc ; sinon surface + bordure separator.
-    /// Coin net `SQRadius.sm`, pastille de couleur à gauche du libellé.
-    private func operatorChip(_ op: String) -> some View {
-        let isSelected = model.operatorFilter == op
-        let isAll = op.uppercased() == "ALL"
-        let accent = isAll ? SQColor.brandRed : model.operatorAccent(op)
-        return Button {
-            Haptics.selection()
-            model.operatorFilter = op
-        } label: {
-            HStack(spacing: SQSpace.xs + 2) {
-                Circle()
-                    .fill(isSelected ? Color.white : accent)
-                    .frame(width: 7, height: 7)
-                Text(model.operatorShortLabel(op))
-                    .font(SQFont.archivo(13, .bold))
-                    .tracking(0.3)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, SQSpace.md - 2)
-            .frame(height: 34)
-            .background(
-                isSelected ? AnyShapeStyle(accent) : AnyShapeStyle(mapSubtlePillFill),
-                in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                    .stroke(isSelected ? Color.clear : SQColor.separator, lineWidth: 1.5)
-            }
-            .foregroundStyle(isSelected ? Color.white : SQColor.label)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(SQPressButtonStyle())
-        .sqAnimation(SQMotion.fast, value: isSelected)
     }
 
     @ViewBuilder
@@ -1604,226 +1587,6 @@ struct MapExplorerView: View {
         .overlay { mapChromeBorder(SQRadius.md) }
         .shadow(color: mapChromeShadow, radius: 12, y: 5)
         .frame(maxWidth: 280, alignment: .leading)
-    }
-
-    @ViewBuilder
-    private var mapFloatingPanel: some View {
-        if showQuickActions {
-            mapQuickActionsPanel
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .opacity
-                ))
-        } else if showLayerSwitch {
-            mapLayerPanel
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .opacity
-                ))
-        }
-    }
-
-    private var mapActionRail: some View {
-        VStack(spacing: SQSpace.sm - 1) {
-            railButton(icon: showLayerSwitch ? "xmark" : "square.3.layers.3d", active: showLayerSwitch, label: showLayerSwitch ? "Fermer les couches" : "Couches de la carte") {
-                withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) {
-                    showLayerSwitch.toggle()
-                    if showLayerSwitch { showQuickActions = false }
-                }
-            }
-            railButton(icon: showQuickActions ? "xmark" : "bolt.horizontal.circle", active: showQuickActions, label: showQuickActions ? "Fermer les actions" : "Actions rapides") {
-                withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) {
-                    showQuickActions.toggle()
-                    if showQuickActions { showLayerSwitch = false }
-                }
-            }
-            Rectangle()
-                .fill(SQColor.separator)
-                .frame(width: 26, height: 1.5)
-            railButton(icon: "location", active: false, label: "Recentrer sur ma position") {
-                centerOnCurrentLocation()
-            }
-            railButton(icon: "arrow.clockwise", active: false, label: "Rafraîchir la carte") {
-                scheduleLoad(region: lastRegion)
-            }
-        }
-        .padding(SQSpace.xs + 1)
-        .background(mapChromeBackground, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay { mapChromeBorder(SQRadius.lg) }
-        .shadow(color: mapChromeShadow, radius: 14, y: 6)
-        .frame(width: 56)
-    }
-
-    private func railButton(icon: String, active: Bool, label: String, action: @escaping () -> Void) -> some View {
-        Button {
-            Haptics.light()
-            action()
-        } label: {
-            Image(systemName: icon)
-                .font(.system(size: 17, weight: .bold))
-                .frame(width: 44, height: 44)
-                .background(active ? SQColor.brandRed : mapControlFill, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                        .stroke(active ? Color.clear : SQColor.separator, lineWidth: 1.5)
-                }
-                .foregroundStyle(active ? Color.white : SQColor.label)
-        }
-        .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel(label)
-    }
-
-    private var mapQuickActionsPanel: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
-            panelHeader("Actions", value: model.currentMarketLabel)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: SQSpace.sm) {
-                quickAction(title: "Amis", icon: "person.2.fill", active: filters.contains(.friend)) {
-                    toggleMapLayer(.friend)
-                }
-                quickAction(title: "Pannes", icon: "exclamationmark.triangle.fill", active: filters.contains(.outage)) {
-                    toggleMapLayer(.outage)
-                }
-                quickAction(title: "Prévisions", icon: "calendar.badge.clock", active: filters.contains(.planned)) {
-                    toggleMapLayer(.planned)
-                }
-                quickAction(title: "Filtres", icon: "line.3.horizontal.decrease", active: activeFilterCount > 0) {
-                    showFilterSheet = true
-                    showQuickActions = false
-                }
-            }
-        }
-        .padding(SQSpace.md)
-        .frame(width: 252, alignment: .leading)
-        .background(mapChromeBackground, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay { mapChromeBorder(SQRadius.lg) }
-        .shadow(color: mapChromeShadow, radius: 14, y: 6)
-    }
-
-    private var mapLayerPanel: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
-            panelHeader("Couches", value: "\(activeLayerCount)")
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: SQSpace.sm) {
-                ForEach(layerPanelOptions, id: \.0.rawValue) { kind, title, icon in
-                    layerChip(kind: kind, title: title, icon: icon)
-                }
-            }
-        }
-        .padding(SQSpace.md)
-        .frame(width: 268, alignment: .leading)
-        .background(mapChromeBackground, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay { mapChromeBorder(SQRadius.lg) }
-        .shadow(color: mapChromeShadow, radius: 14, y: 6)
-        .foregroundStyle(SQColor.label)
-    }
-
-    /// En-tête de panneau : kicker éditorial rouge + compteur en tag net.
-    private func panelHeader(_ title: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title).sqKicker()
-            Spacer()
-            Text(value)
-                .font(SQFont.archivo(11, .bold))
-                .tracking(0.4)
-                .textCase(.uppercase)
-                .lineLimit(1)
-                .padding(.horizontal, SQSpace.sm)
-                .padding(.vertical, SQSpace.xs)
-                .foregroundStyle(SQColor.brandRed)
-                .background(SQColor.brandRed.opacity(0.12), in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                        .stroke(SQColor.brandRed.opacity(0.45), lineWidth: 1)
-                }
-        }
-    }
-
-    private func quickAction(title: String, icon: String, active: Bool, action: @escaping () -> Void) -> some View {
-        Button {
-            Haptics.light()
-            action()
-        } label: {
-            VStack(spacing: SQSpace.xs + 2) {
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .semibold))
-                Text(title)
-                    .font(SQFont.archivo(12, .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 68)
-            .background(active ? SQColor.brandRed : mapControlFill, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                    .stroke(active ? Color.clear : SQColor.separator, lineWidth: 1.5)
-            }
-            .foregroundStyle(active ? Color.white : SQColor.label)
-        }
-        .buttonStyle(SQPressButtonStyle())
-        .sqAnimation(SQMotion.fast, value: active)
-    }
-
-    private func layerChip(kind: MapDisplayItem.Kind, title: String, icon: String) -> some View {
-        let isOn = filters.contains(kind)
-        let accent = color(for: kind)
-        return Button {
-            Haptics.light()
-            toggleMapLayer(kind)
-        } label: {
-            HStack(spacing: SQSpace.sm - 1) {
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: .bold))
-                    .frame(width: 17)
-                Text(title)
-                    .font(SQFont.archivo(12, .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-            }
-            .frame(maxWidth: .infinity, minHeight: 42)
-            .background(isOn ? accent : mapControlFill, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                    .stroke(isOn ? Color.clear : SQColor.separator, lineWidth: 1.5)
-            }
-            .foregroundStyle(isOn ? Color.white : SQColor.label)
-        }
-        .buttonStyle(SQPressButtonStyle())
-        .sqAnimation(SQMotion.fast, value: isOn)
-    }
-
-    private func toggleMapLayer(_ kind: MapDisplayItem.Kind) {
-        if filters.contains(kind) {
-            filters.remove(kind)
-        } else {
-            filters.insert(kind)
-        }
-    }
-
-    /// Couches proposées dans le panneau : un marché communautaire ne montre
-    /// que les couches pertinentes (sites communautaires + speedtests).
-    private var layerPanelOptions: [(MapDisplayItem.Kind, String, String)] {
-        if model.isCommunityOnlyMarket {
-            return [
-                (.communitySite, "Sites comm.", "dot.radiowaves.up.forward"),
-                (.speedtest, "Speed", "speedometer")
-            ]
-        }
-        // Validations retirée (UI minimale, peu utile). Sites communautaires déplacé
-        // vers les filtres avancés (reste accessible là-bas, hors marchés community-only).
-        let options: [(MapDisplayItem.Kind, String, String)] = [
-            (.antenna, "Antennes", "antenna.radiowaves.left.and.right"),
-            (.speedtest, "Speed", "speedometer"),
-            (.coverage, "Couverture", "dot.radiowaves.left.and.right"),
-            (.photo, "Photos", "photo"),
-            (.friend, "Amis", "person.2")
-        ]
-        return options
-    }
-
-    private var activeLayerCount: Int {
-        [.antenna, .speedtest, .coverage, .photo, .validation, .friend, .outage, .planned, .communitySite]
-            .filter(filters.contains)
-            .count
     }
 
     private var activeFilterCount: Int {
