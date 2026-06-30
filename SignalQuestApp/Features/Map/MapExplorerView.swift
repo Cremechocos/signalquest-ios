@@ -2934,6 +2934,8 @@ private struct MapKitMapView: UIViewRepresentable {
     @Binding var zoom: Double
     let onMoveEnd: (MapBounds, Double) -> Void
     let onSelect: (MapAnnotationPayload) -> Void
+    @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
+    private var backdrop: MapBackdrop { MapBackdrop(rawValue: backdropRaw) ?? .applePlan }
 
     private static let referenceWidth: CGFloat = 390
 
@@ -2946,9 +2948,7 @@ private struct MapKitMapView: UIViewRepresentable {
         map.delegate = context.coordinator
         map.showsUserLocation = true
         map.showsCompass = true
-        let config = MKStandardMapConfiguration(elevationStyle: .flat)
-        config.pointOfInterestFilter = .excludingAll
-        map.preferredConfiguration = config
+        context.coordinator.applyBackdrop(backdrop, on: map)
         map.register(SQMapKitMarkerView.self, forAnnotationViewWithReuseIdentifier: SQMapKitMarkerView.reuseID)
         // Tap pour les points speedtest (overlay non-tappable nativement) → hit-test.
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSpeedtestTap(_:)))
@@ -2963,9 +2963,10 @@ private struct MapKitMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ map: MKMapView, context: Context) {
+        context.coordinator.applyBackdrop(backdrop, on: map)
+        context.coordinator.setCones(from: annotations, on: map)
         context.coordinator.setCoverage(coverageHeatFeatures, on: map)
         context.coordinator.setSpeedtest(speedtestFeatures, on: map)
-        context.coordinator.setCones(from: annotations, on: map)
         context.coordinator.apply(annotations: annotations, on: map)
         context.coordinator.applyCameraIfNeeded(center: center, zoom: zoom, on: map)
     }
@@ -2986,6 +2987,8 @@ private struct MapKitMapView: UIViewRepresentable {
         private var conePolygons: [MKPolygon] = []
         private var coneColors: [ObjectIdentifier: UIColor] = [:]
         private var coneSignature = 0
+        private var appliedBackdrop: MapBackdrop?
+        private var tileOverlay: MKTileOverlay?
 
         init(center: Binding<CLLocationCoordinate2D>, zoom: Binding<Double>,
              onMoveEnd: @escaping (MapBounds, Double) -> Void,
@@ -3042,7 +3045,7 @@ private struct MapKitMapView: UIViewRepresentable {
             }
             let overlay = SQMapKitDotsOverlay(dots: dots)
             coverageOverlay = overlay
-            map.addOverlay(overlay, level: .aboveRoads)
+            map.addOverlay(overlay, level: .aboveLabels)
         }
 
         func setSpeedtest(_ features: [SpeedtestFeature], on map: MKMapView) {
@@ -3056,6 +3059,31 @@ private struct MapKitMapView: UIViewRepresentable {
             let overlay = SQMapKitDotsOverlay(dots: dots)
             speedtestOverlay = overlay
             map.addOverlay(overlay, level: .aboveLabels)
+        }
+
+        // MARK: Fond de carte (Apple Plan natif / imagerie Apple / raster MKTileOverlay)
+        func applyBackdrop(_ backdrop: MapBackdrop, on map: MKMapView) {
+            guard backdrop != appliedBackdrop else { return }
+            appliedBackdrop = backdrop
+            if let old = tileOverlay { map.removeOverlay(old); tileOverlay = nil }
+            switch backdrop.mapKitKind {
+            case .applePlan:
+                let c = MKStandardMapConfiguration(elevationStyle: .flat)
+                c.pointOfInterestFilter = .excludingAll
+                map.preferredConfiguration = c
+            case .imagery:
+                map.preferredConfiguration = MKImageryMapConfiguration(elevationStyle: .flat)
+            case .raster(let template, let maxZoom):
+                let c = MKStandardMapConfiguration(elevationStyle: .flat)
+                c.pointOfInterestFilter = .excludingAll
+                map.preferredConfiguration = c
+                // Tuiles raster opaques (remplacent le fond Apple) sous toutes nos couches.
+                let overlay = MKTileOverlay(urlTemplate: template)
+                overlay.canReplaceMapContent = true
+                overlay.maximumZ = maxZoom
+                map.insertOverlay(overlay, at: 0, level: .aboveLabels)
+                tileOverlay = overlay
+            }
         }
 
         /// Cônes de secteur des antennes (affichés z≥14) → polygones MapKit, colorés
@@ -3081,10 +3109,13 @@ private struct MapKitMapView: UIViewRepresentable {
                     conePolygons.append(poly)
                 }
             }
-            if !conePolygons.isEmpty { map.addOverlays(conePolygons, level: .aboveRoads) }
+            if !conePolygons.isEmpty { map.addOverlays(conePolygons, level: .aboveLabels) }
         }
 
         func mapView(_ map: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let tile = overlay as? MKTileOverlay {
+                return MKTileOverlayRenderer(tileOverlay: tile)
+            }
             if let dots = overlay as? SQMapKitDotsOverlay {
                 return SQMapKitDotsRenderer(overlay: dots)
             }
@@ -3231,7 +3262,7 @@ private struct SQMapLibreMapView: UIViewRepresentable {
     @Binding var zoom: Double
     let onMoveEnd: (MapBounds, Double) -> Void
     let onSelect: (MapAnnotationPayload) -> Void
-    @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.carto.rawValue
+    @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
     private var backdrop: MapBackdrop { MapBackdrop(rawValue: backdropRaw) ?? .carto }
 
     func makeCoordinator() -> Coordinator {

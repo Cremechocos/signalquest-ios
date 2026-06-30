@@ -79,7 +79,7 @@ struct ANFRMapLibreView: UIViewRepresentable {
     @Binding var center: CLLocationCoordinate2D
     @Binding var zoom: Double
     let onSelectSite: (ANFRMapSite) -> Void
-    @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.carto.rawValue
+    @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
     private var backdrop: MapBackdrop { MapBackdrop(rawValue: backdropRaw) ?? .carto }
 
     func makeCoordinator() -> Coordinator {

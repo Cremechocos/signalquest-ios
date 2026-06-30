@@ -78,7 +78,7 @@ struct SettingsView: View {
     @State private var show2FADisable = false
     @State private var disable2FACode = ""
     @State private var showDeleteConfirm = false
-    @AppStorage(MapBackdrop.storageKey) private var mapBackdropRaw = MapBackdrop.carto.rawValue
+    @AppStorage(MapBackdrop.storageKey) private var mapBackdropRaw = MapBackdrop.applePlan.rawValue
     @AppStorage(AppLockSettings.enabledKey) private var appLockEnabled = false
     @AppStorage(AppLockSettings.lockGraceKey) private var lockGraceSeconds = 0.0
     @AppStorage(AppLockSettings.autoLogoutKey) private var autoLogoutSeconds = 0.0

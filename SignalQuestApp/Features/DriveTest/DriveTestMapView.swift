@@ -27,7 +27,7 @@ struct DriveTestMapView: UIViewRepresentable {
     /// Tap sur un point speedtest → ouvre la feuille de détails.
     var onSelectSpeedtest: (DriveSpeedtestPoint) -> Void = { _ in }
 
-    @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.carto.rawValue
+    @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
     private var backdrop: MapBackdrop { MapBackdrop(rawValue: backdropRaw) ?? .carto }
 
     func makeCoordinator() -> Coordinator { Coordinator(onSelectSite: onSelectSite, onSelectSpeedtest: onSelectSpeedtest) }
