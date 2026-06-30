@@ -36,6 +36,7 @@
 		1C8AA28EE4CFA6F012C5B69F /* DiskCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F8487B690EEC1DAED017BE3 /* DiskCache.swift */; };
 		1E08C8632734607458C0A7DF /* WiFiSSIDProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E223D37F2AA33DF68928E05 /* WiFiSSIDProvider.swift */; };
 		1EC17F2A5E383435467A6EB1 /* SQBrand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 342AD252F576AA2664A4C655 /* SQBrand.swift */; };
+		1EF63FFE668545D35C37E403 /* MyMeasurementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA556BEE2D1EA6BAA5FB0800 /* MyMeasurementsView.swift */; };
 		2178A64BBFDCF36192FACCD4 /* AppleDeviceDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F5CFE5CCBA408F62BDCC840 /* AppleDeviceDescriptor.swift */; };
 		21EDBBF70A91AEDE041F8298 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 6EAEE5F367C7CB8690FF7147 /* FirebaseMessaging */; };
 		223A9CEC6280B585F98FB578 /* AntennaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DA025CCAC0DF6A4A8AD5A6E /* AntennaModels.swift */; };
@@ -440,6 +441,7 @@
 		E66DFBB8FE15CA2DBA663B20 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		E8F9D2F40F28C9CB1247B4F5 /* TileCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileCache.swift; sourceTree = "<group>"; };
 		E91AD5F784D0FCE84CBC6FC8 /* LiveKitClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitClient.swift; sourceTree = "<group>"; };
+		EA556BEE2D1EA6BAA5FB0800 /* MyMeasurementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyMeasurementsView.swift; sourceTree = "<group>"; };
 		EF18359FD48374A1C9C50A70 /* Archivo-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Archivo-Medium.ttf"; sourceTree = "<group>"; };
 		EF6835ADAA41625A09DC3013 /* PollBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollBubble.swift; sourceTree = "<group>"; };
 		F031B14E382FDADDEAEFECE1 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
@@ -853,6 +855,7 @@
 		B367C49F9620A202AB659ACA /* Sessions */ = {
 			isa = PBXGroup;
 			children = (
+				EA556BEE2D1EA6BAA5FB0800 /* MyMeasurementsView.swift */,
 				F1E8601B1C76C24BA49EBF1C /* SessionDetailView.swift */,
 				24B43573690B59F5B6ECA05C /* SessionsListView.swift */,
 				E31D4A2FC853B46DC0196738 /* SessionTraceMapView.swift */,
@@ -1345,6 +1348,7 @@
 				0498F131894BFA67F39B4BB3 /* MessagesView.swift in Sources */,
 				30799621699A82F5672581C8 /* MockURLProtocol.swift in Sources */,
 				AE4252E6C806B316DED09768 /* MyIdentificationsView.swift in Sources */,
+				1EF63FFE668545D35C37E403 /* MyMeasurementsView.swift in Sources */,
 				A1A44A0CCC7D64304DA39684 /* NetworkPathMonitor.swift in Sources */,
 				1903FFA116C3304098389589 /* NewPollView.swift in Sources */,
 				92554F6DCF00E04342046FDE /* NotificationsCenterView.swift in Sources */,

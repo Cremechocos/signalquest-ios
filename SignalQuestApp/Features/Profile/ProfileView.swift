@@ -58,6 +58,12 @@ struct ProfileView: View {
                     }
                     menuSeparator
                     NavigationLink {
+                        MyMeasurementsView(service: services.sessions)
+                    } label: {
+                        menuRow(title: "Mes mesures sur la carte", icon: "mappin.and.ellipse")
+                    }
+                    menuSeparator
+                    NavigationLink {
                         MyIdentificationsView(service: services.identify)
                     } label: {
                         menuRow(title: "Mes identifications", icon: "checkmark.seal")
