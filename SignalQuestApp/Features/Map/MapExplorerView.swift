@@ -1466,7 +1466,7 @@ struct MapExplorerView: View {
             }
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel("Filtres")
+        .accessibilityLabel("Calques et filtres")
     }
 
     /// Sélecteur d'opérateur compact (bas-gauche) : menu des opérateurs du marché
@@ -2566,6 +2566,35 @@ private struct MapAdvancedFilterSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: SQSpace.md + 2) {
+                    filterSection("Calques", icon: "square.3.layers.3d") {
+                        LazyVGrid(columns: filterColumns, spacing: 8) {
+                            ForEach(layerOptions, id: \.0.rawValue) { kind, label, icon in
+                                filterChip(title: label, icon: icon, active: layers.contains(kind)) {
+                                    toggleLayer(kind)
+                                }
+                            }
+                        }
+                        if communityLayerAvailable && (layers.contains(.communitySite) || selectedEntry?.isCommunityOnly == true) {
+                            Toggle(isOn: $includeObserved) {
+                                Label {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Cellules observées")
+                                            .font(SQFont.archivo(14, .semibold))
+                                            .foregroundStyle(SQColor.label)
+                                        Text("Affiche aussi les cellules captées, en plus des sites probables consolidés")
+                                            .font(SQFont.archivo(11, .regular))
+                                            .foregroundStyle(SQColor.labelSecondary)
+                                    }
+                                } icon: {
+                                    Image(systemName: "dot.radiowaves.up.forward")
+                                        .foregroundStyle(SQColor.brandPink)
+                                }
+                            }
+                            .tint(SQColor.brandRed)
+                            .padding(.top, 4)
+                        }
+                    }
+
                     filterSection("Opérateur", icon: "antenna.radiowaves.left.and.right") {
                         LazyVGrid(columns: filterColumns, spacing: 8) {
                         ForEach(operatorOptions, id: \.self) { op in
@@ -2624,40 +2653,11 @@ private struct MapAdvancedFilterSheet: View {
                         periodPicker("Speedtests", selection: $speedtestDays)
                         periodPicker("Couverture", selection: $coverageDays)
                     }
-
-                    filterSection("Couches", icon: "square.3.layers.3d") {
-                        LazyVGrid(columns: filterColumns, spacing: 8) {
-                            ForEach(layerOptions, id: \.0.rawValue) { kind, label, icon in
-                                filterChip(title: label, icon: icon, active: layers.contains(kind)) {
-                                    toggleLayer(kind)
-                                }
-                            }
-                        }
-                        if communityLayerAvailable && (layers.contains(.communitySite) || selectedEntry?.isCommunityOnly == true) {
-                            Toggle(isOn: $includeObserved) {
-                                Label {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Cellules observées")
-                                            .font(SQFont.archivo(14, .semibold))
-                                            .foregroundStyle(SQColor.label)
-                                        Text("Affiche aussi les cellules captées, en plus des sites probables consolidés")
-                                            .font(SQFont.archivo(11, .regular))
-                                            .foregroundStyle(SQColor.labelSecondary)
-                                    }
-                                } icon: {
-                                    Image(systemName: "dot.radiowaves.up.forward")
-                                        .foregroundStyle(SQColor.brandPink)
-                                }
-                            }
-                            .tint(SQColor.brandRed)
-                            .padding(.top, 4)
-                        }
-                    }
                 }
                 .padding(SQSpace.lg)
             }
             .signalQuestBackground()
-            .navigationTitle("Filtres carte")
+            .navigationTitle("Calques & filtres")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
