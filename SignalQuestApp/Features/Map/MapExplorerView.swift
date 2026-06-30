@@ -1219,7 +1219,9 @@ struct MapExplorerView: View {
     @ViewBuilder
     private var mapLayer: some View {
 #if canImport(MapLibre)
-        SQMapLibreMapView(
+        // Migration moteur unique : rendu MapKit (Apple Plan natif). Même interface
+        // que l'ancien SQMapLibreMapView (mêmes payloads).
+        MapKitMapView(
             annotations: renderedAnnotations,
             coverageHeatFeatures: renderedCoverageFeatures,
             speedtestFeatures: renderedSpeedtestFeatures,
@@ -2794,6 +2796,211 @@ private struct MapAdvancedFilterSheet: View {
 }
 
 #if canImport(MapLibre)
+// MARK: - Carte MapKit (migration vers moteur unique — remplace SQMapLibreMapView)
+// NB : placé sous `#if canImport(MapLibre)` UNIQUEMENT pour accéder à `markerColor`
+// pendant la transition. Ce code n'utilise AUCUN type MapLibre ; la phase finale
+// retirera le gating et le rendra inconditionnel.
+
+/// Annotation MapKit portant le payload (pour le dispatch tap → fiche).
+private final class SQMapKitAnnotation: NSObject, MKAnnotation {
+    let payload: MapAnnotationPayload
+    let coordinate: CLLocationCoordinate2D
+    init(payload: MapAnnotationPayload) {
+        self.payload = payload
+        self.coordinate = payload.coordinate
+    }
+}
+
+/// Vue d'annotation native : pastille colorée (opérateur) ou pastille de cluster
+/// numérotée. (Vignettes photos / cônes : phases ultérieures.)
+private final class SQMapKitMarkerView: MKAnnotationView {
+    static let reuseID = "sq-mapkit-marker"
+    private let dot = UIView()
+    private let countLabel = UILabel()
+
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        backgroundColor = .clear
+        dot.layer.borderColor = UIColor.white.cgColor
+        dot.layer.borderWidth = 2
+        dot.layer.shadowColor = UIColor.black.cgColor
+        dot.layer.shadowOpacity = 0.25
+        dot.layer.shadowRadius = 3
+        dot.layer.shadowOffset = CGSize(width: 0, height: 1.5)
+        countLabel.textColor = .white
+        countLabel.font = .systemFont(ofSize: 12, weight: .bold)
+        countLabel.textAlignment = .center
+        addSubview(dot)
+        dot.addSubview(countLabel)
+    }
+    required init?(coder: NSCoder) { nil }
+
+    func apply(_ payload: MapAnnotationPayload) {
+        let color = UIColor(payload.markerColor)
+        if let count = payload.clusterCount {
+            let size: CGFloat = count >= 100 ? 40 : 34
+            frame = CGRect(x: 0, y: 0, width: size, height: size)
+            dot.frame = bounds
+            dot.layer.cornerRadius = size / 2
+            dot.backgroundColor = color
+            dot.alpha = 1
+            countLabel.frame = dot.bounds
+            countLabel.text = count > 999 ? "999+" : "\(count)"
+            countLabel.isHidden = false
+        } else {
+            let size: CGFloat = 16
+            frame = CGRect(x: 0, y: 0, width: size, height: size)
+            dot.frame = bounds
+            dot.layer.cornerRadius = size / 2
+            dot.backgroundColor = color
+            dot.alpha = payload.communityObserved ? 0.55 : 1
+            countLabel.isHidden = true
+        }
+    }
+}
+
+/// Carte principale rendue avec MapKit (Apple Plan natif). Consomme les MÊMES
+/// payloads que l'ancien moteur MapLibre (`renderedAnnotations`, etc.).
+private struct MapKitMapView: UIViewRepresentable {
+    let annotations: [MapAnnotationPayload]
+    let coverageHeatFeatures: [CoverageHeatFeature]   // Phase 2
+    let speedtestFeatures: [SpeedtestFeature]          // Phase 2
+    let colorScheme: ColorScheme
+    @Binding var center: CLLocationCoordinate2D
+    @Binding var zoom: Double
+    let onMoveEnd: (MapBounds, Double) -> Void
+    let onSelect: (MapAnnotationPayload) -> Void
+
+    private static let referenceWidth: CGFloat = 390
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(center: $center, zoom: $zoom, onMoveEnd: onMoveEnd, onSelect: onSelect)
+    }
+
+    func makeUIView(context: Context) -> MKMapView {
+        let map = MKMapView(frame: .zero)
+        map.delegate = context.coordinator
+        map.showsUserLocation = true
+        map.showsCompass = true
+        let config = MKStandardMapConfiguration(elevationStyle: .flat)
+        config.pointOfInterestFilter = .excludingAll
+        map.preferredConfiguration = config
+        map.register(SQMapKitMarkerView.self, forAnnotationViewWithReuseIdentifier: SQMapKitMarkerView.reuseID)
+        let region = MKCoordinateRegion(center: center, span: Coordinator.span(forZoom: zoom, width: Self.referenceWidth))
+        map.setRegion(region, animated: false)
+        context.coordinator.lastAppliedCenter = center
+        context.coordinator.lastAppliedZoom = zoom
+        return map
+    }
+
+    func updateUIView(_ map: MKMapView, context: Context) {
+        context.coordinator.apply(annotations: annotations, on: map)
+        context.coordinator.applyCameraIfNeeded(center: center, zoom: zoom, on: map)
+    }
+
+    @MainActor final class Coordinator: NSObject, MKMapViewDelegate {
+        @Binding var center: CLLocationCoordinate2D
+        @Binding var zoom: Double
+        private let onMoveEnd: (MapBounds, Double) -> Void
+        private let onSelect: (MapAnnotationPayload) -> Void
+        private var annotationsById: [String: SQMapKitAnnotation] = [:]
+        private var payloadsById: [String: MapAnnotationPayload] = [:]
+        var lastAppliedCenter: CLLocationCoordinate2D?
+        var lastAppliedZoom: Double?
+
+        init(center: Binding<CLLocationCoordinate2D>, zoom: Binding<Double>,
+             onMoveEnd: @escaping (MapBounds, Double) -> Void,
+             onSelect: @escaping (MapAnnotationPayload) -> Void) {
+            _center = center
+            _zoom = zoom
+            self.onMoveEnd = onMoveEnd
+            self.onSelect = onSelect
+        }
+
+        // MARK: Zoom ↔ span (slippy-map, compatible avec le z des tuiles)
+        static func span(forZoom zoom: Double, width: CGFloat) -> MKCoordinateSpan {
+            let lonDelta = Double(width) * 360.0 / (256.0 * pow(2.0, max(zoom, 0.0)))
+            return MKCoordinateSpan(latitudeDelta: min(170, lonDelta), longitudeDelta: min(360, lonDelta))
+        }
+        static func zoom(forRegion region: MKCoordinateRegion, width: CGFloat) -> Double {
+            let lonDelta = max(region.span.longitudeDelta, 0.0000001)
+            return log2(Double(width) * 360.0 / (256.0 * lonDelta))
+        }
+
+        // MARK: Annotations — diff stable par id (add/remove delta)
+        func apply(annotations payloads: [MapAnnotationPayload], on map: MKMapView) {
+            var incoming: [String: MapAnnotationPayload] = [:]
+            incoming.reserveCapacity(payloads.count)
+            for p in payloads { incoming[p.id] = p }
+
+            var toRemove: [SQMapKitAnnotation] = []
+            for (id, ann) in annotationsById where incoming[id] == nil || incoming[id] != payloadsById[id] {
+                toRemove.append(ann)
+                annotationsById[id] = nil
+                payloadsById[id] = nil
+            }
+            if !toRemove.isEmpty { map.removeAnnotations(toRemove) }
+
+            var toAdd: [SQMapKitAnnotation] = []
+            for p in payloads where annotationsById[p.id] == nil {
+                let ann = SQMapKitAnnotation(payload: p)
+                annotationsById[p.id] = ann
+                payloadsById[p.id] = p
+                toAdd.append(ann)
+            }
+            if !toAdd.isEmpty { map.addAnnotations(toAdd) }
+        }
+
+        // MARK: Caméra — n'applique QUE les changements programmatiques (GPS, cluster).
+        func applyCameraIfNeeded(center: CLLocationCoordinate2D, zoom: Double, on map: MKMapView) {
+            let movedCenter = lastAppliedCenter.map {
+                abs($0.latitude - center.latitude) > 0.00005 || abs($0.longitude - center.longitude) > 0.00005
+            } ?? true
+            let changedZoom = lastAppliedZoom.map { abs($0 - zoom) > 0.01 } ?? true
+            guard movedCenter || changedZoom else { return }
+            lastAppliedCenter = center
+            lastAppliedZoom = zoom
+            let width = map.bounds.width > 0 ? map.bounds.width : MapKitMapView.referenceWidth
+            map.setRegion(MKCoordinateRegion(center: center, span: Self.span(forZoom: zoom, width: width)), animated: true)
+        }
+
+        func mapView(_ map: MKMapView, regionDidChangeAnimated animated: Bool) {
+            let width = map.bounds.width > 0 ? map.bounds.width : MapKitMapView.referenceWidth
+            let z = Self.zoom(forRegion: map.region, width: width)
+            // Reflète l'état réel dans les bindings (le guard ci-dessus évite la boucle).
+            lastAppliedCenter = map.centerCoordinate
+            lastAppliedZoom = z
+            center = map.centerCoordinate
+            zoom = z
+            let r = map.region
+            let bounds = MapBounds(
+                north: r.center.latitude + r.span.latitudeDelta / 2,
+                south: r.center.latitude - r.span.latitudeDelta / 2,
+                east: r.center.longitude + r.span.longitudeDelta / 2,
+                west: r.center.longitude - r.span.longitudeDelta / 2
+            )
+            onMoveEnd(bounds, z)
+        }
+
+        func mapView(_ map: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            guard let sq = annotation as? SQMapKitAnnotation else { return nil } // position utilisateur → défaut
+            let view = map.dequeueReusableAnnotationView(withIdentifier: SQMapKitMarkerView.reuseID, for: annotation) as? SQMapKitMarkerView
+                ?? SQMapKitMarkerView(annotation: annotation, reuseIdentifier: SQMapKitMarkerView.reuseID)
+            view.annotation = annotation
+            view.canShowCallout = false
+            view.apply(sq.payload)
+            return view
+        }
+
+        func mapView(_ map: MKMapView, didSelect view: MKAnnotationView) {
+            if let sq = view.annotation as? SQMapKitAnnotation {
+                onSelect(sq.payload)
+            }
+            map.deselectAnnotation(view.annotation, animated: false)
+        }
+    }
+}
+
 private final class SQPointAnnotation: MLNPointAnnotation {
     let payload: MapAnnotationPayload
 
