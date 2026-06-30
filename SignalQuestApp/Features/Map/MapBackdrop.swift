@@ -6,6 +6,7 @@ import Foundation
 /// clair/sombre (défaut) ; `osm`/`topo`/`satellite` = tuiles raster de CDN tiers.
 enum MapBackdrop: String, CaseIterable, Identifiable {
     case carto
+    case applePlan
     case osm
     case topo
     case satellite
@@ -22,6 +23,7 @@ enum MapBackdrop: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .carto: return "Plan (Carto)"
+        case .applePlan: return "Plan iOS"
         case .osm: return "OpenStreetMap"
         case .topo: return "Relief (OpenTopoMap)"
         case .satellite: return "Satellite"
@@ -31,6 +33,7 @@ enum MapBackdrop: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .carto: return "Vectoriel sobre, suit le thème clair/sombre"
+        case .applePlan: return "Style coloré façon Plan, suit le thème clair/sombre"
         case .osm: return "Cartographie communautaire détaillée"
         case .topo: return "Courbes de niveau et relief"
         case .satellite: return "Imagerie aérienne (ESRI)"
@@ -40,6 +43,7 @@ enum MapBackdrop: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .carto: return "map"
+        case .applePlan: return "map.fill"
         case .osm: return "globe.europe.africa.fill"
         case .topo: return "mountain.2.fill"
         case .satellite: return "globe.americas.fill"
@@ -48,7 +52,7 @@ enum MapBackdrop: String, CaseIterable, Identifiable {
 
     /// Tuiles servies par un tiers hors `signalquest.fr` (donc non couvert par le
     /// pinning ATS) : la zone consultée est transmise au fournisseur.
-    var usesThirdPartyTiles: Bool { self != .carto }
+    var usesThirdPartyTiles: Bool { self != .carto && self != .applePlan }
 
     /// URL de style MapLibre à appliquer. Pour `carto`, l'URL vectorielle distante
     /// (thème-aware). Pour les fonds raster, un style JSON minimal est écrit dans un
@@ -60,6 +64,13 @@ enum MapBackdrop: String, CaseIterable, Identifiable {
             if let url = URL(string: "https://basemaps.cartocdn.com/gl/\(style)/style.json") { return url }
             if let bundled = Bundle.main.url(forResource: "MapLibreStyle", withExtension: "json") { return bundled }
             return URL(string: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json") ?? URL(fileURLWithPath: "/")
+        case .applePlan:
+            // Style vectoriel sobre façon Plan iOS (Carto Voyager en clair, Dark Matter
+            // en sombre) — pas de vraies tuiles Apple (API non publique + ATS).
+            let style = dark ? "dark-matter-gl-style" : "voyager-gl-style"
+            if let url = URL(string: "https://basemaps.cartocdn.com/gl/\(style)/style.json") { return url }
+            if let bundled = Bundle.main.url(forResource: "MapLibreStyle", withExtension: "json") { return bundled }
+            return URL(string: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json") ?? URL(fileURLWithPath: "/")
         case .osm:
             return Self.rasterStyleURL(
                 id: "osm",
