@@ -82,12 +82,34 @@ struct SpeedtestWidgetSnapshot: Codable, Equatable, Identifiable {
     }
 }
 
+/// Instantané « réseau autour de moi » (F8), partagé app → widget : opérateur
+/// résolu, génération, antenne la plus proche connue, dernier débit. Écrit
+/// pendant le Drive Test (où opérateur + antenne proche sont tous deux connus).
+struct NetworkGlanceSnapshot: Codable, Equatable {
+    var operatorLabel: String?
+    var generation: String?
+    var nearestDistanceMeters: Double?
+    var nearestOperator: String?
+    var lastDownloadMbps: Double?
+    var date: Date
+
+    init(operatorLabel: String?, generation: String?, nearestDistanceMeters: Double?, nearestOperator: String?, lastDownloadMbps: Double?, date: Date) {
+        self.operatorLabel = operatorLabel
+        self.generation = generation
+        self.nearestDistanceMeters = nearestDistanceMeters
+        self.nearestOperator = nearestOperator
+        self.lastDownloadMbps = lastDownloadMbps
+        self.date = date
+    }
+}
+
 /// Lecture/écriture des instantanés dans `UserDefaults(suiteName:)` de l'App Group.
 /// Fonctionne dès que la capacité App Group est active sur les 2 cibles ; sinon
 /// `UserDefaults(suiteName:)` est nil et les accès sont des no-op silencieux.
 enum WidgetSharedStore {
     private static let speedtestKey = "sq.widget.lastSpeedtest.v1"
     private static let recentKey = "sq.widget.recentSpeedtests.v1"
+    private static let networkGlanceKey = "sq.widget.networkGlance.v1"
     private static let maxRecent = 12
 
     private static var defaults: UserDefaults? {
@@ -116,5 +138,15 @@ enum WidgetSharedStore {
     static func recentSpeedtests() -> [SpeedtestWidgetSnapshot] {
         guard let defaults, let data = defaults.data(forKey: recentKey) else { return [] }
         return (try? JSONDecoder().decode([SpeedtestWidgetSnapshot].self, from: data)) ?? []
+    }
+
+    static func saveNetworkGlance(_ snapshot: NetworkGlanceSnapshot) {
+        guard let defaults, let data = try? JSONEncoder().encode(snapshot) else { return }
+        defaults.set(data, forKey: networkGlanceKey)
+    }
+
+    static func networkGlance() -> NetworkGlanceSnapshot? {
+        guard let defaults, let data = defaults.data(forKey: networkGlanceKey) else { return nil }
+        return try? JSONDecoder().decode(NetworkGlanceSnapshot.self, from: data)
     }
 }

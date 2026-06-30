@@ -165,6 +165,7 @@ final class DriveTestViewModel: ObservableObject {
         appendTrace(coordinate)
         captureCoveragePoint(coordinate)
         recomputeNearest()
+        writeNetworkGlance()
         Task { await refreshAntennasIfNeeded(around: coordinate) }
     }
 
@@ -249,6 +250,18 @@ final class DriveTestViewModel: ObservableObject {
         )
         let sessions = services.sessions
         Task { try? await sessions.createCoverageSession(session) }
+    }
+
+    /// Met à jour l'instantané « réseau autour de moi » (F8) lu par le widget d'accueil.
+    private func writeNetworkGlance() {
+        WidgetSharedStore.saveNetworkGlance(NetworkGlanceSnapshot(
+            operatorLabel: displayedOperatorLabel,
+            generation: services.networkPath.status.cellularTechnology?.rawValue,
+            nearestDistanceMeters: nearestDistanceMeters,
+            nearestOperator: nearestSite?.operators.first,
+            lastDownloadMbps: lastResult?.downloadAverageMbps,
+            date: Date()
+        ))
     }
 
     private func recomputeNearest() {

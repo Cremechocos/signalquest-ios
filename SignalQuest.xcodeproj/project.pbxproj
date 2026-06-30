@@ -177,6 +177,7 @@
 		C44E2B39CE80E88513F8DD18 /* WidgetSharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E5547A4163714BB45440475 /* WidgetSharedStore.swift */; };
 		C59C5E4EB38578979508E028 /* MessageShareModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD352558B0E98E08EE91AFF6 /* MessageShareModels.swift */; };
 		C91B0E17580C298470E45353 /* MapModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CD01567054707A140E2FCA3 /* MapModels.swift */; };
+		C99C5C7ACD235825BF2B534E /* NetworkWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A4F1A6B2D39931723BEF026 /* NetworkWidget.swift */; };
 		CA0070E7B5A6E24C2DAC3D6C /* SignalQuestWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E54BD3EC5237CAE037E9ABB /* SignalQuestWidgetBundle.swift */; };
 		CB838CA8BF3ACD491D1C23FC /* SocialModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EF26DB7319D9F10927854D0 /* SocialModels.swift */; };
 		CB8D5E02EEF4BDE6C61A5B90 /* ANFRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B2B510928CA997F314547B3 /* ANFRService.swift */; };
@@ -369,6 +370,7 @@
 		8738D9A09B93678F37E5A510 /* ValidationsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationsSheet.swift; sourceTree = "<group>"; };
 		879A6D651EB7605DE38CD230 /* SpeedtestShareImageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestShareImageTests.swift; sourceTree = "<group>"; };
 		885DAE78D34639CBB592A710 /* ValidationsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationsService.swift; sourceTree = "<group>"; };
+		8A4F1A6B2D39931723BEF026 /* NetworkWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkWidget.swift; sourceTree = "<group>"; };
 		8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEService.swift; sourceTree = "<group>"; };
 		8BE42927E8831DF442B81823 /* PublicSans-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PublicSans-Medium.ttf"; sourceTree = "<group>"; };
 		8C29B55C40CE44D0AA0D262A /* LeaderboardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardsView.swift; sourceTree = "<group>"; };
@@ -1011,6 +1013,7 @@
 			isa = PBXGroup;
 			children = (
 				6B56E287237E42CD44965DC6 /* Info.plist */,
+				8A4F1A6B2D39931723BEF026 /* NetworkWidget.swift */,
 				AD8048DF32A4922952CF4D9B /* SignalQuestWidget.entitlements */,
 				9E54BD3EC5237CAE037E9ABB /* SignalQuestWidgetBundle.swift */,
 				688909AB965601A75F6DC348 /* SpeedtestControl.swift */,
@@ -1460,6 +1463,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C99C5C7ACD235825BF2B534E /* NetworkWidget.swift in Sources */,
 				CA0070E7B5A6E24C2DAC3D6C /* SignalQuestWidgetBundle.swift in Sources */,
 				5DAFF235085F8497FC489578 /* SpeedtestControl.swift in Sources */,
 				0A25EC5F92ED512E7A81C4DF /* SpeedtestLiveActivity.swift in Sources */,
