@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreLocation
 import Combine
+import os
 
 /// Ce qu'un Drive Test enregistre. Choix persisté localement (`@AppStorage`),
 /// défaut « Les deux » → la couverture est enregistrée par défaut (le choix d'un
@@ -54,6 +55,7 @@ struct DriveSpeedtestPoint: Identifiable, Equatable {
 /// le moteur speedtest, le suivi de localisation continu et la géométrie de secteur.
 @MainActor
 final class DriveTestViewModel: ObservableObject {
+    private static let log = Logger(subsystem: "fr.signalquest.ios", category: "DriveTest")
     // Session speedtest continue.
     @Published private(set) var isRunning = false
     @Published private(set) var testCount = 0
@@ -228,8 +230,11 @@ final class DriveTestViewModel: ObservableObject {
             UIApplication.shared.isIdleTimerDisabled = false
             liveActivity.cancel()
             background.end()
-            uploadCoverageSessionIfNeeded()
             statusLabel = "Arrêté"
+            uploadCoverageSessionIfNeeded()
+            // Draine la file des speedtests en attente (sinon rejeu uniquement à la
+            // prochaine visite de l'onglet Speed) : un échec réseau/auth n'est plus perdu.
+            Task { await services.speedtest.retryPendingSaves() }
         }
         isRunning = false
         isPausedForWiFi = false
@@ -373,9 +378,18 @@ final class DriveTestViewModel: ObservableObject {
         let points = coveragePoints
         coveragePoints.removeAll()
         lastCoveragePointCoord = nil
-        guard sessionMode.recordsCoverage, !VPNDetector.isActive(),
-              points.count >= 2,
-              let first = points.first, let last = points.last else { return }
+        guard sessionMode.recordsCoverage else { return }
+        // Raisons de non-envoi rendues VISIBLES (avant : skip/échec totalement muet).
+        if VPNDetector.isActive() {
+            statusLabel = "Couverture non envoyée — VPN actif"
+            Self.log.notice("coverage upload ignoré : VPN actif")
+            return
+        }
+        guard points.count >= 2, let first = points.first, let last = points.last else {
+            statusLabel = "Couverture non envoyée — trajet trop court (\(points.count) pt)"
+            Self.log.notice("coverage upload ignoré : \(points.count) point(s) seulement")
+            return
+        }
         let plmn = services.networkPath.simPLMN()
         let market = resolvedSim?.market
             ?? marketEntry.map { $0.marketCode.isEmpty ? $0.code : $0.marketCode }
@@ -390,7 +404,26 @@ final class DriveTestViewModel: ObservableObject {
             points: points
         )
         let sessions = services.sessions
-        Task { try? await sessions.createCoverageSession(session) }
+        let count = points.count
+        Task {
+            do {
+                try await sessions.createCoverageSession(session)
+                statusLabel = "Couverture envoyée — \(count) points"
+                Self.log.notice("coverage upload OK : \(count) points")
+            } catch {
+                errorMessage = Self.uploadFailureMessage(error, subject: "couverture")
+                Self.log.error("coverage upload ÉCHEC : \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
+    /// Message d'échec d'upload orienté action : un 401 = session expirée (le token
+    /// iOS ne vit que 7 j et n'est pas rafraîchi), donc on invite à se reconnecter.
+    private static func uploadFailureMessage(_ error: Error, subject: String) -> String {
+        if case APIError.http(let status, _, _, _, _) = error, status == 401 {
+            return "Session expirée — reconnecte-toi pour enregistrer tes mesures."
+        }
+        return "Échec d'envoi (\(subject)) : \(error.localizedDescription)"
     }
 
     /// Met à jour l'instantané « réseau autour de moi » (F8) lu par le widget d'accueil.
@@ -636,7 +669,14 @@ final class DriveTestViewModel: ObservableObject {
             }
         )
         try Task.checkCancellation()
-        try? await services.speedtest.save(measured, streams: settings.streams, publishToMap: publishToMap())
+        do {
+            try await services.speedtest.save(measured, streams: settings.streams, publishToMap: publishToMap())
+        } catch {
+            // `save` met déjà la mesure en file d'attente locale (rejeu ultérieur) ;
+            // on rend la cause visible au lieu de l'avaler silencieusement.
+            errorMessage = Self.uploadFailureMessage(error, subject: "speedtest")
+            Self.log.error("drive speedtest save ÉCHEC (en file d'attente) : \(error.localizedDescription, privacy: .public)")
+        }
         // Valeurs finales du test (restent affichées jusqu'au test suivant).
         livePhaseFinalize(measured)
         // F1 : point de couverture portant le débit mesuré à cette position.
