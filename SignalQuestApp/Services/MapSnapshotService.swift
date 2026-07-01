@@ -233,9 +233,18 @@ final class MapSnapshotService: MapSnapshotServicing {
 
     func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0, bands: Set<Int> = []) async throws -> [AndroidCoverageTileResponse] {
         let bandKey = Self.bandCacheKey(bands)
+        // COV-DENSITY : au DÉZOOM uniquement (z<11), tuiles PLUS FINES (tile.z +1). Le
+        // backend plafonne ~2000 pts/tuile ; des tuiles plus petites = moins d'écrêtage
+        // = plus de points (trails continus, moins de « sauts »). On limite le boost au
+        // dézoom où les tuiles de base sont peu nombreuses : le ×4 reste sous le plafond
+        // (pas de troncature = pas de nouveaux trous) et le nombre de requêtes borné.
+        // Idem overview : grille plus fine = clusters plus denses.
+        let boost = zoom < 11 ? 1 : 0
         return try await fetchTiles(
             bounds: bounds,
             zoom: zoom,
+            detailBoost: boost,
+            maxTiles: boost > 0 ? 40 : 24,
             cacheKey: { tile in
                 // Le z fait partie de la clé, donc detail/limit (dérivés du z)
                 // sont couverts ; days et bandes doivent être explicites.
@@ -292,10 +301,12 @@ final class MapSnapshotService: MapSnapshotServicing {
     private func fetchTiles<T: Decodable & Sendable>(
         bounds: MapBounds,
         zoom: Double,
+        detailBoost: Int = 0,
+        maxTiles: Int = 24,
         cacheKey: @escaping @Sendable (AndroidMapTile) -> String,
         endpoint: @escaping @Sendable (AndroidMapTile) -> APIEndpoint
     ) async throws -> [T] {
-        let tiles = Self.visibleTiles(bounds: bounds, zoom: zoom)
+        let tiles = Self.visibleTiles(bounds: bounds, zoom: zoom, detailBoost: detailBoost, maxTiles: maxTiles)
         guard !tiles.isEmpty else { return [] }
         return try await withThrowingTaskGroup(of: T.self) { group in
             for tile in tiles {
@@ -347,8 +358,8 @@ final class MapSnapshotService: MapSnapshotServicing {
         }
     }
 
-    private static func visibleTiles(bounds: MapBounds, zoom: Double) -> [AndroidMapTile] {
-        let z = min(16, max(4, Int(zoom.rounded(.down))))
+    private static func visibleTiles(bounds: MapBounds, zoom: Double, detailBoost: Int = 0, maxTiles: Int = 24) -> [AndroidMapTile] {
+        let z = min(16, max(4, Int(zoom.rounded(.down)) + detailBoost))
         let north = min(85.05112878, max(-85.05112878, bounds.north))
         let south = min(85.05112878, max(-85.05112878, bounds.south))
         let west = min(180, max(-180, bounds.west))
@@ -359,7 +370,7 @@ final class MapSnapshotService: MapSnapshotServicing {
         let maxX = max(topLeft.x, bottomRight.x)
         let minY = min(topLeft.y, bottomRight.y)
         let maxY = max(topLeft.y, bottomRight.y)
-        let maxTileCount = 24
+        let maxTileCount = maxTiles
         var tiles: [AndroidMapTile] = []
         for x in minX...maxX {
             for y in minY...maxY {
