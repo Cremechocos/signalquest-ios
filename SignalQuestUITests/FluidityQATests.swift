@@ -61,6 +61,30 @@ final class FluidityQATests: XCTestCase {
         }
     }
 
+    /// Pilote : ouvre la Carte et pan en boucle ~50 s (sans mesure). Sert de « driver »
+    /// pour une capture externe `xctrace` (Animation Hitches) attachée à l'app pendant
+    /// que MKMapView s'anime. Imprime TRACE_MAP_PANNING quand le pan démarre.
+    func testMapDriveLong() {
+        let app = configuredApp()
+        app.launch()
+        dismissSystemAlert()
+        XCTAssertTrue(app.tabBars.buttons["Carte"].waitForExistence(timeout: 25))
+        app.tabBars.buttons["Carte"].tap()
+        Thread.sleep(forTimeInterval: 6)
+        let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+        let left   = app.coordinate(withNormalizedOffset: CGVector(dx: 0.22, dy: 0.45))
+        let right  = app.coordinate(withNormalizedOffset: CGVector(dx: 0.78, dy: 0.45))
+        let up     = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.30))
+        NSLog("TRACE_MAP_PANNING")
+        print("TRACE_MAP_PANNING")
+        let deadline = Date().addingTimeInterval(50)
+        while Date() < deadline {
+            center.press(forDuration: 0.02, thenDragTo: left)
+            center.press(forDuration: 0.02, thenDragTo: up)
+            center.press(forDuration: 0.02, thenDragTo: right)
+        }
+    }
+
     /// Fluidité du pan/zoom de la Carte (écran le plus lourd : MapKit + overlays).
     func testMapPanHitches() {
         let app = configuredApp()
