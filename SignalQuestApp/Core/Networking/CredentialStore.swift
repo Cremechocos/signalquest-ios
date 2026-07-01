@@ -29,10 +29,12 @@ final class CredentialStore: @unchecked Sendable {
 
     func accessToken() -> String? {
         lock.lock(); defer { lock.unlock() }
-        if accessTokenLoaded { return _cachedAccessToken }
+        // Fast path : ne sert QUE un token présent depuis le cache. Un cache vide/nil
+        // relit toujours le Keychain (source de vérité) — on ne fige jamais un « nil »
+        // (sinon un token écrit après un premier accès resterait invisible). PERF-KEY-02.
+        if let cached = _cachedAccessToken { return cached }
         let token = try? tokenStore.string(for: Key.accessToken)
         _cachedAccessToken = token
-        accessTokenLoaded = true
         return token
     }
 
