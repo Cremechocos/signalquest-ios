@@ -115,33 +115,36 @@ final class MapExplorerViewModel: ObservableObject {
         if entry == nil { entry = payload.markets.first { $0.publicSelectable } }
         guard let entry else { return }
         let marketCode = entry.marketCode.isEmpty ? entry.code : entry.marketCode
+        // Marché : on respecte la sélection persistée si elle correspond au marché
+        // détecté (on ne la remplace pas).
+        let persistedMarketMatches = MapMarketStore.lastMarket()?.uppercased() == marketCode.uppercased()
 
-        // Choix persisté cohérent : on respecte la sélection de l'utilisateur.
-        if let persisted = MapMarketStore.lastMarket(),
-           persisted.uppercased() == marketCode.uppercased() {
-            currentMarketEntry = entry
-            return
-        }
-
-        // 2. Opérateur : « Tous » par défaut, affiné par l'opérateur réel détecté.
-        var operatorKey = "ALL"
+        // 2. Opérateur : celui de la SIM/réseau RÉEL (IP/ASN hors VPN → MNC). C'est le
+        // DÉFAUT de la carte, appliqué MÊME quand le marché est persisté (avant, l'early-
+        // return bloquait l'opérateur sur le dernier choix / « Tous »). Si la détection
+        // échoue (WiFi, VPN, pas de cellulaire) on garde l'opérateur courant/persisté.
+        var detectedOperator: String?
         if status.connection == .cellular {
             if let detected = await networkOperator.resolve(viaVpn: VPNDetector.isActive()),
                let key = detected.operatorKey,
                entry.operatorEntry(forKey: key) != nil {
-                operatorKey = key
+                detectedOperator = key
             } else if let mnc = status.operatorMnc,
                       let op = entry.selectableOperators.first(where: { $0.mncs.contains(mnc) }) {
-                operatorKey = op.key
+                detectedOperator = op.key
             }
         }
 
         // 3. Application (les onChange court-circuitent grâce au flag).
         initialSelectionInProgress = true
         currentMarketEntry = entry
-        if operatorFilter.uppercased() != operatorKey.uppercased() { operatorFilter = operatorKey }
-        if marketFilter.uppercased() != marketCode.uppercased() { marketFilter = marketCode }
-        MapMarketStore.save(market: marketCode, operator: operatorKey)
+        if let detectedOperator, operatorFilter.uppercased() != detectedOperator.uppercased() {
+            operatorFilter = detectedOperator
+        }
+        if !persistedMarketMatches, marketFilter.uppercased() != marketCode.uppercased() {
+            marketFilter = marketCode
+        }
+        MapMarketStore.save(market: persistedMarketMatches ? marketFilter : marketCode, operator: operatorFilter)
     }
 
     /// Fin de la phase de sélection initiale (réautorise recentrage + rechargement
@@ -436,7 +439,9 @@ final class MapExplorerViewModel: ObservableObject {
         let territory = market.uppercased() == "DROM" ? Self.dromTerritory(for: bounds) : nil
         let wantsPlanned = filters.contains(.planned) && supportsPlannedOutage
         let wantsOutage = filters.contains(.outage) && supportsPlannedOutage
-        let wantsCoverage = filters.contains(.coverage)
+        // Couverture masquée en « Tous » (superposer tous les opérateurs n'a pas de
+        // sens) → on ne la télécharge même pas dans ce cas.
+        let wantsCoverage = filters.contains(.coverage) && op.uppercased() != "ALL"
 
         // Photos : couche dédiée `/api/map/photos` (TOUS les membres), filtrée par
         // opérateur de la photo + mode « Amis » (= filtre `.friend` actif).
@@ -2090,6 +2095,9 @@ struct MapExplorerView: View {
 
     private var coverageHeatFeatures: [CoverageHeatFeature] {
         guard filters.contains(.coverage) else { return [] }
+        // La couverture n'a de sens que pour UN opérateur donné (superposer tous les
+        // opérateurs n'est pas exploitable) → masquée quand l'opérateur est « Tous ».
+        guard model.operatorFilter.uppercased() != "ALL" else { return [] }
         let hasBandFilter = !model.bandFilters.isEmpty
         var features: [CoverageHeatFeature] = []
         for tile in model.coverageTiles {
@@ -2551,10 +2559,21 @@ private struct MapAdvancedFilterSheet: View {
                     filterSection("Calques", icon: "square.3.layers.3d") {
                         LazyVGrid(columns: filterColumns, spacing: 8) {
                             ForEach(layerOptions, id: \.0.rawValue) { kind, label, icon in
-                                filterChip(title: label, icon: icon, active: layers.contains(kind)) {
+                                filterChip(
+                                    title: label, icon: icon,
+                                    active: layers.contains(kind),
+                                    disabled: kind == .coverage && operatorName.uppercased() == "ALL"
+                                ) {
                                     toggleLayer(kind)
                                 }
                             }
+                        }
+                        if operatorName.uppercased() == "ALL", layerOptions.contains(where: { $0.0 == .coverage }) {
+                            Text("Choisis un opérateur pour afficher la couverture.")
+                                .font(SQFont.archivo(11, .regular))
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.top, 2)
                         }
                         if communityLayerAvailable && (layers.contains(.communitySite) || selectedEntry?.isCommunityOnly == true) {
                             Toggle(isOn: $includeObserved) {
@@ -2690,7 +2709,7 @@ private struct MapAdvancedFilterSheet: View {
 
     /// Tag de filtre éditorial : sélectionné = fond rouge plein, texte blanc ;
     /// sinon surface contrastée + bordure separator. Coin net `SQRadius.sm`.
-    private func filterChip(title: String, icon: String, active: Bool, action: @escaping () -> Void) -> some View {
+    private func filterChip(title: String, icon: String, active: Bool, disabled: Bool = false, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.light()
             action()
@@ -2712,8 +2731,10 @@ private struct MapAdvancedFilterSheet: View {
                     .stroke(active ? Color.clear : SQColor.separator, lineWidth: 1.5)
             }
             .foregroundStyle(active ? Color.white : SQColor.label)
+            .opacity(disabled ? 0.4 : 1)
         }
         .buttonStyle(SQPressButtonStyle())
+        .disabled(disabled)
         .sqAnimation(SQMotion.fast, value: active)
     }
 
