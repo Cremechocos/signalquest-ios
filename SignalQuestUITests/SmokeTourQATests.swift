@@ -10,7 +10,15 @@ final class SmokeTourQATests: XCTestCase {
 
     func testSmokeTour() throws {
         let app = XCUIApplication()
-        app.launchArguments += ["--mock-auth", "--reset-map"]
+        // Si un token est fourni (appareil réel, Keychain fonctionnel) → VRAIES données ;
+        // sinon mode démo (`--mock-auth`) pour le simulateur.
+        let token = ProcessInfo.processInfo.environment["SQ_AUTH_TOKEN"] ?? ""
+        if token.isEmpty {
+            app.launchArguments += ["--mock-auth"]
+        } else {
+            app.launchEnvironment["SQ_AUTH_TOKEN"] = token
+        }
+        app.launchArguments += ["--reset-map"]
         app.launch()
 
         // Ferme la demande système de notifications si présente (elle est sur SpringBoard).
