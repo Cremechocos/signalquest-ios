@@ -67,6 +67,23 @@ final class SmokeTourQATests: XCTestCase {
         print("SMOKE_TOUR_DONE")
     }
 
+    /// Capture la couche COUVERTURE (points RSRP) rendue, cadrée sur Paris z14,
+    /// avec la session Keychain existante (compte réel, données couverture publiques).
+    func testCoverageScreenshot() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--start-map", "--qa-map-layers", "--reset-map"]
+        let pan = ProcessInfo.processInfo.environment["SQ_QA_PAN_TO"] ?? "48.857,2.352,14"
+        app.launchEnvironment["SQ_QA_PAN_TO"] = pan   // lat,lng,zoom (défaut Paris z14)
+        app.launch()
+        let sb = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        for l in ["Refuser", "Ne pas autoriser", "Don't Allow", "Autoriser", "Allow"] {
+            let b = sb.buttons[l]
+            if b.waitForExistence(timeout: 3) { b.tap(); break }
+        }
+        Thread.sleep(forTimeInterval: 14)   // pan QA (4 s) + chargement/rendu couverture
+        snap(app, "coverage-paris")
+    }
+
     private func snap(_ app: XCUIApplication, _ name: String) {
         let att = XCTAttachment(screenshot: app.screenshot())
         att.name = name

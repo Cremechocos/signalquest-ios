@@ -2881,19 +2881,18 @@ private final class SQMapKitDotsOverlay: NSObject, MKOverlay {
 private final class SQMapKitDotsRenderer: MKOverlayRenderer {
     override func draw(_ mapRect: MKMapRect, zoomScale: MKZoomScale, in context: CGContext) {
         guard let overlay = overlay as? SQMapKitDotsOverlay else { return }
-        let radius = max(2.0, 3.0 / zoomScale)
+        // Points PLEINS : disque de couleur opaque, sans halo ni aucun contour. Taille
+        // écran ~constante via `k / zoomScale` → nettement visibles à TOUS les zooms.
+        let radius = max(2.6, 4.6 / zoomScale)
         let pad = radius * 3
         let cull = mapRect.insetBy(dx: -pad, dy: -pad)
-        context.setLineWidth(radius * 0.35)
-        let stroke = UIColor.black.withAlphaComponent(0.22).cgColor
+        context.setShouldAntialias(true)
         for dot in overlay.dots {
             guard cull.contains(dot.point) else { continue }
             let p = point(for: dot.point)
             let r = CGRect(x: p.x - radius, y: p.y - radius, width: radius * 2, height: radius * 2)
             context.setFillColor(dot.color)
             context.fillEllipse(in: r)
-            context.setStrokeColor(stroke)
-            context.strokeEllipse(in: r)
         }
     }
 }
