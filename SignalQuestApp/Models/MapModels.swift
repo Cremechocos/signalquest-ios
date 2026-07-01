@@ -271,7 +271,7 @@ struct SocialSpeedtestLive: Codable, Identifiable, Equatable {
 /// site en service mais une bande prévue (ex. 5G 3500) pas encore allumée.
 /// `declared` : station enregistrée sans émetteur actif. `planned` : pas
 /// (encore) construit. Toute valeur inconnue retombe sur `.planned`.
-enum PlannedActivationStatus: String, Equatable, Sendable {
+enum PlannedActivationStatus: String, Equatable, Sendable, CaseIterable {
     case active
     case upgradePending
     case declared

@@ -30,6 +30,9 @@ final class MapExplorerViewModel: ObservableObject {
     @Published var techFilters: Set<String> = []
     @Published var bandFilters: Set<Int> = []
     @Published var sharingFilters: Set<String> = []
+    /// Statuts prévisionnels visibles (croisement ANFR). Par défaut : les 4.
+    /// Filtre 100 % client (les sites sont déjà chargés) → pas de refetch backend.
+    @Published var plannedStatusFilters: Set<PlannedActivationStatus> = MapPlannedStatusStore.load()
     /// Inclure les cellules seulement « observées » (vs sites probables
     /// consolidés) dans la couche communautaire.
     @Published var includeObservedSites = true
@@ -1019,6 +1022,27 @@ enum MapMarketStore {
     }
 }
 
+/// Persiste les statuts prévisionnels visibles. Absence de clé = jamais réglé
+/// → les 4 statuts. Tableau vide stocké = choix explicite « tout masquer ».
+enum MapPlannedStatusStore {
+    private static let key = "map.planned.statusFilters.v1"
+
+    static func load() -> Set<PlannedActivationStatus> {
+        guard let raw = UserDefaults.standard.array(forKey: key) as? [String] else {
+            return Set(PlannedActivationStatus.allCases)
+        }
+        return Set(raw.compactMap(PlannedActivationStatus.init(rawValue:)))
+    }
+
+    static func save(_ statuses: Set<PlannedActivationStatus>) {
+        UserDefaults.standard.set(statuses.map(\.rawValue), forKey: key)
+    }
+
+    static func reset() {
+        UserDefaults.standard.removeObject(forKey: key)
+    }
+}
+
 struct MapExplorerView: View {
     @StateObject private var model: MapExplorerViewModel
     @EnvironmentObject private var services: AppServices
@@ -1110,6 +1134,7 @@ struct MapExplorerView: View {
                 coverageDays: $model.coverageDays,
                 layers: $filters,
                 includeObserved: $model.includeObservedSites,
+                plannedStatuses: $model.plannedStatusFilters,
                 allMarkets: model.registryMarkets
             )
             .presentationDetents([.medium, .large])
@@ -1202,6 +1227,12 @@ struct MapExplorerView: View {
         .onChangeCompat(of: model.bandFilters) { _, _ in scheduleLoad(region: lastRegion) }
         .onChangeCompat(of: model.sharingFilters) { _, _ in scheduleLoad(region: lastRegion) }
         .onChangeCompat(of: model.includeObservedSites) { _, _ in scheduleLoad(region: lastRegion) }
+        .onChangeCompat(of: model.plannedStatusFilters) { _, newValue in
+            // Filtre 100 % client : les sites prévisionnels sont déjà chargés →
+            // on reconstruit juste le rendu, sans requête backend.
+            MapPlannedStatusStore.save(newValue)
+            refreshMapRender()
+        }
         // Données rechargées → reconstruit le cache des couches une seule fois.
         .onChangeCompat(of: model.dataVersion) { _, _ in refreshMapRender() }
         // Le zoom modifie les seuils (azimuts ≥ 14, clustering) : reconstruit aussi.
@@ -1849,6 +1880,8 @@ struct MapExplorerView: View {
             guard matchesSelectedBands(in: plannedBandSearchFields(site)) else { return nil }
             guard let lat = site.lat, let lon = site.lon else { return nil }
             let status = site.activation?.status ?? .planned
+            // Filtre par statut (masquer/afficher actif/upgrade/déclaré/prévu).
+            guard model.plannedStatusFilters.contains(status) else { return nil }
             let techLine = site.technologies.joined(separator: " / ")
             let pending = site.activation?.pendingTechnologies ?? []
             let statusNote: String
@@ -2527,6 +2560,8 @@ private struct MapAdvancedFilterSheet: View {
     @Binding var coverageDays: Int
     @Binding var layers: Set<MapDisplayItem.Kind>
     @Binding var includeObserved: Bool
+    /// Statuts prévisionnels visibles (sous-filtre de la couche Prévisionnels).
+    @Binding var plannedStatuses: Set<PlannedActivationStatus>
     /// Marchés `publicSelectable` du registre, dans l'ordre du backend.
     let allMarkets: [MarketRegistryEntry]
     @Environment(\.dismiss) private var dismiss
@@ -2593,6 +2628,47 @@ private struct MapAdvancedFilterSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: SQSpace.md + 2) {
+                    filterSection("Pays", icon: "globe") {
+                        Menu {
+                            ForEach(allMarkets) { entry in
+                                Button {
+                                    if !isCurrentMarket(entry) { market = entry.code }
+                                } label: {
+                                    if isCurrentMarket(entry) {
+                                        Label(marketMenuTitle(entry), systemImage: "checkmark")
+                                    } else {
+                                        Text(marketMenuTitle(entry))
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: SQSpace.sm) {
+                                Text(flagEmoji(selectedEntry?.countryCode ?? ""))
+                                    .font(.system(size: 18))
+                                Text(selectedEntry?.label ?? market)
+                                    .font(SQFont.archivo(15, .semibold))
+                                    .foregroundStyle(SQColor.label)
+                                    .lineLimit(1)
+                                Spacer()
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(SQColor.labelSecondary)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 46)
+                            .padding(.horizontal, SQSpace.md)
+                            .background(SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                                    .stroke(SQColor.separator, lineWidth: 1.5)
+                            }
+                        }
+                        Text("S'ajuste aussi tout seul selon ta position / ta SIM.")
+                            .font(SQFont.archivo(11, .regular))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 2)
+                    }
+
                     filterSection("Calques", icon: "square.3.layers.3d") {
                         LazyVGrid(columns: filterColumns, spacing: 8) {
                             ForEach(layerOptions, id: \.0.rawValue) { kind, label, icon in
@@ -2630,6 +2706,23 @@ private struct MapAdvancedFilterSheet: View {
                             }
                             .tint(SQColor.brandRed)
                             .padding(.top, 4)
+                        }
+                    }
+
+                    // Sous-filtre de la couche Prévisionnels : n'apparaît que
+                    // lorsqu'elle est active (données ANFR FR/DROM).
+                    if layers.contains(.planned), ["FR", "DROM"].contains(catalogMarket.uppercased()) {
+                        filterSection("Statut prévisionnel", icon: "calendar.badge.clock") {
+                            LazyVGrid(columns: filterColumns, spacing: 8) {
+                                ForEach(PlannedActivationStatus.allCases, id: \.self) { status in
+                                    plannedStatusChip(status)
+                                }
+                            }
+                            Text("Masque ou affiche les antennes prévues selon leur avancement ANFR.")
+                                .font(SQFont.archivo(11, .regular))
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.top, 2)
                         }
                     }
 
@@ -2709,6 +2802,7 @@ private struct MapAdvancedFilterSheet: View {
                         coverageDays = 0
                         layers = MapFilterStore.defaultFilters
                         includeObserved = true
+                        plannedStatuses = Set(PlannedActivationStatus.allCases)
                     }
                     .font(SQFont.archivo(15, .semibold))
                     .tint(SQColor.brandRed)
@@ -2773,6 +2867,69 @@ private struct MapAdvancedFilterSheet: View {
         .buttonStyle(SQPressButtonStyle())
         .disabled(disabled)
         .sqAnimation(SQMotion.fast, value: active)
+    }
+
+    /// Chip d'un statut prévisionnel : reprend la couleur du marqueur carte
+    /// (actif vert / upgrade ambre / déclaré bleu / prévu ardoise). Sélectionné =
+    /// fond coloré plein ; sinon glyphe + bordure de cette couleur → lien visuel
+    /// direct avec les pastilles de la carte.
+    private func plannedStatusChip(_ status: PlannedActivationStatus) -> some View {
+        let color = MapExplorerView.plannedStatusColor(status)
+        let active = plannedStatuses.contains(status)
+        return Button {
+            Haptics.light()
+            togglePlannedStatus(status)
+        } label: {
+            HStack(spacing: SQSpace.sm - 1) {
+                Image(systemName: MapExplorerView.plannedStatusGlyph(status))
+                    .font(.system(size: 12, weight: .bold))
+                    .frame(width: 16)
+                Text(MapExplorerView.plannedStatusLabel(status))
+                    .font(SQFont.archivo(12, .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .frame(maxWidth: .infinity, minHeight: 42)
+            .padding(.horizontal, SQSpace.sm)
+            .background(active ? color : SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                    .stroke(active ? Color.clear : color.opacity(0.55), lineWidth: 1.5)
+            }
+            .foregroundStyle(active ? Color.white : color)
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .sqAnimation(SQMotion.fast, value: active)
+    }
+
+    private func togglePlannedStatus(_ status: PlannedActivationStatus) {
+        if plannedStatuses.contains(status) {
+            plannedStatuses.remove(status)
+        } else {
+            plannedStatuses.insert(status)
+        }
+    }
+
+    /// Le marché `entry` est-il celui actuellement sélectionné dans la feuille ?
+    private func isCurrentMarket(_ entry: MarketRegistryEntry) -> Bool {
+        let m = market.uppercased()
+        return entry.code.uppercased() == m || entry.marketCode.uppercased() == m
+    }
+
+    private func marketMenuTitle(_ entry: MarketRegistryEntry) -> String {
+        "\(flagEmoji(entry.countryCode)) \(entry.label)"
+    }
+
+    /// Drapeau emoji depuis un code pays ISO 2 lettres ("fr" → 🇫🇷). Repli 🌐.
+    private func flagEmoji(_ countryCode: String) -> String {
+        let code = countryCode.trimmingCharacters(in: .whitespaces).uppercased()
+        guard code.count == 2 else { return "🌐" }
+        var result = ""
+        for v in code.unicodeScalars {
+            guard v.value >= 65, v.value <= 90, let s = UnicodeScalar(127397 + v.value) else { return "🌐" }
+            result.unicodeScalars.append(s)
+        }
+        return result
     }
 
     private func periodPicker(_ title: String, selection: Binding<Int>) -> some View {
