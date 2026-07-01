@@ -157,13 +157,9 @@ struct PlannedDetailSheet: View {
         }
     }
 
-    private var statusColor: Color {
-        switch status {
-        case .active: return Color(hex: 0x16A34A)
-        case .upgradePending: return Color(hex: 0xF59E0B)
-        case .declared, .planned: return SQColor.labelSecondary
-        }
-    }
+    // Même source de vérité que la pastille sur la carte → fiche et marqueur
+    // affichent toujours la même couleur de statut (déclaré = bleu, pas gris).
+    private var statusColor: Color { MapExplorerView.plannedStatusColor(status) }
 
     private var statusGlyph: String {
         switch status {

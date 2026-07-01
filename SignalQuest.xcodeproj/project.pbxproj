@@ -64,6 +64,7 @@
 		3544D1A314DE63A90BF89006 /* DriveTestMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF6741C3A6C32E6A351617E7 /* DriveTestMapView.swift */; };
 		38D0EA9A66A425D012948A8E /* SpeedtestShareImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C011703B46C9CCF1394D3BA4 /* SpeedtestShareImageRenderer.swift */; };
 		3AE2A1D61D1D7996E56BC9CF /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D755436C239643387D984492 /* LocationService.swift */; };
+		3D1F0588D592CF8DED9BD1EB /* FluidityQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFDF16B243853AE40E37D07C /* FluidityQATests.swift */; };
 		4062FC76DAFABCDD6E5C6901 /* AntennasService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB24C8F6F0931F6D99B18115 /* AntennasService.swift */; };
 		410070C7BCF48B0D6C417526 /* SmokeTourQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB7D271F7EF3536DB6B7C1A1 /* SmokeTourQATests.swift */; };
 		41CCD76BD13F09EF27F0904C /* SpeedtestLiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761DCC23E9E837925496D61E /* SpeedtestLiveActivityController.swift */; };
@@ -427,6 +428,7 @@
 		C8A8D289A6D4E7B0C9C621A4 /* PushNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationService.swift; sourceTree = "<group>"; };
 		CD352558B0E98E08EE91AFF6 /* MessageShareModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageShareModels.swift; sourceTree = "<group>"; };
 		CE9C7190AEB0D08E27839A20 /* CallsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsService.swift; sourceTree = "<group>"; };
+		CFDF16B243853AE40E37D07C /* FluidityQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FluidityQATests.swift; sourceTree = "<group>"; };
 		D29224A48769AB74981281AE /* MessagingFixesQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagingFixesQATests.swift; sourceTree = "<group>"; };
 		D2F641884A080F0EC459B546 /* PhotoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoService.swift; sourceTree = "<group>"; };
 		D6A0DBB96F9423CDD0C043B6 /* SpeedtestShareQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestShareQATests.swift; sourceTree = "<group>"; };
@@ -801,6 +803,7 @@
 			children = (
 				F1DBE566F150964A2AF9D0EE /* AntennaPhotoQATests.swift */,
 				A4F5346C853F95E32F253D7B /* AuditTourQATests.swift */,
+				CFDF16B243853AE40E37D07C /* FluidityQATests.swift */,
 				AEF301566BC00073B5C158FA /* Info.plist */,
 				9D849C59293B6E1D70C5F88A /* MessagingE2EEQATests.swift */,
 				D29224A48769AB74981281AE /* MessagingFixesQATests.swift */,
@@ -1443,6 +1446,7 @@
 			files = (
 				AAF92F511259C586D92636FC /* AntennaPhotoQATests.swift in Sources */,
 				73A2B7B1908FB3B6415DC31B /* AuditTourQATests.swift in Sources */,
+				3D1F0588D592CF8DED9BD1EB /* FluidityQATests.swift in Sources */,
 				DBD653BB59B8D01C74592509 /* MessagingE2EEQATests.swift in Sources */,
 				5DCECE2C39F5BB5B5F65D5A0 /* MessagingFixesQATests.swift in Sources */,
 				7D587A943F3C2B6675722262 /* SignalQuestUITests.swift in Sources */,

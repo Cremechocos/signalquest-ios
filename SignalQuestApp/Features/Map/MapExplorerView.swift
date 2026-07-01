@@ -1876,8 +1876,9 @@ struct MapExplorerView: View {
                 clusterCount: nil,
                 azimuths: [],
                 showsAzimuths: false,
-                tint: site.operator.map { model.operatorAccent($0) },
-                plannedStatus: status
+                tint: Self.plannedStatusColor(status),
+                plannedStatus: status,
+                glyphOverride: Self.plannedStatusGlyph(status)
             )
         }
         return clusteredPayloads(from: individual, kind: .planned, idPrefix: "planned", minCount: 40, label: { "\($0) prévisionnels" })
@@ -1927,6 +1928,42 @@ struct MapExplorerView: View {
         case "maintenance": return "wrench.and.screwdriver.fill"
         case "degraded": return "exclamationmark.circle.fill"
         default: return "exclamationmark.triangle.fill"
+        }
+    }
+
+    /// Indicateur visuel d'un site prévisionnel selon son croisement ANFR : la
+    /// pastille prend la couleur du statut et un glyphe parlant — actif ✓ (vert),
+    /// upgrade en attente ↑ (ambre), déclaré mais pas en service ⧗ (bleu), simplement
+    /// prévu 📅 (gris). Rend les 4 états lisibles d'un coup d'œil sur la carte.
+    static func plannedStatusColor(_ status: PlannedActivationStatus) -> Color {
+        // Couleurs fixes saturées (mi-luminance) : le glyphe blanc reste lisible sur
+        // le fond de carte en clair ET en sombre, contrairement aux couleurs sémantiques
+        // qui s'éclaircissent en mode sombre. Progression gris→bleu→ambre→vert = du
+        // « juste prévu » au « pleinement actif ».
+        switch status {
+        case .active: return Color(hex: 0x16A34A)        // vert — en service
+        case .upgradePending: return Color(hex: 0xF59E0B) // ambre — upgrade en attente
+        case .declared: return Color(hex: 0x2563EB)       // bleu — déclaré, pas en service
+        case .planned: return Color(hex: 0x64748B)        // ardoise — prévu, pas construit
+        }
+    }
+
+    static func plannedStatusGlyph(_ status: PlannedActivationStatus) -> String {
+        switch status {
+        case .active: return "checkmark"
+        case .upgradePending: return "arrow.up"
+        case .declared: return "hourglass"
+        case .planned: return "calendar"
+        }
+    }
+
+    /// Libellé court du statut, pour les fiches et l'accessibilité.
+    static func plannedStatusLabel(_ status: PlannedActivationStatus) -> String {
+        switch status {
+        case .active: return "Actif"
+        case .upgradePending: return "Upgrade en attente"
+        case .declared: return "Déclaré"
+        case .planned: return "Prévu"
         }
     }
 
