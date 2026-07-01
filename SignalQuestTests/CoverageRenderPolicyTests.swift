@@ -59,4 +59,18 @@ final class CoverageRenderPolicyTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(CoverageRenderPolicy.pointCapPerTile, 2000)
         XCTAssertGreaterThanOrEqual(CoverageRenderPolicy.fallbackCap, 5000)
     }
+
+    func testRSRPGuardRejectsImpossibleValues() {
+        // Un RSRP « 0 » (pas de mesure, ex. couverture iOS sans RSRP) ou > -44 dBm
+        // (max théorique 3GPP) → Inconnu, jamais Excellent : sinon un point sans
+        // vrai signal s'afficherait en vert vif sur la carte Signal.
+        XCTAssertEqual(CoverageQualityBand.band(for: 0), .unknown)
+        XCTAssertEqual(CoverageQualityBand.band(for: -20), .unknown)
+        XCTAssertEqual(CoverageQualityBand.band(for: nil), .unknown)
+        // Les vraies valeurs restent classées normalement.
+        XCTAssertEqual(CoverageQualityBand.band(for: -44), .excellent)
+        XCTAssertEqual(CoverageQualityBand.band(for: -75), .excellent)
+        XCTAssertEqual(CoverageQualityBand.band(for: -95), .fair)
+        XCTAssertEqual(CoverageQualityBand.band(for: -120), .poor)
+    }
 }

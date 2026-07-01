@@ -753,7 +753,7 @@ private struct CoverageHeatFeature: Equatable {
     }
 }
 
-private enum CoverageQualityBand: String, CaseIterable, Identifiable {
+enum CoverageQualityBand: String, CaseIterable, Identifiable {
     case excellent
     case good
     case fair
@@ -771,6 +771,11 @@ private enum CoverageQualityBand: String, CaseIterable, Identifiable {
     // ≥ -80 excellent · -90 bon · -100 moyen · -110 faible · sinon très faible.
     static func band(for rsrp: Double?) -> CoverageQualityBand {
         guard let rsrp else { return .unknown }
+        // Garde-fou : un RSRP physiquement impossible (0 = « pas de mesure », ou
+        // > -44 dBm le maximum théorique 3GPP) → INCONNU, jamais « excellent ». Sinon
+        // un point sans vrai RSRP (couverture iOS = génération seule, potentiellement
+        // servie à 0) s'afficherait en faux vert vif sur la carte Signal.
+        guard rsrp <= -44 else { return .unknown }
         switch rsrp {
         case (-80)...: return .excellent
         case -90..<(-80): return .good
