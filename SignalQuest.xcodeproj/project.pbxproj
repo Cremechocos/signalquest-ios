@@ -126,6 +126,7 @@
 		7C6A3C2708709AE1A38C1DE6 /* CommentsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4841F25C76693497780EE838 /* CommentsSheet.swift */; };
 		7D0BE4AFA8C517809583BFB1 /* IdentifyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C43EF0BBA838F55D6E4EF78 /* IdentifyService.swift */; };
 		7D587A943F3C2B6675722262 /* SignalQuestUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230A19DCE27F22F952273493 /* SignalQuestUITests.swift */; };
+		7DC00F26E17E3572AD6AC560 /* OnboardingAnimationQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E85A770CF60ED550C4CCFE /* OnboardingAnimationQATests.swift */; };
 		7E8B1CCCA9F6BE070514C050 /* SpeedtestIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6A9E12FB0C1755E79A6216 /* SpeedtestIntents.swift */; };
 		8027C2DE7425912942340D4B /* NewModelDecodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A30FBE643735E6E375B3948 /* NewModelDecodeTests.swift */; };
 		80E825877A511351EBDCAE08 /* LiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = BB84BCC804AE4D6D0E2FF2FF /* LiveKit */; };
@@ -284,6 +285,7 @@
 		1F4F7435470D7B186E080C8E /* FeedItemCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedItemCard.swift; sourceTree = "<group>"; };
 		1FF3CB12A75C5483284BC5C7 /* AntennaDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaDetailSheet.swift; sourceTree = "<group>"; };
 		230A19DCE27F22F952273493 /* SignalQuestUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalQuestUITests.swift; sourceTree = "<group>"; };
+		23E85A770CF60ED550C4CCFE /* OnboardingAnimationQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingAnimationQATests.swift; sourceTree = "<group>"; };
 		24B43573690B59F5B6ECA05C /* SessionsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsListView.swift; sourceTree = "<group>"; };
 		26BF4AF46D1515F881E4DF50 /* CommentsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsService.swift; sourceTree = "<group>"; };
 		2A5251F96893CB76BAAC1239 /* SignalQuestWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SignalQuestWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -807,6 +809,7 @@
 				AEF301566BC00073B5C158FA /* Info.plist */,
 				9D849C59293B6E1D70C5F88A /* MessagingE2EEQATests.swift */,
 				D29224A48769AB74981281AE /* MessagingFixesQATests.swift */,
+				23E85A770CF60ED550C4CCFE /* OnboardingAnimationQATests.swift */,
 				230A19DCE27F22F952273493 /* SignalQuestUITests.swift */,
 				DB7D271F7EF3536DB6B7C1A1 /* SmokeTourQATests.swift */,
 				D6A0DBB96F9423CDD0C043B6 /* SpeedtestShareQATests.swift */,
@@ -1449,6 +1452,7 @@
 				3D1F0588D592CF8DED9BD1EB /* FluidityQATests.swift in Sources */,
 				DBD653BB59B8D01C74592509 /* MessagingE2EEQATests.swift in Sources */,
 				5DCECE2C39F5BB5B5F65D5A0 /* MessagingFixesQATests.swift in Sources */,
+				7DC00F26E17E3572AD6AC560 /* OnboardingAnimationQATests.swift in Sources */,
 				7D587A943F3C2B6675722262 /* SignalQuestUITests.swift in Sources */,
 				410070C7BCF48B0D6C417526 /* SmokeTourQATests.swift in Sources */,
 				0674D477E2E2124A28ECDA78 /* SpeedtestShareQATests.swift in Sources */,

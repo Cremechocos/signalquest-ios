@@ -10,7 +10,6 @@ struct SignalQuestApp: App {
     @StateObject private var services: AppServices
     @StateObject private var session: AuthSessionViewModel
     @StateObject private var appLock = AppLockController()
-    @AppStorage("sq.hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     init() {
         let services = AppServices()
@@ -54,7 +53,10 @@ struct SignalQuestApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            // L'onboarding vit dans la hiérarchie (ZStack) et non plus dans un
+            // `fullScreenCover` : son flag « complété » n'est écrit que par un
+            // geste utilisateur, jamais par le démontage de la présentation.
+            OnboardingHost { RootView() }
                 .environmentObject(services)
                 .environmentObject(session)
                 .environmentObject(services.router)
@@ -105,12 +107,6 @@ struct SignalQuestApp: App {
                     default:
                         break
                     }
-                }
-                .fullScreenCover(isPresented: Binding(
-                    get: { !hasCompletedOnboarding },
-                    set: { presented in if !presented { hasCompletedOnboarding = true } }
-                )) {
-                    OnboardingView { hasCompletedOnboarding = true }
                 }
         }
     }
