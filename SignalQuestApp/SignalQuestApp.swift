@@ -256,7 +256,7 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        dockTabView
+        tabContainer
         .task {
             await services.refreshInboxBadge()
             consumeIntentRoutes()
@@ -285,13 +285,81 @@ struct MainTabView: View {
         .onOpenURL { url in handleDeepLink(url) }
     }
 
-    // MARK: Dock flottant custom (toutes versions d'iOS)
+    /// iOS 26+ : tab bar système Liquid Glass native — vrai verre, glissement
+    /// du doigt entre les onglets (la pilule suit), rétraction au scroll
+    /// (`tabBarMinimizeBehavior`), comme les apps natives et la référence
+    /// Revolut. Sa position verticale est celle du système (non réglable).
+    /// Avant iOS 26 : dock flottant custom « Crème » (le verre système
+    /// n'existe pas), posé 8 pt au-dessus de la safe area.
+    @ViewBuilder
+    private var tabContainer: some View {
+        if #available(iOS 26.0, *), !Self.forceLegacyDock {
+            glassTabView
+        } else {
+            dockTabView
+        }
+    }
+
+    /// QA uniquement : force le dock custom sur un simulateur iOS 26+ pour
+    /// vérifier le rendu et la rétraction pré-iOS 26 (DockMinimizeQATests).
+    private static var forceLegacyDock: Bool {
+#if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--qa-legacy-dock")
+#else
+        false
+#endif
+    }
+
+    // MARK: Tab bar Liquid Glass native (iOS 26+)
+
+    @available(iOS 26.0, *)
+    private var glassTabView: some View {
+        TabView(selection: $router.selectedTab) {
+            NavigationStack { SignalQuestHomeView(user: user) }
+                .tabItem { Label("Accueil", systemImage: "house") }
+                .tag(AppRouter.AppTab.home)
+
+            NavigationStack { MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets) }
+                .tabItem { Label("Carte", systemImage: "map") }
+                .tag(AppRouter.AppTab.map)
+
+            NavigationStack { SpeedtestView() }
+                .tabItem { Label("Tester", systemImage: "speedometer") }
+                .tag(AppRouter.AppTab.speed)
+
+            NavigationStack { FeedView(service: services.feed, location: services.location) }
+                // La conversation pose isDockHidden : on masque aussi la barre
+                // système pour laisser le composer prendre le bas de l'écran.
+                .toolbar(router.isDockHidden ? .hidden : .automatic, for: .tabBar)
+                .tabItem { Label("Communauté", systemImage: "person.2") }
+                .tag(AppRouter.AppTab.community)
+                .badge(services.unreadConversations)
+
+            NavigationStack {
+                ProfileView(user: user)
+#if DEBUG
+                    .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-map"))) {
+                        ANFRMapView(service: services.anfr)
+                    }
+                    .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-stats"))) {
+                        ANFRStatsView(service: services.anfr)
+                    }
+#endif
+            }
+            .tabItem { Label("Profil", systemImage: "person.crop.circle") }
+            .tag(AppRouter.AppTab.profile)
+        }
+        // Rétraction au scroll (Liquid Glass) : la barre se réduit en pastille
+        // quand on descend et se redéploie quand on remonte.
+        .tabBarMinimizeBehavior(.onScrollDown)
+        .tint(SQColor.brandRed)
+    }
+
+    // MARK: Dock flottant custom (avant iOS 26)
 
     /// La tab bar système est masquée sur chaque onglet et remplacée par
-    /// `SQDock`, posé 8 pt au-dessus de la safe area — ~20 pt plus haut que la
-    /// barre native iOS 26, qui flotte collée à l'indicateur home sans aucun
-    /// réglage possible. Sur iOS 26+ le dock reprend le vrai matériau Liquid
-    /// Glass et se rétracte au scroll (`sqDockAutoMinimize` sur les racines).
+    /// `SQDock`, posé 8 pt au-dessus de la safe area, avec rétraction au
+    /// scroll custom (`sqDockAutoMinimize` sur les racines, iOS 18+).
     private var dockTabView: some View {
         TabView(selection: $router.selectedTab) {
             NavigationStack { SignalQuestHomeView(user: user).toolbar(.hidden, for: .tabBar) }

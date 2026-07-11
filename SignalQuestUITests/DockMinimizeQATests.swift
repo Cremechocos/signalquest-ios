@@ -1,9 +1,11 @@
 import XCTest
 
-/// Vérifie la rétraction du dock au scroll (équivalent custom de
-/// `tabBarMinimizeBehavior(.onScrollDown)`) : scroll vers le bas → pastille
-/// (icône de l'onglet actif seule) ; tap sur la pastille → dock redéployé ;
-/// remontée → dock redéployé. Captures attachées à chaque étape.
+/// Vérifie la rétraction du DOCK CUSTOM pré-iOS 26 au scroll (équivalent
+/// custom de `tabBarMinimizeBehavior(.onScrollDown)`) : scroll vers le bas →
+/// pastille (icône de l'onglet actif seule) ; tap sur la pastille → dock
+/// redéployé ; remontée → dock redéployé. Captures attachées à chaque étape.
+/// Le simulateur iOS 26+ affiche la barre système native : `--qa-legacy-dock`
+/// force le dock custom pour tester le chemin pré-iOS 26.
 /// Auth : token réel via `SQ_AUTH_TOKEN` si fourni, sinon mode démo.
 @MainActor
 final class DockMinimizeQATests: XCTestCase {
@@ -17,6 +19,7 @@ final class DockMinimizeQATests: XCTestCase {
         } else {
             app.launchEnvironment["SQ_AUTH_TOKEN"] = token
         }
+        app.launchArguments += ["--qa-legacy-dock"]
         app.launch()
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
 
