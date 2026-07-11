@@ -845,13 +845,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     }
 
     /// Temps de lecture des 256 premiers Ko du candidat (nil = échec/timeout).
+    /// PAS de cache-buster : on veut mesurer le chemin que le vrai test
+    /// empruntera — l'edge (cache compris), pas l'origine.
     private func preflightElapsed(_ target: ResolvedDownloadTarget) async -> TimeInterval? {
         let sampleBytes = 262_144
-        var components = URLComponents(url: target.url, resolvingAgainstBaseURL: false)
-        var queryItems = components?.queryItems ?? []
-        queryItems.append(URLQueryItem(name: "cachebust", value: UUID().uuidString))
-        components?.queryItems = queryItems
-        guard let url = components?.url else { return nil }
+        let url = target.url
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 2.5
@@ -1364,11 +1362,21 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 
             guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { continue }
             var query = components.queryItems ?? []
-            query.append(URLQueryItem(name: "r", value: "\(UUID().uuidString)-\(streamIndex)"))
             if token != nil {
+                // VPS (session) : cache-buster + taille demandée — l'endpoint
+                // génère le flux, aucun cache à préserver.
+                query.append(URLQueryItem(name: "r", value: "\(UUID().uuidString)-\(streamIndex)"))
                 query.append(URLQueryItem(name: "bytes", value: "\(chunkBytes)"))
             }
-            components.queryItems = query
+            // CDN (CloudFront / Cloudflare R2) : PAS de cache-buster. Sur un CDN
+            // HTTPS c'est l'edge qu'on veut mesurer : une query aléatoire par
+            // requête casserait la clé de cache Cloudflare (MISS permanent →
+            // on mesurerait l'origine R2, pas l'edge — cf. cas Bell/Canada).
+            // La session éphémère + reloadIgnoringLocalAndRemoteCacheData
+            // suffisent à neutraliser tout cache LOCAL.
+            if !query.isEmpty {
+                components.queryItems = query
+            }
 
             var request = URLRequest(url: components.url ?? url)
             request.timeoutInterval = SpeedtestEngineConfig.chunkTimeoutSeconds
