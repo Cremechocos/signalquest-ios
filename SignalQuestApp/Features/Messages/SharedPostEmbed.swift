@@ -164,6 +164,9 @@ struct SharedPostEmbedBubble: View {
     /// Id du post (clé du cache = `card.socialPostId`).
     let postId: String
     let mine: Bool
+    /// `true` : l'embed EST la bulle (pas de fond brique/surface autour) —
+    /// carte `surface` rayon 22 autonome, comme les photos seules.
+    var standalone: Bool = false
     let service: SocialFeedServicing
     @ObservedObject var store: SharedPostStore
     /// Ouvre les commentaires du post (sheet CommentsSheet gérée par la conversation).
@@ -179,7 +182,11 @@ struct SharedPostEmbedBubble: View {
             case .loaded(let item):
                 embed(item)
             case .unavailable:
-                SharedPostCardBubble(card: card, mine: mine)
+                if standalone {
+                    surfaceWrap { SharedPostCardBubble(card: card, mine: false) }
+                } else {
+                    SharedPostCardBubble(card: card, mine: mine)
+                }
             }
         }
         .frame(maxWidth: 280, alignment: .leading)
@@ -378,8 +385,13 @@ struct SharedPostEmbedBubble: View {
     /// sur sa propre carte surface ; dans la bulle entrante (déjà surface), le
     /// contenu est rendu directement.
     @ViewBuilder
-    private func surfaceWrap<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        if mine {
+    private func surfaceWrap<Content: View>(_ content: () -> Content) -> some View {
+        if standalone {
+            // L'embed est la bulle : carte crème autonome, rayon 22.
+            content()
+                .padding(SQSpace.md + 2)
+                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        } else if mine {
             content()
                 .padding(SQSpace.md)
                 .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))

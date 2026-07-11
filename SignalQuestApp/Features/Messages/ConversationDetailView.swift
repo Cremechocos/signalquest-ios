@@ -595,14 +595,17 @@ struct ConversationDetailView: View {
         }
     }
 
-    /// Corps de bulle : contenu classique (texte/carte/sondage/fichier) ou photo
-    /// seule (la photo EST la bulle), avec les réactions posées en capsules qui
-    /// chevauchent légèrement le bas de la bulle.
+    /// Corps de bulle : contenu classique (texte/carte/sondage/fichier), photo
+    /// seule (la photo EST la bulle) ou publication partagée seule (la carte
+    /// EST la bulle — pas de cadre brique/surface autour), avec les réactions
+    /// posées en capsules qui chevauchent légèrement le bas de la bulle.
     @ViewBuilder
     private func bubbleBody(for message: MessageItem, mine: Bool, isGroupStart: Bool, photoOnly: Bool, reactions: [MessageReactionSummary]) -> some View {
         Group {
             if photoOnly {
                 attachmentsView(for: message, mine: mine, standalone: true)
+            } else if let embed = sharedPostEmbedTarget(for: message) {
+                standaloneSharedPostEmbed(message: message, card: embed.card, postId: embed.postId, mine: mine, isGroupStart: isGroupStart)
             } else {
                 classicBubble(for: message, mine: mine, isGroupStart: isGroupStart)
             }
@@ -614,6 +617,58 @@ struct ConversationDetailView: View {
             reactionChips(for: message, summaries: reactions)
         }
         .padding(.bottom, reactions.isEmpty ? 0 : 13)
+    }
+
+    /// Message qui n'est QU'un partage de publication (embed interactif) :
+    /// rendu sans fond de bulle — la carte est la bulle. On garde le chemin
+    /// classique pour les messages supprimés, sans id de post ou en mode démo.
+    private func sharedPostEmbedTarget(for message: MessageItem) -> (card: ShareCardData, postId: String)? {
+        guard message.deletedAt == nil,
+              !AppEnvironment.usesDemoData,
+              let card = shareCard(for: message),
+              let postId = card.socialPostId else { return nil }
+        return (card, postId)
+    }
+
+    private func standaloneSharedPostEmbed(
+        message: MessageItem,
+        card: ShareCardData,
+        postId: String,
+        mine: Bool,
+        isGroupStart: Bool
+    ) -> some View {
+        VStack(alignment: mine ? .trailing : .leading, spacing: SQSpace.xs) {
+            if !mine, conversation.isGroup, isGroupStart, let name = message.sender?.displayName {
+                Text(name)
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            SharedPostEmbedBubble(
+                card: card,
+                postId: postId,
+                mine: mine,
+                standalone: true,
+                service: services.feed,
+                store: sharedPosts,
+                onComment: { item in
+                    lastSharedPostKey = postId
+                    sharedPostComments = SharedPostCommentsTarget(id: postId, backendPostId: item.backendPostId)
+                },
+                onOpen: { item in
+                    lastSharedPostKey = postId
+                    sharedPostDetail = SharedPostDetailTarget(id: postId, item: item)
+                }
+            )
+            // Heure discrète sous la carte (la carte n'a pas de zone méta).
+            HStack(spacing: SQSpace.xs) {
+                if let created = message.createdAt {
+                    Text(created, format: .dateTime.hour().minute())
+                }
+                if message.editedAt != nil { Text("modifié") }
+            }
+            .font(SQFont.body(10.5))
+            .foregroundStyle(SQColor.labelTertiary)
+        }
     }
 
     private func classicBubble(for message: MessageItem, mine: Bool, isGroupStart: Bool) -> some View {
