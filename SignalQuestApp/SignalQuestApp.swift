@@ -306,11 +306,21 @@ struct MainTabView: View {
     /// dock flottant custom « Crème » (le verre système n'existe pas).
     @ViewBuilder
     private var tabContainer: some View {
-        if #available(iOS 26.0, *) {
+        if #available(iOS 26.0, *), !Self.forceLegacyDock {
             glassTabView
         } else {
             legacyDockTabView
         }
+    }
+
+    /// QA uniquement : force le dock custom sur un simulateur iOS 26+ pour
+    /// vérifier visuellement le rendu pré-iOS 26.
+    private static var forceLegacyDock: Bool {
+#if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--qa-legacy-dock")
+#else
+        false
+#endif
     }
 
     // MARK: Tab bar Liquid Glass (iOS 26+)
@@ -395,18 +405,15 @@ struct MainTabView: View {
             .tag(AppRouter.AppTab.profile)
         }
         .tint(SQColor.brandRed)
-        .overlay {
-            // Posé à 14 pt du bord PHYSIQUE (comme le prototype), au-dessus de
-            // l'indicateur home — d'où le VStack plein écran qui ignore le safe area.
-            VStack {
-                Spacer()
-                if !router.isDockHidden {
-                    SQDock(selection: $router.selectedTab)
-                        .padding(.bottom, 14)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
+        .overlay(alignment: .bottom) {
+            // Posé DANS la safe area : 8 pt au-dessus de l'indicateur home
+            // (Face ID) ou du bord physique (bouton). Jamais sur l'indicateur —
+            // le prototype HTML le posait à 14 pt du bord physique, trop bas.
+            if !router.isDockHidden {
+                SQDock(selection: $router.selectedTab)
+                    .padding(.bottom, SQDock.bottomGap)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            .ignoresSafeArea(edges: .bottom)
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .animation(SQMotion.standard, value: router.isDockHidden)

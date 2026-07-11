@@ -1,16 +1,22 @@
 import SwiftUI
 
 /// Dock de navigation flottant « Crème & Terre cuite ». Remplace la tab bar
-/// système : capsule `SurfaceElevated` à 95 % + blur, marges 16 pt, 14 pt du
-/// bas, ombre dock. Item actif = pilule teintée brique + icône/libellé brique ;
-/// inactifs = bruns discrets. Icônes 22 pt, libellés 9,5 pt.
+/// système : capsule `SurfaceElevated` à 95 % + blur, marges 16 pt, posé
+/// AU-DESSUS de la safe area (8 pt au-dessus de l'indicateur home — jamais
+/// dessus), ombre dock. Item actif = pilule teintée brique + icône/libellé
+/// brique ; inactifs = bruns discrets. Icônes 22 pt, libellés 9,5 pt.
 struct SQDock: View {
     @Binding var selection: AppRouter.AppTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Hauteur totale occupée par le dock au-dessus du bas de l'écran
-    /// (capsule ~64 + marge basse 14). Sert au `safeAreaInset` des contenus.
-    static let clearance: CGFloat = 92
+    /// Écart entre le bas du dock et la safe area (indicateur home sur
+    /// Face ID, bord physique sur les appareils à bouton).
+    static let bottomGap: CGFloat = 8
+
+    /// Hauteur réservée AU-DESSUS de la safe area pour que le contenu ne se
+    /// cache pas derrière le dock (capsule ~64 + bottomGap 8 + respiration 8).
+    /// Sert au `safeAreaInset` des contenus.
+    static let clearance: CGFloat = 80
 
     private let items: [(tab: AppRouter.AppTab, label: String, icon: String)] = [
         (.home, "Accueil", "house"),
@@ -89,7 +95,7 @@ extension View {
     func sqDockSafeArea(_ active: Bool = true) -> some View {
         safeAreaInset(edge: .bottom, spacing: 0) {
             if active {
-                Color.clear.frame(height: SQDock.clearance - 34)
+                Color.clear.frame(height: SQDock.clearance)
             }
         }
     }

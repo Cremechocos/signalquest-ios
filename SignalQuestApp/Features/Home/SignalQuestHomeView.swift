@@ -1,8 +1,10 @@
 import SwiftUI
+import CoreLocation
 
 /// Accueil « Crème & Terre cuite » : salutation, état réseau en direct,
-/// grille 2×2 d'actions (Tester en tuile accent) et dernière mesure.
-/// Le feed social reste dans Communauté.
+/// grille 2×2 d'actions (Tester en tuile accent), données communautaires
+/// AUTOUR DE LA POSITION (pouls + dernières mesures proches) et dernière
+/// mesure locale. Le feed social reste dans Communauté.
 struct SignalQuestHomeView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
@@ -11,6 +13,10 @@ struct SignalQuestHomeView: View {
 
     @State private var latestMeasurement: SpeedtestRunResult?
     @State private var networkStatus: NetworkPathStatus = .unknown
+    /// Données communautaires autour de la position (nil/vides = section masquée).
+    @State private var pulse: NetworkPulse?
+    @State private var nearbyMeasures: [AndroidSpeedtestMarker] = []
+    @State private var userLocation: CLLocation?
 
     private let gridColumns = [
         GridItem(.flexible(), spacing: 14),
@@ -23,6 +29,7 @@ struct SignalQuestHomeView: View {
                 header
                 networkSummary
                 actionsGrid
+                nearbySection
                 latestMeasurementSection
             }
             .padding(.horizontal, SQSpace.xl)
@@ -236,6 +243,157 @@ struct SignalQuestHomeView: View {
         .accessibilityLabel("\(title). \(subtitle)")
     }
 
+    // MARK: Autour de toi — données communautaires proches
+
+    @ViewBuilder
+    private var nearbySection: some View {
+        if pulse?.hasData == true || !nearbyMeasures.isEmpty {
+            VStack(alignment: .leading, spacing: SQSpace.md) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Autour de toi")
+                        .font(SQFont.display(20, .bold))
+                        .foregroundStyle(SQColor.label)
+                    Spacer()
+                    if let count = pulse?.measurementsCount, count > 0 {
+                        Text("\(count) mesures")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                }
+
+                VStack(spacing: SQSpace.md) {
+                    if let pulse, pulse.hasData {
+                        pulseRow(pulse)
+                    }
+                    if !nearbyMeasures.isEmpty {
+                        VStack(spacing: 0) {
+                            ForEach(Array(nearbyMeasures.enumerated()), id: \.element.id) { index, measure in
+                                nearbyMeasureRow(measure)
+                                if index < nearbyMeasures.count - 1 {
+                                    Divider()
+                                        .overlay(SQColor.separator)
+                                        .padding(.leading, 52)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(SQSpace.lg)
+                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                .sqShadowCard()
+            }
+        }
+    }
+
+    /// Agrégat de zone (pouls réseau) : 3 mini-tuiles RSRP / débit médian / meilleur op.
+    private func pulseRow(_ pulse: NetworkPulse) -> some View {
+        HStack(spacing: SQSpace.sm + 2) {
+            if let rsrp = pulse.avgRsrpDbm {
+                pulseTile(value: "\(rsrp)", unit: "dBm moyen")
+            }
+            if let median = pulse.medianDownloadMbps {
+                pulseTile(value: "\(median)", unit: "Mb/s médian")
+            }
+            if let best = pulse.bestOperator, !best.isEmpty {
+                pulseTile(value: best, unit: "meilleur op.")
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Pouls réseau autour de toi")
+    }
+
+    private func pulseTile(value: String, unit: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(SQFont.display(17, .bold))
+                .foregroundStyle(SQColor.brandRed)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(unit)
+                .font(SQFont.body(11))
+                .foregroundStyle(SQColor.labelSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, SQSpace.sm + 2)
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    }
+
+    /// Une mesure communautaire proche : techno teintée, débit, contexte, distance.
+    private func nearbyMeasureRow(_ measure: AndroidSpeedtestMarker) -> some View {
+        Button {
+            Haptics.selection()
+            router.selectedTab = .map
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                ZStack {
+                    Circle().fill(TechAccent.color(for: measure.tech))
+                    if let label = Self.techShortLabel(measure.tech) {
+                        Text(label)
+                            .font(SQFont.bodyFixed(12, .bold))
+                            .foregroundStyle(SQColor.onAccent)
+                    } else {
+                        // Techno inconnue (ex. « CELLULAR » brut) : icône antenne.
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(SQColor.onAccent)
+                    }
+                }
+                .frame(width: 40, height: 40)
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 5) {
+                        Text("\(Int(measure.downloadMbps)) Mbps")
+                            .font(SQFont.body(15, .semibold))
+                            .foregroundStyle(SQColor.label)
+                        if let ping = measure.pingMs {
+                            Text("· \(Int(ping)) ms")
+                                .font(SQFont.body(13))
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
+                    }
+                    Text(nearbyContext(for: measure))
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+            }
+            .padding(.vertical, SQSpace.sm + 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Mesure communautaire : \(Int(measure.downloadMbps)) mégabits. \(nearbyContext(for: measure)). Ouvre la carte.")
+    }
+
+    /// Libellé court de techno pour la pastille (« 5G », « 4G », « Wi-Fi »)
+    /// ou nil si la valeur backend est trop brute pour être affichée.
+    private static func techShortLabel(_ tech: String?) -> String? {
+        guard let tech, !tech.isEmpty else { return nil }
+        let upper = tech.uppercased()
+        if upper.contains("5G") || upper.contains("NR") { return "5G" }
+        if upper.contains("4G") || upper.contains("LTE") { return "4G" }
+        if upper.contains("3G") || upper.contains("UMTS") { return "3G" }
+        if upper.contains("2G") || upper.contains("GSM") { return "2G" }
+        if upper.contains("WIFI") || upper.contains("WI-FI") { return "Wi-Fi" }
+        return nil
+    }
+
+    /// « Orange · il y a 2 h · à 450 m » — ce qui est connu, dans cet ordre.
+    private func nearbyContext(for measure: AndroidSpeedtestMarker) -> String {
+        var parts: [String] = []
+        if let op = measure.`operator`, !op.isEmpty { parts.append(op) }
+        if let date = measure.timestamp {
+            parts.append(date.formatted(.relative(presentation: .named)))
+        }
+        if let location = userLocation {
+            let distance = location.distance(from: CLLocation(latitude: measure.lat, longitude: measure.lng))
+            parts.append("à \(SignalFormatters.meters(distance))")
+        }
+        return parts.joined(separator: " · ")
+    }
+
     // MARK: Dernière mesure
 
     @ViewBuilder
@@ -311,6 +469,44 @@ struct SignalQuestHomeView: View {
         services.networkPath.refreshNow()
         networkStatus = services.networkPath.status
         latestMeasurement = await services.speedtest.history().first
+        await refreshNearby()
+    }
+
+    /// Charge le pouls réseau + les dernières mesures communautaires autour de
+    /// la position. Best-effort : sans position ou sans données, la section
+    /// reste simplement masquée (jamais d'erreur affichée sur l'Accueil).
+    private func refreshNearby() async {
+        guard let location = await services.location.currentLocation(timeoutSeconds: 6) else { return }
+        userLocation = location
+        let lat = location.coordinate.latitude
+        let lng = location.coordinate.longitude
+
+        async let pulseTask: NetworkPulse? = try? services.feed.networkPulse(latitude: lat, longitude: lng)
+        async let markersTask: [AndroidSpeedtestMarker] = nearbyMarkers(latitude: lat, longitude: lng, around: location)
+
+        pulse = await pulseTask
+        nearbyMeasures = await markersTask
+    }
+
+    /// Mesures communautaires dans un rayon ~3 km, les plus récentes d'abord.
+    private func nearbyMarkers(latitude: Double, longitude: Double, around location: CLLocation) async -> [AndroidSpeedtestMarker] {
+        let market = await services.markets.marketForLocation(latitude: latitude, longitude: longitude)?.code ?? "FR"
+        // ±0,03° ≈ 3,3 km N-S ; l'e-o varie avec la latitude mais reste du même ordre.
+        let bounds = MapBounds(
+            north: latitude + 0.03,
+            south: latitude - 0.03,
+            east: longitude + 0.045,
+            west: longitude - 0.045
+        )
+        guard let tiles = try? await services.map.speedtestTiles(
+            bounds: bounds, zoom: 13, market: market, operatorName: "ALL", days: 30, bands: []
+        ) else { return [] }
+
+        return tiles
+            .flatMap(\.markers)
+            .sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+            .prefix(3)
+            .map { $0 }
     }
 }
 
