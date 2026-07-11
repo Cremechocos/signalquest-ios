@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-10T00:00:00+02:00",
+  "title": "Design System: SignalQuest Apple",
+  "extensions": {
+    "colorMeta": {
+      "signal-red": {
+        "role": "primary",
+        "displayName": "Rouge Signal",
+        "canonical": "#E2001A",
+        "tonalRamp": ["#3A0007", "#65000C", "#910011", "#C00017", "#E2001A", "#FF414F", "#FF8A94", "#FFD9DC"]
+      },
+      "field-paper": {
+        "role": "neutral",
+        "displayName": "Papier de terrain",
+        "canonical": "#F4F0E6",
+        "tonalRamp": ["#18150F", "#3A352B", "#6B6457", "#9E9582", "#C4BCA6", "#ECE7D8", "#F4F0E6", "#FBF9F3"]
+      },
+      "field-ink": {
+        "role": "neutral",
+        "displayName": "Encre terrain",
+        "canonical": "#18150F",
+        "tonalRamp": ["#100E0A", "#18150F", "#3A352B", "#6B6457", "#9E9582", "#C4BCA6", "#ECE7D8", "#F4F0E6"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Archivo Expanded Display", "purpose": "Un titre dominant ou un résultat marquant par écran." },
+      "body": { "displayName": "Public Sans Body", "purpose": "Explications, contenu et états de service." },
+      "label": { "displayName": "Archivo Label", "purpose": "Contrôles, boutons et données compactes." }
+    },
+    "shadows": [
+      { "name": "chrome-floating", "value": "0 6px 12px rgba(0,0,0,0.12)", "purpose": "Contrôles flottant au-dessus d'une carte ou d'un média." },
+      { "name": "accent-feedback", "value": "0 4px 8px rgba(226,0,26,0.20)", "purpose": "Feedback transitoire d'une action primaire." }
+    ],
+    "motion": [
+      { "name": "fast", "value": "160ms ease-out", "purpose": "Press, focus et toggles." },
+      { "name": "standard", "value": "250ms ease-in-out", "purpose": "Changement d'état et apparition de contenu." },
+      { "name": "emphasized", "value": "400ms spring", "purpose": "Sheets et transitions de contexte majeures." }
+    ],
+    "breakpoints": [
+      { "name": "compact", "value": "SwiftUI horizontalSizeClass compact" },
+      { "name": "regular", "value": "SwiftUI horizontalSizeClass regular" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Action principale rouge, nette et accessible.",
+      "html": "<button class=\"ds-btn-primary\">Lancer le test</button>",
+      "css": ".ds-btn-primary { min-height:50px; padding:15px 16px; border:0; border-radius:4px; background:#E2001A; color:#FFFFFF; font:700 15px Archivo,system-ui,sans-serif; transition:background 160ms ease-out,transform 160ms ease-out; } .ds-btn-primary:hover { background:#C00017; } .ds-btn-primary:active { transform:scale(.98); } .ds-btn-primary:focus-visible { outline:3px solid #1D4ED8; outline-offset:2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Action secondaire structurée par un contour d'encre.",
+      "html": "<button class=\"ds-btn-secondary\">Voir les détails</button>",
+      "css": ".ds-btn-secondary { min-height:50px; padding:15px 16px; border:1px solid #18150F; border-radius:4px; background:#FBF9F3; color:#18150F; font:700 15px Archivo,system-ui,sans-serif; transition:background 160ms ease-out; } .ds-btn-secondary:hover { background:#ECE7D8; } .ds-btn-secondary:focus-visible { outline:3px solid #1D4ED8; outline-offset:2px; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "description": "Champ natif lisible avec une cible tactile confortable.",
+      "html": "<input class=\"ds-field\" aria-label=\"Rechercher\" placeholder=\"Rechercher\">",
+      "css": ".ds-field { min-height:44px; padding:0 12px; border:1px solid #C4BCA6; border-radius:8px; background:#FBF9F3; color:#18150F; font:400 16px 'Public Sans',system-ui,sans-serif; } .ds-field:focus { border-color:#E2001A; outline:3px solid rgba(226,0,26,.18); } .ds-field::placeholder { color:#3A352B; }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Filtre compact dont l'état reste lisible sans la couleur seule.",
+      "html": "<button class=\"ds-chip\" aria-pressed=\"true\">✓ Speedtests</button>",
+      "css": ".ds-chip { min-height:44px; padding:8px 12px; border:1px solid #E2001A; border-radius:999px; background:#F4F0E6; color:#C00017; font:600 14px Archivo,system-ui,sans-serif; } .ds-chip:hover { background:#ECE7D8; } .ds-chip:focus-visible { outline:3px solid #1D4ED8; outline-offset:2px; }"
+    },
+    {
+      "name": "Reading Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Surface tonale sans ombre décorative.",
+      "html": "<article class=\"ds-card\"><strong>Qualité du réseau</strong><p>Très bonne couverture 5G.</p></article>",
+      "css": ".ds-card { max-width:320px; padding:16px; border-radius:10px; background:#FBF9F3; color:#18150F; font:400 16px 'Public Sans',system-ui,sans-serif; } .ds-card strong { display:block; margin-bottom:8px; font:600 17px Archivo,system-ui,sans-serif; } .ds-card p { margin:0; color:#3A352B; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Le Carnet de terrain",
+    "overview": "SignalQuest ressemble à un carnet de mesure contemporain : précis, lisible en extérieur et enrichi par la communauté. La structure reste familière à un utilisateur Apple ; l'identité apparaît dans la typographie éditoriale, le rouge de signal et une hiérarchie de surfaces inspirée du papier plutôt que dans des effets décoratifs.",
+    "keyCharacteristics": [
+      "Une action principale évidente par contexte.",
+      "Des surfaces tonales nettes et peu d'ombres.",
+      "Une typographie expressive pour les titres, discrète pour l'interface.",
+      "Des états de chargement, hors ligne, vide et erreur aussi soignés que l'état nominal.",
+      "Des transitions de 150 à 250 ms qui expliquent un changement d'état."
+    ],
+    "rules": [
+      { "name": "The Signal Rule", "body": "Le rouge sert aux actions primaires, à la sélection et aux états critiques ; il ne colore jamais tous les éléments d'un écran.", "section": "colors" },
+      { "name": "The One Display Rule", "body": "Un seul niveau Archivo Expanded domine un écran ; les contrôles, listes et données restent en Archivo ou Public Sans.", "section": "typography" },
+      { "name": "The Flat-by-default Rule", "body": "Une carte de contenu ordinaire utilise une surface tonale ou un séparateur, pas une ombre diffuse.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do utiliser les tokens SQColor, SQFont, SQSpace, SQRadius et SQMotion plutôt que des valeurs locales.",
+      "Do conserver une zone tactile d'au moins 44 pt et tester Dynamic Type, VoiceOver et Reduce Motion.",
+      "Do utiliser des patterns Apple standards avant de créer un composant spécifique."
+    ],
+    "donts": [
+      "Don't construire un tableau de bord télécom saturé de métriques, néons et jargon dès le premier écran.",
+      "Don't utiliser du glassmorphism décoratif, des gradients omniprésents ou une large ombre avec une bordure sur la même carte.",
+      "Don't confirmer une sauvegarde, un consentement ou une suppression avant la réponse serveur."
+    ]
+  }
+}
