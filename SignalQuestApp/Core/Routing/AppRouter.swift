@@ -25,6 +25,9 @@ final class AppRouter: ObservableObject {
     /// Masque le dock flottant (conversation ouverte : le composer prend le bas).
     /// Posé par les écrans plein-bas (ConversationDetailView) à l'apparition.
     @Published var isDockHidden = false
+    /// Dock rétracté en pastille après un scroll vers le bas ; redéployé en
+    /// remontant, en changeant d'onglet ou en tapant la pastille.
+    @Published var isDockMinimized = false
 
     init() {
         let args = ProcessInfo.processInfo.arguments

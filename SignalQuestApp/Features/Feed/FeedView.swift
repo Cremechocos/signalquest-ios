@@ -366,6 +366,8 @@ struct FeedView: View {
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
         }
+        // Directement sur le ScrollView (avant le ZStack de signalQuestBackground).
+        .sqDockAutoMinimize()
         .overlay(alignment: .bottom) { shareUndoPill }
         // Header custom (DA Crème) : plus de gros titre nav système.
         .toolbar(.hidden, for: .navigationBar)

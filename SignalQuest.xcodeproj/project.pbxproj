@@ -47,6 +47,7 @@
 		25E51616DFCEE545AE04E5EF /* ExploreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 375D2602C108329658B440F9 /* ExploreView.swift */; };
 		25FB0A6A120E43D0B2E89C8F /* PhotosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8285E18A8C25FEC98790A174 /* PhotosView.swift */; };
 		261ACB1D58A0E45AD45658FE /* SocialCommentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C59360081D5DC685451E0D8D /* SocialCommentModels.swift */; };
+		280856D3EB97C75ED97A90A4 /* LaunchLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B1F180671AE87E17BF1EC7A /* LaunchLoadingView.swift */; };
 		29E12F800448A8C0B72CFC17 /* PhotoCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 763622AD001158FA3157D839 /* PhotoCardView.swift */; };
 		2A75C227B62E74818271FE0A /* E2EEService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */; };
 		2AE3D8AFA78A50D3114E392A /* PhotoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2F641884A080F0EC459B546 /* PhotoService.swift */; };
@@ -138,6 +139,7 @@
 		82D213CFFAD0F862FFF86CE8 /* MessageImageViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37A33F778EF242CBA6881750 /* MessageImageViewer.swift */; };
 		836D76211D8B12F2E56901A8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AD04EAFD67FBCB63533321A0 /* Assets.xcassets */; };
 		8A4136A5D87AAEDAB5407344 /* ANFRDemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C94749CE21617DB555FC5D6 /* ANFRDemoData.swift */; };
+		8A731C079D449D10B1E7ADD3 /* DockMinimizeQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E978EE2EBFDAD88C880B9C9 /* DockMinimizeQATests.swift */; };
 		8C7659AD0943ED428E44029F /* FriendsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D871487D03A7164E856392DE /* FriendsListView.swift */; };
 		8CC009E03CB57D8B8159BCAA /* SessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD5D954E6102D732D621D8E6 /* SessionModels.swift */; };
 		8D6A1FFFCEC4DF3C5D0246A9 /* SignalQuestWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2A5251F96893CB76BAAC1239 /* SignalQuestWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -316,6 +318,7 @@
 		37A33F778EF242CBA6881750 /* MessageImageViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageImageViewer.swift; sourceTree = "<group>"; };
 		389490B290AB8281D5C364D0 /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServices.swift; sourceTree = "<group>"; };
 		39509D5164E7F02622A4D040 /* SpeedtestModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestModels.swift; sourceTree = "<group>"; };
+		3B1F180671AE87E17BF1EC7A /* LaunchLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchLoadingView.swift; sourceTree = "<group>"; };
 		3B2B510928CA997F314547B3 /* ANFRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRService.swift; sourceTree = "<group>"; };
 		3B8BBA72A0A9FF7F8F0F8936 /* ValidationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationModels.swift; sourceTree = "<group>"; };
 		3CD01567054707A140E2FCA3 /* MapModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapModels.swift; sourceTree = "<group>"; };
@@ -401,6 +404,7 @@
 		9D849C59293B6E1D70C5F88A /* MessagingE2EEQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagingE2EEQATests.swift; sourceTree = "<group>"; };
 		9E54BD3EC5237CAE037E9ABB /* SignalQuestWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalQuestWidgetBundle.swift; sourceTree = "<group>"; };
 		9E61F44A7820A00882245D0C /* SQGradient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQGradient.swift; sourceTree = "<group>"; };
+		9E978EE2EBFDAD88C880B9C9 /* DockMinimizeQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockMinimizeQATests.swift; sourceTree = "<group>"; };
 		9EC5960ABF8C24952322E392 /* PrivacyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyService.swift; sourceTree = "<group>"; };
 		9F5CFE5CCBA408F62BDCC840 /* AppleDeviceDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleDeviceDescriptor.swift; sourceTree = "<group>"; };
 		A01462ACA13AD33221D20FAF /* ShareCardBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardBubble.swift; sourceTree = "<group>"; };
@@ -689,6 +693,7 @@
 				F031B14E382FDADDEAEFECE1 /* AppEnvironment.swift */,
 				C70EBF0567FCA17824A1A272 /* GoogleService-Info.plist */,
 				BBEA8942969B9394C2019221 /* Info.plist */,
+				3B1F180671AE87E17BF1EC7A /* LaunchLoadingView.swift */,
 				F46B89349A48401E7563977C /* SignalQuestApp.swift */,
 				281D3D737383707EBC66C8B5 /* Core */,
 				EACADB340AFE214D0CA25D71 /* Design */,
@@ -824,6 +829,7 @@
 			children = (
 				F1DBE566F150964A2AF9D0EE /* AntennaPhotoQATests.swift */,
 				A4F5346C853F95E32F253D7B /* AuditTourQATests.swift */,
+				9E978EE2EBFDAD88C880B9C9 /* DockMinimizeQATests.swift */,
 				CFDF16B243853AE40E37D07C /* FluidityQATests.swift */,
 				AEF301566BC00073B5C158FA /* Info.plist */,
 				9D849C59293B6E1D70C5F88A /* MessagingE2EEQATests.swift */,
@@ -1388,6 +1394,7 @@
 				7D0BE4AFA8C517809583BFB1 /* IdentifyService.swift in Sources */,
 				B34CAE48D657CA2E1045EDD2 /* JSONValue.swift in Sources */,
 				344AD863842861AB53EF46B3 /* KeychainStore.swift in Sources */,
+				280856D3EB97C75ED97A90A4 /* LaunchLoadingView.swift in Sources */,
 				543116391555BF3BE77EDA7F /* LeaderboardModels.swift in Sources */,
 				633DC6F9C6F272906A7E7363 /* LeaderboardService.swift in Sources */,
 				09AC44D177340FD30F2BD91A /* LeaderboardsView.swift in Sources */,
@@ -1509,6 +1516,7 @@
 			files = (
 				AAF92F511259C586D92636FC /* AntennaPhotoQATests.swift in Sources */,
 				73A2B7B1908FB3B6415DC31B /* AuditTourQATests.swift in Sources */,
+				8A731C079D449D10B1E7ADD3 /* DockMinimizeQATests.swift in Sources */,
 				3D1F0588D592CF8DED9BD1EB /* FluidityQATests.swift in Sources */,
 				DBD653BB59B8D01C74592509 /* MessagingE2EEQATests.swift in Sources */,
 				5DCECE2C39F5BB5B5F65D5A0 /* MessagingFixesQATests.swift in Sources */,

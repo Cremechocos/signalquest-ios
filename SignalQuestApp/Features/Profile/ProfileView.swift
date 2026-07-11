@@ -50,6 +50,8 @@ struct ProfileView: View {
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
         }
+        // Directement sur le ScrollView (avant le ZStack de signalQuestBackground).
+        .sqDockAutoMinimize()
         .toolbar(.hidden, for: .navigationBar)
         .signalQuestBackground()
         .sheet(isPresented: $showEdit) {

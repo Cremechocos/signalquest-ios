@@ -136,30 +136,7 @@ struct RootView: View {
         Group {
             switch session.state {
             case .checking:
-                ZStack {
-                    Color.clear.signalQuestHeroBackground()
-                    
-                    VStack(spacing: SQSpace.xxl) {
-                        Image("SQLogoMark")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 96, height: 96)
-                            .clipShape(RoundedRectangle(cornerRadius: SQRadius.xxl, style: .continuous))
-                            .shadow(color: SQColor.brandRed.opacity(0.35), radius: 18, x: 0, y: 8)
-                        
-                        VStack(spacing: SQSpace.md) {
-                            ProgressView()
-                                .tint(SQColor.brandRed)
-                                .scaleEffect(1.2)
-                            
-                            Text("SIGNAL QUEST")
-                                .font(SQFont.archivo(16, .bold))
-                                .tracking(3)
-                                .foregroundStyle(SQColor.label)
-                                .padding(.top, SQSpace.sm)
-                        }
-                    }
-                }
+                LaunchLoadingView()
             case .loggedOut, .requires2FA:
                 LoginView()
             case .offline:
@@ -279,7 +256,7 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        tabContainer
+        dockTabView
         .task {
             await services.refreshInboxBadge()
             consumeIntentRoutes()
@@ -296,83 +273,26 @@ struct MainTabView: View {
             }
         }
         .onChangeCompat(of: router.selectedTab) { _, _ in
+            // Changement d'onglet (tap, deep-link, intent) : dock redéployé.
+            withAnimation(SQMotion.snappy) { router.isDockMinimized = false }
             Task { await services.refreshInboxBadge() }
+        }
+        .onChangeCompat(of: router.isDockHidden) { _, hidden in
+            // Retour de conversation : le dock réapparaît toujours déployé
+            // (le reset se fait pendant qu'il est masqué, sans pop visible).
+            if hidden { router.isDockMinimized = false }
         }
         .onOpenURL { url in handleDeepLink(url) }
     }
 
-    /// iOS 26+ : tab bar système Liquid Glass qui se rétracte au scroll
-    /// (`tabBarMinimizeBehavior`), comme les apps natives. Avant iOS 26 :
-    /// dock flottant custom « Crème » (le verre système n'existe pas).
-    @ViewBuilder
-    private var tabContainer: some View {
-        if #available(iOS 26.0, *), !Self.forceLegacyDock {
-            glassTabView
-        } else {
-            legacyDockTabView
-        }
-    }
+    // MARK: Dock flottant custom (toutes versions d'iOS)
 
-    /// QA uniquement : force le dock custom sur un simulateur iOS 26+ pour
-    /// vérifier visuellement le rendu pré-iOS 26.
-    private static var forceLegacyDock: Bool {
-#if DEBUG
-        ProcessInfo.processInfo.arguments.contains("--qa-legacy-dock")
-#else
-        false
-#endif
-    }
-
-    // MARK: Tab bar Liquid Glass (iOS 26+)
-
-    @available(iOS 26.0, *)
-    private var glassTabView: some View {
-        TabView(selection: $router.selectedTab) {
-            NavigationStack { SignalQuestHomeView(user: user) }
-                .tabItem { Label("Accueil", systemImage: "house") }
-                .tag(AppRouter.AppTab.home)
-
-            NavigationStack { MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets) }
-                .tabItem { Label("Carte", systemImage: "map") }
-                .tag(AppRouter.AppTab.map)
-
-            NavigationStack { SpeedtestView() }
-                .tabItem { Label("Tester", systemImage: "speedometer") }
-                .tag(AppRouter.AppTab.speed)
-
-            NavigationStack { FeedView(service: services.feed, location: services.location) }
-                // La conversation pose isDockHidden : on masque aussi la barre
-                // système pour laisser le composer prendre le bas de l'écran.
-                .toolbar(router.isDockHidden ? .hidden : .automatic, for: .tabBar)
-                .tabItem { Label("Communauté", systemImage: "person.2") }
-                .tag(AppRouter.AppTab.community)
-                .badge(services.unreadConversations)
-
-            NavigationStack {
-                ProfileView(user: user)
-#if DEBUG
-                    .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-map"))) {
-                        ANFRMapView(service: services.anfr)
-                    }
-                    .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-stats"))) {
-                        ANFRStatsView(service: services.anfr)
-                    }
-#endif
-            }
-            .tabItem { Label("Profil", systemImage: "person.crop.circle") }
-            .tag(AppRouter.AppTab.profile)
-        }
-        // Rétraction au scroll (Liquid Glass) : la barre se réduit en pastille
-        // quand on descend et se redéploie quand on remonte.
-        .tabBarMinimizeBehavior(.onScrollDown)
-        .tint(SQColor.brandRed)
-    }
-
-    // MARK: Dock flottant custom (avant iOS 26)
-
-    private var legacyDockTabView: some View {
-        // Dock flottant custom (DA Crème) : la tab bar système est masquée sur
-        // chaque onglet, le dock est posé en overlay 14 pt au-dessus du bas.
+    /// La tab bar système est masquée sur chaque onglet et remplacée par
+    /// `SQDock`, posé 8 pt au-dessus de la safe area — ~20 pt plus haut que la
+    /// barre native iOS 26, qui flotte collée à l'indicateur home sans aucun
+    /// réglage possible. Sur iOS 26+ le dock reprend le vrai matériau Liquid
+    /// Glass et se rétracte au scroll (`sqDockAutoMinimize` sur les racines).
+    private var dockTabView: some View {
         TabView(selection: $router.selectedTab) {
             NavigationStack { SignalQuestHomeView(user: user).toolbar(.hidden, for: .tabBar) }
                 .sqDockSafeArea()
@@ -410,9 +330,16 @@ struct MainTabView: View {
             // (Face ID) ou du bord physique (bouton). Jamais sur l'indicateur —
             // le prototype HTML le posait à 14 pt du bord physique, trop bas.
             if !router.isDockHidden {
-                SQDock(selection: $router.selectedTab)
-                    .padding(.bottom, SQDock.bottomGap)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                SQDock(
+                    selection: $router.selectedTab,
+                    communityBadge: services.unreadConversations,
+                    minimized: router.isDockMinimized,
+                    onExpand: {
+                        withAnimation(SQMotion.snappy) { router.isDockMinimized = false }
+                    }
+                )
+                .padding(.bottom, SQDock.bottomGap)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)

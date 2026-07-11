@@ -36,6 +36,10 @@ struct SignalQuestHomeView: View {
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
         }
+        // Directement sur le ScrollView : signalQuestBackground() enveloppe
+        // dans un ZStack, et onScrollGeometryChange n'observe que la vue à
+        // laquelle il est appliqué.
+        .sqDockAutoMinimize()
         .toolbar(.hidden, for: .navigationBar)
         .signalQuestBackground()
         .task { await refresh() }

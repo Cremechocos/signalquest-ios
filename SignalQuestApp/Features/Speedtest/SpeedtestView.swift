@@ -180,6 +180,8 @@ struct SpeedtestView: View {
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.huge + SQSpace.huge)
         }
+        // Directement sur le ScrollView (avant tout wrap) : rétraction du dock.
+        .sqDockAutoMinimize()
         // En mode invité, la barre de navigation du conteneur (« Fermer »,
         // « Mes reçus ») doit rester visible ; sinon l'en-tête custom suffit.
         .toolbar(guestMode ? .automatic : .hidden, for: .navigationBar)
