@@ -206,23 +206,23 @@ struct ANFRMapView: View {
             } label: {
                 HStack(spacing: SQSpace.sm - 1) {
                     Image(systemName: "calendar")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(SQColor.brandRed)
+                        .frame(width: 28, height: 28)
+                        .background(SQColor.accentSoft, in: Circle())
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Relevé").sqKicker()
+                        Text("Relevé")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
                         Text(model.dateLabel)
-                            .font(SQFont.archivo(14, .bold))
+                            .font(SQFont.body(14, .semibold))
                             .foregroundStyle(SQColor.label)
                             .lineLimit(1)
                     }
                 }
                 .padding(.horizontal, SQSpace.md - 2)
                 .frame(height: 48)
-                .background(SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                        .stroke(SQColor.label, lineWidth: 2)
-                }
+                .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
             .buttonStyle(SQPressButtonStyle())
 
@@ -231,13 +231,13 @@ struct ANFRMapView: View {
             // Count badge
             HStack(spacing: SQSpace.xs + 2) {
                 Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: 12, weight: .semibold))
                 Text("\(model.filteredSites.count)")
-                    .font(SQFont.archivo(15, .bold))
+                    .font(SQFont.display(15, .bold))
                     .monospacedDigit()
                     .contentTransition(.numericText())
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(SQColor.onAccent)
             .padding(.horizontal, SQSpace.md - 1)
             .frame(height: 48)
             .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
@@ -249,20 +249,16 @@ struct ANFRMapView: View {
             } label: {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: "line.3.horizontal.decrease")
-                        .font(.system(size: 17, weight: .bold))
+                        .font(.system(size: 17, weight: .semibold))
                         .frame(width: 48, height: 48)
-                        .background(SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                                .stroke(SQColor.separator, lineWidth: 1.5)
-                        }
+                        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                         .foregroundStyle(SQColor.label)
                     if activeFilterCount > 0 {
                         Text("\(activeFilterCount)")
-                            .font(SQFont.archivo(10, .bold))
+                            .font(SQFont.body(10, .semibold))
                             .frame(minWidth: 17, minHeight: 17)
                             .background(SQColor.brandRed, in: Circle())
-                            .foregroundStyle(.white)
+                            .foregroundStyle(SQColor.onAccent)
                             .offset(x: 5, y: -5)
                     }
                 }
@@ -270,12 +266,8 @@ struct ANFRMapView: View {
             .buttonStyle(SQPressButtonStyle())
         }
         .padding(SQSpace.xs + 1)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1.5)
-        }
-        .shadow(color: chromeShadow, radius: 14, y: 6)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
     private var operatorStrip: some View {
@@ -288,17 +280,14 @@ struct ANFRMapView: View {
                         withAnimation(reduceMotion ? nil : SQMotion.fast) { model.toggleOperator(op) }
                     } label: {
                         HStack(spacing: SQSpace.xs + 2) {
-                            Circle().fill(on ? Color.white : op.color).frame(width: 7, height: 7)
-                            Text(op.label).font(SQFont.archivo(13, .bold))
+                            Circle().fill(on ? SQColor.onAccent : op.color).frame(width: 7, height: 7)
+                            Text(op.label).font(SQFont.body(13, .semibold))
                         }
                         .padding(.horizontal, SQSpace.md - 2)
-                        .frame(height: 34)
-                        .background(on ? AnyShapeStyle(op.color) : AnyShapeStyle(SQColor.surface), in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                                .stroke(on ? Color.clear : SQColor.separator, lineWidth: 1.5)
-                        }
-                        .foregroundStyle(on ? Color.white : SQColor.label)
+                        .frame(height: 36)
+                        .background(on ? AnyShapeStyle(op.color) : AnyShapeStyle(SQColor.surface), in: Capsule(style: .continuous))
+                        .foregroundStyle(on ? SQColor.onAccent : SQColor.label)
+                        .sqShadowSoft()
                     }
                     .buttonStyle(SQPressButtonStyle())
                     .accessibilityLabel("Filtre \(op.label)")
@@ -315,31 +304,29 @@ struct ANFRMapView: View {
         HStack(spacing: SQSpace.sm) {
             ProgressView().tint(SQColor.brandRed)
             Text("Chargement des sites ANFR…")
-                .font(SQFont.archivo(13, .semibold))
+                .font(SQFont.body(13, .semibold))
                 .foregroundStyle(SQColor.label)
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm + 1)
-        .background(SQColor.surface, in: Capsule())
-        .overlay { Capsule().stroke(SQColor.separator, lineWidth: 1.5) }
-        .shadow(color: chromeShadow, radius: 12, y: 5)
+        .background(SQColor.surface, in: Capsule(style: .continuous))
+        .sqShadowCard()
     }
 
     private var emptyPill: some View {
         Label("Aucun site pour ces filtres", systemImage: "magnifyingglass")
-            .font(SQFont.archivo(13, .semibold))
+            .font(SQFont.body(13, .semibold))
             .foregroundStyle(SQColor.labelSecondary)
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.sm + 1)
-            .background(SQColor.surface, in: Capsule())
-            .overlay { Capsule().stroke(SQColor.separator, lineWidth: 1.5) }
-            .shadow(color: chromeShadow, radius: 12, y: 5)
+            .background(SQColor.surface, in: Capsule(style: .continuous))
+            .sqShadowCard()
     }
 
     private func errorPill(_ message: String) -> some View {
         VStack(spacing: SQSpace.sm) {
             Label(message, systemImage: "exclamationmark.triangle.fill")
-                .font(SQFont.archivo(13, .semibold))
+                .font(SQFont.body(13, .semibold))
                 .foregroundStyle(SQColor.label)
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
@@ -347,7 +334,7 @@ struct ANFRMapView: View {
                 Task { await model.loadSnapshot() }
             } label: {
                 Label("Réessayer", systemImage: "arrow.clockwise")
-                    .font(SQFont.archivo(13, .bold))
+                    .font(SQFont.body(13, .semibold))
                     .foregroundStyle(SQColor.brandRed)
             }
             .buttonStyle(.plain)
@@ -355,16 +342,8 @@ struct ANFRMapView: View {
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm + 1)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                .stroke(SQColor.warning.opacity(0.6), lineWidth: 1.5)
-        }
         .frame(maxWidth: 320)
-        .shadow(color: chromeShadow, radius: 12, y: 5)
-    }
-
-    private var chromeShadow: Color {
-        Color.black.opacity(colorScheme == .dark ? 0.30 : 0.10)
+        .sqShadowCard()
     }
 
     private var activeFilterCount: Int {
@@ -419,7 +398,9 @@ struct ANFRMapFilterSheet: View {
 
     private func section<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            Text(title).sqKicker()
+            Text(title)
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
             content()
         }
     }
@@ -430,17 +411,14 @@ struct ANFRMapFilterSheet: View {
             action()
         } label: {
             HStack(spacing: SQSpace.xs + 2) {
-                Circle().fill(on ? Color.white : color).frame(width: 8, height: 8)
-                Text(label).font(SQFont.archivo(14, .bold))
+                Circle().fill(on ? SQColor.onAccent : color).frame(width: 8, height: 8)
+                Text(label).font(SQFont.body(13, .semibold))
             }
             .padding(.horizontal, SQSpace.md)
             .frame(height: 38)
-            .background(on ? AnyShapeStyle(color) : AnyShapeStyle(SQColor.surface), in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                    .stroke(on ? Color.clear : SQColor.separator, lineWidth: 1.5)
-            }
-            .foregroundStyle(on ? Color.white : SQColor.label)
+            .background(on ? AnyShapeStyle(color) : AnyShapeStyle(SQColor.surface), in: Capsule(style: .continuous))
+            .foregroundStyle(on ? SQColor.onAccent : SQColor.label)
+            .sqShadowSoft()
         }
         .buttonStyle(SQPressButtonStyle())
     }
@@ -456,10 +434,12 @@ struct ANFRDatePickerSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.md) {
                 SQSheetHandle()
-                Text("Relevé ANFR").sqKicker()
                 Text("Choisir une date")
                     .font(SQType.title)
                     .foregroundStyle(SQColor.label)
+                Text("Relevé ANFR")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
                     .padding(.bottom, SQSpace.sm)
 
                 dateRow(label: "Dernier relevé", value: model.currentSnapshotDate, isSelected: model.selectedDate == nil) {
@@ -490,7 +470,7 @@ struct ANFRDatePickerSheet: View {
                     .foregroundStyle(isSelected ? SQColor.brandRed : SQColor.labelTertiary)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(label)
-                        .font(SQFont.archivo(15, .semibold))
+                        .font(SQFont.body(15, .semibold))
                         .foregroundStyle(SQColor.label)
                     if let value, let pretty = ANFRDateParser.date(from: value)?.formatted(.dateTime.day().month(.wide).year()) {
                         Text(pretty)
@@ -502,11 +482,11 @@ struct ANFRDatePickerSheet: View {
             }
             .padding(.vertical, SQSpace.md)
             .padding(.horizontal, SQSpace.md)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                    .stroke(isSelected ? SQColor.brandRed.opacity(0.5) : SQColor.separator, lineWidth: 1.5)
-            }
+            .background(
+                isSelected ? AnyShapeStyle(SQColor.accentSoft) : AnyShapeStyle(SQColor.surface),
+                in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+            )
+            .sqShadowSoft()
         }
         .buttonStyle(SQPressButtonStyle())
     }

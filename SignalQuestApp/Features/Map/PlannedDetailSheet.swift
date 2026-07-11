@@ -22,25 +22,25 @@ struct PlannedDetailSheet: View {
             .padding()
         }
         .presentationDetents([.height(460), .medium, .large])
-        .presentationBackgroundCompat(.ultraThinMaterial)
+        .presentationBackgroundCompat(SQColor.bg)
     }
 
     private var header: some View {
         HStack(alignment: .top, spacing: SQSpace.md) {
             Image(systemName: "calendar.badge.clock")
-                .font(.title2.weight(.bold))
-                .foregroundStyle(.white)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(SQColor.onAccent)
                 .frame(width: 46, height: 46)
-                .background(operatorAccent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(operatorAccent, in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(site.codeSite ?? site.idStation ?? "Site prévisionnel")
-                    .font(.title3.weight(.bold))
+                    .font(SQFont.display(20, .bold))
                     .foregroundStyle(SQColor.label)
                 Text(statusLabel)
-                    .font(.callout.weight(.semibold))
+                    .font(SQFont.body(14.5, .semibold))
                     .foregroundStyle(statusColor)
                 Text(operatorLabel)
-                    .font(.caption.weight(.medium))
+                    .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
             }
             Spacer()
@@ -50,43 +50,41 @@ struct PlannedDetailSheet: View {
     private var statusBanner: some View {
         HStack(spacing: SQSpace.sm) {
             Image(systemName: statusGlyph)
-                .font(.subheadline.weight(.bold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(statusColor)
             Text(statusDescription)
-                .font(.subheadline)
+                .font(SQType.subhead)
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(statusColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(statusColor.opacity(0.12), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
     private var technologiesSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text("Technologies prévues")
-                .font(SQFont.archivo(12, .semibold))
-                .tracking(0.4)
-                .textCase(.uppercase)
-                .foregroundStyle(SQColor.labelSecondary)
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 8)], alignment: .leading, spacing: 8) {
                 ForEach(plannedTechs, id: \.self) { tech in
                     Text(tech)
-                        .font(.caption.weight(.semibold))
+                        .font(SQFont.body(12, .semibold))
                         .foregroundStyle(techColor(tech))
                         .lineLimit(1)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
-                        .background(techColor(tech).opacity(0.14), in: Capsule())
+                        .background(techColor(tech).opacity(0.14), in: Capsule(style: .continuous))
                 }
             }
             HStack(spacing: SQSpace.md) {
-                legendDot(Color(hex: 0x16A34A), "En service")
-                legendDot(Color(hex: 0xF59E0B), "En attente")
+                legendDot(SQColor.success, "En service")
+                legendDot(SQColor.warning, "En attente")
                 legendDot(SQColor.labelSecondary, "Prévue")
             }
-            .font(.caption2)
+            .font(SQType.micro)
             .foregroundStyle(SQColor.labelSecondary)
         }
     }
@@ -110,7 +108,8 @@ struct PlannedDetailSheet: View {
             infoRow("Mise en service", formattedDate(site.activation?.lastInServiceDate))
         }
         .padding(.vertical, SQSpace.xs)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
     @ViewBuilder
@@ -118,17 +117,17 @@ struct PlannedDetailSheet: View {
         if let value, !value.isEmpty {
             HStack(alignment: .top) {
                 Text(label)
-                    .font(.subheadline)
+                    .font(SQType.subhead)
                     .foregroundStyle(SQColor.labelSecondary)
                 Spacer()
                 Text(value)
-                    .font(.subheadline.weight(.semibold))
+                    .font(SQFont.body(14, .semibold))
                     .foregroundStyle(SQColor.label)
                     .multilineTextAlignment(.trailing)
             }
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.sm + 1)
-            Divider().padding(.leading, SQSpace.md)
+            Divider().overlay(SQColor.separator).padding(.leading, SQSpace.md)
         }
     }
 
@@ -143,8 +142,8 @@ struct PlannedDetailSheet: View {
         let active = site.activation?.activeTechnologies ?? []
         let confirmed = site.activation?.confirmedTechnologies ?? []
         let pending = site.activation?.pendingTechnologies ?? []
-        if active.contains(tech) || confirmed.contains(tech) { return Color(hex: 0x16A34A) }
-        if pending.contains(tech) { return Color(hex: 0xF59E0B) }
+        if active.contains(tech) || confirmed.contains(tech) { return SQColor.success }
+        if pending.contains(tech) { return SQColor.warning }
         return SQColor.labelSecondary
     }
 

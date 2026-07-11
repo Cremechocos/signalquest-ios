@@ -74,11 +74,7 @@ struct SignupView: View {
                     .opacity(canSubmit ? 1 : 0.5)
                 }
                 .padding(SQSpace.xl)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                        .stroke(SQColor.label, lineWidth: 2)
-                }
+                .sqSoftCard()
                 .sqAuthAppear(appeared, delay: 0.08)
 
                 HStack(spacing: SQSpace.md) {
@@ -94,8 +90,8 @@ struct SignupView: View {
                     handleAppleSignIn(result)
                 }
                 .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                .frame(height: 50)
-                .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                .frame(height: 56)
+                .clipShape(Capsule(style: .continuous))
                 .accessibilityLabel("S’inscrire avec Apple")
                 .sqAuthAppear(appeared, delay: 0.12)
 
@@ -108,7 +104,6 @@ struct SignupView: View {
             }
             .padding(SQSpace.xl)
         }
-        .background { SQAuthHalo() }
         .signalQuestHeroBackground()
         .onAppear { appeared = true }
         .navigationBarTitleDisplayMode(.inline)
@@ -166,17 +161,14 @@ struct SignupView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             Image(systemName: "person.badge.plus")
-                .font(.title2.weight(.bold))
-                .foregroundStyle(.white)
-                .frame(width: 56, height: 56)
-                .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 46, height: 46)
+                .background(SQColor.accentSoft, in: Circle())
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text("Bienvenue").sqKicker()
-                Text("Rejoins SignalQuest")
-                    .font(SQType.display)
-                    .foregroundStyle(SQColor.label)
-            }
+            Text("Rejoins SignalQuest")
+                .font(SQType.display)
+                .foregroundStyle(SQColor.label)
             Text("Cartographie la 4G/5G en France avec une communauté de passionnés.")
                 .font(SQType.body)
                 .foregroundStyle(SQColor.labelSecondary)

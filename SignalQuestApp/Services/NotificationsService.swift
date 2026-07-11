@@ -11,6 +11,52 @@ struct AppNotification: Codable, Identifiable, Equatable {
     let read: Bool?
     let link: String?
     let metadata: [String: JSONValue]?
+
+    init(
+        id: String,
+        type: String?,
+        title: String?,
+        message: String?,
+        createdAt: Date?,
+        read: Bool?,
+        link: String?,
+        metadata: [String: JSONValue]?
+    ) {
+        self.id = id
+        self.type = type
+        self.title = title
+        self.message = message
+        self.createdAt = createdAt
+        self.read = read
+        self.link = link
+        self.metadata = metadata
+    }
+
+    // NOTIF-DECODE-01 : le backend sérialise `metadata` tantôt en OBJET JSON,
+    // tantôt en CHAÎNE contenant du JSON (`"{\"bugId\":…}"`, colonnes texte).
+    // Un décodage strict en objet faisait échouer TOUTE la liste (« Réponse
+    // inattendue du serveur ») dès qu'une notification portait la variante
+    // chaîne. On accepte les deux, et on ignore un JSON de chaîne invalide
+    // plutôt que de casser la liste.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        type = try c.decodeIfPresent(String.self, forKey: .type)
+        title = try c.decodeIfPresent(String.self, forKey: .title)
+        message = try c.decodeIfPresent(String.self, forKey: .message)
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
+        read = try c.decodeIfPresent(Bool.self, forKey: .read)
+        link = try c.decodeIfPresent(String.self, forKey: .link)
+        if let object = try? c.decodeIfPresent([String: JSONValue].self, forKey: .metadata) {
+            metadata = object
+        } else if let raw = try? c.decodeIfPresent(String.self, forKey: .metadata),
+                  let data = raw.data(using: .utf8),
+                  let parsed = try? JSONDecoder().decode([String: JSONValue].self, from: data) {
+            metadata = parsed
+        } else {
+            metadata = nil
+        }
+    }
 }
 
 protocol NotificationsServicing: Sendable {

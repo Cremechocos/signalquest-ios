@@ -15,7 +15,6 @@ struct SpeedtestCardView: View {
     var onReact: ((String) -> Void)? = nil
 
     private var signal: SocialSignalSummary? { item.signal }
-    private var accent: Color { TechAccent.color(for: signal?.technology) }
 
     var body: some View {
         Button(action: onTap) {
@@ -36,11 +35,13 @@ struct SpeedtestCardView: View {
                         .lineLimit(1)
                 }
 
+                // 4 tuiles Down / Up / Ping / Tech — valeurs nues (l'unité est
+                // dans le libellé implicite, cf. proto), Down en accent brique.
                 LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
-                    CardMetricTile(label: "Down", value: SignalFormatters.speed(signal?.downloadMbps), highlight: true, accent: accent)
-                    CardMetricTile(label: "Up", value: SignalFormatters.speed(signal?.uploadMbps))
-                    CardMetricTile(label: "Ping", value: SignalFormatters.ms(signal?.pingMs))
-                    CardMetricTile(label: signal?.rsrp == nil ? "Tech" : "RSRP", value: signal?.rsrp == nil ? (signal?.technology ?? "—") : SignalFormatters.dbm(signal?.rsrp))
+                    CardMetricTile(label: "Down", value: bareSpeed(signal?.downloadMbps), highlight: true)
+                    CardMetricTile(label: "Up", value: bareSpeed(signal?.uploadMbps))
+                    CardMetricTile(label: "Ping", value: bareInt(signal?.pingMs))
+                    CardMetricTile(label: signal?.rsrp == nil ? "Tech" : "RSRP", value: signal?.rsrp == nil ? (signal?.technology ?? "—") : bareInt(signal?.rsrp))
                 }
 
                 if let footer = footer {
@@ -52,6 +53,7 @@ struct SpeedtestCardView: View {
                 if !item.text.isEmpty {
                     Text(item.text)
                         .font(SQType.body)
+                        .lineSpacing(3)
                         .foregroundStyle(SQColor.label)
                 }
 
@@ -73,6 +75,19 @@ struct SpeedtestCardView: View {
 
     private var gridColumns: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: 4)
+    }
+
+    /// Débit sans unité (« 412 », « 64,3 ») — le rendu cible affiche les
+    /// valeurs nues dans les tuiles.
+    private func bareSpeed(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        if value >= 100 { return "\(Int(value.rounded()))" }
+        return String(format: "%.1f", value)
+    }
+
+    private func bareInt(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        return "\(Int(value.rounded()))"
     }
 
     private var subtitle: String {

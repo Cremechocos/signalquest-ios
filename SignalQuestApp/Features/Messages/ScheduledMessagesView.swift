@@ -50,25 +50,37 @@ struct ScheduledMessagesView: View {
     }
 
     private func row(_ item: ScheduledMessage) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
-            if let date = item.sendAt {
-                Label(date.formatted(date: .abbreviated, time: .shortened), systemImage: "clock")
-                    .font(SQType.caption.weight(.semibold))
-                    .foregroundStyle(SQColor.brandRed)
-            }
-            Text(content(for: item))
-                .font(SQType.body)
-                .foregroundStyle(SQColor.label)
-                .lineLimit(4)
-            if let status = item.status, status != "scheduled" {
-                Text(statusLabel(status))
-                    .font(SQType.micro)
-                    .foregroundStyle(SQColor.warning)
+        HStack(alignment: .top, spacing: SQSpace.sm + 2) {
+            Image(systemName: "clock.fill")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 36, height: 36)
+                .background(SQColor.accentSoft, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+                if let date = item.sendAt {
+                    Text(date.formatted(date: .abbreviated, time: .shortened))
+                        .font(SQType.caption.weight(.semibold))
+                        .foregroundStyle(SQColor.brandRed)
+                }
+                Text(content(for: item))
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(4)
+                if let status = item.status, status != "scheduled" {
+                    Text(statusLabel(status))
+                        .font(SQType.micro)
+                        .foregroundStyle(SQColor.warning)
+                }
             }
         }
-        .padding(.vertical, SQSpace.xs)
+        .padding(SQSpace.md + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowSoft()
         .listRowBackground(Color.clear)
-        .listRowSeparatorTint(SQColor.separator)
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: SQSpace.xs + 2, leading: SQSpace.lg, bottom: SQSpace.xs + 2, trailing: SQSpace.lg))
     }
 
     private func content(for item: ScheduledMessage) -> String {

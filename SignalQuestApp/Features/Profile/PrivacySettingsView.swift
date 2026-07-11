@@ -87,12 +87,7 @@ struct PrivacySettingsView: View {
                 Toggle("Partager mes sessions", isOn: $model.shareSessionsWithFriends)
                 Toggle("Afficher mes photos sur la carte Amis", isOn: $model.sharePhotosOnFriendMap)
             } header: {
-                VStack(alignment: .leading, spacing: SQSpace.xs) {
-                    Text("Confidentialité").sqKicker()
-                    Text("Carte des amis")
-                        .font(SQType.subhead)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
+                Text("Carte des amis")
             } footer: {
                 Text("Ces partages sont désactivés par défaut. Les désactiver retire aussi les données temps réel déjà publiées.")
             }
@@ -137,14 +132,14 @@ struct PrivacySettingsView: View {
 
             if let error = model.errorMessage {
                 Section { Text(error).foregroundStyle(SQColor.danger) }
-                    .listRowBackground(SQColor.danger.opacity(0.10))
+                    .listRowBackground(SQColor.dangerSoft)
             }
             if model.savedConfirmation {
                 Section {
                     Label("Préférences enregistrées", systemImage: "checkmark.circle")
                         .foregroundStyle(SQColor.success)
                 }
-                .listRowBackground(SQColor.success.opacity(0.10))
+                .listRowBackground(SQColor.successSoft)
             }
 
             Section {

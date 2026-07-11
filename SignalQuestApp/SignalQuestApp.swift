@@ -19,12 +19,12 @@ struct SignalQuestApp: App {
         Self.configureNavigationTypography()
     }
 
-    /// DM Sans pour les titres de navigation (la DA signalquest.fr) — les
+    /// Bricolage Grotesque pour les titres de navigation (DA Crème) — les
     /// `navigationTitle` SwiftUI passent par UINavigationBar, qu'on ne peut
     /// styler que via l'appearance UIKit. Retombe sur SF si la police manque.
     private static func configureNavigationTypography() {
-        guard let large = UIFont(name: "ArchivoExpanded-Black", size: 30),
-              let inline = UIFont(name: "Archivo-Bold", size: 17) else { return }
+        guard let large = UIFont(name: "BricolageGrotesque-Bold", size: 26),
+              let inline = UIFont(name: "BricolageGrotesque-SemiBold", size: 17) else { return }
         let appearance = UINavigationBarAppearance()
         appearance.configureWithDefaultBackground()
         appearance.largeTitleTextAttributes[.font] = UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: large)
@@ -279,26 +279,27 @@ struct MainTabView: View {
     }
 
     var body: some View {
+        // Dock flottant custom (DA Crème) : la tab bar système est masquée sur
+        // chaque onglet, le dock est posé en overlay 14 pt au-dessus du bas.
         TabView(selection: $router.selectedTab) {
-            NavigationStack { SignalQuestHomeView(user: user) }
-                .tabItem { Label("Accueil", systemImage: "house") }
+            NavigationStack { SignalQuestHomeView(user: user).toolbar(.hidden, for: .tabBar) }
+                .sqDockSafeArea()
                 .tag(AppRouter.AppTab.home)
 
-            NavigationStack { MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets) }
-                .tabItem { Label("Carte", systemImage: "map") }
+            NavigationStack { MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets).toolbar(.hidden, for: .tabBar) }
                 .tag(AppRouter.AppTab.map)
 
-            NavigationStack { SpeedtestView() }
-                .tabItem { Label("Tester", systemImage: "speedometer") }
+            NavigationStack { SpeedtestView().toolbar(.hidden, for: .tabBar) }
+                .sqDockSafeArea()
                 .tag(AppRouter.AppTab.speed)
 
-            NavigationStack { FeedView(service: services.feed, location: services.location) }
-                .tabItem { Label("Communauté", systemImage: "person.2") }
+            NavigationStack { FeedView(service: services.feed, location: services.location).toolbar(.hidden, for: .tabBar) }
+                .sqDockSafeArea(!router.isDockHidden)
                 .tag(AppRouter.AppTab.community)
-                .badge(services.unreadConversations)
 
             NavigationStack {
                 ProfileView(user: user)
+                    .toolbar(.hidden, for: .tabBar)
 #if DEBUG
                     .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-map"))) {
                         ANFRMapView(service: services.anfr)
@@ -308,13 +309,25 @@ struct MainTabView: View {
                     }
 #endif
             }
-            .tabItem { Label("Profil", systemImage: "person.crop.circle") }
+            .sqDockSafeArea()
             .tag(AppRouter.AppTab.profile)
         }
-        // Style « sidebar adaptable » (iPad/large) seulement iOS 18+, sinon onglets standard.
-        .sqSidebarAdaptableTabStyle()
         .tint(SQColor.brandRed)
-        .toolbarBackground(.automatic, for: .tabBar)
+        .overlay {
+            // Posé à 14 pt du bord PHYSIQUE (comme le prototype), au-dessus de
+            // l'indicateur home — d'où le VStack plein écran qui ignore le safe area.
+            VStack {
+                Spacer()
+                if !router.isDockHidden {
+                    SQDock(selection: $router.selectedTab)
+                        .padding(.bottom, 14)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .ignoresSafeArea(edges: .bottom)
+        }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .animation(SQMotion.standard, value: router.isDockHidden)
         .task {
             await services.refreshInboxBadge()
             consumeIntentRoutes()
@@ -359,185 +372,5 @@ struct MainTabView: View {
         case "messages", "community", "communaute": router.route(toConversation: nil)
         default: break
         }
-    }
-}
-
-/// Accueil réseau : un résumé lisible avant les détails experts, avec accès
-/// direct aux trois tâches principales. Le feed social reste dans Communauté.
-private struct SignalQuestHomeView: View {
-    @EnvironmentObject private var services: AppServices
-    @EnvironmentObject private var router: AppRouter
-    @Environment(\.scenePhase) private var scenePhase
-    let user: AuthUser
-
-    @State private var latestMeasurement: SpeedtestRunResult?
-    @State private var networkStatus: NetworkPathStatus = .unknown
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.xl) {
-                VStack(alignment: .leading, spacing: SQSpace.xs) {
-                    Text("Carnet de terrain").sqKicker()
-                    Text("Bonjour \(firstName)")
-                        .font(SQType.display)
-                        .foregroundStyle(SQColor.label)
-                    Text("Mesure ton réseau, comprends le signal, puis partage ce qui compte.")
-                        .font(SQType.body)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
-
-                networkSummary
-                primaryActions
-                latestMeasurementSection
-            }
-            .padding(.horizontal, SQSpace.lg)
-            .padding(.top, SQSpace.md)
-            .padding(.bottom, SQSpace.xxl)
-        }
-        .navigationTitle("Accueil")
-        .toolbarTitleLargeCompat()
-        .signalQuestBackground()
-        .task { await refresh() }
-        .refreshable { await refresh() }
-        .onChangeCompat(of: scenePhase) { _, phase in
-            if phase == .active { Task { await refresh() } }
-        }
-    }
-
-    private var firstName: String {
-        user.name?.split(separator: " ").first.map(String.init) ?? "à toi"
-    }
-
-    private var networkSummary: some View {
-        HStack(spacing: SQSpace.md) {
-            Image(systemName: networkStatus.connection == .cellular
-                  ? "antenna.radiowaves.left.and.right"
-                  : "wifi")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 44, height: 44)
-                .background(SQColor.brandRed.opacity(0.10), in: Circle())
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Réseau actuel")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                Text(networkStatus.displayName)
-                    .font(SQType.heading)
-                    .foregroundStyle(SQColor.label)
-            }
-            Spacer()
-        }
-        .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1)
-        }
-    }
-
-    private var primaryActions: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            Text("Que veux-tu faire ?")
-                .font(SQType.title)
-                .foregroundStyle(SQColor.label)
-            homeAction(
-                title: "Tester maintenant",
-                detail: "Débit, latence et qualité radio",
-                systemImage: "speedometer",
-                tab: .speed
-            )
-            homeAction(
-                title: "Explorer la carte",
-                detail: "Antennes, couverture et mesures",
-                systemImage: "map",
-                tab: .map
-            )
-            homeAction(
-                title: "Voir la communauté",
-                detail: "Publications, stories et messages",
-                systemImage: "person.2",
-                tab: .community
-            )
-        }
-    }
-
-    private func homeAction(
-        title: String,
-        detail: String,
-        systemImage: String,
-        tab: AppRouter.AppTab
-    ) -> some View {
-        Button {
-            Haptics.selection()
-            router.selectedTab = tab
-        } label: {
-            HStack(spacing: SQSpace.md) {
-                Image(systemName: systemImage)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 32)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(SQType.heading)
-                        .foregroundStyle(SQColor.label)
-                    Text(detail)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(SQColor.labelTertiary)
-            }
-            .padding(.vertical, SQSpace.md)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .overlay(alignment: .bottom) { Divider().overlay(SQColor.separator) }
-        .accessibilityHint("Ouvre l’onglet \(title)")
-    }
-
-    @ViewBuilder
-    private var latestMeasurementSection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            Text("Dernière mesure")
-                .font(SQType.title)
-                .foregroundStyle(SQColor.label)
-            if let measurement = latestMeasurement {
-                HStack(alignment: .firstTextBaseline, spacing: SQSpace.md) {
-                    VStack(alignment: .leading, spacing: SQSpace.xs) {
-                        Text(measurement.downloadAverageMbps.formatted(.number.precision(.fractionLength(0))))
-                            .font(SQType.display)
-                            .foregroundStyle(SQColor.label)
-                        Text("Mbps en téléchargement")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: SQSpace.xs) {
-                        Text("\((measurement.pingMinMs ?? measurement.pingMs ?? 0).formatted(.number.precision(.fractionLength(0)))) ms")
-                            .font(SQType.heading)
-                            .foregroundStyle(SQColor.label)
-                        Text(measurement.createdAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                }
-                .padding(SQSpace.lg)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-            } else {
-                EmptyStateView(
-                    title: "Aucune mesure locale",
-                    message: "Lance un premier test pour créer ton repère.",
-                    systemImage: "waveform.path.ecg"
-                )
-            }
-        }
-    }
-
-    private func refresh() async {
-        services.networkPath.refreshNow()
-        networkStatus = services.networkPath.status
-        latestMeasurement = await services.speedtest.history().first
     }
 }

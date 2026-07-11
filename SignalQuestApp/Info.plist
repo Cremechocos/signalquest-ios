@@ -79,16 +79,12 @@
 	<string>$(SQ_URL_SCHEME)</string>
 	<key>UIAppFonts</key>
 	<array>
-		<string>PublicSans-Regular.ttf</string>
-		<string>PublicSans-Medium.ttf</string>
-		<string>PublicSans-SemiBold.ttf</string>
-		<string>PublicSans-Bold.ttf</string>
-		<string>Archivo-Medium.ttf</string>
-		<string>Archivo-SemiBold.ttf</string>
-		<string>Archivo-Bold.ttf</string>
-		<string>ArchivoExpanded-Bold.ttf</string>
-		<string>ArchivoExpanded-ExtraBold.ttf</string>
-		<string>ArchivoExpanded-Black.ttf</string>
+		<string>Figtree-Regular.ttf</string>
+		<string>Figtree-Medium.ttf</string>
+		<string>Figtree-SemiBold.ttf</string>
+		<string>Figtree-Bold.ttf</string>
+		<string>BricolageGrotesque-SemiBold.ttf</string>
+		<string>BricolageGrotesque-Bold.ttf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

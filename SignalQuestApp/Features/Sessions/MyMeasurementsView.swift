@@ -81,30 +81,54 @@ struct MyMeasurementsView: View {
     }
 
     /// Bascule de coloration de la carte : Signal (RSRP) ↔ Génération.
+    /// Chips capsules de la DA (actif brique / inactif surface + ombre repos).
     private var coloringPicker: some View {
-        Picker("Coloration", selection: $coloring) {
-            Text("Signal").tag(SessionPointColoring.rsrp)
-            Text("Génération").tag(SessionPointColoring.generation)
+        HStack(spacing: SQSpace.sm) {
+            coloringChip("Signal", value: .rsrp)
+            coloringChip("Génération", value: .generation)
         }
-        .pickerStyle(.segmented)
-        .frame(maxWidth: 260)
         .padding(.horizontal, SQSpace.md)
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("Coloration de la carte : signal ou génération")
     }
 
-    /// Légende de la carte de couverture GÉNÉRATION (couleurs = `SessionGenerationColor`).
+    private func coloringChip(_ label: String, value: SessionPointColoring) -> some View {
+        let isSelected = coloring == value
+        return Button {
+            Haptics.selection()
+            coloring = value
+        } label: {
+            Text(label)
+                .font(SQFont.body(13, .semibold))
+                .padding(.horizontal, SQSpace.lg - 2)
+                .padding(.vertical, SQSpace.sm)
+                .frame(minHeight: 34)
+                .background(isSelected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface), in: Capsule(style: .continuous))
+                .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
+                .sqShadowSoft()
+                .padding(.vertical, 5)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    /// Légende de la carte de couverture GÉNÉRATION — couleurs dérivées de
+    /// `SessionGenerationColor` (celles des points) pour rester synchrones.
     private var generationLegend: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("Génération").font(.caption2.weight(.bold)).foregroundStyle(SQColor.labelSecondary)
-            legendRow(Color(red: 0.545, green: 0.361, blue: 0.965), "5G")
-            legendRow(Color(red: 0.231, green: 0.510, blue: 0.965), "4G")
-            legendRow(Color(red: 0.078, green: 0.722, blue: 0.651), "3G")
-            legendRow(Color(red: 0.961, green: 0.620, blue: 0.043), "2G")
-            legendRow(Color(red: 0.580, green: 0.639, blue: 0.722), "Aucun")
+            Text("Génération")
+                .font(SQFont.body(12, .semibold, relativeTo: .caption2))
+                .foregroundStyle(SQColor.labelSecondary)
+            legendRow(Color(uiColor: SessionGenerationColor.ui("5G")), "5G")
+            legendRow(Color(uiColor: SessionGenerationColor.ui("4G")), "4G")
+            legendRow(Color(uiColor: SessionGenerationColor.ui("3G")), "3G")
+            legendRow(Color(uiColor: SessionGenerationColor.ui("2G")), "2G")
+            legendRow(Color(uiColor: SessionGenerationColor.ui(nil)), "Aucun")
         }
         .padding(SQSpace.sm + 2)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .overlay { RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).stroke(SQColor.separator, lineWidth: 1) }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqShadowSoft()
         .padding(SQSpace.md)
         .accessibilityHidden(true)
     }
@@ -112,7 +136,9 @@ struct MyMeasurementsView: View {
     private func legendRow(_ color: Color, _ label: String) -> some View {
         HStack(spacing: 6) {
             Circle().fill(color).frame(width: 10, height: 10)
-            Text(label).font(.caption2).foregroundStyle(SQColor.label)
+            Text(label)
+                .font(SQFont.body(11.5, relativeTo: .caption2))
+                .foregroundStyle(SQColor.label)
         }
     }
 
@@ -120,33 +146,31 @@ struct MyMeasurementsView: View {
     private var statsBar: some View {
         if !model.points.isEmpty {
             Text("\(model.points.count) points · \(model.sessionCount) session\(model.sessionCount > 1 ? "s" : "")")
-                .font(.caption.weight(.semibold))
+                .font(SQFont.body(13, .semibold, relativeTo: .caption))
                 .foregroundStyle(SQColor.label)
-                .padding(.horizontal, SQSpace.md)
+                .padding(.horizontal, SQSpace.lg - 2)
                 .padding(.vertical, SQSpace.sm)
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay { Capsule().stroke(SQColor.separator, lineWidth: 1) }
+                .background(SQColor.surface, in: Capsule(style: .continuous))
+                .sqShadowSoft()
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(model.points.count) points de mesure sur \(model.sessionCount) sessions")
         }
     }
 
     private var emptyState: some View {
-        VStack(spacing: SQSpace.md) {
-            Image(systemName: "mappin.slash")
-                .font(.largeTitle)
-                .foregroundStyle(SQColor.labelSecondary)
-            Text(model.errorMessage ?? "Aucune mesure géolocalisée pour l'instant.")
-                .font(.subheadline)
-                .foregroundStyle(SQColor.labelSecondary)
-                .multilineTextAlignment(.center)
+        VStack(spacing: SQSpace.lg) {
+            EmptyStateView(
+                title: "Aucune mesure",
+                message: model.errorMessage ?? "Aucune mesure géolocalisée pour l'instant.",
+                systemImage: "mappin.slash"
+            )
             Text("Lance un Drive Test pour enregistrer tes premières mesures.")
-                .font(.caption)
+                .font(SQType.caption)
                 .foregroundStyle(SQColor.labelTertiary)
                 .multilineTextAlignment(.center)
+                .padding(.horizontal, SQSpace.xl)
         }
-        .padding(SQSpace.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(SQColor.bg)
+        .background(SQColor.bg.ignoresSafeArea())
     }
 }

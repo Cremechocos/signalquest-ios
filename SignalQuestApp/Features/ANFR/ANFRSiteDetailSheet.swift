@@ -45,6 +45,7 @@ struct ANFRSiteDetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
+                    SQSheetHandle()
                     header
                     currentAntennasCard
                     timelineSection
@@ -75,10 +76,12 @@ struct ANFRSiteDetailSheet: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Site ANFR").sqKicker()
             Text(site.city.isEmpty ? "Support \(site.supId)" : site.city.capitalized)
                 .font(SQType.title)
                 .foregroundStyle(SQColor.label)
+            Text("Site ANFR")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
             HStack(spacing: SQSpace.xs + 2) {
                 Image(systemName: "mappin.circle.fill")
                     .font(.caption.weight(.bold))
@@ -113,7 +116,7 @@ struct ANFRSiteDetailSheet: View {
                         .frame(width: 10, height: 10)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(antenna.system.isEmpty ? (antenna.operator?.label ?? "Antenne") : antenna.system)
-                            .font(SQFont.archivo(14, .semibold))
+                            .font(SQFont.body(14, .semibold))
                             .foregroundStyle(SQColor.label)
                         Text(antenna.statut)
                             .font(SQType.micro)
@@ -136,11 +139,8 @@ struct ANFRSiteDetailSheet: View {
             }
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1.5)
-        }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
     // MARK: Timeline
@@ -186,11 +186,8 @@ struct ANFRSiteDetailSheet: View {
             }
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1.5)
-        }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
     // MARK: Helpers
@@ -198,8 +195,11 @@ struct ANFRSiteDetailSheet: View {
     private func sectionTitle(_ title: String, systemImage: String) -> some View {
         HStack(spacing: SQSpace.sm) {
             Image(systemName: systemImage)
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(SQColor.brandRed)
+                .frame(width: 32, height: 32)
+                .background(SQColor.accentSoft, in: Circle())
+                .accessibilityHidden(true)
             Text(title)
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
@@ -208,8 +208,8 @@ struct ANFRSiteDetailSheet: View {
 
     private func modTypeBadge(_ type: ANFRModType) -> some View {
         Image(systemName: type.glyph)
-            .font(.system(size: 11, weight: .black))
-            .foregroundStyle(.white)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(SQColor.onAccent)
             .frame(width: 18, height: 18)
             .background(type.color, in: Circle())
     }
@@ -248,7 +248,7 @@ private struct ANFRTimelineRow: View {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
                 HStack(spacing: SQSpace.sm) {
                     Text(prettyDate(entry.archiveDate))
-                        .font(SQFont.archivo(14, .bold))
+                        .font(SQFont.body(14, .semibold))
                         .foregroundStyle(SQColor.label)
                     if entry.isCurrentSnapshot {
                         Text("Actuel")
@@ -256,20 +256,20 @@ private struct ANFRTimelineRow: View {
                             .foregroundStyle(SQColor.brandRed)
                             .padding(.horizontal, SQSpace.sm)
                             .padding(.vertical, 2)
-                            .background(SQColor.brandRed.opacity(0.12), in: Capsule())
+                            .background(SQColor.accentSoft, in: Capsule(style: .continuous))
                     }
                     Spacer()
                 }
                 ForEach(entry.changes) { change in
                     HStack(spacing: SQSpace.sm) {
                         Image(systemName: change.modType.glyph)
-                            .font(.system(size: 11, weight: .black))
-                            .foregroundStyle(.white)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(SQColor.onAccent)
                             .frame(width: 18, height: 18)
                             .background(change.modType.color, in: Circle())
                         VStack(alignment: .leading, spacing: 1) {
                             Text(changeText(change))
-                                .font(SQFont.archivo(13, .semibold))
+                                .font(SQFont.body(13, .semibold))
                                 .foregroundStyle(SQColor.label)
                                 .lineLimit(2)
                             Text(change.modType.label)

@@ -50,7 +50,7 @@ struct NewPollView: View {
                     section(title: "Question") {
                         TextField("Pose ta question", text: $question, axis: .vertical)
                             .lineLimit(1...3)
-                            .textFieldStyle(SQTextFieldStyle())
+                            .sqCapsuleField()
                     }
 
                     section(title: "Options") {
@@ -58,7 +58,7 @@ struct NewPollView: View {
                             ForEach($options) { $option in
                                 HStack(spacing: SQSpace.sm) {
                                     TextField(optionPlaceholder(for: option), text: $option.text)
-                                        .textFieldStyle(SQTextFieldStyle())
+                                        .sqCapsuleField()
                                     if options.count > 2 {
                                         Button {
                                             options.removeAll { $0.id == option.id }
@@ -88,17 +88,22 @@ struct NewPollView: View {
                     }
 
                     section(title: "Réglages") {
-                        VStack(spacing: SQSpace.sm) {
+                        VStack(spacing: SQSpace.sm + 2) {
                             Toggle("Choix multiples", isOn: $multiSelect)
                                 .tint(SQColor.brandRed)
                             Toggle("Échéance", isOn: $hasDeadline)
                                 .tint(SQColor.brandRed)
                             if hasDeadline {
                                 DatePicker("Clôture le", selection: $deadline, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                                    .tint(SQColor.brandRed)
                                     .font(SQType.caption)
                             }
                         }
                         .font(SQType.body)
+                        .foregroundStyle(SQColor.label)
+                        .padding(SQSpace.md + 2)
+                        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                        .sqShadowCard()
                     }
 
                     if let errorMessage {
@@ -128,7 +133,9 @@ struct NewPollView: View {
 
     private func section<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text(title).sqKicker()
+            Text(title)
+                .font(SQType.subhead)
+                .foregroundStyle(SQColor.labelSecondary)
             content()
         }
     }
@@ -156,5 +163,18 @@ struct NewPollView: View {
             errorMessage = error.localizedDescription
             Haptics.error()
         }
+    }
+}
+
+/// Champ « Crème & Terre cuite » : capsule 44 SurfaceMuted, sans bordure.
+private extension View {
+    func sqCapsuleField() -> some View {
+        self
+            .font(SQType.body)
+            .foregroundStyle(SQColor.label)
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.vertical, SQSpace.sm + 2)
+            .frame(minHeight: 44)
+            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
     }
 }

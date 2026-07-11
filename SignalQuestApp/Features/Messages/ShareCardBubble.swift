@@ -6,7 +6,8 @@ import SwiftUI
 //  - partage générique (speedtest / session / post social) → ShareCardBubble
 //  - mesure de signal enrichie (RSRP/score/bande/site)      → SignalCardBubble
 //  - localisation                                            → LocationBubble
-// Toutes adaptent leurs couleurs selon `mine` (bulle envoyée = fond dégradé).
+// Toutes adaptent leurs couleurs selon `mine` (bulle envoyée = fond brique,
+// textes en crème `onAccent`).
 
 // MARK: Carte de partage générique
 
@@ -17,11 +18,11 @@ struct ShareCardBubble: View {
 
     private var badge: String {
         switch card.kind.lowercased() {
-        case "speedtest": return "SPEEDTEST"
-        case "session": return "SESSION"
-        case "signal_rating", "signal": return "SIGNAL"
-        case "social_post": return "PUBLICATION"
-        default: return "PARTAGE"
+        case "speedtest": return "Speedtest"
+        case "session": return "Session"
+        case "signal_rating", "signal": return "Signal"
+        case "social_post": return "Publication"
+        default: return "Partage"
         }
     }
 
@@ -40,16 +41,16 @@ struct ShareCardBubble: View {
             HStack(spacing: SQSpace.sm) {
                 Image(systemName: icon)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(mine ? .white : SQColor.brandRed)
+                    .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
                     .frame(width: 32, height: 32)
-                    .background(mine ? Color.white.opacity(0.16) : SQColor.brandRed.opacity(0.12), in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                    .background(mine ? SQColor.onAccent.opacity(0.16) : SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(badge)
                         .font(SQType.micro)
-                        .foregroundStyle(mine ? .white.opacity(0.75) : SQColor.labelTertiary)
+                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.75) : SQColor.labelTertiary)
                     Text(card.title)
                         .font(SQType.caption.weight(.semibold))
-                        .foregroundStyle(mine ? .white : SQColor.label)
+                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                         .lineLimit(2)
                 }
                 Spacer(minLength: 0)
@@ -57,7 +58,7 @@ struct ShareCardBubble: View {
             if let subtitle = card.subtitle, !subtitle.isEmpty {
                 Text(subtitle)
                     .font(SQType.micro)
-                    .foregroundStyle(mine ? .white.opacity(0.7) : SQColor.labelSecondary)
+                    .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
                     .lineLimit(2)
             }
             if !card.rows.isEmpty {
@@ -66,11 +67,11 @@ struct ShareCardBubble: View {
                         HStack {
                             Text(row.label)
                                 .font(SQType.micro)
-                                .foregroundStyle(mine ? .white.opacity(0.7) : SQColor.labelSecondary)
+                                .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
                             Spacer(minLength: SQSpace.sm)
                             Text(row.value)
                                 .font(SQType.caption.weight(.medium))
-                                .foregroundStyle(mine ? .white : SQColor.label)
+                                .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                                 .multilineTextAlignment(.trailing)
                         }
                     }
@@ -107,18 +108,18 @@ struct SignalCardBubble: View {
             HStack(spacing: SQSpace.sm) {
                 Image(systemName: "antenna.radiowaves.left.and.right")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(mine ? .white : SQColor.brandRed)
+                    .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
                     .frame(width: 34, height: 34)
-                    .background(mine ? Color.white.opacity(0.16) : SQColor.brandRed.opacity(0.12), in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                    .background(mine ? SQColor.onAccent.opacity(0.16) : SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(card.title)
                         .font(SQType.caption.weight(.semibold))
-                        .foregroundStyle(mine ? .white : SQColor.label)
+                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                         .lineLimit(1)
                     if let sub = signal.subtitleLine ?? card.subtitle {
                         Text(sub)
                             .font(SQType.micro)
-                            .foregroundStyle(mine ? .white.opacity(0.7) : SQColor.labelSecondary)
+                            .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
                             .lineLimit(1)
                     }
                 }
@@ -129,15 +130,15 @@ struct SignalCardBubble: View {
             HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
                 if let rsrp = signal.rsrp {
                     Text("\(rsrp)")
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundStyle(mine ? .white : SQColor.label)
+                        .font(SQFont.display(30, .bold))
+                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                     Text("dBm · RSRP")
                         .font(SQType.micro)
-                        .foregroundStyle(mine ? .white.opacity(0.7) : SQColor.labelSecondary)
+                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
                 } else {
                     Text("RSRP indisponible")
                         .font(SQType.caption)
-                        .foregroundStyle(mine ? .white.opacity(0.8) : SQColor.labelSecondary)
+                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.8) : SQColor.labelSecondary)
                 }
                 Spacer(minLength: 0)
                 if let score = signal.resolvedScore {
@@ -145,8 +146,8 @@ struct SignalCardBubble: View {
                         .font(SQType.caption.weight(.bold))
                         .padding(.horizontal, SQSpace.sm)
                         .padding(.vertical, 3)
-                        .background(mine ? Color.white.opacity(0.22) : scoreColor.opacity(0.16), in: Capsule())
-                        .foregroundStyle(mine ? .white : scoreColor)
+                        .background(mine ? SQColor.onAccent.opacity(0.22) : scoreColor.opacity(0.16), in: Capsule())
+                        .foregroundStyle(mine ? SQColor.onAccent : scoreColor)
                 }
             }
 
@@ -162,8 +163,8 @@ struct SignalCardBubble: View {
                             .font(SQType.micro)
                             .padding(.horizontal, SQSpace.sm)
                             .padding(.vertical, 3)
-                            .background(mine ? Color.white.opacity(0.14) : SQColor.surfaceMuted, in: Capsule())
-                            .foregroundStyle(mine ? .white : SQColor.labelSecondary)
+                            .background(mine ? SQColor.onAccent.opacity(0.14) : SQColor.surfaceMuted, in: Capsule())
+                            .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                     }
                 }
             }
@@ -191,13 +192,13 @@ struct SharedPostCardBubble: View {
             if let text = card.text, !text.isEmpty {
                 Text(text)
                     .font(SQType.caption)
-                    .foregroundStyle(mine ? .white.opacity(0.92) : SQColor.labelSecondary)
+                    .foregroundStyle(mine ? SQColor.onAccent.opacity(0.92) : SQColor.labelSecondary)
                     .lineLimit(4)
             }
             media
             if let url = card.openURL {
                 Rectangle()
-                    .fill(mine ? Color.white.opacity(0.22) : SQColor.separator)
+                    .fill(mine ? SQColor.onAccent.opacity(0.22) : SQColor.separator)
                     .frame(height: 0.5)
                 Button {
                     Haptics.selection()
@@ -210,7 +211,7 @@ struct SharedPostCardBubble: View {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .semibold))
                     }
-                    .foregroundStyle(mine ? .white : SQColor.brandRed)
+                    .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -225,11 +226,11 @@ struct SharedPostCardBubble: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(card.author?.displayName ?? card.title)
                     .font(SQType.caption.weight(.semibold))
-                    .foregroundStyle(mine ? .white : SQColor.label)
+                    .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                     .lineLimit(1)
                 Text(sourceLine)
                     .font(SQType.micro)
-                    .foregroundStyle(mine ? .white.opacity(0.7) : SQColor.labelTertiary)
+                    .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
@@ -247,7 +248,7 @@ struct SharedPostCardBubble: View {
     private var media: some View {
         if let image = card.imageUrl {
             RemoteImage(url: image, maxDimension: 600, contentMode: .fill) {
-                Rectangle().fill(mine ? Color.white.opacity(0.12) : SQColor.surfaceMuted)
+                Rectangle().fill(mine ? SQColor.onAccent.opacity(0.12) : SQColor.surfaceMuted)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 130)
@@ -264,7 +265,7 @@ struct SharedPostCardBubble: View {
             measurementBanner(
                 primary: formatMbps(speedtest.downloadMbps),
                 unit: "Mb/s",
-                tint: mine ? .white : SQColor.brandRed,
+                tint: mine ? SQColor.onAccent : SQColor.brandRed,
                 chips: [speedtest.uploadMbps.map { "↑ \(formatMbps($0)) Mb/s" },
                         speedtest.pingMs.map { "\(Int($0.rounded())) ms" },
                         speedtest.operatorName, speedtest.technology]
@@ -273,7 +274,7 @@ struct SharedPostCardBubble: View {
             measurementBanner(
                 primary: session.points.map { "\($0)" } ?? "—",
                 unit: "points",
-                tint: mine ? .white : SQColor.brandRed,
+                tint: mine ? SQColor.onAccent : SQColor.brandRed,
                 chips: [session.distanceKm.map { String(format: "%.1f km", $0) },
                         session.durationSeconds.map { formatDuration($0) }, session.technologies]
             )
@@ -288,23 +289,23 @@ struct SharedPostCardBubble: View {
         return VStack(alignment: .leading, spacing: SQSpace.xs) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(primary)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(mine ? .white : tint)
+                    .font(SQFont.display(20, .bold))
+                    .foregroundStyle(mine ? SQColor.onAccent : tint)
                 Text(unit)
                     .font(SQType.micro)
-                    .foregroundStyle(mine ? .white.opacity(0.7) : SQColor.labelTertiary)
+                    .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary)
             }
             if !visibleChips.isEmpty {
                 Text(visibleChips.joined(separator: " · "))
                     .font(SQType.micro)
-                    .foregroundStyle(mine ? .white.opacity(0.75) : SQColor.labelSecondary)
+                    .foregroundStyle(mine ? SQColor.onAccent.opacity(0.75) : SQColor.labelSecondary)
                     .lineLimit(1)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, SQSpace.sm + 2)
         .padding(.vertical, SQSpace.sm)
-        .background(mine ? Color.white.opacity(0.12) : SQColor.surfaceMuted,
+        .background(mine ? SQColor.onAccent.opacity(0.12) : SQColor.surfaceMuted,
                     in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
@@ -348,14 +349,10 @@ struct LocationBubble: View {
             }
         } label: {
             VStack(alignment: .leading, spacing: 0) {
-                // Vignette « carte » stylisée + épingle
+                // Vignette « carte » stylisée + épingle (aplat SurfaceMuted, sans dégradé)
                 ZStack {
-                    LinearGradient(
-                        colors: mine
-                            ? [Color.white.opacity(0.22), Color.white.opacity(0.08)]
-                            : [SQColor.brandRed.opacity(0.16), SQColor.brandOrange.opacity(0.10)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    )
+                    Rectangle()
+                        .fill(mine ? SQColor.onAccent.opacity(0.14) : SQColor.surfaceMuted)
                     // Lignes discrètes évoquant une carte
                     GeometryReader { geo in
                         Path { path in
@@ -365,12 +362,11 @@ struct LocationBubble: View {
                             var y: CGFloat = 0
                             while y < geo.size.height { path.move(to: CGPoint(x: 0, y: y)); path.addLine(to: CGPoint(x: geo.size.width, y: y)); y += step }
                         }
-                        .stroke(mine ? Color.white.opacity(0.10) : SQColor.separator.opacity(0.5), lineWidth: 0.5)
+                        .stroke(mine ? SQColor.onAccent.opacity(0.10) : SQColor.separator.opacity(0.5), lineWidth: 0.5)
                     }
                     Image(systemName: "mappin.circle.fill")
                         .font(.system(size: 30))
-                        .foregroundStyle(mine ? .white : SQColor.brandRed)
-                        .shadow(radius: 2, y: 1)
+                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
                 }
                 .frame(height: 96)
                 .frame(maxWidth: .infinity)
@@ -379,22 +375,22 @@ struct LocationBubble: View {
                 HStack(spacing: SQSpace.xs + 2) {
                     Image(systemName: "location.fill")
                         .font(.system(size: 11))
-                        .foregroundStyle(mine ? .white.opacity(0.85) : SQColor.brandRed)
+                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.85) : SQColor.brandRed)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(location.place ?? "Position partagée")
                             .font(SQType.caption.weight(.semibold))
-                            .foregroundStyle(mine ? .white : SQColor.label)
+                            .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                             .lineLimit(1)
                         Text("Ouvrir dans Plans · \(coordinateText)")
                             .font(SQType.micro)
-                            .foregroundStyle(mine ? .white.opacity(0.7) : SQColor.labelTertiary)
+                            .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11))
-                        .foregroundStyle(mine ? .white.opacity(0.7) : SQColor.labelTertiary)
+                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary)
                         .accessibilityHidden(true)
                 }
                 .padding(.top, SQSpace.xs + 2)
@@ -421,7 +417,7 @@ private struct ShareCardOpenButton: View {
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 10, weight: .semibold))
             }
-            .foregroundStyle(mine ? .white : SQColor.brandRed)
+            .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
         }
         .buttonStyle(.plain)
         .padding(.top, 1)

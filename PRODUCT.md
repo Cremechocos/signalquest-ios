@@ -18,14 +18,15 @@ Le produit réussit lorsque les parcours essentiels — découvrir, mesurer, con
 
 ## Brand Personality
 
-Précise, humaine, engagée.
+Précise, humaine, chaleureuse.
 
-La voix est claire et directe, jamais technocratique. SignalQuest doit inspirer la confiance d'un outil de terrain sérieux tout en gardant la chaleur d'une communauté utile. Les données sont expliquées, les limites sont dites et les succès sont célébrés avec retenue.
+La voix est claire et directe, jamais technocratique. SignalQuest inspire la confiance d'un outil de terrain sérieux avec la chaleur d'un compagnon du quotidien : surfaces crème, formes rondes, célébrations sobres. Les données sont expliquées, les limites sont dites, les succès sont soulignés avec retenue (badge olive, jamais de confettis).
 
 ## Anti-references
 
 - Les tableaux de bord télécom saturés de métriques, de néons et de jargon dès le premier écran.
-- Le glassmorphism décoratif, les gradients omniprésents et les ombres diffuses qui brouillent la hiérarchie.
+- Les interfaces « imprimées » froides : bordures systématiques, majuscules trackées, coins durs.
+- Le glassmorphism décoratif, les gradients omniprésents et les ombres longues qui brouillent la hiérarchie.
 - Les grilles de cartes identiques et imbriquées qui transforment chaque information en conteneur.
 - Les interfaces sociales manipulatrices, les permissions surprises et les confirmations de succès avant persistance réelle.
 - Les contrôles réinventés qui ne se comportent pas comme une application Apple.
@@ -36,8 +37,8 @@ La voix est claire et directe, jamais technocratique. SignalQuest doit inspirer 
 2. **Expertise progressive.** Montrer une synthèse accessible, puis révéler les données radio avancées à la demande.
 3. **Confiance vérifiable.** Ne confirmer une action qu'après validation réelle ; expliquer permissions, confidentialité et limites techniques au bon moment.
 4. **Résilience de terrain.** Les parcours critiques survivent aux pertes réseau, suspensions et reprises sans perte silencieuse.
-5. **Natif, cohérent, distinctif.** Utiliser les conventions iOS et iPadOS, puis porter l'identité SignalQuest par la typographie, le rouge et la qualité des détails.
+5. **Natif, chaleureux, distinctif.** Utiliser les conventions iOS et iPadOS, puis porter l'identité SignalQuest par le crème, la brique, Bricolage Grotesque et la douceur des surfaces.
 
 ## Accessibility & Inclusion
 
-La cible minimale est WCAG 2.2 AA. Tous les écrans doivent prendre en charge Dynamic Type, VoiceOver, contraste suffisant, Reduce Motion, différenciation des états autrement que par la couleur, zones tactiles d'au moins 44 points et navigation clavier sur iPad. Les textes essentiels sont disponibles en français et en anglais, sans troncature dans les tailles d'accessibilité.
+La cible minimale est WCAG 2.2 AA. Tous les écrans doivent prendre en charge Dynamic Type, VoiceOver, contraste suffisant (attention particulière : encre secondaire `#8D7C64` réservée aux textes ≥ 13 pt sur crème), Reduce Motion, différenciation des états autrement que par la couleur, zones tactiles d'au moins 44 points et navigation clavier sur iPad. Les textes essentiels sont disponibles en français et en anglais, sans troncature dans les tailles d'accessibilité.

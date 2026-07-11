@@ -127,9 +127,6 @@ struct StoryComposer: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg + 2) {
                     SQSheetHandle()
-                    Text("Nouvelle story")
-                        .sqKicker()
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     PhotosPicker(selection: $model.selectedItem, matching: .images) {
                         ZStack {
                             if let image = previewImage {
@@ -152,19 +149,22 @@ struct StoryComposer: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 280)
                         .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                                .stroke(SQColor.separator, lineWidth: 1.5)
-                        }
+                        .sqShadowCard()
                     }
                     .buttonStyle(SQPressButtonStyle())
                     .onChangeCompat(of: model.selectedItem) { _, _ in
                         Task { await model.loadPickerImage() }
                     }
 
+                    // Champ capsule « Crème » : SurfaceMuted, sans bordure.
                     TextField("Une légende ?", text: $model.text, axis: .vertical)
                         .lineLimit(2...6)
-                        .textFieldStyle(SQTextFieldStyle())
+                        .font(SQType.body)
+                        .foregroundStyle(SQColor.label)
+                        .padding(.horizontal, SQSpace.lg)
+                        .padding(.vertical, SQSpace.sm + 2)
+                        .frame(minHeight: 44)
+                        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
 
                     audienceSection
                     hideSection
@@ -222,40 +222,79 @@ struct StoryComposer: View {
     private var audienceSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text("Audience").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
-            Picker("Audience", selection: $model.audience) {
-                ForEach(StoryAudience.allCases) { audience in Text(audience.label).tag(audience) }
-            }
-            .pickerStyle(.segmented)
-            if model.audience == .closeFriends {
-                Button { model.showCloseFriendsEditor = true } label: {
-                    HStack(spacing: SQSpace.xs + 2) {
-                        Image(systemName: "star.circle")
-                        Text("Gérer mes amis proches (\(model.closeFriendIds.count))")
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.caption)
+            // Segments capsules « Crème » : actif brique, inactif surface + ombre repos.
+            HStack(spacing: SQSpace.sm) {
+                ForEach(StoryAudience.allCases) { audience in
+                    let selected = model.audience == audience
+                    Button {
+                        Haptics.selection()
+                        model.audience = audience
+                    } label: {
+                        Text(audience.label)
+                            .font(SQFont.body(13, .semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 44)
+                            .background(
+                                selected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
+                                in: Capsule(style: .continuous)
+                            )
+                            .foregroundStyle(selected ? SQColor.onAccent : SQColor.label)
+                            .sqShadowSoft()
                     }
-                    .font(SQType.subhead)
-                    .foregroundStyle(SQColor.brandRed)
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
                 }
-                .buttonStyle(.plain)
+            }
+            if model.audience == .closeFriends {
+                menuRow(
+                    systemImage: "star.fill",
+                    title: "Gérer mes amis proches (\(model.closeFriendIds.count))"
+                ) {
+                    model.showCloseFriendsEditor = true
+                }
             }
         }
     }
 
     private var hideSection: some View {
-        Button { model.showHideEditor = true } label: {
-            HStack(spacing: SQSpace.xs + 2) {
-                Image(systemName: "eye.slash")
-                Text(model.hiddenUserIds.isEmpty
-                     ? "Masquer à…"
-                     : "Masqué à \(model.hiddenUserIds.count) personne\(model.hiddenUserIds.count > 1 ? "s" : "")")
-                Spacer()
-                Image(systemName: "chevron.right").font(.caption)
-            }
-            .font(SQType.subhead)
-            .foregroundStyle(SQColor.label)
+        menuRow(
+            systemImage: "eye.slash",
+            title: model.hiddenUserIds.isEmpty
+                ? "Masquer à…"
+                : "Masqué à \(model.hiddenUserIds.count) personne\(model.hiddenUserIds.count > 1 ? "s" : "")"
+        ) {
+            model.showHideEditor = true
         }
-        .buttonStyle(.plain)
+    }
+
+    /// Rangée de menu « Crème » : pastille icône 36 rayon 12 `accentSoft`,
+    /// libellé Figtree 500 15.5, chevron tertiaire — sur petite tuile surface.
+    private func menuRow(systemImage: String, title: String, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SQColor.brandRed)
+                    .frame(width: 36, height: 36)
+                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(SQFont.body(15.5, .medium))
+                    .foregroundStyle(SQColor.label)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(SQSpace.sm + 2)
+            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .sqShadowSoft()
+        }
+        .buttonStyle(SQPressButtonStyle())
     }
 
     private var ttlSection: some View {
@@ -278,13 +317,18 @@ struct StoryComposer: View {
                             Text("\(hours) h")
                             if hours != 24 { Image(systemName: "lock.fill").font(.system(size: 9)) }
                         }
-                        .font(SQType.caption.weight(.semibold))
+                        .font(SQFont.body(13, .semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, SQSpace.sm)
-                        .background(selected ? SQColor.brandRed : SQColor.surfaceMuted, in: Capsule())
-                        .foregroundStyle(selected ? .white : SQColor.labelSecondary)
+                        .background(
+                            selected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
+                            in: Capsule(style: .continuous)
+                        )
+                        .foregroundStyle(selected ? SQColor.onAccent : SQColor.label)
+                        .sqShadowSoft()
                     }
                     .buttonStyle(.plain)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
                     .accessibilityHint(hours == 24 ? "Disponible pour tous" : "Réservé à Premium")
                 }
             }
@@ -297,13 +341,29 @@ struct StoryComposer: View {
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.labelSecondary)
             Spacer()
-            Picker("Durée d'affichage", selection: $model.displayDuration) {
+            HStack(spacing: SQSpace.xs + 2) {
                 ForEach([5, 10, 15], id: \.self) { seconds in
-                    Text("\(seconds)s").tag(seconds)
+                    let selected = model.displayDuration == seconds
+                    Button {
+                        Haptics.selection()
+                        model.displayDuration = seconds
+                    } label: {
+                        Text("\(seconds)s")
+                            .font(SQFont.body(13, .semibold))
+                            .padding(.horizontal, SQSpace.md)
+                            .frame(minHeight: 40)
+                            .background(
+                                selected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
+                                in: Capsule(style: .continuous)
+                            )
+                            .foregroundStyle(selected ? SQColor.onAccent : SQColor.label)
+                            .sqShadowSoft()
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                    .accessibilityLabel("Durée d'affichage \(seconds) secondes")
                 }
             }
-            .pickerStyle(.segmented)
-            .frame(width: 160)
         }
     }
 }

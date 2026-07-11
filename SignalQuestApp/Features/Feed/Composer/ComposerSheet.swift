@@ -239,10 +239,6 @@ struct ComposerSheet: View {
                                     .scaledToFill()
                                     .frame(maxHeight: 260)
                                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                                            .stroke(SQColor.separator, lineWidth: 1.5)
-                                    }
                                     .overlay(alignment: .topTrailing) {
                                         Button {
                                             model.previewImage = nil
@@ -314,6 +310,7 @@ struct ComposerSheet: View {
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
+                    // Capsule accent compacte : l'unique surface brique de l'écran.
                     Button {
                         isInputFocused = false
                         Task {
@@ -321,14 +318,21 @@ struct ComposerSheet: View {
                             if model.didPublish { dismiss() }
                         }
                     } label: {
-                        if model.isBusy {
-                            ProgressView().controlSize(.mini).tint(SQColor.brandRed)
-                        } else {
-                            Text("Publier")
-                                .font(SQFont.archivo(14, .bold))
+                        Group {
+                            if model.isBusy {
+                                ProgressView().controlSize(.mini).tint(SQColor.onAccent)
+                            } else {
+                                Text("Publier")
+                                    .font(SQFont.body(14, .semibold))
+                            }
                         }
+                        .foregroundStyle(SQColor.onAccent)
+                        .padding(.horizontal, SQSpace.lg - 2)
+                        .padding(.vertical, SQSpace.sm - 1)
+                        .background(SQColor.brandRed, in: Capsule(style: .continuous))
+                        .opacity(model.canPublish ? 1 : 0.45)
                     }
-                    .tint(SQColor.brandRed)
+                    .buttonStyle(SQPressButtonStyle())
                     .disabled(!model.canPublish)
                 }
             }
@@ -347,97 +351,93 @@ struct ComposerSheet: View {
     }
 
     private var bottomToolbar: some View {
-        VStack(spacing: 0) {
-            Divider().background(SQColor.separator)
-            
-            HStack(spacing: SQSpace.md) {
-                // Photos Picker
-                PhotosPicker(selection: $model.selectedItem, matching: .images) {
-                    Image(systemName: "photo.on.rectangle.angled")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(SQColor.brandRed)
-                        .frame(width: 40, height: 40)
-                        .background(SQColor.fill, in: Circle())
-                }
-                .accessibilityLabel("Ajouter une photo")
-                .onChangeCompat(of: model.selectedItem) { _, _ in
-                    Task { await model.loadPickerImage() }
-                }
-                
-                // Speedtest attachment
-                if model.attachedSpeedtest == nil {
-                    Button {
-                        Task { await model.attachLatestSpeedtest() }
-                    } label: {
+        HStack(spacing: SQSpace.md) {
+            // Photos Picker — bouton circulaire 40, surface + ombre repos.
+            PhotosPicker(selection: $model.selectedItem, matching: .images) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(SQColor.brandRed)
+                    .frame(width: 40, height: 40)
+                    .background(SQColor.surface, in: Circle())
+                    .sqShadowSoft()
+            }
+            .accessibilityLabel("Ajouter une photo")
+            .onChangeCompat(of: model.selectedItem) { _, _ in
+                Task { await model.loadPickerImage() }
+            }
+
+            // Speedtest attachment
+            if model.attachedSpeedtest == nil {
+                Button {
+                    Task { await model.attachLatestSpeedtest() }
+                } label: {
+                    Group {
                         if model.isLoadingSpeedtest {
                             ProgressView()
                                 .controlSize(.mini)
                                 .tint(SQColor.brandRed)
-                                .frame(width: 40, height: 40)
-                                .background(SQColor.fill, in: Circle())
                         } else {
                             Image(systemName: "speedometer")
                                 .font(.body.weight(.semibold))
                                 .foregroundStyle(SQColor.brandRed)
-                                .frame(width: 40, height: 40)
-                                .background(SQColor.fill, in: Circle())
                         }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Joindre un speedtest")
-                    .disabled(model.isLoadingSpeedtest)
+                    .frame(width: 40, height: 40)
+                    .background(SQColor.surface, in: Circle())
+                    .sqShadowSoft()
                 }
-                
-                // Visibility button
-                Menu {
-                    Picker("Visibilité", selection: $model.visibility) {
-                        ForEach(SocialVisibility.allCases) { value in
-                            Label(value.label, systemImage: value.icon).tag(value)
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: model.visibility.icon)
-                            .font(.caption)
-                        Text(model.visibility.label)
-                            .font(SQFont.archivo(12, .bold))
-                        Image(systemName: "chevron.down")
-                            .font(.caption2)
-                    }
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .padding(.horizontal, SQSpace.md)
-                    .padding(.vertical, 8)
-                    .background(SQColor.fill, in: Capsule())
-                    .overlay {
-                        Capsule().stroke(SQColor.separator, lineWidth: 1)
-                    }
-                }
-                
-                Spacer()
-                
-                // Trash draft button
-                if !model.text.isEmpty {
-                    Button {
-                        model.clearDraft()
-                        Haptics.medium()
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.body)
-                            .foregroundStyle(SQColor.danger)
-                            .frame(width: 40, height: 40)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Supprimer le brouillon")
-                }
-                
-                // Character counter
-                characterCounter
+                .buttonStyle(.plain)
+                .accessibilityLabel("Joindre un speedtest")
+                .disabled(model.isLoadingSpeedtest)
             }
-            .padding(.horizontal, SQSpace.lg)
-            .padding(.vertical, SQSpace.sm)
-            .background(SQColor.surface.opacity(0.95))
-            .background(.ultraThinMaterial)
+
+            // Visibility button — capsule surface + ombre repos, sans bordure.
+            Menu {
+                Picker("Visibilité", selection: $model.visibility) {
+                    ForEach(SocialVisibility.allCases) { value in
+                        Label(value.label, systemImage: value.icon).tag(value)
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: model.visibility.icon)
+                        .font(.caption)
+                    Text(model.visibility.label)
+                        .font(SQFont.body(13, .semibold))
+                    Image(systemName: "chevron.down")
+                        .font(.caption2)
+                }
+                .foregroundStyle(SQColor.labelSecondary)
+                .padding(.horizontal, SQSpace.md)
+                .padding(.vertical, 10)
+                .background(SQColor.surface, in: Capsule(style: .continuous))
+                .sqShadowSoft()
+            }
+
+            Spacer()
+
+            // Trash draft button
+            if !model.text.isEmpty {
+                Button {
+                    model.clearDraft()
+                    Haptics.medium()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.body)
+                        .foregroundStyle(SQColor.danger)
+                        .frame(width: 40, height: 40)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Supprimer le brouillon")
+            }
+
+            // Character counter
+            characterCounter
         }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.sm)
+        .background(SQColor.surfaceGlass)
+        .background(.ultraThinMaterial)
     }
 
     private var characterCounter: some View {
@@ -451,13 +451,13 @@ struct ComposerSheet: View {
             if charCount > 0 {
                 if isClose {
                     Text("\(limit - charCount)")
-                        .font(SQFont.archivo(11, .bold))
+                        .font(SQFont.body(11, .semibold))
                         .foregroundStyle(isOver ? SQColor.danger : SQColor.warning)
                         .contentTransition(.numericText())
                 }
 
                 Circle()
-                    .stroke(SQColor.fill, lineWidth: 2.5)
+                    .stroke(SQColor.surfaceMuted, lineWidth: 2.5)
                     .frame(width: 20, height: 20)
                     .overlay {
                         Circle()
@@ -483,15 +483,12 @@ struct ComposerSheet: View {
                         Haptics.light()
                     } label: {
                         Text(tag)
-                            .font(SQFont.archivo(11, .bold))
+                            .font(SQFont.body(13, .semibold))
                             .foregroundStyle(SQColor.brandRed)
                             .padding(.horizontal, SQSpace.md)
                             .padding(.vertical, SQSpace.sm)
-                            .background(SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                                    .stroke(SQColor.separator, lineWidth: 1.2)
-                            }
+                            .background(SQColor.surface, in: Capsule(style: .continuous))
+                            .sqShadowSoft()
                     }
                     .buttonStyle(.plain)
                 }
@@ -502,13 +499,16 @@ struct ComposerSheet: View {
 
     private func attachedSpeedtestChip(_ speedtest: SocialShareableSpeedtest) -> some View {
         HStack(spacing: SQSpace.md) {
+            // Pastille circulaire teintée : icône brique sur accentSoft.
             Image(systemName: "speedometer")
-                .font(.title3)
-                .foregroundStyle(SQGradient.signal)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 40, height: 40)
+                .background(SQColor.accentSoft, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Speedtest joint")
-                    .font(.footnote.weight(.semibold))
+                    .font(SQFont.body(13, .semibold))
                     .foregroundStyle(SQColor.label)
                 HStack(spacing: SQSpace.sm) {
                     if let down = speedtest.downloadSpeed {
@@ -521,7 +521,7 @@ struct ComposerSheet: View {
                         Text(tech)
                     }
                 }
-                .font(.caption)
+                .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
             }
             Spacer()
@@ -569,7 +569,7 @@ struct PostPreviewCard: View {
                 Spacer()
                 SQEditorialTag(
                     text: speedtest != nil ? "Speedtest" : "Post",
-                    color: speedtest != nil ? SQColor.brandBlue : SQColor.label
+                    color: speedtest != nil ? SQColor.brandRed : SQColor.label
                 )
             }
 
@@ -592,10 +592,6 @@ struct PostPreviewCard: View {
                     .frame(height: 200)
                     .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                            .stroke(SQColor.separator, lineWidth: 1)
-                    }
             }
 
             // Speedtest metrics
@@ -606,7 +602,7 @@ struct PostPreviewCard: View {
                             label: "Download",
                             value: SignalFormatters.speed(down),
                             highlight: true,
-                            accent: SQColor.brandBlue
+                            accent: SQColor.brandRed
                         )
                     }
                     if let ping = speedtest.ping {

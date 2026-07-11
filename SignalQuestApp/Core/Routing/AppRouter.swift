@@ -22,6 +22,9 @@ final class AppRouter: ObservableObject {
     /// Demande de présentation du mode Drive Test (posée par l'App Intent F4 ;
     /// consommée par SpeedtestView une fois l'onglet Speed actif).
     @Published var pendingDriveTest = false
+    /// Masque le dock flottant (conversation ouverte : le composer prend le bas).
+    /// Posé par les écrans plein-bas (ConversationDetailView) à l'apparition.
+    @Published var isDockHidden = false
 
     init() {
         let args = ProcessInfo.processInfo.arguments

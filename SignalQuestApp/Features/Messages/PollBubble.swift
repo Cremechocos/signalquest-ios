@@ -2,7 +2,8 @@ import SwiftUI
 
 /// Rendu d'un message de type sondage dans le fil. Question, options avec barres
 /// de progression et compteurs, vote au tap, état « clôturé » et bouton de
-/// clôture réservé à l'auteur. Éditorial : barres fines, bordures `.separator`.
+/// clôture réservé à l'auteur. DA Crème & Terre cuite : pastille d'icône,
+/// tuiles d'options SurfaceMuted rayon 14 sans bordure, jauge teinte accent.
 struct PollBubble: View {
     let poll: MessagePoll
     let mine: Bool
@@ -19,29 +20,28 @@ struct PollBubble: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
             HStack(alignment: .top, spacing: SQSpace.sm) {
-                Rectangle()
-                    .fill(mine ? Color.white.opacity(0.7) : SQColor.brandRed)
-                    .frame(width: 3)
-                    .frame(maxHeight: .infinity)
+                Image(systemName: "chart.bar.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
+                    .frame(width: 36, height: 36)
+                    .background(mine ? SQColor.onAccent.opacity(0.18) : SQColor.accentSoft, in: Circle())
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("SONDAGE")
-                        .font(SQType.micro)
-                        .foregroundStyle(mine ? .white.opacity(0.75) : SQColor.labelSecondary)
                     Text(poll.question.isEmpty ? "Sondage" : poll.question)
                         .font(SQType.heading)
-                        .foregroundStyle(mine ? .white : SQColor.label)
+                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                     Text(metaLine)
                         .font(SQType.micro)
-                        .foregroundStyle(mine ? .white.opacity(0.7) : SQColor.labelTertiary)
+                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary)
                 }
                 Spacer(minLength: 0)
                 if effectivelyClosed {
-                    Text("CLOS")
+                    Text("Clos")
                         .font(SQType.micro)
-                        .padding(.horizontal, SQSpace.xs + 2)
+                        .padding(.horizontal, SQSpace.sm)
                         .padding(.vertical, 3)
-                        .background((mine ? Color.white.opacity(0.18) : SQColor.fill), in: RoundedRectangle(cornerRadius: SQRadius.sm))
-                        .foregroundStyle(mine ? .white : SQColor.labelSecondary)
+                        .background((mine ? SQColor.onAccent.opacity(0.18) : SQColor.surfaceMuted), in: Capsule())
+                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -60,7 +60,7 @@ struct PollBubble: View {
                 } label: {
                     Label("Clôturer le sondage", systemImage: "lock")
                         .font(SQType.caption.weight(.semibold))
-                        .foregroundStyle(mine ? .white : SQColor.brandRed)
+                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
                 }
                 .buttonStyle(.plain)
             }
@@ -82,10 +82,7 @@ struct PollBubble: View {
     private func optionRow(_ option: PollOption) -> some View {
         let votedByMe = poll.votesByMe.contains(option.id)
         let ratio = Double(option.count) / Double(totalVotes)
-        let fillColor = mine ? Color.white.opacity(0.28) : SQColor.brandRed.opacity(0.16)
-        let borderColor = votedByMe
-            ? (mine ? Color.white : SQColor.brandRed)
-            : (mine ? Color.white.opacity(0.35) : SQColor.separator)
+        let fillColor = mine ? SQColor.onAccent.opacity(0.26) : SQColor.accentSoft
         return Button {
             guard !effectivelyClosed else { return }
             Haptics.selection()
@@ -99,26 +96,23 @@ struct PollBubble: View {
                 }
                 HStack(spacing: SQSpace.sm) {
                     Image(systemName: votedByMe ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 13))
-                        .foregroundStyle(votedByMe ? (mine ? .white : SQColor.brandRed) : (mine ? .white.opacity(0.7) : SQColor.labelTertiary))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(votedByMe ? (mine ? SQColor.onAccent : SQColor.brandRed) : (mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary))
                         .accessibilityHidden(true)
                     Text(option.text.isEmpty ? option.id : option.text)
                         .font(SQType.caption.weight(votedByMe ? .semibold : .regular))
-                        .foregroundStyle(mine ? .white : SQColor.label)
+                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                         .lineLimit(2)
                     Spacer(minLength: SQSpace.sm)
                     Text("\(option.count)")
                         .font(SQType.caption.weight(.semibold))
-                        .foregroundStyle(mine ? .white.opacity(0.85) : SQColor.labelSecondary)
+                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.85) : SQColor.labelSecondary)
                 }
                 .padding(.horizontal, SQSpace.sm + 2)
                 .padding(.vertical, SQSpace.sm)
             }
-            .background((mine ? Color.white.opacity(0.08) : SQColor.surfaceMuted), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                    .stroke(borderColor, lineWidth: 1)
-            }
+            .background((mine ? SQColor.onAccent.opacity(0.10) : SQColor.surfaceMuted), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(effectivelyClosed)

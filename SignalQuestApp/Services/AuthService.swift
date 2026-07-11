@@ -22,6 +22,9 @@ protocol AuthServicing: Sendable {
     func me() async throws -> AuthUser
     func hasStoredCredentials() -> Bool
     func installAuthTokenForDebugQA(_ token: String)
+    /// QA `--reset-auth` : efface la session LOCALE (credentials + clés E2EE)
+    /// sans révoquer le token côté serveur — contrairement à `logout()`.
+    func clearLocalSessionForDebugQA() async
     /// E2EE-WIPE-02 : purge les clés E2EE si l'utilisateur authentifié diffère du
     /// dernier connu sur cet appareil (changement de compte sans logout, ex.
     /// expiration de session). À appeler avant de passer en `.authenticated`.
@@ -30,6 +33,7 @@ protocol AuthServicing: Sendable {
 
 extension AuthServicing {
     func installAuthTokenForDebugQA(_ token: String) {}
+    func clearLocalSessionForDebugQA() async {}
     func hasStoredCredentials() -> Bool { false }
     func wipeE2EEIfIdentityChanged(to userId: String) async {}
 }
@@ -164,6 +168,13 @@ final class AuthService: AuthServicing {
         api.credentials.clearAll()
     }
 
+    func clearLocalSessionForDebugQA() async {
+        // Même purge locale que `logout()`, sans l'appel serveur : le JWT reste
+        // valide pour les autres passes QA (tours UI avec token injecté).
+        await e2ee?.wipeLocalKeys()
+        api.credentials.clearAll()
+    }
+
     func wipeE2EEIfIdentityChanged(to userId: String) async {
         // `lastUserId` vit dans le Keychain AUTH ("fr.signalquest.ios"), distinct
         // du store E2EE wipé → il survit au wipe et aux redémarrages, ce qui permet
@@ -241,7 +252,11 @@ final class AuthSessionViewModel: ObservableObject {
             service.installAuthTokenForDebugQA(injectedAuthToken)
         }
         if AppEnvironment.resetsAuthOnLaunch {
-            try? await service.logout()
+            // QA `--reset-auth` : purge LOCALE uniquement (credentials + E2EE).
+            // Surtout pas de POST /api/auth/logout : le flag sert aux tours de
+            // test UI, et invalider le JWT côté serveur casserait les autres
+            // passes QA qui réutilisent le même token injecté.
+            await service.clearLocalSessionForDebugQA()
             state = .loggedOut
             return
         }

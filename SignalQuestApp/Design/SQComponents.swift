@@ -3,15 +3,14 @@ import MapKit
 
 struct TechBadge: View {
     let text: String
-    var color: Color = SQColor.brandBlue
+    var color: Color = SQColor.brandRed
 
     var body: some View {
-        Text(text.uppercased())
-            .font(SQType.micro)
+        Text(text)
+            .font(SQFont.body(12, .semibold))
             .padding(.horizontal, SQSpace.sm + 2)
             .padding(.vertical, SQSpace.xs + 2)
-            .background(color.opacity(0.18), in: Capsule())
-            .overlay { Capsule().stroke(color.opacity(0.42), lineWidth: 1) }
+            .background(color.opacity(0.13), in: Capsule(style: .continuous))
             .foregroundStyle(color)
     }
 }
@@ -24,22 +23,22 @@ struct MetricPill: View {
     var body: some View {
         HStack(spacing: 7) {
             Image(systemName: systemImage)
-                .foregroundStyle(SQColor.brandOrange)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(SQColor.brandRed)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(SQType.micro)
+                    .font(SQFont.body(11))
                     .foregroundStyle(SQColor.labelSecondary)
                 Text(value)
-                    .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
+                    .font(SQFont.display(15, .bold))
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
         }
-        .padding(.horizontal, SQSpace.sm + 2)
+        .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm)
-        .background(.thinMaterial, in: Capsule())
-        .overlay { Capsule().stroke(SQColor.separator, lineWidth: 1) }
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         // VoiceOver : lire « titre : valeur » d'un bloc plutôt que l'icône + 2 textes.
         .accessibilityElement(children: .combine)
         .accessibilityLabel(title)
@@ -54,7 +53,7 @@ struct SQAvatar: View {
 
     var body: some View {
         ZStack {
-            Circle().fill(SQGradient.signal)
+            Circle().fill(SQColor.brandRed)
             if let url {
                 RemoteImage(url: url, maxDimension: size, contentMode: .fill) {
                     initials
@@ -65,13 +64,12 @@ struct SQAvatar: View {
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
-        .overlay { Circle().stroke(SQColor.separator, lineWidth: 1) }
     }
 
     private var initials: some View {
         Text(String(name.prefix(1)).uppercased())
-            .font(SQFont.archivo(max(13, size * 0.38), .bold))
-            .foregroundStyle(.white)
+            .font(SQFont.display(max(13, size * 0.38), .semibold))
+            .foregroundStyle(SQColor.onAccent)
     }
 }
 
@@ -81,12 +79,13 @@ struct StoryBubble: View {
 
     var body: some View {
         let isViewed = viewed ?? (story.viewedByMe == true)
-        VStack(spacing: SQSpace.sm) {
-            SQAvatar(url: story.author.avatarUrl, name: story.author.displayName, size: 62)
+        VStack(spacing: SQSpace.sm - 1) {
+            // Anneau décollé de 3 pt : brique 3 pt (non vue) / encre 25 % 1,5 pt (vue).
+            SQAvatar(url: story.author.avatarUrl, name: story.author.displayName, size: 60)
                 .padding(3)
                 .overlay {
                     if isViewed {
-                        Circle().strokeBorder(SQColor.separator, lineWidth: 1.5)
+                        Circle().strokeBorder(SQColor.label.opacity(0.25), lineWidth: 1.5)
                     } else {
                         SQStoryRing(lineWidth: 3)
                     }
@@ -95,7 +94,7 @@ struct StoryBubble: View {
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.label)
                 .lineLimit(1)
-                .frame(width: 74)
+                .frame(width: 70)
         }
         .accessibilityElement(children: .combine)
     }
@@ -169,26 +168,33 @@ struct SpeedGaugeView: View {
     let value: Double
     let phase: SpeedtestPhase
 
+    // Cadran « Crème » : arc 270° (départ 135°), track 22 pt bouts ronds
+    // `SurfaceMuted`, remplissage brique, disque central `SurfaceElevated`.
     var body: some View {
         ZStack {
             Circle()
-                .stroke(SQColor.fill, lineWidth: 24)
+                .trim(from: 0, to: 0.75)
+                .stroke(SQColor.surfaceMuted, style: StrokeStyle(lineWidth: 22, lineCap: .round))
+                .rotationEffect(.degrees(135))
             Circle()
-                .trim(from: 0, to: min(value / 1000, 1))
-                .stroke(SQGradient.speed, style: StrokeStyle(lineWidth: 24, lineCap: .round))
-                .rotationEffect(.degrees(-90))
+                .trim(from: 0, to: 0.75 * min(value / 1000, 1))
+                .stroke(SQColor.brandRed, style: StrokeStyle(lineWidth: 22, lineCap: .round))
+                .rotationEffect(.degrees(135))
                 .sqAnimation(.snappy(duration: 0.32), value: value)
-            VStack(spacing: 6) {
+            Circle()
+                .fill(SQColor.surface)
+                .padding(36)
+            VStack(spacing: 4) {
+                Text(phase.label)
+                    .font(SQFont.body(12, .medium))
+                    .foregroundStyle(SQColor.labelSecondary)
                 Text("\(Int(value))")
-                    .font(SQFont.display(54, .bold))
+                    .font(SQFont.display(58, .bold))
                     .foregroundStyle(SQColor.label)
                     .contentTransition(.numericText())
                 Text("Mbps")
-                    .font(SQType.heading)
+                    .font(SQFont.body(14, .medium))
                     .foregroundStyle(SQColor.labelSecondary)
-                Text(phase.label)
-                    .font(SQType.micro)
-                    .foregroundStyle(SQColor.brandOrange)
             }
         }
         .frame(width: 240, height: 240)
@@ -245,15 +251,19 @@ struct MapFilterBar: View {
                             filters.insert(kind)
                         }
                     } label: {
-                        Label(title, systemImage: icon)
-                            .font(SQType.micro)
-                            .padding(.horizontal, SQSpace.md - 1)
+                        // Chips carte : capsules casse normale sans icônes ;
+                        // actif = brique pleine, inactif = surface glass + ombre repos.
+                        Text(title)
+                            .font(SQFont.body(12, .semibold))
+                            .padding(.horizontal, SQSpace.md + 1)
                             .padding(.vertical, SQSpace.sm)
-                            .background(isOn ? SQColor.brandOrange.opacity(0.18) : SQColor.fill, in: Capsule())
-                            .overlay { Capsule().stroke(isOn ? SQColor.brandOrange.opacity(0.55) : SQColor.separator, lineWidth: 1) }
-                            .foregroundStyle(isOn ? SQColor.brandOrange : SQColor.label)
+                            .background(isOn ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surfaceGlass), in: Capsule(style: .continuous))
+                            .foregroundStyle(isOn ? SQColor.onAccent : SQColor.label)
+                            .sqShadowSoft()
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(title)
+                    .accessibilityAddTraits(isOn ? .isSelected : [])
                 }
             }
             .padding(.horizontal)
@@ -500,28 +510,44 @@ struct PhotoTile: View {
 struct LeaderboardPodium: View {
     let entries: [LeaderboardEntry]
 
+    // Podium « Crème » 2-1-3 : nº1 avatar accent + couronne + colonne brique ;
+    // nº2/3 colonnes surface + ombre repos. Colonnes arrondies en haut (rayon 14).
     var body: some View {
-        HStack(alignment: .bottom, spacing: SQSpace.sm + 2) {
+        HStack(alignment: .bottom, spacing: SQSpace.md) {
             ForEach(podiumEntries, id: \.rank) { entry in
+                let isFirst = entry.rank == 1
                 VStack(spacing: SQSpace.sm) {
-                    SQAvatar(url: entry.user.avatarUrl, name: entry.user.displayName, size: entry.rank == 1 ? 64 : 52)
+                    if isFirst {
+                        Text("👑")
+                            .font(SQFont.display(20, .bold))
+                            .accessibilityHidden(true)
+                    }
+                    SQAvatar(url: entry.user.avatarUrl, name: entry.user.displayName, size: isFirst ? 66 : 56)
+                        .modifier(PodiumAccentShadow(active: isFirst))
                     Text(entry.user.displayName)
-                        .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
+                        .font(SQFont.body(13, .semibold))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
-                    Text("\(Int(entry.value)) \(entry.unit)")
-                        .font(SQType.micro)
-                        .foregroundStyle(SQColor.labelSecondary)
-                    RoundedRectangle(cornerRadius: SQRadius.md)
-                        .fill(entry.rank == 1
-                              ? AnyShapeStyle(SQGradient.signal)
-                              : AnyShapeStyle(LinearGradient(colors: [SQColor.surface, SQColor.surfaceMuted], startPoint: .top, endPoint: .bottom)))
-                        .frame(height: entry.rank == 1 ? 88 : 64)
-                        .overlay(
-                            Text("#\(entry.rank)")
-                                .font(SQFont.archivo(17, .bold, relativeTo: .headline))
-                                .foregroundStyle(entry.rank == 1 ? .white : SQColor.label)
-                        )
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: SQRadius.md,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: SQRadius.md,
+                        style: .continuous
+                    )
+                    .fill(isFirst ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface))
+                    .frame(height: isFirst ? 92 : (entry.rank == 2 ? 68 : 52))
+                    .overlay(
+                        VStack(spacing: 1) {
+                            Text("\(entry.rank)")
+                                .font(SQFont.display(isFirst ? 24 : 20, .bold))
+                                .foregroundStyle(isFirst ? SQColor.onAccent : SQColor.label)
+                            Text("\(Int(entry.value)) \(entry.unit)")
+                                .font(SQFont.body(11))
+                                .foregroundStyle(isFirst ? SQColor.onAccent.opacity(0.85) : SQColor.labelSecondary)
+                        }
+                    )
+                    .modifier(PodiumColumnShadow(accent: isFirst))
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -537,6 +563,20 @@ struct LeaderboardPodium: View {
     }
 }
 
+private struct PodiumAccentShadow: ViewModifier {
+    let active: Bool
+    func body(content: Content) -> some View {
+        if active { content.sqShadowAccent() } else { content }
+    }
+}
+
+private struct PodiumColumnShadow: ViewModifier {
+    let accent: Bool
+    func body(content: Content) -> some View {
+        if accent { content.sqShadowAccent() } else { content.sqShadowSoft() }
+    }
+}
+
 struct EmptyStateView: View {
     let title: String
     let message: String
@@ -545,8 +585,10 @@ struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: SQSpace.md) {
             Image(systemName: systemImage)
-                .font(.system(size: 44))
-                .foregroundStyle(SQGradient.signal)
+                .font(.system(size: 26, weight: .medium))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 64, height: 64)
+                .background(SQColor.accentSoft, in: Circle())
             Text(title)
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
@@ -581,7 +623,7 @@ struct ErrorStateView: View {
                 if let retry {
                     Button("Réessayer", action: retry)
                         .buttonStyle(.borderedProminent)
-                        .tint(SQColor.brandOrange)
+                        .tint(SQColor.brandRed)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -609,13 +651,9 @@ struct VPNWarningBanner: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(SQSpace.sm + 2)
+        .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
-                .stroke(SQColor.warning.opacity(0.35), lineWidth: 1)
-        }
+        .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Avertissement. \(message)")
     }
@@ -662,11 +700,8 @@ struct LoadingSkeleton: View {
             .padding(.top, 2)
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xxl, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.xxl, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1.5)
-        }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 }
 
@@ -708,19 +743,20 @@ struct ConversationListSkeleton: View {
 
 // MARK: - New primitives
 
-/// Drag handle used at the top of every custom sheet.
+/// Drag handle used at the top of every custom sheet (40×5, `SurfaceMuted`).
 struct SQSheetHandle: View {
     var body: some View {
         Capsule()
-            .fill(SQColor.labelTertiary)
-            .frame(width: 44, height: 5)
+            .fill(SQColor.surfaceMuted)
+            .frame(width: 40, height: 5)
             .frame(maxWidth: .infinity)
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xs)
     }
 }
 
-/// Compact rounded search field. Replaces ad-hoc TextField + magnifying-glass rows.
+/// Compact rounded search field. Capsule 44 pt, fond crème secondaire, sans
+/// bordure (règle Inputs de la DA Crème).
 struct SQSearchField: View {
     @Binding var text: String
     var placeholder: String = "Rechercher"
@@ -729,8 +765,10 @@ struct SQSearchField: View {
     var body: some View {
         HStack(spacing: SQSpace.sm) {
             Image(systemName: "magnifyingglass")
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(SQColor.labelSecondary)
             TextField(placeholder, text: $text)
+                .font(SQType.body)
                 .submitLabel(.search)
                 .onSubmit { onSubmit?() }
                 .foregroundStyle(SQColor.label)
@@ -745,9 +783,9 @@ struct SQSearchField: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, SQSpace.md)
-        .frame(height: 38)
-        .background(SQColor.fill, in: Capsule())
+        .padding(.horizontal, SQSpace.lg)
+        .frame(height: 44)
+        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
     }
 }
 
@@ -771,13 +809,15 @@ struct SQSegmentedFilter<Value: Hashable>: View {
                             }
                             Text(option.label)
                         }
-                        .font(SQFont.archivo(14, .semibold, relativeTo: .subheadline))
-                        .padding(.horizontal, SQSpace.md + 2)
+                        .font(SQFont.body(13, .semibold))
+                        .padding(.horizontal, SQSpace.lg - 2)
                         .padding(.vertical, SQSpace.sm)
-                        .background(isSelected ? AnyShapeStyle(SQColor.brandOrange) : AnyShapeStyle(SQColor.fill), in: Capsule())
-                        .foregroundStyle(isSelected ? .white : SQColor.label)
+                        .background(isSelected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface), in: Capsule(style: .continuous))
+                        .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
+                        .sqShadowSoft()
                     }
                     .buttonStyle(.plain)
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
             .padding(.horizontal)
@@ -796,10 +836,10 @@ struct SQChipMetric: View {
             HStack(spacing: SQSpace.xs + 2) {
                 if let systemImage {
                     Image(systemName: systemImage)
-                        .foregroundStyle(SQColor.brandOrange)
+                        .foregroundStyle(SQColor.brandRed)
                 }
                 Text(value)
-                    .font(SQFont.archivo(17, .bold, relativeTo: .headline))
+                    .font(SQFont.display(17, .bold, relativeTo: .headline))
                     .foregroundStyle(SQColor.label)
             }
             if let label {
@@ -870,13 +910,13 @@ struct SQFAB: View {
             action()
         } label: {
             Image(systemName: systemImage)
-                .font(.title2.weight(.bold))
-                .foregroundStyle(.white)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(SQColor.onAccent)
                 .frame(width: 56, height: 56)
-                .background(SQGradient.signal, in: Circle())
-                .shadow(color: .black.opacity(0.20), radius: 12, y: 6)
+                .background(SQColor.brandRed, in: Circle())
+                .sqShadowAccent()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SQPressButtonStyle())
     }
 }
 
@@ -884,17 +924,17 @@ private extension SpeedtestPhase {
     var label: String {
         switch self {
         case .idle:
-            return "Prêt"
+            return "Prêt à mesurer"
         case .ping:
             return "Latence"
         case .download:
-            return "Download"
+            return "Téléchargement"
         case .upload:
-            return "Upload"
+            return "Envoi"
         case .saving:
             return "Sync"
         case .finished:
-            return "Terminé"
+            return "Téléchargement"
         case .failed:
             return "Erreur"
         }

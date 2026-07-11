@@ -12,34 +12,15 @@ struct SQBackground: ViewModifier {
     }
 }
 
-/// Hero background reserved for marquee screens (Auth, Speedtest). Renders a
-/// soft brand wash in light mode and a deep navy gradient in dark mode.
+/// Hero background : depuis la DA « Crème & Terre cuite », les écrans marquants
+/// (Auth, Speedtest) partagent le fond crème uni — plus de dégradé ni de halo.
 struct SQHeroBackground: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
-
     func body(content: Content) -> some View {
         ZStack {
-            gradient.ignoresSafeArea()
+            SQColor.bg.ignoresSafeArea()
             content
         }
         .tint(SQColor.brandRed)
-    }
-
-    private var gradient: LinearGradient {
-        if colorScheme == .dark {
-            // Papier sombre chaud de la landing (--paper #100E0A → --paper-2).
-            return LinearGradient(
-                colors: [Color(hex: 0x100E0A), Color(hex: 0x16130D)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-        // Papier crème de la landing (--paper #F4F0E6 → --paper-2 #ECE7D8).
-        return LinearGradient(
-            colors: [Color(hex: 0xF4F0E6), Color(hex: 0xECE7D8)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
     }
 }
 
@@ -55,39 +36,40 @@ extension View {
 
 extension Text {
     func sqSectionTitle() -> some View {
-        font(.title2.weight(.bold))
+        font(SQType.title)
             .foregroundStyle(SQColor.label)
     }
 }
 
-/// Typographie de la DA éditoriale SignalQuest. Trois familles, comme la
-/// landing : Archivo Expanded (display), Archivo (UI/labels), Public Sans
-/// (corps). Tailles relatives aux styles système pour préserver Dynamic Type.
+/// Typographie de la DA « Crème & Terre cuite ». Deux familles :
+/// Bricolage Grotesque (titres, chiffres, boutons) et Figtree (corps, UI).
+/// Tailles relatives aux styles système pour préserver Dynamic Type.
 enum SQType {
-    /// Gros titres de page — Archivo Expanded Black, tracé serré.
-    static let display = SQFont.display(34, .black, relativeTo: .largeTitle)
-    /// Titres de section — Archivo Expanded Bold.
-    static let title = SQFont.display(22, .bold, relativeTo: .title2)
-    /// Sous-titres / en-têtes de carte — Archivo SemiBold.
-    static let heading = SQFont.archivo(17, .semibold, relativeTo: .headline)
-    /// Corps de texte — Public Sans.
-    static let body = SQFont.body(16, relativeTo: .body)
-    static let callout = SQFont.body(15, relativeTo: .callout)
-    static let subhead = SQFont.archivo(14, .medium, relativeTo: .subheadline)
-    static let caption = SQFont.body(13, relativeTo: .footnote)
-    /// Micro-labels MAJUSCULE tracés (kickers) — Archivo Bold.
-    static let micro = SQFont.archivo(11, .bold, relativeTo: .caption2)
-    /// Libellés de boutons — Archivo Bold.
-    static let button = SQFont.archivo(15, .bold)
+    /// Gros titres de page (salutation, titres d'écran) — Bricolage Bold 26.
+    static let display = SQFont.display(26, .bold, relativeTo: .largeTitle)
+    /// Titres de sections majeures / sheets — Bricolage Bold 24.
+    static let title = SQFont.display(24, .bold, relativeTo: .title2)
+    /// Titres de cartes, tuiles — Bricolage SemiBold 16.5.
+    static let heading = SQFont.display(16.5, .semibold, relativeTo: .headline)
+    /// Corps de texte — Figtree 15.
+    static let body = SQFont.body(15, relativeTo: .body)
+    static let callout = SQFont.body(14.5, relativeTo: .callout)
+    /// Sous-titres — Figtree Medium 13.5.
+    static let subhead = SQFont.body(13.5, .medium, relativeTo: .subheadline)
+    /// Sous-titres, horodatages — Figtree 12.5.
+    static let caption = SQFont.body(12.5, relativeTo: .footnote)
+    /// Micro-labels (dock, badges) — Figtree SemiBold 11, casse normale.
+    static let micro = SQFont.body(11, .semibold, relativeTo: .caption2)
+    /// Libellés de boutons — Bricolage SemiBold 16.
+    static let button = SQFont.display(16, .semibold)
 }
 
-/// Kicker éditorial : petit label MAJUSCULE rouge à fort tracking, signature
-/// de la landing (`.kicker`).
+/// Ex-« kicker » éditorial. La DA Crème supprime les micro-labels MAJUSCULES
+/// tracés : le style rend désormais un sous-titre Figtree en casse normale,
+/// couleur secondaire — les appels existants sont adoucis d'office.
 extension Text {
     func sqKicker() -> some View {
-        self.font(SQType.micro)
-            .tracking(1.6)
-            .textCase(.uppercase)
-            .foregroundStyle(SQColor.brandRed)
+        self.font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
     }
 }

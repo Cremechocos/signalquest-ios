@@ -53,25 +53,37 @@ struct RemindersView: View {
     }
 
     private func row(_ item: MessageReminder) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
-            if let date = item.remindAt {
-                Label(date.formatted(date: .abbreviated, time: .shortened), systemImage: "bell")
-                    .font(SQType.caption.weight(.semibold))
-                    .foregroundStyle(SQColor.brandRed)
+        HStack(alignment: .top, spacing: SQSpace.sm + 2) {
+            Image(systemName: "bell.fill")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 36, height: 36)
+                .background(SQColor.accentSoft, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+                if let date = item.remindAt {
+                    Text(date.formatted(date: .abbreviated, time: .shortened))
+                        .font(SQType.caption.weight(.semibold))
+                        .foregroundStyle(SQColor.brandRed)
+                }
+                if let reason = item.reason, !reason.isEmpty {
+                    Text(reason)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                Text(content(for: item))
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(3)
             }
-            if let reason = item.reason, !reason.isEmpty {
-                Text(reason)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-            }
-            Text(content(for: item))
-                .font(SQType.body)
-                .foregroundStyle(SQColor.label)
-                .lineLimit(3)
         }
-        .padding(.vertical, SQSpace.xs)
+        .padding(SQSpace.md + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowSoft()
         .listRowBackground(Color.clear)
-        .listRowSeparatorTint(SQColor.separator)
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: SQSpace.xs + 2, leading: SQSpace.lg, bottom: SQSpace.xs + 2, trailing: SQSpace.lg))
     }
 
     private func content(for item: MessageReminder) -> String {

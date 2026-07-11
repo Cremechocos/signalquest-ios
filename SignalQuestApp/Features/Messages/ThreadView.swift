@@ -88,16 +88,14 @@ struct ThreadView: View {
                     .foregroundStyle(SQColor.label)
             }
             Text("\(replies.count) réponse\(replies.count > 1 ? "s" : "")")
-                .sqKicker()
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
                 .padding(.top, SQSpace.xs)
         }
-        .padding(SQSpace.md)
+        .padding(SQSpace.md + 2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1)
-        }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
     private func replyRow(_ reply: MessageItem) -> some View {
@@ -112,42 +110,59 @@ struct ThreadView: View {
                 }
                 Text(displayedContent(for: reply))
                     .font(SQType.body)
-                    .foregroundStyle(mine ? .white : SQColor.label)
-                    .padding(SQSpace.sm + 2)
-                    .background(
-                        mine ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
-                        in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                    )
-                    .overlay {
-                        if !mine {
-                            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                                .stroke(SQColor.separator, lineWidth: 1)
-                        }
-                    }
+                    .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
+                    .padding(.vertical, 11)
+                    .padding(.horizontal, 15)
+                    .background(mine ? SQColor.brandRed : SQColor.surface, in: bubbleShape(mine: mine))
+                    .sqShadowSoft()
             }
             if !mine { Spacer(minLength: 40) }
         }
+    }
+
+    /// Coins asymétriques DA (alignés sur ConversationDetailView) : le coin bas
+    /// côté émetteur est plus petit, comme une « pointe » de bulle.
+    private func bubbleShape(mine: Bool) -> UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            topLeadingRadius: SQRadius.xl,
+            bottomLeadingRadius: mine ? SQRadius.xl : 6,
+            bottomTrailingRadius: mine ? 6 : SQRadius.xl,
+            topTrailingRadius: SQRadius.xl,
+            style: .continuous
+        )
     }
 
     private var composer: some View {
         HStack(spacing: SQSpace.sm + 2) {
             TextField("Répondre dans le fil", text: $draft, axis: .vertical)
                 .lineLimit(1...4)
-                .textFieldStyle(SQTextFieldStyle())
+                .font(SQType.body)
+                .foregroundStyle(SQColor.label)
+                .padding(.horizontal, SQSpace.lg + 2)
+                .padding(.vertical, SQSpace.sm)
+                .frame(minHeight: 44)
+                .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
             Button {
                 Task { await sendReply() }
             } label: {
                 Image(systemName: isSending ? "hourglass" : "paperplane.fill")
+                    .font(.system(size: 17, weight: .semibold))
                     .frame(width: 44, height: 44)
-                    .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .foregroundStyle(.white)
+                    .background(SQColor.brandRed, in: Circle())
+                    .foregroundStyle(SQColor.onAccent)
+                    .sqShadowAccent()
             }
             .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
             .accessibilityLabel(isSending ? "Envoi en cours" : "Envoyer la réponse")
         }
-        .padding()
-        .background(SQColor.surface)
-        .overlay(alignment: .top) { Divider().overlay(SQColor.separator) }
+        .padding(.horizontal, SQSpace.md + 2)
+        .padding(.vertical, SQSpace.sm + 2)
+        .background {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay(SQColor.surfaceGlass)
+                .ignoresSafeArea(edges: .bottom)
+        }
     }
 
     // MARK: Données

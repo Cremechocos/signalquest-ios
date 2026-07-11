@@ -114,22 +114,10 @@ struct CommentsSheet: View {
         .task { await model.load() }
     }
 
-    /// En-tête éditorial : poignée nette + kicker rouge, filet bas 1px.
+    /// En-tête « Crème » : poignée seule, sans filet ni kicker (le titre est
+    /// porté par la barre de navigation).
     private var sheetHeader: some View {
-        VStack(spacing: SQSpace.xs) {
-            SQSheetHandle()
-            Text("Commentaires")
-                .sqKicker()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, SQSpace.lg)
-                .padding(.bottom, SQSpace.sm + 2)
-        }
-        .background(SQColor.surface)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(SQColor.separator)
-                .frame(height: 1)
-        }
+        SQSheetHandle()
     }
 
     @ViewBuilder
@@ -156,33 +144,41 @@ struct CommentsSheet: View {
         }
     }
 
+    /// Rangée « Crème » : avatar + bulle douce `SurfaceMuted` rayon 14, sans
+    /// bordure ; le like se pose sous la bulle.
     private func commentRow(_ comment: SocialComment) -> some View {
         HStack(alignment: .top, spacing: SQSpace.sm + 2) {
             authorButton(comment) {
                 SQAvatar(url: comment.author.avatarUrl, name: comment.author.displayName, size: 36)
             }
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
-                HStack {
-                    authorButton(comment) {
-                        Text(comment.author.displayName)
-                            .font(SQFont.archivo(15, .semibold))
-                            .foregroundStyle(SQColor.label)
+            VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    HStack {
+                        authorButton(comment) {
+                            Text(comment.author.displayName)
+                                .font(SQFont.body(15, .semibold))
+                                .foregroundStyle(SQColor.label)
+                        }
+                        Spacer()
+                        if let created = comment.createdAt {
+                            Text(created, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelTertiary)
+                        }
                     }
-                    Spacer()
-                    if let created = comment.createdAt {
-                        Text(created, format: .relative(presentation: .named, unitsStyle: .abbreviated))
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelTertiary)
-                    }
+                    Text(comment.text)
+                        .font(SQType.body)
+                        .foregroundStyle(SQColor.label)
                 }
-                Text(comment.text)
-                    .font(SQType.body)
-                    .foregroundStyle(SQColor.label)
+                .padding(SQSpace.md)
+                .background(
+                    SQColor.surfaceMuted,
+                    in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                )
                 likeButton(comment)
+                    .padding(.leading, SQSpace.xs)
             }
         }
-        .padding(SQSpace.md)
-        .sqEditorialCard()
     }
 
     /// Cœur toujours tappable (like/unlike) ; le compteur n'apparaît qu'à partir
@@ -237,23 +233,29 @@ struct CommentsSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.sm)
-            .background(SQColor.danger.opacity(0.10))
+            .background(SQColor.dangerSoft)
             .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
     private var composer: some View {
         let isDisabled = model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isSending
         return HStack(spacing: SQSpace.sm + 2) {
+            // Champ capsule « Crème » : SurfaceMuted, sans bordure, 44 pt mini.
             TextField("Ajoute un commentaire", text: $model.draft, axis: .vertical)
-                .textFieldStyle(SQTextFieldStyle())
+                .font(SQType.body)
+                .foregroundStyle(SQColor.label)
                 .lineLimit(1...4)
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.vertical, SQSpace.sm + 2)
+                .frame(minHeight: 44)
+                .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
             Button {
                 Task { await model.send() }
             } label: {
                 Image(systemName: model.isSending ? "ellipsis" : "paperplane.fill")
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 48, height: 48)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(SQColor.onAccent)
+                    .frame(width: 44, height: 44)
                     .background(SQColor.brandRed, in: Circle())
                     .opacity(isDisabled ? 0.45 : 1)
                     .sqAnimation(SQMotion.fast, value: isDisabled)
@@ -264,10 +266,5 @@ struct CommentsSheet: View {
         }
         .padding(SQSpace.md)
         .background(SQColor.surface)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(SQColor.separator)
-                .frame(height: 1)
-        }
     }
 }

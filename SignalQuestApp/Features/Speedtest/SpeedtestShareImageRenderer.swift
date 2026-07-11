@@ -1,13 +1,17 @@
 import UIKit
 import SwiftUI
 
-/// Carte de partage d'un speedtest — réplique fidèle de l'image Android
-/// (`SpeedTestShareImageGenerator.kt`, `getModernDashboardHTML`) : tableau de
-/// bord sombre 1080×720, deux cartes Download (vert) / Upload (orange) avec gros
-/// chiffres + MAX + **graphes réels** dont le trait est coloré selon la qualité
-/// de chaque point (rouge→vert, comme la jauge live), bandeau latence, pied
-/// appareil, et logo Signal Quest. Rendu nativement via `ImageRenderer`
-/// (instantané, contrairement au WebView Android).
+/// Carte de partage d'un speedtest — même structure que l'image Android
+/// (`SpeedTestShareImageGenerator.kt`) mais habillée DA « Crème & Terre cuite » :
+/// tableau de bord 1080×720, deux cartes Download (olive) / Upload (ambre) avec
+/// gros chiffres Bricolage + Max + **graphes réels** dont le trait est coloré
+/// selon la qualité de chaque point (danger→ambre→olive, comme la jauge live),
+/// bandeau latence, pied appareil, et logo Signal Quest. Rendu nativement via
+/// `ImageRenderer` (instantané, contrairement au WebView Android).
+///
+/// ⚠️ Rendu HORS hiérarchie de vues : les tokens dynamiques (`SQColor`) ne se
+/// résolvent pas de façon déterministe dans `ImageRenderer` — les hex de la DA
+/// sont donc codés en dur ici (exception admise par le contrat de design).
 enum SpeedtestShareImageRenderer {
     private static let cardSize = CGSize(width: 1080, height: 720)
     private static let exportScale: CGFloat = 3
@@ -65,7 +69,12 @@ struct SpeedtestShareTheme {
     let isDark: Bool
     let background: Color
     let surface: Color
-    let border: Color
+    /// Tuiles internes / fond de graphe (crème secondaire, façon `surfaceMuted`).
+    let surfaceMuted: Color
+    /// Lignes de grille du graphe uniquement (pas de bordures de cartes).
+    let separator: Color
+    /// Brique — marque et petits accents éditoriaux.
+    let accent: Color
     let downloadAccent: Color
     let uploadAccent: Color
     let textPrimary: Color
@@ -73,35 +82,39 @@ struct SpeedtestShareTheme {
     /// Palette qualité worst→best (couleur du trait selon la vitesse).
     let qualityStops: [Color]
 
-    /// Sombre — thème Android (#050505) + palette signal *Dark.
+    /// Sombre — nuit brun chaud de la DA « Crème & Terre cuite ».
     static let dark = SpeedtestShareTheme(
         isDark: true,
-        background: Color(hex: 0x050505),
-        surface: Color(hex: 0x0C0C0C),
-        border: Color(hex: 0x262626),
-        downloadAccent: Color(hex: 0x22C55E),
-        uploadAccent: Color(hex: 0xF97316),
-        textPrimary: .white,
-        textSecondary: Color(hex: 0xA3A3A3),
+        background: Color(hex: 0x191410),
+        surface: Color(hex: 0x262019),
+        surfaceMuted: Color(hex: 0x332B20),
+        separator: Color(hex: 0x3A3226),
+        accent: Color(hex: 0xD97A66),
+        downloadAccent: Color(hex: 0xA3B37A),
+        uploadAccent: Color(hex: 0xDCA95E),
+        textPrimary: Color(hex: 0xF2EAD9),
+        textSecondary: Color(hex: 0xA8987E),
         qualityStops: [
-            Color(hex: 0xF87171), Color(hex: 0xFB923C), Color(hex: 0xFDE047),
-            Color(hex: 0xA3E635), Color(hex: 0x4ADE80),
+            Color(hex: 0xE37E6B), Color(hex: 0xDF9364), Color(hex: 0xDCA95E),
+            Color(hex: 0xBFAE6C), Color(hex: 0xA3B37A),
         ]
     )
 
-    /// Clair — papier crème de la DA + palette signal *Light, accents lisibles.
+    /// Clair — papier crème de la DA, accents olive (download) / ambre (upload).
     static let light = SpeedtestShareTheme(
         isDark: false,
-        background: Color(hex: 0xF4F0E6),
-        surface: Color(hex: 0xFBF9F3),
-        border: Color(hex: 0xC4BCA6),
-        downloadAccent: Color(hex: 0x16A34A),
-        uploadAccent: Color(hex: 0xEA580C),
-        textPrimary: Color(hex: 0x18150F),
-        textSecondary: Color(hex: 0x6B6457),
+        background: Color(hex: 0xF3EDE2),
+        surface: Color(hex: 0xFBF7EF),
+        surfaceMuted: Color(hex: 0xEDE5D5),
+        separator: Color(hex: 0xE5DCC9),
+        accent: Color(hex: 0xB04A3C),
+        downloadAccent: Color(hex: 0x7E8C5C),
+        uploadAccent: Color(hex: 0xC08A3E),
+        textPrimary: Color(hex: 0x332818),
+        textSecondary: Color(hex: 0x8D7C64),
         qualityStops: [
-            Color(hex: 0xEF4444), Color(hex: 0xF97316), Color(hex: 0xEAB308),
-            Color(hex: 0x84CC16), Color(hex: 0x22C55E),
+            Color(hex: 0xC13B2C), Color(hex: 0xC06235), Color(hex: 0xC08A3E),
+            Color(hex: 0x9F8B4D), Color(hex: 0x7E8C5C),
         ]
     )
 
@@ -111,6 +124,7 @@ struct SpeedtestShareTheme {
 }
 
 // MARK: - Palette qualité (port de SpeedtestGaugeColors.colorForFillRatio)
+// Rampe DA : danger (brique vive) → ambre → olive, au lieu du rouge→vert data-viz.
 
 enum SpeedtestQualityPalette {
     private static let positions: [Double] = [0.075, 0.25, 0.45, 0.675, 0.90]
@@ -181,7 +195,9 @@ private struct SpeedtestShareCard: View {
 
     private var bg: Color { theme.background }
     private var surface: Color { theme.surface }
-    private var border: Color { theme.border }
+    private var surfaceMuted: Color { theme.surfaceMuted }
+    private var separator: Color { theme.separator }
+    private var accent: Color { theme.accent }
     private var downloadAccent: Color { theme.downloadAccent }
     private var uploadAccent: Color { theme.uploadAccent }
     private var textPrimary: Color { theme.textPrimary }
@@ -218,18 +234,17 @@ private struct SpeedtestShareCard: View {
         // VStack à espacement nul aligné en haut.
         VStack(spacing: 0) {
             header
-            Rectangle().fill(border).frame(height: 1).padding(.top, 22)
 
             Spacer(minLength: 24)
 
             HStack(spacing: 30) {
                 statCard(
-                    label: "DOWNLOAD", accent: downloadAccent,
+                    label: "Download", accent: downloadAccent,
                     avg: result.downloadAverageMbps, maxValue: result.downloadMaxMbps,
                     series: dlSeries, gaugeMax: dlGaugeMax, graphId: "dl"
                 )
                 statCard(
-                    label: "UPLOAD", accent: uploadAccent,
+                    label: "Upload", accent: uploadAccent,
                     avg: result.uploadAverageMbps ?? 0, maxValue: result.uploadMaxMbps ?? (result.uploadAverageMbps ?? 0),
                     series: ulSeries, gaugeMax: ulGaugeMax, graphId: "ul"
                 )
@@ -250,19 +265,19 @@ private struct SpeedtestShareCard: View {
     private var footer: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 10) {
-                RoundedRectangle(cornerRadius: 3).fill(downloadAccent).frame(width: 88, height: 6)
+                RoundedRectangle(cornerRadius: 3, style: .continuous).fill(accent).frame(width: 88, height: 6)
                 Text(device)
-                    .font(SQFont.body(15))
+                    .font(SQFont.bodyFixed(15))
                     .foregroundStyle(textSecondary)
                     .lineLimit(1)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 6) {
                 Text("signalquest.fr")
-                    .font(SQFont.archivo(17, .semibold))
+                    .font(SQFont.displayFixed(17, .semibold))
                     .foregroundStyle(textPrimary)
                 Text(dateLabel)
-                    .font(SQFont.body(13))
+                    .font(SQFont.bodyFixed(13))
                     .foregroundStyle(textSecondary)
                     .lineLimit(1)
             }
@@ -278,14 +293,13 @@ private struct SpeedtestShareCard: View {
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 46, height: 46)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                Text("SIGNAL QUEST")
-                    .font(SQFont.archivo(20, .bold))
-                    .tracking(5)
+                Text("Signal Quest")
+                    .font(SQFont.displayFixed(24, .bold))
                     .foregroundStyle(textPrimary)
             }
             Spacer()
             Text("\(city) • \(network)")
-                .font(SQFont.body(16))
+                .font(SQFont.bodyFixed(16))
                 .foregroundStyle(textSecondary)
                 .lineLimit(1)
         }
@@ -295,26 +309,25 @@ private struct SpeedtestShareCard: View {
         let lineColor = SpeedtestQualityPalette.color(forValue: avg, gaugeMax: gaugeMax, stops: theme.qualityStops)
         return VStack(alignment: .leading, spacing: 0) {
             Text(label)
-                .font(SQFont.archivo(14, .semibold))
-                .tracking(2)
+                .font(SQFont.bodyFixed(15, .semibold))
                 .foregroundStyle(accent)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(formatSpeed(avg))
-                    .font(SQFont.archivo(76, .bold))
+                    .font(SQFont.displayFixed(76, .bold))
                     .foregroundStyle(textPrimary)
                 Text("Mbps")
-                    .font(SQFont.archivo(20, .medium))
+                    .font(SQFont.bodyFixed(20, .medium))
                     .foregroundStyle(textSecondary)
             }
             HStack(spacing: 6) {
-                Text("MAX")
-                    .font(SQFont.archivo(14, .semibold))
+                Text("Max")
+                    .font(SQFont.bodyFixed(14, .semibold))
                     .foregroundStyle(textSecondary)
                 Text(formatSpeed(maxValue))
-                    .font(SQFont.archivo(17, .bold))
+                    .font(SQFont.displayFixed(17, .bold))
                     .foregroundStyle(textPrimary)
                 Text("Mbps")
-                    .font(SQFont.archivo(11, .semibold))
+                    .font(SQFont.bodyFixed(11, .semibold))
                     .foregroundStyle(textSecondary)
             }
             .padding(.top, 6)
@@ -324,7 +337,8 @@ private struct SpeedtestShareCard: View {
                 gaugeMax: gaugeMax,
                 accent: lineColor,
                 qualityStops: theme.qualityStops,
-                gridColor: border,
+                plotBackground: surfaceMuted,
+                gridColor: separator,
                 emptyTextColor: textSecondary
             )
             .frame(height: 128)
@@ -332,11 +346,7 @@ private struct SpeedtestShareCard: View {
         }
         .padding(28)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(surface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .shadow(color: lineColor.opacity(theme.isDark ? 0.08 : 0.04), radius: 24, x: 0, y: 12)
-        .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(border, lineWidth: 1)
-        }
+        .background(surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var latencyStrip: some View {
@@ -362,37 +372,33 @@ private struct SpeedtestShareCard: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(border, lineWidth: 1)
-        }
+        .background(surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private func latencyChip(label: String, value: String, jitter: Double?, tint: Color) -> some View {
         HStack(spacing: 10) {
             Text(label)
-                .font(SQFont.archivo(12, .bold))
-                .tracking(1.1)
+                .font(SQFont.bodyFixed(12, .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 40, alignment: .leading)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
-                    .font(SQFont.archivo(22, .bold))
+                    .font(SQFont.displayFixed(22, .bold))
                     .foregroundStyle(textPrimary)
                 Text("ms")
-                    .font(SQFont.archivo(11, .semibold))
+                    .font(SQFont.bodyFixed(11, .semibold))
                     .foregroundStyle(textSecondary)
             }
             Spacer(minLength: 0)
             Text(jitter.map { "jitter \(String(format: "%.1f", $0))" } ?? "jitter —")
-                .font(SQFont.body(11))
+                .font(SQFont.bodyFixed(11))
                 .foregroundStyle(textSecondary)
                 .lineLimit(1)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(bg.opacity(theme.isDark ? 0.72 : 0.55), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(surfaceMuted, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func formatSpeed(_ value: Double) -> String {
@@ -407,12 +413,13 @@ private struct SpeedtestShareCard: View {
 
 /// Graphe d'une série speedtest, fidèle à `generateGraphSvg` d'Android :
 /// remplissage dégradé, glow, et trait dont la couleur suit la qualité de
-/// chaque point (rouge→vert). « Série réelle indisponible » si < 2 points.
+/// chaque point (rampe DA danger→ambre→olive). Trait pointillé si < 2 points.
 private struct SpeedtestShareGraph: View {
     let series: [Double]
     let gaugeMax: Double
     let accent: Color
     let qualityStops: [Color]
+    let plotBackground: Color
     let gridColor: Color
     let emptyTextColor: Color
 
@@ -439,7 +446,7 @@ private struct SpeedtestShareGraph: View {
         GeometryReader { proxy in
             chart(in: proxy.size)
         }
-        .background(Color.primary.opacity(0.02), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(plotBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func chart(in size: CGSize) -> some View {

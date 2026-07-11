@@ -46,14 +46,15 @@ struct CoverageCardView: View {
                     SQEditorialTag(text: signal?.technology ?? signal?.detectedTechs.first ?? "—", color: accent)
                 }
 
+                // Tuile mise en avant en accent brique (DA), pas en couleur techno.
                 LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
                     if hasSessionAggregate {
-                        CardMetricTile(label: "Distance", value: SignalFormatters.meters(signal?.distanceMeters), highlight: true, accent: accent)
+                        CardMetricTile(label: "Distance", value: SignalFormatters.meters(signal?.distanceMeters), highlight: true)
                         CardMetricTile(label: "Durée", value: SignalFormatters.duration(signal?.durationSeconds))
                         CardMetricTile(label: "Points", value: signal?.pointsCount.map(String.init) ?? "—")
                         CardMetricTile(label: "Signal moy.", value: SignalFormatters.dbm(signal?.averageSignalDbm ?? signal?.rsrp))
                     } else {
-                        CardMetricTile(label: "Tech", value: signal?.technology ?? "—", highlight: true, accent: accent)
+                        CardMetricTile(label: "Tech", value: signal?.technology ?? "—", highlight: true)
                         CardMetricTile(label: "Signal", value: SignalFormatters.dbm(signal?.averageSignalDbm ?? signal?.rsrp))
                         CardMetricTile(label: "Cell", value: signal?.cellId ?? "—")
                         CardMetricTile(label: "PCI", value: signal?.pci.map(String.init) ?? "—")
@@ -70,6 +71,7 @@ struct CoverageCardView: View {
                 if !item.text.isEmpty {
                     Text(item.text)
                         .font(SQType.body)
+                        .lineSpacing(3)
                         .foregroundStyle(SQColor.label)
                 }
 

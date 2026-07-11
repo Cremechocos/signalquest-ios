@@ -28,24 +28,43 @@ struct StoriesBar: View {
         }
     }
 
+    /// « Ta story » : cercle 60 SurfaceMuted, initiale (ou +) en encre
+    /// secondaire, badge « + » brique 21 pt cerclé de la couleur du fond.
     private var composeBubble: some View {
         Button {
             Haptics.light()
             onCompose()
         } label: {
-            VStack(spacing: SQSpace.sm) {
-                SQAvatar(url: currentUser?.avatarUrl, name: currentUser?.displayName ?? "+", size: 62)
-                    .overlay(alignment: .bottomTrailing) {
-                        Circle()
-                            .fill(SQColor.brandRed)
-                            .frame(width: 22, height: 22)
-                            .overlay(Image(systemName: "plus").font(.caption.weight(.bold)).foregroundStyle(.white))
-                            .overlay(Circle().stroke(SQColor.bg, lineWidth: 2))
+            VStack(spacing: SQSpace.sm - 1) {
+                ZStack {
+                    Circle().fill(SQColor.surfaceMuted)
+                    if let initial = currentUser?.displayName.first {
+                        Text(String(initial).uppercased())
+                            .font(SQFont.display(23, .semibold))
+                            .foregroundStyle(SQColor.labelSecondary)
+                    } else {
+                        Image(systemName: "plus")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(SQColor.labelSecondary)
                     }
+                }
+                .frame(width: 60, height: 60)
+                .padding(3)
+                .overlay(alignment: .bottomTrailing) {
+                    Circle()
+                        .fill(SQColor.brandRed)
+                        .frame(width: 21, height: 21)
+                        .overlay(
+                            Image(systemName: "plus")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(SQColor.onAccent)
+                        )
+                        .overlay(Circle().stroke(SQColor.bg, lineWidth: 2))
+                }
                 Text("Ta story")
-                    .font(.caption)
+                    .font(SQType.caption)
                     .foregroundStyle(SQColor.label)
-                    .frame(width: 74)
+                    .frame(width: 70)
             }
         }
         .buttonStyle(.plain)

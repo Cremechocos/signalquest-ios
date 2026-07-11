@@ -204,10 +204,6 @@ struct ExploreView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.xl) {
-                Text("Découvrir le réseau")
-                    .sqKicker()
-                    .padding(.horizontal, SQSpace.xxs)
-
                 SQSearchField(text: $model.searchText, placeholder: "Rechercher un utilisateur") {
                     model.scheduleSearch()
                 }
@@ -263,8 +259,6 @@ struct ExploreView: View {
     @ViewBuilder
     private var searchSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            Text("Résultats")
-                .sqKicker()
             SQSectionHeader("Utilisateurs")
             if model.isSearching {
                 ProgressView()
@@ -328,8 +322,6 @@ struct ExploreView: View {
 
     private var trendingSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            Text("Tendances")
-                .sqKicker()
             SQSectionHeader("À la une")
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: SQSpace.sm) {
@@ -341,26 +333,28 @@ struct ExploreView: View {
                         } label: {
                             HStack(spacing: SQSpace.xs + 2) {
                                 Text("#\(tag.tag)")
-                                    .font(SQFont.archivo(14, .bold))
+                                    .font(SQFont.body(13, .semibold))
                                 Text(SignalFormatters.count(tag.postCount))
                                     .font(SQType.micro)
                                     .opacity(0.8)
                             }
-                            .padding(.horizontal, SQSpace.md)
+                            .padding(.horizontal, SQSpace.md + 1)
                             .padding(.vertical, SQSpace.sm)
                             .background(
                                 isOn ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
-                                in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                                in: Capsule(style: .continuous)
                             )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                                    .stroke(isOn ? Color.clear : SQColor.separator, lineWidth: 1.5)
-                            }
-                            .foregroundStyle(isOn ? .white : SQColor.label)
+                            .foregroundStyle(isOn ? SQColor.onAccent : SQColor.label)
+                            .sqShadowSoft()
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityAddTraits(isOn ? .isSelected : [])
                     }
                 }
+                .padding(.horizontal, SQSpace.xxs)
+                .padding(.vertical, SQSpace.xs)
             }
         }
     }
@@ -419,8 +413,6 @@ struct ExploreView: View {
     @ViewBuilder
     private var suggestionsSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            Text("À suivre")
-                .sqKicker()
             SQSectionHeader("Suggestions")
             if model.suggestions.isEmpty {
                 EmptyStateView(
@@ -468,18 +460,16 @@ struct ExploreView: View {
                 model.toggleFollow(author)
             } label: {
                 Text(followed ? "Abonné" : "Suivre")
-                    .font(SQFont.archivo(13, .bold))
+                    .font(SQFont.body(13, .semibold))
                     .padding(.horizontal, SQSpace.md + 2)
                     .padding(.vertical, SQSpace.sm)
                     .background(
-                        followed ? AnyShapeStyle(SQColor.surface) : AnyShapeStyle(SQColor.brandRed),
-                        in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                        followed ? AnyShapeStyle(SQColor.surfaceMuted) : AnyShapeStyle(SQColor.brandRed),
+                        in: Capsule(style: .continuous)
                     )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                            .stroke(followed ? SQColor.label : Color.clear, lineWidth: 2)
-                    }
-                    .foregroundStyle(followed ? SQColor.label : .white)
+                    .foregroundStyle(followed ? SQColor.label : SQColor.onAccent)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .sqLikePop(trigger: model.followPopTick)

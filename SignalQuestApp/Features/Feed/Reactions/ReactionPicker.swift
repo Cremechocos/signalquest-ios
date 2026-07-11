@@ -33,9 +33,8 @@ struct ReactionPicker: View {
             }
         }
         .padding(SQSpace.sm)
-        .background(SQColor.surface, in: Capsule())
-        .overlay { Capsule().stroke(SQColor.separator, lineWidth: 1.5) }
-        .shadow(color: .black.opacity(0.28), radius: 16, x: 0, y: 8)
+        .background(SQColor.surface, in: Capsule(style: .continuous))
+        .sqShadowDock()
         .onAppear { appeared = true }
     }
 }

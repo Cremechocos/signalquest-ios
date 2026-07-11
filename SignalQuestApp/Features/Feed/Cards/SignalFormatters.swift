@@ -56,33 +56,27 @@ enum TechAccent {
     }
 }
 
-/// Tag éditorial (signature de la landing) : libellé MAJUSCULE Archivo Bold,
-/// fond teinté léger, coin net `SQRadius.sm`, fin filet de la couleur. Remplace
-/// les pilules molles des cartes par un « tag imprimé » à fort contraste.
+/// Tag de carte (DA Crème) : capsule teintée douce, libellé Figtree SemiBold
+/// 11,5 pt en casse normale (« Speedtest », « Photo »). Ni bordure, ni
+/// majuscules.
 struct SQEditorialTag: View {
     let text: String
     var color: Color = SQColor.brandRed
 
     var body: some View {
         Text(text)
-            .font(SQType.micro)
-            .tracking(0.8)
-            .textCase(.uppercase)
+            .font(SQFont.body(11.5, .semibold))
             .lineLimit(1)
-            .padding(.horizontal, SQSpace.sm)
+            .padding(.horizontal, SQSpace.sm + 2)
             .padding(.vertical, SQSpace.xs + 1)
             .foregroundStyle(color)
-            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                    .stroke(color.opacity(0.45), lineWidth: 1)
-            }
+            .background(color.opacity(0.13), in: Capsule(style: .continuous))
     }
 }
 
 /// A simple "label / value" tile reused by every specialised card. Style
-/// éditorial : label MAJUSCULE tracé (Archivo), valeur en chiffres marqués,
-/// surface mate à coin net `SQRadius.sm`.
+/// « Crème » : tuile `SurfaceMuted` rayon 14 sans bordure, label Figtree 11
+/// secondaire en casse normale, valeur Bricolage Bold 15 (accent si highlight).
 struct CardMetricTile: View {
     let label: String
     let value: String
@@ -90,26 +84,20 @@ struct CardMetricTile: View {
     var accent: Color = SQColor.brandRed
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(SQType.micro)
-                .tracking(0.7)
-                .textCase(.uppercase)
-                .foregroundStyle(SQColor.labelTertiary)
+                .font(SQFont.body(11))
+                .foregroundStyle(SQColor.labelSecondary)
             Text(value)
-                .font(SQFont.archivo(15, .bold))
+                .font(SQFont.display(15, .bold))
                 .foregroundStyle(highlight ? accent : SQColor.label)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, SQSpace.sm)
-        .padding(.horizontal, SQSpace.sm + 2)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1)
-        }
+        .padding(.vertical, SQSpace.sm + 2)
+        .padding(.horizontal, SQSpace.md)
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         // VoiceOver : « libellé : valeur » d'un bloc (Down 240 Mbps), pas 2 textes.
         .accessibilityElement(children: .combine)
         .accessibilityLabel(label)
@@ -151,7 +139,7 @@ struct CardHeader: View {
             SQAvatar(url: author.avatarUrl, name: author.displayName)
             VStack(alignment: .leading, spacing: 2) {
                 Text(author.displayName)
-                    .font(SQType.heading)
+                    .font(SQFont.body(16, .semibold))
                     .foregroundStyle(SQColor.label)
                 HStack(spacing: 6) {
                     if let place {
@@ -166,7 +154,7 @@ struct CardHeader: View {
                     }
                 }
                 .font(SQType.caption)
-                .foregroundStyle(SQColor.labelTertiary)
+                .foregroundStyle(SQColor.labelSecondary)
             }
         }
     }
@@ -218,7 +206,7 @@ struct CardActionsBar: View {
             .accessibilityLabel("Partager")
         }
         .buttonStyle(.plain)
-        .font(SQFont.archivo(15, .semibold))
+        .font(SQFont.body(14, .semibold))
         .overlay(alignment: .topLeading) {
             if showReactionPicker {
                 ReactionPicker { emoji in
@@ -294,19 +282,21 @@ struct CardActionsBar: View {
 // MARK: - Editorial card surface
 
 extension View {
-    /// Surface de carte éditoriale (DA landing) : fond `surface`, coin net
-    /// `SQRadius.lg`, filet `separator` 1,5px pour l'aspect imprimé. Pas
-    /// d'ombre ni de glassmorphism — le contraste vient de la bordure et de la
-    /// typo. Passe `clip = true` pour rogner un média plein cadre (PhotoCard).
-    func sqEditorialCard(clip: Bool = false) -> some View {
-        let shape = RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
+    /// Surface de carte douce (DA « Crème & Terre cuite ») : fond
+    /// `SurfaceElevated`, rayon 22 continu, ombre carte chaude. Zéro bordure
+    /// (règle No-Border). Passe `clip = true` pour rogner un média plein cadre
+    /// (PhotoCard).
+    func sqSoftCard(clip: Bool = false) -> some View {
+        let shape = RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
         return self
             .background(SQColor.surface, in: shape)
             .modifier(ConditionalClip(shape: shape, clip: clip))
-            .overlay { shape.stroke(SQColor.separator, lineWidth: 1.5) }
-            // Profondeur discrète : on garde la signature « imprimée » (bordure + typo)
-            // mais on décolle la carte du fond avec une ombre douce (dark-mode friendly).
-            .shadow(color: .black.opacity(0.16), radius: 11, x: 0, y: 5)
+            .sqShadowCard()
+    }
+
+    /// Alias historique : les ~15 appels existants passent sur la carte douce.
+    func sqEditorialCard(clip: Bool = false) -> some View {
+        sqSoftCard(clip: clip)
     }
 }
 

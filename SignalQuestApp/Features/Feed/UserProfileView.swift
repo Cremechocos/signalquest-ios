@@ -225,6 +225,7 @@ struct UserProfileView: View {
 
     @State private var presentedSheet: ProfileSheet?
     @State private var showBlockConfirm = false
+    @State private var showRemoveFriendConfirm = false
 
     private enum ProfileSheet: Identifiable {
         case detail(UnifiedSocialFeedItem)
@@ -273,27 +274,6 @@ struct UserProfileView: View {
         .navigationTitle(model.profile?.displayName ?? model.prefill?.displayName ?? "Profil")
         .navigationBarTitleDisplayMode(.inline)
         .signalQuestBackground()
-        .toolbar {
-            if model.profile?.isSelf == false {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button {
-                            presentedSheet = .reportUser
-                        } label: {
-                            Label("Signaler ce profil", systemImage: "flag")
-                        }
-                        Button(role: .destructive) {
-                            showBlockConfirm = true
-                        } label: {
-                            Label("Bloquer", systemImage: "hand.raised")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                    .accessibilityLabel("Plus d’actions")
-                }
-            }
-        }
         .task {
             if model.profile == nil { await model.load() }
         }
@@ -330,6 +310,65 @@ struct UserProfileView: View {
         }
     }
 
+    /// Menu de gestion de la relation : bouton « ⋯ » circulaire 40 pt
+    /// (surface + ombre repos, règle DA des boutons d'en-tête).
+    /// « Retirer des amis » n'apparaît que si l'amitié est active.
+    private func manageMenu(_ profile: SocialUserProfile) -> some View {
+        Menu {
+            if profile.isFriend {
+                Button(role: .destructive) {
+                    showRemoveFriendConfirm = true
+                } label: {
+                    Label("Retirer des amis", systemImage: "person.fill.xmark")
+                }
+            }
+            Button {
+                presentedSheet = .reportUser
+            } label: {
+                Label("Signaler ce profil", systemImage: "flag")
+            }
+            Button(role: .destructive) {
+                showBlockConfirm = true
+            } label: {
+                Label("Bloquer", systemImage: "hand.raised")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(SQColor.label)
+                .frame(width: 40, height: 40)
+                .background(SQColor.surface, in: Circle())
+                .sqShadowSoft()
+                .contentShape(Circle())
+        }
+        .accessibilityLabel("Gérer la relation avec \(profile.displayName)")
+        // Attaché au menu (et non au ScrollView) : un seul confirmationDialog
+        // par nœud de hiérarchie, celui du blocage vit déjà sur le ScrollView.
+        .confirmationDialog(
+            "Retirer \(profile.displayName) de tes amis ?",
+            isPresented: $showRemoveFriendConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Retirer des amis", role: .destructive) { Task { await removeFriend() } }
+        } message: {
+            Text("Vous ne partagerez plus vos positions ni vos mesures. Tu pourras renvoyer une demande plus tard.")
+        }
+    }
+
+    /// Retire l'amitié puis recharge le profil : `isFriend` est immuable côté
+    /// modèle et le serveur reste la source de vérité.
+    private func removeFriend() async {
+        guard let id = model.profile?.id else { return }
+        do {
+            try await services.friends.remove(userId: id)
+            Haptics.success()
+            await model.load()
+        } catch {
+            model.errorMessage = error.localizedDescription
+            Haptics.error()
+        }
+    }
+
     /// Bloque l'utilisateur consulté (Guideline 1.2) puis ferme l'écran : son
     /// contenu disparaît immédiatement de la pile de navigation courante.
     private func blockUser() async {
@@ -353,8 +392,6 @@ struct UserProfileView: View {
             HStack(alignment: .center, spacing: SQSpace.lg) {
                 avatar
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
-                    Text(profile?.isSelf == true ? "Ton profil" : "Profil")
-                        .sqKicker()
                     Text(profile?.displayName ?? model.prefill?.displayName ?? "Utilisateur")
                         .font(SQType.title)
                         .foregroundStyle(SQColor.label)
@@ -371,6 +408,9 @@ struct UserProfileView: View {
                     }
                 }
                 Spacer()
+                if let profile, !profile.isSelf {
+                    manageMenu(profile)
+                }
             }
 
             if let bio = profile?.bio, !bio.isEmpty {
@@ -425,8 +465,8 @@ struct UserProfileView: View {
     }
 
     private func followButton(_ profile: SocialUserProfile) -> some View {
-        // Bouton plat éditorial : rouge plein quand non suivi, contour encre 2px
-        // quand suivi (cf. GradientButton .primary / .secondary).
+        // Capsule « Crème » : encre pleine quand non suivi, surface + ombre
+        // repos quand suivi (cf. GradientButton .primary / .secondary).
         GradientButton(
             profile.isFollowing ? "Abonné" : "Suivre",
             systemImage: profile.isFollowing ? "checkmark" : "person.badge.plus",

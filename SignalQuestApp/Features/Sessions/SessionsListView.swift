@@ -74,46 +74,49 @@ struct SessionsListView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                Picker("Type", selection: $model.filter) {
-                    ForEach(SessionsListViewModel.Filter.allCases) { f in
-                        Text(f.label).tag(f)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+                SQSegmentedFilter(
+                    selection: $model.filter,
+                    options: SessionsListViewModel.Filter.allCases.map { (value: $0, label: $0.label, icon: String?.none) }
+                )
+                .padding(.horizontal, -SQSpace.lg)
+                .padding(.bottom, SQSpace.xs)
+
+                if model.filtered.isEmpty && !model.isLoading {
+                    EmptyStateView(
+                        title: "Aucune session",
+                        message: "Tes sessions enregistrées (drive-test, couverture) — y compris depuis Android — apparaîtront ici.",
+                        systemImage: "point.topleft.down.curvedto.point.bottomright.up"
+                    )
+                } else {
+                    ForEach(model.filtered) { session in
+                        NavigationLink {
+                            SessionDetailView(session: session)
+                        } label: {
+                            SessionRow(session: session)
+                        }
+                        .buttonStyle(SQPressButtonStyle())
+                    }
+                    if model.hasMore {
+                        HStack { Spacer(); ProgressView().tint(SQColor.brandRed); Spacer() }
+                            .padding(.vertical, SQSpace.md)
+                            .task { await model.loadMore() }
                     }
                 }
-                .pickerStyle(.segmented)
-                .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: SQSpace.md, bottom: SQSpace.sm, trailing: SQSpace.md))
-                .listRowBackground(Color.clear)
-            }
 
-            if model.filtered.isEmpty && !model.isLoading {
-                emptyState
-                    .listRowBackground(Color.clear)
-            } else {
-                ForEach(model.filtered) { session in
-                    NavigationLink {
-                        SessionDetailView(session: session)
-                    } label: {
-                        SessionRow(session: session)
-                    }
-                }
-                if model.hasMore {
-                    HStack { Spacer(); ProgressView(); Spacer() }
-                        .listRowBackground(Color.clear)
-                        .task { await model.loadMore() }
+                if let errorMessage = model.errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.warning)
+                        .padding(.horizontal, SQSpace.xs)
                 }
             }
-
-            if let errorMessage = model.errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle")
-                    .font(.footnote)
-                    .foregroundStyle(SQColor.warning)
-                    .listRowBackground(Color.clear)
-            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.md)
+            .padding(.bottom, SQSpace.xxl)
         }
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
-        .background(SQColor.bg.ignoresSafeArea())
+        .signalQuestBackground()
         .navigationTitle("Mes sessions")
         .toolbarTitleInlineCompat()
         .refreshable { await model.reload() }
@@ -124,23 +127,6 @@ struct SessionsListView: View {
         }
         .task { if model.sessions.isEmpty { await model.reload() } }
     }
-
-    private var emptyState: some View {
-        VStack(spacing: SQSpace.md) {
-            Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
-                .font(.system(size: 44))
-                .foregroundStyle(SQColor.labelSecondary)
-            Text("Aucune session")
-                .font(.headline)
-                .foregroundStyle(SQColor.label)
-            Text("Tes sessions enregistrées (drive-test, couverture) — y compris depuis Android — apparaîtront ici.")
-                .font(.subheadline)
-                .foregroundStyle(SQColor.labelSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, SQSpace.xxl)
-    }
 }
 
 private struct SessionRow: View {
@@ -149,13 +135,14 @@ private struct SessionRow: View {
     var body: some View {
         HStack(spacing: SQSpace.md) {
             Image(systemName: session.isDriveTest ? "car.fill" : "dot.radiowaves.left.and.right")
-                .font(.title3)
-                .foregroundStyle(.white)
-                .frame(width: 40, height: 40)
-                .background(session.isDriveTest ? SQColor.brandBlue : SQColor.brandOrange, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 42, height: 42)
+                .background(SQColor.accentSoft, in: Circle())
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(session.name ?? (session.isDriveTest ? "Drive-test" : "Couverture"))
-                    .font(.subheadline.weight(.semibold))
+                    .font(SQFont.body(15.5, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1)
                 HStack(spacing: SQSpace.sm) {
@@ -172,23 +159,30 @@ private struct SessionRow: View {
                         Text(date, format: .dateTime.day().month().year())
                     }
                 }
-                .font(.caption2)
+                .font(SQFont.body(11.5, .medium, relativeTo: .caption2))
                 .foregroundStyle(SQColor.labelSecondary)
                 .lineLimit(1)
                 if !session.operators.isEmpty {
                     HStack(spacing: 5) {
                         ForEach(session.operators.prefix(4)) { op in
                             Text(op.label)
-                                .font(.system(size: 11, weight: .bold))
-                                .padding(.horizontal, 6).padding(.vertical, 2)
-                                .background(SessionDetailView.operatorColor(op.colorHex).opacity(0.18), in: Capsule())
+                                .font(SQFont.body(11, .semibold, relativeTo: .caption2))
+                                .padding(.horizontal, 7).padding(.vertical, 2)
+                                .background(SessionDetailView.operatorColor(op.colorHex).opacity(0.14), in: Capsule(style: .continuous))
                                 .foregroundStyle(SessionDetailView.operatorColor(op.colorHex))
                         }
                     }
                 }
             }
-            Spacer()
+            Spacer(minLength: SQSpace.sm)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(SQColor.labelTertiary)
+                .accessibilityHidden(true)
         }
-        .padding(.vertical, 4)
+        .padding(SQSpace.md + 2)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqShadowSoft()
+        .contentShape(Rectangle())
     }
 }

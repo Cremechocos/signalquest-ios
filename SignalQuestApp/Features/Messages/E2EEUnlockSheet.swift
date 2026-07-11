@@ -46,14 +46,19 @@ struct E2EEUnlockSheet: View {
                     VStack(alignment: .leading, spacing: SQSpace.sm) {
                         SecureField(needsCreation ? "Nouveau mot de passe E2EE" : "Mot de passe", text: $password)
                             .textContentType(needsCreation ? .newPassword : .password)
-                            .textFieldStyle(SQTextFieldStyle())
+                            .font(SQType.body)
+                            .foregroundStyle(SQColor.label)
+                            .padding(.horizontal, SQSpace.lg)
+                            .padding(.vertical, SQSpace.sm + 2)
+                            .frame(minHeight: 44)
+                            .background(SQColor.surfaceMuted, in: Capsule())
                             .focused($passwordFocused)
                             .submitLabel(needsCreation ? .done : .go)
                             .onSubmit { if canSubmit { Task { await unlockOrCreate() } } }
 
                         if needsCreation {
                             Label("6 caractères minimum. Ce mot de passe ne quitte jamais ton appareil.", systemImage: "info.circle")
-                                .font(.caption2)
+                                .font(SQFont.body(11.5))
                                 .foregroundStyle(SQColor.labelTertiary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -98,7 +103,7 @@ struct E2EEUnlockSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Annuler") { dismiss() }
-                        .tint(SQColor.brandOrange)
+                        .tint(SQColor.brandRed)
                 }
             }
             // Bouton d'action ÉPINGLÉ : reste visible au-dessus du clavier (le détent
@@ -116,7 +121,12 @@ struct E2EEUnlockSheet: View {
                 .padding(.horizontal, SQSpace.lg + 2)
                 .padding(.top, SQSpace.sm)
                 .padding(.bottom, SQSpace.md)
-                .background(.ultraThinMaterial)
+                .background {
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .overlay(SQColor.surfaceGlass)
+                        .ignoresSafeArea(edges: .bottom)
+                }
             }
             .task {
                 await checkExistingKey()
@@ -135,24 +145,21 @@ struct E2EEUnlockSheet: View {
         .sqAnimation(.snappy(duration: 0.25), value: needsCreation)
     }
 
+    /// Pastille cadenas DA : cercle AccentSoft 46, icône brique — sans halo ni dégradé.
     private var badge: some View {
-        ZStack {
-            Circle()
-                .fill(SQGradient.signal)
-                .frame(width: 76, height: 76)
-                .shadow(color: SQColor.brandPink.opacity(0.45), radius: 18, y: 6)
-            Image(systemName: needsCreation ? "lock.badge.clock" : "lock.shield")
-                .font(.title.weight(.semibold))
-                .foregroundStyle(.white)
-        }
-        .scaleEffect(badgeAppeared ? 1 : 0.9)
-        .opacity(badgeAppeared ? 1 : 0)
-        .onAppear {
-            withAnimation(SQMotion.resolve(SQMotion.emphasized, reduceMotion)) {
-                badgeAppeared = true
+        Image(systemName: needsCreation ? "lock.badge.clock" : "lock.shield")
+            .font(.system(size: 20, weight: .semibold))
+            .foregroundStyle(SQColor.brandRed)
+            .frame(width: 46, height: 46)
+            .background(SQColor.accentSoft, in: Circle())
+            .scaleEffect(badgeAppeared ? 1 : 0.9)
+            .opacity(badgeAppeared ? 1 : 0)
+            .onAppear {
+                withAnimation(SQMotion.resolve(SQMotion.emphasized, reduceMotion)) {
+                    badgeAppeared = true
+                }
             }
-        }
-        .accessibilityHidden(true)
+            .accessibilityHidden(true)
     }
 
     private func checkExistingKey() async {

@@ -887,6 +887,14 @@ struct DriveTestView: View {
         }
     }
 
+    /// Fond des contrôles posés sur la carte : verre crème (`surfaceGlass` sur blur
+    /// système) — la profondeur vient des ombres, jamais d'une bordure.
+    private func mapGlassBackground<S: InsettableShape>(_ shape: S) -> some View {
+        shape
+            .fill(SQColor.surfaceGlass)
+            .background(.ultraThinMaterial, in: shape)
+    }
+
     /// Bouton de légende (masquée par défaut) + légende compacte génération/débit.
     private var mapLegendControl: some View {
         VStack(alignment: .trailing, spacing: SQSpace.xs) {
@@ -894,12 +902,13 @@ struct DriveTestView: View {
                 withAnimation(.easeInOut(duration: 0.2)) { showMapLegend.toggle() }
             } label: {
                 Image(systemName: showMapLegend ? "xmark" : "list.bullet")
-                    .font(.footnote.weight(.bold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(SQColor.label)
-                    .frame(width: 34, height: 34)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .overlay { Circle().stroke(SQColor.separator, lineWidth: 1) }
+                    .frame(width: 40, height: 40)
+                    .background { mapGlassBackground(Circle()) }
+                    .sqShadowSoft()
             }
+            .buttonStyle(SQPressButtonStyle())
             .accessibilityLabel(showMapLegend ? "Masquer la légende" : "Afficher la légende")
             if showMapLegend { mapLegend }
         }
@@ -907,6 +916,8 @@ struct DriveTestView: View {
         .padding(.top, SQSpace.sm)
     }
 
+    // Couleurs data de la légende : mêmes échelles génération/débit que les points
+    // dessinés sur la carte (elles identifient une techno / un débit, pas une surface).
     private var mapLegend: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             legendSection("Génération", items: [
@@ -919,8 +930,8 @@ struct DriveTestView: View {
             ], diamond: true)
         }
         .padding(SQSpace.sm + 2)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .overlay { RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).stroke(SQColor.separator, lineWidth: 1) }
+        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+        .sqShadowCard()
         .frame(width: 146)
         .transition(.opacity.combined(with: .move(edge: .top)))
         .accessibilityHidden(true)
@@ -928,7 +939,7 @@ struct DriveTestView: View {
 
     private func legendSection(_ title: String, items: [(String, Color)], diamond: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.caption2.weight(.bold)).foregroundStyle(SQColor.labelSecondary)
+            Text(title).font(SQFont.body(11, .semibold)).foregroundStyle(SQColor.labelSecondary)
             ForEach(items, id: \.0) { label, color in
                 HStack(spacing: 6) {
                     if diamond {
@@ -936,7 +947,7 @@ struct DriveTestView: View {
                     } else {
                         Circle().fill(color).frame(width: 9, height: 9)
                     }
-                    Text(label).font(.caption2).foregroundStyle(SQColor.label)
+                    Text(label).font(SQFont.body(11.5)).foregroundStyle(SQColor.label)
                 }
             }
         }
@@ -981,35 +992,33 @@ struct DriveTestView: View {
             }
             if let errorMessage = model.errorMessage {
                 Text(errorMessage)
-                    .font(.caption)
+                    .font(SQFont.body(12.5, .medium))
                     .foregroundStyle(SQColor.danger)
+                    .padding(.horizontal, SQSpace.sm + 2)
+                    .padding(.vertical, SQSpace.xs + 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                     .lineLimit(2)
             }
             actionButton
         }
-        .padding(SQSpace.md)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.12), radius: 14, y: 6)
+        .padding(SQSpace.lg)
+        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)) }
+        .sqShadowDock()
     }
 
     /// Sélecteur du contenu du Drive Test (avant démarrage) : couverture / speedtest /
     /// les deux. Persisté via `@AppStorage`. « Couverture » enregistre la génération le
     /// long du trajet sans lancer de test de débit.
     private var modePicker: some View {
-        VStack(spacing: SQSpace.xs) {
-            Picker("Mode du Drive Test", selection: $driveTestModeRaw) {
-                ForEach(DriveTestMode.allCases) { mode in
-                    Text(mode.short).tag(mode.rawValue)
-                }
-            }
-            .pickerStyle(.segmented)
+        VStack(spacing: SQSpace.xs + 2) {
+            SQSegmentedFilter(
+                selection: $driveTestModeRaw,
+                options: DriveTestMode.allCases.map { (value: $0.rawValue, label: $0.short, icon: String?.none) }
+            )
+            .padding(.horizontal, -SQSpace.lg)
             Text(driveTestModeHint)
-                .font(.caption2)
+                .font(SQFont.body(12, .medium))
                 .foregroundStyle(SQColor.labelSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -1030,42 +1039,43 @@ struct DriveTestView: View {
     private var coverageStatusRow: some View {
         HStack(spacing: SQSpace.sm) {
             Image(systemName: "point.3.connected.trianglepath.dotted")
-                .font(.caption.weight(.bold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(SQColor.brandRed)
             Text("Couverture · \(model.coveragePointCount) point\(model.coveragePointCount > 1 ? "s" : "")")
-                .font(.caption.weight(.semibold))
+                .font(SQFont.body(13, .semibold))
                 .foregroundStyle(SQColor.label)
                 .monospacedDigit()
             Spacer()
         }
-        .padding(.horizontal, SQSpace.sm + 2)
-        .padding(.vertical, SQSpace.xs + 2)
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.xs + 3)
         .frame(maxWidth: .infinity)
-        .background(SQColor.fill.opacity(0.6), in: Capsule())
+        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Couverture enregistrée : \(model.coveragePointCount) points")
     }
 
-    /// Bandeau « en pause WiFi » (reprise auto en cellulaire) pendant l'enregistrement.
+    /// Bandeau « en pause WiFi » (reprise auto en cellulaire) pendant l'enregistrement :
+    /// statut ambre en pastille teintée.
     private var pauseBanner: some View {
         HStack(spacing: SQSpace.sm) {
             Image(systemName: "pause.circle.fill")
-                .font(.title3.weight(.bold))
-                .foregroundStyle(SQColor.brandOrange)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(SQColor.warning)
             VStack(alignment: .leading, spacing: 1) {
                 Text("En pause — WiFi détecté")
-                    .font(.caption.weight(.bold))
+                    .font(SQFont.body(13, .semibold))
                     .foregroundStyle(SQColor.label)
                 Text("Reprise automatique en cellulaire")
-                    .font(.caption2)
+                    .font(SQFont.body(11.5))
                     .foregroundStyle(SQColor.labelSecondary)
             }
             Spacer()
         }
-        .padding(.horizontal, SQSpace.sm + 2)
-        .padding(.vertical, SQSpace.xs + 2)
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.xs + 3)
         .frame(maxWidth: .infinity)
-        .background(SQColor.brandOrange.opacity(0.12), in: Capsule())
+        .background(SQColor.warningSoft, in: Capsule(style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Session en pause : WiFi détecté, reprise automatique en cellulaire")
     }
@@ -1074,35 +1084,37 @@ struct DriveTestView: View {
         HStack(spacing: SQSpace.sm) {
             ProgressView().controlSize(.small).tint(SQColor.brandRed)
             Text(model.statusLabel)
-                .font(.caption.weight(.semibold))
+                .font(SQFont.body(13, .semibold))
                 .foregroundStyle(SQColor.label)
                 .lineLimit(1)
             Spacer()
             if model.livePhase == .download || model.livePhase == .upload {
                 Text("\(Int(model.liveMbps.rounded())) Mbps")
-                    .font(.caption.weight(.bold))
+                    .font(SQFont.body(13, .bold))
                     .foregroundStyle(SQColor.brandRed)
                     .monospacedDigit()
             }
         }
-        .padding(.horizontal, SQSpace.sm + 2)
-        .padding(.vertical, SQSpace.xs + 2)
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.xs + 3)
         .frame(maxWidth: .infinity)
-        .background(SQColor.fill.opacity(0.6), in: Capsule())
+        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
     }
 
     private var sectorBanner: some View {
-        HStack(spacing: SQSpace.sm) {
+        HStack(spacing: SQSpace.sm + 2) {
             Image(systemName: sectorIcon)
-                .font(.title3.weight(.bold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(sectorColor)
+                .frame(width: 38, height: 38)
+                .background(sectorSoftColor, in: Circle())
             VStack(alignment: .leading, spacing: 1) {
                 Text(sectorTitle)
-                    .font(.subheadline.weight(.bold))
+                    .font(SQFont.body(14.5, .semibold))
                     .foregroundStyle(SQColor.label)
                 if let detail = sectorDetail {
                     Text(detail)
-                        .font(.caption)
+                        .font(SQFont.body(12))
                         .foregroundStyle(SQColor.labelSecondary)
                 }
             }
@@ -1131,21 +1143,21 @@ struct DriveTestView: View {
                     .opacity(model.displayedOperatorKey == nil ? 0 : 1)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(model.displayedOperatorLabel ?? "Opérateur non identifié")
-                        .font(.subheadline.weight(.semibold))
+                        .font(SQFont.body(15, .semibold))
                         .foregroundStyle(SQColor.label)
                     Text(operatorRowSubtitle)
-                        .font(.caption2)
-                        .foregroundStyle(model.displayedOperatorLabel == nil ? SQColor.brandOrange : SQColor.labelSecondary)
+                        .font(SQFont.body(11.5))
+                        .foregroundStyle(model.displayedOperatorLabel == nil ? SQColor.warning : SQColor.labelSecondary)
                 }
                 Spacer()
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(SQColor.labelTertiary)
             }
-            .padding(.horizontal, SQSpace.sm + 2)
+            .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.xs + 4)
             .frame(maxWidth: .infinity)
-            .background(SQColor.fill.opacity(0.6), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         }
         .accessibilityLabel("Opérateur affiché")
         .accessibilityValue(model.displayedOperatorLabel ?? "non identifié")
@@ -1181,9 +1193,11 @@ struct DriveTestView: View {
                 divider
                 stat(label: "Upload", value: liveValue(model.liveUpload), unit: "Mbps")
             }
+            .padding(.vertical, SQSpace.sm)
+            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             if let summary = model.summary, summary.count > 0 {
                 Text("\(summary.count) test\(summary.count > 1 ? "s" : "") · moy. DL \(Int(summary.avgDownload.rounded())) Mbps · ping min \(Int(summary.minPing.rounded())) ms")
-                    .font(.caption2)
+                    .font(SQFont.body(11.5))
                     .foregroundStyle(SQColor.labelSecondary)
             }
         }
@@ -1200,10 +1214,13 @@ struct DriveTestView: View {
     private func stat(label: String, value: String, unit: String?) -> some View {
         VStack(spacing: 1) {
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(value).font(.headline.weight(.bold)).foregroundStyle(SQColor.label)
-                if let unit { Text(unit).font(.caption2).foregroundStyle(SQColor.labelSecondary) }
+                Text(value)
+                    .font(SQFont.display(20, .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.label)
+                if let unit { Text(unit).font(SQFont.body(11)).foregroundStyle(SQColor.labelSecondary) }
             }
-            Text(label).font(.caption2).foregroundStyle(SQColor.labelSecondary)
+            Text(label).font(SQFont.body(11)).foregroundStyle(SQColor.labelSecondary)
         }
         .frame(maxWidth: .infinity)
     }
@@ -1211,15 +1228,8 @@ struct DriveTestView: View {
     @ViewBuilder
     private var actionButton: some View {
         if model.isRunning {
-            Button { model.stop() } label: {
-                Label("Arrêter le drive test", systemImage: "stop.fill")
-                    .font(SQType.button)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, SQSpace.md)
-                    .foregroundStyle(.white)
-                    .background(SQColor.danger, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-            }
-            .buttonStyle(.plain)
+            // Action en cours / stop = capsule brique (la seule grande surface accent).
+            GradientButton("Arrêter le drive test", systemImage: "stop.fill", style: .accent) { model.stop() }
         } else {
             GradientButton(startButtonTitle, systemImage: "play.fill") { model.start() }
         }
@@ -1242,7 +1252,13 @@ struct DriveTestView: View {
 
     private var sectorColor: Color {
         guard model.nearestSite != nil else { return SQColor.labelSecondary }
-        return model.inSector ? .green : .orange
+        return model.inSector ? SQColor.success : SQColor.warning
+    }
+
+    /// Teinte douce de la pastille du statut secteur (olive / ambre / neutre).
+    private var sectorSoftColor: Color {
+        guard model.nearestSite != nil else { return SQColor.surfaceMuted }
+        return model.inSector ? SQColor.successSoft : SQColor.warningSoft
     }
 
     private var sectorTitle: String {

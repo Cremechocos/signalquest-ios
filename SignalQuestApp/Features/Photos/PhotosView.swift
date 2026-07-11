@@ -257,7 +257,7 @@ struct PhotosView: View {
                     }
                 )
                 .presentationDetents([.large])
-                .presentationBackgroundCompat(.ultraThinMaterial)
+                .presentationBackgroundCompat(SQColor.bg)
                 .presentationDragIndicator(.visible)
             }
         }
@@ -266,27 +266,22 @@ struct PhotosView: View {
                 await model.upload(data: data, siteId: siteId, description: desc, operatorName: op, exifMetadata: exif)
             }
             .presentationDetents([.large])
-            .presentationBackgroundCompat(.ultraThinMaterial)
+            .presentationBackgroundCompat(SQColor.bg)
         }
     }
 
     // MARK: Header
 
+    // Pas de gros titre interne : la barre de navigation affiche déjà
+    // « Photos » — on ne garde que le compteur en ligne discrète.
+    @ViewBuilder
     private var galleryHeader: some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs) {
-            Text("Terrain").sqKicker()
-            SQSectionHeader("Photos") {
-                HStack(spacing: SQSpace.sm) {
-                    if !model.photos.isEmpty {
-                        Text("\(model.photos.count) photos")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                    Image(systemName: "camera.aperture")
-                        .font(.title2)
-                        .foregroundStyle(SQColor.brandRed)
-                        .accessibilityHidden(true)
-                }
+        if !model.photos.isEmpty {
+            HStack {
+                Text("\(model.photos.count) photos")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                Spacer()
             }
         }
     }
@@ -341,7 +336,7 @@ struct PhotosView: View {
                         .lineLimit(2)
                     if let address = photo.siteAddress, !address.isEmpty {
                         Label(address, systemImage: "mappin")
-                            .font(SQFont.archivo(11, .medium))
+                            .font(SQFont.body(11, .medium))
                             .foregroundStyle(.white.opacity(0.78))
                             .lineLimit(1)
                     }
@@ -349,34 +344,32 @@ struct PhotosView: View {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
                     Label("\(photo.likeCount ?? photo.likes ?? 0)", systemImage: isLiked ? "heart.fill" : "heart")
-                        .font(SQFont.archivo(12, .semibold))
+                        .font(SQFont.body(12, .semibold))
                         .foregroundStyle(isLiked ? SQColor.like : .white)
                     Label("\(photo.commentCount ?? 0)", systemImage: "bubble.left")
-                        .font(SQFont.archivo(12, .semibold))
+                        .font(SQFont.body(12, .semibold))
                         .foregroundStyle(.white.opacity(0.85))
                 }
             }
             .padding(SQSpace.md + 2)
             .background(
+                // Voile de lisibilité sous les métadonnées (fonctionnel, pas décoratif).
                 LinearGradient(colors: [.clear, .black.opacity(0.72)], startPoint: .top, endPoint: .bottom)
             )
         }
         .overlay(alignment: .topTrailing) {
             if let op = photo.operator, !op.isEmpty {
-                Text(op.uppercased())
+                Text(op)
                     .font(SQType.micro)
                     .foregroundStyle(.white)
                     .padding(.horizontal, SQSpace.sm + 2)
                     .padding(.vertical, SQSpace.xs)
-                    .background(opColor, in: Capsule())
+                    .background(opColor, in: Capsule(style: .continuous))
                     .padding(SQSpace.sm)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: SQRadius.xxl, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.xxl, style: .continuous)
-                .stroke(SQColor.separator.opacity(0.5), lineWidth: 1)
-        }
+        .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
     // MARK: Grid tile — 2 colonnes, format 3:4
@@ -404,7 +397,7 @@ struct PhotosView: View {
                         .frame(width: 6, height: 6)
                     if let op = photo.operator, !op.isEmpty {
                         Text(op)
-                            .font(SQFont.archivo(11, .medium))
+                            .font(SQFont.body(11, .medium))
                             .foregroundStyle(.white.opacity(0.82))
                             .lineLimit(1)
                     }
@@ -413,34 +406,32 @@ struct PhotosView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(isLiked ? SQColor.like : .white.opacity(0.9))
                     Text("\(photo.likeCount ?? photo.likes ?? 0)")
-                        .font(SQFont.archivo(11, .semibold))
+                        .font(SQFont.body(11, .semibold))
                         .foregroundStyle(.white.opacity(0.9))
                 }
             }
             .padding(SQSpace.sm)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
+                // Voile de lisibilité sous la légende (fonctionnel, pas décoratif).
                 LinearGradient(colors: [.clear, .black.opacity(0.68)], startPoint: .top, endPoint: .bottom)
             )
         }
-        .clipShape(RoundedRectangle(cornerRadius: SQRadius.xxl, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.xxl, style: .continuous)
-                .stroke(opColor.opacity(0.25), lineWidth: 1)
-        }
+        .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqShadowSoft()
     }
 
     // MARK: Skeleton
 
     private var gallerySkeleton: some View {
         VStack(spacing: SQSpace.sm) {
-            RoundedRectangle(cornerRadius: SQRadius.xxl, style: .continuous)
+            RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
                 .fill(SQColor.fill)
                 .aspectRatio(16 / 9, contentMode: .fit)
                 .sqShimmer()
             LazyVGrid(columns: twoColumns, spacing: SQSpace.sm) {
                 ForEach(0..<6, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: SQRadius.xxl, style: .continuous)
+                    RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
                         .fill(SQColor.fill)
                         .aspectRatio(3 / 4, contentMode: .fit)
                         .sqShimmer()
@@ -534,7 +525,7 @@ struct PhotoDetailView: View {
                         service: services.antennas
                     )
                     .presentationDetents([.medium, .large])
-                    .presentationBackgroundCompat(.ultraThinMaterial)
+                    .presentationBackgroundCompat(SQColor.bg)
                 }
             }
         }
@@ -554,12 +545,12 @@ struct PhotoDetailView: View {
                 .clipped()
             // Badge opérateur
             if let op = photo.operator, !op.isEmpty {
-                Text(op.uppercased())
-                    .font(SQFont.archivo(9, .bold))
+                Text(op)
+                    .font(SQType.micro)
                     .foregroundStyle(.white)
                     .padding(.horizontal, SQSpace.sm + 2)
                     .padding(.vertical, SQSpace.xs)
-                    .background(opColor, in: Capsule())
+                    .background(opColor, in: Capsule(style: .continuous))
                     .padding(SQSpace.md)
             }
         }
@@ -631,7 +622,7 @@ struct PhotoDetailView: View {
                         .foregroundStyle(isLiked ? SQColor.like : SQColor.labelSecondary)
                         .sqLikePop(trigger: isLiked)
                     Text("\(likeCount)")
-                        .font(SQFont.archivo(14, .semibold))
+                        .font(SQFont.body(14, .semibold))
                         .foregroundStyle(SQColor.label)
                         .contentTransition(.numericText())
                 }
@@ -646,7 +637,7 @@ struct PhotoDetailView: View {
                         .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(SQColor.labelSecondary)
                     Text("\(commentCount)")
-                        .font(SQFont.archivo(14, .semibold))
+                        .font(SQFont.body(14, .semibold))
                         .foregroundStyle(SQColor.label)
                         .contentTransition(.numericText())
                 }
@@ -674,10 +665,7 @@ struct PhotoDetailView: View {
         }
         .padding(SQSpace.md + 2)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1)
-        }
+        .sqShadowCard()
     }
 
     // MARK: Lien vers l'antenne
@@ -688,14 +676,12 @@ struct PhotoDetailView: View {
             showAntennaDetail = true
         } label: {
             HStack(spacing: SQSpace.md) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                        .fill(opColor.opacity(0.14))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: "antenna.radiowaves.left.and.right")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(opColor)
-                }
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(SQColor.brandRed)
+                    .frame(width: 44, height: 44)
+                    .background(SQColor.accentSoft, in: Circle())
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Voir l'antenne")
                         .font(SQType.subhead)
@@ -707,17 +693,15 @@ struct PhotoDetailView: View {
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.callout.weight(.semibold))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
             }
             .padding(SQSpace.md + 2)
             .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
-                    .stroke(opColor.opacity(0.28), lineWidth: 1.5)
-            }
+            .sqShadowCard()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SQPressButtonStyle())
     }
 
     // MARK: Commentaires
@@ -764,11 +748,8 @@ struct PhotoDetailView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(SQSpace.md)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
-                    .stroke(SQColor.separator, lineWidth: 1)
-            }
+            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .sqShadowSoft()
         }
     }
 
@@ -778,8 +759,13 @@ struct PhotoDetailView: View {
         let canSend = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         return HStack(spacing: SQSpace.sm) {
             TextField("Ajouter un commentaire…", text: $draft, axis: .vertical)
-                .textFieldStyle(SQTextFieldStyle())
+                .font(SQType.body)
+                .foregroundStyle(SQColor.label)
                 .lineLimit(1...4)
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.vertical, SQSpace.sm + 2)
+                .frame(minHeight: 44)
+                .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
                 .focused($commentFocused)
             Button {
                 onSend()
@@ -787,26 +773,29 @@ struct PhotoDetailView: View {
             } label: {
                 ZStack {
                     Circle()
-                        .fill(canSend ? AnyShapeStyle(SQGradient.signal) : AnyShapeStyle(SQColor.fill))
-                        .frame(width: 40, height: 40)
+                        .fill(canSend ? SQColor.brandRed : SQColor.surfaceMuted)
+                        .frame(width: 44, height: 44)
                     if isSending {
                         ProgressView()
-                            .tint(.white)
+                            .tint(SQColor.onAccent)
                             .scaleEffect(0.75)
                     } else {
                         Image(systemName: "paperplane.fill")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.white)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(canSend ? SQColor.onAccent : SQColor.labelTertiary)
                     }
                 }
             }
             .disabled(!canSend || isSending)
-            .buttonStyle(.plain)
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityLabel("Envoyer le commentaire")
         }
         .padding(.horizontal, SQSpace.md + 2)
         .padding(.vertical, SQSpace.sm + 2)
-        .background(.ultraThinMaterial)
-        .overlay(alignment: .top) { Divider() }
+        .background(SQColor.surface)
+        .overlay(alignment: .top) {
+            Rectangle().fill(SQColor.separator).frame(height: 1)
+        }
     }
 }
 
@@ -844,16 +833,19 @@ struct PhotoUploadView: View {
                                 .resizable()
                                 .scaledToFill()
                                 .frame(height: 260)
-                                .clipShape(RoundedRectangle(cornerRadius: SQRadius.xxl, style: .continuous))
+                                .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                                .sqShadowCard()
                         } else {
-                            RoundedRectangle(cornerRadius: SQRadius.xxl)
-                                .fill(SQColor.fill)
+                            RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
+                                .fill(SQColor.surfaceMuted)
                                 .frame(height: 260)
                                 .overlay {
                                     VStack(spacing: SQSpace.sm) {
                                         Image(systemName: "photo.badge.plus")
-                                            .font(.largeTitle)
-                                            .foregroundStyle(SQColor.labelSecondary)
+                                            .font(.system(size: 22, weight: .medium))
+                                            .foregroundStyle(SQColor.brandRed)
+                                            .frame(width: 46, height: 46)
+                                            .background(SQColor.accentSoft, in: Circle())
                                         Text("Aperçu photo")
                                             .font(SQType.caption)
                                             .foregroundStyle(SQColor.labelSecondary)
@@ -863,11 +855,19 @@ struct PhotoUploadView: View {
                     }
 
                     PhotosPicker(selection: $pickerItem, matching: .images) {
-                        Label("Choisir une photo", systemImage: "photo")
-                            .frame(maxWidth: .infinity)
+                        HStack(spacing: SQSpace.sm + 2) {
+                            Image(systemName: "photo")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Choisir une photo")
+                                .font(SQType.button)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 56)
+                        .foregroundStyle(SQColor.label)
+                        .background(SQColor.surface, in: Capsule(style: .continuous))
+                        .sqShadowSoft()
                     }
-                    .buttonStyle(.bordered)
-                    .tint(SQColor.brandRed)
+                    .buttonStyle(SQPressButtonStyle())
                     .onChangeCompat(of: pickerItem) { _, newItem in
                         Task {
                             guard let data = try? await newItem?.loadTransferable(type: Data.self),
@@ -879,37 +879,43 @@ struct PhotoUploadView: View {
 
                     // Sélection du site
                     Button { showSitePicker = true } label: {
-                        HStack {
+                        HStack(spacing: SQSpace.md) {
                             Image(systemName: "antenna.radiowaves.left.and.right")
+                                .font(.system(size: 16, weight: .medium))
                                 .foregroundStyle(SQColor.brandRed)
+                                .frame(width: 40, height: 40)
+                                .background(SQColor.accentSoft, in: Circle())
+                                .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(selectedSite.map { $0.siteId ?? $0.id } ?? "Choisir un site")
-                                    .font(.subheadline.weight(.semibold))
+                                    .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                                     .foregroundStyle(SQColor.label)
                                 if let address = selectedSite?.address {
                                     Text(address)
-                                        .font(.caption)
+                                        .font(SQType.caption)
                                         .foregroundStyle(SQColor.labelSecondary)
                                         .lineLimit(1)
                                 }
                             }
                             Spacer()
                             Image(systemName: "chevron.right")
+                                .font(.footnote.weight(.semibold))
                                 .foregroundStyle(SQColor.labelTertiary)
+                                .accessibilityHidden(true)
                         }
                         .padding(SQSpace.md + 2)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                                .stroke(SQColor.separator, lineWidth: 1)
-                        }
+                        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                        .sqShadowCard()
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(SQPressButtonStyle())
 
                     TextField("Légende", text: $description, axis: .vertical)
-                        .textFieldStyle(SQTextFieldStyle())
+                        .font(SQType.body)
+                        .foregroundStyle(SQColor.label)
                         .lineLimit(2...5)
+                        .padding(SQSpace.md + 2)
+                        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
 
                     GradientButton("Uploader", systemImage: "arrow.up.circle", isBusy: isUploading) {
                         guard let original = imageData, let site = selectedSite else { return }
@@ -977,7 +983,7 @@ struct PhotoShareSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Photo") {
+                Section {
                     HStack(spacing: SQSpace.md) {
                         RemoteImage(url: photo.thumbnailUrl ?? photo.imageUrl, maxDimension: 120, contentMode: .fill) {
                             Rectangle().fill(SQColor.fill)
@@ -986,25 +992,33 @@ struct PhotoShareSheet: View {
                         .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                         VStack(alignment: .leading, spacing: SQSpace.xs) {
                             Text(photo.displayCaption)
-                                .font(.subheadline.weight(.semibold))
+                                .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                                 .foregroundStyle(SQColor.label)
                                 .lineLimit(2)
                             if let op = photo.operator {
                                 Text(op)
-                                    .font(.caption)
+                                    .font(SQType.caption)
                                     .foregroundStyle(SQColor.labelSecondary)
                             }
                         }
                     }
+                    .listRowBackground(SQColor.surface)
+                } header: {
+                    Text("Photo")
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .textCase(nil)
                 }
 
-                Section("Partager sur Signal Quest") {
+                Section {
                     if isLoading {
-                        ProgressView()
+                        ProgressView().tint(SQColor.brandRed)
+                            .listRowBackground(SQColor.surface)
                     } else if conversations.isEmpty {
                         Text("Aucune conversation active")
-                            .font(.footnote)
+                            .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
+                            .listRowBackground(SQColor.surface)
                     }
                     ForEach(conversations) { conversation in
                         Button {
@@ -1018,10 +1032,10 @@ struct PhotoShareSheet: View {
                                 )
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(conversation.displayTitle.isEmpty ? "Conversation" : conversation.displayTitle)
-                                        .font(.subheadline.weight(.semibold))
+                                        .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                                         .foregroundStyle(SQColor.label)
                                     Text(conversation.e2eeEnabled == true ? "Chiffrée" : "Conversation")
-                                        .font(.caption)
+                                        .font(SQType.caption)
                                         .foregroundStyle(SQColor.labelSecondary)
                                 }
                                 Spacer()
@@ -1034,15 +1048,25 @@ struct PhotoShareSheet: View {
                             }
                         }
                         .disabled(busyConversationId != nil)
+                        .listRowBackground(SQColor.surface)
                     }
+                } header: {
+                    Text("Partager sur Signal Quest")
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .textCase(nil)
                 }
 
                 if let errorMessage {
                     Section {
-                        Text(errorMessage).foregroundStyle(SQColor.danger)
+                        Text(errorMessage)
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.danger)
+                            .listRowBackground(SQColor.dangerSoft)
                     }
                 }
             }
+            .listRowSeparatorTint(SQColor.separator)
             .scrollContentBackground(.hidden)
             .signalQuestBackground()
             .navigationTitle("Partager")
@@ -1128,21 +1152,21 @@ struct AntennaSitePickerSheet: View {
                     HStack(spacing: SQSpace.sm) {
                         if isLoading { ProgressView().tint(SQColor.brandRed) }
                         Text(sites.isEmpty ? "Déplace la carte pour charger" : "\(sites.count) sites visibles")
-                            .font(.footnote.weight(.semibold))
+                            .font(SQFont.body(13, .semibold, relativeTo: .footnote))
                             .foregroundStyle(SQColor.label)
                     }
-                    .padding(.horizontal, SQSpace.md + 2)
+                    .padding(.horizontal, SQSpace.lg - 2)
                     .padding(.vertical, SQSpace.sm + 2)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(Capsule().stroke(SQColor.separator, lineWidth: 1))
+                    .background(SQColor.surface, in: Capsule(style: .continuous))
+                    .sqShadowSoft()
 
                     if let errorMessage {
                         Text(errorMessage)
-                            .font(.caption)
+                            .font(SQType.caption)
                             .foregroundStyle(SQColor.danger)
                             .padding(.horizontal, SQSpace.md)
                             .padding(.vertical, SQSpace.xs + 2)
-                            .background(.ultraThinMaterial, in: Capsule())
+                            .background(SQColor.dangerSoft, in: Capsule(style: .continuous))
                     }
                 }
                 .padding(.top, SQSpace.md)

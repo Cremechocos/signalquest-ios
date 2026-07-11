@@ -79,17 +79,23 @@ struct NotificationsCenterView: View {
                         } label: {
                             notificationRow(item)
                         }
-                        .buttonStyle(.plain)
-                        .listRowBackground(item.read != true ? SQColor.brandRed.opacity(0.08) : Color.clear)
+                        .buttonStyle(SQPressButtonStyle())
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 5, leading: SQSpace.lg, bottom: 5, trailing: SQSpace.lg))
                         .swipeActions {
                             Button("Lu") { Task { await model.markRead(item.id) } }.tint(SQColor.success)
                         }
                     }
                 } header: {
-                    Text("Activité").sqKicker()
+                    Text("Activité")
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .textCase(nil)
                 }
             }
         }
+        .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .signalQuestBackground()
         .navigationTitle("Notifications")
@@ -109,15 +115,14 @@ struct NotificationsCenterView: View {
 
     @ViewBuilder
     private func notificationRow(_ item: AppNotification) -> some View {
-        let style = iconStyle(for: item.type)
         let isUnread = item.read != true
         let titleText = item.title ?? item.type ?? "Notification"
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: style.icon)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(style.color)
+        HStack(alignment: .top, spacing: SQSpace.md) {
+            Image(systemName: icon(for: item.type))
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(SQColor.brandRed)
                 .frame(width: 38, height: 38)
-                .background(style.color.opacity(0.15), in: Circle())
+                .background(SQColor.accentSoft, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: SQSpace.sm) {
@@ -126,18 +131,27 @@ struct NotificationsCenterView: View {
                         .foregroundStyle(SQColor.label)
                     if isUnread {
                         Circle().fill(SQColor.brandRed).frame(width: 8, height: 8)
+                            .accessibilityLabel("Non lue")
                     }
                 }
                 if let message = item.message {
-                    Text(message).font(.footnote).foregroundStyle(SQColor.labelSecondary)
+                    Text(message)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
                 if let date = item.createdAt {
                     Text(date, format: .relative(presentation: .named))
-                        .font(.caption2)
+                        .font(SQFont.body(11.5, relativeTo: .caption2))
                         .foregroundStyle(SQColor.labelTertiary)
                 }
             }
+            Spacer(minLength: 0)
         }
+        .padding(SQSpace.md + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqShadowSoft()
+        .contentShape(Rectangle())
     }
 
     /// Route vers le contenu lié (NOTIF-UX-01) via l'AppRouter partagé.
@@ -164,19 +178,19 @@ struct NotificationsCenterView: View {
         return nil
     }
 
-    /// Icône + couleur de pastille par type de notification :
-    /// like = rose, commentaire = bleu, follow = orange, système = gris.
-    private func iconStyle(for kind: String?) -> (icon: String, color: Color) {
+    /// Icône par type de notification (pastille unique `accentSoft` de la DA
+    /// Crème : seule la forme distingue le type, la brique reste l'accent).
+    private func icon(for kind: String?) -> String {
         let k = (kind ?? "").lowercased()
         if k.contains("like") || k.contains("reaction") || k.contains("favorite") {
-            return ("heart.fill", SQColor.like)
+            return "heart.fill"
         }
         if k.contains("comment") || k.contains("reply") || k.contains("mention") || k.contains("message") {
-            return ("bubble.left.fill", SQColor.brandBlue)
+            return "bubble.left.fill"
         }
         if k.contains("follow") || k.contains("friend") {
-            return ("person.fill.badge.plus", SQColor.brandRed)
+            return "person.fill.badge.plus"
         }
-        return ("bell.fill", SQColor.labelSecondary)
+        return "bell.fill"
     }
 }

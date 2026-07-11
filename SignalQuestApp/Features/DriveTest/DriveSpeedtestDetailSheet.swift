@@ -49,13 +49,10 @@ struct DriveSpeedtestDetailSheet: View {
         return VStack(spacing: SQSpace.md) {
             ZStack {
                 Circle()
-                    .stroke(SQColor.separator.opacity(0.35), lineWidth: 14)
+                    .stroke(SQColor.surfaceMuted, lineWidth: 14)
                 Circle()
                     .trim(from: 0, to: Self.gaugeFraction(download))
-                    .stroke(
-                        AngularGradient(colors: [color.opacity(0.7), color], center: .center),
-                        style: StrokeStyle(lineWidth: 14, lineCap: .round)
-                    )
+                    .stroke(color, style: StrokeStyle(lineWidth: 14, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 VStack(spacing: 2) {
                     Text(Self.format(download))
@@ -64,11 +61,11 @@ struct DriveSpeedtestDetailSheet: View {
                         .foregroundStyle(SQColor.label)
                     Text("Mbps").font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
                     Text(Self.speedLabel(download))
-                        .font(SQFont.archivo(12, .bold))
+                        .font(SQFont.body(12, .bold))
                         .foregroundStyle(color)
                         .padding(.horizontal, SQSpace.sm)
                         .padding(.vertical, 3)
-                        .background(color.opacity(0.14), in: Capsule())
+                        .background(color.opacity(0.14), in: Capsule(style: .continuous))
                         .padding(.top, 2)
                 }
             }
@@ -77,10 +74,11 @@ struct DriveSpeedtestDetailSheet: View {
 
             HStack(spacing: SQSpace.sm) {
                 if let gen = generationText {
-                    SQEditorialTag(text: gen, color: SQColor.brandRed)
+                    // Couleur data de la techno (même signification que sur la carte).
+                    SQEditorialTag(text: gen, color: SQBrand.techColor(gen))
                 }
                 if let op = operatorText {
-                    SQEditorialTag(text: op, color: SQColor.brandOrange)
+                    SQEditorialTag(text: op, color: SQBrand.operatorColor(op))
                 }
             }
         }
@@ -91,51 +89,49 @@ struct DriveSpeedtestDetailSheet: View {
 
     private var metricsGrid: some View {
         let columns = [GridItem(.flexible()), GridItem(.flexible())]
-        return LazyVGrid(columns: columns, spacing: SQSpace.sm) {
-            metricTile("Download", value: Self.format(result.downloadAverageMbps), unit: "Mbps",
-                       detail: "max \(Self.format(result.downloadMaxMbps))", color: Self.speedColor(result.downloadAverageMbps), icon: "arrow.down")
-            metricTile("Upload", value: Self.format(result.uploadAverageMbps ?? 0), unit: "Mbps",
-                       detail: result.uploadMaxMbps.map { "max \(Self.format($0))" } ?? "—", color: SQColor.brandGreen, icon: "arrow.up")
-            metricTile("Ping", value: Self.format(result.pingMinMs ?? result.pingMs ?? 0), unit: "ms",
-                       detail: pingRange, color: SQColor.brandOrange, icon: "bolt.horizontal")
-            metricTile("Gigue", value: Self.format(result.jitterMs ?? 0), unit: "ms",
-                       detail: "stabilité", color: Color(hex: 0x8B5CF6), icon: "waveform.path")
+        return GlassCard {
+            LazyVGrid(columns: columns, spacing: SQSpace.sm) {
+                metricTile("Download", value: Self.format(result.downloadAverageMbps), unit: "Mbps",
+                           detail: "max \(Self.format(result.downloadMaxMbps))", color: Self.speedColor(result.downloadAverageMbps), icon: "arrow.down")
+                metricTile("Upload", value: Self.format(result.uploadAverageMbps ?? 0), unit: "Mbps",
+                           detail: result.uploadMaxMbps.map { "max \(Self.format($0))" } ?? "—", color: SQColor.success, icon: "arrow.up")
+                metricTile("Ping", value: Self.format(result.pingMinMs ?? result.pingMs ?? 0), unit: "ms",
+                           detail: pingRange, color: SQColor.warning, icon: "bolt.horizontal")
+                metricTile("Gigue", value: Self.format(result.jitterMs ?? 0), unit: "ms",
+                           detail: "stabilité", color: SQColor.info, icon: "waveform.path")
+            }
         }
     }
 
     private func metricTile(_ title: String, value: String, unit: String, detail: String, color: Color, icon: String) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
             HStack(spacing: 6) {
-                Image(systemName: icon).font(.caption.weight(.bold)).foregroundStyle(color)
-                Text(title).font(SQType.micro).tracking(0.6).textCase(.uppercase).foregroundStyle(SQColor.labelSecondary)
+                Image(systemName: icon).font(.caption.weight(.semibold)).foregroundStyle(color)
+                Text(title).font(SQFont.body(11.5, .semibold)).foregroundStyle(SQColor.labelSecondary)
             }
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value).font(SQFont.display(24, .bold)).monospacedDigit().foregroundStyle(SQColor.label)
-                Text(unit).font(.caption2).foregroundStyle(SQColor.labelSecondary)
+                Text(unit).font(SQFont.body(11)).foregroundStyle(SQColor.labelSecondary)
             }
-            Text(detail).font(.caption2).foregroundStyle(SQColor.labelTertiary).lineLimit(1)
+            Text(detail).font(SQFont.body(11)).foregroundStyle(SQColor.labelTertiary).lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SQSpace.md)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).stroke(SQColor.separator, lineWidth: 1.5)
-        }
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
     // MARK: Sparkline du download
 
     private func sparkleCard(series: [Double]) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Débit pendant le test").font(SQType.micro).tracking(0.6).textCase(.uppercase).foregroundStyle(SQColor.labelSecondary)
-            Sparkline(values: series, color: Self.speedColor(result.downloadAverageMbps))
-                .frame(height: 56)
-        }
-        .padding(SQSpace.md)
-        .frame(maxWidth: .infinity)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).stroke(SQColor.separator, lineWidth: 1.5)
+        GlassCard {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                Text("Débit pendant le test")
+                    .font(SQFont.body(13, .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                Sparkline(values: series, color: Self.speedColor(result.downloadAverageMbps))
+                    .frame(height: 56)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -161,26 +157,29 @@ struct DriveSpeedtestDetailSheet: View {
                 metaRow("mappin.and.ellipse", "Lieu", place)
             }
         }
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).stroke(SQColor.separator, lineWidth: 1.5)
-        }
+        .padding(.vertical, SQSpace.xs)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
     private func metaRow(_ icon: String, _ label: String, _ value: String) -> some View {
         HStack(spacing: SQSpace.md) {
-            Image(systemName: icon).font(.footnote.weight(.semibold)).foregroundStyle(SQColor.brandRed).frame(width: 22)
-            Text(label).font(SQFont.archivo(14, .medium)).foregroundStyle(SQColor.labelSecondary)
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 36, height: 36)
+                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            Text(label).font(SQFont.body(14.5, .medium)).foregroundStyle(SQColor.labelSecondary)
             Spacer()
-            Text(value).font(SQFont.archivo(14, .semibold)).foregroundStyle(SQColor.label)
+            Text(value).font(SQFont.body(14.5, .semibold)).foregroundStyle(SQColor.label)
                 .multilineTextAlignment(.trailing).lineLimit(2)
         }
         .padding(.horizontal, SQSpace.md)
-        .padding(.vertical, SQSpace.sm + 2)
+        .padding(.vertical, SQSpace.sm)
     }
 
     private var metaDivider: some View {
-        Rectangle().fill(SQColor.separator).frame(height: 1).padding(.leading, SQSpace.md + 22 + SQSpace.md)
+        Rectangle().fill(SQColor.separator).frame(height: 1).padding(.leading, SQSpace.md + 36 + SQSpace.md)
     }
 
     // MARK: Textes dérivés

@@ -46,23 +46,28 @@ struct ScheduleMessageSheet: View {
                     if isE2EE {
                         Label("Message chiffré de bout en bout — programmé en toute sécurité.", systemImage: "lock.shield")
                             .font(SQType.caption.weight(.semibold))
-                            .foregroundStyle(SQColor.brandGreen)
+                            .foregroundStyle(SQColor.success)
                             .padding(SQSpace.md)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(SQColor.brandGreen.opacity(0.14), in: RoundedRectangle(cornerRadius: SQRadius.md))
+                            .background(SQColor.successSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                     }
 
                     VStack(alignment: .leading, spacing: SQSpace.sm) {
-                        Text("Message").sqKicker()
+                        Text("Message")
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.labelSecondary)
                         TextField("Message à envoyer", text: $text, axis: .vertical)
                             .lineLimit(2...5)
-                            .textFieldStyle(SQTextFieldStyle())
+                            .sqCapsuleField()
                     }
 
                     VStack(alignment: .leading, spacing: SQSpace.sm) {
-                        Text("Envoyer le").sqKicker()
+                        Text("Envoyer le")
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.labelSecondary)
                         DatePicker("", selection: $sendAt, in: Date()..., displayedComponents: [.date, .hourAndMinute])
                             .labelsHidden()
+                            .tint(SQColor.brandRed)
                     }
 
                     if let errorMessage {
@@ -138,16 +143,21 @@ struct AddReminderSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
                     VStack(alignment: .leading, spacing: SQSpace.sm) {
-                        Text("Motif (optionnel)").sqKicker()
+                        Text("Motif (optionnel)")
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.labelSecondary)
                         TextField("Pourquoi ce rappel ?", text: $reason, axis: .vertical)
                             .lineLimit(1...3)
-                            .textFieldStyle(SQTextFieldStyle())
+                            .sqCapsuleField()
                     }
 
                     VStack(alignment: .leading, spacing: SQSpace.sm) {
-                        Text("Me rappeler le").sqKicker()
+                        Text("Me rappeler le")
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.labelSecondary)
                         DatePicker("", selection: $remindAt, in: Date()..., displayedComponents: [.date, .hourAndMinute])
                             .labelsHidden()
+                            .tint(SQColor.brandRed)
                     }
 
                     if let errorMessage {
@@ -193,5 +203,18 @@ struct AddReminderSheet: View {
             errorMessage = error.localizedDescription
             Haptics.error()
         }
+    }
+}
+
+/// Champ « Crème & Terre cuite » : capsule 44 SurfaceMuted, sans bordure.
+private extension View {
+    func sqCapsuleField() -> some View {
+        self
+            .font(SQType.body)
+            .foregroundStyle(SQColor.label)
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.vertical, SQSpace.sm + 2)
+            .frame(minHeight: 44)
+            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
     }
 }

@@ -101,13 +101,14 @@ struct StoryViewer: View {
             }
             .ignoresSafeArea()
         } else {
+            // Story texte : canevas crème uni (nuit en sombre), typo display encre.
             ZStack {
-                SQGradient.signal.ignoresSafeArea()
+                SQColor.bg.ignoresSafeArea()
                 VStack(spacing: SQSpace.lg) {
                     SQAvatar(url: story.author.avatarUrl, name: story.author.displayName, size: 88)
                     Text(story.text ?? "Story")
-                        .font(.title.weight(.bold))
-                        .foregroundStyle(.white)
+                        .font(SQFont.display(28, .bold))
+                        .foregroundStyle(SQColor.label)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, SQSpace.xxl + 4)
                 }
@@ -121,7 +122,8 @@ struct StoryViewer: View {
                 GeometryReader { proxy in
                     Capsule().fill(Color.white.opacity(0.30))
                         .overlay(alignment: .leading) {
-                            Capsule().fill(SQGradient.signal)
+                            // Jauge au langage Crème : remplissage brique uni.
+                            Capsule().fill(SQColor.brandRed)
                                 .frame(width: proxy.size.width * fillRatio(for: i))
                         }
                 }
@@ -208,13 +210,13 @@ struct StoryViewer: View {
                     .onSubmit(sendReply)
                     .padding(.horizontal, SQSpace.md)
                     .padding(.vertical, SQSpace.sm + 2)
+                    .frame(minHeight: 44)
                     .background(.ultraThinMaterial, in: Capsule())
-                    .overlay { Capsule().stroke(.white.opacity(0.4), lineWidth: 1) }
                 if !replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Button(action: sendReply) {
                         Image(systemName: "paperplane.fill")
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(.white)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(SQColor.onAccent)
                             .frame(width: 44, height: 44)
                             .background(SQColor.brandRed, in: Circle())
                     }

@@ -60,15 +60,15 @@ struct ValidationsSheet: View {
                         group("Cell ID", "cellid", v.cellid)
                         group("gNB (5G)", "gnb", v.gnb)
                     } else if !model.isLoading {
-                        Text("Aucune validation pour ce site. Sois le premier à confirmer ses identifiants.")
-                            .font(.subheadline)
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, SQSpace.xxl)
+                        EmptyStateView(
+                            title: "Aucune validation",
+                            message: "Aucune validation pour ce site. Sois le premier à confirmer ses identifiants.",
+                            systemImage: "checkmark.seal"
+                        )
                     }
                     if let errorMessage = model.errorMessage {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")
-                            .font(.footnote).foregroundStyle(SQColor.warning)
+                            .font(SQType.caption).foregroundStyle(SQColor.warning)
                     }
                 }
                 .padding()
@@ -87,37 +87,61 @@ struct ValidationsSheet: View {
         if !entries.isEmpty {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
                 Text(title)
-                    .font(SQFont.archivo(12, .semibold))
-                    .tracking(0.4)
-                    .textCase(.uppercase)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .font(SQType.heading)
+                    .foregroundStyle(SQColor.label)
+                    .padding(.bottom, SQSpace.xs)
                 ForEach(entries) { entry in
                     HStack(spacing: SQSpace.sm) {
                         Text(entry.value)
-                            .font(.subheadline.weight(.semibold).monospacedDigit())
+                            .font(SQFont.body(15, .semibold, relativeTo: .subheadline).monospacedDigit())
                             .foregroundStyle(SQColor.label)
                         Spacer()
                         Label("\(entry.validations)", systemImage: "hand.thumbsup.fill")
-                            .font(.caption2).foregroundStyle(SQColor.brandGreen)
+                            .font(SQFont.body(11.5, .medium, relativeTo: .caption2))
+                            .foregroundStyle(SQColor.success)
                         Label("\(entry.rejections)", systemImage: "hand.thumbsdown.fill")
-                            .font(.caption2).foregroundStyle(SQColor.danger)
+                            .font(SQFont.body(11.5, .medium, relativeTo: .caption2))
+                            .foregroundStyle(SQColor.danger)
                         if model.pendingVote == "\(type)-\(entry.value)" {
-                            ProgressView()
+                            ProgressView().tint(SQColor.brandRed)
                         } else {
-                            Button { Task { await model.vote(type: type, value: entry.value, action: "validate") } } label: {
-                                Image(systemName: "checkmark.circle.fill").foregroundStyle(SQColor.brandGreen)
+                            voteButton("checkmark", tint: SQColor.success, soft: SQColor.successSoft,
+                                       label: "Valider \(title) \(entry.value)") {
+                                Task { await model.vote(type: type, value: entry.value, action: "validate") }
                             }
-                            Button { Task { await model.vote(type: type, value: entry.value, action: "reject") } } label: {
-                                Image(systemName: "xmark.circle.fill").foregroundStyle(SQColor.danger)
+                            voteButton("xmark", tint: SQColor.danger, soft: SQColor.dangerSoft,
+                                       label: "Rejeter \(title) \(entry.value)") {
+                                Task { await model.vote(type: type, value: entry.value, action: "reject") }
                             }
                         }
                     }
-                    .padding(.vertical, 5)
+                    .padding(.vertical, 3)
+                    if entry.id != entries.last?.id {
+                        Rectangle()
+                            .fill(SQColor.separator)
+                            .frame(height: 1)
+                    }
                 }
             }
-            .padding(SQSpace.md)
+            .padding(SQSpace.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+            .sqShadowCard()
         }
+    }
+
+    /// Pastille de vote circulaire (teinte douce + icône pleine), zone tactile ≥ 44 pt.
+    private func voteButton(_ icon: String, tint: Color, soft: Color, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 38, height: 38)
+                .background(soft, in: Circle())
+                .padding(3)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(label)
     }
 }

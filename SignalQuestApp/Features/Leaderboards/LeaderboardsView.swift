@@ -135,6 +135,7 @@ final class LeaderboardsViewModel: ObservableObject {
 
 struct LeaderboardsView: View {
     @StateObject private var model: LeaderboardsViewModel
+    @Environment(\.dismiss) private var dismiss
     private let gamification: GamificationServicing?
     private let currentUser: AuthUser?
 
@@ -150,60 +151,115 @@ struct LeaderboardsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.lg) {
+            VStack(alignment: .leading, spacing: SQSpace.xl) {
                 header
                 if let profile = model.profile, let gamification {
                     LeaderboardHeroCard(profile: profile, user: currentUser, gamification: gamification)
                         .sqFadeUp()
                 }
-                LeaderboardTabSwitcher(selection: $model.tab)
                 filters
                 content
             }
-            .padding(16)
+            .padding(.horizontal, SQSpace.xl)
+            .padding(.top, SQSpace.sm)
             .padding(.bottom, 96)
         }
-        .navigationTitle("Classements")
-        .toolbarTitleInlineCompat()
+        .toolbar(.hidden, for: .navigationBar)
         .signalQuestBackground()
         .task { await model.loadAll() }
         .refreshable { await model.loadAll() }
     }
 
+    /// En-tête custom (nav bar système masquée) : bouton retour circulaire 40 pt
+    /// + titre Bricolage Bold 24, comme le prototype.
     private var header: some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs) {
-            Text("Communauté").sqKicker()
+        HStack(spacing: SQSpace.md) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SQColor.label)
+                    .frame(width: 40, height: 40)
+                    .background(SQColor.surface, in: Circle())
+                    .sqShadowSoft()
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityLabel("Retour")
             Text("Classements")
-                .font(SQType.display)
+                .font(SQFont.display(24, .bold))
                 .foregroundStyle(SQColor.label)
+            Spacer(minLength: 0)
+            // Segment Vitesse | Points compact, intégré au header (gagne une ligne).
+            LeaderboardTabSwitcher(selection: $model.tab)
         }
     }
 
-    // MARK: Filtres
+    // MARK: Filtres — une seule ligne : menus capsules + toggle Amis
 
     private var filters: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: SQSpace.sm) {
-                    LeaderboardFilterChip(label: "Semaine", isOn: model.period == "week") { model.setPeriod("week") }
-                    LeaderboardFilterChip(label: "Mois", isOn: model.period == "month") { model.setPeriod("month") }
-                    LeaderboardFilterChip(label: "Toujours", isOn: model.period == "all") { model.setPeriod("all") }
-                    Divider().frame(height: 18)
-                    LeaderboardFilterChip(label: "Amis", icon: "person.2.fill", isOn: model.scope == "friends") { model.toggleScope() }
+        HStack(spacing: SQSpace.sm) {
+            // Période : menu natif dans une capsule (Semaine / Mois / Toujours).
+            LeaderboardMenuPill(
+                icon: "calendar",
+                label: periodLabel,
+                accessibility: "Période du classement"
+            ) {
+                Button { model.setPeriod("week") } label: {
+                    if model.period == "week" { Label("Semaine", systemImage: "checkmark") } else { Text("Semaine") }
+                }
+                Button { model.setPeriod("month") } label: {
+                    if model.period == "month" { Label("Mois", systemImage: "checkmark") } else { Text("Mois") }
+                }
+                Button { model.setPeriod("all") } label: {
+                    if model.period == "all" { Label("Toujours", systemImage: "checkmark") } else { Text("Toujours") }
                 }
             }
+
+            // Métrique (uniquement pour Vitesse) : Download / Upload / Sessions.
             if model.tab == .speed {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: SQSpace.sm) {
-                        LeaderboardFilterChip(label: "Download", icon: "arrow.down", isOn: model.category == "download") { model.setCategory("download") }
-                        LeaderboardFilterChip(label: "Upload", icon: "arrow.up", isOn: model.category == "upload") { model.setCategory("upload") }
-                        LeaderboardFilterChip(label: "Sessions", icon: "list.number", isOn: model.category == "sessions") { model.setCategory("sessions") }
+                LeaderboardMenuPill(
+                    icon: "speedometer",
+                    label: categoryLabel,
+                    accessibility: "Métrique du classement"
+                ) {
+                    Button { model.setCategory("download") } label: {
+                        if model.category == "download" { Label("Download", systemImage: "checkmark") } else { Text("Download") }
+                    }
+                    Button { model.setCategory("upload") } label: {
+                        if model.category == "upload" { Label("Upload", systemImage: "checkmark") } else { Text("Upload") }
+                    }
+                    Button { model.setCategory("sessions") } label: {
+                        if model.category == "sessions" { Label("Sessions", systemImage: "checkmark") } else { Text("Sessions") }
                     }
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
+
+            Spacer(minLength: 0)
+
+            // Portée Amis : toggle icône compact.
+            LeaderboardFilterChip(label: "Amis", icon: "person.2.fill", isOn: model.scope == "friends") {
+                model.toggleScope()
             }
         }
         .sqAnimation(SQMotion.snappy, value: model.tab)
+    }
+
+    private var periodLabel: String {
+        switch model.period {
+        case "week": return "Semaine"
+        case "month": return "Mois"
+        default: return "Toujours"
+        }
+    }
+
+    private var categoryLabel: String {
+        switch model.category {
+        case "upload": return "Upload"
+        case "sessions": return "Sessions"
+        default: return "Download"
+        }
     }
 
     // MARK: Contenu par onglet
@@ -244,8 +300,7 @@ struct LeaderboardsView: View {
                         rank: entry.rank,
                         name: entry.user.displayName,
                         avatarUrl: entry.user.avatarUrl,
-                        valueText: "\(Int(entry.value)) \(entry.unit)",
-                        level: nil
+                        valueText: "\(Int(entry.value)) \(entry.unit)"
                     )
                 },
                 podiumID: "speed-\(model.speedStamp)",
@@ -297,8 +352,7 @@ struct LeaderboardsView: View {
                         rank: entry.rank,
                         name: entry.displayName,
                         avatarUrl: entry.avatarUrl,
-                        valueText: "\(entry.score(for: model.period).formatted()) pts",
-                        level: entry.level
+                        valueText: "\(entry.score(for: model.period).formatted()) pts"
                     )
                 },
                 podiumID: "points-\(model.pointsStamp)",
@@ -432,7 +486,7 @@ private struct LeaderboardHeroCard: View {
                     Text("Ma progression").sqKicker()
                     HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
                         Text("\(shownPoints)")
-                            .font(SQFont.display(30, .black))
+                            .font(SQFont.display(28, .bold))
                             .monospacedDigit()
                             .contentTransition(.numericText())
                             .foregroundStyle(SQColor.brandRed)
@@ -465,10 +519,7 @@ private struct LeaderboardHeroCard: View {
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
-                .stroke(SQColor.label, lineWidth: 2)
-        }
+        .sqShadowCard()
         .onAppear { animateIn() }
         .onChangeCompat(of: profile) { _, _ in animateIn() }
         .accessibilityElement(children: .combine)
@@ -481,13 +532,13 @@ private struct LeaderboardHeroCard: View {
         }
         .frame(width: 94, height: 94)
         .overlay(alignment: .bottom) {
-            Text("NIV. \(level)")
+            Text("Niv. \(level)")
                 .font(SQType.micro)
                 .monospacedDigit()
                 .padding(.horizontal, SQSpace.sm)
                 .padding(.vertical, 3)
-                .background(SQColor.brandRed, in: Capsule())
-                .foregroundStyle(.white)
+                .background(SQColor.brandRed, in: Capsule(style: .continuous))
+                .foregroundStyle(SQColor.onAccent)
                 .offset(y: 7)
         }
         .accessibilityHidden(true)
@@ -508,15 +559,13 @@ private struct LeaderboardHeroCard: View {
             Spacer(minLength: 0)
             Text("Récompenses")
                 .font(SQType.micro)
-                .tracking(0.8)
-                .textCase(.uppercase)
                 .foregroundStyle(SQColor.brandRed)
         }
     }
 
     private func badgeDot(_ badge: GamificationBadge) -> some View {
         ZStack {
-            Circle().fill(SQColor.fill)
+            Circle().fill(SQColor.surfaceMuted)
             if let icon = badge.icon {
                 Text(icon).font(.system(size: 14))
             } else {
@@ -544,7 +593,7 @@ private struct LeaderboardHeroCard: View {
         }
         .padding(.horizontal, SQSpace.sm + 2)
         .padding(.vertical, 5)
-        .background(SQColor.fill, in: Capsule())
+        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
     }
 
     private func animateIn() {
@@ -563,7 +612,8 @@ private struct LeaderboardHeroCard: View {
     }
 }
 
-/// Anneau de progression XP (rempli au chargement, dégradé rouge signature).
+/// Anneau de progression XP (rempli au chargement) — piste `SurfaceMuted`,
+/// remplissage accent brique uni (la DA Crème supprime les dégradés).
 private struct XPRing: View {
     let progress: Double
     var lineWidth: CGFloat = 7
@@ -571,16 +621,11 @@ private struct XPRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(SQColor.fill, lineWidth: lineWidth)
+                .stroke(SQColor.surfaceMuted, lineWidth: lineWidth)
             Circle()
                 .trim(from: 0, to: max(0.015, min(1, progress)))
                 .stroke(
-                    AngularGradient(
-                        colors: [SQColor.brandRed, SQColor.brandRedDeep, SQColor.brandRed],
-                        center: .center,
-                        startAngle: .degrees(-90),
-                        endAngle: .degrees(270)
-                    ),
+                    SQColor.brandRed,
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
@@ -590,60 +635,85 @@ private struct XPRing: View {
 
 // MARK: - Switcher d'onglets
 
-// Sélecteur éditorial, aligné sur le langage des boutons de la landing
-// (coins nets, bordure encre 2 px, libellés Archivo majuscules tracés) : le
-// segment actif est un bloc rouge plein qui glisse d'un onglet à l'autre.
+// Segments « Crème » : rangée de capsules Figtree SemiBold 13 — l'onglet actif
+// est une capsule brique pleine (texte crème), les inactifs surface + ombre douce.
+/// Segment compact « Vitesse | Points » : une seule capsule surface avec une
+/// pilule brique qui glisse sous l'option active (matchedGeometryEffect).
 private struct LeaderboardTabSwitcher: View {
     @Binding var selection: LeaderboardTab
-    @Namespace private var pillNamespace
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var pill
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 2) {
             ForEach(LeaderboardTab.allCases) { tab in
-                let isSelected = tab == selection
+                let isOn = tab == selection
                 Button {
-                    guard !isSelected else { return }
+                    guard !isOn else { return }
                     Haptics.selection()
                     withAnimation(SQMotion.resolve(SQMotion.emphasized, reduceMotion)) { selection = tab }
                 } label: {
-                    HStack(spacing: SQSpace.sm) {
-                        Image(systemName: tab.icon)
-                            .font(.system(size: 12, weight: .bold))
-                        Text(tab.title.uppercased())
-                            .font(SQFont.archivo(13, .bold, relativeTo: .subheadline))
-                            .tracking(1.2)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, SQSpace.md - 1)
-                    .foregroundStyle(isSelected ? .white : SQColor.label)
-                    .background {
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                .fill(SQColor.brandRed)
-                                .matchedGeometryEffect(id: "tab-pill", in: pillNamespace)
+                    Text(tab.title)
+                        .font(SQFont.body(13, .semibold))
+                        .padding(.horizontal, SQSpace.md)
+                        .padding(.vertical, SQSpace.sm - 1)
+                        .foregroundStyle(isOn ? SQColor.onAccent : SQColor.labelSecondary)
+                        .background {
+                            if isOn {
+                                Capsule(style: .continuous)
+                                    .fill(SQColor.brandRed)
+                                    .matchedGeometryEffect(id: "pill", in: pill)
+                            }
                         }
-                    }
-                    .contentShape(Rectangle())
+                        .contentShape(Capsule(style: .continuous))
                 }
-                .buttonStyle(SQPressButtonStyle())
+                .buttonStyle(.plain)
                 .accessibilityLabel(tab.title)
-                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+                .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
             }
         }
         .padding(3)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                .stroke(SQColor.label, lineWidth: 2)
+        .background(SQColor.surface, in: Capsule(style: .continuous))
+        .sqShadowSoft()
+    }
+}
+
+/// Capsule-menu de filtre : icône + valeur courante + indicateur, menu natif.
+private struct LeaderboardMenuPill<Items: View>: View {
+    let icon: String
+    let label: String
+    let accessibility: String
+    @ViewBuilder var items: () -> Items
+
+    var body: some View {
+        Menu {
+            items()
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(SQColor.brandRed)
+                Text(label)
+                    .font(SQFont.body(13, .semibold))
+                    .foregroundStyle(SQColor.label)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(SQColor.labelTertiary)
+            }
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm)
+            .background(SQColor.surface, in: Capsule(style: .continuous))
+            .sqShadowSoft()
+            .contentShape(Capsule(style: .continuous))
         }
+        .accessibilityLabel("\(accessibility) : \(label)")
     }
 }
 
 // MARK: - Chip de filtre
 
-// Chip de filtre au langage des tags éditoriaux (SQEditorialTag) : majuscules
-// tracées, coins nets, fond teinté 12 % + bordure rouge quand actif.
+// Capsule de segment/filtre « Crème » : Figtree SemiBold 13 en casse normale ;
+// actif = fond brique + texte crème, inactif = surface + ombre douce (sans bordure).
 private struct LeaderboardFilterChip: View {
     let label: String
     var icon: String? = nil
@@ -655,26 +725,23 @@ private struct LeaderboardFilterChip: View {
             Haptics.selection()
             action()
         } label: {
-            HStack(spacing: SQSpace.xs + 2) {
+            HStack(spacing: 5) {
                 if let icon {
                     Image(systemName: icon)
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 11, weight: .semibold))
                 }
-                Text(label.uppercased())
-                    .font(SQFont.archivo(12, .bold, relativeTo: .footnote))
-                    .tracking(0.8)
+                Text(label)
+                    .font(SQFont.body(13, .semibold))
             }
-            .padding(.horizontal, SQSpace.md - 1)
-            .padding(.vertical, SQSpace.sm)
-            .background(
-                isOn ? AnyShapeStyle(SQColor.brandRed.opacity(0.12)) : AnyShapeStyle(Color.clear),
-                in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                    .stroke(isOn ? SQColor.brandRed : SQColor.separator, lineWidth: isOn ? 1.5 : 1)
-            }
-            .foregroundStyle(isOn ? SQColor.brandRed : SQColor.labelSecondary)
+                .padding(.horizontal, SQSpace.md + 2)
+                .padding(.vertical, SQSpace.sm)
+                .background(
+                    isOn ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
+                    in: Capsule(style: .continuous)
+                )
+                .foregroundStyle(isOn ? SQColor.onAccent : SQColor.label)
+                .sqShadowSoft()
+                .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(SQPressButtonStyle())
         .accessibilityLabel(label)
@@ -689,7 +756,6 @@ private struct PodiumEntryData: Identifiable, Equatable {
     let name: String
     let avatarUrl: URL?
     let valueText: String
-    let level: Int?
 
     var id: Int { rank }
 }
@@ -721,6 +787,9 @@ private struct LeaderboardPodiumView: View {
     }
 }
 
+// Colonne « Crème » alignée sur le composant partagé `LeaderboardPodium`
+// (Design/SQComponents.swift) : nº1 = 👑 + avatar 66 + colonne brique pleine ;
+// nº2/3 = avatar 56 + colonne surface. Colonnes arrondies en haut uniquement.
 private struct PodiumColumn: View {
     let entry: PodiumEntryData
     let delay: Double
@@ -730,31 +799,19 @@ private struct PodiumColumn: View {
 
     private var isFirst: Bool { entry.rank == 1 }
 
-    private var metal: Color {
-        switch entry.rank {
-        case 1: return Color(hex: 0xE8B923)
-        case 2: return Color(hex: 0x9AA3AF)
-        default: return Color(hex: 0xC08552)
-        }
-    }
-
     var body: some View {
         VStack(spacing: SQSpace.sm) {
             VStack(spacing: SQSpace.sm) {
+                if isFirst {
+                    Text("👑")
+                        .font(SQFont.display(20, .bold))
+                        .accessibilityHidden(true)
+                }
                 avatar
                 Text(entry.name)
-                    .font(SQType.micro)
+                    .font(SQFont.body(isFirst ? 13.5 : 13, .semibold))
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1)
-                Text(entry.valueText)
-                    .font(SQFont.archivo(isFirst ? 14 : 13, .bold, relativeTo: .footnote))
-                    .monospacedDigit()
-                    .foregroundStyle(isFirst ? SQColor.brandRed : SQColor.labelSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                if let level = entry.level {
-                    LevelPill(level: level)
-                }
             }
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 18)
@@ -785,59 +842,66 @@ private struct PodiumColumn: View {
         }
     }
 
+    @ViewBuilder
     private var avatar: some View {
-        SQAvatar(url: entry.avatarUrl, name: entry.name, size: isFirst ? 74 : 56)
-            .padding(isFirst ? 5 : 4)
-            .overlay {
-                if isFirst {
-                    Circle().strokeBorder(
-                        AngularGradient(
-                            colors: [metal, Color(hex: 0xF6D96B), metal],
-                            center: .center
-                        ),
-                        lineWidth: 3
-                    )
-                } else {
-                    Circle().strokeBorder(metal.opacity(0.85), lineWidth: 2.5)
-                }
-            }
-            .overlay(alignment: .topLeading) {
-                if isFirst {
-                    Image(systemName: "crown.fill")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(metal)
-                        .rotationEffect(.degrees(-22))
-                        .offset(x: -7, y: -9)
-                        .accessibilityHidden(true)
-                }
-            }
+        if isFirst {
+            SQAvatar(url: entry.avatarUrl, name: entry.name, size: 66)
+                .sqShadowAccent()
+        } else {
+            SQAvatar(url: entry.avatarUrl, name: entry.name, size: 56)
+        }
     }
 
     private var step: some View {
-        RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-            .fill(isFirst
-                  ? AnyShapeStyle(SQGradient.signal)
-                  : AnyShapeStyle(SQColor.surface))
-            .frame(height: stepHeight)
-            .overlay {
+        UnevenRoundedRectangle(
+            topLeadingRadius: SQRadius.md,
+            bottomLeadingRadius: 0,
+            bottomTrailingRadius: 0,
+            topTrailingRadius: SQRadius.md,
+            style: .continuous
+        )
+        .fill(isFirst ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface))
+        .frame(height: stepHeight)
+        .overlay(
+            VStack(spacing: 1) {
                 Text("\(entry.rank)")
-                    .font(SQFont.display(isFirst ? 30 : 22, .black))
+                    .font(SQFont.display(isFirst ? 24 : 20, .bold))
                     .monospacedDigit()
-                    .foregroundStyle(isFirst ? .white : SQColor.label)
+                    .foregroundStyle(isFirst ? SQColor.onAccent : SQColor.label)
+                Text(entry.valueText)
+                    .font(SQFont.body(isFirst ? 11.5 : 11))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .padding(.horizontal, SQSpace.xs)
+                    .foregroundStyle(isFirst ? SQColor.onAccent.opacity(0.85) : SQColor.labelSecondary)
             }
-            .overlay {
-                if !isFirst {
-                    RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                        .stroke(SQColor.separator, lineWidth: 1.5)
-                }
-            }
+        )
+        .modifier(SQSoftShadowIf(active: !isFirst, accentOtherwise: true))
     }
 
     private var stepHeight: CGFloat {
         switch entry.rank {
         case 1: return 92
-        case 2: return 70
-        default: return 54
+        case 2: return 68
+        default: return 52
+        }
+    }
+}
+
+/// Ombre conditionnelle : `sqShadowSoft()` quand `active`, sinon `sqShadowAccent()`
+/// si demandé (colonne brique du podium) ou aucune ombre (rangée « moi »).
+private struct SQSoftShadowIf: ViewModifier {
+    let active: Bool
+    var accentOtherwise = false
+
+    func body(content: Content) -> some View {
+        if active {
+            content.sqShadowSoft()
+        } else if accentOtherwise {
+            content.sqShadowAccent()
+        } else {
+            content
         }
     }
 }
@@ -848,13 +912,12 @@ private struct LevelPill: View {
     let level: Int
 
     var body: some View {
-        Text("NIV. \(level)")
+        Text("Niv. \(level)")
             .font(SQType.micro)
             .monospacedDigit()
             .padding(.horizontal, SQSpace.sm)
             .padding(.vertical, 3)
-            .background(SQColor.brandRed.opacity(0.12), in: Capsule())
-            .overlay { Capsule().stroke(SQColor.brandRed.opacity(0.4), lineWidth: 1) }
+            .background(SQColor.accentSoft, in: Capsule(style: .continuous))
             .foregroundStyle(SQColor.brandRed)
     }
 }
@@ -869,21 +932,21 @@ private struct MyRankCard: View {
     var body: some View {
         HStack(spacing: SQSpace.md) {
             ZStack {
-                Circle().fill(SQGradient.signal)
+                Circle().fill(SQColor.brandRed)
                 Image(systemName: "person.fill")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(SQColor.onAccent)
             }
-            .frame(width: 46, height: 46)
+            .frame(width: 44, height: 44)
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Mon rang").sqKicker()
                 HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs + 2) {
                     Text("#\(rank)")
-                        .font(SQFont.display(24, .black))
+                        .font(SQFont.display(24, .bold))
                         .monospacedDigit()
                         .contentTransition(.numericText())
-                        .foregroundStyle(SQColor.label)
+                        .foregroundStyle(SQColor.brandRed)
                     if let total {
                         Text("sur \(total.formatted())")
                             .font(SQType.caption)
@@ -894,17 +957,18 @@ private struct MyRankCard: View {
             Spacer(minLength: SQSpace.sm)
             if let valueText {
                 Text(valueText)
-                    .font(SQFont.archivo(17, .bold, relativeTo: .headline))
+                    .font(SQFont.body(14, .semibold))
                     .monospacedDigit()
                     .foregroundStyle(SQColor.brandRed)
             }
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.brandRed.opacity(0.08), in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .overlay {
+            // Seule bordure autorisée du design system : la rangée/carte « moi ».
             RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
-                .stroke(SQColor.brandRed, lineWidth: 2)
+                .stroke(SQColor.brandRed, lineWidth: 1.5)
         }
         .accessibilityElement(children: .combine)
         // Identifiant stable pour les tests UI (les enfants combinés ne sont
@@ -924,19 +988,19 @@ private struct LeaderboardRowView<Meta: View>: View {
     @ViewBuilder var meta: () -> Meta
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-        HStack(spacing: SQSpace.md) {
-            Text("#\(rank)")
-                .font(SQFont.display(15, .bold))
+        let shape = RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
+        HStack(spacing: SQSpace.md + 1) {
+            Text("\(rank)")
+                .font(SQFont.body(14, .semibold))
                 .monospacedDigit()
                 .foregroundStyle(isMe ? SQColor.brandRed : SQColor.labelSecondary)
-                .frame(width: 40, alignment: .leading)
-            SQAvatar(url: avatarUrl, name: name, size: 42)
+                .frame(minWidth: 22, alignment: .leading)
+            SQAvatar(url: avatarUrl, name: name, size: 40)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: SQSpace.xs + 1) {
                 HStack(spacing: SQSpace.xs + 2) {
                     Text(name)
-                        .font(SQType.heading)
+                        .font(SQFont.body(15, .semibold))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
                     if isMe {
@@ -947,18 +1011,22 @@ private struct LeaderboardRowView<Meta: View>: View {
             }
             Spacer(minLength: SQSpace.sm)
             Text(valueText)
-                .font(SQFont.archivo(16, .bold, relativeTo: .headline))
+                .font(SQFont.body(14, .semibold))
                 .monospacedDigit()
-                .foregroundStyle(isMe ? SQColor.brandRed : SQColor.label)
+                .foregroundStyle(isMe ? SQColor.brandRed : SQColor.labelSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
-        .padding(.horizontal, SQSpace.md + 2)
-        .padding(.vertical, SQSpace.md)
-        .background(isMe ? AnyShapeStyle(SQColor.brandRed.opacity(0.08)) : AnyShapeStyle(SQColor.surface), in: shape)
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.md + 1)
+        .background(isMe ? AnyShapeStyle(SQColor.accentSoft) : AnyShapeStyle(SQColor.surface), in: shape)
         .overlay {
-            shape.stroke(isMe ? SQColor.brandRed : SQColor.separator, lineWidth: isMe ? 2 : 1.5)
+            if isMe {
+                // Seule bordure autorisée du design system : la rangée « moi ».
+                shape.stroke(SQColor.brandRed, lineWidth: 1.5)
+            }
         }
+        .modifier(SQSoftShadowIf(active: !isMe))
         .accessibilityElement(children: .combine)
     }
 }
@@ -969,9 +1037,9 @@ private struct LeaderboardSkeleton: View {
     var body: some View {
         VStack(spacing: SQSpace.lg) {
             HStack(alignment: .bottom, spacing: SQSpace.md) {
-                skeletonColumn(avatar: 56, step: 70)
-                skeletonColumn(avatar: 74, step: 92)
-                skeletonColumn(avatar: 56, step: 54)
+                skeletonColumn(avatar: 56, step: 68)
+                skeletonColumn(avatar: 66, step: 92)
+                skeletonColumn(avatar: 56, step: 52)
             }
             VStack(spacing: SQSpace.sm + 2) {
                 ForEach(0..<5, id: \.self) { _ in
@@ -985,7 +1053,7 @@ private struct LeaderboardSkeleton: View {
 
     private func skeletonColumn(avatar: CGFloat, step: CGFloat) -> some View {
         VStack(spacing: SQSpace.sm) {
-            Circle().fill(SQColor.fill).frame(width: avatar, height: avatar)
+            Circle().fill(SQColor.surfaceMuted).frame(width: avatar, height: avatar)
             SkeletonBlock(width: 64, height: 9)
             SkeletonBlock(width: 46, height: 9)
             SkeletonBlock(height: step, radius: SQRadius.md)
@@ -995,8 +1063,8 @@ private struct LeaderboardSkeleton: View {
 
     private var skeletonRow: some View {
         HStack(spacing: SQSpace.md) {
-            SkeletonBlock(width: 30, height: 12)
-            Circle().fill(SQColor.fill).frame(width: 42, height: 42)
+            SkeletonBlock(width: 22, height: 12)
+            Circle().fill(SQColor.surfaceMuted).frame(width: 40, height: 40)
             VStack(alignment: .leading, spacing: 7) {
                 SkeletonBlock(width: 120, height: 11)
                 SkeletonBlock(width: 80, height: 9)
@@ -1004,13 +1072,10 @@ private struct LeaderboardSkeleton: View {
             Spacer(minLength: 0)
             SkeletonBlock(width: 64, height: 13)
         }
-        .padding(.horizontal, SQSpace.md + 2)
-        .padding(.vertical, SQSpace.md)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1.5)
-        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.md + 1)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowSoft()
     }
 }
 

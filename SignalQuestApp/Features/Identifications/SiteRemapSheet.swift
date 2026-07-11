@@ -114,9 +114,9 @@ struct SiteRemapSheet: View {
                     Spacer()
                     if let errorMessage = model.errorMessage {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")
-                            .font(.caption).foregroundStyle(.white)
+                            .font(SQType.caption).foregroundStyle(SQColor.onAccent)
                             .padding(SQSpace.sm)
-                            .background(SQColor.danger, in: Capsule())
+                            .background(SQColor.danger, in: Capsule(style: .continuous))
                     }
                     selectionBar
                 }
@@ -140,16 +140,22 @@ struct SiteRemapSheet: View {
 
     private var instructionBanner: some View {
         HStack(spacing: SQSpace.sm) {
-            Image(systemName: "hand.tap.fill").foregroundStyle(SQColor.brandOrange)
+            Image(systemName: "hand.tap.fill")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 28, height: 28)
+                .background(SQColor.accentSoft, in: Circle())
+                .accessibilityHidden(true)
             Text("Touche le bon site pour y ré-attribuer \(model.item.nodeLabel)")
-                .font(.caption.weight(.semibold))
+                .font(SQFont.body(12.5, .semibold))
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
             if model.isLoading { ProgressView().controlSize(.mini) }
         }
         .padding(SQSpace.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqShadowCard()
     }
 
     @ViewBuilder
@@ -157,36 +163,31 @@ struct SiteRemapSheet: View {
         if let selected = model.selected {
             VStack(spacing: SQSpace.sm) {
                 HStack(spacing: SQSpace.sm) {
-                    Circle().fill(SQColor.brandGreen).frame(width: 10, height: 10)
+                    Circle().fill(SQColor.success).frame(width: 10, height: 10)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(selected.siteId ?? selected.id)
-                            .font(.subheadline.weight(.bold).monospacedDigit())
+                            .font(SQFont.body(14, .semibold))
+                            .monospacedDigit()
                             .foregroundStyle(SQColor.label)
                             .lineLimit(1)
                         if let address = selected.address, !address.isEmpty {
-                            Text(address).font(.caption2).foregroundStyle(SQColor.labelSecondary).lineLimit(1)
+                            Text(address).font(SQType.micro).foregroundStyle(SQColor.labelSecondary).lineLimit(1)
                         }
                     }
                     Spacer()
                 }
-                Button {
+                GradientButton(
+                    "Ré-identifier ici",
+                    systemImage: "arrow.triangle.swap",
+                    isBusy: model.isSubmitting,
+                    style: .primary
+                ) {
                     Task { await model.confirm() }
-                } label: {
-                    HStack {
-                        if model.isSubmitting { ProgressView().tint(.white) } else { Image(systemName: "arrow.triangle.swap") }
-                        Text("Ré-identifier ici").font(.headline)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, SQSpace.md)
-                    .foregroundStyle(.white)
-                    .background(SQColor.brandGreen, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                 }
-                .buttonStyle(.plain)
-                .disabled(model.isSubmitting)
             }
             .padding(SQSpace.md)
             .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-            .shadow(color: .black.opacity(0.15), radius: 12, y: 6)
+            .sqShadowCard()
         }
     }
 }

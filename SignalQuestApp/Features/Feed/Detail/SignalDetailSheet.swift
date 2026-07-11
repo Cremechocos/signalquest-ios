@@ -255,10 +255,7 @@ struct SignalDetailSheet: View {
             }
             .frame(height: 180)
             .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                    .stroke(SQColor.separator, lineWidth: 1.5)
-            }
+            .sqShadowCard()
         } else if item.kind.lowercased() == "speedtest" {
             Label("Localisation non partagée", systemImage: "location.slash")
                 .font(SQType.subhead)
@@ -300,11 +297,11 @@ struct SignalDetailSheet: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// Bouton d'action éditorial : tuile nette bordée, teinte active (rouge like,
-    /// vert repost, rouge bookmark) qui colore aussi le filet. `pop` déclenche le
-    /// rebond élastique du like quand l'état change.
+    /// Bouton d'action « Crème » : capsule sans bordure — surface + ombre repos
+    /// au repos, teinte douce de l'accent quand actif (rouge like, vert repost,
+    /// rouge bookmark). `pop` déclenche le rebond élastique du like.
     private func actionButton(systemImage: String, tint: Color, active: Bool, pop: Bool = false, action: @escaping () -> Void) -> some View {
-        let shape = RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+        let shape = Capsule(style: .continuous)
         return Button {
             Haptics.light()
             action()
@@ -314,9 +311,9 @@ struct SignalDetailSheet: View {
                 .foregroundStyle(tint)
                 .sqLikePop(trigger: pop)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, SQSpace.md)
-                .background(active ? tint.opacity(0.10) : SQColor.surface, in: shape)
-                .overlay { shape.stroke(active ? tint.opacity(0.45) : SQColor.separator, lineWidth: 1.5) }
+                .frame(minHeight: 44)
+                .background(active ? AnyShapeStyle(tint.opacity(0.12)) : AnyShapeStyle(SQColor.surface), in: shape)
+                .sqShadowSoft()
                 .sqAnimation(SQMotion.fast, value: active)
         }
         .buttonStyle(SQPressButtonStyle())

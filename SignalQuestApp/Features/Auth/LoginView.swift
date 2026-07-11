@@ -31,7 +31,7 @@ struct LoginView: View {
                             TextField("Code TOTP", text: $code)
                                 .textContentType(.oneTimeCode)
                                 .keyboardType(.numberPad)
-                                .font(SQFont.display(28, .black))
+                                .font(SQFont.display(28, .bold))
                                 .multilineTextAlignment(.center)
                                 .textFieldStyle(SQTextFieldStyle())
                             GradientButton("Valider le code", systemImage: "checkmark.shield", isBusy: session.isBusy) {
@@ -73,11 +73,7 @@ struct LoginView: View {
                         }
                     }
                     .padding(SQSpace.xl)
-                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                            .stroke(SQColor.label, lineWidth: 2)
-                    }
+                    .sqSoftCard()
                     .sqAuthAppear(appeared, delay: 0.08)
 
                     if !isTwoFactor {
@@ -87,47 +83,21 @@ struct LoginView: View {
                             handleAppleSignIn(result)
                         }
                         .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                        .frame(height: 50)
-                        .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                        .frame(height: 56)
+                        .clipShape(Capsule(style: .continuous))
                         .accessibilityLabel("Continuer avec Apple")
                         .sqAuthAppear(appeared, delay: 0.10)
                     }
 
-                    Button {
-                        Haptics.light()
+                    GradientButton("Explorer sans compte", systemImage: "map", style: .secondary) {
                         showGuestMap = true
-                    } label: {
-                        Label("Explorer sans compte", systemImage: "map")
-                            .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, SQSpace.md)
-                            .foregroundStyle(SQColor.label)
-                            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                                    .stroke(SQColor.separator, lineWidth: 1.5)
-                            }
                     }
-                    .buttonStyle(SQPressButtonStyle())
                     .accessibilityLabel("Explorer la carte sans compte")
                     .sqAuthAppear(appeared, delay: 0.11)
 
-                    Button {
-                        Haptics.light()
+                    GradientButton("Tester sans compte", systemImage: "speedometer", style: .secondary) {
                         showGuestSpeedtest = true
-                    } label: {
-                        Label("Tester sans compte", systemImage: "speedometer")
-                            .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, SQSpace.md)
-                            .foregroundStyle(SQColor.label)
-                            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                                    .stroke(SQColor.separator, lineWidth: 1.5)
-                            }
                     }
-                    .buttonStyle(SQPressButtonStyle())
                     .accessibilityLabel("Lancer un speedtest sans compte")
                     .sqAuthAppear(appeared, delay: 0.12)
 
@@ -136,7 +106,6 @@ struct LoginView: View {
                 }
                 .padding(SQSpace.xl)
             }
-            .background { SQAuthHalo() }
             .signalQuestHeroBackground()
             .onAppear { appeared = true }
             .sheet(isPresented: $showSignup) {
@@ -211,16 +180,14 @@ struct LoginView: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 64, height: 64)
                 .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                        .stroke(SQColor.separator, lineWidth: 1)
-                }
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text("Réseau mobile, à nu").sqKicker()
                 Text("SignalQuest")
                     .font(SQType.display)
                     .foregroundStyle(SQColor.label)
+                Text("Mesure, comprends et partage ton réseau")
+                    .font(SQType.subhead)
+                    .foregroundStyle(SQColor.labelSecondary)
             }
         }
         .padding(.top, SQSpace.huge + SQSpace.sm)
@@ -254,7 +221,12 @@ private struct GuestMapPreview: View {
                     .foregroundStyle(SQColor.brandRed)
                     .padding(.horizontal, SQSpace.md)
                     .frame(minHeight: 50)
-                    .background(.ultraThinMaterial)
+                    .background {
+                        Rectangle()
+                            .fill(SQColor.surfaceGlass)
+                            .background(.ultraThinMaterial)
+                            .ignoresSafeArea(edges: .top)
+                    }
                     .overlay(alignment: .bottom) {
                         Rectangle()
                             .fill(SQColor.separator)
@@ -392,37 +364,22 @@ private struct GuestSpeedtestReceiptsView: View {
     }
 }
 
+/// Champ « Crème & Terre cuite » : capsule 44, fond `SurfaceMuted`, sans
+/// bordure (règle No-Border) — le focus passe par la teinte brique native.
 struct SQTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
             .font(SQType.body)
-            .padding(SQSpace.md + 2)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                    .stroke(SQColor.separator, lineWidth: 1.5)
-            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.vertical, SQSpace.md)
+            .frame(minHeight: 44)
+            .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
             .foregroundStyle(SQColor.label)
             .autocorrectionDisabled()
     }
 }
 
-// MARK: - Shared auth styling (hero halo + soft appear)
-
-/// Voile rouge très discret en haut de l'écran d'auth. La DA éditoriale est à
-/// plat : on garde juste une touche de chaleur rouge, sans le mesh coloré.
-struct SQAuthHalo: View {
-    var body: some View {
-        Ellipse()
-            .fill(SQColor.brandRed.opacity(0.10))
-            .frame(width: 420, height: 260)
-            .blur(radius: 90)
-            .offset(x: -60, y: -240)
-            .allowsHitTesting(false)
-            .ignoresSafeArea()
-            .accessibilityHidden(true)
-    }
-}
+// MARK: - Shared auth styling (soft appear)
 
 /// Entrée douce (offset + opacity) des blocs d'un écran Auth au premier
 /// affichage. Reduce Motion est respecté via `sqAnimation`.

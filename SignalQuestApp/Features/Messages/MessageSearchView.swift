@@ -102,12 +102,9 @@ struct MessageSearchView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .padding(SQSpace.md)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                    .stroke(SQColor.separator, lineWidth: 1)
-            }
+            .padding(SQSpace.md + 2)
+            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+            .sqShadowCard()
         }
         .buttonStyle(.plain)
     }

@@ -35,7 +35,9 @@ struct EditProfileView: View {
                         .sqFadeUp()
 
                     VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
-                        Text("Identité").sqKicker()
+                        Text("Identité")
+                            .font(SQType.heading)
+                            .foregroundStyle(SQColor.label)
                         TextField("Nom", text: $name)
                             .textContentType(.name)
                             .textFieldStyle(SQTextFieldStyle())
@@ -55,7 +57,8 @@ struct EditProfileView: View {
                                     .foregroundStyle(SQColor.labelTertiary)
                             }
                             .padding(SQSpace.md)
-                            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                            .frame(minHeight: 44)
+                            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                         }
                         .buttonStyle(.plain)
                         TextField("Bio", text: $bio, axis: .vertical)
@@ -70,7 +73,7 @@ struct EditProfileView: View {
                             .foregroundStyle(SQColor.danger)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(SQSpace.md)
-                            .background(SQColor.danger.opacity(0.10), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                            .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                     }
 
                     GradientButton("Enregistrer", systemImage: "checkmark.circle.fill", isBusy: isBusy) {
@@ -125,15 +128,11 @@ struct EditProfileView: View {
                     SQAvatar(url: user.avatarUrl, name: user.displayName, size: 96)
                 }
             }
-            .padding(5)
-            .overlay {
-                Circle().stroke(SQColor.brandRed, lineWidth: 3)
-            }
             .accessibilityHidden(true)
             PhotosPicker(selection: $avatarItem, matching: .images) {
                 Image(systemName: "camera.fill")
                     .font(.footnote.weight(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(SQColor.onAccent)
                     .frame(width: 32, height: 32)
                     .background(SQColor.brandRed, in: Circle())
                     .overlay { Circle().stroke(SQColor.bg, lineWidth: 2) }

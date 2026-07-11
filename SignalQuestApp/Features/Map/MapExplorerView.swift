@@ -1322,6 +1322,10 @@ struct MapExplorerView: View {
             ZStack {
                 VStack(spacing: SQSpace.sm + 2) {
                     mapTopControlBar
+                        .padding(.horizontal, SQSpace.md)
+                    // Chips de couches : composant transverse déjà restylé
+                    // (capsules casse normale, actif brique plein).
+                    MapFilterBar(filters: $filters)
                     if filters.contains(.coverage) {
                         coverageColoringToggle
                         if coverageByGeneration {
@@ -1332,9 +1336,9 @@ struct MapExplorerView: View {
                     }
                     if !model.searchResults.isEmpty {
                         searchSuggestions
+                            .padding(.horizontal, SQSpace.md)
                     }
                 }
-                .padding(.horizontal, SQSpace.md)
                 .padding(.top, SQSpace.sm)
                 .frame(maxWidth: 640)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -1370,9 +1374,8 @@ struct MapExplorerView: View {
                         ProgressView()
                             .tint(SQColor.brandRed)
                             .padding(SQSpace.md)
-                            .background(SQColor.surface, in: Circle())
-                            .overlay { Circle().stroke(SQColor.separator, lineWidth: 1.5) }
-                            .shadow(color: mapChromeShadow, radius: 12, y: 5)
+                            .background { mapGlassBackground(Circle()) }
+                            .sqShadowCard()
                             .padding(.bottom, 18)
                     }
                 }
@@ -1383,7 +1386,7 @@ struct MapExplorerView: View {
     }
 
     /// Bandeau discret « Marché : X » affiché 2 s après un switch automatique :
-    /// surface plate bordée, kicker rouge + libellé Archivo, point rouge.
+    /// capsule crème + point brique, ombre douce (langage des surfaces carte).
     private var marketSwitchNoticeOverlay: some View {
         VStack {
             if let notice = model.marketSwitchNotice {
@@ -1391,19 +1394,15 @@ struct MapExplorerView: View {
                     Circle()
                         .fill(SQColor.brandRed)
                         .frame(width: 8, height: 8)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Marché").sqKicker()
-                        Text(noticeValue(notice))
-                            .font(SQFont.archivo(15, .bold))
-                            .foregroundStyle(SQColor.label)
-                            .lineLimit(1)
-                    }
+                    Text(notice)
+                        .font(SQFont.body(14, .semibold))
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(1)
                 }
-                .padding(.horizontal, SQSpace.md + 2)
-                .padding(.vertical, SQSpace.sm + 1)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                .overlay { mapChromeBorder(SQRadius.md, strong: true) }
-                .shadow(color: mapChromeShadow, radius: 14, y: 6)
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.vertical, SQSpace.sm + 2)
+                .background { mapGlassBackground(Capsule(style: .continuous)) }
+                .sqShadowCard()
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
             Spacer()
@@ -1413,35 +1412,23 @@ struct MapExplorerView: View {
         .allowsHitTesting(false)
     }
 
-    /// Extrait le libellé du marché du message « Marché : X » pour l'afficher
-    /// sous le kicker (sans dupliquer le préfixe).
-    private func noticeValue(_ notice: String) -> String {
-        guard let range = notice.range(of: ":") else { return notice }
-        return String(notice[range.upperBound...]).trimmingCharacters(in: .whitespaces)
-    }
-
     private var mapTopControlBar: some View {
         HStack(spacing: SQSpace.sm) {
             mapSearchField
             filterButton
         }
-        .padding(SQSpace.xs + 1)
-        .frame(height: 58)
-        .foregroundStyle(SQColor.label)
-        .background(mapChromeBackground, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay { mapChromeBorder(SQRadius.lg) }
-        .shadow(color: mapChromeShadow, radius: 14, y: 6)
     }
 
-    /// Champ de recherche net : loupe rouge, fond surface contrasté, coin net.
+    /// Barre de recherche flottante : capsule 42 pt « verre crème » + blur,
+    /// loupe + placeholder Figtree 15 secondaire, ombre carte — sans bordure.
     private var mapSearchField: some View {
-        HStack(spacing: SQSpace.sm - 1) {
+        HStack(spacing: SQSpace.sm) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(SQColor.brandRed)
-            TextField("Rechercher", text: $model.searchQuery)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(SQColor.labelSecondary)
+            TextField("Rechercher une ville, un site…", text: $model.searchQuery)
                 .textFieldStyle(.plain)
-                .font(SQFont.body(15, .medium))
+                .font(SQFont.body(15))
                 .foregroundStyle(SQColor.label)
                 .submitLabel(.search)
                 .onSubmit { Task { await model.search() } }
@@ -1454,12 +1441,14 @@ struct MapExplorerView: View {
                         .foregroundStyle(SQColor.labelTertiary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Effacer la recherche")
             }
         }
-        .frame(height: 48)
-        .padding(.horizontal, SQSpace.md - 1)
-        .background(mapControlFill, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .overlay { mapChromeBorder(SQRadius.md) }
+        .padding(.horizontal, SQSpace.md + 2)
+        .frame(height: 42)
+        .frame(maxWidth: .infinity)
+        .background { mapGlassBackground(Capsule(style: .continuous)) }
+        .sqShadowCard()
     }
 
     private var filterButton: some View {
@@ -1469,19 +1458,20 @@ struct MapExplorerView: View {
         } label: {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 17, weight: .bold))
-                    .frame(width: 48, height: 48)
-                    .background(mapControlFill, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .overlay { mapChromeBorder(SQRadius.md) }
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(SQColor.label)
+                    .frame(width: 44, height: 44)
+                    .background { mapGlassBackground(Circle()) }
                 if activeFilterCount > 0 {
                     Text("\(activeFilterCount)")
-                        .font(SQFont.archivo(10, .bold))
+                        .font(SQFont.bodyFixed(10, .bold))
                         .frame(minWidth: 17, minHeight: 17)
                         .background(SQColor.brandRed, in: Circle())
-                        .foregroundStyle(.white)
-                        .offset(x: 5, y: -5)
+                        .foregroundStyle(SQColor.onAccent)
+                        .offset(x: 4, y: -4)
                 }
             }
+            .sqShadowCard()
         }
         .buttonStyle(SQPressButtonStyle())
         .accessibilityLabel("Calques et filtres")
@@ -1509,27 +1499,27 @@ struct MapExplorerView: View {
                     .fill(model.operatorFilter.uppercased() == "ALL" ? SQColor.brandRed : model.operatorAccent(model.operatorFilter))
                     .frame(width: 9, height: 9)
                 Text(model.operatorShortLabel(model.operatorFilter))
-                    .font(SQFont.archivo(14, .bold))
+                    .font(SQFont.body(13.5, .semibold))
                     .lineLimit(1)
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(SQColor.labelSecondary)
             }
-            .padding(.horizontal, SQSpace.md - 2)
+            .padding(.horizontal, SQSpace.md)
             .frame(height: 42)
             .foregroundStyle(SQColor.label)
-            .background(mapChromeBackground, in: Capsule())
-            .overlay { Capsule().stroke(SQColor.separator, lineWidth: 1.5) }
-            .shadow(color: mapChromeShadow, radius: 12, y: 5)
+            .background { mapGlassBackground(Capsule(style: .continuous)) }
+            .sqShadowCard()
         }
         .accessibilityLabel("Opérateur affiché : \(model.operatorShortLabel(model.operatorFilter))")
     }
 
     /// Pile de 2 boutons flottants (bas-droite) : recentrage GPS + rafraîchissement.
-    /// Remplace le rail de 4 boutons + les panneaux flottants (désencombrement).
+    /// Cercles 46 pt « verre crème » + blur : flèche de localisation brique,
+    /// second bouton encre — ombre carte, sans bordure.
     private var mapFabStack: some View {
-        VStack(spacing: SQSpace.sm) {
-            mapFab(icon: "location", label: "Recentrer sur ma position") {
+        VStack(spacing: SQSpace.sm + 2) {
+            mapFab(icon: "location", tint: SQColor.brandRed, label: "Recentrer sur ma position") {
                 centerOnCurrentLocation()
             }
             mapFab(icon: "arrow.clockwise", label: "Rafraîchir la carte") {
@@ -1538,46 +1528,30 @@ struct MapExplorerView: View {
         }
     }
 
-    private func mapFab(icon: String, label: String, action: @escaping () -> Void) -> some View {
+    private func mapFab(icon: String, tint: Color = SQColor.label, label: String, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.light()
             action()
         } label: {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .bold))
-                .frame(width: 48, height: 48)
-                .foregroundStyle(SQColor.label)
-                .background(mapChromeBackground, in: Circle())
-                .overlay { Circle().stroke(SQColor.separator, lineWidth: 1.5) }
-                .shadow(color: mapChromeShadow, radius: 12, y: 5)
+                .font(.system(size: 18, weight: .semibold))
+                .frame(width: 46, height: 46)
+                .foregroundStyle(tint)
+                .background { mapGlassBackground(Circle()) }
+                .sqShadowCard()
         }
         .buttonStyle(SQPressButtonStyle())
         .accessibilityLabel(label)
     }
 
-    // MARK: Chrome éditorial (à plat, opaque, bordé — pas de glassmorphism)
+    // MARK: Chrome « Crème & Terre cuite » (verre crème + ombres douces, zéro bordure)
 
-    /// Conteneur des contrôles superposés : surface opaque crème/encre, jamais
-    /// translucide, pour rester lisible par-dessus la carte.
-    private var mapChromeBackground: AnyShapeStyle { AnyShapeStyle(SQColor.surface) }
-
-    /// Remplissage des contrôles internes (champ recherche, boutons) : surface
-    /// légèrement contrastée du conteneur.
-    private var mapControlFill: Color { SQColor.fill }
-
-    /// Pastille discrète (légende, tags hors conteneur) posée à même la carte.
-    private var mapSubtlePillFill: Color { SQColor.surface }
-
-    /// Ombre éditoriale très légère (la profondeur vient surtout de la bordure).
-    private var mapChromeShadow: Color {
-        Color.black.opacity(colorScheme == .dark ? 0.30 : 0.10)
-    }
-
-    /// Bordure fine encre/separator commune à tous les conteneurs de la carte.
-    @ViewBuilder
-    private func mapChromeBorder(_ radius: CGFloat, strong: Bool = false) -> some View {
-        RoundedRectangle(cornerRadius: radius, style: .continuous)
-            .stroke(strong ? SQColor.label : SQColor.separator, lineWidth: strong ? 2 : 1.5)
+    /// Fond commun des contrôles posés sur la carte : `surfaceGlass` (crème 92 %)
+    /// sur blur système — la profondeur vient des ombres, jamais d'une bordure.
+    private func mapGlassBackground<S: InsettableShape>(_ shape: S) -> some View {
+        shape
+            .fill(SQColor.surfaceGlass)
+            .background(.ultraThinMaterial, in: shape)
     }
 
     @ViewBuilder
@@ -1592,18 +1566,17 @@ struct MapExplorerView: View {
     private func mapToast(_ text: String, icon: String, tint: Color) -> some View {
         HStack(spacing: SQSpace.sm - 1) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
             Text(text)
-                .font(SQFont.archivo(13, .semibold))
+                .font(SQFont.body(13, .semibold))
                 .foregroundStyle(SQColor.label)
                 .lineLimit(2)
         }
-        .padding(.horizontal, SQSpace.md - 1)
-        .padding(.vertical, SQSpace.sm + 1)
-        .background(mapChromeBackground, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .overlay { mapChromeBorder(SQRadius.md) }
-        .shadow(color: mapChromeShadow, radius: 12, y: 5)
+        .padding(.horizontal, SQSpace.md + 2)
+        .padding(.vertical, SQSpace.sm + 2)
+        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+        .sqShadowCard()
         .frame(maxWidth: 280, alignment: .leading)
     }
 
@@ -1638,30 +1611,44 @@ struct MapExplorerView: View {
     private var coverageQualityLegend: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
-                Text("Qualité RSRP (dBm)").sqKicker()
-
+                legendTitlePill("Qualité RSRP (dBm)")
                 ForEach(CoverageQualityBand.visibleBands) { band in
-                    HStack(spacing: SQSpace.xs + 1) {
-                        RoundedRectangle(cornerRadius: 2, style: .continuous)
-                            .fill(band.swiftUIColor)
-                            .frame(width: 9, height: 9)
-                        Text("\(band.title) \(band.rangeLabel)")
-                            .font(SQFont.archivo(11, .semibold))
-                            .foregroundStyle(SQColor.label)
-                            .lineLimit(1)
-                    }
-                    .padding(.horizontal, SQSpace.sm)
-                    .padding(.vertical, SQSpace.xs + 1)
-                    .background(mapSubtlePillFill, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                            .stroke(SQColor.separator, lineWidth: 1.5)
-                    }
+                    legendPill(color: band.swiftUIColor, text: "\(band.title) \(band.rangeLabel)")
                 }
             }
             .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.xs)
         }
-        .frame(height: 36)
+        .frame(height: 40)
+    }
+
+    /// Pastille-titre d'une légende : capsule verre crème, texte secondaire.
+    private func legendTitlePill(_ text: String) -> some View {
+        Text(text)
+            .font(SQFont.body(11, .semibold))
+            .foregroundStyle(SQColor.labelSecondary)
+            .lineLimit(1)
+            .padding(.horizontal, SQSpace.sm + 2)
+            .padding(.vertical, SQSpace.xs + 2)
+            .background { mapGlassBackground(Capsule(style: .continuous)) }
+            .sqShadowSoft()
+    }
+
+    /// Pastille d'une bande de légende : point coloré + libellé, capsule crème.
+    private func legendPill(color: Color, text: String) -> some View {
+        HStack(spacing: SQSpace.xs + 1) {
+            Circle()
+                .fill(color)
+                .frame(width: 9, height: 9)
+            Text(text)
+                .font(SQFont.body(11, .semibold))
+                .foregroundStyle(SQColor.label)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, SQSpace.sm + 2)
+        .padding(.vertical, SQSpace.xs + 2)
+        .background { mapGlassBackground(Capsule(style: .continuous)) }
+        .sqShadowSoft()
     }
 
     /// Bascule de coloration de la couche Couverture : Signal (RSRP) ↔ Génération.
@@ -1671,6 +1658,9 @@ struct MapExplorerView: View {
             Text("Génération").tag(true)
         }
         .pickerStyle(.segmented)
+        .padding(SQSpace.xs)
+        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+        .sqShadowSoft()
         .frame(maxWidth: 280)
         .padding(.horizontal, SQSpace.md)
         .accessibilityLabel("Coloration de la couverture : signal ou génération")
@@ -1680,30 +1670,15 @@ struct MapExplorerView: View {
     private var coverageGenerationLegend: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
-                Text("Génération").sqKicker()
-
+                legendTitlePill("Génération")
                 ForEach(CoverageGenerationBand.visibleBands) { band in
-                    HStack(spacing: SQSpace.xs + 1) {
-                        RoundedRectangle(cornerRadius: 2, style: .continuous)
-                            .fill(band.swiftUIColor)
-                            .frame(width: 9, height: 9)
-                        Text(band.title)
-                            .font(SQFont.archivo(11, .semibold))
-                            .foregroundStyle(SQColor.label)
-                            .lineLimit(1)
-                    }
-                    .padding(.horizontal, SQSpace.sm)
-                    .padding(.vertical, SQSpace.xs + 1)
-                    .background(mapSubtlePillFill, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                            .stroke(SQColor.separator, lineWidth: 1.5)
-                    }
+                    legendPill(color: band.swiftUIColor, text: band.title)
                 }
             }
             .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.xs)
         }
-        .frame(height: 36)
+        .frame(height: 40)
     }
 
     private var searchSuggestions: some View {
@@ -1721,10 +1696,10 @@ struct MapExplorerView: View {
                     } label: {
                         HStack(spacing: SQSpace.sm) {
                             Image(systemName: "antenna.radiowaves.left.and.right")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(SQColor.brandRed)
                             Text(site.siteId ?? site.id)
-                                .font(SQFont.archivo(14, .bold))
+                                .font(SQFont.body(14, .semibold))
                             if let address = site.address {
                                 Text(address)
                                     .font(SQFont.body(13))
@@ -1733,11 +1708,11 @@ struct MapExplorerView: View {
                             }
                             Spacer()
                         }
-                        .padding(.horizontal, SQSpace.md - 1)
-                        .padding(.vertical, SQSpace.sm + 1)
+                        .padding(.horizontal, SQSpace.md + 2)
+                        .padding(.vertical, SQSpace.sm + 2)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(mapChromeBackground, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                        .overlay { mapChromeBorder(SQRadius.md) }
+                        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+                        .sqShadowSoft()
                     }
                     .buttonStyle(SQPressButtonStyle())
                     .foregroundStyle(SQColor.label)
@@ -2651,21 +2626,17 @@ private struct MapAdvancedFilterSheet: View {
                                 Text(flagEmoji(selectedEntry?.countryCode ?? ""))
                                     .font(.system(size: 18))
                                 Text(selectedEntry?.label ?? market)
-                                    .font(SQFont.archivo(15, .semibold))
+                                    .font(SQFont.body(15, .semibold))
                                     .foregroundStyle(SQColor.label)
                                     .lineLimit(1)
                                 Spacer()
                                 Image(systemName: "chevron.up.chevron.down")
-                                    .font(.system(size: 12, weight: .bold))
+                                    .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(SQColor.labelSecondary)
                             }
                             .frame(maxWidth: .infinity, minHeight: 46)
                             .padding(.horizontal, SQSpace.md)
-                            .background(SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                                    .stroke(SQColor.separator, lineWidth: 1.5)
-                            }
+                            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                         }
                         Text("S'ajuste aussi tout seul selon ta position / ta SIM.")
                             .font(SQFont.archivo(11, .regular))
@@ -2836,15 +2807,12 @@ private struct MapAdvancedFilterSheet: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1.5)
-        }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
-    /// Tag de filtre éditorial : sélectionné = fond rouge plein, texte blanc ;
-    /// sinon surface contrastée + bordure separator. Coin net `SQRadius.sm`.
+    /// Chip de filtre « Crème » : capsule Figtree SemiBold — actif = brique
+    /// pleine texte crème ; inactif = tuile `SurfaceMuted` texte encre. Sans bordure.
     private func filterChip(title: String, icon: String, active: Bool, disabled: Bool = false, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.light()
@@ -2852,21 +2820,17 @@ private struct MapAdvancedFilterSheet: View {
         } label: {
             HStack(spacing: SQSpace.sm - 1) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: 12, weight: .semibold))
                     .frame(width: 16)
                 Text(title)
-                    .font(SQFont.archivo(12, .semibold))
+                    .font(SQFont.body(12.5, .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
-            .frame(maxWidth: .infinity, minHeight: 42)
+            .frame(maxWidth: .infinity, minHeight: 44)
             .padding(.horizontal, SQSpace.sm)
-            .background(active ? SQColor.brandRed : SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                    .stroke(active ? Color.clear : SQColor.separator, lineWidth: 1.5)
-            }
-            .foregroundStyle(active ? Color.white : SQColor.label)
+            .background(active ? SQColor.brandRed : SQColor.surfaceMuted, in: Capsule(style: .continuous))
+            .foregroundStyle(active ? SQColor.onAccent : SQColor.label)
             .opacity(disabled ? 0.4 : 1)
         }
         .buttonStyle(SQPressButtonStyle())
@@ -2876,8 +2840,8 @@ private struct MapAdvancedFilterSheet: View {
 
     /// Chip d'un statut prévisionnel : reprend la couleur du marqueur carte
     /// (actif vert / upgrade ambre / déclaré bleu / prévu ardoise). Sélectionné =
-    /// fond coloré plein ; sinon glyphe + bordure de cette couleur → lien visuel
-    /// direct avec les pastilles de la carte.
+    /// capsule pleine ; sinon capsule teintée douce de cette couleur → lien
+    /// visuel direct avec les pastilles de la carte, sans bordure.
     private func plannedStatusChip(_ status: PlannedActivationStatus) -> some View {
         let color = MapExplorerView.plannedStatusColor(status)
         let active = plannedStatuses.contains(status)
@@ -2887,20 +2851,16 @@ private struct MapAdvancedFilterSheet: View {
         } label: {
             HStack(spacing: SQSpace.sm - 1) {
                 Image(systemName: MapExplorerView.plannedStatusGlyph(status))
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: 12, weight: .semibold))
                     .frame(width: 16)
                 Text(MapExplorerView.plannedStatusLabel(status))
-                    .font(SQFont.archivo(12, .semibold))
+                    .font(SQFont.body(12.5, .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
-            .frame(maxWidth: .infinity, minHeight: 42)
+            .frame(maxWidth: .infinity, minHeight: 44)
             .padding(.horizontal, SQSpace.sm)
-            .background(active ? color : SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                    .stroke(active ? Color.clear : color.opacity(0.55), lineWidth: 1.5)
-            }
+            .background(active ? color : color.opacity(0.13), in: Capsule(style: .continuous))
             .foregroundStyle(active ? Color.white : color)
         }
         .buttonStyle(SQPressButtonStyle())
@@ -2940,9 +2900,7 @@ private struct MapAdvancedFilterSheet: View {
     private func periodPicker(_ title: String, selection: Binding<Int>) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text(title)
-                .font(SQFont.archivo(12, .semibold))
-                .tracking(0.4)
-                .textCase(.uppercase)
+                .font(SQFont.body(12.5, .semibold))
                 .foregroundStyle(SQColor.labelSecondary)
             Picker(title, selection: selection) {
                 Text("Tout").tag(0)
@@ -3017,16 +2975,18 @@ private final class SQMapKitMarkerView: MKAnnotationView {
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
         backgroundColor = .clear
-        dot.layer.borderColor = UIColor.white.cgColor
-        dot.layer.borderWidth = 2
+        // Style « Crème & Terre cuite » : bord crème 2,5 pt + ombre noire 22 %.
+        // Le glyphe/compteur reste crème sur la couleur (opérateur) du marqueur.
+        dot.layer.borderColor = UIColor(SQColor.onAccent).cgColor
+        dot.layer.borderWidth = 2.5
         dot.layer.shadowColor = UIColor.black.cgColor
-        dot.layer.shadowOpacity = 0.25
-        dot.layer.shadowRadius = 3
-        dot.layer.shadowOffset = CGSize(width: 0, height: 1.5)
-        countLabel.textColor = .white
+        dot.layer.shadowOpacity = 0.22
+        dot.layer.shadowRadius = 5
+        dot.layer.shadowOffset = CGSize(width: 0, height: 3)
+        countLabel.textColor = UIColor(SQColor.onAccent)
         countLabel.font = .systemFont(ofSize: 12, weight: .bold)
         countLabel.textAlignment = .center
-        glyph.tintColor = .white
+        glyph.tintColor = UIColor(SQColor.onAccent)
         glyph.contentMode = .scaleAspectFit
         addSubview(dot)
         dot.addSubview(glyph)
@@ -3037,7 +2997,7 @@ private final class SQMapKitMarkerView: MKAnnotationView {
     func apply(_ payload: MapAnnotationPayload) {
         let color = UIColor(payload.markerColor)
         if let count = payload.clusterCount {
-            let size: CGFloat = count >= 100 ? 40 : 34
+            let size: CGFloat = count >= 100 ? 44 : 38
             frame = CGRect(x: 0, y: 0, width: size, height: size)
             dot.frame = bounds
             dot.layer.cornerRadius = size / 2
@@ -3048,16 +3008,16 @@ private final class SQMapKitMarkerView: MKAnnotationView {
             countLabel.isHidden = false
             glyph.isHidden = true
         } else {
-            let size: CGFloat = 22
+            let size: CGFloat = 36
             frame = CGRect(x: 0, y: 0, width: size, height: size)
             dot.frame = bounds
             dot.layer.cornerRadius = size / 2
             dot.backgroundColor = color
             dot.alpha = payload.communityObserved ? 0.6 : 1
             countLabel.isHidden = true
-            glyph.frame = dot.bounds.insetBy(dx: 4, dy: 4)
+            glyph.frame = dot.bounds.insetBy(dx: 8, dy: 8)
             glyph.image = UIImage(systemName: Self.glyphName(for: payload))?
-                .withConfiguration(UIImage.SymbolConfiguration(pointSize: 10, weight: .bold))
+                .withConfiguration(UIImage.SymbolConfiguration(pointSize: 13, weight: .bold))
             glyph.isHidden = false
         }
     }
@@ -3523,7 +3483,7 @@ struct OutageDetailSheet: View {
             .padding()
         }
         .presentationDetents([.height(440), .medium, .large])
-        .presentationBackgroundCompat(.ultraThinMaterial)
+        .presentationBackgroundCompat(SQColor.bg)
     }
 
     private var header: some View {
@@ -3532,17 +3492,17 @@ struct OutageDetailSheet: View {
                 .font(.title2.weight(.bold))
                 .foregroundStyle(.white)
                 .frame(width: 46, height: 46)
-                .background(issueColor, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(issueColor, in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(site.commune?.capitalized ?? site.siteId ?? "Site en panne")
-                    .font(.title3.weight(.bold))
+                    .font(SQFont.display(20, .bold, relativeTo: .title3))
                     .foregroundStyle(SQColor.label)
                 Text(issueLabel)
-                    .font(.callout.weight(.semibold))
+                    .font(SQFont.body(14.5, .semibold, relativeTo: .callout))
                     .foregroundStyle(issueColor)
                 if let op = site.operator {
                     Text(op)
-                        .font(.caption.weight(.medium))
+                        .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
             }
@@ -3553,25 +3513,23 @@ struct OutageDetailSheet: View {
     private var servicesSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text("Services impactés")
-                .font(SQFont.archivo(12, .semibold))
-                .tracking(0.4)
-                .textCase(.uppercase)
+                .font(SQFont.body(12.5, .semibold))
                 .foregroundStyle(SQColor.labelSecondary)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
                 ForEach(site.services, id: \.label) { service in
                     HStack(spacing: 6) {
                         Circle().fill(serviceColor(service.status)).frame(width: 8, height: 8)
                         Text(service.label)
-                            .font(.footnote.weight(.semibold))
+                            .font(SQFont.body(13, .semibold, relativeTo: .footnote))
                             .foregroundStyle(SQColor.label)
                         Spacer(minLength: 0)
                         Text(serviceStatusLabel(service.status))
-                            .font(.caption2.weight(.bold))
+                            .font(SQFont.body(11, .bold, relativeTo: .caption2))
                             .foregroundStyle(serviceColor(service.status))
                     }
                     .padding(.horizontal, SQSpace.sm + 2)
                     .padding(.vertical, 7)
-                    .background(serviceColor(service.status).opacity(0.12), in: Capsule())
+                    .background(serviceColor(service.status).opacity(0.12), in: Capsule(style: .continuous))
                 }
             }
         }
@@ -3587,7 +3545,8 @@ struct OutageDetailSheet: View {
             infoRow("Site", site.siteId)
         }
         .padding(.vertical, SQSpace.xs)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
     @ViewBuilder
@@ -3595,11 +3554,11 @@ struct OutageDetailSheet: View {
         if let value, !value.isEmpty {
             HStack(alignment: .top) {
                 Text(label)
-                    .font(.subheadline)
+                    .font(SQType.subhead)
                     .foregroundStyle(SQColor.labelSecondary)
                 Spacer()
                 Text(value)
-                    .font(.subheadline.weight(.semibold))
+                    .font(SQFont.body(13.5, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
                     .multilineTextAlignment(.trailing)
             }

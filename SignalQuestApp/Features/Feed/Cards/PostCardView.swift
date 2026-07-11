@@ -29,6 +29,7 @@ struct PostCardView: View {
                 if !item.text.isEmpty {
                     Text(item.text)
                         .font(SQType.body)
+                        .lineSpacing(3)
                         .foregroundStyle(SQColor.label)
                         .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.leading)
@@ -37,14 +38,10 @@ struct PostCardView: View {
                 if let attachment = item.attachments.first,
                    let url = attachment.thumbnailUrl ?? attachment.url {
                     RemoteImage(url: url, maxDimension: 440, contentMode: .fill) {
-                        Rectangle().fill(SQColor.fill)
+                        Rectangle().fill(SQColor.surfaceMuted)
                     }
                     .frame(height: 220)
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                            .stroke(SQColor.separator, lineWidth: 1)
-                    }
                     .onTapGesture(count: 2) {
                         Haptics.medium()
                         onLike()

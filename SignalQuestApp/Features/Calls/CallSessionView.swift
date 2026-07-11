@@ -32,14 +32,14 @@ struct CallScreen: View {
                 }
                 if let error = liveKit.mediaErrorMessage {
                     Text(error)
-                        .font(.caption)
+                        .font(SQType.caption)
                         .foregroundStyle(SQColor.danger)
                         .multilineTextAlignment(.center)
                 }
                 controls
                 Text("Audio et vidéo transportés par LiveKit.")
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.55))
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelTertiary)
                     .accessibilityLabel("Les appels utilisent le transport LiveKit")
             }
             .padding(.horizontal, SQSpace.lg)
@@ -53,7 +53,7 @@ struct CallScreen: View {
             if let handle = callManager.activeCall?.handle, !handle.isEmpty {
                 Text(handle)
                     .font(SQType.display)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(SQColor.label)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
@@ -61,24 +61,16 @@ struct CallScreen: View {
                 statusGlyph
                 statusText
             }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.72))
+            .font(SQFont.body(14, .semibold))
+            .foregroundStyle(SQColor.labelSecondary)
         }
         .accessibilityElement(children: .combine)
     }
 
-    /// Déclinaison sombre du fond DA (mêmes teintes que le hero dark).
+    /// Fond nuit chaude de la DA Crème : l'écran est forcé en sombre, `SQColor.bg`
+    /// y résout le brun nuit — plus de dégradé décoratif.
     private var callBackground: some View {
-        LinearGradient(
-            colors: [
-                Color(hex: 0x08080F),
-                Color(hex: 0x150E1E),
-                Color(hex: 0x1C0F18)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        SQColor.bg.ignoresSafeArea()
     }
 
     private var centralAvatar: some View {
@@ -86,9 +78,8 @@ struct CallScreen: View {
         return SQAvatar(url: nil, name: (handle?.isEmpty == false ? handle! : "?"), size: 120)
             .padding(6)
             .overlay {
-                Circle().stroke(SQGradient.signal, lineWidth: 3)
+                Circle().stroke(SQColor.brandRed, lineWidth: 3)
             }
-            .shadow(color: SQBrand.signatureStart.opacity(0.35), radius: 28, y: 10)
     }
 
     @ViewBuilder
@@ -103,8 +94,8 @@ struct CallScreen: View {
                 VStack(spacing: SQSpace.lg) {
                     centralAvatar
                     Text(liveKit.state == .connected ? "En attente de la caméra distante" : "Connexion vidéo…")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.7))
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -112,12 +103,8 @@ struct CallScreen: View {
             if let local = liveKit.localVideoTrack, liveKit.isCameraOn {
                 SwiftUIVideoView(local, layoutMode: .fill, mirrorMode: .mirror)
                     .frame(width: 104, height: 148)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(.white.opacity(0.35), lineWidth: 1)
-                    }
-                    .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
+                    .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                    .sqShadowCard()
                     .padding(SQSpace.sm)
                     .accessibilityLabel("Aperçu de ta caméra")
             }
@@ -131,8 +118,8 @@ struct CallScreen: View {
 #endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .accessibilityElement(children: .contain)
 #else
         centralAvatar
@@ -202,11 +189,11 @@ struct CallScreen: View {
         case .idle, .connecting:
             ProgressView()
                 .controlSize(.small)
-                .tint(.white)
+                .tint(SQColor.label)
                 .accessibilityHidden(true)
         default:
             Image(systemName: (callManager.activeCall?.hasVideo ?? false) ? "video.fill" : "phone.fill")
-                .foregroundStyle(SQGradient.signal)
+                .foregroundStyle(SQColor.brandRed)
                 .accessibilityHidden(true)
         }
     }
@@ -214,24 +201,25 @@ struct CallScreen: View {
     private var controls: some View {
         VStack(spacing: SQSpace.md) {
             HStack(spacing: SQSpace.lg) {
-                controlButton(systemImage: liveKit.isMicMuted ? "mic.slash.fill" : "mic.fill", tint: liveKit.isMicMuted ? SQColor.danger : .white) {
+                controlButton(systemImage: liveKit.isMicMuted ? "mic.slash.fill" : "mic.fill", tint: liveKit.isMicMuted ? SQColor.danger : SQColor.label) {
                     callManager.setMuted(!liveKit.isMicMuted)
                 }
                 .accessibilityLabel(liveKit.isMicMuted ? "Réactiver le micro" : "Couper le micro")
 
-                controlButton(systemImage: liveKit.isSpeakerOn ? "speaker.wave.3.fill" : "speaker.fill", tint: liveKit.isSpeakerOn ? SQColor.success : .white) {
+                controlButton(systemImage: liveKit.isSpeakerOn ? "speaker.wave.3.fill" : "speaker.fill", tint: liveKit.isSpeakerOn ? SQColor.success : SQColor.label) {
                     liveKit.toggleSpeaker()
                 }
                 .accessibilityLabel(liveKit.isSpeakerOn ? "Désactiver le haut-parleur" : "Activer le haut-parleur")
 
                 if callManager.activeCall?.hasVideo == true {
-                    controlButton(systemImage: liveKit.isCameraOn ? "video.fill" : "video.slash.fill", tint: liveKit.isCameraOn ? SQColor.success : .white) {
+                    controlButton(systemImage: liveKit.isCameraOn ? "video.fill" : "video.slash.fill", tint: liveKit.isCameraOn ? SQColor.success : SQColor.label) {
                         liveKit.toggleCamera()
                     }
                     .accessibilityLabel(liveKit.isCameraOn ? "Couper la caméra" : "Activer la caméra")
                 }
 
-                controlButton(systemImage: "phone.down.fill", tint: SQColor.danger, large: true) {
+                // Raccrocher : danger plein, icône crème (DA Crème).
+                controlButton(systemImage: "phone.down.fill", tint: SQColor.onAccent, fill: SQColor.danger, large: true) {
                     callManager.endActiveCall()
                 }
                 .accessibilityLabel("Raccrocher")
@@ -239,7 +227,7 @@ struct CallScreen: View {
 
             if callManager.activeCall?.hasVideo == true {
                 HStack(spacing: SQSpace.xl) {
-                    controlButton(systemImage: "arrow.triangle.2.circlepath.camera", tint: .white) {
+                    controlButton(systemImage: "arrow.triangle.2.circlepath.camera", tint: SQColor.label) {
                         liveKit.switchCamera()
                     }
                     .disabled(!liveKit.isCameraOn || !liveKit.canSwitchCamera)
@@ -248,7 +236,7 @@ struct CallScreen: View {
 
                     controlButton(
                         systemImage: liveKit.isPictureInPictureActive ? "pip.exit" : "pip.enter",
-                        tint: liveKit.isPictureInPictureActive ? SQColor.success : .white
+                        tint: liveKit.isPictureInPictureActive ? SQColor.success : SQColor.label
                     ) {
                         liveKit.togglePictureInPicture()
                     }
@@ -260,20 +248,19 @@ struct CallScreen: View {
         }
     }
 
-    private func controlButton(systemImage: String, tint: Color, large: Bool = false, action: @escaping () -> Void) -> some View {
+    private func controlButton(systemImage: String, tint: Color, fill: Color = SQColor.surface, large: Bool = false, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.medium()
             action()
         } label: {
             Image(systemName: systemImage)
-                .font(.system(size: large ? 28 : 22, weight: .bold))
+                .font(.system(size: large ? 26 : 21, weight: .semibold))
                 .foregroundStyle(tint)
-                .frame(width: large ? 68 : 56, height: large ? 68 : 56)
-                .background(Color.white.opacity(0.12), in: Circle())
-                .overlay { Circle().stroke(.white.opacity(0.14), lineWidth: 1) }
-                .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
+                .frame(width: large ? 64 : 56, height: large ? 64 : 56)
+                .background(fill, in: Circle())
+                .sqShadowSoft()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SQPressButtonStyle())
     }
 }
 

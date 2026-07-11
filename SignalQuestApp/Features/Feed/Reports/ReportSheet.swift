@@ -26,18 +26,25 @@ struct ReportSheet: View {
                         .lineLimit(3...6)
                 }
                 if let error {
-                    Section { Text(error).foregroundStyle(.red) }
+                    Section { Text(error).foregroundStyle(SQColor.danger) }
                 }
                 Section {
                     Button(role: .destructive) {
                         Task { await send() }
                     } label: {
                         HStack {
-                            if isBusy { ProgressView() } else { Text("Envoyer le signalement") }
+                            if isBusy {
+                                ProgressView().tint(SQColor.danger)
+                            } else {
+                                Text("Envoyer le signalement")
+                                    .font(SQType.button)
+                            }
                         }
                         .frame(maxWidth: .infinity)
+                        .foregroundStyle(SQColor.danger)
                     }
                     .disabled(isBusy)
+                    .listRowBackground(SQColor.dangerSoft)
                 }
             }
             .scrollContentBackground(.hidden)

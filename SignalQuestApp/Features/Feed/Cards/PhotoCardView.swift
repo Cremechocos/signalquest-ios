@@ -20,49 +20,51 @@ struct PhotoCardView: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 0) {
+            // DA Crème : header d'abord, média encadré (rayon 14) dans la carte,
+            // tag « Photo » olive. Le double-tap sur le média like toujours.
+            VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+                CardHeader(
+                    author: item.author,
+                    place: item.signal?.city ?? item.placeLabel,
+                    createdAt: item.createdAt,
+                    kindBadge: "Photo",
+                    kindColor: SQColor.success,
+                    onAuthorTap: onAuthorTap
+                )
+
                 heroImage
-                VStack(alignment: .leading, spacing: SQSpace.md + 2) {
-                    CardHeader(
-                        author: item.author,
-                        place: item.signal?.city ?? item.placeLabel,
-                        createdAt: item.createdAt,
-                        kindBadge: "Photo",
-                        kindColor: SQColor.brandRed,
-                        onAuthorTap: onAuthorTap
-                    )
 
-                    if !item.text.isEmpty {
-                        Text(item.text)
-                            .font(SQType.body)
-                            .foregroundStyle(SQColor.label)
-                            .lineLimit(3)
-                    }
+                if !item.text.isEmpty {
+                    Text(item.text)
+                        .font(SQType.body)
+                        .lineSpacing(3)
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(3)
+                }
 
-                    if let signal = item.signal, signal.siteLabel != nil || signal.operator != nil {
-                        HStack(spacing: SQSpace.sm) {
-                            if let site = signal.siteLabel {
-                                SQEditorialTag(text: site, color: SQColor.label)
-                            }
-                            if let op = signal.operator {
-                                SQEditorialTag(text: op, color: SQBrand.operatorColor(op))
-                            }
+                if let signal = item.signal, signal.siteLabel != nil || signal.operator != nil {
+                    HStack(spacing: SQSpace.sm) {
+                        if let site = signal.siteLabel {
+                            SQEditorialTag(text: site, color: SQColor.label)
+                        }
+                        if let op = signal.operator {
+                            SQEditorialTag(text: op, color: SQBrand.operatorColor(op))
                         }
                     }
-
-                    CardActionsBar(
-                        item: item,
-                        onLike: onLike,
-                        onRepost: onRepost,
-                        onComment: onComment,
-                        onFavorite: onFavorite,
-                        onShare: onShare,
-                        onReact: onReact
-                    )
                 }
-                .padding(SQSpace.lg)
+
+                CardActionsBar(
+                    item: item,
+                    onLike: onLike,
+                    onRepost: onRepost,
+                    onComment: onComment,
+                    onFavorite: onFavorite,
+                    onShare: onShare,
+                    onReact: onReact
+                )
             }
-            .sqEditorialCard(clip: true)
+            .padding(SQSpace.lg)
+            .sqEditorialCard()
         }
         .buttonStyle(SQPressButtonStyle())
     }
@@ -72,7 +74,7 @@ struct PhotoCardView: View {
         let url = item.attachments.first?.url ?? item.attachments.first?.thumbnailUrl
         ZStack {
             RemoteImage(url: url, maxDimension: 460, contentMode: .fill) {
-                Rectangle().fill(SQColor.fill)
+                Rectangle().fill(SQColor.surfaceMuted)
                     .overlay(
                         Image(systemName: "antenna.radiowaves.left.and.right")
                             .font(.largeTitle)
@@ -87,9 +89,10 @@ struct PhotoCardView: View {
                     .transition(.scale.combined(with: .opacity))
             }
         }
-        .frame(height: 260)
-        .clipped()
-        .clipShape(UnevenRoundedRectangle(topLeadingRadius: SQRadius.lg, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: SQRadius.lg))
+        .frame(height: 180)
+        .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .onTapGesture(count: 2) {
             Haptics.medium()
             onLike()
@@ -98,5 +101,6 @@ struct PhotoCardView: View {
                 withAnimation(SQMotion.resolve(.snappy(duration: 0.25), reduceMotion)) { likeBurst = false }
             }
         }
+        .accessibilityLabel("Photo du site")
     }
 }

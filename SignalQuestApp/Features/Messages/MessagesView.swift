@@ -74,11 +74,18 @@ struct MessagesView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var router: AppRouter
+    @Environment(\.dismiss) private var dismiss
     private let service: MessagesServicing
     private let e2ee: E2EEServicing?
     @State private var showNewConversation = false
     @State private var showE2EEUnlock = false
     @State private var routedConversationId: String?
+
+    /// Insets des rangées : gap vertical de 14 pt entre cartes (2 × 7),
+    /// marge d'écran 20 pt.
+    private var cardRowInsets: EdgeInsets {
+        EdgeInsets(top: 7, leading: SQSpace.xl, bottom: 7, trailing: SQSpace.xl)
+    }
 
     init(service: MessagesServicing = MessagesService(api: APIClient()), e2ee: E2EEServicing? = nil) {
         self.service = service
@@ -88,94 +95,68 @@ struct MessagesView: View {
 
     var body: some View {
         List {
-            Section {
-                if model.isLoading && model.conversations.isEmpty {
-                    ConversationListSkeleton()
-                        .sqShimmer()
-                        .padding(.vertical, SQSpace.xs)
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                }
-                ForEach(model.conversations) { conversation in
-                    Button {
-                        routedConversationId = conversation.id
-                    } label: {
-                        HStack(spacing: SQSpace.sm) {
-                            conversationRow(conversation, unread: isUnread(conversation))
-                            Spacer(minLength: 0)
-                            VStack(alignment: .trailing, spacing: SQSpace.xs) {
-                                if isUnread(conversation) {
-                                    Circle()
-                                        .fill(SQColor.brandRed)
-                                        .frame(width: 9, height: 9)
-                                        .accessibilityLabel("Non lu")
-                                }
-                                if let date = conversation.lastMessageAt ?? conversation.updatedAt {
-                                    Text(date, format: .relative(presentation: .named, unitsStyle: .abbreviated))
-                                        .font(SQType.caption)
-                                        .foregroundStyle(isUnread(conversation) ? SQColor.brandRed : SQColor.labelTertiary)
-                                }
-                                Image(systemName: "chevron.right")
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(SQColor.labelTertiary)
-                                    .accessibilityHidden(true)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .listRowBackground(Color.clear)
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                        Button {
-                            Task { await model.markRead(conversation); await services.refreshInboxBadge() }
-                        } label: {
-                            Label("Lu", systemImage: "checkmark.message")
-                        }
-                        .tint(SQColor.brandRed)
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            Task { await model.leave(conversation); await services.refreshInboxBadge() }
-                        } label: {
-                            Label("Quitter", systemImage: "rectangle.portrait.and.arrow.right")
-                        }
-                    }
-                }
-                if !model.isLoading && model.conversations.isEmpty && model.errorMessage == nil {
-                    EmptyStateView(
-                        title: "Aucune conversation",
-                        message: "Démarre une discussion avec un membre de la communauté.",
-                        systemImage: "bubble.left.and.bubble.right"
-                    )
-                    .frame(maxWidth: .infinity)
+            header
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: SQSpace.xl, bottom: SQSpace.sm, trailing: SQSpace.xl))
+
+            if model.isLoading && model.conversations.isEmpty {
+                ConversationListSkeleton()
+                    .sqShimmer()
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
+                    .listRowInsets(cardRowInsets)
+            }
+            ForEach(model.conversations) { conversation in
+                Button {
+                    routedConversationId = conversation.id
+                } label: {
+                    conversationCard(conversation)
                 }
-            } header: { Text("Conversations") }
+                .buttonStyle(.plain)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(cardRowInsets)
+                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    Button {
+                        Task { await model.markRead(conversation); await services.refreshInboxBadge() }
+                    } label: {
+                        Label("Lu", systemImage: "checkmark.message")
+                    }
+                    .tint(SQColor.brandRed)
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) {
+                        Task { await model.leave(conversation); await services.refreshInboxBadge() }
+                    } label: {
+                        Label("Quitter", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                }
+            }
+            if !model.isLoading && model.conversations.isEmpty && model.errorMessage == nil {
+                EmptyStateView(
+                    title: "Aucune conversation",
+                    message: "Démarre une discussion avec un membre de la communauté.",
+                    systemImage: "bubble.left.and.bubble.right"
+                )
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
 
             if let error = model.errorMessage {
-                Section {
-                    Text(error)
-                        .font(.footnote)
-                        .foregroundStyle(SQColor.danger)
-                        .listRowBackground(Color.clear)
-                }
+                Text(error)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.danger)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(cardRowInsets)
             }
         }
+        .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .navigationTitle("Messages")
-        .toolbarTitleInlineCompat()
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showNewConversation = true
-                } label: {
-                    Image(systemName: "square.and.pencil")
-                        .foregroundStyle(SQColor.label)
-                }
-                .accessibilityLabel("Nouvelle conversation")
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationBarBackButtonHidden(true)
         .signalQuestBackground()
         .task {
             if model.conversations.isEmpty { await model.load() }
@@ -237,8 +218,51 @@ struct MessagesView: View {
         }
     }
 
+    /// En-tête custom (pas de gros titre nav système) : retour 40 pt circulaire,
+    /// titre Bricolage 24, composer 40 pt.
+    private var header: some View {
+        HStack(spacing: SQSpace.md) {
+            Button {
+                Haptics.light()
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SQColor.label)
+                    .frame(width: 40, height: 40)
+                    .background(SQColor.surface, in: Circle())
+                    .sqShadowSoft()
+            }
+            .buttonStyle(.plain)
+            .frame(width: 44, height: 44)
+            .accessibilityLabel("Retour")
+
+            Text("Messages")
+                .font(SQFont.display(24, .bold))
+                .foregroundStyle(SQColor.label)
+
+            Spacer(minLength: SQSpace.sm)
+
+            Button {
+                Haptics.light()
+                showNewConversation = true
+            } label: {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(SQColor.label)
+                    .frame(width: 40, height: 40)
+                    .background(SQColor.surface, in: Circle())
+                    .sqShadowSoft()
+            }
+            .buttonStyle(.plain)
+            .frame(width: 44, height: 44)
+            .accessibilityLabel("Nouvelle conversation")
+        }
+    }
+
     /// Aperçu du dernier message : déchiffré quand la clé E2EE est disponible,
-    /// cadenas sinon ; mention explicite pour les pièces jointes.
+    /// cadenas sinon ; mention explicite pour les pièces jointes. Le cadenas des
+    /// conversations chiffrées est rendu en icône (12 pt) devant l'aperçu.
     private func lastMessagePreview(_ conversation: MessageConversation) -> String {
         guard let last = conversation.lastMessage else {
             return conversation.e2eeEnabled == true ? "Conversation chiffrée" : "Aucun message"
@@ -249,7 +273,7 @@ struct MessagesView: View {
             if let plain = model.decryptedPreviews[conversation.id], !plain.isEmpty {
                 return attachmentHint + plain
             }
-            return attachmentHint.isEmpty ? "🔒 Message chiffré" : "🔒 📎 Pièce jointe"
+            return attachmentHint.isEmpty ? "Message chiffré" : "📎 Pièce jointe"
         }
         if let content = last.content, !content.isEmpty {
             return attachmentHint + content
@@ -269,9 +293,13 @@ struct MessagesView: View {
             ?? conversation.participants.first
     }
 
-    private func conversationRow(_ conversation: MessageConversation, unread: Bool = false) -> some View {
+    /// Carte de conversation (rayon 22, fond surface, ombre carte) : avatar 52,
+    /// nom Figtree 600 16, aperçu 13.5 (encre + medium si non-lu), heure à droite
+    /// (accent si non-lu) + pastille non-lu accent.
+    private func conversationCard(_ conversation: MessageConversation) -> some View {
+        let unread = isUnread(conversation)
         let title = conversation.displayTitle(excluding: currentUserId)
-        return HStack(spacing: SQSpace.md) {
+        return HStack(spacing: SQSpace.md + 1) {
             SQAvatar(
                 url: conversation.groupPhotoUrl ?? otherParticipant(conversation)?.user.avatarUrl,
                 name: title.isEmpty ? "Conversation" : title,
@@ -283,30 +311,48 @@ struct MessagesView: View {
                     Circle()
                         .fill(SQColor.brandGreen)
                         .frame(width: 13, height: 13)
-                        .overlay { Circle().stroke(SQColor.bg, lineWidth: 2) }
+                        .overlay { Circle().stroke(SQColor.surface, lineWidth: 2) }
                         .accessibilityLabel("En ligne")
                 }
             }
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
-                HStack(spacing: SQSpace.xs + 2) {
-                    Text(title.isEmpty ? "Conversation" : title)
-                        .font(SQType.heading)
-                        .lineLimit(1)
+            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                Text(title.isEmpty ? "Conversation" : title)
+                    .font(SQFont.body(16, .semibold))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(1)
+                HStack(spacing: SQSpace.xs + 1) {
                     if conversation.e2eeEnabled == true {
                         Image(systemName: "lock.fill")
-                            .font(.caption2)
-                            .foregroundStyle(SQColor.brandGreen)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(unread ? SQColor.label : SQColor.labelSecondary)
                             .accessibilityLabel("Conversation chiffrée")
                     }
+                    Text(lastMessagePreview(conversation))
+                        .font(unread ? SQFont.body(13.5, .medium) : SQFont.body(13.5))
+                        .foregroundStyle(unread ? SQColor.label : SQColor.labelSecondary)
+                        .lineLimit(1)
                 }
-                Text(lastMessagePreview(conversation))
-                    .font(unread ? SQFont.archivo(13, .semibold, relativeTo: .footnote) : SQType.caption)
-                    .foregroundStyle(unread ? SQColor.label : SQColor.labelSecondary)
-                    .lineLimit(1)
+            }
+            Spacer(minLength: SQSpace.sm)
+            VStack(alignment: .trailing, spacing: 5) {
+                if let date = conversation.lastMessageAt ?? conversation.updatedAt {
+                    Text(date, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                        .font(SQFont.body(12, .medium))
+                        .foregroundStyle(unread ? SQColor.brandRed : SQColor.labelSecondary)
+                }
+                if unread {
+                    Circle()
+                        .fill(SQColor.brandRed)
+                        .frame(width: 12, height: 12)
+                        .accessibilityLabel("Non lu")
+                }
             }
         }
-        .foregroundStyle(SQColor.label)
-        .padding(.vertical, 6)
+        .padding(.vertical, 14)
+        .padding(.horizontal, SQSpace.lg)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
+        .contentShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
     }
 
     /// Pastille de présence : au moins un autre participant est en ligne.
@@ -401,14 +447,14 @@ private struct NewConversationSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Annuler") { dismiss() }.tint(SQColor.brandOrange)
+                    Button("Annuler") { dismiss() }.tint(SQColor.brandRed)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(isBusy ? "Creation..." : "Creer") {
                         Task { await create() }
                     }
                     .disabled(selected.isEmpty || isBusy)
-                    .tint(SQColor.brandOrange)
+                    .tint(SQColor.brandRed)
                 }
             }
             .onChangeCompat(of: query) { _, _ in

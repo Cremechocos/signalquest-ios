@@ -153,12 +153,7 @@ struct SettingsView: View {
                     ChangePasswordView()
                 } label: { settingsLabel("Changer le mot de passe", systemImage: "key.fill") }
             } header: {
-                VStack(alignment: .leading, spacing: SQSpace.xs) {
-                    Text("Préférences").sqKicker()
-                    Text("Sécurité")
-                        .font(SQType.subhead)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
+                Text("Sécurité")
             }
             .listRowBackground(SQColor.surface)
             if BiometricAuth.isAvailable {
@@ -270,8 +265,10 @@ struct SettingsView: View {
                     } label: {
                         HStack(spacing: SQSpace.md) {
                             Image(systemName: option.systemImage)
+                                .font(.system(size: 15, weight: .medium))
                                 .foregroundStyle(SQColor.brandRed)
-                                .frame(width: 26)
+                                .frame(width: 36, height: 36)
+                                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(option.label).foregroundStyle(SQColor.label)
                                 Text(option.subtitle)
@@ -343,10 +340,10 @@ struct SettingsView: View {
                         .frame(maxWidth: .infinity)
                 }
             }
-            .listRowBackground(SQColor.danger.opacity(0.10))
+            .listRowBackground(SQColor.dangerSoft)
             if let error = model.errorMessage {
                 Section { Text(error).foregroundStyle(SQColor.danger) }
-                    .listRowBackground(SQColor.danger.opacity(0.10))
+                    .listRowBackground(SQColor.dangerSoft)
             }
         }
         .scrollContentBackground(.hidden)
@@ -389,11 +386,19 @@ struct SettingsView: View {
         }
     }
 
+    /// Rangée de réglage (DA Crème) : pastille d'icône 36 pt `accentSoft`
+    /// (icône brique) + libellé Figtree Medium 15,5. Aucune bordure.
     private func settingsLabel(_ title: String, systemImage: String) -> some View {
         Label {
-            Text(title).foregroundStyle(SQColor.label)
+            Text(title)
+                .font(SQFont.body(15.5, .medium))
+                .foregroundStyle(SQColor.label)
         } icon: {
-            Image(systemName: systemImage).foregroundStyle(SQColor.brandRed)
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 36, height: 36)
+                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 
@@ -476,11 +481,11 @@ struct ChangePasswordView: View {
             .listRowBackground(SQColor.surface)
             if let error {
                 Section { Text(error).foregroundStyle(SQColor.danger) }
-                    .listRowBackground(SQColor.danger.opacity(0.10))
+                    .listRowBackground(SQColor.dangerSoft)
             }
             if success {
                 Section { Label("Mot de passe modifié", systemImage: "checkmark.circle").foregroundStyle(SQColor.success) }
-                    .listRowBackground(SQColor.success.opacity(0.10))
+                    .listRowBackground(SQColor.successSoft)
             }
             Section {
                 GradientButton("Mettre à jour", systemImage: "key.fill", isBusy: isBusy) {
@@ -570,11 +575,18 @@ private struct DeleteAccountSheet: View {
                         Text("Impossible de charger le détail de la suppression. Aucun compte ne sera supprimé tant que cette vérification échoue.")
                             .font(SQType.body)
                             .foregroundStyle(SQColor.labelSecondary)
-                        Button("Réessayer") {
+                        Button {
                             Task { await loadPreview() }
+                        } label: {
+                            Text("Réessayer")
+                                .font(SQType.button)
+                                .foregroundStyle(SQColor.label)
+                                .padding(.horizontal, SQSpace.xl)
+                                .frame(minHeight: 44)
+                                .background(SQColor.surface, in: Capsule(style: .continuous))
+                                .sqShadowSoft()
                         }
-                        .buttonStyle(.bordered)
-                        .tint(SQColor.brandRed)
+                        .buttonStyle(SQPressButtonStyle())
                     }
 
                     if let error = model.deletionError {
@@ -646,8 +658,7 @@ private struct DeleteAccountSheet: View {
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface)
-        .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
     @ViewBuilder
@@ -735,15 +746,11 @@ private struct DeleteAccountSheet: View {
             Text("Un code à usage unique sera envoyé à \(preview.maskedEmail).")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
-            Button {
+            GradientButton("Envoyer le code", systemImage: "envelope.badge", style: .accent) {
                 Task { await requestEmailCode() }
-            } label: {
-                Label("Envoyer le code", systemImage: "envelope.badge")
-                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(SQColor.brandRed)
             .disabled(!hasAcknowledged || isBusy)
+            .opacity(hasAcknowledged && !isBusy ? 1 : 0.5)
         }
     }
 

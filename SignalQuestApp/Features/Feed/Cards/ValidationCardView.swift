@@ -43,12 +43,12 @@ struct ValidationCardView: View {
                     SQEditorialTag(text: signal?.technology ?? "—", color: accent)
                 }
 
+                // Tuile mise en avant en accent brique (DA), pas en couleur techno.
                 LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
                     CardMetricTile(
                         label: "Ident.",
                         value: signal?.identifierValue ?? signal?.cellId ?? "—",
-                        highlight: true,
-                        accent: accent
+                        highlight: true
                     )
                     CardMetricTile(label: "PCI", value: signal?.pci.map(String.init) ?? "—")
                     CardMetricTile(label: "Cell", value: signal?.cellId ?? "—")
@@ -65,6 +65,7 @@ struct ValidationCardView: View {
                 if !item.text.isEmpty {
                     Text(item.text)
                         .font(SQType.body)
+                        .lineSpacing(3)
                         .foregroundStyle(SQColor.label)
                 }
 

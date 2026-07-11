@@ -160,17 +160,18 @@ struct AntennaDetailSheet: View {
             PhotosPicker(selection: $photoPickerItem, matching: .images) {
                 HStack(spacing: SQSpace.sm) {
                     if uploading {
-                        ProgressView().tint(.white)
+                        ProgressView().tint(SQColor.onAccent)
                     } else {
-                        Image(systemName: "camera.fill").font(.system(size: 15, weight: .bold))
+                        Image(systemName: "camera.fill").font(.system(size: 15, weight: .semibold))
                     }
                     Text(uploading ? "Envoi…" : "Choisir une photo du site")
                         .font(SQType.button)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, SQSpace.md)
-                .foregroundStyle(.white)
-                .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                .frame(minHeight: 52)
+                .foregroundStyle(SQColor.onAccent)
+                .background(SQColor.brandRed, in: Capsule(style: .continuous))
+                .sqShadowAccent()
             }
             .disabled(model.isUploadingPhoto)
             if let message = model.photoUploadMessage {
@@ -192,21 +193,16 @@ struct AntennaDetailSheet: View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack(alignment: .top, spacing: SQSpace.md) {
                 Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(SQColor.brandRed)
                     .frame(width: 44, height: 44)
-                    .background(SQColor.brandRed.opacity(0.10), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                            .stroke(SQColor.brandRed.opacity(0.32), lineWidth: 1.5)
-                    }
+                    .background(SQColor.accentSoft, in: Circle())
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
-                    Text("Fiche site").sqKicker()
                     Text("Site \(site.siteId ?? site.id)")
                         .font(SQType.title)
                         .foregroundStyle(SQColor.label)
                     Text(site.owner ?? "Opérateurs inconnus")
-                        .font(SQFont.archivo(13, .medium))
+                        .font(SQType.subhead)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
                 Spacer()
@@ -229,8 +225,8 @@ struct AntennaDetailSheet: View {
     }
 
     /// Tag opérateur. Sur un site partagé, il devient un bouton de bascule :
-    /// l'opérateur actif est en plein (fond couleur, texte blanc), les autres en
-    /// version atténuée. Sur un site mono-opérateur, simple tag éditorial.
+    /// l'opérateur actif est en plein (capsule couleur, texte blanc), les autres
+    /// en capsule teintée douce. Sur un site mono-opérateur, simple tag éditorial.
     @ViewBuilder
     private func operatorTag(_ op: String) -> some View {
         let color = SQBrand.operatorColor(op)
@@ -243,24 +239,18 @@ struct AntennaDetailSheet: View {
                 selectedOperator = op
             } label: {
                 Text(op)
-                    .font(SQType.micro)
-                    .tracking(0.8)
-                    .textCase(.uppercase)
+                    .font(SQFont.body(11.5, .semibold))
                     .lineLimit(1)
-                    .padding(.horizontal, SQSpace.sm)
+                    .padding(.horizontal, SQSpace.sm + 2)
                     .padding(.vertical, SQSpace.xs + 1)
                     .foregroundStyle(isActive ? Color.white : color)
                     .background(
-                        (isActive ? color : color.opacity(0.12)),
-                        in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                        isActive ? color : color.opacity(0.13),
+                        in: Capsule(style: .continuous)
                     )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                            .stroke(color.opacity(isActive ? 0 : 0.45), lineWidth: 1)
-                    }
-                    .opacity(isActive ? 1 : 0.85)
             }
             .buttonStyle(SQPressButtonStyle())
+            .accessibilityAddTraits(isActive ? .isSelected : [])
         } else {
             SQEditorialTag(text: op, color: color)
         }
@@ -410,8 +400,6 @@ struct AntennaDetailSheet: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("PCI")
                                     .font(SQType.micro)
-                                    .tracking(0.6)
-                                    .textCase(.uppercase)
                                     .foregroundStyle(SQColor.labelTertiary)
                                 ForEach(core.cellIdentifiers.pci.prefix(8)) { pci in
                                     detailRow(
@@ -425,8 +413,6 @@ struct AntennaDetailSheet: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Cell ID")
                                     .font(SQType.micro)
-                                    .tracking(0.6)
-                                    .textCase(.uppercase)
                                     .foregroundStyle(SQColor.labelTertiary)
                                 ForEach(core.cellIdentifiers.cellId.prefix(8)) { cell in
                                     detailRow(
@@ -451,8 +437,6 @@ struct AntennaDetailSheet: View {
                                     Spacer()
                                     Text(carrier.source ?? "Backend")
                                         .font(SQType.micro)
-                                        .tracking(0.6)
-                                        .textCase(.uppercase)
                                         .foregroundStyle(SQColor.labelTertiary)
                                 }
                                 detailRow("Fréquences", [carrier.txFrequencyMhz.map { "\($0) MHz TX" }, carrier.rxFrequencyMhz.map { "\($0) MHz RX" }].compactMap { $0 }.joined(separator: " · "))
@@ -522,14 +506,11 @@ struct AntennaDetailSheet: View {
                                 viewerPhoto = photo
                             } label: {
                                 RemoteImage(url: photo.thumbnailUrl ?? photo.imageUrl, maxDimension: 110, contentMode: .fill) {
-                                    SQColor.fill
+                                    SQColor.surfaceMuted
                                 }
                                 .frame(width: 110, height: 84)
-                                .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                                        .stroke(SQColor.separator, lineWidth: 1)
-                                }
+                                .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                                .sqShadowSoft()
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Photo du site, toucher pour agrandir")
@@ -553,54 +534,47 @@ struct AntennaDetailSheet: View {
         let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines)
         return HStack(alignment: .firstTextBaseline) {
             Text(label)
-                .font(SQType.micro)
-                .tracking(0.6)
-                .textCase(.uppercase)
-                .foregroundStyle(SQColor.labelTertiary)
+                .font(SQFont.body(12))
+                .foregroundStyle(SQColor.labelSecondary)
             Spacer(minLength: SQSpace.md)
             Text((normalized?.isEmpty == false ? normalized : "—") ?? "—")
-                .font(SQFont.archivo(13, .semibold))
+                .font(SQFont.body(13, .semibold))
                 .foregroundStyle(SQColor.label)
                 .multilineTextAlignment(.trailing)
         }
         .padding(.vertical, SQSpace.sm - 1)
         .padding(.horizontal, SQSpace.sm + 2)
-        .background(SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
     }
 }
 
-/// Carte éditoriale de la fiche antenne : surface à plat, coins nets, bordure
-/// fine encre (module imprimé). Remplace l'ancien GlassCard glassmorphique.
+/// Carte douce de la fiche antenne : surface crème, rayon 22 continu, ombre
+/// carte — sans bordure (règle No-Border de la DA « Crème & Terre cuite »).
 /// Entrée fondu-translation douce au scroll (`sqFadeUp`, respecte Reduce Motion).
 private extension View {
     func sqSheetCard(strong: Bool = false) -> some View {
         self
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(SQSpace.lg)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                    .stroke(strong ? SQColor.label : SQColor.separator, lineWidth: strong ? 2 : 1.5)
-            }
+            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+            .sqShadowCard()
             .sqFadeUp()
     }
 }
 
-/// En-tête de section de la fiche antenne : kicker rouge + titre Archivo
-/// SemiBold, icône rouge — remplace les `Label(...).font(.headline)`.
+/// En-tête de section de la fiche antenne : titre Bricolage + icône. L'ancien
+/// kicker MAJUSCULES est supprimé (DA Crème) — le paramètre est conservé pour
+/// ne pas réécrire les appels, mais n'est plus rendu.
 private struct AntennaSectionHeader: View {
     let kicker: String
     let title: String
     let systemImage: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs) {
-            Text(kicker).sqKicker()
-            Label(title, systemImage: systemImage)
-                .font(SQType.heading)
-                .foregroundStyle(SQColor.label)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        Label(title, systemImage: systemImage)
+            .font(SQType.heading)
+            .foregroundStyle(SQColor.label)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

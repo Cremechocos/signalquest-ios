@@ -5,13 +5,6 @@ enum PaywallEntryPoint: Equatable, Sendable {
     case profile
     case premiumFeature(String)
 
-    var kicker: String {
-        switch self {
-        case .profile: return "Abonnements"
-        case .premiumFeature: return "Fonction Premium"
-        }
-    }
-
     var introduction: String {
         switch self {
         case .profile:
@@ -60,7 +53,6 @@ struct PaywallView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text(entryPoint.kicker).sqKicker()
             Text("Choisis ton niveau d’exploration")
                 .font(SQType.display)
                 .foregroundStyle(SQColor.label)
@@ -77,8 +69,10 @@ struct PaywallView: View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             HStack(spacing: SQSpace.sm) {
                 Image(systemName: entitlementStatusIcon)
-                    .font(.body.weight(.bold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(entitlementStatusColor)
+                    .frame(width: 40, height: 40)
+                    .background(entitlementStatusSoftColor, in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: SQSpace.xxs) {
                     Text("Ton offre : \(store.activeTier.displayName)")
@@ -106,43 +100,45 @@ struct PaywallView: View {
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                .stroke(entitlementStatusColor.opacity(0.55), lineWidth: 1.5)
-        }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
         .accessibilityElement(children: .combine)
     }
 
+    // Segments « Crème » : chips capsules partagées (actif brique / inactif surface).
     private var periodPicker: some View {
-        Picker("Période de facturation", selection: $selectedPeriod) {
-            ForEach(SubscriptionBillingPeriod.allCases) { period in
-                Text(period.displayName).tag(period)
-            }
-        }
-        .pickerStyle(.segmented)
+        SQSegmentedFilter(
+            selection: $selectedPeriod,
+            options: SubscriptionBillingPeriod.allCases.map { (value: $0, label: $0.displayName, icon: String?.none) }
+        )
+        .padding(.horizontal, -SQSpace.lg)
         .accessibilityHint("Choisis une facturation mensuelle ou annuelle")
     }
 
+    /// Carte d'offre. Premium = l'unique grande surface brique de l'écran
+    /// (mise en avant de vente), Basic = carte crème classique. Zéro bordure.
     private func planCard(tier: SupporterTier) -> some View {
         let identifier = SignalQuestSubscriptionProduct.product(tier: tier, period: selectedPeriod)
         let product = store.product(for: tier, period: selectedPeriod)
         let isCurrentOrLower = store.activeTier.rank >= tier.rank
+        let isPremium = tier == .premium
+        let primaryText = isPremium ? SQColor.onAccent : SQColor.label
+        let secondaryText = isPremium ? SQColor.onAccent.opacity(0.8) : SQColor.labelSecondary
 
-        return VStack(alignment: .leading, spacing: SQSpace.md) {
+        let card = VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
                     Text(tier.displayName)
                         .font(SQType.title)
-                        .foregroundStyle(SQColor.label)
+                        .foregroundStyle(primaryText)
                     Text(priceText(product: product, identifier: identifier))
-                        .font(SQFont.archivo(18, .bold, relativeTo: .headline))
-                        .foregroundStyle(tier == .premium ? SQColor.brandRed : SQColor.label)
+                        .font(SQFont.display(18, .bold))
+                        .foregroundStyle(primaryText)
                 }
                 Spacer()
                 SQEditorialTag(
-                    text: tier == .premium ? "Le plus complet" : "L’essentiel +",
-                    color: tier == .premium ? SQColor.brandRed : SQColor.labelSecondary
+                    text: isPremium ? "Le plus complet" : "L’essentiel +",
+                    color: isPremium ? SQColor.onAccent : SQColor.labelSecondary
                 )
             }
 
@@ -150,7 +146,7 @@ struct PaywallView: View {
                 ForEach(benefits(for: tier), id: \.self) { benefit in
                     Label(benefit, systemImage: "checkmark.circle.fill")
                         .font(SQType.callout)
-                        .foregroundStyle(SQColor.label)
+                        .foregroundStyle(primaryText)
                         .symbolRenderingMode(.hierarchical)
                 }
             }
@@ -158,18 +154,18 @@ struct PaywallView: View {
             if tier == .premium, selectedPeriod == .annual {
                 Text("Environ 6,67 € / mois, facturé annuellement.")
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(secondaryText)
             } else if tier == .basic, selectedPeriod == .annual {
                 Text("Environ 2,50 € / mois, facturé annuellement.")
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(secondaryText)
             }
 
             GradientButton(
                 purchaseButtonTitle(tier: tier, isCurrentOrLower: isCurrentOrLower),
                 systemImage: isCurrentOrLower ? "checkmark.seal.fill" : "sparkles",
                 isBusy: isPurchasing(tier),
-                style: tier == .premium ? .primary : .secondary
+                style: isPremium ? .primary : .secondary
             ) {
                 guard let identifier else { return }
                 Task { await store.purchase(identifier) }
@@ -178,10 +174,18 @@ struct PaywallView: View {
             .opacity(isCurrentOrLower || !store.eligibility.canPurchase || product == nil ? 0.62 : 1)
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                .stroke(tier == .premium ? SQColor.brandRed : SQColor.separator, lineWidth: tier == .premium ? 2 : 1.5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            isPremium ? SQColor.brandRed : SQColor.surface,
+            in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
+        )
+
+        return Group {
+            if isPremium {
+                card.sqShadowAccent()
+            } else {
+                card.sqShadowCard()
+            }
         }
         .accessibilityElement(children: .contain)
     }
@@ -274,6 +278,17 @@ struct PaywallView: View {
         case .available(let snapshot):
             if snapshot.status == .paymentFailed { return SQColor.warning }
             return store.activeTier == .premium ? SQColor.brandRed : SQColor.success
+        }
+    }
+
+    /// Teinte douce de la pastille d'icône du statut (icône posée sur soft).
+    private var entitlementStatusSoftColor: Color {
+        switch store.serverState {
+        case .unavailable: return SQColor.warningSoft
+        case .idle, .loading: return SQColor.surfaceMuted
+        case .available(let snapshot):
+            if snapshot.status == .paymentFailed { return SQColor.warningSoft }
+            return store.activeTier == .premium ? SQColor.accentSoft : SQColor.successSoft
         }
     }
 

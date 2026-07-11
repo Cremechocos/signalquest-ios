@@ -54,8 +54,10 @@ struct OnboardingView: View {
                         pageView(item).tag(index)
                     }
                 }
-                .tabViewStyle(.page(indexDisplayMode: .always))
-                .indexViewStyle(.page(backgroundDisplayMode: .interactive))
+                .tabViewStyle(.page(indexDisplayMode: .never))
+
+                pageDots
+                    .padding(.bottom, SQSpace.lg)
 
                 GradientButton(isLastPage ? "Commencer" : "Suivant", systemImage: isLastPage ? "arrow.right.circle.fill" : "arrow.right") {
                     if isLastPage {
@@ -70,15 +72,30 @@ struct OnboardingView: View {
         }
     }
 
+    /// Points de page en accent brique : le point actif s'étire en petite
+    /// capsule, les autres restent des pastilles crème secondaire.
+    private var pageDots: some View {
+        HStack(spacing: SQSpace.sm) {
+            ForEach(pages.indices, id: \.self) { index in
+                Capsule(style: .continuous)
+                    .fill(index == page ? SQColor.brandRed : SQColor.surfaceMuted)
+                    .frame(width: index == page ? 22 : 8, height: 8)
+                    .sqAnimation(SQMotion.standard, value: page)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Page \(page + 1) sur \(pages.count)")
+    }
+
     private func pageView(_ item: Page) -> some View {
         VStack(spacing: SQSpace.xl) {
             Spacer()
             Image(systemName: item.icon)
-                .font(.system(size: 64, weight: .bold))
-                .foregroundStyle(.white)
+                .font(.system(size: 56, weight: .semibold))
+                .foregroundStyle(SQColor.onAccent)
                 .frame(width: 128, height: 128)
-                .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.xxl, style: .continuous))
-                .shadow(color: SQColor.brandRed.opacity(0.35), radius: 18, x: 0, y: 8)
+                .background(SQColor.brandRed, in: Circle())
+                .sqShadowAccent()
                 .accessibilityHidden(true)
 
             VStack(spacing: SQSpace.md) {

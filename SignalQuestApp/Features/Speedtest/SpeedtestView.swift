@@ -125,107 +125,63 @@ struct SpeedtestView: View {
     }
 
     var body: some View {
-        ZStack {
-            // Halo lumineux dynamique sous le cadran
-            GeometryReader { proxy in
-                RadialGradient(
-                    colors: [phaseColor, .clear],
-                    center: .init(x: 0.5, y: 0.32),
-                    startRadius: 40,
-                    endRadius: 280
+        ScrollView {
+            VStack(spacing: SQSpace.xl) {
+                header
+
+                if isVPNActive {
+                    VPNWarningBanner()
+                }
+
+                SignatureSpeedDial(
+                    value: gaugeDisplay.value,
+                    unit: gaugeDisplay.unit,
+                    phaseTitle: phase.dialTitle,
+                    phase: phase,
+                    completionLabel: dialCompletionLabel
                 )
-                .blur(radius: 20)
-                .sqAnimation(.easeInOut(duration: 0.6), value: phase)
-            }
-            .ignoresSafeArea()
+                .frame(maxWidth: .infinity)
 
-            ScrollView {
-                VStack(spacing: SQSpace.xl) {
-                    if isVPNActive {
-                        VPNWarningBanner()
-                    }
-                    VStack(spacing: SQSpace.xs) {
-                        Text("Mesure terrain")
-                            .sqKicker()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        SpeedtestServerBar(
-                            // Opérateur : résultat mesuré → API device → repli IP
-                            // (cellulaire). Cf. headerOperatorName.
-                            operatorName: headerOperatorName,
-                            network: result?.networkDisplayName ?? currentNetworkStatus.displayName,
-                            // Serveur de download/ping ACTIF (AWS CloudFront par
-                            // défaut). On n'affiche plus le VPS de mesure : l'opérateur
-                            // prend sa place dans le bandeau.
-                            server: result?.downloadServerName ?? downloadTarget.displayName
-                        )
-                    }
+                SpeedtestTriMetric(
+                    activePhase: phase,
+                    progress: liveProgress,
+                    result: result
+                )
 
-                    SignatureSpeedDial(
-                        value: gaugeDisplay.value,
-                        unit: gaugeDisplay.unit,
-                        phaseTitle: phase.displayTitle,
-                        subtitle: gaugeDisplay.subtitle,
-                        phaseFraction: phaseProgressFraction,
-                        phase: phase
-                    )
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, SQSpace.lg)
+                primaryAction
 
-                    SpeedtestTriMetric(
-                        activePhase: phase,
-                        progress: liveProgress,
-                        result: result
-                    )
+                if let burstSummary {
+                    burstSummaryCard(burstSummary)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
 
-                    primaryAction
+                if let result {
+                    sharePanel(for: result)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    resultDetail(for: result)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
 
-                    if let burstSummary {
-                        burstSummaryCard(burstSummary)
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    }
-
-                    if let result {
-                        sharePanel(for: result)
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
-                        resultDetail(for: result)
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    }
-
-                    if let errorMessage {
-                        ErrorStateView(title: "Speedtest non synchronisé", message: errorMessage) {
-                            self.errorMessage = nil
-                            Task {
-                                await services.speedtest.retryPendingSaves()
-                                history = await services.speedtest.history()
-                            }
+                if let errorMessage {
+                    ErrorStateView(title: "Speedtest non synchronisé", message: errorMessage) {
+                        self.errorMessage = nil
+                        Task {
+                            await services.speedtest.retryPendingSaves()
+                            history = await services.speedtest.history()
                         }
-                        .transition(.opacity)
                     }
+                    .transition(.opacity)
+                }
 
-                    historySection
-                }
-                .padding(.horizontal, SQSpace.lg)
-                .padding(.top, SQSpace.md)
-                .padding(.bottom, SQSpace.huge + SQSpace.huge)
+                historySection
             }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.sm)
+            .padding(.bottom, SQSpace.huge + SQSpace.huge)
         }
-        .navigationTitle("Speedtest")
-        .toolbarTitleInlineCompat()
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { showDriveTest = true } label: {
-                    Image(systemName: "location.north.line.fill")
-                        .foregroundStyle(SQColor.brandRed)
-                }
-                .accessibilityLabel("Mode Drive Test")
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showSettings = true } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .foregroundStyle(SQColor.brandRed)
-                }
-            }
-        }
+        // En mode invité, la barre de navigation du conteneur (« Fermer »,
+        // « Mes reçus ») doit rester visible ; sinon l'en-tête custom suffit.
+        .toolbar(guestMode ? .automatic : .hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showDriveTest) {
             DriveTestView(services: services)
         }
@@ -237,7 +193,7 @@ struct SpeedtestView: View {
                 services.router.pendingDriveTest = false
             }
         }
-        .signalQuestHeroBackground()
+        .signalQuestBackground()
         .sheet(isPresented: $showSettings) { settingsSheet }
         .sheet(isPresented: $showLocationPriming) {
             LocationPrimingSheet(
@@ -284,6 +240,50 @@ struct SpeedtestView: View {
         }
     }
 
+    // MARK: - Header (titre centré + capsule serveur, DA « Crème & Terre cuite »)
+
+    private var header: some View {
+        VStack(spacing: SQSpace.sm + 2) {
+            ZStack {
+                HStack {
+                    headerButton(systemImage: "location.north.line.fill", label: "Mode Drive Test") {
+                        showDriveTest = true
+                    }
+                    Spacer()
+                    headerButton(systemImage: "slider.horizontal.3", label: "Réglages du test") {
+                        showSettings = true
+                    }
+                }
+                Text("Speedtest")
+                    .font(SQType.title)
+                    .foregroundStyle(SQColor.label)
+            }
+            SpeedtestServerBar(
+                // Opérateur : résultat mesuré → API device → repli IP
+                // (cellulaire). Cf. headerOperatorName.
+                operatorName: headerOperatorName,
+                network: result?.networkDisplayName ?? currentNetworkStatus.displayName,
+                // Serveur de download/ping ACTIF (AWS CloudFront par
+                // défaut). On n'affiche plus le VPS de mesure : l'opérateur
+                // prend sa place dans le bandeau.
+                server: result?.downloadServerName ?? downloadTarget.displayName
+            )
+        }
+    }
+
+    private func headerButton(systemImage: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(SQColor.label)
+                .frame(width: 44, height: 44)
+                .background(SQColor.surface, in: Circle())
+                .sqShadowSoft()
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(label)
+    }
+
     // MARK: - Primary action
 
     @ViewBuilder
@@ -293,10 +293,9 @@ struct SpeedtestView: View {
                 burstRunningPill(index: burstProgress.index, total: burstProgress.total)
             }
             if isRunning {
-                SpeedtestStopButton(title: "Arrêter", systemImage: "stop.fill", action: stop)
+                GradientButton("Arrêter", systemImage: "stop.fill", style: .accent, action: stop)
             } else {
                 GradientButton(primaryButtonTitle, systemImage: primaryButtonIcon, action: start)
-                    .shadow(color: SQBrand.signatureStart.opacity(0.32), radius: 16, y: 8)
             }
         }
     }
@@ -311,9 +310,9 @@ struct SpeedtestView: View {
         return result == nil ? "Lancer le test" : "Relancer le test"
     }
 
-    private var primaryButtonIcon: String {
+    private var primaryButtonIcon: String? {
         if burstCount == Self.continuousBurst { return "infinity" }
-        return burstCount > 1 ? "bolt.fill" : "play.fill"
+        return burstCount > 1 ? "bolt.fill" : nil
     }
 
     @ViewBuilder
@@ -321,61 +320,44 @@ struct SpeedtestView: View {
         HStack(spacing: SQSpace.sm) {
             if total == 0 {
                 // Session continue (drive test) : pas de total, progression indéterminée.
-                Image(systemName: "infinity").foregroundStyle(SQColor.brandOrange)
+                Image(systemName: "infinity")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SQColor.brandRed)
                 Text("Continu · test \(index)")
-                    .font(.caption.weight(.bold))
+                    .font(SQFont.body(12, .semibold))
                     .foregroundStyle(SQColor.label)
                 ProgressView()
                     .controlSize(.small)
-                    .tint(SQColor.brandOrange)
+                    .tint(SQColor.brandRed)
             } else {
-                Image(systemName: "bolt.fill").foregroundStyle(SQColor.brandOrange)
+                Image(systemName: "bolt.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SQColor.brandRed)
                 Text("Rafale · test \(index)/\(total)")
-                    .font(.caption.weight(.bold))
+                    .font(SQFont.body(12, .semibold))
                     .foregroundStyle(SQColor.label)
                 ProgressView(value: Double(index), total: Double(total))
                     .frame(width: 90)
-                    .tint(SQColor.brandOrange)
+                    .tint(SQColor.brandRed)
             }
         }
         .padding(.horizontal, SQSpace.md).padding(.vertical, SQSpace.sm)
-        .background(SQColor.surface.opacity(0.7), in: Capsule())
-        .overlay(Capsule().stroke(SQColor.brandOrange.opacity(0.3), lineWidth: 1))
+        .background(SQColor.surface, in: Capsule(style: .continuous))
+        .sqShadowSoft()
     }
 
     // MARK: - Share panel (single-tap)
 
     @ViewBuilder
     private func sharePanel(for result: SpeedtestRunResult) -> some View {
-        Button {
-            Haptics.light()
+        GradientButton(
+            "Partager le résultat",
+            systemImage: "square.and.arrow.up",
+            isBusy: isPreparingShare,
+            style: .secondary
+        ) {
             presentShare(for: result)
-        } label: {
-            HStack(spacing: SQSpace.sm) {
-                if isPreparingShare {
-                    ProgressView().tint(.white)
-                } else {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.headline)
-                }
-                Text("Partager le résultat")
-                    .font(SQType.button)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, SQSpace.md + 2)
-            .foregroundStyle(.white)
-            .background(
-                LinearGradient(
-                    colors: [SQBrand.signatureStart, SQBrand.signatureEnd],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ),
-                in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-            )
-            .shadow(color: SQBrand.signatureStart.opacity(0.35), radius: 12, y: 6)
         }
-        .buttonStyle(SQPressButtonStyle())
-        .disabled(isPreparingShare)
         .sheet(item: $sharePayload) { payload in
             ShareSheet(items: payload.items)
                 .presentationDetents([.medium, .large])
@@ -456,64 +438,59 @@ struct SpeedtestView: View {
     @ViewBuilder
     private func resultDetail(for result: SpeedtestRunResult) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            HStack(alignment: .center) {
-                Label("Résultats", systemImage: "chart.bar.doc.horizontal.fill")
-                    .font(SQFont.archivo(17, .bold))
+            HStack(alignment: .firstTextBaseline) {
+                Text("Résultats")
+                    .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
                 Spacer()
                 Text(result.createdAt.formatted(date: .abbreviated, time: .shortened))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
             }
-            
-            Divider()
-                .background(SQColor.separator.opacity(colorScheme == .dark ? 0.2 : 0.1))
+
+            Rectangle()
+                .fill(SQColor.separator)
+                .frame(height: 1)
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: SQSpace.md), GridItem(.flexible(), spacing: SQSpace.md)], spacing: SQSpace.md) {
-                detailItem(label: "DL moyen", value: speed(result.downloadAverageMbps), color: SQBrand.signatureStart)
-                detailItem(label: "DL max", value: speed(result.downloadMaxMbps), color: SQBrand.signatureStart)
-                detailItem(label: "UL moyen", value: speed(result.uploadAverageMbps), color: SQBrand.signatureEnd)
-                detailItem(label: "UL max", value: speed(result.uploadMaxMbps), color: SQBrand.signatureEnd)
-                detailItem(label: "Ping", value: ms(result.pingMinMs ?? result.pingMs), trailing: result.pingProtocol, color: Color(hex: 0x06B6D4))
-                detailItem(label: "Jitter", value: ms(result.jitterMs), color: Color(hex: 0x06B6D4))
-                detailItem(label: "Ping DL", value: ms(result.pingDlMs), color: Color(hex: 0x06B6D4))
-                detailItem(label: "Jitter DL", value: ms(result.jitterDlMs), color: Color(hex: 0x06B6D4))
-                detailItem(label: "Ping UL", value: ms(result.pingUlMs), color: Color(hex: 0x06B6D4))
-                detailItem(label: "Jitter UL", value: ms(result.jitterUlMs), color: Color(hex: 0x06B6D4))
-                detailItem(label: "Réseau", value: result.networkShareDisplayName, color: SQColor.label)
+                detailItem(label: "DL moyen", value: speed(result.downloadAverageMbps), highlight: true)
+                detailItem(label: "DL max", value: speed(result.downloadMaxMbps), highlight: true)
+                detailItem(label: "UL moyen", value: speed(result.uploadAverageMbps))
+                detailItem(label: "UL max", value: speed(result.uploadMaxMbps))
+                detailItem(label: "Ping", value: ms(result.pingMinMs ?? result.pingMs), trailing: result.pingProtocol)
+                detailItem(label: "Jitter", value: ms(result.jitterMs))
+                detailItem(label: "Ping DL", value: ms(result.pingDlMs))
+                detailItem(label: "Jitter DL", value: ms(result.jitterDlMs))
+                detailItem(label: "Ping UL", value: ms(result.pingUlMs))
+                detailItem(label: "Jitter UL", value: ms(result.jitterUlMs))
+                detailItem(label: "Réseau", value: result.networkShareDisplayName)
                 // Le ping ET le download sont mesurés contre la même source (le CDN
                 // sélectionné, AWS CloudFront par défaut). On affiche donc ce serveur
                 // unique au lieu du VPS de session/upload (qui n'est qu'un détail
                 // technique et induisait en erreur ici).
-                detailItem(label: "Serveur ping + DL", value: result.downloadServerName ?? result.serverName ?? "—", color: SQColor.label)
+                detailItem(label: "Serveur ping + DL", value: result.downloadServerName ?? result.serverName ?? "—")
             }
         }
-        .padding(SQSpace.lg)
-        .background(SQColor.surface.opacity(colorScheme == .dark ? 0.35 : 0.65), in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator.opacity(colorScheme == .dark ? 0.25 : 0.15), lineWidth: 1)
-        }
-        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.12 : 0.05), radius: 16, x: 0, y: 8)
+        .padding(SQSpace.lg + 2)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
-    private func detailItem(label: String, value: String, trailing: String? = nil, color: Color) -> some View {
+    private func detailItem(label: String, value: String, trailing: String? = nil, highlight: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(SQType.micro)
-                .tracking(0.8)
-                .textCase(.uppercase)
                 .foregroundStyle(SQColor.labelSecondary)
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
-                    .font(SQFont.archivo(17, .semibold, relativeTo: .body))
+                    .font(SQFont.display(17, .semibold, relativeTo: .body))
                     .monospacedDigit()
-                    .foregroundStyle(color)
+                    .foregroundStyle(highlight ? SQColor.brandRed : SQColor.label)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 if let trailing {
                     Text(trailing)
-                        .font(.caption2)
+                        .font(SQType.micro)
                         .foregroundStyle(SQColor.labelTertiary)
                         .lineLimit(1)
                 }
@@ -531,31 +508,30 @@ struct SpeedtestView: View {
                     "\(sessionIsContinuous ? "Session continue" : "Rafale") — \(s.count) test\(s.count > 1 ? "s" : "")",
                     systemImage: sessionIsContinuous ? "infinity" : "bolt.fill"
                 )
-                    .font(SQFont.archivo(17, .bold))
+                    .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
                 Spacer()
                 if s.truncatedAt != nil {
                     Text("arrêtée")
-                        .font(.caption2.weight(.semibold))
-                        .padding(.horizontal, 7).padding(.vertical, 3)
-                        .background(SQColor.warning.opacity(0.18), in: Capsule())
+                        .font(SQType.micro)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(SQColor.warningSoft, in: Capsule(style: .continuous))
                         .foregroundStyle(SQColor.warning)
                 }
             }
-            Divider().background(SQColor.separator.opacity(colorScheme == .dark ? 0.2 : 0.1))
+            Rectangle()
+                .fill(SQColor.separator)
+                .frame(height: 1)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: SQSpace.md), GridItem(.flexible(), spacing: SQSpace.md)], spacing: SQSpace.md) {
-                detailItem(label: "DL moyen", value: speed(s.avgDownload), color: SQBrand.signatureStart)
-                detailItem(label: "DL max", value: speed(s.maxDownload), color: SQBrand.signatureStart)
-                detailItem(label: "UL moyen", value: speed(s.avgUpload), color: SQBrand.signatureEnd)
-                detailItem(label: "Ping min", value: ms(s.minPing), color: Color(hex: 0x06B6D4))
+                detailItem(label: "DL moyen", value: speed(s.avgDownload), highlight: true)
+                detailItem(label: "DL max", value: speed(s.maxDownload), highlight: true)
+                detailItem(label: "UL moyen", value: speed(s.avgUpload))
+                detailItem(label: "Ping min", value: ms(s.minPing))
             }
         }
-        .padding(SQSpace.lg)
-        .background(SQColor.surface.opacity(colorScheme == .dark ? 0.35 : 0.65), in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator.opacity(colorScheme == .dark ? 0.25 : 0.15), lineWidth: 1)
-        }
+        .padding(SQSpace.lg + 2)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
     // MARK: - Settings sheet (unchanged behaviour)
@@ -615,8 +591,8 @@ struct SpeedtestView: View {
                                         .font(.caption.weight(.bold))
                                         .frame(minWidth: 38)
                                         .padding(.vertical, SQSpace.xs + 3)
-                                        .background(streams == value ? SQColor.brandRed : SQColor.fill, in: Capsule())
-                                        .foregroundStyle(streams == value ? .white : SQColor.label)
+                                        .background(streams == value ? SQColor.brandRed : SQColor.fill, in: Capsule(style: .continuous))
+                                        .foregroundStyle(streams == value ? SQColor.onAccent : SQColor.label)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -636,8 +612,8 @@ struct SpeedtestView: View {
                                             .font(.caption.weight(.bold))
                                             .frame(minWidth: 38)
                                             .padding(.vertical, SQSpace.xs + 3)
-                                            .background(burstCount == value ? SQColor.brandRed : SQColor.fill, in: Capsule())
-                                            .foregroundStyle(burstCount == value ? .white : SQColor.label)
+                                            .background(burstCount == value ? SQColor.brandRed : SQColor.fill, in: Capsule(style: .continuous))
+                                            .foregroundStyle(burstCount == value ? SQColor.onAccent : SQColor.label)
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -650,8 +626,8 @@ struct SpeedtestView: View {
                                         .font(.caption.weight(.bold))
                                         .frame(minWidth: 38)
                                         .padding(.vertical, SQSpace.xs + 3)
-                                        .background(burstCount == Self.continuousBurst ? SQColor.brandRed : SQColor.fill, in: Capsule())
-                                        .foregroundStyle(burstCount == Self.continuousBurst ? .white : SQColor.label)
+                                        .background(burstCount == Self.continuousBurst ? SQColor.brandRed : SQColor.fill, in: Capsule(style: .continuous))
+                                        .foregroundStyle(burstCount == Self.continuousBurst ? SQColor.onAccent : SQColor.label)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -694,6 +670,7 @@ struct SpeedtestView: View {
                     }
                     .padding(SQSpace.lg)
                     .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                    .sqShadowCard()
                 }
                 .padding(SQSpace.lg)
             }
@@ -712,21 +689,18 @@ struct SpeedtestView: View {
 
     // MARK: - History
 
+    // Fidèle au prototype : les cartes d'historique suivent directement le
+    // bouton, sans titre de section (le contexte suffit).
     private var historySection: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            SQSectionHeader("Historique")
             if history.isEmpty {
                 EmptyStateView(title: "Aucun test", message: "Lance ton premier speedtest.", systemImage: "clock")
             } else {
                 VStack(spacing: SQSpace.sm + 2) {
                     ForEach(Array(history.enumerated()), id: \.element.id) { _, item in
                         SpeedtestHistoryRow(result: item)
-                            .background(SQColor.surface.opacity(colorScheme == .dark ? 0.35 : 0.65), in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                                    .stroke(SQColor.separator.opacity(colorScheme == .dark ? 0.25 : 0.15), lineWidth: 1)
-                            }
-                            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.08 : 0.03), radius: 8, x: 0, y: 4)
+                            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                            .sqShadowSoft()
                             .sqFadeUp()
                     }
                 }
@@ -736,27 +710,19 @@ struct SpeedtestView: View {
 
     // MARK: - Derived state
 
-    private var phaseColor: Color {
-        switch phase {
-        case .idle:
-            return SQColor.brandRed.opacity(0.12)
-        case .ping:
-            return Color(hex: 0x06B6D4).opacity(0.18) // Cyan
-        case .download:
-            return Color(hex: 0x10B981).opacity(0.20) // Green
-        case .upload:
-            return SQBrand.signatureEnd.opacity(0.22) // Orange/Pink
-        case .saving:
-            return SQColor.success.opacity(0.15)
-        case .finished:
-            return SQColor.success.opacity(0.18)
-        case .failed:
-            return SQColor.danger.opacity(0.20)
-        }
-    }
-
     private var isRunning: Bool {
         runTask != nil
+    }
+
+    /// Badge sous la valeur du cadran une fois le test terminé : confirme la
+    /// publication communautaire quand elle a réellement été demandée (opt-in,
+    /// hors VPN, sans erreur de sync), sinon simple confirmation de fin.
+    private var dialCompletionLabel: String? {
+        guard case .finished = phase else { return nil }
+        if errorMessage == nil, mapPublicationEnabled, !isVPNActive {
+            return "publié sur la carte ✓"
+        }
+        return "test terminé ✓"
     }
 
     private var downloadTarget: SpeedtestDownloadTarget {
@@ -772,15 +738,6 @@ struct SpeedtestView: View {
         )
     }
 
-    private var phaseProgressFraction: Double {
-        switch phase {
-        case .idle: return 0
-        case .finished: return 1
-        case .failed: return 0
-        default: return liveProgress.fraction
-        }
-    }
-
     /// Progression grossière (0→1) par phase, pour la Live Activity.
     private func liveActivityFraction(_ phase: SpeedtestPhase) -> Double {
         switch phase {
@@ -793,24 +750,21 @@ struct SpeedtestView: View {
         }
     }
 
-    private var gaugeDisplay: (value: Double, unit: String, subtitle: String) {
+    private var gaugeDisplay: (value: Double, unit: String) {
         switch phase {
         case .ping:
             let value = liveProgress.pingLiveMs ?? liveProgress.pingFinalMs ?? result?.pingMinMs ?? result?.pingMs ?? 0
-            let count = liveProgress.pingSampleTarget > 0 ? "\(liveProgress.pingSampleCount)/\(liveProgress.pingSampleTarget)" : "latence"
-            return (value, "ms", count)
+            return (value, "ms")
         case .upload:
             let value = liveProgress.uploadLiveMbps ?? liveProgress.uploadAverageMbps ?? result?.uploadAverageMbps ?? 0
-            return (value, "Mbps", "envoi")
+            return (value, "Mbps")
         case .download:
             let value = liveProgress.downloadLiveMbps ?? liveProgress.downloadAverageMbps ?? result?.downloadAverageMbps ?? 0
-            return (value, "Mbps", "réception")
-        case .saving:
-            return (result?.downloadAverageMbps ?? liveMbps, "Mbps", "synchronisation")
-        case .finished:
-            return (result?.downloadAverageMbps ?? liveMbps, "Mbps", "téléchargement")
+            return (value, "Mbps")
+        case .saving, .finished:
+            return (result?.downloadAverageMbps ?? liveMbps, "Mbps")
         default:
-            return (0, "Mbps", "prêt")
+            return (0, "Mbps")
         }
     }
 
@@ -1283,7 +1237,7 @@ struct ContinuousSessionAccumulator {
     }
 }
 
-// MARK: - Server bar (discreet top strip)
+// MARK: - Server bar (capsule sous le titre)
 
 private struct SpeedtestServerBar: View {
     /// Opérateur mobile (Orange, SFR…) lu via CoreTelephony. nil/vide en WiFi ou
@@ -1294,307 +1248,199 @@ private struct SpeedtestServerBar: View {
     /// Serveur de download/ping actif (CDN AWS CloudFront par défaut).
     let server: String
 
-    /// « Orange · 5G NSA » quand l'opérateur est connu, sinon la techno seule.
-    private var networkLabel: String {
+    /// « Orange · 5G NSA · CloudFront Paris » — l'opérateur quand il est connu.
+    private var label: String {
+        var parts: [String] = []
         if let op = operatorName?.trimmingCharacters(in: .whitespacesAndNewlines),
            !op.isEmpty, op != network {
-            return "\(op) · \(network)"
+            parts.append(op)
         }
-        return network
+        parts.append(network)
+        parts.append(server)
+        return parts.joined(separator: " · ")
     }
 
     var body: some View {
-        HStack(spacing: SQSpace.sm) {
-            Image(systemName: networkIcon)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(SQColor.brandRed)
-            Text(networkLabel)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(SQColor.label)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .layoutPriority(1)
+        HStack(spacing: 7) {
             Circle()
-                .fill(SQColor.labelTertiary)
-                .frame(width: 3, height: 3)
-            Image(systemName: "server.rack")
-                .font(.caption2)
-                .foregroundStyle(SQColor.labelSecondary)
-            Text(server)
-                .font(.caption.weight(.medium))
+                .fill(SQColor.success)
+                .frame(width: 7, height: 7)
+                .accessibilityHidden(true)
+            Text(label)
+                .font(SQFont.body(13, .medium))
                 .foregroundStyle(SQColor.labelSecondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, SQSpace.sm)
-        .padding(.horizontal, SQSpace.md)
-        .background(SQColor.surface.opacity(0.65), in: Capsule())
-        .overlay { Capsule().stroke(SQColor.separator, lineWidth: 1) }
-    }
-
-    private var networkIcon: String {
-        let lower = network.lowercased()
-        if lower.contains("wifi") || lower.contains("wi-fi") { return "wifi" }
-        if lower.contains("5g") || lower.contains("4g") || lower.contains("lte") || lower.contains("cellular") { return "antenna.radiowaves.left.and.right" }
-        if lower.contains("ether") || lower.contains("wired") { return "cable.connector" }
-        return "network"
+        .padding(.vertical, 7)
+        .padding(.horizontal, SQSpace.md + 2)
+        .background(SQColor.surface, in: Capsule(style: .continuous))
+        .sqShadowSoft()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Réseau : \(label)")
     }
 }
 
-// MARK: - Signature speed dial (gradient orange → rose de la DA)
+// MARK: - Cadran signature (arc 270° « Crème & Terre cuite »)
 
 private struct SignatureSpeedDial: View {
     let value: Double
     let unit: String
     let phaseTitle: String
-    let subtitle: String
-    let phaseFraction: Double
     let phase: SpeedtestPhase
+    /// Badge affiché sous la valeur une fois le test terminé
+    /// (« publié sur la carte ✓ »…). nil tant qu'aucun résultat n'est acquis.
+    let completionLabel: String?
 
-    private let arcSpan: Double = 0.75  // 270 degrees
+    private let arcSpan: Double = 0.75   // 270°, départ 135°
     private let lineWidth: CGFloat = 22
+    private let diameter: CGFloat = 272
 
-    @State private var animatePulse = false
-    @Environment(\.colorScheme) private var colorScheme
+    @State private var pulsing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Fraction de remplissage de l'arc : échelle log pour les débits
+    /// (1 Gbps = plein), inverse pour la latence (0 ms = plein).
     private var normalized: Double {
+        guard value > 0 else { return 0 }
         if unit == "ms" {
-            guard value > 0 else { return 0 }
             return max(0, min(1, (120 - value) / 120))
         }
-        guard value > 0 else { return 0 }
-        let log = log10(value)
-        return max(0, min(1, log / 3))
+        return max(0, min(1, log10(value) / 3))
     }
 
-    /// La mesure est en cours : l'arc actif reçoit un glow.
-    private var isLive: Bool {
+    /// Mesure en cours (latence/téléchargement/envoi/synchro) : badge pulsé.
+    private var isRunning: Bool {
         switch phase {
-        case .ping, .download, .upload: return true
+        case .ping, .download, .upload, .saving: return true
         default: return false
         }
     }
 
-    private var gaugeColors: [Color] {
-        [
-            Color(hex: 0xEF4444), // Nul (Red)
-            Color(hex: 0xF97316), // Bof (Orange)
-            Color(hex: 0xFDE047), // Moyen (Yellow)
-            Color(hex: 0x22C55E), // Bon (Green)
-            Color(hex: 0x15803D)  // Très bon (Dark Green)
-        ]
-    }
-
-    private func lerpColor(from: Color, to: Color, t: Double) -> Color {
-        let uiFrom = UIColor(from)
-        let uiTo = UIColor(to)
-        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
-        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
-        uiFrom.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
-        uiTo.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
-        return Color(
-            .sRGB,
-            red: Double(r1 + (r2 - r1) * CGFloat(t)),
-            green: Double(g1 + (g2 - g1) * CGFloat(t)),
-            blue: Double(b1 + (b2 - b1) * CGFloat(t)),
-            opacity: Double(a1 + (a2 - a1) * CGFloat(t))
-        )
-    }
-
-    private func colorForRatio(_ ratio: Double) -> Color {
-        let v = max(0, min(1, ratio))
-        let colors = gaugeColors
-        let count = colors.count
-        guard count > 1 else { return colors.first ?? .gray }
-        
-        let segment = 1.0 / Double(count - 1)
-        let index = Int(v / segment)
-        if index >= count - 1 {
-            return colors.last!
-        }
-        let t = (v - Double(index) * segment) / segment
-        return lerpColor(from: colors[index], to: colors[index + 1], t: t)
-    }
-
-    /// Teinte dynamique basée sur la qualité de la vitesse / latence actuelle.
-    private var accent: Color {
-        guard normalized > 0 else { return SQColor.brandRed }
-        return colorForRatio(normalized)
-    }
-
-    /// Offset (depuis le centre du cadran 280×280) pour placer le dot indicateur
-    /// exactement au centre du trait à l'angle de fin de l'arc actif.
-    private var arcEndOffset: CGSize {
-        let endAngleDeg = 225.0 + 270.0 * normalized
-        let endAngleRad = endAngleDeg * Double.pi / 180.0
-        let r: CGFloat = 280.0 / 2  // rayon au centre du trait
-        return CGSize(
-            width: r * CGFloat(sin(endAngleRad)),
-            height: -r * CGFloat(cos(endAngleRad))
-        )
-    }
-
-    /// Gradient de couleur multi-segment pour la jauge représentant la qualité.
-    private var arcGradient: AngularGradient {
-        AngularGradient(
-            colors: gaugeColors,
-            center: .center,
-            startAngle: .degrees(0),
-            endAngle: .degrees(360 * arcSpan)
-        )
-    }
-
     var body: some View {
         ZStack {
-            // Halo de fond interne
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [accent.opacity(colorScheme == .dark ? 0.22 : 0.14), .clear],
-                        center: .center,
-                        startRadius: 20,
-                        endRadius: 170
-                    )
-                )
-                .blur(radius: 20)
-
-            // Centre en verre translucide épuré pour donner de la profondeur
-            Circle()
-                .fill(SQColor.surface.opacity(colorScheme == .dark ? 0.4 : 0.7))
-                .padding(lineWidth + 2)
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.2 : 0.08), radius: 12, x: 0, y: 6)
-
-            // Cercle d'échelle fin externe style chronomètre
+            // Track 270°, épaisseur 22, bouts ronds.
             Circle()
                 .trim(from: 0, to: arcSpan)
-                .stroke(SQColor.separator.opacity(colorScheme == .dark ? 0.5 : 0.3), style: StrokeStyle(lineWidth: 1))
+                .stroke(SQColor.surfaceMuted, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(135))
-                .padding(-10)
+                .padding(21)
 
-            // Jauge de fond vide
+            // Arc actif brique, même géométrie. Le trim epsilon conserve un point
+            // brique au départ de l'arc quand la jauge est à zéro (repère visuel).
             Circle()
-                .trim(from: 0, to: arcSpan)
-                .stroke(SQColor.fill.opacity(colorScheme == .dark ? 0.6 : 0.8), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .trim(from: 0, to: max(0.0004, arcSpan * normalized))
+                .stroke(SQColor.brandRed, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(135))
-
-            // Jauge active de vitesse (.butt : pas de capsule flottante en bout d'arc)
-            Circle()
-                .trim(from: 0, to: arcSpan * normalized)
-                .stroke(arcGradient, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
-                .rotationEffect(.degrees(135))
-                .shadow(color: isLive ? accent.opacity(0.6) : .clear, radius: 12)
+                .padding(21)
                 .sqAnimation(.snappy(duration: 0.32), value: normalized)
 
-            // Dot indicateur positionné exactement au bout de l'arc actif
-            if normalized > 0 {
-                Circle()
-                    .fill(accent)
-                    .frame(width: lineWidth, height: lineWidth)
-                    .shadow(color: isLive ? accent.opacity(0.8) : .clear, radius: 8)
-                    .offset(arcEndOffset)
-                    .sqAnimation(.snappy(duration: 0.32), value: normalized)
-            }
-
-            // Anneau de progression fin interne
+            // Disque central (r ≈ 93).
             Circle()
-                .trim(from: 0, to: arcSpan * max(0.02, min(1, phaseFraction)))
-                .stroke(accent.opacity(colorScheme == .dark ? 0.65 : 0.45), style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                .rotationEffect(.degrees(135))
-                .padding(lineWidth + 8)
-                .sqAnimation(.snappy(duration: 0.32), value: phaseFraction)
+                .fill(SQColor.surface)
+                .padding(46)
 
-            VStack(spacing: 4) {
-                Text(phaseTitle.uppercased())
-                    .font(SQFont.archivo(11, .bold))
-                    .tracking(2.4)
-                    .foregroundStyle(isLive ? accent : SQColor.labelSecondary)
+            VStack(spacing: 2) {
+                Text(phaseTitle)
+                    .font(SQFont.body(12, .medium))
+                    .foregroundStyle(SQColor.labelSecondary)
                 Text(formattedValue)
-                    .font(SQFont.archivo(56, .bold))
+                    .font(SQFont.display(58, .bold))
                     .monospacedDigit()
                     .foregroundStyle(SQColor.label)
                     .contentTransition(.numericText())
                     .minimumScaleFactor(0.55)
                     .lineLimit(1)
                 Text(unit)
-                    .font(SQType.caption)
+                    .font(SQFont.body(14, .medium))
                     .foregroundStyle(SQColor.labelSecondary)
-                Text(subtitle)
-                    .font(SQFont.archivo(11, .semibold))
-                    .foregroundStyle(SQColor.labelTertiary)
-                    .padding(.top, 2)
+                if isRunning {
+                    dialBadge("en cours…", color: SQColor.brandRed, background: SQColor.accentSoft)
+                        .opacity(pulsing && !reduceMotion ? 0.35 : 1)
+                        .animation(
+                            reduceMotion ? nil : .easeInOut(duration: 0.7).repeatForever(autoreverses: true),
+                            value: pulsing
+                        )
+                        .onAppear { pulsing = true }
+                        .onDisappear { pulsing = false }
+                } else if let completionLabel {
+                    dialBadge(completionLabel, color: SQColor.success, background: SQColor.successSoft)
+                }
             }
-            .padding(.horizontal, SQSpace.xl)
+            .padding(.horizontal, SQSpace.xxl + SQSpace.xl)
         }
-        .frame(width: 280, height: 280)
-        .scaleEffect(isLive && animatePulse ? 1.03 : 1.0)
-        .sqAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: isLive && animatePulse)
-        .onAppear {
-            animatePulse = true
-        }
+        .frame(width: diameter, height: diameter)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(phaseTitle) \(formattedValue) \(unit)")
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private func dialBadge(_ text: String, color: Color, background: Color) -> some View {
+        Text(text)
+            .font(SQFont.body(12, .semibold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(background, in: Capsule(style: .continuous))
+            .padding(.top, 6)
+    }
+
+    private var accessibilityText: String {
+        var parts = ["\(phaseTitle) \(formattedValue) \(unit)"]
+        if isRunning {
+            parts.append("mesure en cours")
+        } else if let completionLabel {
+            parts.append(completionLabel)
+        }
+        return parts.joined(separator: ", ")
     }
 
     private var formattedValue: String {
         guard value > 0, value.isFinite else { return "—" }
-        if unit == "ms" {
-            return "\(Int(value.rounded()))"
-        }
-        if value >= 100 {
+        if unit == "ms" || value >= 100 {
             return "\(Int(value.rounded()))"
         }
         return String(format: "%.1f", value)
     }
 }
 
-// MARK: - Tri-metric strip (Ping / Download / Upload)
+// MARK: - Cartes métriques (Ping / Réception / Envoi)
 
 private struct SpeedtestTriMetric: View {
     let activePhase: SpeedtestPhase
     let progress: SpeedtestLiveProgress
     let result: SpeedtestRunResult?
 
-    @Environment(\.colorScheme) private var colorScheme
-
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: SQSpace.md) {
             cell(
                 title: "Ping",
-                icon: "timer",
-                value: ms(result?.pingMinMs ?? progress.pingFinalMs ?? progress.pingLiveMs),
-                state: state(for: .ping),
-                accent: SQBrand.signatureStart
+                value: pingText,
+                state: state(for: .ping)
             )
-            divider
             cell(
                 title: "Réception",
-                icon: "arrow.down",
-                value: speed(result?.downloadAverageMbps ?? progress.downloadAverageMbps ?? progress.downloadLiveMbps),
-                state: state(for: .download),
-                accent: SQBrand.signatureStart
+                value: mbpsText(result?.downloadAverageMbps ?? progress.downloadAverageMbps ?? progress.downloadLiveMbps),
+                state: state(for: .download)
             )
-            divider
             cell(
                 title: "Envoi",
-                icon: "arrow.up",
-                value: speed(result?.uploadAverageMbps ?? progress.uploadAverageMbps ?? progress.uploadLiveMbps),
-                state: state(for: .upload),
-                accent: SQBrand.signatureEnd
+                value: mbpsText(result?.uploadAverageMbps ?? progress.uploadAverageMbps ?? progress.uploadLiveMbps),
+                state: state(for: .upload)
             )
-        }
-        .padding(.vertical, SQSpace.md)
-        .background(SQColor.surface.opacity(colorScheme == .dark ? 0.35 : 0.65), in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator.opacity(colorScheme == .dark ? 0.25 : 0.15), lineWidth: 1)
         }
     }
 
-    private var divider: some View {
-        Rectangle()
-            .fill(SQColor.separator.opacity(colorScheme == .dark ? 0.3 : 0.2))
-            .frame(width: 1, height: 32)
+    private var pingText: String {
+        guard let value = result?.pingMinMs ?? progress.pingFinalMs ?? progress.pingLiveMs,
+              value.isFinite, value >= 0 else { return "—" }
+        return "\(Int(value.rounded())) ms"
+    }
+
+    /// Débit sans unité (« 403 », « 38.5 ») — le « Mbps » est porté par le cadran.
+    private func mbpsText(_ value: Double?) -> String {
+        guard let value, value.isFinite, value > 0 else { return "—" }
+        if value >= 100 { return "\(Int(value.rounded()))" }
+        return String(format: "%.1f", value)
     }
 
     private enum CellState { case pending, active, done }
@@ -1615,72 +1461,47 @@ private struct SpeedtestTriMetric: View {
         }
     }
 
-    @ViewBuilder
-    private func cell(title: String, icon: String, value: String, state: CellState, accent: Color) -> some View {
-        VStack(spacing: SQSpace.xs + 2) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.caption2.weight(.bold))
-                Text(title)
-                    .font(SQType.micro)
-                    .tracking(0.6)
-                    .textCase(.uppercase)
-            }
-            .foregroundStyle(state == .active ? accent : SQColor.labelSecondary)
+    private func valueColor(_ value: String, state: CellState) -> Color {
+        if state == .active { return SQColor.brandRed }
+        if value == "—" { return SQColor.labelTertiary }
+        return SQColor.label
+    }
 
+    /// Barrette d'état 26×4 : brique = phase active, olive = terminée,
+    /// `SurfaceMuted` = à venir.
+    private func barColor(_ state: CellState) -> Color {
+        switch state {
+        case .active: return SQColor.brandRed
+        case .done: return SQColor.success
+        case .pending: return SQColor.surfaceMuted
+        }
+    }
+
+    @ViewBuilder
+    private func cell(title: String, value: String, state: CellState) -> some View {
+        VStack(spacing: 3) {
+            Text(title)
+                .font(SQFont.body(12))
+                .foregroundStyle(SQColor.labelSecondary)
             Text(value)
-                .font(SQFont.archivo(20, .bold, relativeTo: .title3))
+                .font(SQFont.display(20, .bold, relativeTo: .title3))
                 .monospacedDigit()
-                .foregroundStyle(state == .pending ? SQColor.labelTertiary : SQColor.label)
+                .foregroundStyle(valueColor(value, state: state))
                 .contentTransition(.numericText())
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-
-            if state == .active {
-                Capsule()
-                    .fill(accent)
-                    .frame(width: 32, height: 4)
-                    .shadow(color: accent.opacity(0.6), radius: 4, x: 0, y: 1)
-                    .transition(.scale.combined(with: .opacity))
-            } else {
-                Capsule()
-                    .fill(state == .done ? SQColor.success : SQColor.separator.opacity(0.5))
-                    .frame(width: 24, height: 3)
-            }
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(barColor(state))
+                .frame(width: 26, height: 4)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, SQSpace.xs)
-        .background(
-            state == .active
-                ? AnyView(accent.opacity(colorScheme == .dark ? 0.06 : 0.04).clipShape(RoundedRectangle(cornerRadius: SQRadius.md)))
-                : AnyView(Color.clear)
-        )
-        .animation(.snappy(duration: 0.25), value: state)
-    }
-}
-
-// MARK: - Stop button (même géométrie que GradientButton, teinte danger)
-
-private struct SpeedtestStopButton: View {
-    let title: String
-    let systemImage: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: SQSpace.sm + 2) {
-                Image(systemName: systemImage)
-                Text(title)
-                    .font(.headline)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, SQSpace.md + 3)
-            .foregroundStyle(.white)
-            .background(SQColor.danger, in: RoundedRectangle(cornerRadius: SQRadius.lg + 2, style: .continuous))
-            .shadow(color: SQColor.danger.opacity(0.32), radius: 16, y: 8)
-        }
-        .buttonStyle(.plain)
+        .padding(.vertical, SQSpace.md + 2)
+        .padding(.horizontal, SQSpace.sm)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqShadowSoft()
+        .sqAnimation(.snappy(duration: 0.25), value: state)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title) : \(value == "—" ? "non mesuré" : value)")
     }
 }
 
@@ -1690,96 +1511,67 @@ private struct SpeedtestHistoryRow: View {
     let result: SpeedtestRunResult
 
     var body: some View {
-        HStack(alignment: .top, spacing: SQSpace.md) {
+        HStack(spacing: SQSpace.md) {
             ZStack {
                 Circle()
-                    .fill(SQColor.brandRed.opacity(0.14))
-                    .frame(width: 36, height: 36)
-                Image(systemName: networkIcon)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(SQColor.brandRed)
+                    .fill(SQColor.successSoft)
+                    .frame(width: 40, height: 40)
+                Image(systemName: "checkmark")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SQColor.success)
             }
+            .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
-                // L'adresse occupe désormais toute la largeur (les métriques sont
-                // passées sur leur propre rangée juste en dessous).
-                Text(locationLine)
-                    .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(titleLine)
+                    .font(SQFont.body(15, .semibold))
                     .foregroundStyle(SQColor.label)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text(relativeDate)
-                    .font(SQType.caption)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Text(subtitleLine)
+                    .font(SQFont.body(12.5))
                     .foregroundStyle(SQColor.labelSecondary)
                     .lineLimit(1)
-
-                // Rangée dédiée DL · UL · ping (avec unités, plus de troncature de
-                // l'adresse pour leur faire de la place).
-                HStack(spacing: SQSpace.md) {
-                    stat(icon: "arrow.down", value: shortSpeed(result.downloadAverageMbps), unit: "Mbps")
-                    stat(icon: "arrow.up", value: shortSpeed(result.uploadAverageMbps), unit: "Mbps")
-                    stat(icon: "timer", value: shortMs(result.pingMinMs ?? result.pingMs), unit: "ms")
-                }
-                .padding(.top, 1)
             }
-        }
-        .padding(.horizontal, SQSpace.lg)
-        .padding(.vertical, SQSpace.md)
-    }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-    private func stat(icon: String, value: String, unit: String) -> some View {
-        HStack(spacing: 3) {
-            Image(systemName: icon)
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(SQColor.labelSecondary)
-                .accessibilityHidden(true)
-            Text(value)
-                .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
-                .monospacedDigit()
-                .foregroundStyle(SQColor.label)
-                .lineLimit(1)
-            Text(unit)
-                .font(SQType.micro)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(SQColor.labelTertiary)
+                .accessibilityHidden(true)
         }
-        .fixedSize(horizontal: true, vertical: false)
+        .padding(.horizontal, SQSpace.lg + 2)
+        .padding(.vertical, SQSpace.md + 3)
+        .accessibilityElement(children: .combine)
     }
 
-    /// Ligne principale : adresse (rue + commune) reverse-géocodée du point de
-    /// mesure. Repli sur la commune seule, puis sur la techno réseau quand la
-    /// localisation manque (test sans autorisation, ancien historique).
-    private var locationLine: String {
-        if let address = result.address?.trimmingCharacters(in: .whitespacesAndNewlines), !address.isEmpty {
-            return address
+    /// « 10 juil. · 388 Mbps · 21 ms »
+    private var titleLine: String {
+        var parts = [result.createdAt.formatted(.dateTime.day().month(.abbreviated))]
+        parts.append("\(shortSpeed(result.downloadAverageMbps)) Mbps")
+        if let ping = result.pingMinMs ?? result.pingMs, ping.isFinite, ping >= 0 {
+            parts.append("\(Int(ping.rounded())) ms")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Sous-titre réseau : « 5G NSA · Orange », « WiFi · Freebox »… Repli sur
+    /// l'adresse ou la commune quand elles sont connues (contexte de la mesure).
+    private var subtitleLine: String {
+        var parts = [result.networkDisplayName]
+        if let op = result.networkOperatorName?.trimmingCharacters(in: .whitespacesAndNewlines), !op.isEmpty {
+            parts.append(op)
         }
         if let city = result.city?.trimmingCharacters(in: .whitespacesAndNewlines), !city.isEmpty {
-            return city
+            parts.append(city)
         }
-        return result.networkDisplayName
-    }
-
-    private var relativeDate: String {
-        result.createdAt.formatted(.relative(presentation: .named))
-    }
-
-    private var networkIcon: String {
-        switch result.connectionType {
-        case .wifi: return "wifi"
-        case .cellular: return "antenna.radiowaves.left.and.right"
-        case .wired: return "cable.connector"
-        case .other: return "network"
-        }
+        return parts.joined(separator: " · ")
     }
 
     private func shortSpeed(_ value: Double?) -> String {
         guard let value, value.isFinite, value > 0 else { return "—" }
         if value >= 100 { return "\(Int(value.rounded()))" }
         return String(format: "%.1f", value)
-    }
-
-    private func shortMs(_ value: Double?) -> String {
-        guard let value, value.isFinite, value >= 0 else { return "—" }
-        return "\(Int(value.rounded()))"
     }
 }
 
@@ -1809,6 +1601,20 @@ private extension SpeedtestPhase {
         case .upload: return "Envoi"
         case .saving: return "Sync"
         case .finished: return "Résultat"
+        case .failed: return "Erreur"
+        }
+    }
+
+    /// Libellé de phase du cadran (casse normale, DA « Crème & Terre cuite »).
+    /// `displayTitle` reste utilisé tel quel par la Live Activity.
+    var dialTitle: String {
+        switch self {
+        case .idle: return "Prêt à mesurer"
+        case .ping: return "Latence"
+        case .download: return "Téléchargement"
+        case .upload: return "Envoi"
+        case .saving: return "Synchronisation"
+        case .finished: return "Téléchargement"
         case .failed: return "Erreur"
         }
     }

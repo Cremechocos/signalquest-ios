@@ -116,7 +116,7 @@ struct SectorEditSheet: View {
             ScrollView {
                 VStack(spacing: SQSpace.lg) {
                     Text("Touche le secteur réellement desservi par \(model.item.nodeLabel).")
-                        .font(.subheadline)
+                        .font(SQType.subhead)
                         .foregroundStyle(SQColor.labelSecondary)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
@@ -141,26 +141,26 @@ struct SectorEditSheet: View {
 
                         if let index = model.selectedIndex {
                             Text("Secteur \(model.sectorLabel(forIndex: index)) · azimut \(Int(model.azimuths[index].rounded()))°")
-                                .font(.subheadline.weight(.semibold))
+                                .font(SQFont.body(14, .semibold))
                                 .foregroundStyle(SQColor.label)
                         } else {
                             Text("Aucun secteur sélectionné")
-                                .font(.subheadline)
+                                .font(SQType.subhead)
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
                     }
 
                     if let info = model.infoMessage {
                         Label(info, systemImage: "info.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(SQColor.brandBlue)
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.label)
                             .padding(SQSpace.md)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(SQColor.brandBlue.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                     }
                     if let error = model.errorMessage, !model.azimuths.isEmpty {
                         Label(error, systemImage: "exclamationmark.triangle")
-                            .font(.caption).foregroundStyle(SQColor.warning)
+                            .font(SQType.caption).foregroundStyle(SQColor.warning)
                     }
 
                     saveButton
@@ -186,21 +186,16 @@ struct SectorEditSheet: View {
     @ViewBuilder
     private var saveButton: some View {
         if !model.azimuths.isEmpty {
-            Button {
+            GradientButton(
+                "Enregistrer le secteur",
+                systemImage: "checkmark",
+                isBusy: model.isSubmitting,
+                style: .primary
+            ) {
                 Task { await model.submit() }
-            } label: {
-                HStack {
-                    if model.isSubmitting { ProgressView().tint(.white) } else { Image(systemName: "checkmark") }
-                    Text("Enregistrer le secteur").font(.headline)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, SQSpace.md)
-                .foregroundStyle(.white)
-                .background(model.selectedIndex == nil ? SQColor.labelSecondary : SQColor.brandGreen,
-                            in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
             }
-            .buttonStyle(.plain)
             .disabled(model.selectedIndex == nil || model.isSubmitting)
+            .opacity(model.selectedIndex == nil ? 0.5 : 1)
         }
     }
 }
@@ -328,20 +323,23 @@ struct SectorWedge: Shape {
     }
 }
 
-/// État vide compatible iOS 16 (ContentUnavailableView est iOS 17+).
+/// État vide compatible iOS 16 (ContentUnavailableView est iOS 17+),
+/// dans le langage DA Crème : pastille circulaire teintée + typo tokens.
 struct ContentUnavailableCompat: View {
     let title: String
     let message: String
     let systemImage: String
 
     var body: some View {
-        VStack(spacing: SQSpace.sm) {
+        VStack(spacing: SQSpace.md) {
             Image(systemName: systemImage)
-                .font(.system(size: 40))
-                .foregroundStyle(SQColor.labelSecondary)
-            Text(title).font(.headline).foregroundStyle(SQColor.label)
+                .font(.system(size: 26, weight: .medium))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 64, height: 64)
+                .background(SQColor.accentSoft, in: Circle())
+            Text(title).font(SQType.heading).foregroundStyle(SQColor.label)
             Text(message)
-                .font(.subheadline)
+                .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .multilineTextAlignment(.center)
         }

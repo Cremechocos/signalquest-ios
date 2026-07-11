@@ -239,15 +239,14 @@ struct ANFRStatsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Observatoire ANFR").sqKicker()
             Text("Le réseau mobile français")
                 .font(SQType.display)
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: SQSpace.xs + 2) {
                 Image(systemName: "clock.arrow.circlepath")
-                    .font(.caption.weight(.bold))
-                Text("Relevé du \(model.latestDateLabel)")
+                    .font(.caption.weight(.semibold))
+                Text("Observatoire ANFR · relevé du \(model.latestDateLabel)")
                     .font(SQType.subhead)
             }
             .foregroundStyle(SQColor.labelSecondary)
@@ -267,11 +266,7 @@ struct ANFRStatsView: View {
             }
         }
         .padding(3)
-        .background(SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1.5)
-        }
+        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
     }
 
     private func toggleSegment(title: String, active: Bool, action: @escaping () -> Void) -> some View {
@@ -280,11 +275,11 @@ struct ANFRStatsView: View {
             action()
         } label: {
             Text(title)
-                .font(SQFont.archivo(14, .bold))
-                .foregroundStyle(active ? .white : SQColor.label)
+                .font(SQFont.body(13, .semibold))
+                .foregroundStyle(active ? SQColor.onAccent : SQColor.label)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, SQSpace.sm + 2)
-                .background(active ? SQColor.brandRed : Color.clear, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                .background(active ? SQColor.brandRed : Color.clear, in: Capsule(style: .continuous))
         }
         .buttonStyle(SQPressButtonStyle())
         .sqAnimation(SQMotion.fast, value: active)
@@ -311,15 +306,12 @@ struct ANFRStatsView: View {
                         }
                     } label: {
                         Text(type.label)
-                            .font(SQFont.archivo(13, .bold))
+                            .font(SQFont.body(13, .semibold))
                             .padding(.horizontal, SQSpace.md)
                             .frame(height: 36)
-                            .background(selected ? SQColor.brandRed : SQColor.fill, in: Capsule())
-                            .overlay {
-                                Capsule()
-                                    .stroke(selected ? Color.clear : SQColor.separator, lineWidth: 1.5)
-                            }
-                            .foregroundStyle(selected ? Color.white : SQColor.label)
+                            .background(selected ? SQColor.brandRed : SQColor.surface, in: Capsule(style: .continuous))
+                            .foregroundStyle(selected ? SQColor.onAccent : SQColor.label)
+                            .sqShadowSoft()
                     }
                     .buttonStyle(SQPressButtonStyle())
                     .sqAnimation(SQMotion.fast, value: selected)
@@ -338,10 +330,12 @@ struct ANFRStatsView: View {
             : "Supports opérationnels, \(filterLabel)"
             
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Supports déployés").sqKicker()
+            Text("Supports déployés")
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
             HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
                 Text(model.totalOperational, format: .number.grouping(.automatic))
-                    .font(SQFont.display(46, .black))
+                    .font(SQFont.display(46, .bold))
                     .foregroundStyle(SQColor.label)
                     .monospacedDigit()
                     .contentTransition(.numericText())
@@ -354,16 +348,16 @@ struct ANFRStatsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1.5)
-        }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
         .overlay(alignment: .topTrailing) {
             Image(systemName: "antenna.radiowaves.left.and.right")
-                .font(.system(size: 34, weight: .bold))
-                .foregroundStyle(SQColor.brandRed.opacity(0.16))
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 44, height: 44)
+                .background(SQColor.accentSoft, in: Circle())
                 .padding(SQSpace.lg)
+                .accessibilityHidden(true)
         }
     }
 
@@ -373,16 +367,16 @@ struct ANFRStatsView: View {
             let positive = delta > 0
             HStack(spacing: 2) {
                 Image(systemName: positive ? "arrow.up.right" : "arrow.down.right")
-                    .font(.system(size: 11, weight: .black))
+                    .font(.system(size: 11, weight: .semibold))
                 Text("\(abs(delta))")
-                    .font(SQFont.archivo(13, .bold))
+                    .font(SQFont.body(13, .semibold))
                     .monospacedDigit()
                     .contentTransition(.numericText())
             }
             .foregroundStyle(positive ? SQColor.success : SQColor.danger)
             .padding(.horizontal, SQSpace.sm)
             .padding(.vertical, SQSpace.xs)
-            .background((positive ? SQColor.success : SQColor.danger).opacity(0.12), in: Capsule())
+            .background(positive ? SQColor.successSoft : SQColor.dangerSoft, in: Capsule(style: .continuous))
             .accessibilityLabel(positive ? "en hausse de \(delta) cette semaine" : "en baisse de \(abs(delta)) cette semaine")
         }
     }
@@ -401,11 +395,8 @@ struct ANFRStatsView: View {
             }
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1.5)
-        }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
     private func operatorBar(_ row: (operator: ANFROperator, value: Int, delta: Int), fraction: Double) -> some View {
@@ -413,11 +404,11 @@ struct ANFRStatsView: View {
             HStack(spacing: SQSpace.sm) {
                 Circle().fill(row.operator.color).frame(width: 10, height: 10)
                 Text(row.operator.label)
-                    .font(SQFont.archivo(15, .bold))
+                    .font(SQFont.body(15, .semibold))
                     .foregroundStyle(SQColor.label)
                 Spacer()
                 Text(row.value, format: .number.grouping(.automatic))
-                    .font(SQFont.archivo(15, .bold))
+                    .font(SQFont.display(15, .bold))
                     .monospacedDigit()
                     .foregroundStyle(SQColor.label)
                     .contentTransition(.numericText())
@@ -425,7 +416,7 @@ struct ANFRStatsView: View {
             }
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(SQColor.fill).frame(height: 8)
+                    Capsule().fill(SQColor.surfaceMuted).frame(height: 8)
                     Capsule()
                         .fill(row.operator.color)
                         .frame(width: proxy.size.width * (appeared ? fraction : 0), height: 8)
@@ -450,19 +441,16 @@ struct ANFRStatsView: View {
                 .frame(height: 196)
             HStack(spacing: SQSpace.lg) {
                 if model.selectedFilter == .g4 {
-                    legendDot(color: ANFRGeneration.g4.color, label: "4G globale")
+                    legendDot(color: SQColor.success, label: "4G globale")
                 } else {
-                    legendDot(color: ANFRGeneration.g5.color, label: model.selectedFilter.label)
+                    legendDot(color: SQColor.brandRed, label: model.selectedFilter.label)
                 }
                 Spacer()
             }
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1.5)
-        }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
     private var operatorPicker: some View {
@@ -477,18 +465,14 @@ struct ANFRStatsView: View {
                         }
                     } label: {
                         HStack(spacing: SQSpace.xs + 2) {
-                            Circle().fill(selected ? Color.white : op.color).frame(width: 7, height: 7)
+                            Circle().fill(selected ? SQColor.onAccent : op.color).frame(width: 7, height: 7)
                             Text(op.label)
-                                .font(SQFont.archivo(13, .bold))
+                                .font(SQFont.body(13, .semibold))
                         }
                         .padding(.horizontal, SQSpace.md - 2)
                         .frame(height: 34)
-                        .background(selected ? AnyShapeStyle(op.color) : AnyShapeStyle(SQColor.fill), in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                                .stroke(selected ? Color.clear : SQColor.separator, lineWidth: 1.5)
-                        }
-                        .foregroundStyle(selected ? Color.white : SQColor.label)
+                        .background(selected ? AnyShapeStyle(op.color) : AnyShapeStyle(SQColor.surfaceMuted), in: Capsule(style: .continuous))
+                        .foregroundStyle(selected ? SQColor.onAccent : SQColor.label)
                     }
                     .buttonStyle(SQPressButtonStyle())
                     .sqAnimation(SQMotion.fast, value: selected)
@@ -524,7 +508,7 @@ struct ANFRStatsView: View {
                             .lineLimit(1)
                         Spacer()
                         Text(model.showProjected ? band.total : band.operational, format: .number.grouping(.automatic))
-                            .font(SQFont.archivo(15, .bold))
+                            .font(SQFont.display(15, .bold))
                             .monospacedDigit()
                             .foregroundStyle(SQColor.label)
                             .contentTransition(.numericText())
@@ -536,11 +520,8 @@ struct ANFRStatsView: View {
             }
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1.5)
-        }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
     // MARK: Régions (top)
@@ -555,17 +536,17 @@ struct ANFRStatsView: View {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, region in
                     HStack(spacing: SQSpace.sm) {
                         Text("\(index + 1)")
-                            .font(SQFont.archivo(12, .bold))
+                            .font(SQFont.body(12, .semibold))
                             .foregroundStyle(SQColor.labelTertiary)
                             .frame(width: 18)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(region.label)
-                                .font(SQFont.archivo(14, .semibold))
+                                .font(SQFont.body(14, .semibold))
                                 .foregroundStyle(SQColor.label)
                                 .lineLimit(1)
                             GeometryReader { proxy in
                                 ZStack(alignment: .leading) {
-                                    Capsule().fill(SQColor.fill).frame(height: 6)
+                                    Capsule().fill(SQColor.surfaceMuted).frame(height: 6)
                                     Capsule()
                                         .fill(model.selectedOperator.color)
                                         .frame(width: proxy.size.width * (appeared ? Double(region.operational) / Double(maxValue) : 0), height: 6)
@@ -574,7 +555,7 @@ struct ANFRStatsView: View {
                             .frame(height: 6)
                         }
                         Text(region.operational, format: .number.grouping(.automatic))
-                            .font(SQFont.archivo(14, .bold))
+                            .font(SQFont.display(14, .bold))
                             .monospacedDigit()
                             .foregroundStyle(SQColor.label)
                     }
@@ -583,11 +564,8 @@ struct ANFRStatsView: View {
             }
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1.5)
-        }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
     private var topRegions: [ANFRTerritoryMetric] {
@@ -604,8 +582,11 @@ struct ANFRStatsView: View {
     private func sectionHeader(_ title: String, systemImage: String) -> some View {
         HStack(spacing: SQSpace.sm) {
             Image(systemName: systemImage)
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(SQColor.brandRed)
+                .frame(width: 32, height: 32)
+                .background(SQColor.accentSoft, in: Circle())
+                .accessibilityHidden(true)
             Text(title)
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
@@ -649,9 +630,10 @@ private struct ANFRTrendChart: View {
             .foregroundStyle(by: .value("Génération", point.generation.label))
             .opacity(0.12)
         }
+        // Graphique teinté DA : 4G en olive (succès), 5G en brique (accent).
         .chartForegroundStyleScale([
-            ANFRGeneration.g4.label: ANFRGeneration.g4.color,
-            ANFRGeneration.g5.label: ANFRGeneration.g5.color
+            ANFRGeneration.g4.label: SQColor.success,
+            ANFRGeneration.g5.label: SQColor.brandRed
         ])
         .chartLegend(.hidden)
         .chartYAxis {

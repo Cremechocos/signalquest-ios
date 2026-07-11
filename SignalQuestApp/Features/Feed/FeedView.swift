@@ -292,10 +292,8 @@ struct FeedView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: SQSpace.lg + 2) {
-                Text("Le réseau, sans filtre")
-                    .sqKicker()
-                    .padding(.horizontal, SQSpace.xxs)
+            LazyVStack(alignment: .leading, spacing: SQSpace.lg) {
+                header
 
                 if model.isLoading && model.page == nil {
                     LoadingSkeleton()
@@ -305,7 +303,10 @@ struct FeedView: View {
                         NetworkPulseHero(pulse: pulse)
                             .sqFadeUp()
                     }
-                    if let stories = model.page?.stories, !stories.isEmpty {
+                    // Rail visible dès que la page est chargée, même sans story
+                    // amie (fidèle au prototype : « Ta story » reste le point
+                    // d'entrée de création).
+                    if let stories = model.page?.stories {
                         StoriesBar(
                             stories: stories,
                             currentUser: nil,
@@ -316,6 +317,9 @@ struct FeedView: View {
                                 }
                             }
                         )
+                        // Rail débordant : annule le padding écran pour que le
+                        // scroll fuie sous les bords (1re bulle alignée à 20 pt).
+                        .padding(.horizontal, -SQSpace.lg)
                     }
                     hashtags
                     if let error = model.errorMessage {
@@ -358,57 +362,13 @@ struct FeedView: View {
                     }
                 }
             }
-            .padding(.horizontal, SQSpace.lg)
+            .padding(.horizontal, SQSpace.xl)
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
         }
-        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 96) }
         .overlay(alignment: .bottom) { shareUndoPill }
-        .navigationTitle("Communauté")
-        .toolbarTitleLargeCompat()
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    Haptics.light()
-                    showMessages = true
-                } label: {
-                    Image(systemName: "bubble.left.and.bubble.right")
-                        .foregroundStyle(SQColor.brandRed)
-                        .overlay(alignment: .topTrailing) {
-                            if services.unreadConversations > 0 {
-                                Circle()
-                                    .fill(SQColor.danger)
-                                    .frame(width: 8, height: 8)
-                                    .offset(x: 3, y: -3)
-                            }
-                        }
-                }
-                .accessibilityLabel("Messages")
-                .accessibilityValue(services.unreadConversations == 0
-                                    ? "Aucun message non lu"
-                                    : "\(services.unreadConversations) conversations non lues")
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    Haptics.light()
-                    showExplore = true
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(SQColor.brandRed)
-                }
-                .accessibilityLabel("Explorer")
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    Haptics.light()
-                    showComposer = true
-                } label: {
-                    Image(systemName: "square.and.pencil")
-                        .foregroundStyle(SQColor.brandRed)
-                }
-                .accessibilityLabel("Créer une publication")
-            }
-        }
+        // Header custom (DA Crème) : plus de gros titre nav système.
+        .toolbar(.hidden, for: .navigationBar)
         .signalQuestBackground()
         .task {
             if model.page == nil { await model.load() }
@@ -578,11 +538,10 @@ struct FeedView: View {
             }
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.sm + 2)
-            .background(SQColor.surface, in: Capsule())
-            .overlay { Capsule().stroke(SQColor.separator, lineWidth: 1) }
-            .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
-            .padding(.horizontal, SQSpace.lg)
-            .padding(.bottom, 108)
+            .background(SQColor.surface, in: Capsule(style: .continuous))
+            .sqShadowDock()
+            .padding(.horizontal, SQSpace.xl)
+            .padding(.bottom, SQSpace.lg)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
@@ -641,6 +600,74 @@ struct FeedView: View {
         }
     }
 
+    // MARK: Header custom — titre display + boutons circulaires
+
+    private var header: some View {
+        HStack(spacing: SQSpace.sm + 2) {
+            Text("Communauté")
+                .font(SQFont.display(26, .bold))
+                .foregroundStyle(SQColor.label)
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: SQSpace.sm)
+            headerButton(systemImage: "bubble.left.and.bubble.right", label: "Messages") {
+                showMessages = true
+            } decoration: {
+                if services.unreadConversations > 0 {
+                    Circle()
+                        .fill(SQColor.brandRed)
+                        .frame(width: 10, height: 10)
+                        .padding(2)
+                        .background(SQColor.surface, in: Circle())
+                        .offset(x: 1, y: -1)
+                }
+            }
+            .accessibilityValue(services.unreadConversations == 0
+                                ? "Aucun message non lu"
+                                : "\(services.unreadConversations) conversations non lues")
+            headerButton(systemImage: "magnifyingglass", label: "Explorer") {
+                showExplore = true
+            }
+            headerButton(systemImage: "square.and.pencil", label: "Créer une publication") {
+                showComposer = true
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Bouton circulaire d'en-tête 42 pt : fond surface + ombre douce, icône
+    /// encre ; `decoration` pose le point « non-lus » au-dessus du cercle.
+    private func headerButton(
+        systemImage: String,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        headerButton(systemImage: systemImage, label: label, action: action) { EmptyView() }
+    }
+
+    private func headerButton<Decoration: View>(
+        systemImage: String,
+        label: String,
+        action: @escaping () -> Void,
+        @ViewBuilder decoration: () -> Decoration
+    ) -> some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(SQColor.label)
+                .frame(width: 42, height: 42)
+                .background(SQColor.surface, in: Circle())
+                .sqShadowSoft()
+                .overlay(alignment: .topTrailing) { decoration() }
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(label)
+    }
+
+    // MARK: Hashtags — capsules pleines/douces
+
     private var hashtags: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
@@ -652,23 +679,25 @@ struct FeedView: View {
                         Task { await model.load() }
                     } label: {
                         Text("#\(tag.tag)")
-                            .font(SQFont.archivo(14, .bold))
-                            .padding(.horizontal, SQSpace.md)
+                            .font(SQFont.body(13, .semibold))
+                            .padding(.horizontal, SQSpace.md + 1)
                             .padding(.vertical, SQSpace.sm)
                             .background(
                                 isOn ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
-                                in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                                in: Capsule(style: .continuous)
                             )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                                    .stroke(isOn ? Color.clear : SQColor.separator, lineWidth: 1.5)
-                            }
-                            .foregroundStyle(isOn ? .white : SQColor.label)
+                            .foregroundStyle(isOn ? SQColor.onAccent : SQColor.label)
+                            .sqShadowSoft()
                     }
                     .buttonStyle(.plain)
+                    .accessibilityAddTraits(isOn ? .isSelected : [])
                 }
             }
+            .padding(.horizontal, SQSpace.xl)
+            .padding(.vertical, SQSpace.xs)
         }
+        // Déborde du padding écran pour ne pas rogner les ombres au scroll.
+        .padding(.horizontal, -SQSpace.xl)
     }
 }
 

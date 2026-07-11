@@ -84,12 +84,12 @@ struct SessionDetailView: View {
                 }
                 if let result = model.identifyResult {
                     Label(result, systemImage: "checkmark.seal")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(SQColor.brandGreen)
+                        .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                        .foregroundStyle(SQColor.success)
                 }
                 if let errorMessage = model.errorMessage {
                     Label(errorMessage, systemImage: "exclamationmark.triangle")
-                        .font(.footnote)
+                        .font(SQType.caption)
                         .foregroundStyle(SQColor.warning)
                 }
             }
@@ -128,31 +128,42 @@ struct SessionDetailView: View {
 
     private var statsCard: some View {
         let s = model.session
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: 2), spacing: SQSpace.sm) {
-            statTile("Points", s.totalPoints.map { "\($0)" } ?? "—", "mappin.and.ellipse")
-            statTile("Distance", s.distanceKm.map(Self.formatKm) ?? "—", "ruler")
-            statTile("RSRP moyen", s.avgSignalStrength.map { "\(Int($0)) dBm" } ?? "—", "antenna.radiowaves.left.and.right")
-            statTile(s.isDriveTest ? "Durée" : "Date",
-                     s.isDriveTest ? (s.durationLabel ?? "—")
-                                   : (s.startTime.map { $0.formatted(.dateTime.day().month().year()) } ?? "—"),
-                     s.isDriveTest ? "clock" : "calendar")
+        return GlassCard {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: 2), spacing: SQSpace.sm) {
+                statTile("Points", s.totalPoints.map { "\($0)" } ?? "—", "mappin.and.ellipse")
+                statTile("Distance", s.distanceKm.map(Self.formatKm) ?? "—", "ruler")
+                statTile("RSRP moyen", s.avgSignalStrength.map { "\(Int($0)) dBm" } ?? "—", "antenna.radiowaves.left.and.right")
+                statTile(s.isDriveTest ? "Durée" : "Date",
+                         s.isDriveTest ? (s.durationLabel ?? "—")
+                                       : (s.startTime.map { $0.formatted(.dateTime.day().month().year()) } ?? "—"),
+                         s.isDriveTest ? "clock" : "calendar")
+            }
         }
     }
 
     private func statTile(_ label: String, _ value: String, _ icon: String) -> some View {
         HStack(spacing: SQSpace.sm) {
             Image(systemName: icon)
-                .foregroundStyle(SQColor.brandOrange)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(SQColor.brandRed)
                 .frame(width: 24)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
-                Text(label).font(.caption2).foregroundStyle(SQColor.labelSecondary)
-                Text(value).font(.subheadline.weight(.semibold)).foregroundStyle(SQColor.label).lineLimit(1)
+                Text(label).font(SQFont.body(11, relativeTo: .caption2)).foregroundStyle(SQColor.labelSecondary)
+                Text(value)
+                    .font(SQFont.display(15, .bold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
             Spacer(minLength: 0)
         }
         .padding(SQSpace.sm + 2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(label)
+        .accessibilityValue(value)
     }
 
     // MARK: Operators + technologies chips
@@ -163,21 +174,23 @@ struct SessionDetailView: View {
                 ForEach(model.session.operators) { op in
                     HStack(spacing: 5) {
                         Circle().fill(Self.operatorColor(op.colorHex)).frame(width: 8, height: 8)
-                        Text(op.label).font(.caption.weight(.semibold))
-                        if let count = op.count { Text("\(count)").font(.caption2).foregroundStyle(SQColor.labelSecondary) }
+                        Text(op.label).font(SQFont.body(13, .semibold, relativeTo: .caption))
+                        if let count = op.count {
+                            Text("\(count)")
+                                .font(SQFont.body(11.5, relativeTo: .caption2))
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
                     }
-                    .padding(.horizontal, 10).padding(.vertical, 6)
-                    .background(SQColor.surface, in: Capsule())
-                    .overlay(Capsule().stroke(Self.operatorColor(op.colorHex).opacity(0.35), lineWidth: 1))
+                    .foregroundStyle(SQColor.label)
+                    .padding(.horizontal, SQSpace.md).padding(.vertical, 7)
+                    .background(SQColor.surface, in: Capsule(style: .continuous))
+                    .sqShadowSoft()
                 }
                 ForEach(model.session.technologies, id: \.self) { tech in
-                    Text(tech)
-                        .font(.caption2.weight(.bold))
-                        .padding(.horizontal, 9).padding(.vertical, 6)
-                        .background(SQColor.brandBlue.opacity(0.15), in: Capsule())
-                        .foregroundStyle(SQColor.brandBlue)
+                    TechBadge(text: tech, color: SQBrand.techColor(tech))
                 }
             }
+            .padding(.vertical, SQSpace.xs)
         }
     }
 
@@ -191,40 +204,39 @@ struct SessionDetailView: View {
                                     antennas: detail.servingAntennas,
                                     drawPath: model.session.isDriveTest)
                     .frame(height: 300)
-                    .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                            .stroke(SQColor.separator, lineWidth: 1)
-                    }
+                    .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                    .sqShadowCard()
                 if !detail.points.isEmpty {
                     rsrpLegend
                 }
             }
         } else if model.detail != nil && !model.isLoading {
             Text("Aucun point géolocalisé pour cette session.")
-                .font(.footnote)
+                .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, SQSpace.lg)
         }
     }
 
+    /// Légende RSRP — couleurs dérivées de `SessionRSRPColor` (celles des points
+    /// de la carte) pour garantir la correspondance légende ↔ tracé.
     private var rsrpLegend: some View {
         HStack(spacing: SQSpace.sm) {
-            legendDot(0x10B981, "Excellent")
-            legendDot(0x84CC16, "Bon")
-            legendDot(0xF59E0B, "Moyen")
-            legendDot(0xF97316, "Faible")
-            legendDot(0xEF4444, "Mauvais")
+            legendDot(SessionRSRPColor.ui(-70), "Excellent")
+            legendDot(SessionRSRPColor.ui(-85), "Bon")
+            legendDot(SessionRSRPColor.ui(-95), "Moyen")
+            legendDot(SessionRSRPColor.ui(-105), "Faible")
+            legendDot(SessionRSRPColor.ui(-115), "Mauvais")
         }
-        .font(.system(size: 11, weight: .medium))
+        .font(SQFont.body(11, .medium, relativeTo: .caption2))
         .foregroundStyle(SQColor.labelSecondary)
         .frame(maxWidth: .infinity)
     }
 
-    private func legendDot(_ hex: UInt32, _ label: String) -> some View {
+    private func legendDot(_ color: UIColor, _ label: String) -> some View {
         HStack(spacing: 3) {
-            Circle().fill(Color(hex: hex)).frame(width: 7, height: 7)
+            Circle().fill(Color(uiColor: color)).frame(width: 7, height: 7)
             Text(label)
         }
     }
@@ -234,18 +246,23 @@ struct SessionDetailView: View {
     private func servingAntennasSection(_ antennas: [ServingAntenna]) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text("Antennes desservantes")
-                .font(SQFont.archivo(12, .semibold))
-                .tracking(0.4)
-                .textCase(.uppercase)
-                .foregroundStyle(SQColor.labelSecondary)
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
+                .padding(.bottom, SQSpace.xs)
             ForEach(antennas) { antenna in
                 antennaRow(antenna)
-                if antenna.id != antennas.last?.id { Divider().overlay(SQColor.separator) }
+                if antenna.id != antennas.last?.id {
+                    Rectangle()
+                        .fill(SQColor.separator)
+                        .frame(height: 1)
+                        .padding(.leading, SQSpace.lg + 2)
+                }
             }
         }
-        .padding(SQSpace.md)
+        .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
     }
 
     private func antennaRow(_ antenna: ServingAntenna) -> some View {
@@ -253,15 +270,18 @@ struct SessionDetailView: View {
             Circle().fill(Self.statusColor(antenna.status)).frame(width: 10, height: 10)
             VStack(alignment: .leading, spacing: 2) {
                 Text(antenna.operatorName ?? antenna.displayName ?? "Antenne")
-                    .font(.subheadline.weight(.semibold))
+                    .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1)
                 Text(Self.statusLabel(antenna))
-                    .font(.caption2)
+                    .font(SQFont.body(11.5, relativeTo: .caption2))
                     .foregroundStyle(SQColor.labelSecondary)
                     .lineLimit(1)
                 if let commune = antenna.commune, !commune.isEmpty {
-                    Text(commune).font(.caption2).foregroundStyle(SQColor.labelSecondary).lineLimit(1)
+                    Text(commune)
+                        .font(SQFont.body(11.5, relativeTo: .caption2))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(1)
                 }
             }
             Spacer()
@@ -269,20 +289,30 @@ struct SessionDetailView: View {
                 Button {
                     pendingIdentify = antenna
                 } label: {
-                    if model.identifyingId == antenna.id {
-                        ProgressView()
-                    } else {
-                        Text("Valider").font(.caption.weight(.bold))
+                    Group {
+                        if model.identifyingId == antenna.id {
+                            ProgressView().tint(SQColor.onAccent)
+                        } else {
+                            Text("Valider").font(SQFont.body(13, .semibold, relativeTo: .caption))
+                        }
                     }
+                    .foregroundStyle(SQColor.onAccent)
+                    .padding(.horizontal, SQSpace.md + 2)
+                    .frame(minHeight: 34)
+                    .background(SQColor.brandRed, in: Capsule(style: .continuous))
+                    // Capsule visuelle 34 pt, zone tactile étendue à ≥ 44 pt.
+                    .padding(.vertical, 5)
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .tint(SQColor.brandOrange)
+                .buttonStyle(SQPressButtonStyle())
                 .disabled(model.identifyingId != nil)
                 .accessibilityLabel("Valider l'antenne \(antenna.operatorName ?? antenna.displayName ?? "")")
             }
             if antenna.siteId != nil {
-                Image(systemName: "chevron.right").font(.caption2).foregroundStyle(SQColor.labelSecondary)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
             }
         }
         .contentShape(Rectangle())
@@ -291,16 +321,17 @@ struct SessionDetailView: View {
                 validationTarget = ValidationTarget(siteId: siteId, operatorName: antenna.operatorName)
             }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, SQSpace.sm)
     }
 
     private var emptyAntennasHint: some View {
         Label("Aucune antenne desservante résolue pour cette session.", systemImage: "antenna.radiowaves.left.and.right.slash")
-            .font(.footnote)
+            .font(SQType.caption)
             .foregroundStyle(SQColor.labelSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(SQSpace.md)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .sqShadowSoft()
     }
 
     // MARK: Helpers
@@ -312,8 +343,8 @@ struct SessionDetailView: View {
 
     static func statusColor(_ s: ServingStatus) -> Color {
         switch s {
-        case .identified: return SQColor.brandGreen
-        case .hypothesis: return SQColor.brandOrange
+        case .identified: return SQColor.success
+        case .hypothesis: return SQColor.warning
         case .proximity, .unknown: return SQColor.labelSecondary
         }
     }
@@ -329,10 +360,12 @@ struct SessionDetailView: View {
         return parts.joined(separator: " · ")
     }
 
+    /// Couleur d'opérateur fournie par le backend (donnée, pas décor) ;
+    /// repli neutre si absente ou illisible.
     static func operatorColor(_ hex: String?) -> Color {
-        guard let hex else { return SQColor.brandBlue }
+        guard let hex else { return SQColor.labelSecondary }
         let cleaned = hex.replacingOccurrences(of: "#", with: "")
-        guard let value = UInt32(cleaned, radix: 16) else { return SQColor.brandBlue }
+        guard let value = UInt32(cleaned, radix: 16) else { return SQColor.labelSecondary }
         return Color(hex: value)
     }
 }

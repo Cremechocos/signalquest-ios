@@ -45,12 +45,9 @@ struct ChooseHandleSheet: View {
                             .onChangeCompat(of: input) { _, _ in scheduleCheck() }
                         statusIcon
                     }
-                    .padding(SQSpace.md)
-                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                            .stroke(isNegative ? SQColor.danger : SQColor.separator, lineWidth: 1)
-                    }
+                    .padding(.horizontal, SQSpace.lg)
+                    .frame(minHeight: 48)
+                    .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
                     .sqFadeUp()
 
                     Text(message.isEmpty
@@ -89,7 +86,7 @@ struct ChooseHandleSheet: View {
         case .checking:
             ProgressView()
         case .available:
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.green)
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(SQColor.success)
         case .taken, .invalid, .error, .cooldown:
             Image(systemName: "xmark.circle.fill").foregroundStyle(SQColor.danger)
         case .idle:
@@ -98,7 +95,7 @@ struct ChooseHandleSheet: View {
     }
 
     private var messageColor: Color {
-        if status == .available { return Color.green }
+        if status == .available { return SQColor.success }
         if isNegative { return SQColor.danger }
         return SQColor.labelSecondary
     }

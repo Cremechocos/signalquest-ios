@@ -43,6 +43,8 @@ struct FriendsListView: View {
     @StateObject private var model: FriendsViewModel
     @EnvironmentObject private var services: AppServices
     @State private var showAddFriend = false
+    /// Ami dont on consulte le profil public (push UserProfileView).
+    @State private var profileAuthor: SocialFeedAuthor?
     init(service: FriendsServicing) {
         _model = StateObject(wrappedValue: FriendsViewModel(service: service))
     }
@@ -54,8 +56,9 @@ struct FriendsListView: View {
     var body: some View {
         List {
             if model.isLoading && model.friends.isEmpty && model.requests.isEmpty {
-                ProgressView().frame(maxWidth: .infinity)
+                ProgressView().tint(SQColor.brandRed).frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             } else if isEverythingEmpty && model.errorMessage == nil {
                 EmptyStateView(
                     title: "Aucun ami",
@@ -63,53 +66,82 @@ struct FriendsListView: View {
                     systemImage: "person.2"
                 )
                 .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
             if !model.requests.isEmpty {
-                Section("Demandes") {
+                Section {
                     ForEach(model.requests) { request in
-                        requestRow(request)
-                            .listRowBackground(SQColor.surface)
+                        cardRow { requestRow(request) }
                     }
+                } header: {
+                    sectionHeader("Demandes")
                 }
             }
             Section {
                 ForEach(model.friends) { friend in
-                    friendRow(friend)
-                        .swipeActions {
-                            Button(role: .destructive) { Task { await model.remove(friend) } } label: {
-                                Label("Retirer", systemImage: "person.fill.xmark")
-                            }
+                    Button {
+                        Haptics.light()
+                        profileAuthor = SocialFeedAuthor(
+                            id: friend.userId,
+                            name: friend.name,
+                            handle: friend.handle,
+                            avatarUrl: friend.avatarUrl,
+                            isFriend: true,
+                            isFollowing: nil,
+                            liveRadio: nil
+                        )
+                    } label: {
+                        cardSurface { friendRow(friend) }
+                            .contentShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 5, leading: SQSpace.lg, bottom: 5, trailing: SQSpace.lg))
+                    .swipeActions {
+                        Button(role: .destructive) { Task { await model.remove(friend) } } label: {
+                            Label("Retirer", systemImage: "person.fill.xmark")
                         }
-                        .listRowBackground(SQColor.surface)
+                    }
+                    .accessibilityHint("Ouvre le profil de \(friend.displayName)")
                 }
             } header: {
-                VStack(alignment: .leading, spacing: SQSpace.xs) {
-                    Text("Mon réseau").sqKicker()
-                    Text("Amis (\(model.friends.count))")
-                        .font(SQType.subhead)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
+                sectionHeader("Amis (\(model.friends.count))")
             }
             if !model.blocked.isEmpty {
-                Section("Bloqués") {
+                Section {
                     ForEach(model.blocked) { user in
-                        HStack(spacing: SQSpace.md) {
-                            SQAvatar(url: user.avatarUrl, name: user.displayName)
-                                .opacity(0.55)
-                                .accessibilityHidden(true)
-                            Text(user.displayName)
-                                .font(SQType.body)
-                                .foregroundStyle(SQColor.labelSecondary)
+                        cardRow {
+                            HStack(spacing: SQSpace.md) {
+                                SQAvatar(url: user.avatarUrl, name: user.displayName)
+                                    .opacity(0.55)
+                                    .accessibilityHidden(true)
+                                Text(user.displayName)
+                                    .font(SQType.body)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                Spacer()
+                            }
                         }
-                        .listRowBackground(SQColor.surface)
                     }
+                } header: {
+                    sectionHeader("Bloqués")
                 }
             }
             if let error = model.errorMessage {
-                Section { Text(error).font(.footnote).foregroundStyle(SQColor.danger) }
-                    .listRowBackground(SQColor.danger.opacity(0.10))
+                Section {
+                    Text(error)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.danger)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(SQSpace.md + 2)
+                        .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 5, leading: SQSpace.lg, bottom: 5, trailing: SQSpace.lg))
+                }
             }
         }
+        .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .signalQuestBackground()
         .navigationTitle("Amis")
@@ -127,8 +159,44 @@ struct FriendsListView: View {
                 await model.load()
             }
         }
+        .navigationDestinationItemCompat($profileAuthor) { author in
+            UserProfileView(userId: author.id, prefill: author, service: services.feed)
+        }
+        .onChangeCompat(of: profileAuthor) { _, newValue in
+            // Au retour du profil, l'amitié a pu être retirée ou l'utilisateur
+            // bloqué : on resynchronise la liste.
+            if newValue == nil { Task { await model.load() } }
+        }
         .task { await model.load() }
         .refreshable { await model.load() }
+    }
+
+    /// En-tête de section Figtree, casse normale (plus de MAJUSCULES système).
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(SQType.subhead)
+            .foregroundStyle(SQColor.labelSecondary)
+            .textCase(nil)
+    }
+
+    /// Habillage carte douce seul (surface, rayon 14, ombre repos), sans les
+    /// réglages de rangée de liste — réutilisé par la rangée-bouton des amis
+    /// pour que le press scale s'applique à toute la carte.
+    private func cardSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(.horizontal, SQSpace.md + 2)
+            .padding(.vertical, SQSpace.sm + 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .sqShadowSoft()
+    }
+
+    /// Rangée-carte douce : surface, rayon 14, ombre repos.
+    private func cardRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        cardSurface(content: content)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 5, leading: SQSpace.lg, bottom: 5, trailing: SQSpace.lg))
     }
 
     private func requestRow(_ request: FriendRequest) -> some View {
@@ -140,33 +208,29 @@ struct FriendsListView: View {
                 .foregroundStyle(SQColor.label)
                 .lineLimit(1)
             Spacer(minLength: SQSpace.sm)
-            compactButton("Accepter", style: .primary) { Task { await model.accept(request) } }
-            compactButton("Refuser", style: .ghost) { Task { await model.decline(request) } }
+            compactButton("Accepter", accented: true) { Task { await model.accept(request) } }
+            compactButton("Refuser", accented: false) { Task { await model.decline(request) } }
         }
         .padding(.vertical, SQSpace.xs)
     }
 
-    /// Variante compacte du GradientButton pour les rangées de liste
-    /// (mêmes styles primary / ghost, gabarit capsule réduit).
-    private func compactButton(_ title: String, style: GradientButton.Style, action: @escaping () -> Void) -> some View {
+    /// Petits boutons capsule des rangées : accepter = brique pleine,
+    /// refuser = tuile crème secondaire — sans bordure (règle No-Border).
+    private func compactButton(_ title: String, accented: Bool, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.medium()
             action()
         } label: {
             Text(title)
-                .font(SQFont.archivo(13, .bold, relativeTo: .footnote))
+                .font(SQFont.body(13, .semibold, relativeTo: .footnote))
                 .padding(.horizontal, SQSpace.md)
                 .padding(.vertical, SQSpace.sm)
-                .foregroundStyle(style == .primary ? .white : SQColor.label)
-                .background {
-                    if style == .primary {
-                        Capsule().fill(SQColor.brandRed)
-                    } else {
-                        Capsule().stroke(SQColor.separator, lineWidth: 1.5)
-                    }
-                }
+                .foregroundStyle(accented ? SQColor.onAccent : SQColor.label)
+                .background(accented ? SQColor.brandRed : SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                .padding(.vertical, SQSpace.xs)
+                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SQPressButtonStyle())
     }
 
     private func friendRow(_ friend: Friend) -> some View {
@@ -218,33 +282,56 @@ private struct AddFriendSheet: View {
                     TextField("Nom, handle ou email", text: $query)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                        .listRowBackground(SQColor.surface)
+                        .font(SQType.body)
+                        .foregroundStyle(SQColor.label)
+                        .padding(.horizontal, SQSpace.lg)
+                        .frame(height: 44)
+                        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: SQSpace.lg, bottom: SQSpace.sm, trailing: SQSpace.lg))
                     ForEach(results) { user in
                         HStack(spacing: SQSpace.md) {
                             SQAvatar(url: user.avatarUrl, name: user.displayName, size: 36)
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(user.displayName).foregroundStyle(SQColor.label)
-                                Text(user.email).font(.caption).foregroundStyle(SQColor.labelSecondary)
+                                Text(user.displayName)
+                                    .font(SQType.body)
+                                    .foregroundStyle(SQColor.label)
+                                Text(user.email)
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.labelSecondary)
                             }
                             Spacer()
                             if busyId == user.id {
-                                ProgressView()
+                                ProgressView().tint(SQColor.brandRed)
                             } else {
                                 Button { Task { await send(user) } } label: {
-                                    Image(systemName: "person.badge.plus").foregroundStyle(SQColor.brandRed)
+                                    Image(systemName: "person.badge.plus")
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundStyle(SQColor.brandRed)
+                                        .frame(width: 38, height: 38)
+                                        .background(SQColor.accentSoft, in: Circle())
+                                        .padding(3)
+                                        .contentShape(Rectangle())
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(SQPressButtonStyle())
                                 .accessibilityLabel("Envoyer une demande à \(user.displayName)")
                             }
                         }
                         .listRowBackground(SQColor.surface)
+                        .listRowSeparatorTint(SQColor.separator)
                     }
                     if let errorMessage {
-                        Text(errorMessage).font(.caption).foregroundStyle(SQColor.danger)
+                        Text(errorMessage).font(SQType.caption).foregroundStyle(SQColor.danger)
                             .listRowBackground(Color.clear)
                     }
-                } header: { Text("Ajouter un ami").sqKicker() }
+                } header: {
+                    Text("Résultats")
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .textCase(nil)
+                }
             }
             .scrollContentBackground(.hidden)
             .signalQuestBackground()

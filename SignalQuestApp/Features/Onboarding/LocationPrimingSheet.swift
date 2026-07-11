@@ -16,10 +16,10 @@ struct LocationPrimingSheet: View {
             SQSheetHandle()
             Spacer()
             Image(systemName: isDenied ? "location.slash.fill" : "location.fill.viewfinder")
-                .font(.system(size: 52, weight: .bold))
-                .foregroundStyle(.white)
+                .font(.system(size: 44, weight: .semibold))
+                .foregroundStyle(SQColor.brandRed)
                 .frame(width: 100, height: 100)
-                .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                .background(SQColor.accentSoft, in: Circle())
                 .accessibilityHidden(true)
 
             VStack(spacing: SQSpace.sm) {

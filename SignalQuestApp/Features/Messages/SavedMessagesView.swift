@@ -51,19 +51,11 @@ struct SavedMessagesView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: SQSpace.sm) {
-            Image(systemName: "bookmark")
-                .font(.system(size: 34))
-                .foregroundStyle(SQColor.labelTertiary)
-            Text("Aucun message enregistré")
-                .font(SQType.heading)
-                .foregroundStyle(SQColor.label)
-            Text("Touche longuement un message puis « Enregistrer » pour le retrouver ici.")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(SQSpace.xl)
+        EmptyStateView(
+            title: "Aucun message enregistré",
+            message: "Touche longuement un message puis « Enregistrer » pour le retrouver ici.",
+            systemImage: "bookmark"
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -104,20 +96,21 @@ struct SavedMessagesView: View {
                 Task { await remove(entry) }
             } label: {
                 Image(systemName: "bookmark.slash.fill")
-                    .font(.system(size: 15))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(SQColor.brandRed)
+                    .frame(width: 36, height: 36)
+                    .background(SQColor.accentSoft, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .disabled(removing.contains(message.id))
             .accessibilityLabel("Retirer des enregistrés")
         }
-        .padding(SQSpace.md)
+        .padding(SQSpace.md + 2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1)
-        }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
         .opacity(removing.contains(message.id) ? 0.4 : 1)
     }
 

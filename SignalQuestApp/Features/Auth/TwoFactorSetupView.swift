@@ -63,15 +63,17 @@ struct TwoFactorSetupView: View {
                                 .scaledToFit()
                                 .frame(width: 220, height: 220)
                                 .padding(SQSpace.sm)
-                                .background(Color.white, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                                .background(Color.white, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                                 .accessibilityLabel("QR code de configuration 2FA")
                         }
-                        Text("Secret manuel").sqKicker()
+                        Text("Secret manuel")
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.labelSecondary)
                         Text(setup.secret)
                             .font(.system(.callout, design: .monospaced))
                             .foregroundStyle(SQColor.label)
-                            .padding(.horizontal, SQSpace.md).padding(.vertical, SQSpace.sm)
-                            .background(SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                            .padding(.horizontal, SQSpace.lg).padding(.vertical, SQSpace.sm + 2)
+                            .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
                             .contextMenu {
                                 Button("Copier") { copySecret(setup.secret) }
                             }
@@ -85,11 +87,7 @@ struct TwoFactorSetupView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(SQSpace.xl)
-                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                            .stroke(SQColor.label, lineWidth: 2)
-                    }
+                    .sqSoftCard()
                     .sqAuthAppear(appeared, delay: 0.08)
 
                     VStack(alignment: .leading, spacing: SQSpace.md) {
@@ -99,7 +97,7 @@ struct TwoFactorSetupView: View {
                         TextField("Code TOTP à 6 chiffres", text: $model.code)
                             .keyboardType(.numberPad)
                             .textContentType(.oneTimeCode)
-                            .font(SQFont.display(28, .black))
+                            .font(SQFont.display(28, .bold))
                             .multilineTextAlignment(.center)
                             .textFieldStyle(SQTextFieldStyle())
                         GradientButton("Activer la 2FA", systemImage: "lock.shield.fill", isBusy: model.isBusy) {
@@ -118,11 +116,7 @@ struct TwoFactorSetupView: View {
                         }
                     }
                     .padding(SQSpace.xl)
-                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                            .stroke(SQColor.separator, lineWidth: 1.5)
-                    }
+                    .sqSoftCard()
                     .sqAuthAppear(appeared, delay: 0.14)
                 } else {
                     VStack(spacing: SQSpace.sm + 2) {
@@ -133,17 +127,12 @@ struct TwoFactorSetupView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(SQSpace.xl)
-                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                            .stroke(SQColor.separator, lineWidth: 1.5)
-                    }
+                    .sqSoftCard()
                     .sqAuthAppear(appeared, delay: 0.08)
                 }
             }
             .padding(SQSpace.xl)
         }
-        .background { SQAuthHalo() }
         .signalQuestHeroBackground()
         .onAppear { appeared = true }
         .task { if model.setup == nil { await model.load() } }
@@ -154,17 +143,14 @@ struct TwoFactorSetupView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             Image(systemName: "lock.shield")
-                .font(.title2.weight(.bold))
-                .foregroundStyle(.white)
-                .frame(width: 56, height: 56)
-                .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 46, height: 46)
+                .background(SQColor.accentSoft, in: Circle())
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text("Sécurité").sqKicker()
-                Text("Double authentification")
-                    .font(SQType.display)
-                    .foregroundStyle(SQColor.label)
-            }
+            Text("Double authentification")
+                .font(SQType.display)
+                .foregroundStyle(SQColor.label)
             Text("Scanne le QR avec Authy, Google Authenticator ou 1Password puis valide avec un code généré.")
                 .font(SQType.body)
                 .foregroundStyle(SQColor.labelSecondary)

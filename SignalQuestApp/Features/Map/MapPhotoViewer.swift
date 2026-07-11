@@ -71,10 +71,12 @@ struct MapPhotoViewer: View {
         HStack {
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(.white)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(SQColor.label)
                     .frame(width: 40, height: 40)
                     .background(.ultraThinMaterial, in: Circle())
+                    .background(SQColor.surfaceGlass, in: Circle())
+                    .sqShadowSoft()
             }
             .accessibilityLabel("Fermer")
             Spacer()
@@ -91,17 +93,18 @@ struct MapPhotoViewer: View {
             if let caption = photo?.displayCaption, !caption.isEmpty, caption != "Photo SignalQuest" {
                 Text(caption)
                     .font(SQFont.body(14, .regular))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
             }
             actionRow
-            Divider().overlay(Color.white.opacity(0.12))
+            Divider().overlay(SQColor.separator)
             commentsSection
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.ultraThinMaterial)
-        .clipShape(.rect(topLeadingRadius: 22, topTrailingRadius: 22))
+        .background(SQColor.surfaceGlass)
+        .clipShape(.rect(topLeadingRadius: SQRadius.xl, topTrailingRadius: SQRadius.xl))
         .offset(y: appeared ? 0 : 40)
         .opacity(appeared ? 1 : 0)
     }
@@ -109,21 +112,21 @@ struct MapPhotoViewer: View {
     private var header: some View {
         HStack(spacing: SQSpace.sm) {
             if let operatorName {
-                Text(operatorName.uppercased())
-                    .font(SQFont.archivo(12, .bold))
-                    .foregroundStyle(.white)
+                Text(operatorName)
+                    .font(SQFont.body(12, .semibold))
+                    .foregroundStyle(SQColor.onAccent)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(operatorAccent(operatorName), in: Capsule())
+                    .background(operatorAccent(operatorName), in: Capsule(style: .continuous))
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(siteTitle)
-                    .font(SQFont.archivo(15, .bold))
-                    .foregroundStyle(.white)
+                    .font(SQFont.display(15, .semibold))
+                    .foregroundStyle(SQColor.label)
                 if let subtitle = siteSubtitle {
                     Text(subtitle)
                         .font(SQFont.body(12, .regular))
-                        .foregroundStyle(.white.opacity(0.65))
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
             }
             Spacer()
@@ -154,11 +157,11 @@ struct MapPhotoViewer: View {
                 HStack(spacing: 6) {
                     Image(systemName: liked ? "heart.fill" : "heart")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(liked ? SQColor.brandRed : .white)
+                        .foregroundStyle(liked ? SQColor.like : SQColor.label)
                         .symbolEffectBounceCompat(value: liked)
                     Text("\(likeCount)")
                         .font(SQFont.archivo(14, .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(SQColor.label)
                         .contentTransition(.numericText())
                 }
             }
@@ -172,7 +175,7 @@ struct MapPhotoViewer: View {
                     .font(SQFont.archivo(14, .semibold))
                     .contentTransition(.numericText())
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(SQColor.label)
 
             Spacer()
         }
@@ -183,11 +186,11 @@ struct MapPhotoViewer: View {
     private var commentsSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             if isLoading {
-                ProgressView().tint(.white).frame(maxWidth: .infinity)
+                ProgressView().tint(SQColor.label).frame(maxWidth: .infinity)
             } else if comments.isEmpty {
                 Text("Soyez le premier à commenter")
                     .font(SQFont.body(13, .regular))
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(SQColor.labelSecondary)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: SQSpace.sm) {
@@ -206,17 +209,17 @@ struct MapPhotoViewer: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
                 Text(comment.userName ?? "Membre")
-                    .font(SQFont.archivo(13, .bold))
-                    .foregroundStyle(.white)
+                    .font(SQFont.body(13, .semibold))
+                    .foregroundStyle(SQColor.label)
                 if let date = comment.createdAt {
                     Text(date.formatted(.relative(presentation: .numeric)))
                         .font(SQFont.body(11, .regular))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(SQColor.labelTertiary)
                 }
             }
             Text(comment.content ?? "")
                 .font(SQFont.body(13, .regular))
-                .foregroundStyle(.white.opacity(0.85))
+                .foregroundStyle(SQColor.labelSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -225,24 +228,26 @@ struct MapPhotoViewer: View {
         HStack(spacing: SQSpace.sm) {
             TextField("Ajouter un commentaire…", text: $commentDraft, axis: .vertical)
                 .font(SQFont.body(14, .regular))
-                .foregroundStyle(.white)
+                .foregroundStyle(SQColor.label)
                 .tint(SQColor.brandRed)
                 .focused($commentFocused)
                 .lineLimit(1...3)
                 .padding(.horizontal, SQSpace.md)
                 .padding(.vertical, SQSpace.sm)
-                .background(.white.opacity(0.1), in: Capsule())
+                .frame(minHeight: 44)
+                .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
 
             Button {
                 Task { await sendComment() }
             } label: {
                 Image(systemName: "paperplane.fill")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 38, height: 38)
-                    .background(canSend ? SQColor.brandRed : Color.white.opacity(0.18), in: Circle())
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(canSend ? SQColor.onAccent : SQColor.labelTertiary)
+                    .frame(width: 44, height: 44)
+                    .background(canSend ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surfaceMuted), in: Circle())
             }
             .disabled(!canSend || sendingComment)
+            .accessibilityLabel("Envoyer le commentaire")
         }
     }
 

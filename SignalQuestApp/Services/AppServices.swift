@@ -24,6 +24,7 @@ final class AppServices: ObservableObject {
     let e2ee: E2EEServicing
     let friends: FriendsServicing
     let gamification: GamificationServicing
+    let gamificationV2: GamificationV2Servicing
     let notifications: NotificationsServicing
     let calls: CallsServicing
     let users: UserServicing
@@ -73,6 +74,7 @@ final class AppServices: ObservableObject {
         identify = IdentifyService(api: api)
         friends = FriendsService(api: api)
         gamification = GamificationService(api: api)
+        gamificationV2 = GamificationV2Service(api: api)
         notifications = NotificationsService(api: api)
         let callsService = CallsService(api: api)
         calls = callsService

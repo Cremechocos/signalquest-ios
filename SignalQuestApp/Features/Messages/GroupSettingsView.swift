@@ -48,7 +48,7 @@ struct GroupSettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Groupe") {
+                Section {
                     HStack(spacing: SQSpace.md) {
                         if isAdmin {
                             adminAvatarPicker
@@ -56,21 +56,29 @@ struct GroupSettingsView: View {
                             groupAvatar
                         }
                         TextField("Nom du groupe", text: $title)
+                            .font(SQType.body)
+                            .foregroundStyle(SQColor.label)
                             .onSubmit { Task { await rename() } }
                     }
+                } header: {
+                    sectionHeader("Groupe")
                 }
+                .listRowBackground(SQColor.surface)
+                .listRowSeparatorTint(SQColor.separator)
 
-                Section("Membres (\(participants.count))") {
+                Section {
                     ForEach(participants) { participant in
                         HStack {
                             SQAvatar(url: participant.user.avatarUrl, name: participant.user.displayName, size: 34)
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading) {
                                 Text(participant.user.displayName)
+                                    .font(SQType.body)
+                                    .foregroundStyle(SQColor.label)
                                 if participant.role == "admin" {
                                     Text("Admin")
                                         .font(SQType.micro)
-                                        .foregroundStyle(SQColor.brandOrange)
+                                        .foregroundStyle(SQColor.brandRed)
                                 }
                             }
                             Spacer()
@@ -97,11 +105,17 @@ struct GroupSettingsView: View {
                             }
                         }
                     }
+                } header: {
+                    sectionHeader("Membres (\(participants.count))")
                 }
+                .listRowBackground(SQColor.surface)
+                .listRowSeparatorTint(SQColor.separator)
 
                 if isAdmin {
-                    Section("Ajouter des membres") {
+                    Section {
                         TextField("Nom, handle ou email", text: $searchQuery)
+                            .font(SQType.body)
+                            .foregroundStyle(SQColor.label)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                         ForEach(searchResults.filter { result in !participants.contains(where: { $0.userId == result.id }) }) { user in
@@ -112,14 +126,20 @@ struct GroupSettingsView: View {
                                     SQAvatar(url: user.avatarUrl, name: user.displayName, size: 34)
                                         .accessibilityHidden(true)
                                     Text(user.displayName)
+                                        .font(SQType.body)
+                                        .foregroundStyle(SQColor.label)
                                     Spacer()
                                     Image(systemName: "plus.circle")
-                                        .foregroundStyle(SQColor.brandGreen)
+                                        .foregroundStyle(SQColor.success)
                                         .accessibilityHidden(true)
                                 }
                             }
                         }
+                    } header: {
+                        sectionHeader("Ajouter des membres")
                     }
+                    .listRowBackground(SQColor.surface)
+                    .listRowSeparatorTint(SQColor.separator)
                 }
 
                 Section {
@@ -127,11 +147,15 @@ struct GroupSettingsView: View {
                         confirmLeave = true
                     } label: {
                         Label("Quitter le groupe", systemImage: "rectangle.portrait.and.arrow.right")
+                            .font(SQType.body.weight(.medium))
+                            .foregroundStyle(SQColor.danger)
                     }
                 }
+                .listRowBackground(SQColor.dangerSoft)
 
                 if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(SQColor.danger) }
+                    Section { Text(errorMessage).font(SQType.caption).foregroundStyle(SQColor.danger) }
+                        .listRowBackground(SQColor.dangerSoft)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -140,7 +164,7 @@ struct GroupSettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Fermer") { dismiss() }.tint(SQColor.brandOrange)
+                    Button("Fermer") { dismiss() }.tint(SQColor.brandRed)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     if isBusy { ProgressView() }
@@ -160,6 +184,14 @@ struct GroupSettingsView: View {
                 Task { await uploadPhoto(item: newValue) }
             }
         }
+    }
+
+    /// En-tête de section : Figtree casse normale (pas de majuscules trackées).
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(SQType.subhead)
+            .foregroundStyle(SQColor.labelSecondary)
+            .textCase(nil)
     }
 
     private func search() async {
@@ -251,7 +283,7 @@ struct GroupSettingsView: View {
                         .foregroundStyle(SQColor.label)
                         .padding(5)
                         .background(SQColor.surface, in: Circle())
-                        .overlay { Circle().stroke(SQColor.bg, lineWidth: 2) }
+                        .sqShadowSoft()
                         .accessibilityHidden(true)
                 }
                 .opacity(isBusy && pickedPreview != nil ? 0.6 : 1)

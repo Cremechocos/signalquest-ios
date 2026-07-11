@@ -76,11 +76,7 @@ struct ForgotPasswordView: View {
                     }
                 }
                 .padding(SQSpace.xl)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                        .stroke(SQColor.label, lineWidth: 2)
-                }
+                .sqSoftCard()
                 .sqAuthAppear(appeared, delay: 0.08)
 
                 Button("Retour à la connexion") { dismiss() }
@@ -92,7 +88,6 @@ struct ForgotPasswordView: View {
             }
             .padding(SQSpace.xl)
         }
-        .background { SQAuthHalo() }
         .signalQuestHeroBackground()
         .onAppear { appeared = true }
         .navigationBarTitleDisplayMode(.inline)
@@ -108,17 +103,14 @@ struct ForgotPasswordView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             Image(systemName: "key.horizontal.fill")
-                .font(.title2.weight(.bold))
-                .foregroundStyle(.white)
-                .frame(width: 56, height: 56)
-                .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 46, height: 46)
+                .background(SQColor.accentSoft, in: Circle())
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text("Récupération").sqKicker()
-                Text("Mot de passe oublié ?")
-                    .font(SQType.display)
-                    .foregroundStyle(SQColor.label)
-            }
+            Text("Mot de passe oublié ?")
+                .font(SQType.display)
+                .foregroundStyle(SQColor.label)
         }
         .padding(.top, SQSpace.xxxl + SQSpace.xs)
     }

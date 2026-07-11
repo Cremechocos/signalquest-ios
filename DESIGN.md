@@ -1,56 +1,63 @@
 ---
-name: SignalQuest Apple
-description: Un carnet de terrain éditorial pour mesurer, comprendre et partager le réseau.
+name: SignalQuest Crème
+description: Un compagnon réseau chaleureux — mesurer, comprendre et partager le signal, avec la douceur d'un carnet crème.
 colors:
-  signal-red: "#E2001A"
-  signal-red-deep: "#C00017"
-  signal-red-dark: "#FF414F"
-  field-paper: "#F4F0E6"
-  field-paper-secondary: "#ECE7D8"
-  field-surface: "#FBF9F3"
-  field-raised: "#FFFFFF"
-  field-ink: "#18150F"
-  field-ink-secondary: "#3A352B"
-  field-separator: "#C4BCA6"
-  night-paper: "#100E0A"
-  night-surface: "#26221A"
-  night-ink: "#F3EFE3"
-  info: "#1D4ED8"
-  success: "#16A34A"
-  warning: "#E8590C"
+  brique: "#B04A3C"
+  brique-pressed: "#963D31"
+  brique-dark: "#D97A66"
+  creme: "#F3EDE2"
+  creme-secondary: "#EDE5D5"
+  creme-surface: "#FBF7EF"
+  creme-raised: "#FFFFFF"
+  encre: "#332818"
+  encre-secondary: "#8D7C64"
+  encre-tertiary: "#C0B098"
+  separator: "#E5DCC9"
+  nuit: "#191410"
+  nuit-surface: "#262019"
+  nuit-muted: "#332B20"
+  nuit-encre: "#F2EAD9"
+  olive: "#7E8C5C"
+  olive-dark: "#A3B37A"
+  ambre: "#C08A3E"
+  danger: "#C13B2C"
 typography:
   display:
-    fontFamily: "Archivo Expanded, SF Pro Display, sans-serif"
-    fontSize: "34pt"
-    fontWeight: 900
-    lineHeight: 1.05
-    letterSpacing: "-0.02em"
+    fontFamily: "Bricolage Grotesque, SF Pro Display, sans-serif"
+    fontSize: "26pt"
+    fontWeight: 700
+    lineHeight: 1.1
   title:
-    fontFamily: "Archivo Expanded, SF Pro Display, sans-serif"
-    fontSize: "22pt"
+    fontFamily: "Bricolage Grotesque, SF Pro Display, sans-serif"
+    fontSize: "24pt"
     fontWeight: 700
     lineHeight: 1.15
   headline:
-    fontFamily: "Archivo, SF Pro Text, sans-serif"
-    fontSize: "17pt"
+    fontFamily: "Bricolage Grotesque, SF Pro Text, sans-serif"
+    fontSize: "16.5pt"
     fontWeight: 600
     lineHeight: 1.25
   body:
-    fontFamily: "Public Sans, SF Pro Text, sans-serif"
-    fontSize: "16pt"
-    fontWeight: 400
-    lineHeight: 1.4
-  label:
-    fontFamily: "Archivo, SF Pro Text, sans-serif"
+    fontFamily: "Figtree, SF Pro Text, sans-serif"
     fontSize: "15pt"
-    fontWeight: 700
+    fontWeight: 400
+    lineHeight: 1.45
+  label:
+    fontFamily: "Figtree, SF Pro Text, sans-serif"
+    fontSize: "15pt"
+    fontWeight: 600
     lineHeight: 1.2
+  caption:
+    fontFamily: "Figtree, SF Pro Text, sans-serif"
+    fontSize: "13pt"
+    fontWeight: 400
+    lineHeight: 1.35
 rounded:
-  sm: "4pt"
-  md: "6pt"
-  lg: "8pt"
-  xl: "10pt"
-  xxl: "12pt"
+  sm: "10pt"
+  md: "14pt"
+  lg: "20pt"
+  xl: "22pt"
+  xxl: "26pt"
   pill: "999pt"
 spacing:
   xxs: "2pt"
@@ -64,158 +71,153 @@ spacing:
   huge: "40pt"
 components:
   button-primary:
-    backgroundColor: "{colors.signal-red}"
-    textColor: "{colors.field-raised}"
-    typography: "{typography.label}"
-    rounded: "{rounded.sm}"
-    padding: "15pt 16pt"
-    height: "50pt"
-  button-secondary:
-    backgroundColor: "{colors.field-surface}"
-    textColor: "{colors.field-ink}"
-    typography: "{typography.label}"
-    rounded: "{rounded.sm}"
-    padding: "15pt 16pt"
-    height: "50pt"
-  card:
-    backgroundColor: "{colors.field-surface}"
-    textColor: "{colors.field-ink}"
-    rounded: "{rounded.xl}"
-    padding: "16pt"
-  chip:
-    backgroundColor: "{colors.field-paper-secondary}"
-    textColor: "{colors.field-ink}"
+    backgroundColor: "{colors.encre}"
+    textColor: "{colors.creme-surface}"
+    typography: "{typography.headline}"
     rounded: "{rounded.pill}"
-    padding: "8pt 12pt"
+    padding: "16pt 24pt"
+    height: "56pt"
+  button-accent:
+    backgroundColor: "{colors.brique}"
+    textColor: "{colors.creme-surface}"
+    typography: "{typography.headline}"
+    rounded: "{rounded.pill}"
+    height: "56pt"
+  card:
+    backgroundColor: "{colors.creme-surface}"
+    textColor: "{colors.encre}"
+    rounded: "{rounded.xl}"
+    padding: "18pt"
+    shadow: "0 4pt 18pt rgba(51,40,24,0.06)"
+  chip:
+    backgroundColor: "{colors.creme-surface}"
+    textColor: "{colors.encre}"
+    rounded: "{rounded.pill}"
+    padding: "8pt 13pt"
+  tile:
+    backgroundColor: "{colors.creme-secondary}"
+    rounded: "{rounded.md}"
+    padding: "10pt 12pt"
 ---
 
-# Design System: SignalQuest Apple
+# Design System : SignalQuest Crème
 
 ## Overview
 
-**Creative North Star: "Le Carnet de terrain"**
+**Creative North Star : « Le compagnon de terrain »**
 
-SignalQuest ressemble à un carnet de mesure contemporain : précis, lisible en extérieur et enrichi par la communauté. La structure reste familière à un utilisateur Apple ; l'identité apparaît dans la typographie éditoriale, le rouge de signal et une hiérarchie de surfaces inspirée du papier plutôt que dans des effets décoratifs.
+SignalQuest devient un outil chaleureux et accueillant : un fond crème, des surfaces douces qui flottent sans bordures, des capsules généreuses et une brique terreuse pour l'action. La précision de la mesure reste au premier plan, mais elle est portée par la rondeur et la lumière plutôt que par des filets et des majuscules.
 
-La densité varie avec l'intention. Les actions et conclusions sont immédiates ; les métriques radio détaillées se déploient ensuite. L'interface refuse les tableaux de bord télécom saturés, le glassmorphism décoratif, les grilles de cartes imbriquées et les contrôles non natifs.
+La densité reste progressive : une action évidente par écran, les métriques détaillées ensuite. L'interface refuse les tableaux de bord saturés, les bordures systématiques, le glassmorphism décoratif et les contrôles non natifs.
 
-**Key Characteristics:**
+**Key Characteristics :**
 
-- Une action principale évidente par contexte.
-- Des surfaces tonales nettes et peu d'ombres.
-- Une typographie expressive pour les titres, discrète pour l'interface.
-- Des états de chargement, hors ligne, vide et erreur aussi soignés que l'état nominal.
-- Des transitions de 150 à 250 ms qui expliquent un changement d'état.
+- Beige crème comme couleur principale ; la brique est rare et signifiante.
+- Zéro bordure sur les cartes : la hiérarchie vient des tons et d'ombres très courtes.
+- Capsules (pill) pour tout ce qui se touche : boutons, chips, champs, dock.
+- Icônes SF Symbols posées dans des pastilles circulaires teintées.
+- Titres Bricolage Grotesque ronds et affirmés ; corps Figtree calme.
+- Clair et sombre au même niveau de soin (le sombre est brun chaud, jamais gris).
 
 ## Colors
 
-La palette associe un rouge franc à des neutres de terrain chauds, avec des couleurs sémantiques réservées aux données et aux états.
-
 ### Primary
 
-- **Rouge Signal** : action principale, sélection active et moments de contribution. Sa rareté maintient sa force.
-- **Rouge Signal profond** : état pressé ou accent de contraste ; jamais comme grande surface décorative.
+- **Brique** (`#B04A3C`, sombre `#D97A66`) : action principale, sélection active, badges non-lus, tuile Tester, bulles sortantes. Une grande surface brique par écran maximum.
+- **Brique pressée** (`#963D31`) : état pressé uniquement.
+- Teinte douce : brique à 12 % d'alpha (18 % en sombre) pour pastilles d'icônes, pilule active du dock, tags.
 
 ### Secondary
 
-- **Bleu Information** : information non destructive et catégories radio quand le rouge signifierait une action.
-- **Vert Validation** : succès confirmé et qualité positive, jamais simple décoration.
-- **Orange Alerte** : avertissement et attention non bloquante.
+- **Olive** (`#7E8C5C`, sombre `#A3B37A`) : succès, état « Stable », validations, phases terminées.
+- **Ambre** (`#C08A3E`) : avertissements.
+- **Danger** (`#C13B2C`) : destructif — distinct de la brique par sa vivacité et toujours accompagné d'un libellé.
 
 ### Neutral
 
-- **Papier de terrain** : arrière-plan principal clair.
-- **Papier secondaire** : regroupement structurel, filtres inactifs et séparations tonales.
-- **Surface de lecture** : contenu élevé d'un niveau sans effet de verre.
-- **Encre terrain** : texte principal ; l'encre secondaire reste suffisamment contrastée pour le corps.
-- **Papier nocturne** et **surface nocturne** : équivalents sombres, déclenchés par l'apparence système.
+- **Crème** (`#F3EDE2` / nuit `#191410`) : fond principal.
+- **Surface** (`#FBF7EF` / `#262019`) : cartes, dock, sheets.
+- **Crème secondaire** (`#EDE5D5` / `#332B20`) : tuiles internes, tracks de jauges, champs de saisie.
+- **Encre** (`#332818` / `#F2EAD9`) : texte principal, bouton primaire.
 
-**The Signal Rule.** Le rouge sert aux actions primaires, à la sélection et aux états critiques ; il ne colore jamais tous les éléments d'un écran.
+**The Brique Rule.** La brique signale l'action et la sélection ; elle ne colore jamais tout un écran. Quand tout est important, rien ne l'est.
 
-**The Meaning Rule.** Une couleur de technologie, d'opérateur ou d'état conserve la même signification sur la carte, les mesures, les classements et le social.
+**The Meaning Rule.** Une couleur de technologie, d'opérateur ou d'état garde la même signification sur la carte, les mesures, les classements et le social.
 
 ## Typography
 
-**Display Font:** Archivo Expanded (repli SF Pro Display)
+**Display Font :** Bricolage Grotesque (repli SF Pro Display)
 
-**Body Font:** Public Sans (repli SF Pro Text)
+**Body Font :** Figtree (repli SF Pro Text)
 
-**Label Font:** Archivo (repli SF Pro Text)
-
-**Character:** Archivo Expanded donne aux titres une autorité éditoriale ; Archivo rend les contrôles nets ; Public Sans garde les explications calmes et lisibles. Tous les rôles utilisent Dynamic Type et retombent sur les polices système si les fontes embarquées manquent.
+**Character :** Bricolage donne aux titres et aux chiffres une rondeur confiante ; Figtree garde l'interface légère et lisible. Casse normale partout — plus de micro-labels majuscules tracés. Dynamic Type respecté via les styles relatifs.
 
 ### Hierarchy
 
-- **Display** (Black, 34 pt, interligne 1,05) : titre principal d'une vue ou résultat marquant, jamais label de contrôle.
-- **Title** (Bold, 22 pt, interligne 1,15) : sections majeures et feuilles de détail.
-- **Headline** (Semibold, 17 pt, interligne 1,25) : titres de groupes et cartes.
-- **Body** (Regular, 16 pt, interligne 1,4) : explications et contenu, avec une largeur de lecture limitée à environ 70 caractères.
-- **Label** (Bold, 15 pt, interligne 1,2) : boutons et contrôles. Les micro-labels en capitales restent exceptionnels.
-
-**The One Display Rule.** Un seul niveau Archivo Expanded domine un écran ; les contrôles, listes et données restent en Archivo ou Public Sans.
+- **Display** (Bold 26, interligne 1.1) : salutation, titres d'écran.
+- **Title** (Bold 24) : sections majeures, sheets.
+- **Headline** (SemiBold 16.5) : cartes, tuiles, boutons.
+- **Chiffres** (Bold 20–58) : métriques — 58 pt au centre du cadran, 30 pt dernière mesure, 22 pt stats.
+- **Body** (Regular 15 / 1.45) : contenu.
+- **Caption** (Regular 12.5–13.5) : sous-titres, horodatages.
 
 ## Elevation
 
-Le système est tonal par défaut. Les différences entre papier, surface et surface élevée portent la hiérarchie ; les séparateurs de 1 pt structurent les listes. Les ombres sont réservées aux éléments réellement flottants — chrome de carte, popover, feuille détachée — et restent courtes. Le Liquid Glass natif peut servir au chrome interactif sur iOS 26, jamais comme langage universel des cartes.
+Le système remplace les bordures par des ombres chaudes très courtes :
 
-### Shadow Vocabulary
+- **Repos** (`0 2pt 8pt rgba(51,40,24,0.05)`) : chips, petites tuiles.
+- **Carte** (`0 4pt 18pt rgba(51,40,24,0.06)`) : toutes les cartes de contenu.
+- **Accent** (`0 8pt 22pt brique@28%`) : uniquement sous les surfaces brique.
+- **Dock flottant** (`0 10pt 30pt rgba(51,40,24,0.14)`) : dock, sheets détachées.
 
-- **Chrome flottant** (`0 6pt 12pt rgba(0,0,0,0.12)`) : contrôles superposés à une carte ou une image.
-- **Feedback accentué** (`0 4pt 8pt rgba(226,0,26,0.20)`) : état transitoire d'une action principale, jamais au repos.
-
-**The Flat-by-default Rule.** Une carte de contenu ordinaire utilise une surface tonale ou un séparateur, pas une ombre diffuse.
+**The No-Border Rule.** Une carte n'a jamais à la fois ombre et bordure. La seule bordure du système : la rangée « moi » des classements (brique 1.5 pt sur fond teinté).
 
 ## Components
 
 ### Buttons
 
-- **Shape:** géométrie nette et continue (rayon 4 pt), zone tactile minimale de 44 pt et hauteur nominale de 50 pt.
-- **Primary:** fond Rouge Signal, libellé Archivo Bold blanc, une seule action primaire visible par groupe.
-- **Hover / Focus:** feedback natif, réduction d'échelle légère au press et contour d'accessibilité système ; aucune animation si Reduce Motion est actif.
-- **Secondary / Ghost:** surface claire avec contour Encre terrain, ou fond transparent avec séparateur discret.
+- Capsules, hauteur 56 pt, zone tactile ≥ 44 pt, libellé Bricolage SemiBold 16.
+- **Primary** : fond encre, texte crème. **Action en cours / stop** : fond brique.
+- **Secondary** : fond surface + ombre repos, texte encre. **Destructif** : texte danger sur teinte danger 10 %.
+- Press : scale 0.97, 160 ms ; aucun effet si Reduce Motion.
 
 ### Chips
 
-- **Style:** capsule compacte, fond Papier secondaire, libellé Archivo et icône SF Symbol.
-- **State:** sélection Rouge Signal avec contraste AA ; l'état ne dépend jamais de la couleur seule.
+- Capsules Figtree 600 12–13 pt ; inactif surface + ombre repos, actif brique plein texte crème. Jamais de bordure, jamais de majuscules.
 
 ### Cards / Containers
 
-- **Corner Style:** rayon de 8 à 10 pt.
-- **Background:** Surface de lecture ou regroupement tonal.
-- **Shadow Strategy:** aucune ombre au repos ; chrome flottant uniquement selon la règle d'élévation.
-- **Border:** séparateur 1 pt lorsque le contraste tonal ne suffit pas.
-- **Internal Padding:** 16 pt, avec 12 pt entre groupes proches.
+- Rayon 22 pt continu, fond surface, padding 18 pt, ombre carte. Tuiles internes : crème secondaire, rayon 14, sans ombre.
 
-### Inputs / Fields
+### Inputs
 
-- **Style:** surface de lecture, rayon 8 pt, libellé explicite et zone tactile de 44 pt minimum.
-- **Focus:** comportement iOS natif et teinte Rouge Signal.
-- **Error / Disabled:** message adjacent localisé, couleur sémantique plus icône/texte ; jamais une bordure rouge sans explication.
+- Capsules 44 pt, fond crème secondaire, sans bordure ; focus par teinte brique native.
 
 ### Navigation
 
-La navigation utilise `NavigationStack`, les titres système et une barre d'onglets adaptative. Les cinq destinations produit sont Accueil, Carte, Tester, Communauté et Profil ; Messages est une destination de Communauté. Sur iPad, les composants s'adaptent à la largeur disponible et à Split View sans agrandir artificiellement la typographie.
+- **Dock flottant** : capsule surface à 95 % + blur, marges 16 pt, 14 pt du bas, ombre dock. Item actif : pilule teintée brique 12 % + icône/libellé brique ; inactifs bruns discrets. Icônes 22 pt, libellés 9.5 pt.
+- Destinations : Accueil, Carte, Tester, Communauté, Profil. Messages et Classements sont des pushes.
+- Le dock disparaît en conversation (composer au clavier).
 
-### Measurement Summary
+### Measurement Dial
 
-Le résumé de mesure présente d'abord conclusion, technologie et trois métriques essentielles. Les identifiants radio, bandes, cellules et détails serveur sont disponibles dans une section progressive dédiée.
+- Arc 270° (départ 135°), track 22 pt bouts ronds crème secondaire, remplissage brique, disque central surface. Valeur Bricolage 58, phase en Figtree 12, badge d'état en capsule teintée.
 
 ## Do's and Don'ts
 
-### Do:
+### Do :
 
-- **Do** utiliser les tokens `SQColor`, `SQFont`, `SQSpace`, `SQRadius` et `SQMotion` plutôt que des valeurs locales.
-- **Do** conserver une zone tactile d'au moins 44 pt et tester Dynamic Type, VoiceOver et Reduce Motion.
-- **Do** afficher skeleton, état vide pédagogique, hors ligne, erreur et confirmation persistée pour chaque flux réseau.
-- **Do** utiliser des patterns Apple standards avant de créer un composant spécifique.
-- **Do** réserver les données expertes à une divulgation progressive.
+- **Do** passer par les tokens (`SQColor`, `SQFont`, `SQRadius`, `SQSpace`, `SQMotion`) — aucune valeur locale.
+- **Do** poser les icônes SF Symbols dans des pastilles circulaires teintées.
+- **Do** garder une seule grande surface brique par écran.
+- **Do** soigner squelettes, états vides, hors ligne et erreurs dans le même langage (formes arrondies, tons crème).
+- **Do** tester Dynamic Type, VoiceOver, Reduce Motion et le mode sombre brun.
 
-### Don't:
+### Don't :
 
-- **Don't** construire un tableau de bord télécom saturé de métriques, néons et jargon dès le premier écran.
-- **Don't** utiliser du glassmorphism décoratif, des gradients omniprésents ou une large ombre avec une bordure sur la même carte.
-- **Don't** empiler des grilles de cartes identiques ou imbriquer une carte dans une carte sans relation structurelle réelle.
-- **Don't** confirmer une sauvegarde, un consentement ou une suppression avant la réponse serveur.
-- **Don't** réinventer boutons, navigation, menus, alertes ou champs lorsqu'un contrôle Apple standard convient.
-- **Don't** utiliser une couleur seule pour communiquer qualité, sélection, erreur ou abonnement.
+- **Don't** ajouter des bordures aux cartes ou aux chips (règle No-Border).
+- **Don't** réintroduire majuscules trackées, kickers rouges ou coins nets.
+- **Don't** utiliser la brique en grand aplat décoratif ou sur plusieurs éléments concurrents.
+- **Don't** empiler carte dans carte sans relation structurelle.
+- **Don't** confirmer une action avant la réponse serveur.
+- **Don't** réinventer un contrôle quand un composant Apple standard convient.

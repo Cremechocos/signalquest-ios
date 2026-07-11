@@ -1,32 +1,37 @@
 import SwiftUI
 
+/// Carte douce de la DA « Crème & Terre cuite » : fond `SurfaceElevated`,
+/// rayon 22 continu, ombre carte chaude. Ni bordure, ni glassmorphism.
+/// (Nom historique conservé — c'était le conteneur « glass » de l'ancienne DA.)
 struct GlassCard<Content: View>: View {
     private let cornerRadius: CGFloat
     private let padding: CGFloat
-    private let variant: SQGlassBackground.Variant
     private let content: Content
 
     init(
         cornerRadius: CGFloat = SQRadius.xl,
-        padding: CGFloat = SQSpace.lg,
+        padding: CGFloat = SQSpace.lg + 2,
         variant: SQGlassBackground.Variant = .regular,
         @ViewBuilder content: () -> Content
     ) {
         self.cornerRadius = cornerRadius
         self.padding = padding
-        self.variant = variant
         self.content = content()
     }
 
     var body: some View {
         content
             .padding(padding)
-            .sqGlass(variant, cornerRadius: cornerRadius)
+            .background(
+                SQColor.surface,
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+            .sqShadowCard()
     }
 }
 
 struct GradientButton: View {
-    enum Style { case primary, secondary, ghost }
+    enum Style { case primary, secondary, ghost, accent, destructive }
 
     let title: String
     let systemImage: String?
@@ -59,9 +64,10 @@ struct GradientButton: View {
         self.init(title, systemImage: systemImage, isBusy: isBusy, style: isProminent ? .primary : .secondary, action: action)
     }
 
-    // Boutons éditoriaux : rouge plein (primary), encre-outline (secondary),
-    // simple (ghost). Coins nets (radius 4), libellé Archivo Bold, hauteur 50
-    // comme `.btn` de la landing.
+    // Boutons « Crème & Terre cuite » : capsules hauteur 56, libellé Bricolage
+    // SemiBold 16. Primaire = encre pleine ; accent (action en cours / stop) =
+    // brique ; secondaire = surface + ombre repos ; destructif = texte danger
+    // sur teinte danger. Aucune bordure.
     var body: some View {
         Button {
             Haptics.medium()
@@ -72,7 +78,7 @@ struct GradientButton: View {
                     ProgressView().tint(foreground)
                 } else if let systemImage {
                     Image(systemName: systemImage)
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: 16, weight: .semibold))
                 }
                 Text(title)
                     .font(SQType.button)
@@ -80,13 +86,10 @@ struct GradientButton: View {
                     .minimumScaleFactor(0.82)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, SQSpace.md + 3)
+            .frame(minHeight: 56)
             .foregroundStyle(foreground)
-            .background(background, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                    .stroke(borderColor, lineWidth: borderWidth)
-            }
+            .background(background, in: Capsule(style: .continuous))
+            .modifier(GradientButtonShadow(style: style))
         }
         .disabled(isBusy)
         .buttonStyle(SQPressButtonStyle())
@@ -94,38 +97,44 @@ struct GradientButton: View {
 
     private var foreground: Color {
         switch style {
-        case .primary: return .white
+        case .primary: return SQColor.onInk
+        case .accent: return SQColor.onAccent
         case .secondary, .ghost: return SQColor.label
+        case .destructive: return SQColor.danger
         }
     }
 
     private var background: AnyShapeStyle {
         switch style {
-        case .primary: return AnyShapeStyle(SQColor.brandRed)
+        case .primary: return AnyShapeStyle(SQColor.label)
+        case .accent: return AnyShapeStyle(SQColor.brandRed)
         case .secondary: return AnyShapeStyle(SQColor.surface)
         case .ghost: return AnyShapeStyle(Color.clear)
-        }
-    }
-
-    private var borderColor: Color {
-        switch style {
-        case .primary: return .clear
-        case .secondary: return SQColor.label
-        case .ghost: return SQColor.separator
-        }
-    }
-
-    private var borderWidth: CGFloat {
-        switch style {
-        case .primary: return 0
-        case .secondary: return 2   // bordure 2px encre, signature éditoriale
-        case .ghost: return 1
+        case .destructive: return AnyShapeStyle(SQColor.dangerSoft)
         }
     }
 }
 
-/// Léger enfoncement au tap (la landing fait un translateY au hover ; sur
-/// mobile on traduit par un petit scale).
+/// Ombre portée par style de bouton : encre sous le primaire, brique sous
+/// l'accent, repos sous le secondaire, rien sous ghost/destructif.
+private struct GradientButtonShadow: ViewModifier {
+    let style: GradientButton.Style
+
+    func body(content: Content) -> some View {
+        switch style {
+        case .primary:
+            content.shadow(color: SQColor.shadowDock, radius: 12, x: 0, y: 10)
+        case .accent:
+            content.sqShadowAccent()
+        case .secondary:
+            content.sqShadowSoft()
+        case .ghost, .destructive:
+            content
+        }
+    }
+}
+
+/// Léger enfoncement au tap (press = scale 0.97, 160 ms).
 struct SQPressButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {

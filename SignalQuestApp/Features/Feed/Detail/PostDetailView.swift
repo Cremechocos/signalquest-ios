@@ -39,19 +39,13 @@ struct PostDetailView: View {
                     onShare: { /* PR4: share to conversation */ },
                     onAuthorTap: { profileAuthor = localItem.author }
                 )
-                Button { showCommentsSheet = true } label: {
-                    Label("Voir tous les commentaires (\(localItem.commentsCount))", systemImage: "bubble.left.and.bubble.right")
-                        .font(SQFont.archivo(15, .semibold))
-                        .padding(.vertical, SQSpace.md + 1)
-                        .frame(maxWidth: .infinity)
-                        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                                .stroke(SQColor.separator, lineWidth: 1.5)
-                        }
+                GradientButton(
+                    "Voir tous les commentaires (\(localItem.commentsCount))",
+                    systemImage: "bubble.left.and.bubble.right",
+                    style: .secondary
+                ) {
+                    showCommentsSheet = true
                 }
-                .buttonStyle(SQPressButtonStyle())
-                .foregroundStyle(SQColor.label)
             }
             .padding(SQSpace.lg)
         }

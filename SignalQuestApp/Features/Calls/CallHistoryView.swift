@@ -46,26 +46,27 @@ struct CallHistoryView: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(style.color)
                             .frame(width: 38, height: 38)
-                            .background(style.color.opacity(0.14), in: Circle())
+                            .background(style.soft, in: Circle())
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(call.participants?.joined(separator: ", ") ?? "Conversation")
-                                .font(SQType.subhead)
+                                .font(SQFont.body(15, .medium))
                                 .foregroundStyle(style.isMissed ? SQColor.danger : SQColor.label)
                             if let date = call.createdAt {
                                 Text(date, format: .dateTime.day().month(.abbreviated).hour().minute())
-                                    .font(.caption)
+                                    .font(SQType.caption)
                                     .foregroundStyle(SQColor.labelSecondary)
                             }
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 2) {
                             Text(statusLabel(call.status))
-                                .font(.caption.weight(.semibold))
+                                .font(SQType.caption)
                                 .foregroundStyle(style.isMissed ? SQColor.danger : SQColor.labelSecondary)
                             if let duration = durationText(call) {
                                 Text(duration)
-                                    .font(.caption2.monospacedDigit())
+                                    .font(SQType.micro)
+                                    .monospacedDigit()
                                     .foregroundStyle(SQColor.labelTertiary)
                             }
                         }
@@ -78,7 +79,9 @@ struct CallHistoryView: View {
                     .accessibilityElement(children: .combine)
                 }
             } header: {
-                Text("Journal").sqKicker()
+                Text("Journal")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
             }
         }
         .scrollContentBackground(.hidden)
@@ -91,15 +94,16 @@ struct CallHistoryView: View {
 
     /// Icône + couleur selon l'ISSUE de l'appel (pas la direction : aucun champ
     /// entrant/sortant fiable côté backend — CALL-HIST-07). Manqué/refusé en danger,
-    /// terminé en succès, en cours/sonnerie en rouge.
-    private func directionStyle(_ call: CallSession) -> (icon: String, color: Color, isMissed: Bool) {
+    /// terminé en succès, en cours/sonnerie en brique. La pastille reprend la
+    /// teinte douce assortie (DA Crème).
+    private func directionStyle(_ call: CallSession) -> (icon: String, color: Color, soft: Color, isMissed: Bool) {
         switch call.status {
         case "missed", "rejected":
-            return ("phone.down.fill", SQColor.danger, true)
+            return ("phone.down.fill", SQColor.danger, SQColor.dangerSoft, true)
         case "ended", "accepted":
-            return ("phone.fill", SQColor.success, false)
+            return ("phone.fill", SQColor.success, SQColor.successSoft, false)
         default:
-            return ("phone.fill", SQColor.brandRed, false)
+            return ("phone.fill", SQColor.brandRed, SQColor.accentSoft, false)
         }
     }
 
