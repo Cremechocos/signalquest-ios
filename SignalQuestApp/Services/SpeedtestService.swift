@@ -374,6 +374,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         )
 
         progress?(SpeedtestLiveProgress(phase: .download, fraction: 0, serverName: measurementServerName))
+        // Capture du POP edge (x-amz-cf-pop / cf-ray) : télémétrie de diagnostic
+        // des chemins CDN (les colonnes existent déjà côté backend, remplies par
+        // Android — iOS ne les envoyait pas).
+        let edgeCapture = SpeedtestEdgeCaptureBox()
         let downloadOutcome = try await measureDownload(
             url: downloadTarget.url,
             token: downloadTarget.token,
@@ -383,6 +387,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             reliabilityMode: settings.reliabilityMode,
             serverName: measurementServerName,
             pingProtocol: pingOutcome.protocolName,
+            edgeCapture: edgeCapture,
             progress: progress
         )
 
@@ -445,6 +450,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             coordinate: location,
             serverName: measurementServerName,
             downloadServerName: downloadTarget.serverName,
+            downloadServerId: downloadTarget.targetId,
+            downloadServerCode: edgeCapture.code,
             createdAt: startedAt,
             downloadSeriesMbps: downloadOutcome.seriesMbps,
             uploadSeriesMbps: uploadOutcome.seriesMbps,
@@ -755,6 +762,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let url: URL
         let token: String?
         let serverName: String
+        /// Id de cible soumis au backend (`downloadServerId`) : cloudflare_r2 /
+        /// aws_cloudfront / vps_internal — pour diagnostiquer les chemins CDN.
+        let targetId: String
     }
 
     private func resolveDownloadTarget(
@@ -779,7 +789,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         ResolvedDownloadTarget(
             url: sessionResponse.downloadUrl,
             token: sessionResponse.sessionToken,
-            serverName: sessionResponse.selectedServer?.name ?? SpeedtestDownloadTarget.vpsInternal.displayName
+            serverName: sessionResponse.selectedServer?.name ?? SpeedtestDownloadTarget.vpsInternal.displayName,
+            targetId: SpeedtestDownloadTarget.vpsInternal.rawValue
         )
     }
 
@@ -801,7 +812,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             sessionDownloadURL: sessionResponse.downloadUrl,
             speedtestBaseURL: api.config.speedtestBaseURL
         ) else { return nil }
-        return ResolvedDownloadTarget(url: url, token: nil, serverName: target.displayName)
+        return ResolvedDownloadTarget(url: url, token: nil, serverName: target.displayName, targetId: target.rawValue)
     }
 
     /// Sélection automatique « hybride » (parité Android `hybrid_auto`) :
@@ -1117,6 +1128,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         reliabilityMode: Bool,
         serverName: String,
         pingProtocol: String,
+        edgeCapture: SpeedtestEdgeCaptureBox? = nil,
         progress: SpeedtestProgressHandler?
     ) async throws -> DownloadOutcome {
         do {
@@ -1128,6 +1140,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 streams: streams,
                 serverName: serverName,
                 pingProtocol: pingProtocol,
+                edgeCapture: edgeCapture,
                 progress: progress
             )
             // If the multi-stream attempt yielded a meaningful number of windows
@@ -1147,6 +1160,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             streams: 1,
             serverName: serverName,
             pingProtocol: pingProtocol,
+            edgeCapture: edgeCapture,
             progress: progress
         )
     }
@@ -1160,6 +1174,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         streams: Int,
         serverName: String,
         pingProtocol: String,
+        edgeCapture: SpeedtestEdgeCaptureBox? = nil,
         progress: SpeedtestProgressHandler?
     ) async throws -> DownloadOutcome {
         let baseGraceMs = SpeedtestEngineConfig.downloadGraceTimeMs
@@ -1289,7 +1304,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                         window: window,
                         attemptStart: attemptStart,
                         totals: totals,
-                        stallMonitor: progressMonitor
+                        stallMonitor: progressMonitor,
+                        edgeCapture: edgeCapture
                     )
                 }
             }
@@ -1340,7 +1356,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         window: SpeedtestAdaptivePhaseWindow,
         attemptStart: Date,
         totals: SpeedtestSyncByteCounter,
-        stallMonitor: SpeedtestStallMonitor
+        stallMonitor: SpeedtestStallMonitor,
+        edgeCapture: SpeedtestEdgeCaptureBox? = nil
     ) async throws {
         while Date() < window.deadline && !Task.isCancelled {
             if await stallMonitor.stalled { return }
@@ -1364,7 +1381,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             }
 
             do {
-                try await performStreamingDownload(request: request, session: session, deadline: window.deadline) { byteCount in
+                try await performStreamingDownload(request: request, session: session, deadline: window.deadline, edgeCapture: edgeCapture) { byteCount in
                     guard byteCount > 0 else { return }
                     let elapsedMs = Date().timeIntervalSince(attemptStart) * 1_000
                     guard elapsedMs <= window.deadline.timeIntervalSince(attemptStart) * 1_000 else { return }
@@ -1392,9 +1409,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         request: URLRequest,
         session: URLSession,
         deadline: Date,
+        edgeCapture: SpeedtestEdgeCaptureBox? = nil,
         onBytes: @escaping @Sendable (Int) -> Void
     ) async throws {
-        let delegate = SpeedtestDownloadDelegate(deadline: deadline, onBytes: onBytes)
+        let delegate = SpeedtestDownloadDelegate(deadline: deadline, onBytes: onBytes, edgeCapture: edgeCapture)
         let task = session.dataTask(with: request)
         task.delegate = delegate
         try await delegate.run(task: task)
@@ -1995,17 +2013,45 @@ private final class SpeedtestURLSessionTaskBox: @unchecked Sendable {
     }
 }
 
+/// Boîte thread-safe qui capture UNE fois le POP edge du CDN qui a servi le
+/// download (diagnostic Bell/Canada : sans ce champ, impossible de savoir si
+/// un test lent a été servi par un edge local ou un POP lointain).
+/// - CloudFront : header `x-amz-cf-pop` (« CDG52-P1 » → « CDG »)
+/// - Cloudflare : header `cf-ray` (« a1996735e8f7e165-MRS » → « MRS »)
+final class SpeedtestEdgeCaptureBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _code: String?
+
+    var code: String? {
+        lock.lock(); defer { lock.unlock() }
+        return _code
+    }
+
+    func capture(from response: HTTPURLResponse) {
+        lock.lock(); defer { lock.unlock() }
+        guard _code == nil else { return }
+        if let pop = response.value(forHTTPHeaderField: "x-amz-cf-pop") {
+            _code = String(pop.prefix(3)).uppercased()
+        } else if let ray = response.value(forHTTPHeaderField: "cf-ray"),
+                  let colo = ray.split(separator: "-").last, colo.count == 3 {
+            _code = colo.uppercased()
+        }
+    }
+}
+
 private final class SpeedtestDownloadDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private let deadline: Date
     private let onBytes: @Sendable (Int) -> Void
+    private let edgeCapture: SpeedtestEdgeCaptureBox?
     private let lock = NSLock()
     private var continuation: CheckedContinuation<Void, Error>?
     private var responseError: Error?
     private var receivedBytes = 0
 
-    init(deadline: Date, onBytes: @escaping @Sendable (Int) -> Void) {
+    init(deadline: Date, onBytes: @escaping @Sendable (Int) -> Void, edgeCapture: SpeedtestEdgeCaptureBox? = nil) {
         self.deadline = deadline
         self.onBytes = onBytes
+        self.edgeCapture = edgeCapture
     }
 
     func run(task: URLSessionDataTask) async throws {
@@ -2057,6 +2103,7 @@ private final class SpeedtestDownloadDelegate: NSObject, URLSessionDataDelegate,
             completionHandler(.cancel)
             return
         }
+        edgeCapture?.capture(from: http)
         completionHandler(.allow)
     }
 

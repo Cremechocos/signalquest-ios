@@ -124,6 +124,11 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     /// serveur de mesure. Distinct de `serverName` pour ne plus afficher « AWS »
     /// comme serveur de test.
     let downloadServerName: String?
+    /// Id de cible CDN soumis au backend (cloudflare_r2 / aws_cloudfront /
+    /// vps_internal) + code POP edge réel (x-amz-cf-pop / cf-ray) — télémétrie
+    /// de diagnostic des chemins CDN (parité Android).
+    let downloadServerId: String?
+    let downloadServerCode: String?
     let createdAt: Date
     let downloadSeriesMbps: [Double]?
     let uploadSeriesMbps: [Double]?
@@ -168,6 +173,8 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         coordinate: Coordinates? = nil,
         serverName: String? = nil,
         downloadServerName: String? = nil,
+        downloadServerId: String? = nil,
+        downloadServerCode: String? = nil,
         createdAt: Date = Date(),
         downloadSeriesMbps: [Double]? = nil,
         uploadSeriesMbps: [Double]? = nil,
@@ -211,6 +218,8 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         self.coordinate = coordinate
         self.serverName = serverName
         self.downloadServerName = downloadServerName
+        self.downloadServerId = downloadServerId
+        self.downloadServerCode = downloadServerCode
         self.createdAt = createdAt
         self.downloadSeriesMbps = downloadSeriesMbps
         self.uploadSeriesMbps = uploadSeriesMbps
@@ -303,6 +312,8 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         coordinate: nil,
         serverName: nil,
         downloadServerName: nil,
+        downloadServerId: nil,
+        downloadServerCode: nil,
         createdAt: Date(),
         downloadSeriesMbps: nil,
         uploadSeriesMbps: nil,
@@ -376,9 +387,11 @@ struct SpeedtestSubmission: Encodable, Equatable {
     let guestDeleteToken: String?
     let server: String?
     let downloadServerName: String?
+    let downloadServerId: String?
+    let downloadServerCode: String?
 
     enum CodingKeys: String, CodingKey {
-        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, server, downloadServerName
+        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, server, downloadServerName, downloadServerId, downloadServerCode
         case rsrp, rsrq, snr, cellId, pci, enb, gnb, radioSnapshots
         case pingDl, jitterDl, pingUl, jitterUl
     }
@@ -450,7 +463,9 @@ struct SpeedtestSubmission: Encodable, Equatable {
             shareExactLocation: shareExactLocation,
             guestDeleteToken: guestDeleteToken,
             server: result.serverName,
-            downloadServerName: result.downloadServerName ?? result.serverName
+            downloadServerName: result.downloadServerName ?? result.serverName,
+            downloadServerId: result.downloadServerId,
+            downloadServerCode: result.downloadServerCode
         )
     }
 
@@ -502,6 +517,8 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encodeIfPresent(guestDeleteToken, forKey: .guestDeleteToken)
         try c.encodeIfPresent(server, forKey: .server)
         try c.encodeIfPresent(downloadServerName, forKey: .downloadServerName)
+        try c.encodeIfPresent(downloadServerId, forKey: .downloadServerId)
+        try c.encodeIfPresent(downloadServerCode, forKey: .downloadServerCode)
         try c.encodeNil(forKey: .rsrp)
         try c.encodeNil(forKey: .rsrq)
         try c.encodeNil(forKey: .snr)
