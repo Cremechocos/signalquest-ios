@@ -279,6 +279,88 @@ struct MainTabView: View {
     }
 
     var body: some View {
+        tabContainer
+        .task {
+            await services.refreshInboxBadge()
+            consumeIntentRoutes()
+            // À l'arrivée (Feed = onglet par défaut) sans @handle : inviter à en choisir un.
+            if (user.handle ?? "").isEmpty { showHandleGate = true }
+        }
+        .sheet(isPresented: $showHandleGate) {
+            ChooseHandleSheet(onSuccess: { _ in Task { await session.refreshUser() } })
+        }
+        .onChangeCompat(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await services.refreshInboxBadge() }
+                consumeIntentRoutes()
+            }
+        }
+        .onChangeCompat(of: router.selectedTab) { _, _ in
+            Task { await services.refreshInboxBadge() }
+        }
+        .onOpenURL { url in handleDeepLink(url) }
+    }
+
+    /// iOS 26+ : tab bar système Liquid Glass qui se rétracte au scroll
+    /// (`tabBarMinimizeBehavior`), comme les apps natives. Avant iOS 26 :
+    /// dock flottant custom « Crème » (le verre système n'existe pas).
+    @ViewBuilder
+    private var tabContainer: some View {
+        if #available(iOS 26.0, *) {
+            glassTabView
+        } else {
+            legacyDockTabView
+        }
+    }
+
+    // MARK: Tab bar Liquid Glass (iOS 26+)
+
+    @available(iOS 26.0, *)
+    private var glassTabView: some View {
+        TabView(selection: $router.selectedTab) {
+            NavigationStack { SignalQuestHomeView(user: user) }
+                .tabItem { Label("Accueil", systemImage: "house") }
+                .tag(AppRouter.AppTab.home)
+
+            NavigationStack { MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets) }
+                .tabItem { Label("Carte", systemImage: "map") }
+                .tag(AppRouter.AppTab.map)
+
+            NavigationStack { SpeedtestView() }
+                .tabItem { Label("Tester", systemImage: "speedometer") }
+                .tag(AppRouter.AppTab.speed)
+
+            NavigationStack { FeedView(service: services.feed, location: services.location) }
+                // La conversation pose isDockHidden : on masque aussi la barre
+                // système pour laisser le composer prendre le bas de l'écran.
+                .toolbar(router.isDockHidden ? .hidden : .automatic, for: .tabBar)
+                .tabItem { Label("Communauté", systemImage: "person.2") }
+                .tag(AppRouter.AppTab.community)
+                .badge(services.unreadConversations)
+
+            NavigationStack {
+                ProfileView(user: user)
+#if DEBUG
+                    .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-map"))) {
+                        ANFRMapView(service: services.anfr)
+                    }
+                    .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-stats"))) {
+                        ANFRStatsView(service: services.anfr)
+                    }
+#endif
+            }
+            .tabItem { Label("Profil", systemImage: "person.crop.circle") }
+            .tag(AppRouter.AppTab.profile)
+        }
+        // Rétraction au scroll (Liquid Glass) : la barre se réduit en pastille
+        // quand on descend et se redéploie quand on remonte.
+        .tabBarMinimizeBehavior(.onScrollDown)
+        .tint(SQColor.brandRed)
+    }
+
+    // MARK: Dock flottant custom (avant iOS 26)
+
+    private var legacyDockTabView: some View {
         // Dock flottant custom (DA Crème) : la tab bar système est masquée sur
         // chaque onglet, le dock est posé en overlay 14 pt au-dessus du bas.
         TabView(selection: $router.selectedTab) {
@@ -328,25 +410,6 @@ struct MainTabView: View {
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .animation(SQMotion.standard, value: router.isDockHidden)
-        .task {
-            await services.refreshInboxBadge()
-            consumeIntentRoutes()
-            // À l'arrivée (Feed = onglet par défaut) sans @handle : inviter à en choisir un.
-            if (user.handle ?? "").isEmpty { showHandleGate = true }
-        }
-        .sheet(isPresented: $showHandleGate) {
-            ChooseHandleSheet(onSuccess: { _ in Task { await session.refreshUser() } })
-        }
-        .onChangeCompat(of: scenePhase) { _, phase in
-            if phase == .active {
-                Task { await services.refreshInboxBadge() }
-                consumeIntentRoutes()
-            }
-        }
-        .onChangeCompat(of: router.selectedTab) { _, _ in
-            Task { await services.refreshInboxBadge() }
-        }
-        .onOpenURL { url in handleDeepLink(url) }
     }
 
     /// Applique une route demandée par un App Intent / raccourci Siri (onglet Speed/Carte).

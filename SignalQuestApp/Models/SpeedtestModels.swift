@@ -31,6 +31,11 @@ struct SpeedtestServer: Codable, Equatable {
 }
 
 enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
+    /// Sélection automatique (défaut) : préflight au début de la phase DL —
+    /// 256 Ko lus sur chaque candidat, le plus rapide gagne (parité Android
+    /// `hybrid_auto`). Le ping suit la cible retenue.
+    case hybridAuto = "hybrid_auto"
+    case cloudflareR2 = "cloudflare_r2"
     case awsCloudFront = "aws_cloudfront"
     case vpsInternal = "vps_internal"
 
@@ -38,6 +43,8 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
+        case .hybridAuto: return "Auto"
+        case .cloudflareR2: return "Cloudflare"
         case .awsCloudFront: return "AWS CloudFront"
         case .vpsInternal: return "VPS OVH Gravelines"
         }
@@ -51,7 +58,7 @@ struct SpeedtestRunSettings: Codable, Equatable {
     var reliabilityMode: Bool
 
     static let androidDefault = SpeedtestRunSettings(
-        downloadTarget: .awsCloudFront,
+        downloadTarget: .hybridAuto,
         durationSeconds: 10,
         streams: 16,
         reliabilityMode: true

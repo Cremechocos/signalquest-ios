@@ -20,6 +20,7 @@ struct ConversationDetailView: View {
     @EnvironmentObject private var networkPath: NetworkPathMonitor
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var messages: [MessageItem] = []
     @State private var olderCursor: String?
@@ -150,7 +151,9 @@ struct ConversationDetailView: View {
 
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 10) {
+                    // Espacement géré par message (groupes 2/10 pt + horodatages
+                    // de section) — le spacing uniforme est donc à 0.
+                    LazyVStack(spacing: 0) {
                         // MSG-FLUIDITY-02 — Sentinelle de pagination en tête de liste :
                         // se déclenche quand le haut de l'historique devient visible.
                         // Plus fiable que l'onAppear du premier message (qui se
@@ -166,14 +169,33 @@ struct ConversationDetailView: View {
                                 .tint(SQColor.brandRed)
                                 .padding(.vertical, SQSpace.sm)
                         }
-                        ForEach(messages) { message in
-                            messageBubble(message)
-                                .id(message.id)
-                                .background(
-                                    RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                                        .fill(SQColor.brandRed.opacity(highlightedMessageId == message.id ? 0.14 : 0))
+                        ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
+                            let previous = index > 0 ? messages[index - 1] : nil
+                            let next = index + 1 < messages.count ? messages[index + 1] : nil
+                            let stamp = sectionStamp(for: message, previous: previous)
+                            VStack(spacing: 0) {
+                                if let stamp {
+                                    Text(stamp)
+                                        .font(SQType.caption)
+                                        .foregroundStyle(SQColor.labelTertiary)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, SQSpace.sm)
+                                }
+                                messageBubble(
+                                    message,
+                                    isGroupStart: stamp != nil || previous == nil || previous?.senderId != message.senderId,
+                                    isGroupEnd: isGroupEnd(message, next: next)
                                 )
-                                .animation(SQMotion.standard, value: highlightedMessageId)
+                            }
+                            // Groupes de messages : même auteur = 2 pt, changement
+                            // d'auteur = 10 pt (l'horodatage de section gère le sien).
+                            .padding(.top, stamp != nil ? SQSpace.xs : (previous == nil ? 0 : (previous?.senderId == message.senderId ? 2 : 10)))
+                            .id(message.id)
+                            .background(
+                                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                                    .fill(SQColor.brandRed.opacity(highlightedMessageId == message.id ? 0.14 : 0))
+                            )
+                            .animation(SQMotion.standard, value: highlightedMessageId)
                         }
                         readReceiptFooter
                         if let errorMessage {
@@ -512,13 +534,57 @@ struct ConversationDetailView: View {
 
     // MARK: Bulles
 
-    private func messageBubble(_ message: MessageItem) -> some View {
+    private func messageBubble(_ message: MessageItem, isGroupStart: Bool = true, isGroupEnd: Bool = true) -> some View {
         let mine = (message.senderId == currentUserId)
-        return HStack {
+        let reactions = reactionSummaries(for: message)
+        let photoOnly = isPhotoOnlyMessage(message)
+        return HStack(alignment: .bottom, spacing: SQSpace.sm) {
             if mine { Spacer(minLength: 72) }
+            // Avatar de groupe : uniquement sur le DERNIER message d'une série
+            // entrante ; les autres bulles réservent la largeur pour l'alignement.
+            if !mine && conversation.isGroup {
+                if isGroupEnd {
+                    SQAvatar(url: message.sender?.avatarUrl, name: message.sender?.displayName ?? "?", size: 26)
+                        .accessibilityHidden(true)
+                } else {
+                    Color.clear.frame(width: 26, height: 1)
+                }
+            }
             VStack(alignment: mine ? .trailing : .leading, spacing: SQSpace.xs) {
+                bubbleBody(for: message, mine: mine, isGroupStart: isGroupStart, photoOnly: photoOnly, reactions: reactions)
+                if sendStatus[message.id] == .failed {
+                    failedRetryRow(for: message)
+                }
+                threadReplyBadge(for: message)
+            }
+            if !mine { Spacer(minLength: 72) }
+        }
+    }
+
+    /// Corps de bulle : contenu classique (texte/carte/sondage/fichier) ou photo
+    /// seule (la photo EST la bulle), avec les réactions posées en capsules qui
+    /// chevauchent légèrement le bas de la bulle.
+    @ViewBuilder
+    private func bubbleBody(for message: MessageItem, mine: Bool, isGroupStart: Bool, photoOnly: Bool, reactions: [MessageReactionSummary]) -> some View {
+        Group {
+            if photoOnly {
+                attachmentsView(for: message, mine: mine, standalone: true)
+            } else {
+                classicBubble(for: message, mine: mine, isGroupStart: isGroupStart)
+            }
+        }
+        .sqShadowSoft()
+        .opacity(sendStatus[message.id] == .sending ? 0.7 : 1)
+        .contextMenu { contextMenu(for: message, mine: mine) }
+        .overlay(alignment: mine ? .bottomTrailing : .bottomLeading) {
+            reactionChips(for: message, summaries: reactions)
+        }
+        .padding(.bottom, reactions.isEmpty ? 0 : 13)
+    }
+
+    private func classicBubble(for message: MessageItem, mine: Bool, isGroupStart: Bool) -> some View {
             VStack(alignment: mine ? .trailing : .leading, spacing: SQSpace.xs + 1) {
-                if !mine, let name = message.sender?.displayName {
+                if !mine, conversation.isGroup, isGroupStart, let name = message.sender?.displayName {
                     Text(name)
                         .font(SQType.micro)
                         .foregroundStyle(SQColor.labelSecondary)
@@ -601,59 +667,93 @@ struct ConversationDetailView: View {
                             .font(SQFont.body(10.5))
                             .foregroundStyle((mine ? SQColor.onAccent : SQColor.label).opacity(0.6))
                     }
-                    if !message.reactions.isEmpty {
-                        ForEach(reactionSummaries(for: message)) { reaction in
-                            Text("\(reaction.emoji) \(reaction.count)")
-                                .font(.caption2)
-                                .padding(.horizontal, SQSpace.xs + 2).padding(.vertical, 3)
-                                .background(mine ? SQColor.onAccent.opacity(0.18) : SQColor.surfaceMuted, in: Capsule())
-                                .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
-                        }
-                    }
                     sendStatusIndicator(for: message)
                 }
             }
             .padding(.vertical, 11)
             .padding(.horizontal, 15)
             .background(mine ? SQColor.brandRed : SQColor.surface, in: bubbleShape(mine: mine))
-            .sqShadowSoft()
             .accessibilityElement(children: .combine)
-            .contextMenu { contextMenu(for: message, mine: mine) }
-                threadReplyBadge(for: message)
+    }
+
+    /// Capsules de réactions posées, regroupées par emoji, chevauchant le bas de
+    /// la bulle. Tap = toggle de MA réaction. Ma réaction = capsule teintée accent.
+    @ViewBuilder
+    private func reactionChips(for message: MessageItem, summaries: [MessageReactionSummary]) -> some View {
+        if !summaries.isEmpty {
+            HStack(spacing: SQSpace.xs) {
+                ForEach(summaries) { reaction in
+                    Button {
+                        Haptics.selection()
+                        Task { await toggleReaction(message: message, emoji: reaction.emoji) }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(reaction.emoji)
+                                .font(.system(size: 13))
+                            if reaction.count > 1 {
+                                Text("\(reaction.count)")
+                                    .font(SQFont.body(11, .semibold))
+                                    .foregroundStyle(reaction.mine ? SQColor.brandRed : SQColor.labelSecondary)
+                            }
+                        }
+                        .padding(.horizontal, SQSpace.sm)
+                        .padding(.vertical, 4)
+                        .background {
+                            // Base opaque `surface` (la capsule chevauche la bulle) ;
+                            // ma réaction reçoit la teinte accentSoft par-dessus.
+                            Capsule(style: .continuous)
+                                .fill(SQColor.surface)
+                                .overlay(
+                                    Capsule(style: .continuous)
+                                        .fill(reaction.mine ? SQColor.accentSoft : Color.clear)
+                                )
+                        }
+                        .sqShadowSoft()
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(reaction.count) réaction\(reaction.count > 1 ? "s" : "") \(reaction.emoji)\(reaction.mine ? ", dont la tienne" : "")")
+                    .accessibilityHint(reaction.mine ? "Toucher pour retirer ta réaction" : "Toucher pour réagir aussi")
+                }
             }
-            if !mine { Spacer(minLength: 72) }
+            .offset(y: 12)
+            .padding(.horizontal, SQSpace.sm + 2)
         }
     }
 
-    /// Statut d'envoi optimiste sous la bulle (MSG-API-01). En cours : petite
-    /// horloge discrète. Échec : « Échec · Réessayer » tappable qui rejoue
-    /// l'envoi (même Idempotency-Key, donc sans doublon).
+    /// Statut d'envoi optimiste dans la ligne méta (MSG-API-01). En cours :
+    /// spinner discret (la bulle passe aussi à 0.7 d'opacité). L'échec est porté
+    /// par `failedRetryRow`, SOUS la bulle (le danger sur fond brique serait illisible).
     @ViewBuilder
     private func sendStatusIndicator(for message: MessageItem) -> some View {
-        switch sendStatus[message.id] {
-        case .sending:
-            Image(systemName: "clock")
-                .font(.system(size: 10))
-                .foregroundStyle(SQColor.onAccent.opacity(0.7))
+        if sendStatus[message.id] == .sending {
+            ProgressView()
+                .controlSize(.mini)
+                .tint(SQColor.onAccent.opacity(0.8))
                 .accessibilityLabel("Envoi en cours")
-        case .failed:
-            Button {
-                Haptics.medium()
-                Task { await performSend(localId: message.id) }
-            } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "exclamationmark.arrow.circlepath")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text("Échec · Réessayer")
-                        .font(SQType.micro.weight(.semibold))
-                }
-                .foregroundStyle(SQColor.onAccent)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Échec de l'envoi. Appuyer pour réessayer.")
-        case .none:
-            EmptyView()
         }
+    }
+
+    /// Échec d'envoi : capsule dangerSoft sous la bulle, tappable pour rejouer
+    /// l'envoi (même Idempotency-Key, donc sans doublon serveur).
+    private func failedRetryRow(for message: MessageItem) -> some View {
+        Button {
+            Haptics.medium()
+            Task { await performSend(localId: message.id) }
+        } label: {
+            HStack(spacing: SQSpace.xs) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Échec de l’envoi · Renvoyer")
+                    .font(SQType.micro.weight(.semibold))
+            }
+            .foregroundStyle(SQColor.danger)
+            .padding(.horizontal, SQSpace.sm + 2)
+            .padding(.vertical, 5)
+            .background(SQColor.dangerSoft, in: Capsule(style: .continuous))
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Échec de l'envoi. Appuyer pour réessayer.")
     }
 
     /// Indicateur « N réponses » affiché sous une bulle qui a des réponses de
@@ -709,10 +809,14 @@ struct ConversationDetailView: View {
 
     @ViewBuilder
     private func contextMenu(for message: MessageItem, mine: Bool) -> some View {
-        ForEach(["❤️", "🔥", "👏", "🚀", "📡"], id: \.self) { emoji in
-            Button(emoji) {
-                Task { await toggleReaction(message: message, emoji: emoji) }
-            }
+        // Rangée d'emojis compacte en tête du menu contextuel : palette
+        // horizontale native sur iOS 17+ (rendu type iMessage, dim léger, pas de
+        // fond plein écran), boutons classiques en repli iOS 16.
+        if #available(iOS 17.0, *) {
+            ControlGroup { reactionMenuButtons(for: message) }
+                .controlGroupStyle(.palette)
+        } else {
+            reactionMenuButtons(for: message)
         }
         Divider()
         Button {
@@ -810,23 +914,150 @@ struct ConversationDetailView: View {
         }
     }
 
+    /// Boutons de réaction du menu contextuel (toggle : re-taper retire MA réaction).
     @ViewBuilder
-    private func attachmentsView(for message: MessageItem, mine: Bool) -> some View {
+    private func reactionMenuButtons(for message: MessageItem) -> some View {
+        ForEach(["❤️", "🔥", "👏", "🚀", "⚡", "📡"], id: \.self) { emoji in
+            Button {
+                Haptics.light()
+                Task { await toggleReaction(message: message, emoji: emoji) }
+            } label: {
+                Text(emoji)
+            }
+            .accessibilityLabel("Réagir avec \(emoji)")
+        }
+    }
+
+    @ViewBuilder
+    private func attachmentsView(for message: MessageItem, mine: Bool, standalone: Bool = false) -> some View {
         ForEach(message.attachments.filter { $0.url != nil }) { attachment in
-            if attachment.kind.uppercased() == "IMAGE" || (attachment.contentType?.hasPrefix("image/") ?? false) {
-                RemoteImage(url: attachment.url, maxDimension: 240, contentMode: .fill) {
-                    Rectangle().fill(SQColor.surfaceMuted).sqShimmer()
-                }
-                .frame(maxWidth: 240, maxHeight: 240)
-                .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            if isImageAttachment(attachment) {
+                attachmentImage(attachment, message: message, mine: mine, standalone: standalone)
             } else if let url = attachment.url {
-                Link(destination: url) {
-                    Label(attachment.fileName ?? "Pièce jointe", systemImage: "doc")
-                        .font(SQType.caption)
-                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
-                }
+                attachmentFileRow(attachment, url: url, mine: mine)
             }
         }
+    }
+
+    private func isImageAttachment(_ attachment: MessageAttachment) -> Bool {
+        attachment.kind.uppercased() == "IMAGE" || (attachment.contentType?.hasPrefix("image/") ?? false)
+    }
+
+    /// Vrai quand le message se réduit à UNE photo (sans légende ni carte de
+    /// partage/sondage) : la photo est alors rendue comme bulle à part entière.
+    private func isPhotoOnlyMessage(_ message: MessageItem) -> Bool {
+        let visible = message.attachments.filter { $0.url != nil }
+        guard visible.count == 1, isImageAttachment(visible[0]),
+              message.deletedAt == nil,
+              message.metadata == nil,
+              displayedContent(for: message).isEmpty else { return false }
+        return true
+    }
+
+    /// Photo envoyée : shimmer pendant le chargement, ratio préservé (max ~240 pt).
+    /// Dans une bulle avec légende : coin 14. En « photo seule » : la photo
+    /// remplit la bulle (coins de bulle) avec l'heure en surimpression.
+    private func attachmentImage(_ attachment: MessageAttachment, message: MessageItem, mine: Bool, standalone: Bool) -> some View {
+        let size = imageDisplaySize(for: attachment)
+        let shape: AnyShape = standalone
+            ? AnyShape(bubbleShape(mine: mine))
+            : AnyShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        return RemoteImage(url: attachment.url, maxDimension: 240, contentMode: .fill) {
+            Rectangle().fill(SQColor.surfaceMuted).sqShimmer()
+        }
+        .frame(width: size.width, height: size.height)
+        .clipShape(shape)
+        .overlay(alignment: .bottomTrailing) {
+            if standalone { photoTimeOverlay(for: message) }
+        }
+        .accessibilityLabel("Photo envoyée")
+    }
+
+    /// Taille d'affichage d'une photo : ratio préservé, plus grand côté ≤ 240 pt,
+    /// plus petit côté ≥ 96 pt (repli carré 240 sans dimensions serveur).
+    private func imageDisplaySize(for attachment: MessageAttachment) -> CGSize {
+        guard let w = attachment.width, let h = attachment.height, w > 0, h > 0 else {
+            return CGSize(width: 240, height: 240)
+        }
+        let scale = min(240 / CGFloat(max(w, h)), 1)
+        return CGSize(
+            width: max(96, CGFloat(w) * scale),
+            height: max(96, CGFloat(h) * scale)
+        )
+    }
+
+    /// Heure (+ éphémère) en surimpression bas-droit d'une photo seule, sur
+    /// scrim léger. Noir/blanc volontaires : superposés à la photo, ils sont
+    /// indépendants du thème (pas des couleurs d'UI).
+    @ViewBuilder
+    private func photoTimeOverlay(for message: MessageItem) -> some View {
+        if let created = message.createdAt {
+            HStack(spacing: SQSpace.xs) {
+                if message.expiresAt != nil && message.deletedAt == nil {
+                    Image(systemName: "timer")
+                        .font(.system(size: 9))
+                        .accessibilityLabel("Message éphémère")
+                }
+                Text(created, format: .dateTime.hour().minute())
+                    .font(SQFont.body(10.5, .medium))
+            }
+            .foregroundStyle(Color.white.opacity(0.95))
+            .padding(.horizontal, SQSpace.sm)
+            .padding(.vertical, 3)
+            .background(Color.black.opacity(0.32), in: Capsule(style: .continuous))
+            .padding(SQSpace.sm)
+        }
+    }
+
+    /// Pièce jointe non-image : rangée icône doc en pastille 36, nom + taille,
+    /// bouton d'ouverture — tuile coin 14 dans la bulle.
+    private func attachmentFileRow(_ attachment: MessageAttachment, url: URL, mine: Bool) -> some View {
+        Link(destination: url) {
+            HStack(spacing: SQSpace.sm) {
+                Image(systemName: "doc.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
+                    .frame(width: 36, height: 36)
+                    .background(mine ? SQColor.onAccent.opacity(0.16) : SQColor.accentSoft, in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(attachment.fileName ?? "Pièce jointe")
+                        .font(SQFont.body(13, .semibold))
+                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text(fileMetaLine(attachment))
+                        .font(SQType.micro)
+                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: SQSpace.sm)
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(mine ? SQColor.onAccent.opacity(0.9) : SQColor.brandRed)
+                    .accessibilityHidden(true)
+            }
+            .padding(SQSpace.sm)
+            .frame(minWidth: 200, alignment: .leading)
+            .background(mine ? SQColor.onAccent.opacity(0.10) : SQColor.surfaceMuted,
+                        in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Pièce jointe \(attachment.fileName ?? "fichier"), \(fileMetaLine(attachment)). Toucher pour ouvrir.")
+    }
+
+    /// « 1,2 Mo · PDF » — taille + extension lisibles sous le nom du fichier.
+    private func fileMetaLine(_ attachment: MessageAttachment) -> String {
+        var parts: [String] = []
+        if let size = attachment.size, size > 0 {
+            parts.append(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
+        }
+        if let ext = attachment.fileName?.split(separator: ".").last.map(String.init),
+           ext.count <= 5, !ext.isEmpty, attachment.fileName?.contains(".") == true {
+            parts.append(ext.uppercased())
+        }
+        return parts.isEmpty ? "Fichier" : parts.joined(separator: " · ")
     }
 
     // MARK: Barre d'épinglés
@@ -890,6 +1121,7 @@ struct ConversationDetailView: View {
                     .font(SQType.micro)
                     .foregroundStyle(SQColor.labelTertiary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.top, SQSpace.xs)
             }
         }
     }
@@ -897,21 +1129,69 @@ struct ConversationDetailView: View {
     @ViewBuilder
     private var typingIndicator: some View {
         if let typingUntil, typingUntil > Date() {
-            TypingDotsView()
-                .padding(.horizontal, SQSpace.sm + 2)
-                .padding(.vertical, SQSpace.xs + 2)
-                .background(SQColor.surface, in: Capsule())
-                .sqShadowSoft()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.bottom, SQSpace.xs)
-                .transition(.opacity)
-                .accessibilityLabel("En train d’écrire…")
+            HStack(alignment: .bottom, spacing: SQSpace.sm) {
+                SQAvatar(
+                    url: conversation.groupPhotoUrl ?? otherParticipantAvatarURL,
+                    name: conversationTitle,
+                    size: 24
+                )
+                .accessibilityHidden(true)
+                TypingDotsView()
+                    .padding(.horizontal, SQSpace.md)
+                    .padding(.vertical, SQSpace.sm + 2)
+                    .background(SQColor.surface, in: bubbleShape(mine: false))
+                    .sqShadowSoft()
+                Spacer(minLength: 0)
+            }
+            .padding(.bottom, SQSpace.xs)
+            .transition(
+                reduceMotion
+                    ? .opacity
+                    : .asymmetric(
+                        insertion: .scale(scale: 0.85, anchor: .bottomLeading).combined(with: .opacity),
+                        removal: .opacity
+                    )
+            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("En train d’écrire")
+            // Disparition en douceur à l'échéance : sans ce timer, la condition
+            // `typingUntil > Date()` n'était réévaluée qu'au prochain re-render.
+            .task(id: typingUntil) {
+                let remaining = typingUntil.timeIntervalSinceNow
+                guard remaining > 0 else { return }
+                try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) {
+                    self.typingUntil = nil
+                }
+            }
         }
     }
 
     private func quotedMessage(for message: MessageItem) -> MessageItem? {
         guard let replyToId = message.replyToId else { return nil }
         return messages.first { $0.id == replyToId }
+    }
+
+    /// Horodatage de section centré (« Aujourd’hui 14:32 ») : affiché en tête de
+    /// conversation, au changement de jour, ou après plus d'une heure de silence.
+    private func sectionStamp(for message: MessageItem, previous: MessageItem?) -> String? {
+        guard let date = message.createdAt else { return nil }
+        if let previousDate = previous?.createdAt {
+            let sameDay = Calendar.current.isDate(date, inSameDayAs: previousDate)
+            guard !sameDay || date.timeIntervalSince(previousDate) > 3600 else { return nil }
+        }
+        let time = date.formatted(date: .omitted, time: .shortened)
+        if Calendar.current.isDateInToday(date) { return "Aujourd’hui \(time)" }
+        if Calendar.current.isDateInYesterday(date) { return "Hier \(time)" }
+        return "\(date.formatted(.dateTime.weekday(.wide).day().month(.wide))) \(time)"
+    }
+
+    /// Dernier message d'un groupe du même auteur (porte l'avatar en groupe entrant).
+    private func isGroupEnd(_ message: MessageItem, next: MessageItem?) -> Bool {
+        guard let next else { return true }
+        if next.senderId != message.senderId { return true }
+        return sectionStamp(for: next, previous: message) != nil
     }
 
     /// Saut vers le message cité : défilement animé + surbrillance transitoire.
@@ -936,13 +1216,17 @@ struct ConversationDetailView: View {
     private func reactionSummaries(for message: MessageItem) -> [MessageReactionSummary] {
         var order: [String] = []
         var counts: [String: Int] = [:]
+        var mine: Set<String> = []
         for reaction in message.reactions {
             if counts[reaction.emoji] == nil {
                 order.append(reaction.emoji)
             }
             counts[reaction.emoji, default: 0] += 1
+            if reaction.userId == currentUserId { mine.insert(reaction.emoji) }
         }
-        return order.map { MessageReactionSummary(emoji: $0, count: counts[$0, default: 0]) }
+        return order.map {
+            MessageReactionSummary(emoji: $0, count: counts[$0, default: 0], mine: mine.contains($0))
+        }
     }
 
     private func displayedContent(for message: MessageItem) -> String {
@@ -1795,6 +2079,8 @@ private struct MessageComposerBar: View {
 private struct MessageReactionSummary: Identifiable {
     let emoji: String
     let count: Int
+    /// L'utilisateur courant a posé cette réaction (capsule teintée accentSoft).
+    let mine: Bool
 
     var id: String { emoji }
 }
@@ -1833,8 +2119,8 @@ private struct TypingDotsView: View {
                 Circle()
                     .fill(SQColor.labelSecondary)
                     .frame(width: 6, height: 6)
-                    .offset(y: CGFloat(phase) * -2.5)
-                    .opacity(0.45 + 0.55 * max(0, phase))
+                    .offset(y: CGFloat(phase) * -2)
+                    .opacity(0.3 + 0.7 * max(0, phase))
             }
         }
     }

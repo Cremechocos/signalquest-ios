@@ -22,7 +22,8 @@ struct SpeedtestView: View {
     @EnvironmentObject private var services: AppServices
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("speedtest_download_target") private var downloadTargetRaw = SpeedtestDownloadTarget.awsCloudFront.rawValue
+    // Défaut « Auto » : préflight Cloudflare/AWS/VPS, le plus rapide gagne.
+    @AppStorage("speedtest_download_target") private var downloadTargetRaw = SpeedtestDownloadTarget.hybridAuto.rawValue
     @AppStorage("speedtest_duration_seconds") private var durationSeconds = 10
     @AppStorage("speedtest_streams") private var streams = 16
     @AppStorage("speedtest_reliability_mode") private var reliabilityMode = true
@@ -543,19 +544,19 @@ struct SpeedtestView: View {
                     SQSheetHandle()
                     VStack(alignment: .leading, spacing: SQSpace.md + 2) {
                         VStack(alignment: .leading, spacing: SQSpace.xs) {
-                            Text("Source du téléchargement")
+                            Text("Serveur de test")
                                 .font(SQFont.archivo(15, .bold))
                                 .foregroundStyle(SQColor.label)
-                            Text("Origine des octets de download. Le ping est mesuré contre cette même source ; seul l'upload reste sur le serveur SignalQuest (VPS).")
+                            Text("« Auto » compare Cloudflare, AWS et le VPS au démarrage et prend le plus rapide. Le ping est mesuré contre le serveur retenu ; l'upload reste sur le serveur SignalQuest (mesure certifiée).")
                                 .font(.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
-                        Picker("Source DL", selection: Binding(
+                        Picker("Serveur de test", selection: Binding(
                             get: { downloadTarget },
                             set: { downloadTargetRaw = $0.rawValue }
                         )) {
                             ForEach(SpeedtestDownloadTarget.allCases) { target in
-                                Text(target.displayName).tag(target)
+                                Text(target == .vpsInternal ? "VPS" : target.displayName).tag(target)
                             }
                         }
                         .pickerStyle(.segmented)
@@ -578,25 +579,11 @@ struct SpeedtestView: View {
                             .tint(SQColor.brandRed)
                         }
 
-                        HStack {
-                            Text("Streams")
-                                .foregroundStyle(SQColor.label)
-                            Spacer()
-                            ForEach([1, 4, 8, 16], id: \.self) { value in
-                                Button {
-                                    streams = value
-                                    Haptics.selection()
-                                } label: {
-                                    Text("\(value)x")
-                                        .font(.caption.weight(.bold))
-                                        .frame(minWidth: 38)
-                                        .padding(.vertical, SQSpace.xs + 3)
-                                        .background(streams == value ? SQColor.brandRed : SQColor.fill, in: Capsule(style: .continuous))
-                                        .foregroundStyle(streams == value ? SQColor.onAccent : SQColor.label)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
+                        // Streams et « mode fiabilité » ne sont plus exposés :
+                        // le moteur utilise d'office le multi-stream maximal
+                        // (16 DL / 12 UL) avec reprise automatique — les presets
+                        // manuels (1×/4×) produisaient des mesures faussement
+                        // basses sans bénéfice utilisateur.
 
                         VStack(alignment: .leading, spacing: SQSpace.xs) {
                             HStack {
@@ -636,13 +623,6 @@ struct SpeedtestView: View {
                                 .foregroundStyle(SQColor.labelSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
-
-                        Toggle(isOn: $reliabilityMode) {
-                            Text("Mode fiabilité")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(SQColor.label)
-                        }
-                        .tint(SQColor.brandRed)
 
                         Divider().overlay(SQColor.separator)
 
@@ -726,7 +706,7 @@ struct SpeedtestView: View {
     }
 
     private var downloadTarget: SpeedtestDownloadTarget {
-        SpeedtestDownloadTarget(rawValue: downloadTargetRaw) ?? .awsCloudFront
+        SpeedtestDownloadTarget(rawValue: downloadTargetRaw) ?? .hybridAuto
     }
 
     private var runSettings: SpeedtestRunSettings {
@@ -750,6 +730,10 @@ struct SpeedtestView: View {
         }
     }
 
+    /// Valeur affichée par l'aiguille du cadran. Pendant les phases DL/UL, les
+    /// champs `*LiveMbps` portent le débit INSTANTANÉ (fenêtre glissante 1 s,
+    /// léger EMA — cf. `SpeedtestLiveSampler`) : l'aiguille suit le réseau en
+    /// temps réel. La valeur finale (phases saving/finished) reste la MOYENNE.
     private var gaugeDisplay: (value: Double, unit: String) {
         switch phase {
         case .ping:

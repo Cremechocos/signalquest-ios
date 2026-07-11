@@ -206,6 +206,20 @@ private enum SpeedtestEngineConfig {
     /// otherwise drag the average down on fast links.
     static let downloadGraceTimeMs: Double = 2_000
     static let uploadGraceTimeMs: Double = 2_000
+    /// Grace ÉTENDUE, appliquée quand le débit instantané est encore en rampe
+    /// (ou dépasse `fastLinkThresholdMbps`) à l'approche de la frontière des
+    /// 2 s : sur les liens rapides le slow-start TCP dure plus longtemps que le
+    /// warm-up de base et écraserait la moyenne. Reste dans la fourchette
+    /// 3-4 s que le serveur accepte via `warmupMs` au finalize.
+    static let extendedGraceTimeMs: Double = 3_500
+    /// Au-delà de ce débit instantané, 2 s de warm-up ne suffisent jamais.
+    static let fastLinkThresholdMbps: Double = 200
+    /// Croissance relative (+15 %) du débit instantané en fin de warm-up qui
+    /// signe un lien encore en slow-start.
+    static let risingGraceRatio: Double = 1.15
+    /// Recul (ms) utilisé pour comparer débit récent vs antérieur lors de la
+    /// décision de grace adaptative.
+    static let graceComparisonLookbackMs: Double = 600
     /// Window length used to compute Mbps samples post-grace. Android uses
     /// 1000 ms and reads the same value for the public p90/p95/peak stats.
     static let publicPeakWindowMs: Double = 1_000
@@ -317,7 +331,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             authenticated: false
         )
 
-        let downloadTarget = resolveDownloadTarget(settings: settings, sessionResponse: sessionResponse)
+        let downloadTarget = await resolveDownloadTarget(settings: settings, sessionResponse: sessionResponse)
 
         // Le serveur de MESURE est le VPS sélectionné par la session : il reçoit
         // toujours l'upload et reste le « serveur de test » affiché/soumis. Le
@@ -746,28 +760,112 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private func resolveDownloadTarget(
         settings: SpeedtestRunSettings,
         sessionResponse: SpeedtestSessionResponse
-    ) -> ResolvedDownloadTarget {
-        if settings.downloadTarget == .awsCloudFront {
-            let cloudFrontURL = api.config.speedtestCloudFrontDownloadURL
-            if !isProtectedSpeedtestDownloadURL(
-                cloudFrontURL,
-                protectedDownloadURL: api.config.speedtestDownloadURL,
-                sessionDownloadURL: sessionResponse.downloadUrl,
-                speedtestBaseURL: api.config.speedtestBaseURL
-            ) {
-                return ResolvedDownloadTarget(
-                    url: cloudFrontURL,
-                    token: nil,
-                    serverName: settings.downloadTarget.displayName
-                )
-            }
+    ) async -> ResolvedDownloadTarget {
+        switch settings.downloadTarget {
+        case .hybridAuto:
+            return await preflightBestDownloadTarget(sessionResponse: sessionResponse)
+        case .cloudflareR2:
+            if let target = cdnTarget(.cloudflareR2, sessionResponse: sessionResponse) { return target }
+        case .awsCloudFront:
+            if let target = cdnTarget(.awsCloudFront, sessionResponse: sessionResponse) { return target }
+        case .vpsInternal:
+            break
         }
 
-        return ResolvedDownloadTarget(
+        return vpsTarget(sessionResponse: sessionResponse)
+    }
+
+    private func vpsTarget(sessionResponse: SpeedtestSessionResponse) -> ResolvedDownloadTarget {
+        ResolvedDownloadTarget(
             url: sessionResponse.downloadUrl,
             token: sessionResponse.sessionToken,
-            serverName: sessionResponse.selectedServer?.name ?? settings.downloadTarget.displayName
+            serverName: sessionResponse.selectedServer?.name ?? SpeedtestDownloadTarget.vpsInternal.displayName
         )
+    }
+
+    /// Cible CDN (CloudFront / Cloudflare R2) si son URL configurée ne pointe
+    /// pas par erreur vers l'endpoint protégé du VPS (garde-fou historique).
+    private func cdnTarget(
+        _ target: SpeedtestDownloadTarget,
+        sessionResponse: SpeedtestSessionResponse
+    ) -> ResolvedDownloadTarget? {
+        let url: URL
+        switch target {
+        case .awsCloudFront: url = api.config.speedtestCloudFrontDownloadURL
+        case .cloudflareR2: url = api.config.speedtestCloudflareDownloadURL
+        default: return nil
+        }
+        guard !isProtectedSpeedtestDownloadURL(
+            url,
+            protectedDownloadURL: api.config.speedtestDownloadURL,
+            sessionDownloadURL: sessionResponse.downloadUrl,
+            speedtestBaseURL: api.config.speedtestBaseURL
+        ) else { return nil }
+        return ResolvedDownloadTarget(url: url, token: nil, serverName: target.displayName)
+    }
+
+    /// Sélection automatique « hybride » (parité Android `hybrid_auto`) :
+    /// mini-warmup séquentiel sur chaque candidat — on chronomètre la lecture
+    /// des 256 premiers Ko (GET streamé, annulé ensuite ; PAS de Range : R2
+    /// l'ignore) avec timeout 2,5 s — le plus rapide gagne. Le ping du test
+    /// suivra la cible retenue (chemin réellement mesuré). Candidat en échec =
+    /// exclu ; si tous échouent, repli VPS (toujours joignable via la session).
+    private func preflightBestDownloadTarget(
+        sessionResponse: SpeedtestSessionResponse
+    ) async -> ResolvedDownloadTarget {
+        var candidates: [ResolvedDownloadTarget] = []
+        if let cloudflare = cdnTarget(.cloudflareR2, sessionResponse: sessionResponse) {
+            candidates.append(cloudflare)
+        }
+        if let cloudFront = cdnTarget(.awsCloudFront, sessionResponse: sessionResponse) {
+            candidates.append(cloudFront)
+        }
+        candidates.append(vpsTarget(sessionResponse: sessionResponse))
+
+        var best: (target: ResolvedDownloadTarget, elapsed: TimeInterval)?
+        for candidate in candidates {
+            if let elapsed = await preflightElapsed(candidate) {
+                if best == nil || elapsed < best!.elapsed {
+                    best = (candidate, elapsed)
+                }
+            }
+        }
+        return best?.target ?? vpsTarget(sessionResponse: sessionResponse)
+    }
+
+    /// Temps de lecture des 256 premiers Ko du candidat (nil = échec/timeout).
+    private func preflightElapsed(_ target: ResolvedDownloadTarget) async -> TimeInterval? {
+        let sampleBytes = 262_144
+        var components = URLComponents(url: target.url, resolvingAgainstBaseURL: false)
+        var queryItems = components?.queryItems ?? []
+        queryItems.append(URLQueryItem(name: "cachebust", value: UUID().uuidString))
+        components?.queryItems = queryItems
+        guard let url = components?.url else { return nil }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 2.5
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        if let token = target.token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let started = Date()
+        do {
+            let (bytes, response) = try await session.bytes(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return nil }
+            var received = 0
+            for try await _ in bytes {
+                received += 1
+                if received >= sampleBytes { break }
+                // Garde-fou timeout vérifié tous les 16 Ko (pas à chaque octet).
+                if received & 0x3FFF == 0, Date().timeIntervalSince(started) > 2.5 { return nil }
+            }
+            guard received >= min(sampleBytes, 1) else { return nil }
+            return Date().timeIntervalSince(started)
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - Ping
@@ -937,10 +1035,12 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         }
     }
 
+    /// `deadline` est une closure : l'échéance de la phase peut glisser quand la
+    /// grace adaptative est étendue.
     private func measureLoadedPings(
         url: URL,
         token: String?,
-        deadline: Date,
+        deadline: @escaping @Sendable () -> Date,
         protocolName: String
     ) async -> [Double] {
         var values: [Double] = []
@@ -949,7 +1049,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         }
         let port = UInt16(url.port ?? (url.scheme?.lowercased() == "http" ? 80 : 443))
 
-        while Date() < deadline && !Task.isCancelled {
+        while Date() < deadline() && !Task.isCancelled {
             let start = Date()
             do {
                 if protocolName == "TCP" {
@@ -1062,36 +1162,76 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         pingProtocol: String,
         progress: SpeedtestProgressHandler?
     ) async throws -> DownloadOutcome {
-        let graceMs = SpeedtestEngineConfig.downloadGraceTimeMs
+        let baseGraceMs = SpeedtestEngineConfig.downloadGraceTimeMs
         let usefulDurationMs = Double(max(5, min(durationSeconds, 30))) * 1_000
-        let totalDurationMs = usefulDurationMs + graceMs  // Match Android: grace + test
         let attemptStart = Date()
-        let deadline = attemptStart.addingTimeInterval(totalDurationMs / 1_000)
+        // Grace ADAPTATIVE : la fenêtre démarre au warm-up de base (2 s) et
+        // peut être étendue UNE fois, avant son expiration, si le lien est
+        // encore en slow-start — l'échéance glisse d'autant pour préserver la
+        // durée utile de mesure.
+        let window = SpeedtestAdaptivePhaseWindow(
+            graceMs: baseGraceMs,
+            deadline: attemptStart.addingTimeInterval((usefulDurationMs + baseGraceMs) / 1_000)
+        )
 
         let totals = SpeedtestSyncByteCounter()
         let liveAggregator = SpeedtestLiveSampler()
         let samplesBox = SpeedtestSamplesBox()
         let progressMonitor = SpeedtestStallMonitor(timeoutMs: SpeedtestEngineConfig.downloadStallTimeoutMs)
 
+        // Session PERSISTANTE pour toute la phase : les streams se partagent le
+        // pool (une connexion par stream) et chaque rotation de requête réutilise
+        // sa connexion (keep-alive) au lieu de repayer handshake TLS + slow-start
+        // TCP — cause n°1 de sous-estimation avec l'ancienne session éphémère.
+        let streamCount = max(1, min(streams, SpeedtestEngineConfig.hardMaxStreams))
+        let phaseSession = makeMeasurementSession(
+            maxConnectionsPerHost: streamCount,
+            requestTimeout: SpeedtestEngineConfig.chunkTimeoutSeconds
+        )
+
         let loadedPingsTask = Task { [weak self] in
             guard let self else { return [Double]() }
-            try? await Task.sleep(nanoseconds: UInt64(graceMs * 1_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(baseGraceMs * 1_000_000))
+            // La grace a pu être étendue pendant le warm-up de base : attendre le
+            // complément pour ne mesurer la latence en charge que sur la fenêtre utile.
+            let extraMs = window.graceMs - baseGraceMs
+            if extraMs > 0 { try? await Task.sleep(nanoseconds: UInt64(extraMs * 1_000_000)) }
             guard !Task.isCancelled else { return [Double]() }
-            return await self.measureLoadedPings(url: url, token: token, deadline: deadline, protocolName: pingProtocol)
+            return await self.measureLoadedPings(url: url, token: token, deadline: { window.deadline }, protocolName: pingProtocol)
         }
 
-        // Live progress sampler — pulses the UI every 150 ms with a smoothed Mbps.
+        // Live progress sampler — pulses the UI every 150 ms.
         let progressTask = Task { [weak self] in
             guard self != nil else { return }
             var lastSampleMs: Double?
             var lastSampleTotalBytes = 0
+            var instantHistory: [(ms: Double, mbps: Double)] = []
+            var graceDecided = false
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.sampleIntervalMs * 1_000_000))
                 if Task.isCancelled { return }
                 let now = Date()
-                if now >= deadline { return }
+                if now >= window.deadline { return }
                 let elapsedMs = now.timeIntervalSince(attemptStart) * 1_000
                 let snapshot = totals.snapshot()
+
+                // Aiguille = débit INSTANTANÉ (fenêtre glissante 1 s + léger EMA),
+                // émis dès le warm-up. La moyenne (valeur finale) reste cumulée
+                // post-grace, inchangée.
+                let needleMbps = liveAggregator.observe(totalBytes: snapshot.total, elapsedMs: elapsedMs)
+                instantHistory.append((ms: elapsedMs, mbps: liveAggregator.lastInstantMbps))
+
+                // Grace adaptative : décidée au dernier tick AVANT la frontière du
+                // warm-up (jamais après — les octets seraient déjà comptés utiles).
+                if !graceDecided, elapsedMs >= baseGraceMs - SpeedtestEngineConfig.sampleIntervalMs * 1.5 {
+                    graceDecided = true
+                    let earlier = instantHistory.last(where: { $0.ms <= elapsedMs - SpeedtestEngineConfig.graceComparisonLookbackMs })?.mbps
+                    if speedtestShouldExtendGrace(recentMbps: liveAggregator.lastInstantMbps, earlierMbps: earlier) {
+                        window.extendGrace(to: SpeedtestEngineConfig.extendedGraceTimeMs, ifNotPastMs: elapsedMs)
+                    }
+                }
+
+                let graceMs = window.graceMs
                 if elapsedMs >= graceMs {
                     if let startMs = lastSampleMs, startMs >= graceMs {
                         let bytesDiff = max(0, snapshot.total - lastSampleTotalBytes)
@@ -1102,15 +1242,14 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     lastSampleMs = elapsedMs
                     lastSampleTotalBytes = snapshot.total
 
-                    let mbps = liveAggregator.observe(totalBytes: snapshot.total, graceBytes: snapshot.grace, elapsedMs: elapsedMs, graceMs: graceMs)
                     let effectiveBytes = max(0, snapshot.total - snapshot.grace)
                     let averageMbps = boundedMbps(bytes: effectiveBytes, durationMs: elapsedMs - graceMs)
                     let fraction = max(0, min(1, (elapsedMs - graceMs) / usefulDurationMs))
                     progress?(SpeedtestLiveProgress(
                         phase: .download,
-                        currentMbps: mbps,
+                        currentMbps: needleMbps,
                         fraction: fraction,
-                        downloadLiveMbps: mbps,
+                        downloadLiveMbps: needleMbps,
                         downloadAverageMbps: averageMbps,
                         serverName: serverName
                     ))
@@ -1118,17 +1257,27 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 } else {
                     lastSampleMs = elapsedMs
                     lastSampleTotalBytes = snapshot.total
+                    // Pendant le warm-up : l'aiguille bouge (débit réel instantané),
+                    // mais aucune moyenne n'est encore publiée.
+                    progress?(SpeedtestLiveProgress(
+                        phase: .download,
+                        currentMbps: needleMbps,
+                        fraction: 0,
+                        downloadLiveMbps: needleMbps,
+                        serverName: serverName
+                    ))
                 }
             }
         }
         defer {
             progressTask.cancel()
             loadedPingsTask.cancel()
+            phaseSession.invalidateAndCancel()
         }
 
         // Concurrent streams (staggered).
         try await withThrowingTaskGroup(of: Void.self) { group in
-            for streamIndex in 0..<max(1, min(streams, SpeedtestEngineConfig.hardMaxStreams)) {
+            for streamIndex in 0..<streamCount {
                 group.addTask { [self] in
                     try await Task.sleep(nanoseconds: UInt64(Double(streamIndex) * SpeedtestEngineConfig.streamStaggerMs * 1_000_000))
                     try await runDownloadStream(
@@ -1136,11 +1285,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                         url: url,
                         token: token,
                         chunkBytes: chunkBytes,
-                        deadline: deadline,
+                        session: phaseSession,
+                        window: window,
                         attemptStart: attemptStart,
-                        graceMs: graceMs,
                         totals: totals,
-                        samples: samplesBox,
                         stallMonitor: progressMonitor
                     )
                 }
@@ -1155,16 +1303,17 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let jitterDlMs = downloadPings.isEmpty ? nil : SpeedMetricCalculator.jitter(downloadPings)
 
         // Aggregate: avg = effectiveBytes * 8 / (effectiveDurationSec) / 1e6.
+        let finalGraceMs = window.graceMs
         let snapshot = totals.snapshot()
-        let measurementEndMs = min(Date().timeIntervalSince(attemptStart) * 1_000, totalDurationMs)
+        let measurementEndMs = min(Date().timeIntervalSince(attemptStart) * 1_000, usefulDurationMs + finalGraceMs)
         let effectiveBytes = max(0, snapshot.total - snapshot.grace)
-        let effectiveDurationMs = max(1, measurementEndMs - graceMs)
+        let effectiveDurationMs = max(1, measurementEndMs - finalGraceMs)
         guard let averageMbps = measuredTransferMbps(effectiveBytes: effectiveBytes, durationMs: effectiveDurationMs) else {
             throw SpeedtestEngineError.downloadProducedNoBytes
         }
 
         // p90 / p95 / peak via 1 s windows.
-        let stats = await samplesBox.publicStats(windowMs: SpeedtestEngineConfig.publicPeakWindowMs, graceMs: graceMs, endMs: measurementEndMs)
+        let stats = await samplesBox.publicStats(windowMs: SpeedtestEngineConfig.publicPeakWindowMs, graceMs: finalGraceMs, endMs: measurementEndMs)
 
         return DownloadOutcome(
             averageMbps: averageMbps,
@@ -1179,20 +1328,21 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     }
 
     /// One download stream — pulls bytes through a `URLSessionDataDelegate` so
-    /// we count real received chunks without a Swift byte-by-byte loop.
+    /// we count real received chunks without a Swift byte-by-byte loop. Toutes
+    /// les requêtes du stream passent par la session PERSISTANTE de la phase :
+    /// la rotation de chunk réutilise la connexion (keep-alive).
     private func runDownloadStream(
         streamIndex: Int,
         url: URL,
         token: String?,
         chunkBytes: Int,
-        deadline: Date,
+        session: URLSession,
+        window: SpeedtestAdaptivePhaseWindow,
         attemptStart: Date,
-        graceMs: Double,
         totals: SpeedtestSyncByteCounter,
-        samples: SpeedtestSamplesBox,
         stallMonitor: SpeedtestStallMonitor
     ) async throws {
-        while Date() < deadline && !Task.isCancelled {
+        while Date() < window.deadline && !Task.isCancelled {
             if await stallMonitor.stalled { return }
 
             guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { continue }
@@ -1214,11 +1364,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             }
 
             do {
-                try await performStreamingDownload(request: request, deadline: deadline) { byteCount in
+                try await performStreamingDownload(request: request, session: session, deadline: window.deadline) { byteCount in
                     guard byteCount > 0 else { return }
                     let elapsedMs = Date().timeIntervalSince(attemptStart) * 1_000
-                    guard elapsedMs <= deadline.timeIntervalSince(attemptStart) * 1_000 else { return }
-                    totals.add(byteCount, isGrace: elapsedMs < graceMs)
+                    guard elapsedMs <= window.deadline.timeIntervalSince(attemptStart) * 1_000 else { return }
+                    totals.add(byteCount, isGrace: elapsedMs < window.graceMs)
                 }
             } catch is SpeedtestRateLimitedError {
                 try? await Task.sleep(nanoseconds: UInt64(250 + (streamIndex * 50)) * 1_000_000)
@@ -1234,21 +1384,33 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         }
     }
 
+    /// Exécute une requête de download sur la session PERSISTANTE de la phase,
+    /// avec un délégué PAR TÂCHE (iOS 15+) qui compte les octets reçus. La
+    /// connexion survit à la requête (keep-alive) — plus de handshake TLS ni de
+    /// slow-start TCP à chaque rotation de chunk.
     private func performStreamingDownload(
         request: URLRequest,
+        session: URLSession,
         deadline: Date,
         onBytes: @escaping @Sendable (Int) -> Void
     ) async throws {
+        let delegate = SpeedtestDownloadDelegate(deadline: deadline, onBytes: onBytes)
+        let task = session.dataTask(with: request)
+        task.delegate = delegate
+        try await delegate.run(task: task)
+    }
+
+    /// Session de MESURE persistante pour une phase (download OU upload),
+    /// partagée par tous les streams : `httpMaximumConnectionsPerHost` = nombre
+    /// de streams pour qu'ils conservent chacun leur connexion. Invalidée par
+    /// l'appelant en fin de phase.
+    private func makeMeasurementSession(maxConnectionsPerHost: Int, requestTimeout: TimeInterval) -> URLSession {
         let config = URLSessionConfiguration.ephemeral
         config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         config.urlCache = nil
-        config.httpMaximumConnectionsPerHost = 1
-        config.timeoutIntervalForRequest = min(SpeedtestEngineConfig.chunkTimeoutSeconds, max(1, deadline.timeIntervalSinceNow + 2))
-        let delegate = SpeedtestDownloadDelegate(deadline: deadline, onBytes: onBytes)
-        let delegateSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
-        defer { delegateSession.invalidateAndCancel() }
-        let task = delegateSession.dataTask(with: request)
-        try await delegate.run(task: task)
+        config.httpMaximumConnectionsPerHost = max(1, maxConnectionsPerHost)
+        config.timeoutIntervalForRequest = requestTimeout
+        return URLSession(configuration: config)
     }
 
     // MARK: - Upload (Android-aligned, simpler — single chunk POSTs)
@@ -1265,10 +1427,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         pingProtocol: String,
         progress: SpeedtestProgressHandler?
     ) async throws -> UploadOutcome {
-        let graceMs = SpeedtestEngineConfig.uploadGraceTimeMs
+        let baseGraceMs = SpeedtestEngineConfig.uploadGraceTimeMs
         let usefulDurationMs = Double(max(5, min(durationSeconds, 30))) * 1_000
-        let totalDurationMs = usefulDurationMs + graceMs
-        let beginBody = Data(#"{"warmupMs":2000,"durationMs":\#(Int(usefulDurationMs)),"windowMs":1000}"#.utf8)
+        let beginBody = Data(#"{"warmupMs":\#(Int(baseGraceMs)),"durationMs":\#(Int(usefulDurationMs)),"windowMs":1000}"#.utf8)
         var begin = URLRequest(url: beginURL)
         begin.httpMethod = "POST"
         begin.timeoutInterval = SpeedtestEngineConfig.uploadTimeoutSeconds
@@ -1290,28 +1451,62 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 
         let payload = Data(repeating: 0x5A, count: maxBytes)
         let attemptStart = Date()
-        let deadline = attemptStart.addingTimeInterval(totalDurationMs / 1_000)
+        // Grace ADAPTATIVE (cf. download) : extension possible une seule fois,
+        // avant la frontière du warm-up, échéance repoussée d'autant.
+        let window = SpeedtestAdaptivePhaseWindow(
+            graceMs: baseGraceMs,
+            deadline: attemptStart.addingTimeInterval((usefulDurationMs + baseGraceMs) / 1_000)
+        )
         let totals = SpeedtestSyncByteCounter()
         let samples = SpeedtestSamplesBox()
         let liveAggregator = SpeedtestLiveSampler()
 
+        // Session PERSISTANTE pour toute la phase upload : les POSTs successifs
+        // d'un même stream réutilisent leur connexion (keep-alive) — plus de
+        // handshake TLS + slow-start TCP à chaque rotation de 32 Mo, qui
+        // plafonnaient artificiellement l'upload (~100 Mbps à 4 streams).
+        let streamCount = max(1, min(streams, SpeedtestEngineConfig.hardMaxUploadStreams))
+        let phaseSession = makeMeasurementSession(
+            maxConnectionsPerHost: streamCount,
+            requestTimeout: SpeedtestEngineConfig.uploadTimeoutSeconds
+        )
+
         let loadedPingsTask = Task { [weak self] in
             guard let self else { return [Double]() }
-            try? await Task.sleep(nanoseconds: UInt64(graceMs * 1_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(baseGraceMs * 1_000_000))
+            let extraMs = window.graceMs - baseGraceMs
+            if extraMs > 0 { try? await Task.sleep(nanoseconds: UInt64(extraMs * 1_000_000)) }
             guard !Task.isCancelled else { return [Double]() }
-            return await self.measureLoadedPings(url: uploadURL, token: token, deadline: deadline, protocolName: pingProtocol)
+            return await self.measureLoadedPings(url: uploadURL, token: token, deadline: { window.deadline }, protocolName: pingProtocol)
         }
 
         let progressTask = Task { [weak self] in
             guard self != nil else { return }
             var lastSampleMs: Double?
             var lastSampleTotalBytes = 0
+            var instantHistory: [(ms: Double, mbps: Double)] = []
+            var graceDecided = false
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.sampleIntervalMs * 1_000_000))
                 if Task.isCancelled { return }
-                if Date() >= deadline { return }
-                let elapsedMs = Date().timeIntervalSince(attemptStart) * 1_000
+                let now = Date()
+                if now >= window.deadline { return }
+                let elapsedMs = now.timeIntervalSince(attemptStart) * 1_000
                 let snapshot = totals.snapshot()
+
+                // Aiguille = débit INSTANTANÉ (fenêtre glissante 1 s + léger EMA).
+                let needleMbps = liveAggregator.observe(totalBytes: snapshot.total, elapsedMs: elapsedMs)
+                instantHistory.append((ms: elapsedMs, mbps: liveAggregator.lastInstantMbps))
+
+                if !graceDecided, elapsedMs >= baseGraceMs - SpeedtestEngineConfig.sampleIntervalMs * 1.5 {
+                    graceDecided = true
+                    let earlier = instantHistory.last(where: { $0.ms <= elapsedMs - SpeedtestEngineConfig.graceComparisonLookbackMs })?.mbps
+                    if speedtestShouldExtendGrace(recentMbps: liveAggregator.lastInstantMbps, earlierMbps: earlier) {
+                        window.extendGrace(to: SpeedtestEngineConfig.extendedGraceTimeMs, ifNotPastMs: elapsedMs)
+                    }
+                }
+
+                let graceMs = window.graceMs
                 if elapsedMs >= graceMs {
                     if let startMs = lastSampleMs, startMs >= graceMs {
                         let bytesDiff = max(0, snapshot.total - lastSampleTotalBytes)
@@ -1322,34 +1517,41 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     lastSampleMs = elapsedMs
                     lastSampleTotalBytes = snapshot.total
 
-                    let mbps = liveAggregator.observe(totalBytes: snapshot.total, graceBytes: snapshot.grace, elapsedMs: elapsedMs, graceMs: graceMs)
                     let effectiveBytes = max(0, snapshot.total - snapshot.grace)
                     let averageMbps = boundedMbps(bytes: effectiveBytes, durationMs: elapsedMs - graceMs)
-                    let fraction = max(0, min(1, (elapsedMs - graceMs) / (totalDurationMs - graceMs)))
+                    let fraction = max(0, min(1, (elapsedMs - graceMs) / usefulDurationMs))
                     progress?(SpeedtestLiveProgress(
                         phase: .upload,
-                        currentMbps: mbps,
+                        currentMbps: needleMbps,
                         fraction: fraction,
-                        uploadLiveMbps: mbps,
+                        uploadLiveMbps: needleMbps,
                         uploadAverageMbps: averageMbps,
                         serverName: serverName
                     ))
                 } else {
                     lastSampleMs = elapsedMs
                     lastSampleTotalBytes = snapshot.total
+                    progress?(SpeedtestLiveProgress(
+                        phase: .upload,
+                        currentMbps: needleMbps,
+                        fraction: 0,
+                        uploadLiveMbps: needleMbps,
+                        serverName: serverName
+                    ))
                 }
             }
         }
         defer {
             progressTask.cancel()
             loadedPingsTask.cancel()
+            phaseSession.invalidateAndCancel()
         }
 
         try await withThrowingTaskGroup(of: Void.self) { group in
-            for streamIndex in 0..<max(1, min(streams, SpeedtestEngineConfig.hardMaxUploadStreams)) {
+            for streamIndex in 0..<streamCount {
                 group.addTask { [self] in
                     try await Task.sleep(nanoseconds: UInt64(Double(streamIndex) * SpeedtestEngineConfig.streamStaggerMs * 1_000_000))
-                    while Date() < deadline && !Task.isCancelled {
+                    while Date() < window.deadline && !Task.isCancelled {
                         guard var components = URLComponents(url: uploadURL, resolvingAgainstBaseURL: false) else { continue }
                         var query = components.queryItems ?? []
                         query.append(URLQueryItem(name: "r", value: "\(UUID().uuidString)-\(streamIndex)"))
@@ -1361,18 +1563,19 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                         do {
                             let requestTimeout = max(
                                 3,
-                                min(SpeedtestEngineConfig.uploadTimeoutSeconds, deadline.timeIntervalSinceNow + 3)
+                                min(SpeedtestEngineConfig.uploadTimeoutSeconds, window.deadline.timeIntervalSinceNow + 3)
                             )
-                            let requestDeadline = min(deadline, Date().addingTimeInterval(requestTimeout))
+                            let requestDeadline = min(window.deadline, Date().addingTimeInterval(requestTimeout))
                             let result = try await performStreamingUpload(
                                 upload,
+                                session: phaseSession,
                                 payload: payload,
                                 deadline: requestDeadline
                             ) { sentBytes in
                                 guard sentBytes > 0 else { return }
                                 let elapsedMs = Date().timeIntervalSince(attemptStart) * 1_000
-                                guard elapsedMs <= totalDurationMs else { return }
-                                totals.add(sentBytes, isGrace: elapsedMs < graceMs)
+                                guard elapsedMs <= window.deadline.timeIntervalSince(attemptStart) * 1_000 else { return }
+                                totals.add(sentBytes, isGrace: elapsedMs < window.graceMs)
                             }
                             guard result.receivedResponse else { continue }
                             if let statusCode = result.httpStatusCode, !(200..<400).contains(statusCode) {
@@ -1404,13 +1607,16 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let pingUlMs = uploadPings.isEmpty ? nil : SpeedMetricCalculator.average(uploadPings)
         let jitterUlMs = uploadPings.isEmpty ? nil : SpeedMetricCalculator.jitter(uploadPings)
 
-        // Finalize on the server (best-effort).
+        // Finalize on the server (best-effort). Transmet le warm-up réellement
+        // appliqué (grace adaptative) pour que la fenêtre serveur exclue
+        // exactement la même rampe — `warmupMs` au finalize est accepté par le
+        // protocole existant.
         var finalize = URLRequest(url: finalizeURL)
         finalize.httpMethod = "POST"
         finalize.timeoutInterval = SpeedtestEngineConfig.uploadTimeoutSeconds
         finalize.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         finalize.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        finalize.httpBody = Data("{\"uploadRunId\":\"\(runId)\"}".utf8)
+        finalize.httpBody = speedtestUploadFinalizeBody(runId: runId, warmupMs: window.graceMs)
         let serverMeasurement: UploadServerMeasurement?
         do {
             let (finalData, finalResponse) = try await session.data(for: finalize)
@@ -1423,24 +1629,29 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             serverMeasurement = nil
         }
 
+        let finalGraceMs = window.graceMs
         let snapshot = totals.snapshot()
-        let measurementEndMs = min(Date().timeIntervalSince(attemptStart) * 1_000, totalDurationMs)
+        let measurementEndMs = min(Date().timeIntervalSince(attemptStart) * 1_000, usefulDurationMs + finalGraceMs)
         let effectiveBytes = max(0, snapshot.total - snapshot.grace)
-        let effectiveDurationMs = max(1, measurementEndMs - graceMs)
+        let effectiveDurationMs = max(1, measurementEndMs - finalGraceMs)
         let confirmedBytes = computeConfirmedUploadBytes(
             clientWrittenBytes: effectiveBytes,
             serverConfirmedBytes: serverMeasurement?.serverBytesReceived
         )
         let clientAverage = measuredTransferMbps(effectiveBytes: confirmedBytes, durationMs: effectiveDurationMs) ?? 0
-        let stats = await samples.publicStats(windowMs: SpeedtestEngineConfig.publicPeakWindowMs, graceMs: graceMs, endMs: measurementEndMs)
+        let stats = await samples.publicStats(windowMs: SpeedtestEngineConfig.publicPeakWindowMs, graceMs: finalGraceMs, endMs: measurementEndMs)
 
         let usableServerMeasurement = serverMeasurement?.isUsable(expectedUsefulDurationMs: usefulDurationMs) == true
-        let cappedServerAverage: Double? = if usableServerMeasurement, let serverDurationMs = serverMeasurement?.serverDurationMs {
-            boundedMbps(bytes: confirmedBytes, durationMs: serverDurationMs)
-        } else {
-            nil
-        }
-        let averageMbps = cappedServerAverage ?? clientAverage
+        // Mesure serveur utilisable → `serverAvgMbps` est AUTORITAIRE : octets et
+        // durée proviennent de la MÊME fenêtre serveur. L'ancien mix
+        // min(client, serveur) / durée serveur mélangeait deux fenêtres et
+        // sous-estimait. Sinon, repli client borné par les octets confirmés
+        // (anti-triche conservé).
+        let averageMbps = resolvedUploadAverageMbps(
+            serverMeasurement: serverMeasurement,
+            expectedUsefulDurationMs: usefulDurationMs,
+            clientAverageMbps: clientAverage
+        )
         guard confirmedBytes > 0, averageMbps > 0 else {
             throw SpeedtestEngineError.uploadProducedNoBytes
         }
@@ -1467,21 +1678,18 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         )
     }
 
+    /// Exécute un POST d'upload sur la session PERSISTANTE de la phase, avec un
+    /// délégué PAR TÂCHE (iOS 15+) qui compte les octets réellement envoyés.
     private func performStreamingUpload(
         _ request: URLRequest,
+        session: URLSession,
         payload: Data,
         deadline: Date,
         onBytesSent: @escaping @Sendable (Int) -> Void
     ) async throws -> SpeedtestUploadTaskResult {
-        let config = URLSessionConfiguration.ephemeral
-        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        config.urlCache = nil
-        config.httpMaximumConnectionsPerHost = 1
-        config.timeoutIntervalForRequest = min(SpeedtestEngineConfig.uploadTimeoutSeconds, max(1, deadline.timeIntervalSinceNow + 2))
         let delegate = SpeedtestUploadDelegate(deadline: deadline, onBytesSent: onBytesSent)
-        let delegateSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
-        defer { delegateSession.invalidateAndCancel() }
-        let task = delegateSession.uploadTask(with: request, from: payload)
+        let task = session.uploadTask(with: request, from: payload)
+        task.delegate = delegate
         return try await delegate.run(task: task)
     }
 
@@ -1576,6 +1784,43 @@ func computeConfirmedUploadBytes(clientWrittenBytes: Int, serverConfirmedBytes: 
     return max(0, min(clientWrittenBytes, serverConfirmedBytes))
 }
 
+/// Décide si la grace (warm-up) doit être étendue au-delà de la fenêtre de
+/// base : oui quand le débit instantané dépasse `fastLinkThresholdMbps`
+/// (2 s de slow-start pèsent lourd sur la moyenne des liens rapides) ou quand
+/// il croît encore nettement (≥ `risingGraceRatio`) par rapport au début de
+/// fenêtre — signature d'un lien toujours en rampe TCP.
+func speedtestShouldExtendGrace(recentMbps: Double, earlierMbps: Double?) -> Bool {
+    guard recentMbps > 0 else { return false }
+    if recentMbps > SpeedtestEngineConfig.fastLinkThresholdMbps { return true }
+    guard let earlierMbps, earlierMbps > 0 else { return false }
+    return recentMbps >= earlierMbps * SpeedtestEngineConfig.risingGraceRatio
+}
+
+/// Corps du POST de finalize upload : `uploadRunId` + le `warmupMs` réellement
+/// appliqué côté client (grace adaptative), pour que la fenêtre de mesure
+/// serveur exclue la même rampe. Paramètre déjà accepté par le serveur.
+func speedtestUploadFinalizeBody(runId: String, warmupMs: Double) -> Data {
+    Data("{\"uploadRunId\":\"\(runId)\",\"warmupMs\":\(Int(warmupMs.rounded()))}".utf8)
+}
+
+/// Moyenne finale d'upload. Quand la mesure serveur est utilisable (et non
+/// tronquée), `serverAvgMbps` est AUTORITAIRE : octets et durée proviennent de
+/// la même fenêtre serveur — c'est aussi la valeur anti-triche par excellence
+/// (mesurée côté serveur). Sinon, repli sur la moyenne client bornée par les
+/// octets confirmés (min client/serveur), qui ne peut jamais gonfler le score.
+func resolvedUploadAverageMbps(
+    serverMeasurement: UploadServerMeasurement?,
+    expectedUsefulDurationMs: Double,
+    clientAverageMbps: Double
+) -> Double {
+    if let serverMeasurement,
+       serverMeasurement.isUsable(expectedUsefulDurationMs: expectedUsefulDurationMs),
+       let serverAverage = serverMeasurement.serverAvgMbps {
+        return serverAverage
+    }
+    return clientAverageMbps
+}
+
 func isProtectedSpeedtestDownloadURL(
     _ candidate: URL,
     protectedDownloadURL: URL,
@@ -1622,6 +1867,9 @@ struct UploadServerMeasurement: Equatable, Sendable {
     let serverPeakMbps: Double?
     let serverMeasuredWindows: Int?
     let serverMeasurementComplete: Bool?
+    /// Run interrompu prématurément côté serveur : sa fenêtre de mesure n'est
+    /// pas représentative — la moyenne serveur ne doit PAS être autoritaire.
+    let serverRunTruncated: Bool?
 
     init?(data: Data) {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -1635,6 +1883,7 @@ struct UploadServerMeasurement: Equatable, Sendable {
         serverPeakMbps = json.doubleValue("serverPeakMbps")
         serverMeasuredWindows = json.intValue("serverMeasuredWindows")
         serverMeasurementComplete = json.boolValue("serverMeasurementComplete")
+        serverRunTruncated = json.boolValue("serverRunTruncated")
     }
 
     func isUsable(expectedUsefulDurationMs: Double) -> Bool {
@@ -1644,6 +1893,11 @@ struct UploadServerMeasurement: Equatable, Sendable {
             return false
         }
         if let windows = serverMeasuredWindows, windows <= 0 {
+            return false
+        }
+        // Respect de `serverRunTruncated` (ignoré auparavant) : un run tronqué
+        // retombe sur le calcul client borné par les octets confirmés.
+        if serverRunTruncated == true {
             return false
         }
         return true
@@ -1683,6 +1937,43 @@ final class SpeedtestSyncByteCounter: @unchecked Sendable {
         let snapshot = Snapshot(total: total, grace: grace)
         lock.unlock()
         return snapshot
+    }
+}
+
+/// Fenêtre temporelle ADAPTATIVE d'une phase de mesure : la grace (warm-up)
+/// démarre à sa valeur de base et peut être étendue UNE seule fois, avant son
+/// expiration, quand le lien est encore en slow-start à la frontière (liens
+/// rapides). L'échéance de la phase glisse du même délai pour préserver la
+/// durée utile de mesure. Thread-safe : lue depuis les callbacks URLSession et
+/// les boucles de streams, étendue depuis la tâche de progression.
+final class SpeedtestAdaptivePhaseWindow: @unchecked Sendable {
+    private let lock = NSLock()
+    private var graceMsValue: Double
+    private var deadlineValue: Date
+    private var extended = false
+
+    init(graceMs: Double, deadline: Date) {
+        self.graceMsValue = graceMs
+        self.deadlineValue = deadline
+    }
+
+    var graceMs: Double { lock.withLock { graceMsValue } }
+    var deadline: Date { lock.withLock { deadlineValue } }
+    var wasExtended: Bool { lock.withLock { extended } }
+
+    /// Étend la grace à `newGraceMs` et repousse l'échéance du même délai.
+    /// Sans effet (renvoie false) si déjà étendue, si la frontière de grace est
+    /// déjà passée (`elapsedMs`), ou si la nouvelle valeur ne l'allonge pas —
+    /// une extension tardive fausserait le marquage grace/utile des octets.
+    @discardableResult
+    func extendGrace(to newGraceMs: Double, ifNotPastMs elapsedMs: Double) -> Bool {
+        lock.withLock {
+            guard !extended, elapsedMs < graceMsValue, newGraceMs > graceMsValue else { return false }
+            deadlineValue = deadlineValue.addingTimeInterval((newGraceMs - graceMsValue) / 1_000)
+            graceMsValue = newGraceMs
+            extended = true
+            return true
+        }
     }
 }
 
@@ -2070,21 +2361,51 @@ actor SpeedtestStallMonitor {
     }
 }
 
-/// Smoothed live-Mbps emitter for the UI gauge. Uses an exponential moving
-/// average over the post-grace effective throughput so the needle climbs
-/// instead of jumping wildly.
+/// Émetteur du débit live pour l'aiguille du cadran : débit INSTANTANÉ calculé
+/// sur une fenêtre GLISSANTE (~1 s) de relevés cumulés, lissé par un léger EMA
+/// pour éviter le tremblement. L'aiguille suit ainsi le réseau en temps réel —
+/// l'ancienne version affichait la moyenne cumulée lissée, qui traînait
+/// systématiquement derrière le débit courant. La valeur FINALE affichée reste
+/// la moyenne cumulée post-grace, calculée en fin de phase (inchangée).
 final class SpeedtestLiveSampler: @unchecked Sendable {
-    private let smoothing: Double = 0.42
-    private var emaMbps: Double = 0
+    private struct Point {
+        let elapsedMs: Double
+        let totalBytes: Int
+    }
 
-    func observe(totalBytes: Int, graceBytes: Int, elapsedMs: Double, graceMs: Double) -> Double {
-        guard elapsedMs > graceMs else { return emaMbps }
-        let effectiveBytes = max(0, totalBytes - graceBytes)
-        let mbps = boundedMbps(bytes: effectiveBytes, durationMs: elapsedMs - graceMs)
+    private let windowMs: Double
+    private let smoothing: Double
+    private var points: [Point] = []
+    private var emaMbps: Double = 0
+    /// Dernier débit instantané NON lissé (fenêtre glissante brute) — sert
+    /// notamment à la décision de grace adaptative.
+    private(set) var lastInstantMbps: Double = 0
+
+    init(windowMs: Double = 1_000, smoothing: Double = 0.35) {
+        self.windowMs = max(1, windowMs)
+        self.smoothing = min(1, max(0.01, smoothing))
+    }
+
+    /// À appeler à chaque tick avec le TOTAL cumulé d'octets : renvoie le débit
+    /// instantané lissé (fenêtre glissante), indépendant de la grace — pendant
+    /// le warm-up l'aiguille montre déjà le débit réel, seule la moyenne
+    /// l'exclut.
+    func observe(totalBytes: Int, elapsedMs: Double) -> Double {
+        points.append(Point(elapsedMs: elapsedMs, totalBytes: totalBytes))
+        // Conserve un point au-delà de la fenêtre pour que le delta couvre
+        // toujours ~windowMs une fois la fenêtre remplie.
+        while points.count > 2, points[1].elapsedMs <= elapsedMs - windowMs {
+            points.removeFirst()
+        }
+        guard points.count >= 2, let first = points.first else { return emaMbps }
+        let spanMs = elapsedMs - first.elapsedMs
+        guard spanMs > 0 else { return emaMbps }
+        let instant = boundedMbps(bytes: max(0, totalBytes - first.totalBytes), durationMs: spanMs)
+        lastInstantMbps = instant
         if emaMbps == 0 {
-            emaMbps = mbps
+            emaMbps = instant
         } else {
-            emaMbps = (smoothing * mbps) + ((1 - smoothing) * emaMbps)
+            emaMbps = (smoothing * instant) + ((1 - smoothing) * emaMbps)
         }
         return emaMbps
     }

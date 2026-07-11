@@ -4,10 +4,11 @@ import SwiftUI
 /// Carte de partage d'un speedtest — même structure que l'image Android
 /// (`SpeedTestShareImageGenerator.kt`) mais habillée DA « Crème & Terre cuite » :
 /// tableau de bord 1080×720, deux cartes Download (olive) / Upload (ambre) avec
-/// gros chiffres Bricolage + Max + **graphes réels** dont le trait est coloré
-/// selon la qualité de chaque point (danger→ambre→olive, comme la jauge live),
-/// bandeau latence, pied appareil, et logo Signal Quest. Rendu nativement via
-/// `ImageRenderer` (instantané, contrairement au WebView Android).
+/// gros chiffres Bricolage + Max + **graphes réels** (séries 1 s du moteur,
+/// interpolation monotone sans point inventé, trait olive/ambre 2.5 pt,
+/// remplissage dégradé vertical, labels min/max discrets), bandeau latence,
+/// pied appareil, et logo Signal Quest. Rendu nativement via `ImageRenderer`
+/// (instantané, contrairement au WebView Android).
 ///
 /// ⚠️ Rendu HORS hiérarchie de vues : les tokens dynamiques (`SQColor`) ne se
 /// résolvent pas de façon déterministe dans `ImageRenderer` — les hex de la DA
@@ -205,8 +206,6 @@ private struct SpeedtestShareCard: View {
 
     private var dlSeries: [Double] { cleaned(result.downloadSeriesMbps) }
     private var ulSeries: [Double] { cleaned(result.uploadSeriesMbps) }
-    private var dlGaugeMax: Double { SpeedtestGaugeScale.maxSpeed(for: result, upload: false) }
-    private var ulGaugeMax: Double { SpeedtestGaugeScale.maxSpeed(for: result, upload: true) }
 
     private var city: String { result.city?.trimmedNonEmpty ?? "Localisation indisponible" }
     private var network: String { result.networkShareDisplayName.trimmedNonEmpty ?? "Réseau indisponible" }
@@ -241,12 +240,12 @@ private struct SpeedtestShareCard: View {
                 statCard(
                     label: "Download", accent: downloadAccent,
                     avg: result.downloadAverageMbps, maxValue: result.downloadMaxMbps,
-                    series: dlSeries, gaugeMax: dlGaugeMax, graphId: "dl"
+                    series: dlSeries
                 )
                 statCard(
                     label: "Upload", accent: uploadAccent,
                     avg: result.uploadAverageMbps ?? 0, maxValue: result.uploadMaxMbps ?? (result.uploadAverageMbps ?? 0),
-                    series: ulSeries, gaugeMax: ulGaugeMax, graphId: "ul"
+                    series: ulSeries
                 )
             }
 
@@ -305,9 +304,8 @@ private struct SpeedtestShareCard: View {
         }
     }
 
-    private func statCard(label: String, accent: Color, avg: Double, maxValue: Double, series: [Double], gaugeMax: Double, graphId: String) -> some View {
-        let lineColor = SpeedtestQualityPalette.color(forValue: avg, gaugeMax: gaugeMax, stops: theme.qualityStops)
-        return VStack(alignment: .leading, spacing: 0) {
+    private func statCard(label: String, accent: Color, avg: Double, maxValue: Double, series: [Double]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
             Text(label)
                 .font(SQFont.bodyFixed(15, .semibold))
                 .foregroundStyle(accent)
@@ -334,12 +332,10 @@ private struct SpeedtestShareCard: View {
 
             SpeedtestShareGraph(
                 series: series,
-                gaugeMax: gaugeMax,
-                accent: lineColor,
-                qualityStops: theme.qualityStops,
+                accent: accent,
                 plotBackground: surfaceMuted,
                 gridColor: separator,
-                emptyTextColor: textSecondary
+                labelColor: textSecondary
             )
             .frame(height: 128)
             .padding(.top, 18)
@@ -411,26 +407,20 @@ private struct SpeedtestShareCard: View {
     }
 }
 
-/// Graphe d'une série speedtest, fidèle à `generateGraphSvg` d'Android :
-/// remplissage dégradé, glow, et trait dont la couleur suit la qualité de
-/// chaque point (rampe DA danger→ambre→olive). Trait pointillé si < 2 points.
+/// Graphe d'une série speedtest RÉELLE (fenêtres 1 s du moteur — jamais de
+/// point inventé) : trait 2.5 pt à la couleur d'accent de la carte (olive DL /
+/// ambre UL), remplissage dégradé vertical accent→transparent (12 %), 3 lignes
+/// de grille horizontales fines (separator), labels min/max discrets, axe
+/// temps implicite. L'échelle Y part de ZÉRO et englobe le max réel de la
+/// série (aucun clipping). Interpolation cubique MONOTONE (Fritsch–Carlson) :
+/// lissage léger, la courbe reste bornée par les points mesurés. Trait
+/// pointillé si < 2 points (série vide → fallback).
 private struct SpeedtestShareGraph: View {
     let series: [Double]
-    let gaugeMax: Double
     let accent: Color
-    let qualityStops: [Color]
     let plotBackground: Color
     let gridColor: Color
-    let emptyTextColor: Color
-
-    /// Axe Y mis à l'échelle du max de la SÉRIE (avec ~15 % de marge haute) pour
-    /// que la courbe remplisse la hauteur — évite les lignes plates en bas
-    /// qu'imposerait une échelle commune ou la jauge réseau. La COULEUR, elle,
-    /// reste indexée sur la jauge réseau (qualité selon le type de connexion).
-    private var axisMax: Double {
-        let peak = displaySeries.max() ?? 0
-        return peak > 0 ? peak * 1.15 : 1
-    }
+    let labelColor: Color
 
     private var displaySeries: [Double] {
         if series.count >= 2 {
@@ -442,95 +432,62 @@ private struct SpeedtestShareGraph: View {
         }
     }
 
+    private var isFallback: Bool { series.count < 2 }
+
     var body: some View {
-        GeometryReader { proxy in
-            chart(in: proxy.size)
+        ZStack(alignment: .topLeading) {
+            GeometryReader { proxy in
+                chart(in: proxy.size)
+            }
+            if !isFallback {
+                minMaxLabels
+            }
         }
         .background(plotBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    /// Min/max RÉELS de la série, discrets (petits, secondaires), max en haut,
+    /// min en bas — l'axe temps reste implicite (gauche→droite).
+    private var minMaxLabels: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(axisLabel(displaySeries.max() ?? 0))
+            Spacer(minLength: 0)
+            Text(axisLabel(displaySeries.min() ?? 0))
+        }
+        .font(SQFont.bodyFixed(11, .medium))
+        .foregroundStyle(labelColor.opacity(0.85))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    private func axisLabel(_ value: Double) -> String {
+        guard value.isFinite else { return "—" }
+        return value >= 10 ? String(format: "%.0f", value) : String(format: "%.1f", value)
     }
 
     private func chart(in size: CGSize) -> some View {
         let pts = simplified(displaySeries)
         let w = size.width, h = size.height
-        let localMax = max(axisMax, 1)
+        // Échelle Y : ZÉRO en bas, max réel de la série en tête — le pic n'est
+        // jamais coupé. Les insets gardent le trait entier dans le cadre.
+        let axisMax = max(pts.max() ?? 0, 0.001)
+        let topInset: CGFloat = 12
+        let bottomInset: CGFloat = 3
+        let plotHeight = max(1, h - topInset - bottomInset)
         let step = w / CGFloat(max(pts.count - 1, 1))
         let x: (Int) -> CGFloat = { CGFloat($0) * step }
-        // ~6 % de marge basse pour que le minimum ne colle pas au bord.
-        let y: (Double) -> CGFloat = { h - (0.06 + CGFloat(min(1, max(0, $0 / localMax))) * 0.9) * h }
+        let y: (Double) -> CGFloat = { h - bottomInset - CGFloat(min(1, max(0, $0 / axisMax))) * plotHeight }
 
         var points: [CGPoint] = []
         for i in 0..<pts.count {
             points.append(CGPoint(x: x(i), y: y(pts[i])))
         }
 
-        let n = points.count
-        var m = [CGFloat](repeating: 0, count: n)
-        for i in 0..<n {
-            if n <= 2 {
-                m[i] = 0
-            } else if i == 0 {
-                m[i] = (points[1].y - points[0].y) / (points[1].x - points[0].x)
-            } else if i == n - 1 {
-                m[i] = (points[n-1].y - points[n-2].y) / (points[n-1].x - points[n-2].x)
-            } else {
-                let dx = points[i+1].x - points[i-1].x
-                m[i] = dx > 0 ? (points[i+1].y - points[i-1].y) / dx : 0
-            }
-        }
+        let tangents = monotoneTangents(points)
+        let line = hermitePath(points: points, tangents: tangents, height: h, closed: false)
+        let fill = hermitePath(points: points, tangents: tangents, height: h, closed: true)
 
-        let line = Path { p in
-            guard n >= 2 else { return }
-            p.move(to: points[0])
-            for i in 0..<(n - 1) {
-                let p1 = points[i]
-                let p2 = points[i+1]
-                let dx = p2.x - p1.x
-                
-                let control1 = CGPoint(
-                    x: p1.x + dx * 0.33,
-                    y: min(h, max(0, p1.y + m[i] * (dx * 0.33)))
-                )
-                let control2 = CGPoint(
-                    x: p2.x - dx * 0.33,
-                    y: min(h, max(0, p2.y - m[i+1] * (dx * 0.33)))
-                )
-                p.addCurve(to: p2, control1: control1, control2: control2)
-            }
-        }
-
-        let fill = Path { p in
-            guard n >= 2 else { return }
-            p.move(to: CGPoint(x: points[0].x, y: h))
-            p.addLine(to: points[0])
-            for i in 0..<(n - 1) {
-                let p1 = points[i]
-                let p2 = points[i+1]
-                let dx = p2.x - p1.x
-                
-                let control1 = CGPoint(
-                    x: p1.x + dx * 0.33,
-                    y: min(h, max(0, p1.y + m[i] * (dx * 0.33)))
-                )
-                let control2 = CGPoint(
-                    x: p2.x - dx * 0.33,
-                    y: min(h, max(0, p2.y - m[i+1] * (dx * 0.33)))
-                )
-                p.addCurve(to: p2, control1: control1, control2: control2)
-            }
-            p.addLine(to: CGPoint(x: points[n-1].x, y: h))
-            p.closeSubpath()
-        }
-
-        // Dégradé horizontal du trait : une teinte qualité par point (vs jauge).
-        let strokeGradient = LinearGradient(
-            stops: pts.enumerated().map { i, v in
-                Gradient.Stop(
-                    color: SpeedtestQualityPalette.color(forValue: v, gaugeMax: gaugeMax, stops: qualityStops),
-                    location: pts.count > 1 ? CGFloat(i) / CGFloat(pts.count - 1) : 0
-                )
-            },
-            startPoint: .leading, endPoint: .trailing
-        )
         let grid = Path { p in
             for i in 1...3 {
                 let gy = h / 4 * CGFloat(i)
@@ -538,28 +495,92 @@ private struct SpeedtestShareGraph: View {
             }
         }
 
-        let isFallback = series.count < 2
-
         return ZStack {
-            grid.stroke(gridColor.opacity(0.6), lineWidth: 1)
+            grid.stroke(gridColor.opacity(0.55), lineWidth: 1)
             if !isFallback {
                 fill.fill(
                     LinearGradient(
-                        colors: [accent.opacity(0.16), accent.opacity(0)],
+                        colors: [accent.opacity(0.12), accent.opacity(0)],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
-                line.stroke(strokeGradient, style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round))
-                    .opacity(0.42)
-                    .blur(radius: 6)
-                line.stroke(strokeGradient, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                line.stroke(accent, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
             } else {
-                line.stroke(strokeGradient, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round, dash: [6, 6]))
-                    .opacity(0.5)
+                line.stroke(accent.opacity(0.5), style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: [6, 6]))
             }
         }
     }
 
+    /// Tangentes d'une interpolation cubique MONOTONE (Fritsch–Carlson) : la
+    /// courbe ne dépasse jamais au-dessus/dessous des points mesurés — lissage
+    /// léger sans inventer de pics ni de creux.
+    private func monotoneTangents(_ points: [CGPoint]) -> [CGFloat] {
+        let n = points.count
+        guard n >= 2 else { return Array(repeating: 0, count: n) }
+        var delta = [CGFloat](repeating: 0, count: n - 1)
+        for i in 0..<(n - 1) {
+            let dx = points[i + 1].x - points[i].x
+            delta[i] = dx > 0 ? (points[i + 1].y - points[i].y) / dx : 0
+        }
+        var m = [CGFloat](repeating: 0, count: n)
+        m[0] = delta[0]
+        m[n - 1] = delta[n - 2]
+        for i in 1..<(n - 1) {
+            m[i] = (delta[i - 1] * delta[i] <= 0) ? 0 : (delta[i - 1] + delta[i]) / 2
+        }
+        for i in 0..<(n - 1) {
+            guard delta[i] != 0 else {
+                m[i] = 0
+                m[i + 1] = 0
+                continue
+            }
+            let a = m[i] / delta[i]
+            let b = m[i + 1] / delta[i]
+            let s = a * a + b * b
+            if s > 9 {
+                let t = 3 / s.squareRoot()
+                m[i] = t * a * delta[i]
+                m[i + 1] = t * b * delta[i]
+            }
+        }
+        return m
+    }
+
+    /// Chemin Hermite→Bézier ; `closed` referme sur la ligne de base (y = h,
+    /// c'est-à-dire zéro) pour le remplissage dégradé.
+    private func hermitePath(points: [CGPoint], tangents: [CGFloat], height: CGFloat, closed: Bool) -> Path {
+        Path { p in
+            let n = points.count
+            guard n >= 2 else { return }
+            if closed {
+                p.move(to: CGPoint(x: points[0].x, y: height))
+                p.addLine(to: points[0])
+            } else {
+                p.move(to: points[0])
+            }
+            for i in 0..<(n - 1) {
+                let p1 = points[i]
+                let p2 = points[i + 1]
+                let dx = p2.x - p1.x
+                let control1 = CGPoint(
+                    x: p1.x + dx / 3,
+                    y: min(height, max(0, p1.y + tangents[i] * dx / 3))
+                )
+                let control2 = CGPoint(
+                    x: p2.x - dx / 3,
+                    y: min(height, max(0, p2.y - tangents[i + 1] * dx / 3))
+                )
+                p.addCurve(to: p2, control1: control1, control2: control2)
+            }
+            if closed {
+                p.addLine(to: CGPoint(x: points[n - 1].x, y: height))
+                p.closeSubpath()
+            }
+        }
+    }
+
+    /// Réduction en buckets moyennés UNIQUEMENT au-delà de 32 points (les
+    /// séries réelles font ~10-30 fenêtres de 1 s : elles passent inchangées).
     private func simplified(_ values: [Double], maxPoints: Int = 32) -> [Double] {
         guard values.count > maxPoints else { return values }
         return (0..<maxPoints).map { bucket in

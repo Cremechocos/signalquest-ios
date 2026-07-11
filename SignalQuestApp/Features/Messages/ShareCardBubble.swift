@@ -49,7 +49,7 @@ struct ShareCardBubble: View {
                         .font(SQType.micro)
                         .foregroundStyle(mine ? SQColor.onAccent.opacity(0.75) : SQColor.labelTertiary)
                     Text(card.title)
-                        .font(SQType.caption.weight(.semibold))
+                        .font(SQFont.body(14, .semibold))
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                         .lineLimit(2)
                 }
@@ -113,7 +113,7 @@ struct SignalCardBubble: View {
                     .background(mine ? SQColor.onAccent.opacity(0.16) : SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(card.title)
-                        .font(SQType.caption.weight(.semibold))
+                        .font(SQFont.body(14, .semibold))
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                         .lineLimit(1)
                     if let sub = signal.subtitleLine ?? card.subtitle {
@@ -212,9 +212,11 @@ struct SharedPostCardBubble: View {
                             .font(.system(size: 11, weight: .semibold))
                     }
                     .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
+                    .frame(minHeight: 28)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Voir la publication")
             }
         }
         .frame(maxWidth: 280, alignment: .leading)
@@ -225,7 +227,7 @@ struct SharedPostCardBubble: View {
             SQAvatar(url: card.author?.avatarUrl, name: card.author?.displayName ?? "SignalQuest", size: 30)
             VStack(alignment: .leading, spacing: 1) {
                 Text(card.author?.displayName ?? card.title)
-                    .font(SQType.caption.weight(.semibold))
+                    .font(SQFont.body(14, .semibold))
                     .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                     .lineLimit(1)
                 Text(sourceLine)
@@ -248,11 +250,13 @@ struct SharedPostCardBubble: View {
     private var media: some View {
         if let image = card.imageUrl {
             RemoteImage(url: image, maxDimension: 600, contentMode: .fill) {
-                Rectangle().fill(mine ? SQColor.onAccent.opacity(0.12) : SQColor.surfaceMuted)
+                Rectangle()
+                    .fill(mine ? SQColor.onAccent.opacity(0.12) : SQColor.surfaceMuted)
+                    .sqShimmer()
             }
             .frame(maxWidth: .infinity)
             .frame(height: 130)
-            .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
         } else if let signal = card.signal, let rsrp = signal.rsrp {
             measurementBanner(
                 primary: "\(rsrp)",
@@ -405,21 +409,35 @@ struct LocationBubble: View {
 
 // MARK: Bouton « Ouvrir » partagé
 
+/// CTA d'ouverture harmonisé avec la carte de publication : hairline puis
+/// rangée pleine largeur « Ouvrir » + chevron (teinte onAccent/brandRed).
 private struct ShareCardOpenButton: View {
     let mine: Bool
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: SQSpace.xs) {
-                Text("Ouvrir")
-                    .font(SQType.caption.weight(.semibold))
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 10, weight: .semibold))
+        VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+            Rectangle()
+                .fill(mine ? SQColor.onAccent.opacity(0.22) : SQColor.separator)
+                .frame(height: 0.5)
+            Button {
+                Haptics.selection()
+                action()
+            } label: {
+                HStack(spacing: SQSpace.xs) {
+                    Text("Ouvrir")
+                        .font(SQType.caption.weight(.semibold))
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
+                .frame(minHeight: 28)
+                .contentShape(Rectangle())
             }
-            .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Ouvrir le partage")
         }
-        .buttonStyle(.plain)
         .padding(.top, 1)
     }
 }

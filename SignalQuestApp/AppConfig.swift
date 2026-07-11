@@ -40,6 +40,7 @@ struct AppConfig: Equatable {
     let speedtestBaseURL: URL
     let speedtestDownloadURL: URL
     let speedtestCloudFrontDownloadURL: URL
+    let speedtestCloudflareDownloadURL: URL
     let debugLogsEnabled: Bool
 
     static let current = AppConfig(bundle: .main)
@@ -51,6 +52,7 @@ struct AppConfig: Equatable {
         speedtestBaseURL: URL,
         speedtestDownloadURL: URL,
         speedtestCloudFrontDownloadURL: URL,
+        speedtestCloudflareDownloadURL: URL,
         debugLogsEnabled: Bool
     ) {
         self.environment = environment
@@ -59,6 +61,7 @@ struct AppConfig: Equatable {
         self.speedtestBaseURL = speedtestBaseURL
         self.speedtestDownloadURL = speedtestDownloadURL
         self.speedtestCloudFrontDownloadURL = speedtestCloudFrontDownloadURL
+        self.speedtestCloudflareDownloadURL = speedtestCloudflareDownloadURL
         self.debugLogsEnabled = debugLogsEnabled
     }
 
@@ -72,6 +75,7 @@ struct AppConfig: Equatable {
             speedtestBaseURL: Self.url(bundle, "SQ_SPEEDTEST_BASE_URL", fallback: fallback.speedtest),
             speedtestDownloadURL: Self.url(bundle, "SQ_SPEEDTEST_DOWNLOAD_URL", fallback: fallback.download),
             speedtestCloudFrontDownloadURL: Self.url(bundle, "SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL", fallback: fallback.cloudFront),
+            speedtestCloudflareDownloadURL: Self.url(bundle, "SQ_SPEEDTEST_CLOUDFLARE_DOWNLOAD_URL", fallback: fallback.cloudflare),
             debugLogsEnabled: Self.bool(bundle, "SQ_DEBUG_LOGS", fallback: false)
         )
     }
@@ -89,7 +93,7 @@ struct AppConfig: Equatable {
     }
 
     private var serviceURLs: [URL] {
-        [appBaseURL, apiBaseURL, speedtestBaseURL, speedtestDownloadURL, speedtestCloudFrontDownloadURL]
+        [appBaseURL, apiBaseURL, speedtestBaseURL, speedtestDownloadURL, speedtestCloudFrontDownloadURL, speedtestCloudflareDownloadURL]
     }
 
     private static let productionHosts: Set<String> = [
@@ -97,6 +101,7 @@ struct AppConfig: Equatable {
         "api.signalquest.fr",
         "speedtest.signalquest.fr",
         "d2d31ihf1e95ah.cloudfront.net",
+        "dl.signalquest.fr",
     ]
 
     /// Une Beta dont les build settings seraient absents doit rester
@@ -106,7 +111,8 @@ struct AppConfig: Equatable {
         api: String,
         speedtest: String,
         download: String,
-        cloudFront: String
+        cloudFront: String,
+        cloudflare: String
     ) {
         if environment == .staging {
             return (
@@ -114,7 +120,8 @@ struct AppConfig: Equatable {
                 "https://api.staging.invalid",
                 "https://speedtest.staging.invalid",
                 "https://speedtest.staging.invalid/download",
-                "https://cdn.staging.invalid/1000MB.bin"
+                "https://cdn.staging.invalid/1000MB.bin",
+                "https://dl.staging.invalid/speedtest/5G.bin"
             )
         }
         return (
@@ -122,7 +129,8 @@ struct AppConfig: Equatable {
             "https://signalquest.fr",
             "https://speedtest.signalquest.fr",
             "https://speedtest.signalquest.fr/download",
-            "https://d2d31ihf1e95ah.cloudfront.net/1000MB.bin"
+            "https://d2d31ihf1e95ah.cloudfront.net/1000MB.bin",
+            "https://dl.signalquest.fr/speedtest/5G.bin"
         )
     }
 

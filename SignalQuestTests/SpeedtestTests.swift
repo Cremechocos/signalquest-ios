@@ -87,6 +87,113 @@ final class SpeedtestTests: XCTestCase {
         }
         """.utf8)))
         XCTAssertFalse(zeroBytes.isUsable(expectedUsefulDurationMs: 10_000))
+
+        // Run tronqué côté serveur : fenêtre non représentative → la mesure
+        // serveur ne doit PAS être autoritaire (repli client confirmé).
+        let truncated = try XCTUnwrap(UploadServerMeasurement(data: Data("""
+        {
+          "serverBytesReceived": 32000000,
+          "serverDurationMs": 10000,
+          "serverAvgMbps": 25.6,
+          "serverMeasuredWindows": 8,
+          "serverRunTruncated": true
+        }
+        """.utf8)))
+        XCTAssertFalse(truncated.isUsable(expectedUsefulDurationMs: 10_000))
+    }
+
+    func testUploadAverageIsServerAuthoritativeWhenUsable() throws {
+        // Mesure serveur utilisable → serverAvgMbps DIRECT (octets et durée de
+        // la MÊME fenêtre serveur), pas le mix min(client, serveur)/durée
+        // serveur qui mélangeait deux fenêtres et sous-estimait.
+        let usable = try XCTUnwrap(UploadServerMeasurement(data: Data("""
+        {"serverBytesReceived": 320000000, "serverDurationMs": 10000, "serverAvgMbps": 256.0, "serverMeasuredWindows": 10}
+        """.utf8)))
+        XCTAssertEqual(
+            resolvedUploadAverageMbps(serverMeasurement: usable, expectedUsefulDurationMs: 10_000, clientAverageMbps: 180),
+            256, accuracy: 0.001
+        )
+
+        // Pas de réponse serveur → repli client (borné par les octets confirmés
+        // en amont : l'anti-triche reste intact).
+        XCTAssertEqual(
+            resolvedUploadAverageMbps(serverMeasurement: nil, expectedUsefulDurationMs: 10_000, clientAverageMbps: 42),
+            42, accuracy: 0.001
+        )
+
+        // Run tronqué → la moyenne serveur n'est pas autoritaire.
+        let truncated = try XCTUnwrap(UploadServerMeasurement(data: Data("""
+        {"serverBytesReceived": 320000000, "serverDurationMs": 10000, "serverAvgMbps": 256.0, "serverMeasuredWindows": 10, "serverRunTruncated": true}
+        """.utf8)))
+        XCTAssertEqual(
+            resolvedUploadAverageMbps(serverMeasurement: truncated, expectedUsefulDurationMs: 10_000, clientAverageMbps: 42),
+            42, accuracy: 0.001
+        )
+    }
+
+    func testUploadFinalizeBodyCarriesRunIdAndEffectiveWarmup() throws {
+        // Le finalize doit transmettre le warm-up réellement appliqué (grace
+        // adaptative), pas seulement l'uploadRunId.
+        let body = speedtestUploadFinalizeBody(runId: "run-42", warmupMs: 3_500)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(json["uploadRunId"] as? String, "run-42")
+        XCTAssertEqual(json["warmupMs"] as? Int, 3_500)
+    }
+
+    func testAdaptiveGraceExtendsOnFastOrRisingLinks() {
+        // > 200 Mbps : 2 s de slow-start pèsent trop lourd → extension.
+        XCTAssertTrue(speedtestShouldExtendGrace(recentMbps: 320, earlierMbps: 315))
+        // Débit encore nettement croissant en fin de warm-up → extension.
+        XCTAssertTrue(speedtestShouldExtendGrace(recentMbps: 90, earlierMbps: 60))
+        // Débit stabilisé sous le seuil → warm-up de base suffisant.
+        XCTAssertFalse(speedtestShouldExtendGrace(recentMbps: 80, earlierMbps: 78))
+        // Pas de débit mesurable ou pas d'historique → pas d'extension.
+        XCTAssertFalse(speedtestShouldExtendGrace(recentMbps: 0, earlierMbps: nil))
+        XCTAssertFalse(speedtestShouldExtendGrace(recentMbps: 150, earlierMbps: nil))
+    }
+
+    func testAdaptivePhaseWindowExtendsOnceBeforeBoundaryAndShiftsDeadline() {
+        let deadline = Date(timeIntervalSince1970: 1_000)
+        let window = SpeedtestAdaptivePhaseWindow(graceMs: 2_000, deadline: deadline)
+
+        // Trop tard (frontière de grace déjà passée) : refusé — les octets
+        // seraient déjà marqués « utiles ».
+        XCTAssertFalse(window.extendGrace(to: 3_500, ifNotPastMs: 2_100))
+        XCTAssertEqual(window.graceMs, 2_000)
+
+        // Avant la frontière : accepté, l'échéance glisse du même délai pour
+        // préserver la durée utile de mesure.
+        XCTAssertTrue(window.extendGrace(to: 3_500, ifNotPastMs: 1_850))
+        XCTAssertEqual(window.graceMs, 3_500)
+        XCTAssertTrue(window.wasExtended)
+        XCTAssertEqual(window.deadline.timeIntervalSince(deadline), 1.5, accuracy: 0.001)
+
+        // Une seule extension par phase.
+        XCTAssertFalse(window.extendGrace(to: 4_000, ifNotPastMs: 1_900))
+        XCTAssertEqual(window.graceMs, 3_500)
+    }
+
+    func testLiveSamplerTracksInstantaneousRateOverSlidingWindow() {
+        // smoothing 1.0 → valeur brute de la fenêtre glissante (sans EMA), pour
+        // vérifier la fenêtre elle-même.
+        let sampler = SpeedtestLiveSampler(windowMs: 1_000, smoothing: 1.0)
+        var total = 0
+        var value = 0.0
+        // 12,5 Mo/s (= 100 Mbps) pendant 3 s, tick toutes les 150 ms.
+        for tick in 1...20 {
+            total += 1_875_000
+            value = sampler.observe(totalBytes: total, elapsedMs: Double(tick) * 150)
+        }
+        XCTAssertEqual(value, 100, accuracy: 5)
+        XCTAssertEqual(sampler.lastInstantMbps, 100, accuracy: 5)
+
+        // Le débit DOUBLE : l'aiguille doit suivre le débit INSTANTANÉ (~200),
+        // pas la moyenne cumulée (~150 après autant de temps à 100 puis 200).
+        for tick in 21...40 {
+            total += 3_750_000
+            value = sampler.observe(totalBytes: total, elapsedMs: Double(tick) * 150)
+        }
+        XCTAssertEqual(value, 200, accuracy: 10)
     }
 
     func testUploadScalingRatioCorrection() {
