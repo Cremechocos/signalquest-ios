@@ -42,7 +42,8 @@ final class FluidityQATests: XCTestCase {
         let app = configuredApp()
         measure(metrics: [XCTApplicationLaunchMetric()]) {
             app.launch()
-            _ = app.tabBars.buttons["Feed"].waitForExistence(timeout: 25)
+            SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
+            _ = SignalQuestUITestSupport.tab(named: "Accueil", in: app).waitForExistence(timeout: 25)
             app.terminate()
         }
     }
@@ -51,8 +52,12 @@ final class FluidityQATests: XCTestCase {
     func testFeedScrollHitches() {
         let app = configuredApp()
         app.launch()
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
         dismissSystemAlert()
-        XCTAssertTrue(app.tabBars.buttons["Feed"].waitForExistence(timeout: 25))
+        let community = SignalQuestUITestSupport.tab(named: "Communauté", in: app)
+        XCTAssertTrue(community.waitForExistence(timeout: 25))
+        community.tap()
+        XCTAssertTrue(app.navigationBars["Communauté"].waitForExistence(timeout: 10))
         measure(metrics: [XCTOSSignpostMetric.scrollDecelerationMetric, XCTCPUMetric(), XCTMemoryMetric()], options: measureOptions()) {
             startMeasuring()
             for _ in 0..<6 { app.swipeUp(velocity: .fast) }
@@ -67,9 +72,11 @@ final class FluidityQATests: XCTestCase {
     func testMapDriveLong() {
         let app = configuredApp()
         app.launch()
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
         dismissSystemAlert()
-        XCTAssertTrue(app.tabBars.buttons["Carte"].waitForExistence(timeout: 25))
-        app.tabBars.buttons["Carte"].tap()
+        let map = SignalQuestUITestSupport.tab(named: "Carte", in: app)
+        XCTAssertTrue(map.waitForExistence(timeout: 25))
+        map.tap()
         Thread.sleep(forTimeInterval: 6)
         let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
         let left   = app.coordinate(withNormalizedOffset: CGVector(dx: 0.22, dy: 0.45))
@@ -89,9 +96,11 @@ final class FluidityQATests: XCTestCase {
     func testMapPanHitches() {
         let app = configuredApp()
         app.launch()
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
         dismissSystemAlert()
-        XCTAssertTrue(app.tabBars.buttons["Carte"].waitForExistence(timeout: 25))
-        app.tabBars.buttons["Carte"].tap()
+        let map = SignalQuestUITestSupport.tab(named: "Carte", in: app)
+        XCTAssertTrue(map.waitForExistence(timeout: 25))
+        map.tap()
         Thread.sleep(forTimeInterval: 5)   // laisse la carte + antennes charger
         // Drags UNIQUEMENT dans la zone centrale (dy 0.30–0.55) : loin de la barre de
         // recherche (haut), de la barre d'onglets et des boutons (bas) → aucun tap

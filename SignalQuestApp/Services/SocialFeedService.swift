@@ -17,7 +17,9 @@ protocol SocialFeedServicing: Sendable {
     func favorite(postId: String) async throws -> ReactionResponse
     func repost(postId: String) async throws -> ReactionResponse
     func muteNotifications(postId: String) async throws -> SuccessResponse
-    func share(postId: String, conversationId: String) async throws -> SuccessResponse
+    /// Partage un post vers une conversation. Renvoie l'id du message créé (pour
+    /// permettre l'annulation), ou nil si le backend ne l'a pas fourni.
+    func share(postId: String, conversationId: String) async throws -> String?
 
     // MARK: Réseau social (profils, follow, exploration)
 
@@ -33,6 +35,8 @@ protocol SocialFeedServicing: Sendable {
     func searchUsers(query: String, limit: Int) async throws -> [SocialUserSearchResult]
     /// Dernier speedtest sauvegardé côté backend (pour l'attacher à un post).
     func myLatestSpeedtest() async throws -> SocialShareableSpeedtest?
+    /// Pouls réseau autour d'une position : `GET /api/social/network-pulse`.
+    func networkPulse(latitude: Double, longitude: Double) async throws -> NetworkPulse
 }
 
 extension SocialFeedServicing {
@@ -50,6 +54,21 @@ extension SocialFeedServicing {
             targetId: nil,
             extraMetadata: nil
         )
+    }
+}
+
+/// Réponse de `POST /api/social/posts/{id}/share` : `{ message: { id, … } }`.
+/// On n'a besoin que de l'id du message créé (pour l'annulation).
+struct SharePostResponse: Decodable {
+    let messageId: String?
+
+    private enum RootKeys: String, CodingKey { case message }
+    private enum MessageKeys: String, CodingKey { case id }
+
+    init(from decoder: Decoder) throws {
+        let root = try decoder.container(keyedBy: RootKeys.self)
+        let message = try? root.nestedContainer(keyedBy: MessageKeys.self, forKey: .message)
+        messageId = try? message?.decode(String.self, forKey: .id)
     }
 }
 
@@ -144,15 +163,31 @@ final class SocialFeedService: SocialFeedServicing {
         try await api.request(APIEndpoint(path: "/api/social/posts/\(normalizedPostId(postId))/notifications", method: .post), as: SuccessResponse.self)
     }
 
-    func share(postId: String, conversationId: String) async throws -> SuccessResponse {
-        try await api.requestJSON("/api/social/posts/\(normalizedPostId(postId))/share", body: ["conversationId": conversationId])
+    func share(postId: String, conversationId: String) async throws -> String? {
+        let response: SharePostResponse = try await api.requestJSON(
+            "/api/social/posts/\(normalizedPostId(postId))/share",
+            body: ["conversationId": conversationId]
+        )
+        return response.messageId
+    }
+
+    /// `radius` volontairement omis : le backend applique 3 km par défaut (et le
+    /// zod rejette un radius à 0 issu d'un coerce null→0).
+    func networkPulse(latitude: Double, longitude: Double) async throws -> NetworkPulse {
+        try await api.request(
+            APIEndpoint(path: "/api/social/network-pulse", query: [
+                URLQueryItem(name: "lat", value: String(latitude)),
+                URLQueryItem(name: "lng", value: String(longitude))
+            ]),
+            as: NetworkPulse.self
+        )
     }
 
     // MARK: - Profils & follow
 
     func userProfile(userId: String) async throws -> SocialUserProfile {
         let response: SocialUserProfileResponse = try await api.request(
-            APIEndpoint(path: "/users/\(userId)/profile"),
+            APIEndpoint(path: "/api/users/\(userId)/profile"),
             as: SocialUserProfileResponse.self
         )
         return response.profile
@@ -237,7 +272,7 @@ final class SocialFeedService: SocialFeedServicing {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
         return try await api.request(
-            APIEndpoint(path: "/users/search", query: [
+            APIEndpoint(path: "/api/users/search", query: [
                 URLQueryItem(name: "q", value: trimmed),
                 URLQueryItem(name: "limit", value: String(limit))
             ]),

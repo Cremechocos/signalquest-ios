@@ -90,7 +90,7 @@ final class MessagesService: MessagesServicing {
         guard !q.isEmpty else { return [] }
         return try await api.request(
             APIEndpoint(
-                path: "/users/search",
+                path: "/api/users/search",
                 query: [
                     URLQueryItem(name: "q", value: q),
                     URLQueryItem(name: "limit", value: "20")
@@ -135,7 +135,12 @@ final class MessagesService: MessagesServicing {
         let payload: SendMessageRequest
         if conversation.e2eeEnabled == true {
             guard let e2ee else { throw E2EEError.locked }
-            let encrypted = try await e2ee.encryptText(conversationId: conversation.id, text: text)
+            let encrypted = try await e2ee.encryptText(
+                conversationId: conversation.id,
+                text: text,
+                contentType: .text,
+                operationId: idempotencyKey
+            )
             // Partage la clé de conversation aux participants qui ne l'ont pas
             // encore (ex. un destinataire Android ayant configuré son E2EE APRÈS
             // la dernière ouverture de la conversation) — sinon il voit le message
@@ -184,27 +189,17 @@ final class MessagesService: MessagesServicing {
         replyToId: String? = nil,
         e2ee: E2EEServicing?
     ) async throws -> MessageItem {
-        // Les pièces jointes voyagent en clair dans `attachments` (URLs serveur),
-        // seul le texte d'accompagnement est chiffré — même comportement
-        // qu'Android `sendAttachmentMessage`.
-        let trimmedCaption = caption.trimmingCharacters(in: .whitespacesAndNewlines)
-        var encrypted: E2EEPayload?
-        var content: String?
-        if conversation.e2eeEnabled == true {
-            guard let e2ee else { throw E2EEError.locked }
-            // Cf. sendText : garantir que les participants récemment configurés
-            // reçoivent la clé de conversation (best-effort).
-            await e2ee.shareConversationKeyIfNeeded(conversationId: conversation.id)
-            if !trimmedCaption.isEmpty {
-                encrypted = try await e2ee.encryptText(conversationId: conversation.id, text: trimmedCaption)
-            }
-        } else if !trimmedCaption.isEmpty {
-            content = trimmedCaption
+        // Ne jamais joindre une URL/métadonnée en clair à une conversation E2EE.
+        // Le chiffrement binaire interopérable sera réactivé avec l'enveloppe média
+        // V2 ; jusque-là on échoue explicitement avant la création du message.
+        guard conversation.e2eeEnabled != true else {
+            throw E2EEError.unsupported("Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils.")
         }
+        let trimmedCaption = caption.trimmingCharacters(in: .whitespacesAndNewlines)
         let payload = SendMessageRequest(
             kind: attachments.isEmpty ? "TEXT" : "ATTACHMENT",
-            content: content,
-            e2ee: encrypted,
+            content: trimmedCaption.isEmpty ? nil : trimmedCaption,
+            e2ee: nil,
             replyToId: replyToId,
             attachments: attachments
         )
@@ -250,7 +245,12 @@ final class MessagesService: MessagesServicing {
         let body: EditRequest
         if conversation.e2eeEnabled == true {
             guard let e2ee else { throw E2EEError.locked }
-            let encrypted = try await e2ee.encryptText(conversationId: conversation.id, text: text)
+            let encrypted = try await e2ee.encryptText(
+                conversationId: conversation.id,
+                text: text,
+                contentType: .edit,
+                operationId: messageId
+            )
             body = EditRequest(content: nil, e2ee: encrypted)
         } else {
             body = EditRequest(content: text, e2ee: nil)
@@ -538,7 +538,12 @@ final class MessagesService: MessagesServicing {
         let body: ThreadReplyRequest
         if conversation.e2eeEnabled == true {
             guard let e2ee else { throw E2EEError.locked }
-            let encrypted = try await e2ee.encryptText(conversationId: conversation.id, text: text)
+            let encrypted = try await e2ee.encryptText(
+                conversationId: conversation.id,
+                text: text,
+                contentType: .threadReply,
+                operationId: parentMessageId
+            )
             body = ThreadReplyRequest(content: nil, e2ee: encrypted)
         } else {
             body = ThreadReplyRequest(content: text, e2ee: nil)
@@ -578,7 +583,12 @@ final class MessagesService: MessagesServicing {
                 multiSelect: multiSelect
             )
             let json = String(decoding: try JSONEncoder.signalQuest.encode(encoded), as: UTF8.self)
-            let encrypted = try await e2ee.encryptText(conversationId: conversationId, text: json)
+            let encrypted = try await e2ee.encryptText(
+                conversationId: conversationId,
+                text: json,
+                contentType: .poll,
+                operationId: nil
+            )
             struct E2EEPollRequest: Encodable {
                 let optionIds: [String]
                 let multiSelect: Bool

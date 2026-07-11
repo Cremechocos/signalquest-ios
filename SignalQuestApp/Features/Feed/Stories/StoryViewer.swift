@@ -12,10 +12,18 @@ struct StoryViewer: View {
     /// Réponse / réaction à une story = message privé à l'auteur (façon Instagram).
     /// Le parent résout/crée la conversation DM et envoie le texte/emoji.
     var onSendReply: (SocialStory, String) -> Void = { _, _ in }
+    /// Suppression d'une story (auteur) — le parent supprime côté serveur + rafraîchit.
+    var onDelete: (SocialStory) -> Void = { _ in }
+    /// Fournit la liste « Vu par » d'une story (auteur uniquement).
+    var viewersProvider: (SocialStory) async -> [StoryViewerEntry] = { _ in [] }
 
     @State private var replyText = ""
     @FocusState private var replyFocused: Bool
     @State private var sentConfirmation = false
+    @State private var showViewers = false
+    @State private var viewers: [StoryViewerEntry] = []
+    @State private var loadingViewers = false
+    @State private var showDeleteConfirm = false
 
     /// Durée d'affichage dérivée du choix de l'auteur (5/10/15 s côté backend),
     /// bornée 5...15 (STORY-BUG-01 : la constante 6 s ignorait `durationSeconds`).
@@ -39,8 +47,21 @@ struct StoryViewer: View {
                 progressBars
                 header
                 Spacer()
-                replyAffordance
+                if currentStory?.isMine == true {
+                    ownerFooter
+                } else {
+                    replyAffordance
+                }
             }
+        }
+        .sheet(isPresented: $showViewers) {
+            StoryViewersSheet(viewers: viewers, isLoading: loadingViewers)
+        }
+        .confirmationDialog("Supprimer cette story ?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            Button("Supprimer", role: .destructive) {
+                if let story = currentStory { onDelete(story); dismiss() }
+            }
+            Button("Annuler", role: .cancel) {}
         }
         .onTapGesture(coordinateSpace: .local) { location in
             let half = UIScreen.main.bounds.width / 2
@@ -59,7 +80,7 @@ struct StoryViewer: View {
             var elapsed: Double = 0
             while !Task.isCancelled {
                 // En pause pendant la saisie d'une réponse (le clavier est ouvert).
-                if !replyFocused {
+                if !replyFocused && !showViewers && !showDeleteConfirm {
                     elapsed += 0.05
                     progress = min(1, elapsed / duration)
                     if elapsed >= duration {
@@ -208,6 +229,45 @@ struct StoryViewer: View {
         .sqAnimation(SQMotion.snappy, value: sentConfirmation)
     }
 
+    /// Pied affiché sur ses PROPRES stories : « Vu par… » + suppression.
+    private var ownerFooter: some View {
+        HStack(spacing: SQSpace.md) {
+            Button {
+                Task { await loadViewers() }
+                showViewers = true
+            } label: {
+                Label("Vu par…", systemImage: "eye")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, SQSpace.md)
+                    .padding(.vertical, SQSpace.sm)
+                    .background(.ultraThinMaterial, in: Capsule())
+            }
+            .accessibilityLabel("Voir qui a vu la story")
+            Spacer()
+            Button {
+                Haptics.medium()
+                showDeleteConfirm = true
+            } label: {
+                Image(systemName: "trash")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+            .accessibilityLabel("Supprimer la story")
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.bottom, SQSpace.lg)
+    }
+
+    private func loadViewers() async {
+        guard let story = currentStory else { return }
+        loadingViewers = true
+        viewers = await viewersProvider(story)
+        loadingViewers = false
+    }
+
     private func sendReply() {
         let text = replyText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let story = currentStory else { return }
@@ -241,5 +301,51 @@ struct StoryViewer: View {
     }
     private func back() {
         if index > 0 { index -= 1 }
+    }
+}
+
+/// Feuille « Vu par N » (façon Instagram) : liste des utilisateurs + instant de vue.
+private struct StoryViewersSheet: View {
+    let viewers: [StoryViewerEntry]
+    let isLoading: Bool
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isLoading {
+                    ProgressView().tint(SQColor.brandRed)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if viewers.isEmpty {
+                    EmptyStateView(title: "Personne pour l'instant", message: "Les vues apparaîtront ici.", systemImage: "eye")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List {
+                        ForEach(viewers) { entry in
+                            HStack(spacing: SQSpace.md) {
+                                SQAvatar(url: entry.user.avatarUrl, name: entry.user.displayName, size: 36)
+                                Text(entry.user.displayName).foregroundStyle(SQColor.label)
+                                Spacer()
+                                if let viewedAt = entry.viewedAt {
+                                    Text(viewedAt, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                                        .font(SQType.caption)
+                                        .foregroundStyle(SQColor.labelTertiary)
+                                }
+                            }
+                        }
+                    }
+                    .scrollContentBackground(.hidden)
+                }
+            }
+            .signalQuestBackground()
+            .navigationTitle("Vu par \(viewers.count)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Fermer") { dismiss() }.tint(SQColor.brandRed)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }

@@ -6,11 +6,13 @@ import Foundation
 /// notification tap always lands somewhere sensible instead of nowhere.
 @MainActor
 final class AppRouter: ObservableObject {
-    enum AppTab: Hashable { case feed, map, speed, messages, profile }
+    enum AppTab: Hashable { case home, map, speed, community, profile }
 
     @Published var selectedTab: AppTab
     /// Set to request opening a specific conversation on the Messages tab.
     @Published var openConversationId: String?
+    /// Ouvre la boîte Messages dans l'onglet Communauté, même sans conversation ciblée.
+    @Published var openMessagesInbox = false
     /// Set to request opening a specific post on the Feed tab.
     @Published var openPostId: String?
     /// Set to request opening a user profile on the Feed tab (notification de follow).
@@ -31,12 +33,12 @@ final class AppRouter: ObservableObject {
                     || args.contains("--qa-open-antenna") {
             selectedTab = .map
         } else if args.contains("--qa-tab-messages") {
-            selectedTab = .messages
+            selectedTab = .community
         } else if ProcessInfo.processInfo.arguments.contains("--qa-anfr-map") ||
                     ProcessInfo.processInfo.arguments.contains("--qa-anfr-stats") {
             selectedTab = .profile
         } else {
-            selectedTab = .feed
+            selectedTab = .home
         }
     }
 
@@ -68,17 +70,18 @@ final class AppRouter: ObservableObject {
     }
 
     func route(toConversation id: String?) {
-        selectedTab = .messages
+        selectedTab = .community
+        openMessagesInbox = true
         if let id { openConversationId = id }
     }
 
     func route(toPost id: String?) {
-        selectedTab = .feed
+        selectedTab = .community
         if let id { openPostId = id }
     }
 
     func route(toUserProfile id: String?) {
-        selectedTab = .feed
+        selectedTab = .community
         if let id { openUserProfileId = id }
     }
 

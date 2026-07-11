@@ -10,7 +10,7 @@
 	</array>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>webcredentials:signalquest.fr</string>
+		<string>$(SQ_ASSOCIATED_DOMAIN)</string>
 	</array>
 	<key>com.apple.developer.group-session</key>
 	<true/>
@@ -18,7 +18,7 @@
 	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.fr.signalquest.ios</string>
+		<string>$(SQ_APP_GROUP)</string>
 	</array>
 </dict>
 </plist>

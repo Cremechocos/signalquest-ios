@@ -153,7 +153,7 @@ struct ChooseHandleSheet: View {
             onSuccess(normalized)
             dismiss()
         } catch let APIError.http(_, code, serverMessage, _, _) {
-            let msg = serverMessage ?? "Échec de l’enregistrement."
+            let msg = serverMessage.isEmpty ? "Échec de l’enregistrement." : serverMessage
             switch code {
             case "HANDLE_COOLDOWN": status = .cooldown; message = msg
             case "HANDLE_ALREADY_USED": status = .taken; message = msg

@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 @MainActor
 final class FeedViewModel: ObservableObject {
@@ -7,13 +8,36 @@ final class FeedViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var isLoadingMore = false
     @Published var errorMessage: String?
+    /// Pouls réseau (héro) — nil tant qu'aucune donnée / position n'est disponible.
+    @Published var pulse: NetworkPulse?
 
     private let service: SocialFeedServicing
     private let storiesService: StoriesServicing?
+    private let location: LocationService?
 
-    init(service: SocialFeedServicing, storiesService: StoriesServicing? = nil) {
+    init(service: SocialFeedServicing, storiesService: StoriesServicing? = nil, location: LocationService? = nil) {
         self.service = service
         self.storiesService = storiesService
+        self.location = location
+    }
+
+    /// Charge le pouls réseau autour de la position courante. Ne déclenche JAMAIS
+    /// de prompt de localisation depuis le feed : on ne l'interroge que si
+    /// l'autorisation est déjà accordée ou qu'une position est déjà connue. Échec
+    /// silencieux : le héro disparaît simplement.
+    func loadPulse() async {
+        if AppEnvironment.usesDemoData { pulse = .demo; return }
+        guard let location else { return }
+        let status = location.authorizationStatus
+        let authorized = status == .authorizedWhenInUse || status == .authorizedAlways
+        guard authorized || location.lastLocation != nil else { return }
+        guard let coordinate = await location.currentLocation()?.coordinate else { return }
+        do {
+            let result = try await service.networkPulse(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            pulse = result.hasData ? result : nil
+        } catch {
+            // Silencieux : le héro n'est simplement pas affiché.
+        }
     }
 
     func load() async {
@@ -142,15 +166,16 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
-    func share(_ item: UnifiedSocialFeedItem, to conversation: MessageConversation) async -> Bool {
+    /// Partage le post ; renvoie l'id du message créé (pour l'annulation), nil si échec.
+    func share(_ item: UnifiedSocialFeedItem, to conversation: MessageConversation) async -> String? {
         do {
-            _ = try await service.share(postId: item.id, conversationId: conversation.id)
+            let messageId = try await service.share(postId: item.id, conversationId: conversation.id)
             Haptics.success()
-            return true
+            return messageId
         } catch {
             if !error.isCancellation { errorMessage = error.localizedDescription }
             Haptics.error()
-            return false
+            return nil
         }
     }
 
@@ -219,12 +244,21 @@ struct FeedView: View {
     @State private var showStoryComposer = false
     @State private var showComposer = false
     @State private var showExplore = false
+    @State private var showMessages = false
     /// Auteur dont on pousse le profil public (cards, commentaires, stories…).
     @State private var profileAuthor: SocialFeedAuthor?
     /// Profil demandé par notification (follow) via AppRouter — par id seul.
     @State private var routedProfileId: String?
     /// Post ouvert via deep-link / notification (résolu en item complet).
     @State private var routedPostItem: RoutedPost?
+    /// Partage réussi en attente d'annulation (pilule éphémère en bas du feed).
+    @State private var shareUndo: ShareUndoState?
+
+    private struct ShareUndoState: Identifiable {
+        let id = UUID()
+        let messageId: String
+        let conversationTitle: String
+    }
 
     private enum FeedSheet: Identifiable {
         case detail(UnifiedSocialFeedItem)
@@ -252,8 +286,8 @@ struct FeedView: View {
         func hash(into hasher: inout Hasher) { hasher.combine(id) }
     }
 
-    init(service: SocialFeedServicing = SocialFeedService(api: APIClient())) {
-        _model = StateObject(wrappedValue: FeedViewModel(service: service))
+    init(service: SocialFeedServicing = SocialFeedService(api: APIClient()), location: LocationService? = nil) {
+        _model = StateObject(wrappedValue: FeedViewModel(service: service, location: location))
     }
 
     var body: some View {
@@ -267,6 +301,10 @@ struct FeedView: View {
                     LoadingSkeleton()
                         .sqShimmer()
                 } else {
+                    if let pulse = model.pulse {
+                        NetworkPulseHero(pulse: pulse)
+                            .sqFadeUp()
+                    }
                     if let stories = model.page?.stories, !stories.isEmpty {
                         StoriesBar(
                             stories: stories,
@@ -325,9 +363,31 @@ struct FeedView: View {
             .padding(.bottom, SQSpace.xxl)
         }
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 96) }
-        .navigationTitle("Feed")
+        .overlay(alignment: .bottom) { shareUndoPill }
+        .navigationTitle("Communauté")
         .toolbarTitleLargeCompat()
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Haptics.light()
+                    showMessages = true
+                } label: {
+                    Image(systemName: "bubble.left.and.bubble.right")
+                        .foregroundStyle(SQColor.brandRed)
+                        .overlay(alignment: .topTrailing) {
+                            if services.unreadConversations > 0 {
+                                Circle()
+                                    .fill(SQColor.danger)
+                                    .frame(width: 8, height: 8)
+                                    .offset(x: 3, y: -3)
+                            }
+                        }
+                }
+                .accessibilityLabel("Messages")
+                .accessibilityValue(services.unreadConversations == 0
+                                    ? "Aucun message non lu"
+                                    : "\(services.unreadConversations) conversations non lues")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     Haptics.light()
@@ -352,11 +412,19 @@ struct FeedView: View {
         .signalQuestBackground()
         .task {
             if model.page == nil { await model.load() }
+            await model.loadPulse()
             await consumeFeedRoutesIfNeeded()
+            presentMessagesIfNeeded()
         }
-        .refreshable { await model.load() }
+        .refreshable {
+            await model.load()
+            await model.loadPulse()
+        }
         .navigationDestination(isPresented: $showExplore) {
             ExploreView(service: services.feed)
+        }
+        .navigationDestination(isPresented: $showMessages) {
+            MessagesView(service: services.messages, e2ee: services.e2ee)
         }
         .navigationDestinationItemCompat($profileAuthor) { author in
             UserProfileView(
@@ -382,6 +450,12 @@ struct FeedView: View {
         }
         .onChangeCompat(of: router.openPostId) { _, _ in
             Task { await consumeFeedRoutesIfNeeded() }
+        }
+        .onChangeCompat(of: router.openConversationId) { _, conversationId in
+            if conversationId != nil { showMessages = true }
+        }
+        .onChangeCompat(of: router.openMessagesInbox) { _, shouldOpen in
+            if shouldOpen { presentMessagesIfNeeded() }
         }
         .sheet(item: $presentedSheet) { sheet in
             switch sheet {
@@ -417,6 +491,9 @@ struct FeedView: View {
                     messagesService: services.messages,
                     onShare: { conversation in
                         await model.share(item, to: conversation)
+                    },
+                    onShared: { messageId, conversation in
+                        presentShareUndo(messageId: messageId, conversation: conversation)
                     }
                 )
             case .stories:
@@ -438,15 +515,75 @@ struct FeedView: View {
                             },
                             onSendReply: { story, text in
                                 sendStoryReply(story, text: text)
+                            },
+                            onDelete: { story in
+                                Task {
+                                    try? await services.stories.delete(story.id)
+                                    await model.load()
+                                }
+                            },
+                            viewersProvider: { story in
+                                (try? await services.stories.viewers(storyId: story.id)) ?? []
                             })
             }
         }
         .sheet(isPresented: $showStoryComposer) {
-            StoryComposer(service: services.stories)
+            StoryComposer(service: services.stories, friendsService: services.friends)
         }
         .sheet(isPresented: $showComposer) {
             ComposerSheet(service: services.feed, userService: services.users)
                 .onDisappear { Task { await model.load() } }
+        }
+    }
+
+    // MARK: Annulation d'un partage
+
+    private func presentShareUndo(messageId: String, conversation: MessageConversation) {
+        let title = conversation.displayTitle.isEmpty ? "la conversation" : conversation.displayTitle
+        let state = ShareUndoState(messageId: messageId, conversationTitle: title)
+        withAnimation(SQMotion.snappy) { shareUndo = state }
+        Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            await MainActor.run {
+                if shareUndo?.id == state.id { withAnimation(SQMotion.snappy) { shareUndo = nil } }
+            }
+        }
+    }
+
+    private func undoShare(_ state: ShareUndoState) {
+        withAnimation(SQMotion.snappy) { shareUndo = nil }
+        Task {
+            try? await services.messages.deleteMessage(messageId: state.messageId, forEveryone: true)
+            await MainActor.run { Haptics.success() }
+        }
+    }
+
+    /// Pilule éphémère « Partagé · Annuler » (parité pilule Android). Le message
+    /// partagé est supprimé côté serveur si l'utilisateur annule.
+    @ViewBuilder
+    private var shareUndoPill: some View {
+        if let state = shareUndo {
+            HStack(spacing: SQSpace.sm) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(SQColor.success)
+                    .accessibilityHidden(true)
+                Text("Partagé vers \(state.conversationTitle)")
+                    .font(SQType.caption.weight(.medium))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(1)
+                Spacer(minLength: SQSpace.sm)
+                Button("Annuler") { undoShare(state) }
+                    .font(SQType.caption.weight(.bold))
+                    .tint(SQColor.brandRed)
+            }
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm + 2)
+            .background(SQColor.surface, in: Capsule())
+            .overlay { Capsule().stroke(SQColor.separator, lineWidth: 1) }
+            .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.bottom, 108)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
 
@@ -466,6 +603,12 @@ struct FeedView: View {
                 routedPostItem = RoutedPost(item: fetched)
             }
         }
+    }
+
+    private func presentMessagesIfNeeded() {
+        guard router.openMessagesInbox || router.openConversationId != nil else { return }
+        router.openMessagesInbox = false
+        showMessages = true
     }
 
     /// Pousse le profil après la fermeture d'un sheet / fullScreenCover :
@@ -534,7 +677,10 @@ private struct StoriesPresentation: Identifiable { let id = UUID() }
 private struct PostShareSheet: View {
     let post: UnifiedSocialFeedItem
     let messagesService: MessagesServicing
-    let onShare: (MessageConversation) async -> Bool
+    /// Renvoie l'id du message créé (succès) ou nil (échec).
+    let onShare: (MessageConversation) async -> String?
+    /// Appelé après un partage réussi, pour proposer l'annulation côté feed.
+    var onShared: (String, MessageConversation) -> Void = { _, _ in }
 
     @Environment(\.dismiss) private var dismiss
     @State private var conversations: [MessageConversation] = []
@@ -619,7 +765,8 @@ private struct PostShareSheet: View {
     private func share(_ conversation: MessageConversation) async {
         busyConversationId = conversation.id
         defer { busyConversationId = nil }
-        if await onShare(conversation) {
+        if let messageId = await onShare(conversation) {
+            onShared(messageId, conversation)
             dismiss()
         }
     }

@@ -134,6 +134,15 @@ final class DriveTestViewModel: ObservableObject {
     private var coveragePoints: [CoveragePointUpload] = []
     private var lastCoveragePointCoord: CLLocationCoordinate2D?
     private let coveragePointCap = 3000
+    /// Identité locale stable de la session, conservée dans le corps et dans
+    /// l'Idempotency-Key pendant tous les rejeux réseau.
+    private var coverageSessionId: UUID?
+    private var coverageStartedAtMs: Int?
+    /// Choix de visibilité figé au démarrage, puis persisté avec le brouillon.
+    private var coverageShowOnMap = false
+    /// Dès qu'un VPN est vu pendant la session, la contribution est supprimée de
+    /// la file locale et ne sera jamais rejouée après un redémarrage.
+    private var coverageUploadSuppressed = false
     /// Mode figé au démarrage de la session (couverture / speedtest / les deux).
     private var sessionMode: DriveTestMode = .both
     /// Nombre de points de couverture capturés (affiché en mode couverture).
@@ -165,6 +174,9 @@ final class DriveTestViewModel: ObservableObject {
 
     func onAppear() {
         isVPNActive = VPNDetector.isActive()
+        // Reprend aussi une session interrompue par un kill précédent. La file
+        // reste intacte si le réseau ou l'authentification ne sont pas disponibles.
+        Task { await services.sessions.retryPendingCoverageSessions() }
         // Pré-remplit le sélecteur d'opérateur sans attendre une position.
         Task { await prepareOperatorSelector() }
         services.location.onLocationUpdate = { [weak self] location in
@@ -198,6 +210,30 @@ final class DriveTestViewModel: ObservableObject {
         lastCoveragePointCoord = nil
         coveragePointCount = 0
         sessionMode = DriveTestMode.current
+        coverageSessionId = nil
+        coverageStartedAtMs = nil
+        coverageShowOnMap = publishToMap()
+        coverageUploadSuppressed = VPNDetector.isActive()
+        if sessionMode.recordsCoverage {
+            let sessionId = UUID()
+            let startedAt = Self.nowMs()
+            coverageSessionId = sessionId
+            coverageStartedAtMs = startedAt
+            // Sous VPN, la trace peut rester visible pendant le trajet mais elle
+            // n'est jamais écrite dans une file qui pourrait être rejouée plus tard.
+            if !coverageUploadSuppressed, let draft = makeCoverageSessionUpload(endTime: startedAt) {
+                do {
+                    try services.sessions.persistCoverageDraft(draft)
+                } catch {
+                    coverageSessionId = nil
+                    coverageStartedAtMs = nil
+                    statusLabel = "Stockage local indisponible"
+                    errorMessage = "Impossible de sécuriser ce Drive Test sur l’appareil. Réessaie avant de partir."
+                    Self.log.error("création brouillon couverture ÉCHEC : \(error.localizedDescription, privacy: .public)")
+                    return
+                }
+            }
+        }
         liveMbps = 0
         livePhase = .idle
         isRunning = true
@@ -330,6 +366,7 @@ final class DriveTestViewModel: ObservableObject {
             coverageTrail.removeFirst(coverageTrail.count - coveragePointCap)
         }
         coveragePointCount = coveragePoints.count
+        persistCoverageSnapshot()
     }
 
     /// Mémorise un point speedtest géolocalisé pour la carte (borné).
@@ -371,40 +408,85 @@ final class DriveTestViewModel: ObservableObject {
         )
     }
 
-    /// Téléverse la session de couverture en fin de drive (best-effort) — seulement
-    /// si le mode enregistre la couverture (= consentement) ET hors VPN (opérateur non
-    /// fiable sous VPN). Le choix d'un mode couverture vaut publication.
-    private func uploadCoverageSessionIfNeeded() {
-        let points = coveragePoints
-        coveragePoints.removeAll()
-        lastCoveragePointCoord = nil
-        guard sessionMode.recordsCoverage else { return }
-        // Raisons de non-envoi rendues VISIBLES (avant : skip/échec totalement muet).
-        if VPNDetector.isActive() {
-            statusLabel = "Couverture non envoyée — VPN actif"
-            Self.log.notice("coverage upload ignoré : VPN actif")
-            return
-        }
-        guard points.count >= 2, let first = points.first, let last = points.last else {
-            statusLabel = "Couverture non envoyée — trajet trop court (\(points.count) pt)"
-            Self.log.notice("coverage upload ignoré : \(points.count) point(s) seulement")
-            return
-        }
+    /// Construit l'instantané complet de la session avec l'identifiant et le choix
+    /// `showOnMap` figés au démarrage.
+    private func makeCoverageSessionUpload(endTime: Int? = nil) -> CoverageSessionUpload? {
+        guard let sessionId = coverageSessionId, let startedAt = coverageStartedAtMs else { return nil }
         let plmn = services.networkPath.simPLMN()
         let market = resolvedSim?.market
             ?? marketEntry.map { $0.marketCode.isEmpty ? $0.code : $0.marketCode }
-        let session = CoverageSessionUpload(
-            startTime: first.timestamp,
-            endTime: last.timestamp,
+        return CoverageSessionUpload(
+            sessionId: sessionId,
+            startTime: startedAt,
+            endTime: max(startedAt, endTime ?? coveragePoints.last?.timestamp ?? Self.nowMs()),
             mcc: plmn.mcc,
             mnc: plmn.mnc,
             operatorKey: displayedOperatorKey,
             marketCode: market,
-            showOnMap: true,
-            points: points
+            showOnMap: coverageShowOnMap,
+            points: coveragePoints
         )
+    }
+
+    /// Écrit chaque nouveau point dans le JSON atomique avant toute tentative
+    /// réseau. L'opération est volontairement synchrone : un retour de cette méthode
+    /// signifie que le point est déjà durable sur disque.
+    private func persistCoverageSnapshot() {
+        guard sessionMode.recordsCoverage, let sessionId = coverageSessionId else { return }
+        if VPNDetector.isActive() {
+            if !coverageUploadSuppressed {
+                try? services.sessions.discardCoverageDraft(sessionId: sessionId)
+            }
+            coverageUploadSuppressed = true
+            return
+        }
+        guard !coverageUploadSuppressed, let draft = makeCoverageSessionUpload() else { return }
+        do {
+            try services.sessions.persistCoverageDraft(draft)
+        } catch {
+            errorMessage = "Stockage local interrompu : garde l’app ouverte puis réessaie."
+            Self.log.error("persistance point couverture ÉCHEC : \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Finalise d'abord la session sur disque, puis tente le téléversement. Un kill
+    /// entre ces deux étapes laisse donc une entrée rejouable au prochain lancement.
+    private func uploadCoverageSessionIfNeeded() {
+        let points = coveragePoints
+        let sessionId = coverageSessionId
+        defer {
+            coveragePoints.removeAll()
+            lastCoveragePointCoord = nil
+            coverageSessionId = nil
+            coverageStartedAtMs = nil
+            coverageUploadSuppressed = false
+        }
+        guard sessionMode.recordsCoverage else { return }
+        // Raisons de non-envoi rendues VISIBLES (avant : skip/échec totalement muet).
+        if coverageUploadSuppressed || VPNDetector.isActive() {
+            if let sessionId { try? services.sessions.discardCoverageDraft(sessionId: sessionId) }
+            statusLabel = "Couverture non envoyée — VPN actif"
+            Self.log.notice("coverage upload ignoré : VPN actif")
+            return
+        }
+        guard points.count >= 2, let last = points.last else {
+            if let sessionId { try? services.sessions.discardCoverageDraft(sessionId: sessionId) }
+            statusLabel = "Couverture non envoyée — trajet trop court (\(points.count) pt)"
+            Self.log.notice("coverage upload ignoré : \(points.count) point(s) seulement")
+            return
+        }
+        guard let session = makeCoverageSessionUpload(endTime: last.timestamp) else { return }
         let sessions = services.sessions
         let count = points.count
+        do {
+            // Étape critique synchrone : la file est finalisée AVANT Task/network.
+            try sessions.finalizeCoverageDraft(session)
+        } catch {
+            statusLabel = "Couverture conservée en mémoire — stockage indisponible"
+            errorMessage = "Impossible de finaliser le Drive Test sur l’appareil."
+            Self.log.error("finalisation couverture ÉCHEC : \(error.localizedDescription, privacy: .public)")
+            return
+        }
         Task {
             do {
                 try await sessions.createCoverageSession(session)
@@ -757,8 +839,9 @@ final class DriveTestViewModel: ObservableObject {
     private func publishToMap() -> Bool {
         // Sous VPN : jamais de publication carte (opérateur du tunnel non fiable).
         guard !VPNDetector.isActive() else { return false }
-        // Activé par défaut ; le choix de l'utilisateur (réglages speedtest) est mémorisé.
-        return (UserDefaults.standard.object(forKey: "speedtest_publish_to_map") as? Bool) ?? true
+        // Opt-in partagé avec le speedtest : une nouvelle installation ne publie
+        // jamais un trajet précis tant que l'utilisateur ne l'a pas demandé.
+        return (UserDefaults.standard.object(forKey: "speedtest_publish_to_map") as? Bool) ?? false
     }
 }
 

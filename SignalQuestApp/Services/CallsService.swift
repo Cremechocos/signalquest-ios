@@ -11,10 +11,14 @@ struct CallSession: Decodable, Identifiable, Equatable {
     let liveKitUrl: URL?
     let liveKitRoom: String?
     let status: String?          // pending | ringing | accepted | rejected | ended
+    let isPending: Bool?
+    let displayName: String?
+    let isGroup: Bool
 
     enum CodingKeys: String, CodingKey {
-        case id, callId, mode, type, conversationId, createdAt, startedAt, endedAt, participants
-        case liveKitToken, token, liveKitUrl, wsUrl, liveKitRoom, roomName, status
+        case id, callId, mode, type, callType, conversationId, createdAt, startedAt, endedAt, participants
+        case otherParticipants, caller, callerName, conversation, conversationTitle, isGroup
+        case liveKitToken, token, liveKitUrl, wsUrl, liveKitRoom, roomName, status, pending
     }
 
     init(
@@ -27,7 +31,10 @@ struct CallSession: Decodable, Identifiable, Equatable {
         liveKitToken: String?,
         liveKitUrl: URL?,
         liveKitRoom: String?,
-        status: String?
+        status: String?,
+        isPending: Bool? = nil,
+        displayName: String? = nil,
+        isGroup: Bool = false
     ) {
         self.id = id
         self.mode = mode
@@ -39,22 +46,34 @@ struct CallSession: Decodable, Identifiable, Equatable {
         self.liveKitUrl = liveKitUrl
         self.liveKitRoom = liveKitRoom
         self.status = status
+        self.isPending = isPending
+        self.displayName = displayName
+        self.isGroup = isGroup
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = (try? c.decode(String.self, forKey: .id))
-            ?? (try? c.decode(String.self, forKey: .callId))
-            ?? UUID().uuidString
+        guard let decodedID = (try? c.decode(String.self, forKey: .id))
+            ?? (try? c.decode(String.self, forKey: .callId)),
+              !decodedID.isEmpty else {
+            throw DecodingError.keyNotFound(
+                CodingKeys.callId,
+                .init(codingPath: decoder.codingPath, debugDescription: "A call requires id or callId")
+            )
+        }
+        id = decodedID
         let rawMode = (try? c.decodeIfPresent(String.self, forKey: .mode))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .callType))
             ?? (try? c.decodeIfPresent(String.self, forKey: .type))
         mode = rawMode?.lowercased()
         conversationId = try? c.decodeIfPresent(String.self, forKey: .conversationId)
         createdAt = (try? c.decodeIfPresent(Date.self, forKey: .createdAt))
             ?? (try? c.decodeIfPresent(Date.self, forKey: .startedAt))
         endedAt = try? c.decodeIfPresent(Date.self, forKey: .endedAt)
-        participants = (try? c.decodeIfPresent([String].self, forKey: .participants))
+        let decodedParticipants = (try? c.decodeIfPresent([String].self, forKey: .participants))
             ?? (try? c.decodeLossyParticipants(forKey: .participants))
+            ?? (try? c.decodeLossyParticipants(forKey: .otherParticipants))
+        participants = decodedParticipants
         liveKitToken = (try? c.decodeIfPresent(String.self, forKey: .liveKitToken))
             ?? (try? c.decodeIfPresent(String.self, forKey: .token))
         liveKitUrl = (try? c.decodeIfPresent(URL.self, forKey: .liveKitUrl))
@@ -62,6 +81,54 @@ struct CallSession: Decodable, Identifiable, Equatable {
         liveKitRoom = (try? c.decodeIfPresent(String.self, forKey: .liveKitRoom))
             ?? (try? c.decodeIfPresent(String.self, forKey: .roomName))
         status = (try? c.decodeIfPresent(String.self, forKey: .status))?.lowercased()
+        isPending = try? c.decodeIfPresent(Bool.self, forKey: .pending)
+        let callerName = try? c.decodeIfPresent(String.self, forKey: .callerName)
+        let conversationTitle = try? c.decodeIfPresent(String.self, forKey: .conversationTitle)
+        let caller = try? c.decodeIfPresent(CallDisplayEntity.self, forKey: .caller)
+        let conversation = try? c.decodeIfPresent(CallConversationSummary.self, forKey: .conversation)
+        displayName = conversationTitle
+            ?? conversation?.title
+            ?? callerName
+            ?? caller?.name
+            ?? decodedParticipants?.first
+        isGroup = (try? c.decodeIfPresent(Bool.self, forKey: .isGroup))
+            ?? conversation?.isGroup
+            ?? false
+    }
+}
+
+private struct CallDisplayEntity: Decodable {
+    let name: String?
+}
+
+private struct CallConversationSummary: Decodable {
+    let title: String?
+    let isGroup: Bool?
+}
+
+/// `/api/calls/pending` currently returns one object (`pending`, `callId`, …),
+/// whereas older clients expected `{ calls: [...] }`. Decode both shapes so a
+/// contract migration cannot silently make incoming calls disappear.
+struct PendingCallsResponse: Decodable, Equatable {
+    let calls: [CallSession]
+
+    private enum CodingKeys: String, CodingKey { case pending, calls, items }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let calls = try container.decodeIfPresent([CallSession].self, forKey: .calls) {
+            self.calls = calls
+            return
+        }
+        if let items = try container.decodeIfPresent([CallSession].self, forKey: .items) {
+            calls = items
+            return
+        }
+        guard try container.decodeIfPresent(Bool.self, forKey: .pending) == true else {
+            calls = []
+            return
+        }
+        calls = [try CallSession(from: decoder)]
     }
 }
 
@@ -104,9 +171,11 @@ final class CallsService: CallsServicing {
     }
 
     func pending() async throws -> [CallSession] {
-        struct Response: Decodable { let calls: [CallSession]?; let items: [CallSession]? }
-        let r: Response = try await api.request(APIEndpoint(path: "/api/calls/pending"), as: Response.self)
-        return r.calls ?? r.items ?? []
+        let response: PendingCallsResponse = try await api.request(
+            APIEndpoint(path: "/api/calls/pending"),
+            as: PendingCallsResponse.self
+        )
+        return response.calls
     }
 
     func history() async throws -> [CallSession] {
@@ -117,7 +186,8 @@ final class CallsService: CallsServicing {
 }
 
 private extension KeyedDecodingContainer where Key == CallSession.CodingKeys {
-    func decodeLossyParticipants(forKey key: Key) throws -> [String] {
+    func decodeLossyParticipants(forKey key: Key) throws -> [String]? {
+        guard contains(key) else { return nil }
         if let values = try? decodeIfPresent([[String: String]].self, forKey: key) {
             return values.compactMap { $0["name"] ?? $0["email"] ?? $0["id"] ?? $0["userId"] }
         }

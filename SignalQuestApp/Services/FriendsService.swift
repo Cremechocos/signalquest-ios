@@ -108,12 +108,12 @@ final class FriendsService: FriendsServicing {
     }
 
     func block(userId: String) async throws {
-        let _: SuccessResponse = try await api.requestJSON("/api/friends/block", body: ["userId": userId])
+        let _: SuccessResponse = try await api.requestJSON("/api/users/blocks", body: ["userId": userId])
     }
 
     func blocks() async throws -> [BlockedUser] {
         struct Response: Codable { let blocks: [BlockedUser]?; let items: [BlockedUser]? }
-        let r: Response = try await api.request(APIEndpoint(path: "/users/blocks"), as: Response.self)
+        let r: Response = try await api.request(APIEndpoint(path: "/api/users/blocks"), as: Response.self)
         return r.blocks ?? r.items ?? []
     }
 }

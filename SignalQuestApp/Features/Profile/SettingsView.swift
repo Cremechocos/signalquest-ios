@@ -22,6 +22,9 @@ final class SettingsViewModel: ObservableObject {
     @Published var isBusy = false
     @Published var errorMessage: String?
     @Published var isExporting = false
+    @Published var deletionPreview: AccountDeletionPreview?
+    @Published var isDeletionPreviewLoading = false
+    @Published var deletionError: String?
     /// Renseigné quand l'archive RGPD est prête → déclenche la feuille de partage.
     @Published var exportedFile: ExportedDataFile?
 
@@ -64,9 +67,37 @@ final class SettingsViewModel: ObservableObject {
         do { try await authService.disable2FA(code: code) } catch { errorMessage = error.localizedDescription }
     }
 
-    func deleteAccount(password: String) async -> Bool {
-        do { try await userService.deleteAccount(password: password); return true }
-        catch { errorMessage = error.localizedDescription; return false }
+    func loadAccountDeletionPreview() async {
+        isDeletionPreviewLoading = true
+        deletionError = nil
+        defer { isDeletionPreviewLoading = false }
+        do {
+            deletionPreview = try await userService.accountDeletionPreview()
+        } catch {
+            if error.isCancellation { return }
+            deletionError = error.localizedDescription
+        }
+    }
+
+    func requestAccountDeletionEmailCode() async -> AccountDeletionEmailChallenge? {
+        deletionError = nil
+        do {
+            return try await userService.requestAccountDeletionEmailCode()
+        } catch {
+            if !error.isCancellation { deletionError = error.localizedDescription }
+            return nil
+        }
+    }
+
+    func deleteAccount(using proof: AccountDeletionProof) async -> Bool {
+        deletionError = nil
+        do {
+            _ = try await userService.deleteAccount(using: proof)
+            return true
+        } catch {
+            if !error.isCancellation { deletionError = error.localizedDescription }
+            return false
+        }
     }
 }
 
@@ -351,10 +382,9 @@ struct SettingsView: View {
             ShareSheet(items: [file.url])
         }
         .sheet(isPresented: $showDeleteConfirm) {
-            DeleteAccountSheet { password in
-                let ok = await model.deleteAccount(password: password)
-                if ok { await session.logout() }
-                return ok
+            DeleteAccountSheet(model: model) {
+                await services.push.unregister()
+                await session.logout()
             }
         }
     }
@@ -484,16 +514,36 @@ struct ChangePasswordView: View {
     }
 }
 
-/// Suppression de compte (PROFILE-UX-12) : feuille dédiée avec avertissement clair
-/// + champ mot de passe, au lieu d'un SecureField dans une alert.
+/// Suppression de compte : le serveur fournit l'inventaire réel et les méthodes
+/// de réauthentification disponibles. La suppression n'est déclenchée qu'après
+/// consentement explicite et preuve mot de passe, Apple ou code e-mail.
 private struct DeleteAccountSheet: View {
-    /// Renvoie `true` si la suppression a réussi (la session se ferme alors d'elle-même).
-    let onDelete: (String) async -> Bool
+    private enum ReauthMethod: String, Identifiable {
+        case password
+        case apple
+        case email
+
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .password: "Mot de passe"
+            case .apple: "Apple"
+            case .email: "Code e-mail"
+            }
+        }
+    }
+
+    @ObservedObject var model: SettingsViewModel
+    let onDeleted: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var password = ""
+    @State private var emailCode = ""
+    @State private var emailChallenge: AccountDeletionEmailChallenge?
+    @State private var selectedMethod: ReauthMethod?
+    @State private var hasAcknowledged = false
     @State private var isBusy = false
-    @State private var error: String?
 
     var body: some View {
         NavigationStack {
@@ -505,29 +555,33 @@ private struct DeleteAccountSheet: View {
                     Text("Supprimer ton compte")
                         .font(SQType.title)
                         .foregroundStyle(SQColor.label)
-                    Text("Cette action est irréversible. Ton compte et tes données personnelles (e-mail, mot de passe, profil) seront supprimés. Tes contributions — speedtests, validations, photos — seront anonymisées et resteront sur la carte communautaire.")
-                        .font(SQType.body)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    SecureField("Mot de passe", text: $password)
-                        .textContentType(.password)
-                        .textFieldStyle(SQTextFieldStyle())
-                    if let error {
+
+                    if model.isDeletionPreviewLoading && model.deletionPreview == nil {
+                        HStack(spacing: SQSpace.sm) {
+                            ProgressView().tint(SQColor.brandRed)
+                            Text("Vérification des données concernées…")
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    } else if let preview = model.deletionPreview {
+                        deletionInventory(preview)
+                        reauthentication(preview)
+                    } else {
+                        Text("Impossible de charger le détail de la suppression. Aucun compte ne sera supprimé tant que cette vérification échoue.")
+                            .font(SQType.body)
+                            .foregroundStyle(SQColor.labelSecondary)
+                        Button("Réessayer") {
+                            Task { await loadPreview() }
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(SQColor.brandRed)
+                    }
+
+                    if let error = model.deletionError {
                         Label(error, systemImage: "exclamationmark.triangle")
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.danger)
                     }
-                    GradientButton("Supprimer définitivement", systemImage: "trash", isBusy: isBusy) {
-                        Task {
-                            isBusy = true
-                            error = nil
-                            let ok = await onDelete(password)
-                            isBusy = false
-                            if !ok { error = "Suppression impossible. Vérifie ton mot de passe." }
-                        }
-                    }
-                    .disabled(password.isEmpty || isBusy)
-                    .opacity(password.isEmpty ? 0.5 : 1)
                 }
                 .padding(SQSpace.xl)
             }
@@ -540,7 +594,216 @@ private struct DeleteAccountSheet: View {
                 }
             }
         }
+        .task { await loadPreview() }
         .presentationDetents([.medium, .large])
+        .interactiveDismissDisabled(isBusy)
+    }
+
+    @ViewBuilder
+    private func deletionInventory(_ preview: AccountDeletionPreview) -> some View {
+        Text(preview.warning)
+            .font(SQType.body)
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+        inventoryGroup(
+            title: "Sera supprimé",
+            systemImage: "trash",
+            color: SQColor.danger,
+            values: preview.willBeDeleted
+        )
+        inventoryGroup(
+            title: "Sera anonymisé et conservé",
+            systemImage: "person.crop.circle.badge.questionmark",
+            color: SQColor.warning,
+            values: preview.willBeAnonymized
+        )
+
+        Toggle(isOn: $hasAcknowledged) {
+            Text("J’ai compris que cette action est irréversible et que mes contributions listées ci-dessus resteront anonymisées.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.label)
+        }
+        .tint(SQColor.brandRed)
+    }
+
+    private func inventoryGroup(
+        title: String,
+        systemImage: String,
+        color: Color,
+        values: [String: String]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Label(title, systemImage: systemImage)
+                .font(SQType.heading)
+                .foregroundStyle(color)
+            ForEach(values.sorted(by: { $0.key < $1.key }), id: \.key) { item in
+                Text("• \(item.value)")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(SQSpace.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.surface)
+        .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func reauthentication(_ preview: AccountDeletionPreview) -> some View {
+        let methods = availableMethods(preview)
+        if !methods.isEmpty {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                Text("Confirmer ton identité")
+                    .font(SQType.heading)
+                    .foregroundStyle(SQColor.label)
+
+                if methods.count > 1 {
+                    Picker("Méthode", selection: $selectedMethod) {
+                        ForEach(methods) { method in
+                            Text(method.title).tag(Optional(method))
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                switch selectedMethod ?? methods.first {
+                case .password:
+                    passwordConfirmation
+                case .apple:
+                    appleConfirmation
+                case .email:
+                    emailConfirmation(preview)
+                case nil:
+                    EmptyView()
+                }
+            }
+        } else {
+            Label("Aucune méthode de réauthentification disponible.", systemImage: "lock.trianglebadge.exclamationmark")
+                .font(SQType.body)
+                .foregroundStyle(SQColor.danger)
+        }
+    }
+
+    private var passwordConfirmation: some View {
+        VStack(spacing: SQSpace.md) {
+            SecureField("Mot de passe", text: $password)
+                .textContentType(.password)
+                .textFieldStyle(SQTextFieldStyle())
+            destructiveButton(disabled: password.isEmpty) {
+                await delete(using: .password(password))
+            }
+        }
+    }
+
+    private var appleConfirmation: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Apple te demandera de confirmer l’identité liée à ce compte.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+            SignInWithAppleButton(.continue) { request in
+                request.requestedScopes = []
+            } onCompletion: { result in
+                handleAppleReauthentication(result)
+            }
+            .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+            .frame(height: 50)
+            .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+            .disabled(!hasAcknowledged || isBusy)
+            .opacity(hasAcknowledged && !isBusy ? 1 : 0.5)
+        }
+    }
+
+    @ViewBuilder
+    private func emailConfirmation(_ preview: AccountDeletionPreview) -> some View {
+        if let challenge = emailChallenge {
+            Text("Code envoyé à \(challenge.maskedEmail). Il expire dans 10 minutes et ne peut être utilisé qu’une fois.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+            TextField("Code à 6 chiffres", text: $emailCode)
+                .keyboardType(.numberPad)
+                .textContentType(.oneTimeCode)
+                .textFieldStyle(SQTextFieldStyle())
+                .onChange(of: emailCode) { value in
+                    emailCode = String(value.filter(\.isNumber).prefix(6))
+                }
+            destructiveButton(disabled: emailCode.count != 6) {
+                await delete(using: .email(challengeId: challenge.challengeId, code: emailCode))
+            }
+        } else {
+            Text("Un code à usage unique sera envoyé à \(preview.maskedEmail).")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+            Button {
+                Task { await requestEmailCode() }
+            } label: {
+                Label("Envoyer le code", systemImage: "envelope.badge")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(SQColor.brandRed)
+            .disabled(!hasAcknowledged || isBusy)
+        }
+    }
+
+    private func destructiveButton(
+        disabled: Bool,
+        action: @escaping () async -> Void
+    ) -> some View {
+        GradientButton("Supprimer définitivement", systemImage: "trash", isBusy: isBusy) {
+            Task { await action() }
+        }
+        .disabled(disabled || !hasAcknowledged || isBusy)
+        .opacity(disabled || !hasAcknowledged ? 0.5 : 1)
+    }
+
+    private func availableMethods(_ preview: AccountDeletionPreview) -> [ReauthMethod] {
+        var result: [ReauthMethod] = []
+        if preview.reauthMethods.password { result.append(.password) }
+        if preview.reauthMethods.apple { result.append(.apple) }
+        if preview.reauthMethods.email { result.append(.email) }
+        return result
+    }
+
+    private func loadPreview() async {
+        await model.loadAccountDeletionPreview()
+        guard selectedMethod == nil, let preview = model.deletionPreview else { return }
+        selectedMethod = availableMethods(preview).first
+    }
+
+    private func requestEmailCode() async {
+        isBusy = true
+        defer { isBusy = false }
+        emailChallenge = await model.requestAccountDeletionEmailCode()
+    }
+
+    private func delete(using proof: AccountDeletionProof) async {
+        isBusy = true
+        let succeeded = await model.deleteAccount(using: proof)
+        if succeeded {
+            Haptics.success()
+            await onDeleted()
+            dismiss()
+        } else {
+            Haptics.error()
+        }
+        isBusy = false
+    }
+
+    private func handleAppleReauthentication(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = credential.identityToken,
+                  let identityToken = String(data: tokenData, encoding: .utf8) else {
+                model.deletionError = "Jeton Apple manquant. Réessaie."
+                return
+            }
+            Task { await delete(using: .apple(identityToken: identityToken)) }
+        case .failure(let error):
+            if (error as? ASAuthorizationError)?.code == .canceled { return }
+            model.deletionError = "Réauthentification Apple impossible. Réessaie."
+        }
     }
 }
-

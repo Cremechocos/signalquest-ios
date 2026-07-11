@@ -123,6 +123,41 @@ struct NotificationPreferences: Codable {
     var callsDoNotDisturb: Bool?
 }
 
+struct AccountDeletionPreview: Codable, Sendable {
+    struct ReauthMethods: Codable, Sendable {
+        let password: Bool
+        let apple: Bool
+        let email: Bool
+    }
+
+    let confirmationText: String
+    let reauthMethods: ReauthMethods
+    let maskedEmail: String
+    let willBeDeleted: [String: String]
+    let willBeAnonymized: [String: String]
+    let warning: String
+}
+
+struct AccountDeletionEmailChallenge: Codable, Sendable {
+    let success: Bool
+    let method: String
+    let challengeId: String
+    let maskedEmail: String
+    let expiresAt: Date
+}
+
+struct AccountDeletionResult: Codable, Sendable {
+    let success: Bool
+    let reauthMethod: String
+    let message: String
+}
+
+enum AccountDeletionProof: Sendable {
+    case password(String)
+    case apple(identityToken: String)
+    case email(challengeId: String, code: String)
+}
+
 protocol UserServicing: Sendable {
     func profile() async throws -> AuthUser
     func updateProfile(_ patch: UserProfilePatch) async throws -> AuthUser
@@ -132,7 +167,9 @@ protocol UserServicing: Sendable {
     func notificationPreferences() async throws -> NotificationPreferences
     func updateNotificationPreferences(_ prefs: NotificationPreferences) async throws -> NotificationPreferences
     func heartbeat() async throws
-    func deleteAccount(password: String) async throws
+    func accountDeletionPreview() async throws -> AccountDeletionPreview
+    func requestAccountDeletionEmailCode() async throws -> AccountDeletionEmailChallenge
+    func deleteAccount(using proof: AccountDeletionProof) async throws -> AccountDeletionResult
     /// Archive RGPD complète (profil, mesures, contributions, messages…) au format
     /// JSON, telle que renvoyée par le backend `GET /api/export/my-data`.
     func exportPersonalData() async throws -> Data
@@ -200,13 +237,57 @@ final class UserService: UserServicing {
         )
     }
 
-    func deleteAccount(password: String) async throws {
-        // Le backend exige DELETE + { password, confirmation: "SUPPRIMER MON COMPTE" }.
-        let _: SuccessResponse = try await api.requestJSON(
-            "/api/user/delete-account",
-            method: .delete,
-            body: ["password": password, "confirmation": "SUPPRIMER MON COMPTE"]
+    func accountDeletionPreview() async throws -> AccountDeletionPreview {
+        try await api.request(
+            APIEndpoint(path: "/api/user/delete-account"),
+            as: AccountDeletionPreview.self
         )
+    }
+
+    func requestAccountDeletionEmailCode() async throws -> AccountDeletionEmailChallenge {
+        struct Request: Encodable { let method = "email" }
+        return try await api.requestJSON(
+            "/api/user/delete-account",
+            body: Request()
+        )
+    }
+
+    func deleteAccount(using proof: AccountDeletionProof) async throws -> AccountDeletionResult {
+        struct PasswordRequest: Encodable {
+            let password: String
+            let confirmation: String
+        }
+        struct AppleRequest: Encodable {
+            let appleIdentityToken: String
+            let confirmation: String
+        }
+        struct EmailRequest: Encodable {
+            let challengeId: String
+            let emailCode: String
+            let confirmation: String
+        }
+
+        let confirmation = "SUPPRIMER MON COMPTE"
+        switch proof {
+        case .password(let password):
+            return try await api.requestJSON(
+                "/api/user/delete-account",
+                method: .delete,
+                body: PasswordRequest(password: password, confirmation: confirmation)
+            )
+        case .apple(let identityToken):
+            return try await api.requestJSON(
+                "/api/user/delete-account",
+                method: .delete,
+                body: AppleRequest(appleIdentityToken: identityToken, confirmation: confirmation)
+            )
+        case .email(let challengeId, let code):
+            return try await api.requestJSON(
+                "/api/user/delete-account",
+                method: .delete,
+                body: EmailRequest(challengeId: challengeId, emailCode: code, confirmation: confirmation)
+            )
+        }
     }
 
     func exportPersonalData() async throws -> Data {
@@ -215,4 +296,3 @@ final class UserService: UserServicing {
         try await api.requestData(APIEndpoint(path: "/api/export/my-data"))
     }
 }
-

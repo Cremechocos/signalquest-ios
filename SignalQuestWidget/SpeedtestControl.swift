@@ -4,7 +4,7 @@ import WidgetKit
 
 /// F3 — Contrôle Centre de contrôle / écran verrouillé (iOS 18+) : lance un
 /// speedtest en 1 tap. Ouvre l'app sur l'onglet Speed via le deep link
-/// `signalquest://speedtest` (déjà géré par `handleDeepLink`). La cible widget
+/// via le schéma de l'environnement (déjà géré par `handleDeepLink`). La cible widget
 /// est isolée : aucune dépendance aux composants/couleurs de l'app.
 @available(iOS 18.0, *)
 struct SpeedtestControl: ControlWidget {
@@ -25,6 +25,6 @@ struct LaunchSpeedtestControlIntent: AppIntent {
     static let title: LocalizedStringResource = "Lancer un Speedtest SignalQuest"
 
     func perform() async throws -> some IntentResult & OpensIntent {
-        .result(opensIntent: OpenURLIntent(URL(string: "signalquest://speedtest")!))
+        .result(opensIntent: OpenURLIntent(SQSharedConfiguration.deepLink("speedtest")))
     }
 }

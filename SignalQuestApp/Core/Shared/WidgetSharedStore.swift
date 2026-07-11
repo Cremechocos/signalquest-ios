@@ -51,10 +51,32 @@ struct SpeedtestActivityAttributes: ActivityAttributes, Sendable {
     }
 }
 
-/// Identifiant de l'App Group partagé entre l'app et l'extension widget.
-/// À activer sur l'App ID (portail Apple Developer) + entitlements des 2 cibles.
-enum SQAppGroup {
-    static let identifier = "group.fr.signalquest.ios"
+/// Configuration partagée entre l'app et l'extension. Les valeurs proviennent
+/// des xcconfig afin que Beta ne lise jamais l'App Group ni le schéma URL de
+/// production.
+enum SQSharedConfiguration {
+    private static func value(_ key: String, fallback: String) -> String {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: key) as? String,
+              !raw.isEmpty,
+              !raw.contains("$(") else { return fallback }
+        return raw
+    }
+
+    static var appGroupIdentifier: String {
+        value("SQ_APP_GROUP", fallback: "group.fr.signalquest.ios")
+    }
+
+    static var urlScheme: String {
+        value("SQ_URL_SCHEME", fallback: "signalquest")
+    }
+
+    static func deepLink(_ host: String) -> URL {
+        var components = URLComponents()
+        components.scheme = urlScheme
+        components.host = host
+        // The configured scheme and static host are programmer-controlled.
+        return components.url ?? URL(string: "signalquest://\(host)")!
+    }
 }
 
 /// Instantané compact d'un speedtest, partagé app → widget via l'App Group.
@@ -113,7 +135,7 @@ enum WidgetSharedStore {
     private static let maxRecent = 12
 
     private static var defaults: UserDefaults? {
-        UserDefaults(suiteName: SQAppGroup.identifier)
+        UserDefaults(suiteName: SQSharedConfiguration.appGroupIdentifier)
     }
 
     static func saveLastSpeedtest(_ snapshot: SpeedtestWidgetSnapshot) {

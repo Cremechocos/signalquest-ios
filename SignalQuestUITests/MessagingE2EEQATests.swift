@@ -24,9 +24,9 @@ final class MessagingE2EEQATests: XCTestCase {
         let app = XCUIApplication()
         app.launchEnvironment["SQ_AUTH_TOKEN"] = token
         app.launch()
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
 
-        XCTAssertTrue(app.tabBars.buttons["Messages"].waitForExistence(timeout: 20))
-        app.tabBars.buttons["Messages"].tap()
+        SignalQuestUITestSupport.openMessages(in: app)
 
         // Le sheet E2EE se présente automatiquement quand une conversation
         // chiffrée existe et que la clé n'est pas déverrouillée.

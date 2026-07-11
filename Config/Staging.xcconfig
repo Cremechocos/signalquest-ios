@@ -1,8 +1,21 @@
-SQ_APP_BASE_URL = https:/$()/signalquest.fr
-SQ_API_BASE_URL = https:/$()/api.signalquest.fr
-SQ_SPEEDTEST_BASE_URL = https:/$()/speedtest.signalquest.fr
-SQ_SPEEDTEST_DOWNLOAD_URL = https:/$()/speedtest.signalquest.fr/download
-SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL = https:/$()/d2d31ihf1e95ah.cloudfront.net/1000MB.bin
-SQ_DEBUG_LOGS = YES
-SQ_APS_ENVIRONMENT = development
-SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG STAGING
+// Safe-by-default placeholders. A Beta build MUST override these with the
+// isolated staging services. validate_build_environment.sh rejects both these
+// placeholders and every production endpoint.
+SQ_APP_BASE_URL = https:/$()/app.staging.invalid
+SQ_API_BASE_URL = https:/$()/api.staging.invalid
+SQ_SPEEDTEST_BASE_URL = https:/$()/speedtest.staging.invalid
+SQ_SPEEDTEST_DOWNLOAD_URL = https:/$()/speedtest.staging.invalid/download
+SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL = https:/$()/cdn.staging.invalid/1000MB.bin
+SQ_DEBUG_LOGS = NO
+SQ_APS_ENVIRONMENT = production
+SQ_ENVIRONMENT = staging
+SQ_DISPLAY_NAME = SignalQuest Beta
+SQ_APP_GROUP = group.fr.signalquest.ios.beta
+SQ_ASSOCIATED_DOMAIN = webcredentials:app.staging.invalid
+SQ_URL_SCHEME = signalquest-beta
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = STAGING
+SWIFT_OPTIMIZATION_LEVEL = -O
+ONLY_ACTIVE_ARCH = NO
+ENABLE_NS_ASSERTIONS = NO
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+MTL_ENABLE_DEBUG_INFO = NO

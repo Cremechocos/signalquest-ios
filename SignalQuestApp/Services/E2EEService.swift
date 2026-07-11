@@ -46,6 +46,12 @@ protocol E2EEServicing: Sendable {
     func isUnlocked() async -> Bool
     func isConversationUnlocked(conversationId: String) async -> Bool
     func encryptText(conversationId: String, text: String) async throws -> E2EEPayload
+    func encryptText(
+        conversationId: String,
+        text: String,
+        contentType: EncryptedMessageContentType,
+        operationId: String?
+    ) async throws -> E2EEPayload
     /// Chiffre avec une AAD explicite (payload v2). Utilisé pour les messages
     /// planifiés E2EE (le backend exige `aadB64` non vide + un `nonce`). L'AAD est
     /// renvoyée dans le payload et utilisée telle quelle au déchiffrement.
@@ -57,9 +63,50 @@ protocol E2EEServicing: Sendable {
     func wipeLocalKeys() async
 }
 
+enum EncryptedMessageContentType: String, Codable, Sendable {
+    case text
+    case edit
+    case scheduled
+    case threadReply = "thread_reply"
+    case poll
+    case attachmentCaption = "attachment_caption"
+}
+
+/// Métadonnées authentifiées mais non secrètes de l'enveloppe V2. Toute
+/// modification de conversation, type ou appareil fait échouer AES-GCM.
+struct EncryptedMessageEnvelopeV2AAD: Codable, Equatable, Sendable {
+    let schema: String
+    let cryptoVersion: Int
+    let conversationId: String
+    let contentType: EncryptedMessageContentType
+    let senderDeviceId: String
+    let operationId: String?
+
+    init(
+        conversationId: String,
+        contentType: EncryptedMessageContentType,
+        senderDeviceId: String,
+        operationId: String? = nil
+    ) {
+        schema = "signalquest.encrypted-message"
+        cryptoVersion = 2
+        self.conversationId = conversationId
+        self.contentType = contentType
+        self.senderDeviceId = senderDeviceId
+        self.operationId = operationId
+    }
+
+    func encoded() throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        return try encoder.encode(self)
+    }
+}
+
 final class E2EEService: E2EEServicing, @unchecked Sendable {
     private let api: APIClient
     private let tokenStore: TokenStore
+    private let senderDeviceId: String
     private let stateLock = NSLock()
     private var unlockedPrivateJwk: String?
     /// Cache mémoire des clés symétriques de conversation (PERF-KEY-01) : évite une
@@ -67,9 +114,14 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
     /// Keychain ; invalidé sur rotation de clé (409) et à `wipeLocalKeys()`.
     private var conversationKeyCache: [String: Data] = [:]
 
-    init(api: APIClient, tokenStore: TokenStore = KeychainStore(service: "fr.signalquest.ios.e2ee")) {
+    init(
+        api: APIClient,
+        tokenStore: TokenStore = KeychainStore(service: "fr.signalquest.ios.e2ee"),
+        senderDeviceId: String = InstallationIdentity().deviceID()
+    ) {
         self.api = api
         self.tokenStore = tokenStore
+        self.senderDeviceId = senderDeviceId
     }
 
     func bootstrap() async throws -> E2EEBootstrapResponse {
@@ -216,17 +268,27 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
     }
 
     func encryptText(conversationId: String, text: String) async throws -> E2EEPayload {
-        let key = try await conversationKey(conversationId: conversationId)
-        let nonce = AES.GCM.Nonce()
-        let sealed = try AES.GCM.seal(Data(text.utf8), using: key, nonce: nonce)
-        var ciphertextAndTag = Data(sealed.ciphertext)
-        ciphertextAndTag.append(sealed.tag)
-        return E2EEPayload(
-            v: 1,
-            ivB64: nonce.data.base64EncodedNoPadding(),
-            ciphertextB64: ciphertextAndTag.base64EncodedNoPadding(),
-            aadB64: nil
+        try await encryptText(
+            conversationId: conversationId,
+            text: text,
+            contentType: .text,
+            operationId: nil
         )
+    }
+
+    func encryptText(
+        conversationId: String,
+        text: String,
+        contentType: EncryptedMessageContentType,
+        operationId: String?
+    ) async throws -> E2EEPayload {
+        let aad = try EncryptedMessageEnvelopeV2AAD(
+            conversationId: conversationId,
+            contentType: contentType,
+            senderDeviceId: senderDeviceId,
+            operationId: operationId
+        ).encoded()
+        return try await encryptText(conversationId: conversationId, text: text, aad: aad)
     }
 
     func encryptText(conversationId: String, text: String, aad: Data) async throws -> E2EEPayload {

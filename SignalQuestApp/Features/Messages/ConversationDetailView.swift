@@ -66,6 +66,8 @@ struct ConversationDetailView: View {
     @State private var transcriptions: [String: String] = [:]
     @State private var transcriptionRequested: Set<String> = []
     @State private var scrollTargetId: String?
+    /// Message momentanément surligné après un saut vers une citation (~850 ms).
+    @State private var highlightedMessageId: String?
     /// MSG-FLUIDITY-01 — id du message qui était en tête AVANT un prepend ; sert
     /// à réancrer le scroll dessus (sans animation) pour figer la position de
     /// lecture quand on charge des messages plus anciens.
@@ -161,9 +163,13 @@ struct ConversationDetailView: View {
                         ForEach(messages) { message in
                             messageBubble(message)
                                 .id(message.id)
+                                .background(
+                                    RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                                        .fill(SQColor.brandOrange.opacity(highlightedMessageId == message.id ? 0.16 : 0))
+                                )
+                                .animation(SQMotion.standard, value: highlightedMessageId)
                         }
                         readReceiptFooter
-                        typingIndicator
                         if let errorMessage {
                             ErrorStateView(title: "Messages indisponibles", message: errorMessage) {
                                 Task { await load() }
@@ -193,6 +199,10 @@ struct ConversationDetailView: View {
                 }
             }
 
+            // Frappe : ligne compacte épinglée juste au-dessus du composer (parité
+            // Android — auparavant dans l'en-tête, désormais en bas de conversation).
+            typingIndicator
+                .padding(.horizontal)
             composer
         }
         .navigationTitle(conversationTitle)
@@ -430,21 +440,28 @@ struct ConversationDetailView: View {
                         .foregroundStyle(SQColor.labelSecondary)
                 }
                 if let quoted = quotedMessage(for: message) {
-                    HStack(spacing: SQSpace.xs + 2) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(mine ? Color.white.opacity(0.6) : SQColor.brandOrange)
-                            .frame(width: 3)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(quoted.sender?.displayName ?? "Message")
-                                .font(SQType.micro)
-                            Text(displayedContent(for: quoted))
-                                .font(SQType.caption)
-                                .lineLimit(2)
+                    // Tap sur la citation → saut animé + surbrillance du message d'origine.
+                    Button {
+                        jumpToQuoted(quoted)
+                    } label: {
+                        HStack(spacing: SQSpace.xs + 2) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(mine ? Color.white.opacity(0.6) : SQColor.brandOrange)
+                                .frame(width: 3)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(quoted.sender?.displayName ?? "Message")
+                                    .font(SQType.micro)
+                                Text(displayedContent(for: quoted))
+                                    .font(SQType.caption)
+                                    .lineLimit(2)
+                            }
                         }
+                        .opacity(0.75)
+                        .padding(SQSpace.xs + 2)
+                        .background((mine ? Color.white.opacity(0.14) : SQColor.fill.opacity(0.6)), in: RoundedRectangle(cornerRadius: SQRadius.sm))
+                        .contentShape(Rectangle())
                     }
-                    .opacity(0.75)
-                    .padding(SQSpace.xs + 2)
-                    .background((mine ? Color.white.opacity(0.14) : SQColor.fill.opacity(0.6)), in: RoundedRectangle(cornerRadius: SQRadius.sm))
+                    .buttonStyle(.plain)
                 }
                 attachmentsView(for: message, mine: mine)
                 if message.deletedAt != nil {
@@ -452,8 +469,12 @@ struct ConversationDetailView: View {
                         .font(SQType.caption.italic())
                         .foregroundStyle(mine ? .white.opacity(0.7) : SQColor.labelTertiary)
                 } else if let shareCard = shareCard(for: message) {
-                    // Partage envoyé par Android (signal / speedtest / session…).
-                    if let signal = shareCard.signal {
+                    // Partage envoyé par Android (publication / signal / speedtest / session…).
+                    // La publication (`social_post`) est testée EN PREMIER car elle peut
+                    // aussi porter une mesure : elle se rend en carte riche fidèle.
+                    if shareCard.kind.lowercased() == "social_post" {
+                        SharedPostCardBubble(card: shareCard, mine: mine)
+                    } else if let signal = shareCard.signal {
                         SignalCardBubble(card: shareCard, signal: signal, mine: mine)
                     } else {
                         ShareCardBubble(card: shareCard, mine: mine)
@@ -792,11 +813,12 @@ struct ConversationDetailView: View {
     private var typingIndicator: some View {
         if let typingUntil, typingUntil > Date() {
             TypingDotsView()
-                .padding(.horizontal, SQSpace.md)
-                .padding(.vertical, SQSpace.sm + 2)
+                .padding(.horizontal, SQSpace.sm + 2)
+                .padding(.vertical, SQSpace.xs + 2)
                 .background(SQColor.surface, in: Capsule())
                 .overlay { Capsule().stroke(SQColor.separator, lineWidth: 1) }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, SQSpace.xs)
                 .transition(.opacity)
                 .accessibilityLabel("En train d’écrire…")
         }
@@ -805,6 +827,25 @@ struct ConversationDetailView: View {
     private func quotedMessage(for message: MessageItem) -> MessageItem? {
         guard let replyToId = message.replyToId else { return nil }
         return messages.first { $0.id == replyToId }
+    }
+
+    /// Saut vers le message cité : défilement animé + surbrillance transitoire.
+    private func jumpToQuoted(_ message: MessageItem) {
+        Haptics.selection()
+        scrollTargetId = message.id
+        highlightMessage(message.id)
+    }
+
+    private func highlightMessage(_ id: String) {
+        withAnimation(SQMotion.fast) { highlightedMessageId = id }
+        Task {
+            try? await Task.sleep(nanoseconds: 850_000_000)
+            await MainActor.run {
+                if highlightedMessageId == id {
+                    withAnimation(SQMotion.standard) { highlightedMessageId = nil }
+                }
+            }
+        }
     }
 
     private func reactionSummaries(for message: MessageItem) -> [MessageReactionSummary] {
@@ -1269,6 +1310,9 @@ struct ConversationDetailView: View {
         isSending = true
         defer { isSending = false }
         do {
+            guard !isE2EE else {
+                throw E2EEError.unsupported("Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils.")
+            }
             guard let raw = try await item.loadTransferable(type: Data.self) else { return }
             // Décodage/redimensionnement/encodage hors du main thread pour ne pas
             // geler l'UI pendant l'envoi (image plein format).
@@ -1424,6 +1468,16 @@ struct ConversationDetailView: View {
     }
 
     private func startCall(mode: String) {
+        guard conversation.participants.count >= 2 else {
+            errorMessage = "Aucun autre participant n’est disponible pour cet appel."
+            Haptics.error()
+            return
+        }
+        guard CallLifecyclePolicy.canStartCall(participantCount: conversation.participants.count) else {
+            errorMessage = "Les appels de groupe sont limités à 8 participants."
+            Haptics.error()
+            return
+        }
         services.callManager.startOutgoingCall(conversationId: conversation.id, mode: mode, displayName: conversationTitle)
     }
 
@@ -1601,14 +1655,16 @@ private struct MessageComposerBar: View {
             .disabled(!canSend || isSending || isSharingLocation)
             .accessibilityLabel("Plus d'actions")
 
-            PhotosPicker(selection: $pickerItem, matching: .images) {
-                Image(systemName: "paperclip")
-                    .frame(width: 36, height: 36)
-                    .background(SQColor.fill, in: Circle())
-                    .foregroundStyle(SQColor.label)
+            if !isE2EE {
+                PhotosPicker(selection: $pickerItem, matching: .images) {
+                    Image(systemName: "paperclip")
+                        .frame(width: 36, height: 36)
+                        .background(SQColor.fill, in: Circle())
+                        .foregroundStyle(SQColor.label)
+                }
+                .disabled(!canSend || isSending)
+                .accessibilityLabel("Joindre une photo")
             }
-            .disabled(!canSend || isSending)
-            .accessibilityLabel("Joindre une photo")
 
             TextField(canSend ? "Message" : "Chiffrement à déverrouiller", text: $text, axis: .vertical)
                 .lineLimit(1...4)

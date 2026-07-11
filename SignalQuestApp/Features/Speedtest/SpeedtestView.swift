@@ -18,6 +18,7 @@ private enum SpeedtestSharePreparation: Equatable {
 }
 
 struct SpeedtestView: View {
+    private let guestMode: Bool
     @EnvironmentObject private var services: AppServices
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
@@ -25,10 +26,15 @@ struct SpeedtestView: View {
     @AppStorage("speedtest_duration_seconds") private var durationSeconds = 10
     @AppStorage("speedtest_streams") private var streams = 16
     @AppStorage("speedtest_reliability_mode") private var reliabilityMode = true
-    /// Publication sur la carte communautaire publique. Activé par défaut (choix
-    /// mémorisé localement) ; position arrondie à ~100 m et jamais publié sous VPN.
-    /// L'utilisateur peut se retirer à tout moment via ce réglage.
-    @AppStorage("speedtest_publish_to_map") private var publishToMap = true
+    /// Publication sur la carte communautaire publique. Opt-in explicite, mémorisé
+    /// localement, et jamais publié sous VPN. La précision publique dépend ensuite
+    /// du réglage global de confidentialité côté serveur.
+    @AppStorage("speedtest_publish_to_map") private var publishToMap = false
+    @AppStorage(MeasurementPrivacySettings.shareExactMeasurementsKey) private var shareExactMeasurements = false
+    /// Les choix invités sont volontairement éphémères : chaque nouvelle session
+    /// redemande le consentement de publication et de précision.
+    @State private var guestPublishToMap = false
+    @State private var guestShareExactLocation = false
     /// Nombre de tests enchaînés en rafale (1 = test simple).
     @AppStorage("speedtest_burst_count") private var burstCount = 1
     @State private var phase: SpeedtestPhase = .idle
@@ -70,6 +76,32 @@ struct SpeedtestView: View {
     @State private var sharePreparation: SpeedtestSharePreparation = .idle
     @State private var shareRenderTask: Task<Void, Never>?
     @State private var sharePrerenderTask: Task<Void, Never>?
+
+    init(guestMode: Bool = false) {
+        self.guestMode = guestMode
+    }
+
+    private var mapPublicationEnabled: Bool {
+        guestMode ? guestPublishToMap : publishToMap
+    }
+
+    private var exactLocationEnabled: Bool {
+        mapPublicationEnabled && (guestMode ? guestShareExactLocation : shareExactMeasurements)
+    }
+
+    private var mapPublicationBinding: Binding<Bool> {
+        Binding(
+            get: { mapPublicationEnabled },
+            set: { enabled in
+                if guestMode {
+                    guestPublishToMap = enabled
+                    if !enabled { guestShareExactLocation = false }
+                } else {
+                    publishToMap = enabled
+                }
+            }
+        )
+    }
 
     private var isPreparingShare: Bool {
         if case .rendering = sharePreparation { return true }
@@ -639,16 +671,25 @@ struct SpeedtestView: View {
                         Divider().overlay(SQColor.separator)
 
                         VStack(alignment: .leading, spacing: SQSpace.xs) {
-                            Toggle(isOn: $publishToMap) {
+                            Toggle(isOn: mapPublicationBinding) {
                                 Text("Publier sur la carte communautaire")
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(SQColor.label)
                             }
                             .tint(SQColor.brandRed)
-                            Text("Ta position (arrondie à ~100 m) et ton opérateur seront visibles publiquement. Activé par défaut ; ton choix est mémorisé.")
+                            Text(guestMode
+                                 ? "Désactivé par défaut et redemandé à chaque visite invitée. La mesure et l’opérateur deviennent publics."
+                                 : "Désactivé par défaut. Si tu l’actives, ta mesure et ton opérateur deviennent publics ; la position reste floutée sauf consentement séparé dans Confidentialité.")
                                 .font(.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
+                            if guestMode && guestPublishToMap {
+                                Toggle("Partager ma position exacte pour ce test", isOn: $guestShareExactLocation)
+                                    .font(.subheadline.weight(.semibold))
+                                Text("Facultatif et valable uniquement pour ce test. Sans ce choix, le serveur publie une position floutée.")
+                                    .font(.caption)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                            }
                         }
                     }
                     .padding(SQSpace.lg)
@@ -785,13 +826,13 @@ struct SpeedtestView: View {
         }
         // ONB-SEC-01 : localisation refusée + publication carte active → proposer un
         // retour vers les Réglages plutôt que de lancer sans position en silence.
-        if !AppEnvironment.runsSpeedtestQA, publishToMap,
+        if !AppEnvironment.runsSpeedtestQA, mapPublicationEnabled,
            services.location.authorizationStatus == .denied || services.location.authorizationStatus == .restricted {
             primingDenied = true
             showLocationPriming = true
             return
         }
-        let requestLocation = !AppEnvironment.runsSpeedtestQA
+        let requestLocation = !AppEnvironment.runsSpeedtestQA && (!guestMode || mapPublicationEnabled)
         if burstCount == Self.continuousBurst {
             performContinuousSession(requestLocation: requestLocation)
         } else if burstCount > 1 {
@@ -873,7 +914,12 @@ struct SpeedtestView: View {
         phase = .saving
         do {
             // Sous VPN : jamais de publication carte (opérateur du tunnel non fiable).
-            try await services.speedtest.save(measured, streams: settings.streams, publishToMap: publishToMap && !isVPNActive)
+            try await services.speedtest.save(
+                measured,
+                streams: settings.streams,
+                publishToMap: mapPublicationEnabled && !isVPNActive,
+                shareExactLocation: exactLocationEnabled && !isVPNActive
+            )
         } catch {
             errorMessage = error.localizedDescription
         }

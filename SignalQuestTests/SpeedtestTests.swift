@@ -438,6 +438,74 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertTrue(payload.isVisibleOnMap)
     }
 
+    func testSpeedtestPayloadRequiresSeparateExactLocationOptIn() {
+        let blurred = SpeedtestSubmission.iosPayload(
+            from: makeResultForPrivacy(),
+            streams: 4,
+            deviceModel: "iPhone",
+            isVisibleOnMap: true
+        )
+        let exact = SpeedtestSubmission.iosPayload(
+            from: makeResultForPrivacy(),
+            streams: 4,
+            deviceModel: "iPhone",
+            isVisibleOnMap: true,
+            shareExactLocation: true
+        )
+
+        XCTAssertFalse(blurred.shareExactLocation)
+        XCTAssertEqual(blurred.coordinates?.latitude ?? 0, 48.857, accuracy: 0.00001)
+        XCTAssertTrue(exact.shareExactLocation)
+        XCTAssertEqual(exact.coordinates?.latitude ?? 0, 48.8566, accuracy: 0.000001)
+    }
+
+    func testGuestSpeedtestPayloadCarriesClientOwnedDeletionReceipt() throws {
+        let token = String(repeating: "a", count: 43)
+        let payload = SpeedtestSubmission.iosPayload(
+            from: makeResultForPrivacy(),
+            streams: 4,
+            deviceModel: "iPhone",
+            guestDeleteToken: token
+        )
+        let data = try JSONEncoder.signalQuest.encode(payload)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        XCTAssertEqual(payload.guestDeleteToken, token)
+        XCTAssertEqual(json["guestDeleteToken"] as? String, token)
+    }
+
+    func testGuestSaveResponseResolvesCreationAndReplayIdentifiers() throws {
+        let creation = try JSONDecoder.signalQuest.decode(
+            SpeedtestSaveResponse.self,
+            from: Data(#"{"success":true,"data":{"id":"created-id"},"deleteToken":"receipt"}"#.utf8)
+        )
+        let replay = try JSONDecoder.signalQuest.decode(
+            SpeedtestSaveResponse.self,
+            from: Data(#"{"success":true,"id":"replayed-id","data":{"id":"created-id"}}"#.utf8)
+        )
+
+        XCTAssertEqual(creation.resolvedID, "created-id")
+        XCTAssertEqual(replay.resolvedID, "replayed-id")
+    }
+
+    func testGuestDeletionReceiptsPersistAndAreRemovedOnlyExplicitly() {
+        let keychain = InMemoryTokenStore()
+        let firstStore = GuestSpeedtestReceiptStore(store: keychain)
+        let receipt = GuestSpeedtestDeletionReceipt(
+            id: "speedtest-1",
+            clientSubmissionId: "client-1",
+            deleteToken: String(repeating: "b", count: 43),
+            createdAt: Date(timeIntervalSince1970: 100)
+        )
+
+        firstStore.upsert(receipt)
+        let relaunchedStore = GuestSpeedtestReceiptStore(store: keychain)
+        XCTAssertEqual(relaunchedStore.all(), [receipt])
+
+        relaunchedStore.remove(id: receipt.id)
+        XCTAssertTrue(firstStore.all().isEmpty)
+    }
+
     func testSpeedtestPayloadMinimizesCoordinates() {
         let payload = SpeedtestSubmission.iosPayload(from: makeResultForPrivacy(), streams: 4, deviceModel: "iPhone")
         let coords = try? XCTUnwrap(payload.coordinates)

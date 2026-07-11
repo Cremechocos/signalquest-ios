@@ -36,6 +36,43 @@ struct SignalShareData: Equatable {
     }
 }
 
+// MARK: - Publication partagée (kind "social_post")
+//
+// Depuis le durcissement backend (commit b9bbc1b8), le partage d'un post écrit un
+// `shareCard` fidèle : auteur, texte, vignette image et l'éventuelle mesure
+// (signal / speedtest / session). On les décode pour afficher une carte riche.
+
+/// Auteur d'une publication partagée.
+struct ShareCardAuthor: Equatable {
+    let name: String?
+    let handle: String?
+    let avatarUrl: URL?
+
+    var displayName: String { name?.nilIfEmpty ?? handle?.nilIfEmpty ?? "SignalQuest" }
+    /// Handle normalisé avec « @ » de tête.
+    var handleLine: String? {
+        guard let h = handle?.nilIfEmpty else { return nil }
+        return h.hasPrefix("@") ? h : "@\(h)"
+    }
+}
+
+/// Mesure « speedtest » portée par une publication partagée.
+struct SpeedtestShareData: Equatable {
+    let downloadMbps: Double?
+    let uploadMbps: Double?
+    let pingMs: Double?
+    let technology: String?
+    let operatorName: String?
+}
+
+/// Mesure « session de couverture » portée par une publication partagée.
+struct SessionShareData: Equatable {
+    let points: Int?
+    let distanceKm: Double?
+    let durationSeconds: Int?
+    let technologies: String?
+}
+
 /// Une ligne « label : valeur » d'une carte de partage générique.
 struct ShareCardRow: Equatable, Identifiable {
     let label: String
@@ -52,6 +89,12 @@ struct ShareCardData: Equatable {
     let url: String?
     let rows: [ShareCardRow]
     let signal: SignalShareData?
+    // Champs enrichis du partage de publication (kind == "social_post").
+    let author: ShareCardAuthor?
+    let text: String?
+    let imageUrl: URL?
+    let speedtest: SpeedtestShareData?
+    let session: SessionShareData?
 
     var openURL: URL? { url.flatMap(URL.init(string:)) }
 
@@ -96,13 +139,47 @@ struct ShareCardData: Equatable {
             )
         }
 
+        // Publication partagée : auteur, texte, vignette et mesure enrichie.
+        var author: ShareCardAuthor?
+        if let a = card["author"] as? [String: Any] {
+            author = ShareCardAuthor(
+                name: ShareCardData.optString(a["name"]),
+                handle: ShareCardData.optString(a["handle"]),
+                avatarUrl: ShareCardData.optString(a["avatarUrl"]).flatMap(URL.init(string:))
+            )
+        }
+        var speedtest: SpeedtestShareData?
+        if let s = card["speedtest"] as? [String: Any] {
+            speedtest = SpeedtestShareData(
+                downloadMbps: ShareCardData.doubleValue(s["download"]),
+                uploadMbps: ShareCardData.doubleValue(s["upload"]),
+                pingMs: ShareCardData.doubleValue(s["ping"]),
+                technology: ShareCardData.optString(s["technology"]),
+                operatorName: ShareCardData.optString(s["operator"])
+            )
+        }
+        var session: SessionShareData?
+        if let s = card["session"] as? [String: Any] {
+            session = SessionShareData(
+                points: ShareCardData.intValue(s["points"]),
+                distanceKm: ShareCardData.doubleValue(s["distance"]),
+                durationSeconds: ShareCardData.intValue(s["duration"]),
+                technologies: ShareCardData.optString(s["technologies"])
+            )
+        }
+
         return ShareCardData(
             kind: kind,
             title: title,
             subtitle: ShareCardData.optString(card["subtitle"]),
             url: ShareCardData.optString(card["url"]),
             rows: rows,
-            signal: signal
+            signal: signal,
+            author: author,
+            text: ShareCardData.optString(card["text"]),
+            imageUrl: ShareCardData.optString(card["image"]).flatMap(URL.init(string:)),
+            speedtest: speedtest,
+            session: session
         )
     }
 
@@ -124,6 +201,12 @@ struct ShareCardData: Equatable {
     private static func intValue(_ value: Any?) -> Int? {
         if let n = value as? NSNumber { return n.intValue }
         if let s = value as? String { return Int(s) }
+        return nil
+    }
+
+    private static func doubleValue(_ value: Any?) -> Double? {
+        if let n = value as? NSNumber { return n.doubleValue }
+        if let s = value as? String { return Double(s) }
         return nil
     }
 }

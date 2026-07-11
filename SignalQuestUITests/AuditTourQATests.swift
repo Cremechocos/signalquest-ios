@@ -26,16 +26,18 @@ final class AuditTourQATests: XCTestCase {
             app.launchEnvironment["SQ_QA_PAN_TO"] = "50.85,4.35,7"
         }
         app.launch()
-        XCTAssertTrue(app.tabBars.buttons["Feed"].waitForExistence(timeout: 20))
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
+        XCTAssertTrue(SignalQuestUITestSupport.tab(named: "Accueil", in: app).waitForExistence(timeout: 20))
 
         if tour == "tabs" {
-            // Profil avant Messages : le sheet E2EE auto-présenté sur Messages
-            // recouvrirait les onglets suivants.
-            for (name, pause) in [("Feed", 5.0), ("Carte", 8.0), ("Speed", 5.0), ("Profil", 5.0), ("Messages", 6.0)] {
-                app.tabBars.buttons[name].tap()
+            for (name, pause) in [("Accueil", 5.0), ("Carte", 8.0), ("Tester", 5.0), ("Communauté", 5.0), ("Profil", 5.0)] {
+                SignalQuestUITestSupport.tab(named: name, in: app).tap()
                 print("TOUR_AT \(name)")
                 Thread.sleep(forTimeInterval: pause)
             }
+            SignalQuestUITestSupport.openMessages(in: app)
+            print("TOUR_AT Messages")
+            Thread.sleep(forTimeInterval: 6)
             print("TOUR_DONE")
             return
         }
@@ -43,7 +45,7 @@ final class AuditTourQATests: XCTestCase {
         // tour == "market" : la caméra est déplacée sur Bruxelles par le hook
         // QA SQ_QA_PAN_TO (lancé via launchEnvironment) — fin de pan simulée,
         // la chaîne onMoveEnd → détection → switch est réelle.
-        app.tabBars.buttons["Carte"].tap()
+        SignalQuestUITestSupport.tab(named: "Carte", in: app).tap()
         // Le sélecteur de marché est un Button (libellé pays en MAJUSCULES) : on
         // cherche le marché sur n'importe quel élément, insensible à la casse.
         XCTAssertTrue(marketElement(app, "France").waitForExistence(timeout: 20), "Marché initial France attendu")

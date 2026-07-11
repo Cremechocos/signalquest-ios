@@ -7,8 +7,9 @@ struct SocialComment: Decodable, Identifiable, Equatable {
     let author: SocialFeedAuthor
     let text: String
     let createdAt: Date?
-    let likes: Int?
-    let likedByMe: Bool?
+    // var (et non let) : mise à jour en place lors d'un like/unlike optimiste.
+    var likes: Int?
+    var likedByMe: Bool?
     let repliesCount: Int?
 
     enum CodingKeys: String, CodingKey {
@@ -83,5 +84,24 @@ struct CreateCommentResponse: Decodable {
             if let v = try? c.decode(SocialComment.self, forKey: .item) { comment = v; return }
         }
         comment = try SocialComment(from: decoder)
+    }
+}
+
+/// Réponse de like/unlike d'un commentaire :
+/// `POST` / `DELETE /api/social/posts/{id}/comments/{commentId}/reactions`.
+/// Le backend renvoie l'état final (idempotent) : `{ liked, count }`.
+struct CommentReactionResponse: Decodable {
+    let liked: Bool
+    let count: Int
+
+    enum CodingKeys: String, CodingKey { case liked, count, likesCount, likes }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        liked = (try? c.decode(Bool.self, forKey: .liked)) ?? false
+        count = (try? c.decode(Int.self, forKey: .count))
+            ?? (try? c.decode(Int.self, forKey: .likesCount))
+            ?? (try? c.decode(Int.self, forKey: .likes))
+            ?? 0
     }
 }

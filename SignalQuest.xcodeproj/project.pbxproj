@@ -211,6 +211,7 @@
 		ECBDC1919F95968B3CBB37C0 /* ThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF1F41B3B9C7134D4B1810A3 /* ThreadView.swift */; };
 		ECC09E7CA1AB0F9C9BE01F32 /* DriveTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07ACC9D1192AB45142AE044 /* DriveTestView.swift */; };
 		EE47E722A4FE5F89F50C9523 /* MarketRegistryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 182127C92C62ADE344EDBCD1 /* MarketRegistryService.swift */; };
+		F38CCC8B26C990891C8186C7 /* NetworkPulseHero.swift in Sources */ = {isa = PBXBuildFile; fileRef = C82A89658CFF511C4133BD31 /* NetworkPulseHero.swift */; };
 		F5272C5A267FE6C612845506 /* SQGlass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A1BBD0BBAB60EBB9F3E8FA /* SQGlass.swift */; };
 		F5B1F063472CD474A7C9E2A1 /* E2EEBiometric.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E3C9707438A21F39B4C8A70 /* E2EEBiometric.swift */; };
 		F65CE0D7B751228A5B147A0A /* SQSpace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A073CAEDF99975C220519FB1 /* SQSpace.swift */; };
@@ -218,6 +219,10 @@
 		FC56E7C3FFDFBDBD65E65037 /* SQComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0078226636E735A7665D8A3 /* SQComponents.swift */; };
 		FD652D6B4802405CA11E6A2E /* ArchivoExpanded-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8D019C806054A39837556C09 /* ArchivoExpanded-Bold.ttf */; };
 		FD8C8A4E55F6F7F937636C0E /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C14BE7BE1D4056FB4421D16 /* APIClientTests.swift */; };
+		E71000000000000000000011 /* EntitlementsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71000000000000000000001 /* EntitlementsService.swift */; };
+		E71000000000000000000012 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71000000000000000000002 /* PaywallView.swift */; };
+		E71000000000000000000013 /* EntitlementsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71000000000000000000003 /* EntitlementsTests.swift */; };
+		C41100000000000000000002 /* CallReliabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C41100000000000000000001 /* CallReliabilityTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -263,7 +268,7 @@
 		0412AAD8AE4FABC8AFE66ADE /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		0447B79F47CDC0258E0BEA27 /* SQFont.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQFont.swift; sourceTree = "<group>"; };
 		0B9B5640F38ED77C1C34D499 /* CoverageRenderPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageRenderPolicyTests.swift; sourceTree = "<group>"; };
-		0BBEF6D66A51142E104DBD6B /* SignalQuestUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SignalQuestUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0BBEF6D66A51142E104DBD6B /* SignalQuestUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SignalQuestUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0CE1FA9C0AE5C296806B4C08 /* SQCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQCompat.swift; sourceTree = "<group>"; };
 		0E223D37F2AA33DF68928E05 /* WiFiSSIDProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiSSIDProvider.swift; sourceTree = "<group>"; };
 		0E4882F72DD2907AAAE98D14 /* MessageModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageModels.swift; sourceTree = "<group>"; };
@@ -296,7 +301,7 @@
 		2FB22F5DE6B092A44B9F7A91 /* SQRadius.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQRadius.swift; sourceTree = "<group>"; };
 		30EFB586826CF2A6A011E18D /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
 		3132D23393CBFB7001BC1C1D /* SectorNumbering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectorNumbering.swift; sourceTree = "<group>"; };
-		3208FA15F4116CDD6FB4BF47 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		3208FA15F4116CDD6FB4BF47 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3300B0156FFEE46C1CC81882 /* AppLockController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLockController.swift; sourceTree = "<group>"; };
 		33B5B8A2020DDEBF038A38DA /* PublicSans-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PublicSans-Bold.ttf"; sourceTree = "<group>"; };
 		342AD252F576AA2664A4C655 /* SQBrand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQBrand.swift; sourceTree = "<group>"; };
@@ -330,9 +335,11 @@
 		5AEDFB065EC3512D77D7569B /* CredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialStore.swift; sourceTree = "<group>"; };
 		5B45485E64C72BC0A432936C /* E2EEUnlockSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEUnlockSheet.swift; sourceTree = "<group>"; };
 		5C14BE7BE1D4056FB4421D16 /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
+		C41100000000000000000001 /* CallReliabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallReliabilityTests.swift; sourceTree = "<group>"; };
 		5E03418AAFBEEEBDF356739B /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
 		5E552A9B78EBBE744667DDC4 /* market_location_areas.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = market_location_areas.json; sourceTree = "<group>"; };
 		5E5547A4163714BB45440475 /* WidgetSharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSharedStore.swift; sourceTree = "<group>"; };
+		5E8A6136300054B40058157D /* SignalQuestTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SignalQuestTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5EF26DB7319D9F10927854D0 /* SocialModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialModels.swift; sourceTree = "<group>"; };
 		610EE8D2CB67E2741D6E1701 /* PlannedDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannedDetailSheet.swift; sourceTree = "<group>"; };
 		63F121F16DC7FF76A1D7D6ED /* SQMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQMotion.swift; sourceTree = "<group>"; };
@@ -397,7 +404,7 @@
 		A4F5346C853F95E32F253D7B /* AuditTourQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditTourQATests.swift; sourceTree = "<group>"; };
 		A4F8B268ACB58F2F9B93795E /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		A5C7F0DAC41E77828173A282 /* MapBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapBackdrop.swift; sourceTree = "<group>"; };
-		A6E1EF0479FCED5DDDEC9CBB /* SignalQuest.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SignalQuest.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A6E1EF0479FCED5DDDEC9CBB /* SignalQuest.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SignalQuest.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA6A9E12FB0C1755E79A6216 /* SpeedtestIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestIntents.swift; sourceTree = "<group>"; };
 		AC02787ABEAE06188ADF7D1F /* LeaderboardService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardService.swift; sourceTree = "<group>"; };
 		AC51F8CACA66BE964E15F919 /* APIEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIEndpoint.swift; sourceTree = "<group>"; };
@@ -425,6 +432,7 @@
 		C5B4A61B546243ACDB9EAA06 /* Staging.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Staging.xcconfig; sourceTree = "<group>"; };
 		C6B3B3E33665A0D12EB2183E /* SQEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQEffects.swift; sourceTree = "<group>"; };
 		C70EBF0567FCA17824A1A272 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		C82A89658CFF511C4133BD31 /* NetworkPulseHero.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPulseHero.swift; sourceTree = "<group>"; };
 		C8A8D289A6D4E7B0C9C621A4 /* PushNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationService.swift; sourceTree = "<group>"; };
 		CD352558B0E98E08EE91AFF6 /* MessageShareModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageShareModels.swift; sourceTree = "<group>"; };
 		CE9C7190AEB0D08E27839A20 /* CallsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsService.swift; sourceTree = "<group>"; };
@@ -433,7 +441,7 @@
 		D2F641884A080F0EC459B546 /* PhotoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoService.swift; sourceTree = "<group>"; };
 		D6A0DBB96F9423CDD0C043B6 /* SpeedtestShareQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestShareQATests.swift; sourceTree = "<group>"; };
 		D6FFA250C4BE27D4200678E2 /* ModelDecodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDecodeTests.swift; sourceTree = "<group>"; };
-		D7454A1BEDAD17CEBB961A3D /* SignalQuestTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SignalQuestTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D7454A1BEDAD17CEBB961A3D /* SignalQuestTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SignalQuestTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D755436C239643387D984492 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
 		D871487D03A7164E856392DE /* FriendsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsListView.swift; sourceTree = "<group>"; };
 		D89B6EA883CAE3151D38ABEB /* IdentificationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentificationModels.swift; sourceTree = "<group>"; };
@@ -477,7 +485,18 @@
 		FF6741C3A6C32E6A351617E7 /* DriveTestMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveTestMapView.swift; sourceTree = "<group>"; };
 		FF71EBDA3DD738BAEF9242E3 /* GlassCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassCard.swift; sourceTree = "<group>"; };
 		FFB64D26D0A20143A4BE4181 /* SignalDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalDetailSheet.swift; sourceTree = "<group>"; };
+		E71000000000000000000001 /* EntitlementsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitlementsService.swift; sourceTree = "<group>"; };
+		E71000000000000000000002 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		E71000000000000000000003 /* EntitlementsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitlementsTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		5E8A6137300054B40058157D /* SignalQuestTV */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SignalQuestTV;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		095C7997E533FDC4D69340AA /* Frameworks */ = {
@@ -487,6 +506,13 @@
 				80E825877A511351EBDCAE08 /* LiveKit in Frameworks */,
 				E53F5CF267D21D6EBCBBB070 /* FirebaseAnalytics in Frameworks */,
 				48C419E3E4CA1E519CB37A9B /* FirebaseMessaging in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5E8A6133300054B40058157D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -579,6 +605,7 @@
 			children = (
 				375D2602C108329658B440F9 /* ExploreView.swift */,
 				F378A97EE08A97DD345A432F /* FeedView.swift */,
+				C82A89658CFF511C4133BD31 /* NetworkPulseHero.swift */,
 				5E03418AAFBEEEBDF356739B /* UserProfileView.swift */,
 				CCFCCE071F97F59DD0BF3345 /* Cards */,
 				80F320AF93635CCCDF215541 /* Comments */,
@@ -686,6 +713,7 @@
 				752CA575743D913E207E4A67 /* ChooseHandleSheet.swift */,
 				AEB3FB0048F8A13762D3E9A7 /* EditProfileView.swift */,
 				F47AE72407AC9406E2699806 /* GamificationView.swift */,
+				E71000000000000000000002 /* PaywallView.swift */,
 				F7FC8EF017841F78C280399C /* PrivacySettingsView.swift */,
 				6DA29CF4FE66121B9C7C8ECC /* ProfileView.swift */,
 				F3B11B2DAF5DED109A1CA2CE /* SettingsView.swift */,
@@ -774,6 +802,7 @@
 				D7454A1BEDAD17CEBB961A3D /* SignalQuestTests.xctest */,
 				0BBEF6D66A51142E104DBD6B /* SignalQuestUITests.xctest */,
 				2A5251F96893CB76BAAC1239 /* SignalQuestWidget.appex */,
+				5E8A6136300054B40058157D /* SignalQuestTV.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -794,6 +823,7 @@
 				DFEE52FF944D70A5C57A7E12 /* SignalQuestTests */,
 				7AF292E443FD86F6B602A9E6 /* SignalQuestUITests */,
 				E626C88F57DD69C3C24E4350 /* SignalQuestWidget */,
+				5E8A6137300054B40058157D /* SignalQuestTV */,
 				5FF01791C8007B706913F656 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -971,6 +1001,7 @@
 				CE9C7190AEB0D08E27839A20 /* CallsService.swift */,
 				26BF4AF46D1515F881E4DF50 /* CommentsService.swift */,
 				8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */,
+				E71000000000000000000001 /* EntitlementsService.swift */,
 				F2CA58924E285286ACEFF82F /* FriendsService.swift */,
 				7DE13CA2784C45B1F0EDF3B2 /* GamificationService.swift */,
 				7C43EF0BBA838F55D6E4EF78 /* IdentifyService.swift */,
@@ -997,10 +1028,12 @@
 			isa = PBXGroup;
 			children = (
 				5C14BE7BE1D4056FB4421D16 /* APIClientTests.swift */,
+				C41100000000000000000001 /* CallReliabilityTests.swift */,
 				830D7ECFA820F2E774487EC0 /* AuthCookieStoreTests.swift */,
 				1B7D91FD53A512C0A154BCFB /* AutoRefreshTests.swift */,
 				0B9B5640F38ED77C1C34D499 /* CoverageRenderPolicyTests.swift */,
 				1483D87FE8E1D946F88F7C05 /* E2EETests.swift */,
+				E71000000000000000000003 /* EntitlementsTests.swift */,
 				74CF7E1DDA21B03198307ED6 /* Info.plist */,
 				B1F4DC14B58C08DADF46E158 /* MapFilterStoreTests.swift */,
 				D6FFA250C4BE27D4200678E2 /* ModelDecodeTests.swift */,
@@ -1130,10 +1163,33 @@
 			productReference = D7454A1BEDAD17CEBB961A3D /* SignalQuestTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		5E8A6135300054B40058157D /* SignalQuestTV */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5E8A6141300054B50058157D /* Build configuration list for PBXNativeTarget "SignalQuestTV" */;
+			buildPhases = (
+				5E8A6132300054B40058157D /* Sources */,
+				5E8A6133300054B40058157D /* Frameworks */,
+				5E8A6134300054B40058157D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5E8A6137300054B40058157D /* SignalQuestTV */,
+			);
+			name = SignalQuestTV;
+			packageProductDependencies = (
+			);
+			productName = SignalQuestTV;
+			productReference = 5E8A6136300054B40058157D /* SignalQuestTV.app */;
+			productType = "com.apple.product-type.application";
+		};
 		9023B26AAE2BC6AEEBAC8CE6 /* SignalQuest */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 71D3576E8E5FE2A2C8DF7B8A /* Build configuration list for PBXNativeTarget "SignalQuest" */;
 			buildPhases = (
+				D4A70C28E03AA2F100000001 /* Validate Build Environment */,
 				2E049C742214CA1798856C44 /* Sources */,
 				F02B3DC4F972A46E5907DC8D /* Resources */,
 				095C7997E533FDC4D69340AA /* Frameworks */,
@@ -1196,11 +1252,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
+				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					27D68F01D65D0B4BB086ADB6 = {
 						DevelopmentTeam = 835X2977R7;
 						ProvisioningStyle = Automatic;
+					};
+					5E8A6135300054B40058157D = {
+						CreatedOnToolsVersion = 27.0;
 					};
 					9023B26AAE2BC6AEEBAC8CE6 = {
 						DevelopmentTeam = 835X2977R7;
@@ -1218,11 +1278,12 @@
 				};
 			};
 			buildConfigurationList = CFBF9F39E5ECBF3DA0E7492C /* Build configuration list for PBXProject "SignalQuest" */;
-			developmentRegion = en;
+			developmentRegion = fr;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
 				en,
+				fr,
 			);
 			mainGroup = 78214B716A9029C68E81E8F2;
 			minimizedProjectReferenceProxies = 1;
@@ -1239,11 +1300,19 @@
 				27D68F01D65D0B4BB086ADB6 /* SignalQuestTests */,
 				F0008CBF468668149A9A5EA6 /* SignalQuestUITests */,
 				CD7D689ABD04AE8BCC254A5A /* SignalQuestWidget */,
+				5E8A6135300054B40058157D /* SignalQuestTV */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		5E8A6134300054B40058157D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F02B3DC4F972A46E5907DC8D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1267,6 +1336,30 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		D4A70C28E03AA2F100000001 /* Validate Build Environment */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/ci_scripts/validate_build_environment.sh",
+			);
+			name = "Validate Build Environment";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/ci_scripts/validate_build_environment.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		2E049C742214CA1798856C44 /* Sources */ = {
@@ -1315,6 +1408,7 @@
 				ECC09E7CA1AB0F9C9BE01F32 /* DriveTestView.swift in Sources */,
 				F5B1F063472CD474A7C9E2A1 /* E2EEBiometric.swift in Sources */,
 				2A75C227B62E74818271FE0A /* E2EEService.swift in Sources */,
+				E71000000000000000000011 /* EntitlementsService.swift in Sources */,
 				505D859D72F614CC8E5C784C /* E2EEUnlockSheet.swift in Sources */,
 				D1A58B2BB8DD3C9F24E5DAC3 /* EditProfileView.swift in Sources */,
 				25E51616DFCEE545AE04E5EF /* ExploreView.swift in Sources */,
@@ -1358,6 +1452,7 @@
 				AE4252E6C806B316DED09768 /* MyIdentificationsView.swift in Sources */,
 				1EF63FFE668545D35C37E403 /* MyMeasurementsView.swift in Sources */,
 				A1A44A0CCC7D64304DA39684 /* NetworkPathMonitor.swift in Sources */,
+				F38CCC8B26C990891C8186C7 /* NetworkPulseHero.swift in Sources */,
 				1903FFA116C3304098389589 /* NewPollView.swift in Sources */,
 				92554F6DCF00E04342046FDE /* NotificationsCenterView.swift in Sources */,
 				B11527ED2AE1705CF5EAA4AD /* NotificationsService.swift in Sources */,
@@ -1368,6 +1463,7 @@
 				4A47DAD1AD56717BCE3405C7 /* PhotoUploadPreparation.swift in Sources */,
 				25FB0A6A120E43D0B2E89C8F /* PhotosView.swift in Sources */,
 				8DFAAE9EED690BB0A8D45D29 /* PlannedDetailSheet.swift in Sources */,
+				E71000000000000000000012 /* PaywallView.swift in Sources */,
 				4F87D6C98875D32BB45CB4EA /* PollBubble.swift in Sources */,
 				DA97C11B6664887E0F4F3C42 /* PostCardView.swift in Sources */,
 				C3B0B1D99C78B3D0E3E7A676 /* PostDetailView.swift in Sources */,
@@ -1440,6 +1536,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5E8A6132300054B40058157D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		81851BC3572A1F6E2927FA61 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1460,10 +1563,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				FD8C8A4E55F6F7F937636C0E /* APIClientTests.swift in Sources */,
+				C41100000000000000000002 /* CallReliabilityTests.swift in Sources */,
 				4A54B72BCBA77DBCE0F62CD9 /* AuthCookieStoreTests.swift in Sources */,
 				5F7AF0A6DEEB9A788A1199E7 /* AutoRefreshTests.swift in Sources */,
 				59319D5732AB2088D06F5F8D /* CoverageRenderPolicyTests.swift in Sources */,
 				A9AA093F88B7A4E23A7EE3A7 /* E2EETests.swift in Sources */,
+				E71000000000000000000013 /* EntitlementsTests.swift in Sources */,
 				5BB7F333FAEBC17CD67A33C2 /* MapFilterStoreTests.swift in Sources */,
 				15606EDE03FC5483778DB980 /* ModelDecodeTests.swift in Sources */,
 				8027C2DE7425912942340D4B /* NewModelDecodeTests.swift in Sources */,
@@ -1512,6 +1617,7 @@
 /* Begin XCBuildConfiguration section */
 		05576890912DC0B149E7B14B /* Staging */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C5B4A61B546243ACDB9EAA06 /* Staging.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1524,7 +1630,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios.widget;
+				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios.beta.widget;
 				PRODUCT_NAME = SignalQuestWidget;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1533,6 +1639,7 @@
 		};
 		3EDF074135F794207D52150C /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 53482F595BA7C9973BE76955 /* Debug.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1636,6 +1743,121 @@
 			};
 			name = Debug;
 		};
+		5E8A613E300054B50058157D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 835X2977R7;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.meovo.SignalQuestTV;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		5E8A613F300054B50058157D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 835X2977R7;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.meovo.SignalQuestTV;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 27.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		5E8A6140300054B50058157D /* Staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 835X2977R7;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.meovo.SignalQuestTV;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 27.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Staging;
+		};
 		67090B696006A7721A40EE3C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 53482F595BA7C9973BE76955 /* Debug.xcconfig */;
@@ -1667,7 +1889,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios.beta;
 				PRODUCT_NAME = SignalQuest;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1676,6 +1898,7 @@
 		};
 		85660F9EE7DEC1999D101644 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0412AAD8AE4FABC8AFE66ADE /* Release.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1706,7 +1929,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios.uitests;
+				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios.beta.uitests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = SignalQuest;
@@ -1821,7 +2044,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios.beta.tests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SignalQuest.app/SignalQuest";
@@ -1941,6 +2164,16 @@
 				3EDF074135F794207D52150C /* Debug */,
 				85660F9EE7DEC1999D101644 /* Release */,
 				05576890912DC0B149E7B14B /* Staging */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5E8A6141300054B50058157D /* Build configuration list for PBXNativeTarget "SignalQuestTV" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5E8A613E300054B50058157D /* Debug */,
+				5E8A613F300054B50058157D /* Release */,
+				5E8A6140300054B50058157D /* Staging */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

@@ -351,11 +351,13 @@ struct SpeedtestSubmission: Encodable, Equatable {
     let deviceType: String
     let deviceModel: String
     let isVisibleOnMap: Bool
+    let shareExactLocation: Bool
+    let guestDeleteToken: String?
     let server: String?
     let downloadServerName: String?
 
     enum CodingKeys: String, CodingKey {
-        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, server, downloadServerName
+        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, server, downloadServerName
         case rsrp, rsrq, snr, cellId, pci, enb, gnb, radioSnapshots
         case pingDl, jitterDl, pingUl, jitterUl
     }
@@ -377,7 +379,9 @@ struct SpeedtestSubmission: Encodable, Equatable {
         streams: Int,
         deviceModel: String,
         mobileOperator: String? = nil,
-        isVisibleOnMap: Bool = false
+        isVisibleOnMap: Bool = false,
+        shareExactLocation: Bool = false,
+        guestDeleteToken: String? = nil
     ) -> SpeedtestSubmission {
         SpeedtestSubmission(
             clientSubmissionId: result.id.uuidString,
@@ -410,7 +414,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
             streams: streams,
             connectionType: result.speedtestConnectionType,
             networkType: result.connectionType.rawValue,
-            coordinates: minimizedCoordinates(result.coordinate),
+            coordinates: shareExactLocation ? result.coordinate : minimizedCoordinates(result.coordinate),
             city: result.city,
             address: result.address,
             mobileOperator: mobileOperator ?? result.networkOperatorName,
@@ -422,6 +426,8 @@ struct SpeedtestSubmission: Encodable, Equatable {
             deviceType: "iPhone",
             deviceModel: deviceModel,
             isVisibleOnMap: isVisibleOnMap,
+            shareExactLocation: shareExactLocation,
+            guestDeleteToken: guestDeleteToken,
             server: result.serverName,
             downloadServerName: result.downloadServerName ?? result.serverName
         )
@@ -471,6 +477,8 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encode(deviceType, forKey: .deviceType)
         try c.encode(deviceModel, forKey: .deviceModel)
         try c.encode(isVisibleOnMap, forKey: .isVisibleOnMap)
+        try c.encode(shareExactLocation, forKey: .shareExactLocation)
+        try c.encodeIfPresent(guestDeleteToken, forKey: .guestDeleteToken)
         try c.encodeIfPresent(server, forKey: .server)
         try c.encodeIfPresent(downloadServerName, forKey: .downloadServerName)
         try c.encodeNil(forKey: .rsrp)
@@ -489,6 +497,19 @@ struct SpeedtestSaveResponse: Codable {
     let id: String?
     let data: JSONValue?
     let requestId: String?
+    /// Renvoyé uniquement à la création anonyme. Le serveur n'en conserve que le hash.
+    let deleteToken: String?
+
+    /// Le backend historique renvoie `data.id` lors de la création et `id` lors
+    /// d'un rejeu idempotent. Accepter les deux évite de perdre le reçu invité
+    /// précisément lorsque le premier POST a réussi.
+    var resolvedID: String? {
+        if let id, !id.isEmpty { return id }
+        guard case .object(let object) = data,
+              case .string(let nestedID) = object["id"],
+              !nestedID.isEmpty else { return nil }
+        return nestedID
+    }
 }
 
 struct SpeedtestDetail: Decodable, Identifiable, Equatable {

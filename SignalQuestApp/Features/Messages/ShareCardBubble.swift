@@ -176,6 +176,159 @@ struct SignalCardBubble: View {
     }
 }
 
+// MARK: Carte de publication partagée (kind « social_post »)
+
+/// Rendu fidèle d'une publication partagée : en-tête auteur, texte, vignette OU
+/// bandeau mesure, pied « Voir la publication ». Parité design A Android.
+struct SharedPostCardBubble: View {
+    let card: ShareCardData
+    let mine: Bool
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            header
+            if let text = card.text, !text.isEmpty {
+                Text(text)
+                    .font(SQType.caption)
+                    .foregroundStyle(mine ? .white.opacity(0.92) : SQColor.labelSecondary)
+                    .lineLimit(4)
+            }
+            media
+            if let url = card.openURL {
+                Rectangle()
+                    .fill(mine ? Color.white.opacity(0.22) : SQColor.separator)
+                    .frame(height: 0.5)
+                Button {
+                    Haptics.selection()
+                    openURL(url)
+                } label: {
+                    HStack(spacing: SQSpace.xs) {
+                        Text("Voir la publication")
+                            .font(SQType.caption.weight(.semibold))
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(mine ? .white : SQColor.brandRed)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: 280, alignment: .leading)
+    }
+
+    private var header: some View {
+        HStack(spacing: SQSpace.sm) {
+            SQAvatar(url: card.author?.avatarUrl, name: card.author?.displayName ?? "SignalQuest", size: 30)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(card.author?.displayName ?? card.title)
+                    .font(SQType.caption.weight(.semibold))
+                    .foregroundStyle(mine ? .white : SQColor.label)
+                    .lineLimit(1)
+                Text(sourceLine)
+                    .font(SQType.micro)
+                    .foregroundStyle(mine ? .white.opacity(0.7) : SQColor.labelTertiary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var sourceLine: String {
+        if let handle = card.author?.handleLine { return "\(handle) · Fil réseau" }
+        return "Fil réseau"
+    }
+
+    /// Vignette image en priorité ; sinon bandeau de mesure selon ce que porte la
+    /// publication (signal → speedtest → session).
+    @ViewBuilder
+    private var media: some View {
+        if let image = card.imageUrl {
+            RemoteImage(url: image, maxDimension: 600, contentMode: .fill) {
+                Rectangle().fill(mine ? Color.white.opacity(0.12) : SQColor.surfaceMuted)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 130)
+            .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        } else if let signal = card.signal, let rsrp = signal.rsrp {
+            measurementBanner(
+                primary: "\(rsrp)",
+                unit: "dBm",
+                tint: rsrpColor(rsrp),
+                chips: [signal.operatorName, signal.technology,
+                        signal.band.map { "Bande \($0)" }, signal.site.map { "Site \($0)" }]
+            )
+        } else if let speedtest = card.speedtest, speedtest.downloadMbps != nil {
+            measurementBanner(
+                primary: formatMbps(speedtest.downloadMbps),
+                unit: "Mb/s",
+                tint: mine ? .white : SQColor.brandRed,
+                chips: [speedtest.uploadMbps.map { "↑ \(formatMbps($0)) Mb/s" },
+                        speedtest.pingMs.map { "\(Int($0.rounded())) ms" },
+                        speedtest.operatorName, speedtest.technology]
+            )
+        } else if let session = card.session, session.points != nil || session.distanceKm != nil {
+            measurementBanner(
+                primary: session.points.map { "\($0)" } ?? "—",
+                unit: "points",
+                tint: mine ? .white : SQColor.brandRed,
+                chips: [session.distanceKm.map { String(format: "%.1f km", $0) },
+                        session.durationSeconds.map { formatDuration($0) }, session.technologies]
+            )
+        }
+    }
+
+    private func measurementBanner(primary: String, unit: String, tint: Color, chips: [String?]) -> some View {
+        let visibleChips = chips.compactMap { chip -> String? in
+            guard let value = chip?.trimmingCharacters(in: .whitespaces), !value.isEmpty else { return nil }
+            return value
+        }.prefix(3)
+        return VStack(alignment: .leading, spacing: SQSpace.xs) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(primary)
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundStyle(mine ? .white : tint)
+                Text(unit)
+                    .font(SQType.micro)
+                    .foregroundStyle(mine ? .white.opacity(0.7) : SQColor.labelTertiary)
+            }
+            if !visibleChips.isEmpty {
+                Text(visibleChips.joined(separator: " · "))
+                    .font(SQType.micro)
+                    .foregroundStyle(mine ? .white.opacity(0.75) : SQColor.labelSecondary)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, SQSpace.sm + 2)
+        .padding(.vertical, SQSpace.sm)
+        .background(mine ? Color.white.opacity(0.12) : SQColor.surfaceMuted,
+                    in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    }
+
+    /// Seuils qualité RSRP alignés sur Android : ≥−85 vert, ≥−100 ambre, sinon rouge.
+    private func rsrpColor(_ rsrp: Int) -> Color {
+        switch rsrp {
+        case (-85)...: return SQColor.success
+        case (-100)...: return SQColor.warning
+        default: return SQColor.danger
+        }
+    }
+
+    private func formatMbps(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        return value >= 100 ? String(Int(value.rounded())) : String(format: "%.1f", value)
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        if minutes >= 60 { return "\(minutes / 60) h \(minutes % 60) min" }
+        return minutes > 0 ? "\(minutes) min" : "\(seconds) s"
+    }
+}
+
 // MARK: Carte de localisation
 
 struct LocationBubble: View {

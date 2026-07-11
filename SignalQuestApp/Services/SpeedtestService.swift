@@ -3,6 +3,7 @@ import CoreLocation
 import Network
 import UIKit
 import WidgetKit
+import Security
 
 // MARK: - Service protocol
 
@@ -12,7 +13,75 @@ protocol SpeedtestServicing: Sendable {
     func save(_ result: SpeedtestRunResult) async throws
     func save(_ result: SpeedtestRunResult, streams: Int) async throws
     func save(_ result: SpeedtestRunResult, streams: Int, publishToMap: Bool) async throws
+    func save(_ result: SpeedtestRunResult, streams: Int, publishToMap: Bool, shareExactLocation: Bool) async throws
     func details(id: String) async throws -> SpeedtestDetail
+    func guestDeletionReceipts() -> [GuestSpeedtestDeletionReceipt]
+    func deleteGuestSpeedtest(_ receipt: GuestSpeedtestDeletionReceipt) async throws
+}
+
+struct GuestSpeedtestDeletionReceipt: Codable, Equatable, Identifiable, Sendable {
+    /// Identifiant serveur du speedtest, requis par la route DELETE.
+    let id: String
+    let clientSubmissionId: String
+    let deleteToken: String
+    let createdAt: Date
+}
+
+private enum GuestSpeedtestReceiptError: LocalizedError {
+    case tokenGenerationFailed
+
+    var errorDescription: String? {
+        "Impossible de créer le reçu de suppression local. Le speedtest invité n’a pas été envoyé. Réessaie."
+    }
+}
+
+/// Les reçus invités sont sensibles : ils donnent le droit de supprimer une mesure.
+/// Ils vivent donc dans un service Keychain dédié, et non dans UserDefaults.
+final class GuestSpeedtestReceiptStore: @unchecked Sendable {
+    private let store: TokenStore
+    private let lock = NSLock()
+    private let key = "guest-speedtest-deletion-receipts-v1"
+
+    init(store: TokenStore = KeychainStore(service: "fr.signalquest.ios.guest-speedtests")) {
+        self.store = store
+    }
+
+    func all() -> [GuestSpeedtestDeletionReceipt] {
+        lock.withLock { readUnlocked() }
+    }
+
+    func upsert(_ receipt: GuestSpeedtestDeletionReceipt) {
+        lock.withLock {
+            var values = readUnlocked().filter { $0.id != receipt.id }
+            values.append(receipt)
+            writeUnlocked(values.sorted { $0.createdAt > $1.createdAt })
+        }
+    }
+
+    func remove(id: String) {
+        lock.withLock {
+            writeUnlocked(readUnlocked().filter { $0.id != id })
+        }
+    }
+
+    private func readUnlocked() -> [GuestSpeedtestDeletionReceipt] {
+        guard let raw = try? store.string(for: key),
+              let data = raw.data(using: .utf8),
+              let values = try? JSONDecoder.signalQuest.decode([GuestSpeedtestDeletionReceipt].self, from: data) else {
+            return []
+        }
+        return values
+    }
+
+    private func writeUnlocked(_ values: [GuestSpeedtestDeletionReceipt]) {
+        guard !values.isEmpty else {
+            try? store.remove(key)
+            return
+        }
+        guard let data = try? JSONEncoder.signalQuest.encode(values),
+              let raw = String(data: data, encoding: .utf8) else { return }
+        try? store.set(raw, for: key, accessibility: .whenUnlocked)
+    }
 }
 
 /// Live progress emitted by the engine during a run. The UI uses this to drive
@@ -200,6 +269,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private let session: URLSession
     private let historyCache: DiskCache
     private let pendingCache: DiskCache
+    private let guestReceiptStore: GuestSpeedtestReceiptStore
     private let tcpProbe: SpeedtestTCPProbing
     private let pendingSaveKey = "pending-speedtest-saves"
 
@@ -210,6 +280,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         session: URLSession? = nil,
         historyCache: DiskCache = DiskCache(folderName: "SignalQuestSpeedtestHistory"),
         pendingCache: DiskCache = DiskCache(folderName: "SignalQuestSpeedtestPending"),
+        guestReceiptStore: GuestSpeedtestReceiptStore = GuestSpeedtestReceiptStore(),
         tcpProbe: SpeedtestTCPProbing = NetworkSpeedtestTCPProbe()
     ) {
         self.api = api
@@ -224,6 +295,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         self.session = session ?? URLSession(configuration: config)
         self.historyCache = historyCache
         self.pendingCache = pendingCache
+        self.guestReceiptStore = guestReceiptStore
         self.tcpProbe = tcpProbe
     }
 
@@ -469,13 +541,38 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     }
 
     func save(_ result: SpeedtestRunResult, streams: Int, publishToMap: Bool) async throws {
+        try await save(
+            result,
+            streams: streams,
+            publishToMap: publishToMap,
+            shareExactLocation: false
+        )
+    }
+
+    func save(
+        _ result: SpeedtestRunResult,
+        streams: Int,
+        publishToMap: Bool,
+        shareExactLocation: Bool
+    ) async throws {
+        let guestDeleteToken: String?
+        if api.credentials.accessToken() == nil {
+            guard let token = Self.makeGuestDeleteToken() else {
+                throw GuestSpeedtestReceiptError.tokenGenerationFailed
+            }
+            guestDeleteToken = token
+        } else {
+            guestDeleteToken = nil
+        }
         let pending = PendingSpeedtestSave(
             id: result.id.uuidString,
             result: result,
             streams: streams,
             deviceModel: await UIDevice.current.modelName,
             createdAt: Date(),
-            isVisibleOnMap: publishToMap
+            isVisibleOnMap: publishToMap,
+            shareExactLocation: publishToMap && shareExactLocation,
+            guestDeleteToken: guestDeleteToken
         )
         try? await upsertPendingSave(pending)
         do {
@@ -501,6 +598,24 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             APIEndpoint(path: "/api/speedtests/\(encodedId)", authenticated: false),
             as: SpeedtestDetail.self
         )
+    }
+
+    func guestDeletionReceipts() -> [GuestSpeedtestDeletionReceipt] {
+        guestReceiptStore.all()
+    }
+
+    func deleteGuestSpeedtest(_ receipt: GuestSpeedtestDeletionReceipt) async throws {
+        let encodedId = receipt.id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? receipt.id
+        let _: SuccessResponse = try await api.request(
+            APIEndpoint(
+                path: "/api/speedtests/\(encodedId)",
+                method: .delete,
+                headers: ["X-Speedtest-Delete-Token": receipt.deleteToken],
+                authenticated: false
+            ),
+            as: SuccessResponse.self
+        )
+        guestReceiptStore.remove(id: receipt.id)
     }
 
     private func appendHistory(_ result: SpeedtestRunResult) async throws {
@@ -534,6 +649,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         /// rester compatible avec les sauvegardes en attente déjà sérialisées avant
         /// l'ajout du consentement — `nil` est traité comme « non publié ».
         let isVisibleOnMap: Bool?
+        /// Opt-in explicite. Optionnel pour décoder les anciennes files locales.
+        let shareExactLocation: Bool?
+        /// Généré et persisté dans la file AVANT le POST : le même secret survit
+        /// à un commit serveur dont la réponse aurait été perdue.
+        let guestDeleteToken: String?
     }
 
     private func pendingSaves() async -> [PendingSpeedtestSave] {
@@ -564,9 +684,35 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             from: pending.result,
             streams: pending.streams,
             deviceModel: pending.deviceModel,
-            isVisibleOnMap: pending.isVisibleOnMap ?? false
+            isVisibleOnMap: pending.isVisibleOnMap ?? false,
+            shareExactLocation: pending.shareExactLocation ?? false,
+            guestDeleteToken: pending.guestDeleteToken
         )
-        let _: SpeedtestSaveResponse = try await api.requestJSON("/api/speedtests", body: payload)
+        let response: SpeedtestSaveResponse = try await api.requestJSON(
+            "/api/speedtests",
+            body: payload,
+            idempotencyKey: pending.id
+        )
+        if let serverId = response.resolvedID,
+           let deleteToken = response.deleteToken ?? pending.guestDeleteToken {
+            guestReceiptStore.upsert(GuestSpeedtestDeletionReceipt(
+                id: serverId,
+                clientSubmissionId: pending.id,
+                deleteToken: deleteToken,
+                createdAt: pending.createdAt
+            ))
+        }
+    }
+
+    private static func makeGuestDeleteToken() -> String? {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        let status = bytes.withUnsafeMutableBytes { buffer in
+            SecRandomCopyBytes(kSecRandomDefault, buffer.count, buffer.baseAddress!)
+        }
+        guard status == errSecSuccess else {
+            return nil
+        }
+        return Data(bytes).base64URLEncodedNoPadding()
     }
 
     private func flushPendingSaves(excluding excludedIds: Set<String> = []) async throws {

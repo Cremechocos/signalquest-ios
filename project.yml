@@ -1,18 +1,19 @@
 name: SignalQuest
 options:
+  developmentLanguage: fr
   bundleIdPrefix: fr.signalquest
   createIntermediateGroups: true
   deploymentTarget:
     iOS: "16.0"
 configs:
   Debug: debug
-  Staging: debug
+  Staging: release
   Release: release
 settings:
   base:
     SWIFT_VERSION: "6.0"
     IPHONEOS_DEPLOYMENT_TARGET: "16.0"
-    TARGETED_DEVICE_FAMILY: "1"
+    TARGETED_DEVICE_FAMILY: "1,2"
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: "835X2977R7"
 packages:
@@ -54,6 +55,13 @@ targets:
         CODE_SIGN_ENTITLEMENTS: SignalQuestApp/SignalQuest.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_USER_SCRIPT_SANDBOXING: YES
+      configs:
+        Staging:
+          PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.beta
+    preBuildScripts:
+      - name: Validate Build Environment
+        path: ci_scripts/validate_build_environment.sh
+        basedOnDependencyAnalysis: false
     dependencies:
       - package: LiveKit
         product: LiveKit
@@ -75,6 +83,10 @@ targets:
     sources:
       - path: SignalQuestWidget
       - path: SignalQuestApp/Core/Shared/WidgetSharedStore.swift
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Staging: Config/Staging.xcconfig
+      Release: Config/Release.xcconfig
     info:
       path: SignalQuestWidget/Info.plist
       properties:
@@ -89,6 +101,9 @@ targets:
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
+      configs:
+        Staging:
+          PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.beta.widget
   SignalQuestTests:
     type: bundle.unit-test
     platform: iOS
@@ -102,6 +117,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.tests
         INFOPLIST_FILE: SignalQuestTests/Info.plist
+      configs:
+        Staging:
+          PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.beta.tests
     dependencies:
       - target: SignalQuest
   SignalQuestUITests:
@@ -117,6 +135,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.uitests
         INFOPLIST_FILE: SignalQuestUITests/Info.plist
+      configs:
+        Staging:
+          PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.beta.uitests
     dependencies:
       - target: SignalQuest
 schemes:
@@ -134,3 +155,17 @@ schemes:
       config: Debug
     archive:
       config: Release
+  SignalQuest Beta:
+    build:
+      targets:
+        SignalQuest: all
+    test:
+      config: Staging
+      targets:
+        - SignalQuestTests
+        - SignalQuestUITests
+      gatherCoverageData: true
+    run:
+      config: Staging
+    archive:
+      config: Staging

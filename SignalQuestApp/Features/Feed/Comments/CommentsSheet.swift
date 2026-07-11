@@ -45,6 +45,35 @@ final class CommentsViewModel: ObservableObject {
         }
     }
 
+    /// Like/unlike optimiste d'un commentaire : bascule immédiate de l'état local
+    /// puis réconciliation avec la réponse serveur (rollback en cas d'échec).
+    /// Même pattern que `FeedViewModel.react`.
+    func toggleLike(_ comment: SocialComment) {
+        guard let idx = comments.firstIndex(where: { $0.id == comment.id }) else { return }
+        let wasLiked = comments[idx].likedByMe == true
+        let previousCount = comments[idx].likes ?? 0
+        comments[idx].likedByMe = !wasLiked
+        comments[idx].likes = max(0, previousCount + (wasLiked ? -1 : 1))
+        Haptics.light()
+        Task {
+            do {
+                let response = wasLiked
+                    ? try await service.unlike(postId: postId, commentId: comment.id)
+                    : try await service.like(postId: postId, commentId: comment.id)
+                if let i = comments.firstIndex(where: { $0.id == comment.id }) {
+                    comments[i].likedByMe = response.liked
+                    comments[i].likes = response.count
+                }
+            } catch {
+                guard !error.isCancellation else { return }
+                if let i = comments.firstIndex(where: { $0.id == comment.id }) {
+                    comments[i].likedByMe = wasLiked
+                    comments[i].likes = previousCount
+                }
+            }
+        }
+    }
+
 }
 
 struct CommentsSheet: View {
@@ -149,24 +178,37 @@ struct CommentsSheet: View {
                 Text(comment.text)
                     .font(SQType.body)
                     .foregroundStyle(SQColor.label)
-                if let likes = comment.likes, likes > 0 {
-                    let isLiked = comment.likedByMe == true
-                    HStack(spacing: SQSpace.xs + 1) {
-                        Image(systemName: isLiked ? "heart.fill" : "heart")
-                            .sqLikePop(trigger: isLiked)
-                            .accessibilityHidden(true)
-                        Text("\(likes)")
-                            .monospacedDigit()
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(isLiked ? SQColor.like : SQColor.labelSecondary)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(likes) j’aime")
-                }
+                likeButton(comment)
             }
         }
         .padding(SQSpace.md)
         .sqEditorialCard()
+    }
+
+    /// Cœur toujours tappable (like/unlike) ; le compteur n'apparaît qu'à partir
+    /// de 1. Bascule optimiste gérée par le view model.
+    private func likeButton(_ comment: SocialComment) -> some View {
+        let isLiked = comment.likedByMe == true
+        let count = comment.likes ?? 0
+        return Button {
+            model.toggleLike(comment)
+        } label: {
+            HStack(spacing: SQSpace.xs + 1) {
+                Image(systemName: isLiked ? "heart.fill" : "heart")
+                    .sqLikePop(trigger: isLiked)
+                    .accessibilityHidden(true)
+                if count > 0 {
+                    Text("\(count)").monospacedDigit()
+                }
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(isLiked ? SQColor.like : SQColor.labelSecondary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 1)
+        .accessibilityLabel(isLiked ? "Je n’aime plus" : "J’aime")
+        .accessibilityValue(count > 0 ? "\(count) j’aime" : "")
     }
 
     /// Avatar / nom tappable quand le parent fournit `onAuthorTap`.

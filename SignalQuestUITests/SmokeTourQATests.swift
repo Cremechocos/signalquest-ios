@@ -20,6 +20,7 @@ final class SmokeTourQATests: XCTestCase {
         }
         app.launchArguments += ["--reset-map"]
         app.launch()
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
 
         // Ferme la demande système de notifications si présente (elle est sur SpringBoard).
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
@@ -28,21 +29,24 @@ final class SmokeTourQATests: XCTestCase {
             if b.waitForExistence(timeout: 3) { b.tap(); break }
         }
 
-        XCTAssertTrue(app.tabBars.buttons["Feed"].waitForExistence(timeout: 25), "tab bar absente")
-        snap(app, "01-Feed")
+        XCTAssertTrue(SignalQuestUITestSupport.tab(named: "Accueil", in: app).waitForExistence(timeout: 25), "navigation principale absente")
+        snap(app, "01-Accueil")
 
-        for (name, wait) in [("Carte", 8.0), ("Speed", 4.0), ("Profil", 4.0)] {
-            let btn = app.tabBars.buttons[name]
+        for (name, wait) in [("Carte", 8.0), ("Tester", 4.0), ("Communauté", 4.0), ("Profil", 4.0)] {
+            let btn = SignalQuestUITestSupport.tab(named: name, in: app)
             if btn.waitForExistence(timeout: 6) { btn.tap() }
             Thread.sleep(forTimeInterval: wait)
             snap(app, name)
         }
 
         // Messagerie : liste puis 1re conversation (teste le composer isolé du Lot E).
-        if app.tabBars.buttons["Messages"].waitForExistence(timeout: 6) {
-            app.tabBars.buttons["Messages"].tap()
+        let community = SignalQuestUITestSupport.tab(named: "Communauté", in: app)
+        if community.waitForExistence(timeout: 6) {
+            community.tap()
+            let messages = app.buttons["Messages"]
+            if messages.waitForExistence(timeout: 6) { messages.tap() }
             Thread.sleep(forTimeInterval: 3)
-            snap(app, "05-Messages")
+            snap(app, "06-Messages")
             for label in ["Fermer", "Annuler", "Plus tard"] {
                 let b = app.buttons[label]
                 if b.exists { b.tap(); Thread.sleep(forTimeInterval: 1); break }
@@ -53,14 +57,14 @@ final class SmokeTourQATests: XCTestCase {
             if convo.waitForExistence(timeout: 5) {
                 convo.tap()
                 Thread.sleep(forTimeInterval: 3)
-                snap(app, "06-Conversation")
+                snap(app, "07-Conversation")
                 // Tape dans le composer pour vérifier qu'il ne fige/casse pas la liste.
                 let field = app.textViews.firstMatch.exists ? app.textViews.firstMatch : app.textFields.firstMatch
                 if field.waitForExistence(timeout: 3) {
                     field.tap()
                     field.typeText("Test perf composer")
                     Thread.sleep(forTimeInterval: 1)
-                    snap(app, "07-Composer-saisie")
+                    snap(app, "08-Composer-saisie")
                 }
             }
         }

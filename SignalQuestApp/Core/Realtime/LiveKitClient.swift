@@ -2,6 +2,10 @@ import Foundation
 import AVFAudio
 import Combine
 import os
+#if os(iOS)
+import AVKit
+import UIKit
+#endif
 #if canImport(LiveKit)
 import LiveKit
 #endif
@@ -13,9 +17,37 @@ import LiveKitWebRTC
 final class LiveKitClient: ObservableObject {
     enum State: Equatable { case idle, connecting, connected, failed(String), ended }
 
+    enum MediaControlError: LocalizedError {
+        case screenSharingDisabled
+
+        var errorDescription: String? {
+            switch self {
+            case .screenSharingDisabled:
+                return "Le partage d’écran n’est pas encore disponible sur iOS."
+            }
+        }
+    }
+
     @Published private(set) var state: State = .idle
     @Published private(set) var isMicMuted = false
     @Published private(set) var isCameraOn = false
+    @Published private(set) var canSwitchCamera = false
+    @Published private(set) var isSpeakerOn = false
+    @Published private(set) var mediaErrorMessage: String?
+    @Published private(set) var isPictureInPictureActive = false
+    @Published private(set) var canStartPictureInPicture = false
+#if canImport(LiveKit)
+    struct RemoteVideo: Identifiable {
+        let id: String
+        let participantID: String
+        let displayName: String
+        let track: any VideoTrack
+        let isScreenShare: Bool
+    }
+
+    @Published private(set) var remoteVideos: [RemoteVideo] = []
+    @Published private(set) var localVideoTrack: (any VideoTrack)?
+#endif
 
     /// CALL-RTC-01 : appelé sur le MainActor quand la room se déconnecte en cours
     /// d'appel (l'autre participant part, room fermée, ou réseau tombé). Câblé par
@@ -35,12 +67,22 @@ final class LiveKitClient: ObservableObject {
     /// CALL-RTC-01 : vrai pendant un disconnect() local, pour NE PAS traiter le
     /// didDisconnect provoqué par notre propre raccrochage comme une fin distante.
     private var isTearingDown = false
+    private var emptyRoomTask: Task<Void, Never>?
     private var mediaCancellables = Set<AnyCancellable>()
+#if os(iOS) && canImport(LiveKit)
+    private let pictureInPicture = LiveKitPictureInPictureController()
+#endif
 #if canImport(LiveKit)
     private var room: Room?
     private var localMedia: LocalMedia?
     private var roomObserver: RoomConnectionObserver?
 #endif
+
+    func prepareForCall() {
+        guard state != .connecting, state != .connected else { return }
+        state = .idle
+        mediaErrorMessage = nil
+    }
 
     func connect(url: URL, token: String, room: String, video: Bool, managesAudioSession: Bool = true) async {
         // CALL-RTC-05 : marque cette tentative ; un disconnect() concurrent
@@ -48,29 +90,60 @@ final class LiveKitClient: ObservableObject {
         connectGeneration &+= 1
         let myGeneration = connectGeneration
         isTearingDown = false
+        emptyRoomTask?.cancel()
+        emptyRoomTask = nil
         state = .connecting
+        mediaErrorMessage = nil
+#if canImport(LiveKit)
+        remoteVideos = []
+        localVideoTrack = nil
+#endif
+        mediaCancellables.removeAll()
         self.managesAudioSession = managesAudioSession
+        isSpeakerOn = video
+#if canImport(LiveKit)
+        AudioManager.shared.isSpeakerOutputPreferred = video
+#endif
         startObservingInterruptions()
         do {
+            // CallKit owns activation/deactivation, but the app still owns the
+            // category and mode used once CallKit activates the session. Without
+            // this configuration an audio call can inherit a playback-only
+            // category and publish no microphone on a real device.
+            try session.setCategory(
+                .playAndRecord,
+                mode: .voiceChat,
+                // Ne pas utiliser `.defaultToSpeaker` : avec cette option,
+                // `overrideOutputAudioPort(.none)` ne revient pas fiablement à
+                // l'écouteur et le bouton haut-parleur mentirait à l'utilisateur.
+                options: [.allowBluetoothHFP]
+            )
             if managesAudioSession {
-                try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .defaultToSpeaker])
                 try session.setActive(true, options: [])
             } else {
                 #if canImport(LiveKit)
                 AudioManager.shared.audioSession.isAutomaticConfigurationEnabled = false
                 #endif
             }
-            logger.info("Connecting to room=\(room, privacy: .public) video=\(video)")
+            applySpeakerOutput()
+            // Le nom de room contient l'identifiant de conversation : ne jamais
+            // l'émettre dans les journaux de production.
+            logger.info("Connecting to LiveKit (video=\(video, privacy: .public))")
 #if canImport(LiveKit)
-            let observer = RoomConnectionObserver { [weak self] in
-                Task { @MainActor in
-                    guard let self, !self.isTearingDown, self.state == .connected else { return }
-                    // Déconnexion subie en cours d'appel (raccrochage distant / chute
-                    // réseau) — distincte de notre propre disconnect() (isTearingDown).
-                    self.state = .ended
-                    self.onRemoteDisconnect?()
+            let observer = RoomConnectionObserver(
+                onDisconnect: { [weak self] in
+                    Task { @MainActor in
+                        guard let self, !self.isTearingDown, self.state == .connected else { return }
+                        // Déconnexion de LA ROOM (fin distante / chute réseau). Le
+                        // départ d'un participant d'un groupe ne termine pas l'appel.
+                        self.state = .ended
+                        self.onRemoteDisconnect?()
+                    }
+                },
+                onMediaChanged: { [weak self] in
+                    Task { @MainActor in self?.refreshRemoteMedia() }
                 }
-            }
+            )
             self.roomObserver = observer
             let liveRoom = Room(delegate: observer)
             try await liveRoom.connect(url: url.absoluteString, token: token)
@@ -101,6 +174,18 @@ final class LiveKitClient: ObservableObject {
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] on in self?.isCameraOn = on }
                 .store(in: &mediaCancellables)
+            media.$canSwitchCamera
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] canSwitch in self?.canSwitchCamera = canSwitch }
+                .store(in: &mediaCancellables)
+            media.$cameraTrack
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] track in
+                    self?.localVideoTrack = track
+                    self?.refreshPictureInPictureTrack()
+                }
+                .store(in: &mediaCancellables)
+            refreshRemoteMedia()
             state = .connected
 #else
             throw LiveKitUnavailableError()
@@ -116,18 +201,30 @@ final class LiveKitClient: ObservableObject {
         // une fin distante (pas de double clôture).
         connectGeneration &+= 1
         isTearingDown = true
+        emptyRoomTask?.cancel()
+        emptyRoomTask = nil
         mediaCancellables.removeAll()
         stopObservingInterruptions()
+#if os(iOS) && canImport(LiveKit)
+        pictureInPicture.stop()
+#endif
 #if canImport(LiveKit)
         await room?.disconnect()
         room = nil
         localMedia = nil
         roomObserver = nil
+        remoteVideos = []
+        localVideoTrack = nil
 #endif
         if managesAudioSession {
             try? session.setActive(false, options: [.notifyOthersOnDeactivation])
         }
         state = .ended
+        isMicMuted = false
+        isCameraOn = false
+        canSwitchCamera = false
+        canStartPictureInPicture = false
+        isPictureInPictureActive = false
     }
 
     // MARK: Interruptions audio
@@ -192,6 +289,7 @@ final class LiveKitClient: ObservableObject {
         #if canImport(LiveKit)
         LKRTCAudioSession.sharedInstance().audioSessionDidActivate(audioSession)
         #endif
+        applySpeakerOutput()
     }
 
     func audioSessionDidDeactivate(_ audioSession: AVAudioSession) {
@@ -218,6 +316,152 @@ final class LiveKitClient: ObservableObject {
 #endif
         }
     }
+
+    func switchCamera() {
+        guard canSwitchCamera else { return }
+        Task {
+#if canImport(LiveKit)
+            await localMedia?.switchCamera()
+#endif
+        }
+    }
+
+    func toggleSpeaker() {
+        setSpeakerOutput(!isSpeakerOn)
+    }
+
+    /// Présent pour préparer l'interopérabilité, mais rendu inatteignable par le
+    /// feature flag tant que les tests Android↔iOS ne sont pas verts.
+    func toggleScreenShare() async throws {
+        guard SQFeatures.callScreenSharingEnabled else {
+            throw MediaControlError.screenSharingDisabled
+        }
+#if canImport(LiveKit)
+        await localMedia?.toggleScreenShare(disableCamera: false)
+#endif
+    }
+
+#if os(iOS)
+    func configurePictureInPicture(sourceView: UIView) {
+#if canImport(LiveKit)
+        pictureInPicture.onStateChanged = { [weak self] active, possible in
+            self?.isPictureInPictureActive = active
+            self?.canStartPictureInPicture = possible && self?.pictureInPictureTrack != nil
+        }
+        pictureInPicture.configure(sourceView: sourceView, track: pictureInPictureTrack)
+        canStartPictureInPicture = pictureInPicture.isPossible && pictureInPictureTrack != nil
+#endif
+    }
+
+    func togglePictureInPicture() {
+#if canImport(LiveKit)
+        guard pictureInPictureTrack != nil else { return }
+        pictureInPicture.toggle()
+#endif
+    }
+#endif
+
+    private func setSpeakerOutput(_ enabled: Bool) {
+        isSpeakerOn = enabled
+#if canImport(LiveKit)
+        AudioManager.shared.isSpeakerOutputPreferred = enabled
+#endif
+        applySpeakerOutput()
+    }
+
+    private func applySpeakerOutput() {
+        do {
+            try session.overrideOutputAudioPort(isSpeakerOn ? .speaker : .none)
+            mediaErrorMessage = nil
+        } catch {
+            mediaErrorMessage = "Sortie audio indisponible : \(error.localizedDescription)"
+            logger.error("Speaker route failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+#if canImport(LiveKit)
+    private var pictureInPictureTrack: (any VideoTrack)? {
+        remoteVideos.first(where: { !$0.isScreenShare })?.track
+            ?? remoteVideos.first?.track
+            ?? localVideoTrack
+    }
+
+    private func refreshRemoteMedia() {
+        guard let room else {
+            remoteVideos = []
+            refreshPictureInPictureTrack()
+            return
+        }
+        let tracks = room.remoteParticipants.values
+            .sorted { ($0.name ?? $0.identity?.stringValue ?? "") < ($1.name ?? $1.identity?.stringValue ?? "") }
+            .flatMap { participant -> [RemoteVideo] in
+                let participantID = participant.identity?.stringValue
+                    ?? participant.sid?.stringValue
+                    ?? "participant"
+                let displayName = participant.name ?? "Participant"
+                var videos: [RemoteVideo] = []
+                if SQFeatures.callScreenSharingEnabled,
+                   let track = participant.firstScreenShareVideoTrack {
+                    videos.append(RemoteVideo(
+                        id: "\(participantID):screen",
+                        participantID: participantID,
+                        displayName: displayName,
+                        track: track,
+                        isScreenShare: true
+                    ))
+                }
+                if let track = participant.firstCameraVideoTrack {
+                    videos.append(RemoteVideo(
+                        id: "\(participantID):camera",
+                        participantID: participantID,
+                        displayName: displayName,
+                        track: track,
+                        isScreenShare: false
+                    ))
+                }
+                return videos
+            }
+        // Le produit limite un appel à huit personnes : sept vidéos distantes au
+        // maximum, même face à une room backend mal configurée.
+        remoteVideos = Array(tracks.prefix(7))
+        reconcileRemoteParticipantPresence(in: room)
+        refreshPictureInPictureTrack()
+    }
+
+    private func reconcileRemoteParticipantPresence(in room: Room) {
+        if !room.remoteParticipants.isEmpty {
+            emptyRoomTask?.cancel()
+            emptyRoomTask = nil
+            return
+        }
+        guard state == .connected || state == .connecting, emptyRoomTask == nil else { return }
+        // En groupe, une première personne peut partir pendant que d'autres
+        // destinataires sonnent encore. Conserver toute la fenêtre de sonnerie
+        // évite de couper l'appelant après le départ du premier participant.
+        // En 1:1, la suppression normale de la room termine immédiatement via
+        // didDisconnect ; ces 45 s ne sont qu'un filet si le backend échoue.
+        let delay: Duration = .seconds(45)
+        emptyRoomTask = Task { [weak self, weak room] in
+            do { try await Task.sleep(for: delay) } catch { return }
+            guard let self, let room,
+                  !self.isTearingDown,
+                  self.state == .connected,
+                  room.remoteParticipants.isEmpty else { return }
+            // Aucun participant distant après la sonnerie, ou tous les distants
+            // sont partis sans que le backend ait fermé la room : terminer le
+            // participant local évite un appel fantôme indéfini.
+            self.state = .ended
+            self.onRemoteDisconnect?()
+        }
+    }
+
+    private func refreshPictureInPictureTrack() {
+#if os(iOS)
+        pictureInPicture.update(track: pictureInPictureTrack)
+        canStartPictureInPicture = pictureInPicture.isPossible && pictureInPictureTrack != nil
+#endif
+    }
+#endif
 }
 
 #if canImport(LiveKit)
@@ -226,12 +470,123 @@ final class LiveKitClient: ObservableObject {
 /// notifie LiveKitClient via le closure (qui hop sur le MainActor). CALL-RTC-01.
 private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked Sendable {
     private let onDisconnect: @Sendable () -> Void
-    init(onDisconnect: @escaping @Sendable () -> Void) {
+    private let onMediaChanged: @Sendable () -> Void
+
+    init(
+        onDisconnect: @escaping @Sendable () -> Void,
+        onMediaChanged: @escaping @Sendable () -> Void
+    ) {
         self.onDisconnect = onDisconnect
+        self.onMediaChanged = onMediaChanged
         super.init()
     }
     func room(_ room: Room, didDisconnectWithError error: LiveKitError?) { onDisconnect() }
-    func room(_ room: Room, participantDidDisconnect participant: RemoteParticipant) { onDisconnect() }
+    func room(_ room: Room, participantDidConnect participant: RemoteParticipant) { onMediaChanged() }
+    func room(_ room: Room, participantDidDisconnect participant: RemoteParticipant) { onMediaChanged() }
+    func room(_ room: Room, participant: RemoteParticipant, didSubscribeTrack publication: RemoteTrackPublication) { onMediaChanged() }
+    func room(_ room: Room, participant: RemoteParticipant, didUnsubscribeTrack publication: RemoteTrackPublication) { onMediaChanged() }
+    func room(_ room: Room, participant: Participant, trackPublication: TrackPublication, didUpdateIsMuted isMuted: Bool) { onMediaChanged() }
+}
+#endif
+
+#if os(iOS) && canImport(LiveKit)
+@MainActor
+private final class LiveKitPictureInPictureController: NSObject {
+    var onStateChanged: ((Bool, Bool) -> Void)?
+    private(set) var isPossible = false
+
+    private weak var sourceView: UIView?
+    private var controller: AVPictureInPictureController?
+    private var possibilityObservation: AnyCancellable?
+    private let contentController = AVPictureInPictureVideoCallViewController()
+    private let videoView = VideoView()
+
+    override init() {
+        super.init()
+        contentController.preferredContentSize = CGSize(width: 360, height: 640)
+        contentController.view.backgroundColor = .black
+        videoView.layoutMode = .fit
+        videoView.translatesAutoresizingMaskIntoConstraints = false
+        contentController.view.addSubview(videoView)
+        NSLayoutConstraint.activate([
+            videoView.leadingAnchor.constraint(equalTo: contentController.view.leadingAnchor),
+            videoView.trailingAnchor.constraint(equalTo: contentController.view.trailingAnchor),
+            videoView.topAnchor.constraint(equalTo: contentController.view.topAnchor),
+            videoView.bottomAnchor.constraint(equalTo: contentController.view.bottomAnchor),
+        ])
+    }
+
+    func configure(sourceView: UIView, track: (any VideoTrack)?) {
+        update(track: track)
+        guard AVPictureInPictureController.isPictureInPictureSupported() else {
+            isPossible = false
+            onStateChanged?(false, false)
+            return
+        }
+        guard self.sourceView !== sourceView || controller == nil else {
+            updatePossibility()
+            return
+        }
+        controller?.stopPictureInPicture()
+        possibilityObservation = nil
+        self.sourceView = sourceView
+        let source = AVPictureInPictureController.ContentSource(
+            activeVideoCallSourceView: sourceView,
+            contentViewController: contentController
+        )
+        let controller = AVPictureInPictureController(contentSource: source)
+        controller.delegate = self
+        controller.canStartPictureInPictureAutomaticallyFromInline = true
+        self.controller = controller
+        possibilityObservation = controller.publisher(for: \.isPictureInPicturePossible)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updatePossibility() }
+        updatePossibility()
+    }
+
+    func update(track: (any VideoTrack)?) {
+        videoView.track = track
+        updatePossibility()
+    }
+
+    func toggle() {
+        guard let controller else { return }
+        if controller.isPictureInPictureActive {
+            controller.stopPictureInPicture()
+        } else if controller.isPictureInPicturePossible {
+            controller.startPictureInPicture()
+        }
+    }
+
+    func stop() {
+        controller?.stopPictureInPicture()
+        possibilityObservation = nil
+        videoView.track = nil
+        isPossible = false
+        onStateChanged?(false, false)
+    }
+
+    private func updatePossibility() {
+        isPossible = controller?.isPictureInPicturePossible == true && videoView.track != nil
+        onStateChanged?(controller?.isPictureInPictureActive == true, isPossible)
+    }
+}
+
+extension LiveKitPictureInPictureController: AVPictureInPictureControllerDelegate {
+    nonisolated func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        Task { @MainActor in self.onStateChanged?(true, self.isPossible) }
+    }
+
+    nonisolated func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        Task { @MainActor in self.onStateChanged?(false, self.isPossible) }
+    }
+
+    nonisolated func pictureInPictureController(
+        _ pictureInPictureController: AVPictureInPictureController,
+        failedToStartPictureInPictureWithError error: Error
+    ) {
+        Task { @MainActor in self.onStateChanged?(false, self.isPossible) }
+    }
 }
 #endif
 

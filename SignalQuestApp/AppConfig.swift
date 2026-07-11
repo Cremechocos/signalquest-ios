@@ -1,5 +1,12 @@
 import Foundation
 
+enum SQDeploymentEnvironment: String, Codable, Sendable {
+    case development
+    case staging
+    case production
+    case test
+}
+
 /// Indicateurs de fonctionnalité compilés — kill-switch de repli (App Store /
 /// prod). Volontairement des constantes : pas de toggle utilisateur ni de
 /// remote-config. Pour désactiver une fonctionnalité, passer le flag à `false`
@@ -9,9 +16,25 @@ enum SQFeatures {
     /// validation device échoue : masque toute initiation d'appel sans bloquer
     /// le reste de l'app (l'enregistrement push reste inchangé).
     static let callsEnabled = true
+
+    /// Le partage d'écran n'est pas encore validé en interopérabilité
+    /// Android↔iOS. Le code média reste inaccessible tant que ce verrou compilé
+    /// n'est pas explicitement ouvert après la campagne de tests.
+    static let callScreenSharingEnabled = false
+
+    /// Achat App Store. Reste fermé tant que les produits App Store Connect,
+    /// l'endpoint de validation serveur et les App Store Server Notifications
+    /// ne sont pas validés ensemble en staging.
+    static let storeKitPurchasesEnabled = false
+
+    /// Livraison d'une transaction StoreKit vérifiée au backend. Ce second
+    /// verrou empêche qu'un simple changement du flag d'UI autorise un achat
+    /// local sans octroyer les droits multiplateformes côté serveur.
+    static let storeKitServerVerificationEnabled = false
 }
 
 struct AppConfig: Equatable {
+    let environment: SQDeploymentEnvironment
     let appBaseURL: URL
     let apiBaseURL: URL
     let speedtestBaseURL: URL
@@ -22,6 +45,7 @@ struct AppConfig: Equatable {
     static let current = AppConfig(bundle: .main)
 
     init(
+        environment: SQDeploymentEnvironment = .test,
         appBaseURL: URL,
         apiBaseURL: URL,
         speedtestBaseURL: URL,
@@ -29,6 +53,7 @@ struct AppConfig: Equatable {
         speedtestCloudFrontDownloadURL: URL,
         debugLogsEnabled: Bool
     ) {
+        self.environment = environment
         self.appBaseURL = appBaseURL
         self.apiBaseURL = apiBaseURL
         self.speedtestBaseURL = speedtestBaseURL
@@ -38,14 +63,83 @@ struct AppConfig: Equatable {
     }
 
     init(bundle: Bundle) {
+        let environment = Self.environment(bundle)
+        let fallback = Self.fallbackURLs(for: environment)
         self.init(
-            appBaseURL: Self.url(bundle, "SQ_APP_BASE_URL", fallback: "https://signalquest.fr"),
-            apiBaseURL: Self.url(bundle, "SQ_API_BASE_URL", fallback: "https://signalquest.fr"),
-            speedtestBaseURL: Self.url(bundle, "SQ_SPEEDTEST_BASE_URL", fallback: "https://speedtest.signalquest.fr"),
-            speedtestDownloadURL: Self.url(bundle, "SQ_SPEEDTEST_DOWNLOAD_URL", fallback: "https://speedtest.signalquest.fr/download"),
-            speedtestCloudFrontDownloadURL: Self.url(bundle, "SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL", fallback: "https://d2d31ihf1e95ah.cloudfront.net/1000MB.bin"),
+            environment: environment,
+            appBaseURL: Self.url(bundle, "SQ_APP_BASE_URL", fallback: fallback.app),
+            apiBaseURL: Self.url(bundle, "SQ_API_BASE_URL", fallback: fallback.api),
+            speedtestBaseURL: Self.url(bundle, "SQ_SPEEDTEST_BASE_URL", fallback: fallback.speedtest),
+            speedtestDownloadURL: Self.url(bundle, "SQ_SPEEDTEST_DOWNLOAD_URL", fallback: fallback.download),
+            speedtestCloudFrontDownloadURL: Self.url(bundle, "SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL", fallback: fallback.cloudFront),
             debugLogsEnabled: Self.bool(bundle, "SQ_DEBUG_LOGS", fallback: false)
         )
+    }
+
+    /// True when a non-production binary still targets one of the canonical
+    /// production services. The Xcode build gate enforces this for Beta; this
+    /// property keeps the invariant testable in Swift as well.
+    var usesProductionServicesOutsideProduction: Bool {
+        guard environment != .production else { return false }
+        return serviceURLs.contains { Self.productionHosts.contains($0.host?.lowercased() ?? "") }
+    }
+
+    var hasPlaceholderServices: Bool {
+        serviceURLs.contains { ($0.host?.lowercased() ?? "").hasSuffix(".invalid") }
+    }
+
+    private var serviceURLs: [URL] {
+        [appBaseURL, apiBaseURL, speedtestBaseURL, speedtestDownloadURL, speedtestCloudFrontDownloadURL]
+    }
+
+    private static let productionHosts: Set<String> = [
+        "signalquest.fr",
+        "api.signalquest.fr",
+        "speedtest.signalquest.fr",
+        "d2d31ihf1e95ah.cloudfront.net",
+    ]
+
+    /// Une Beta dont les build settings seraient absents doit rester
+    /// non-routable. Elle ne doit jamais retomber silencieusement sur production.
+    private static func fallbackURLs(for environment: SQDeploymentEnvironment) -> (
+        app: String,
+        api: String,
+        speedtest: String,
+        download: String,
+        cloudFront: String
+    ) {
+        if environment == .staging {
+            return (
+                "https://app.staging.invalid",
+                "https://api.staging.invalid",
+                "https://speedtest.staging.invalid",
+                "https://speedtest.staging.invalid/download",
+                "https://cdn.staging.invalid/1000MB.bin"
+            )
+        }
+        return (
+            "https://signalquest.fr",
+            "https://signalquest.fr",
+            "https://speedtest.signalquest.fr",
+            "https://speedtest.signalquest.fr/download",
+            "https://d2d31ihf1e95ah.cloudfront.net/1000MB.bin"
+        )
+    }
+
+    private static func environment(_ bundle: Bundle) -> SQDeploymentEnvironment {
+        let raw = (bundle.object(forInfoDictionaryKey: "SQ_ENVIRONMENT") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        if let raw, !raw.contains("$("), let value = SQDeploymentEnvironment(rawValue: raw) {
+            return value
+        }
+        #if STAGING
+        return .staging
+        #elseif DEBUG
+        return .development
+        #else
+        return .production
+        #endif
     }
 
     private static func url(_ bundle: Bundle, _ key: String, fallback: String) -> URL {

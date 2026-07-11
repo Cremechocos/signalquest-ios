@@ -115,6 +115,48 @@ struct SocialStory: Codable, Identifiable, Equatable {
     let isMine: Bool?
 }
 
+/// Réponse de `GET /api/social/network-pulse` : agrégat réseau autour d'une
+/// position (RSRP moyen, débit médian, meilleur opérateur de la zone).
+struct NetworkPulse: Decodable, Equatable {
+    let avgRsrpDbm: Int?
+    let medianDownloadMbps: Int?
+    let measurementsCount: Int
+    let bestOperator: String?
+    let radiusMeters: Int?
+
+    /// Rien à afficher tant qu'aucune mesure n'a été agrégée dans la zone.
+    var hasData: Bool { measurementsCount > 0 }
+
+    init(avgRsrpDbm: Int?, medianDownloadMbps: Int?, measurementsCount: Int, bestOperator: String?, radiusMeters: Int?) {
+        self.avgRsrpDbm = avgRsrpDbm
+        self.medianDownloadMbps = medianDownloadMbps
+        self.measurementsCount = measurementsCount
+        self.bestOperator = bestOperator
+        self.radiusMeters = radiusMeters
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case avgRsrpDbm, medianDownloadMbps, measurementsCount, bestOperator, radiusMeters
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // Le backend arrondit déjà, mais on tolère un nombre à virgule par sûreté.
+        func intFlex(_ key: CodingKeys) -> Int? {
+            if let i = try? c.decode(Int.self, forKey: key) { return i }
+            if let d = try? c.decode(Double.self, forKey: key) { return Int(d.rounded()) }
+            return nil
+        }
+        avgRsrpDbm = intFlex(.avgRsrpDbm)
+        medianDownloadMbps = intFlex(.medianDownloadMbps)
+        measurementsCount = intFlex(.measurementsCount) ?? 0
+        bestOperator = try c.decodeIfPresent(String.self, forKey: .bestOperator)
+        radiusMeters = intFlex(.radiusMeters)
+    }
+
+    static let demo = NetworkPulse(avgRsrpDbm: -85, medianDownloadMbps: 120, measurementsCount: 42, bestOperator: "Orange", radiusMeters: 3000)
+}
+
 struct SocialSignalSummary: Codable, Equatable {
     let type: String?
     let technology: String?

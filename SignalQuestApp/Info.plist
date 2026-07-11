@@ -34,7 +34,7 @@
 		</dict>
 	</dict>
 	<key>CFBundleDisplayName</key>
-	<string>SignalQuest</string>
+	<string>$(SQ_DISPLAY_NAME)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -61,16 +61,22 @@
 	<string>SignalQuest peut importer une photo choisie pour contribuer aux sites antennes.</string>
 	<key>SQ_API_BASE_URL</key>
 	<string>$(SQ_API_BASE_URL)</string>
+	<key>SQ_APP_GROUP</key>
+	<string>$(SQ_APP_GROUP)</string>
 	<key>SQ_APP_BASE_URL</key>
 	<string>$(SQ_APP_BASE_URL)</string>
 	<key>SQ_DEBUG_LOGS</key>
 	<string>$(SQ_DEBUG_LOGS)</string>
+	<key>SQ_ENVIRONMENT</key>
+	<string>$(SQ_ENVIRONMENT)</string>
 	<key>SQ_SPEEDTEST_BASE_URL</key>
 	<string>$(SQ_SPEEDTEST_BASE_URL)</string>
 	<key>SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL</key>
 	<string>$(SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL)</string>
 	<key>SQ_SPEEDTEST_DOWNLOAD_URL</key>
 	<string>$(SQ_SPEEDTEST_DOWNLOAD_URL)</string>
+	<key>SQ_URL_SCHEME</key>
+	<string>$(SQ_URL_SCHEME)</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>PublicSans-Regular.ttf</string>
@@ -103,19 +109,26 @@
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiresFullScreen</key>
-	<true/>
+	<false/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>fr.signalquest.ios.deeplink</string>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER).deeplink</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>signalquest</string>
+				<string>$(SQ_URL_SCHEME)</string>
 			</array>
 		</dict>
 	</array>

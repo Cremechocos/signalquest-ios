@@ -1,0 +1,9 @@
+# Un chemin ou fragment de chemin par ligne. Ces fichiers portent de la logique
+# pure ou critique (auth, contrats API, radio, chiffrement, droits) et sont
+# agrégés séparément par check_coverage.sh.
+SignalQuestApp/Core/Networking/APIEndpoint.swift
+SignalQuestApp/Core/Networking/APIError.swift
+SignalQuestApp/Core/Networking/AuthCookieStore.swift
+SignalQuestApp/Features/Identifications/SectorNumbering.swift
+SignalQuestApp/Services/E2EEService.swift
+SignalQuestApp/Services/EntitlementsService.swift

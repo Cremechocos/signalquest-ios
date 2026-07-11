@@ -3,6 +3,10 @@ import Foundation
 protocol CommentsServicing: Sendable {
     func list(postId: String, cursor: String?) async throws -> SocialCommentsResponse
     func add(postId: String, text: String, parentId: String?) async throws -> SocialComment
+    /// Like ❤️ d'un commentaire (idempotent). Renvoie l'état final `{ liked, count }`.
+    func like(postId: String, commentId: String) async throws -> CommentReactionResponse
+    /// Retire le like ❤️ d'un commentaire (idempotent).
+    func unlike(postId: String, commentId: String) async throws -> CommentReactionResponse
 }
 
 final class CommentsService: CommentsServicing {
@@ -33,6 +37,26 @@ final class CommentsService: CommentsServicing {
             body: CreateCommentRequest(text: text, parentId: parentId)
         )
         return response.comment
+    }
+
+    /// `POST .../comments/{commentId}/reactions` avec `{ emoji: "❤️" }` (même
+    /// convention que les réactions de post). Le backend borne l'emoji à ❤️.
+    func like(postId: String, commentId: String) async throws -> CommentReactionResponse {
+        try await api.requestJSON(
+            "/api/social/posts/\(normalizedPostId(postId))/comments/\(commentId)/reactions",
+            body: ["emoji": "❤️"]
+        )
+    }
+
+    /// `DELETE .../comments/{commentId}/reactions` (retire le ❤️, sans corps).
+    func unlike(postId: String, commentId: String) async throws -> CommentReactionResponse {
+        try await api.request(
+            APIEndpoint(
+                path: "/api/social/posts/\(normalizedPostId(postId))/comments/\(commentId)/reactions",
+                method: .delete
+            ),
+            as: CommentReactionResponse.self
+        )
     }
 
 }

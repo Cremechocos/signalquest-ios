@@ -3,6 +3,48 @@ import UIKit
 import UserNotifications
 import os
 
+struct InstallationIdentity: Sendable {
+    private enum Key {
+        static let deviceID = "installation.device-id"
+        static let fcmToken = "installation.fcm-token"
+    }
+
+    private let store: TokenStore
+
+    init(store: TokenStore = KeychainStore(service: "fr.signalquest.ios.installation")) {
+        self.store = store
+    }
+
+    func deviceID() -> String {
+        if let existing = (try? store.string(for: Key.deviceID)) ?? nil,
+           !existing.isEmpty {
+            return existing
+        }
+        let created = UUID().uuidString.lowercased()
+        try? store.set(created, for: Key.deviceID, accessibility: .afterFirstUnlock)
+        return created
+    }
+
+    func saveFCMToken(_ token: String) {
+        try? store.set(token, for: Key.fcmToken, accessibility: .afterFirstUnlock)
+    }
+
+    func storedFCMToken() -> String? {
+        (try? store.string(for: Key.fcmToken)) ?? nil
+    }
+
+    func clearFCMToken() {
+        try? store.remove(Key.fcmToken)
+    }
+}
+
+private struct DevicePushRegistration: Encodable {
+    let fcmToken: String
+    let platform: String
+    let deviceId: String
+    let environment: String
+}
+
 /// Registers the device for remote notifications. The backend supports Firebase
 /// Cloud Messaging — we forward whichever token we have (APNs for now, FCM
 /// once the firebase-ios-sdk Swift Package is wired in) via
@@ -10,14 +52,22 @@ import os
 final class PushNotificationService: NSObject, @unchecked Sendable {
     private let api: APIClient
     private let router: AppRouter
+    private let identity: InstallationIdentity
+    private let deviceID: String
     private let logger = Logger(subsystem: "fr.signalquest.ios", category: "Push")
     /// Protégé par un verrou : `didRegister` est appelé sur un thread système
     /// (callback APNs) tandis que `unregister` est appelé depuis une tâche async.
     private let lastToken = OSAllocatedUnfairLock<String?>(initialState: nil)
 
-    init(api: APIClient, router: AppRouter) {
+    init(
+        api: APIClient,
+        router: AppRouter,
+        identity: InstallationIdentity = InstallationIdentity()
+    ) {
         self.api = api
         self.router = router
+        self.identity = identity
+        deviceID = identity.deviceID()
         super.init()
     }
 
@@ -41,11 +91,17 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
     /// backend sait cibler pour livrer les notifications.
     func didRegister(fcmToken token: String) {
         lastToken.withLock { $0 = token }
+        identity.saveFCMToken(token)
         Task {
             do {
                 let _: SuccessResponse = try await api.requestJSON(
                     "/api/user/fcm-token",
-                    body: ["fcmToken": token, "platform": "ios"]
+                    body: DevicePushRegistration(
+                        fcmToken: token,
+                        platform: "ios",
+                        deviceId: deviceID,
+                        environment: api.config.environment.rawValue
+                    )
                 )
                 logger.info("FCM token registered with backend")
             } catch {
@@ -62,11 +118,12 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
     /// the previous account. Unregisters locally and best-effort revokes the token
     /// server-side, then clears the badge.
     func unregister() async {
-        let token = lastToken.withLock { value -> String? in
+        let inMemoryToken = lastToken.withLock { value -> String? in
             let current = value
             value = nil
             return current
         }
+        let token = inMemoryToken ?? identity.storedFCMToken()
         await MainActor.run {
             UIApplication.shared.unregisterForRemoteNotifications()
             UNUserNotificationCenter.current().setBadgeCountCompat(0)
@@ -75,9 +132,15 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
             let _: SuccessResponse? = try? await api.requestJSON(
                 "/api/user/fcm-token",
                 method: .delete,
-                body: ["fcmToken": token, "platform": "ios"]
+                body: DevicePushRegistration(
+                    fcmToken: token,
+                    platform: "ios",
+                    deviceId: deviceID,
+                    environment: api.config.environment.rawValue
+                )
             )
         }
+        identity.clearFCMToken()
     }
 }
 

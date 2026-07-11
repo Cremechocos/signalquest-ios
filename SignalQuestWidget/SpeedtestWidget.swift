@@ -70,7 +70,7 @@ func speedQualityLabel(_ mbps: Double) -> String {
 }
 
 /// Deep-link ouvrant l'app sur l'onglet Speedtest (géré par `onOpenURL`).
-let speedtestWidgetURL = URL(string: "signalquest://speedtest")!
+let speedtestWidgetURL = SQSharedConfiguration.deepLink("speedtest")
 
 /// Normalise un débit (Mbps) en 0…1 sur une échelle log (jauge accessoire).
 func speedNormalized(_ mbps: Double) -> Double {

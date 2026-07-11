@@ -30,6 +30,9 @@ GoogleService-Info.plist
 # Archives
 *.xcarchive
 
+# Artefacts générés (pipelines de génération d'assets, ex. hatch-pet)
+output/
+
 # App Store Connect API Keys
 *.p8
 

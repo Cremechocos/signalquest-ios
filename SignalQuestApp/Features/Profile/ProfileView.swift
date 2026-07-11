@@ -34,9 +34,15 @@ struct ProfileView: View {
                     }
                     menuSeparator
                     NavigationLink {
-                        LeaderboardsView(service: services.leaderboards)
+                        PaywallView(store: services.entitlements, entryPoint: .profile)
                     } label: {
-                        menuRow(title: "Classement", icon: "trophy")
+                        menuRow(title: "Abonnements", icon: "checkmark.seal.fill")
+                    }
+                    menuSeparator
+                    NavigationLink {
+                        LeaderboardsView(service: services.leaderboards, gamification: services.gamification, user: user)
+                    } label: {
+                        menuRow(title: "Classements", icon: "trophy")
                     }
                     menuSeparator
                     NavigationLink {

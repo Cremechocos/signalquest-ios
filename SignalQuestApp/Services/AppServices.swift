@@ -27,6 +27,7 @@ final class AppServices: ObservableObject {
     let notifications: NotificationsServicing
     let calls: CallsServicing
     let users: UserServicing
+    let entitlements: EntitlementsStore
     let push: PushNotificationService
     let router: AppRouter
     let callManager: CallManager
@@ -63,7 +64,11 @@ final class AppServices: ObservableObject {
         photos = PhotoService(api: api)
         messages = MessagesService(api: api)
         leaderboards = LeaderboardService(api: api)
-        sessions = SessionsService(api: api)
+        let sessionsService = SessionsService(api: api)
+        sessions = sessionsService
+        // Rejoue au lancement les Drive Tests finalisés hors ligne ou interrompus
+        // par une terminaison du processus. Un échec conserve la file sur disque.
+        Task { await sessionsService.retryPendingCoverageSessions() }
         validations = ValidationsService(api: api)
         identify = IdentifyService(api: api)
         friends = FriendsService(api: api)
@@ -72,6 +77,10 @@ final class AppServices: ObservableObject {
         let callsService = CallsService(api: api)
         calls = callsService
         users = UserService(api: api)
+        // Le synchroniseur Apple reste volontairement absent tant que le
+        // backend ne valide pas les JWS StoreKit. Le store peut néanmoins lire
+        // les droits canoniques et restaurer l'état local sans débiter.
+        entitlements = EntitlementsStore(api: api)
         push = PushNotificationService(api: api, router: appRouter)
         callManager = CallManager(callsService: callsService, api: api)
     }

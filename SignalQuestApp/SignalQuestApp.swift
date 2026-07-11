@@ -40,7 +40,7 @@ struct SignalQuestApp: App {
     /// garde sur `voipRegistry == nil`.
     @MainActor
     private func registerPushIfAuthenticated(_ state: AuthSessionViewModel.State) async {
-        guard case .authenticated = state else { return }
+        guard case .authenticated = state, hasCompletedOnboarding else { return }
         await services.push.requestAuthorizationAndRegister()
         services.callManager.registerForVoIPPushes()
         // CALL-VOIP-04 : un login dans une session déjà lancée (install→1er login,
@@ -66,6 +66,12 @@ struct SignalQuestApp: App {
                     AppDelegate.sharedPush = services.push
                     AppDelegate.sharedCallManager = services.callManager
                     AppDelegate.sharedE2EE = services.e2ee
+                    // PushKit doit être prêt avant tout `await` de bootstrap : au
+                    // lancement à froid provoqué par une push VoIP, retarder la
+                    // création du registre peut faire expirer le watchdog avant
+                    // le report CallKit. Le token n'est associé au compte qu'après
+                    // authentification par `registerPushIfAuthenticated`.
+                    services.callManager.registerForVoIPPushes()
                     await session.bootstrap()
                     await registerPushIfAuthenticated(session.state)
                     // Verrouillage biométrique à l'ouverture (si activé + authentifié).
@@ -83,6 +89,10 @@ struct SignalQuestApp: App {
                     } else {
                         appLock.reset()   // jamais verrouillé par-dessus l'écran de login
                     }
+                }
+                .onChangeCompat(of: hasCompletedOnboarding) { _, completed in
+                    guard completed else { return }
+                    Task { await registerPushIfAuthenticated(session.state) }
                 }
                 .onChangeCompat(of: scenePhase) { _, phase in
                     switch phase {
@@ -270,21 +280,21 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $router.selectedTab) {
-            NavigationStack { FeedView(service: services.feed) }
-                .tabItem { Label("Feed", systemImage: "sparkles") }
-                .tag(AppRouter.AppTab.feed)
+            NavigationStack { SignalQuestHomeView(user: user) }
+                .tabItem { Label("Accueil", systemImage: "house") }
+                .tag(AppRouter.AppTab.home)
 
             NavigationStack { MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets) }
                 .tabItem { Label("Carte", systemImage: "map") }
                 .tag(AppRouter.AppTab.map)
 
             NavigationStack { SpeedtestView() }
-                .tabItem { Label("Speed", systemImage: "speedometer") }
+                .tabItem { Label("Tester", systemImage: "speedometer") }
                 .tag(AppRouter.AppTab.speed)
 
-            NavigationStack { MessagesView(service: services.messages, e2ee: services.e2ee) }
-                .tabItem { Label("Messages", systemImage: "bubble.left.and.bubble.right") }
-                .tag(AppRouter.AppTab.messages)
+            NavigationStack { FeedView(service: services.feed, location: services.location) }
+                .tabItem { Label("Communauté", systemImage: "person.2") }
+                .tag(AppRouter.AppTab.community)
                 .badge(services.unreadConversations)
 
             NavigationStack {
@@ -303,7 +313,7 @@ struct MainTabView: View {
         }
         // Style « sidebar adaptable » (iPad/large) seulement iOS 18+, sinon onglets standard.
         .sqSidebarAdaptableTabStyle()
-        .tint(SQColor.brandOrange)
+        .tint(SQColor.brandRed)
         .toolbarBackground(.automatic, for: .tabBar)
         .task {
             await services.refreshInboxBadge()
@@ -333,21 +343,201 @@ struct MainTabView: View {
         } else if SQIntentRoute.consumeMap() {
             router.selectedTab = .map
         } else if SQIntentRoute.consumeMessages() {
-            router.selectedTab = .messages
+            router.route(toConversation: nil)
         } else if SQIntentRoute.consumeDriveTest() {
             router.selectedTab = .speed
             router.pendingDriveTest = true
         }
     }
 
-    /// Deep-link `signalquest://…` (widgets, raccourcis) → onglet correspondant.
+    /// Deep-link de l'environnement (widgets, raccourcis) → onglet correspondant.
     private func handleDeepLink(_ url: URL) {
-        guard url.scheme == "signalquest" else { return }
+        guard url.scheme == SQSharedConfiguration.urlScheme else { return }
         switch url.host {
         case "speedtest", "speed": router.selectedTab = .speed
         case "map", "carte": router.selectedTab = .map
-        case "messages": router.selectedTab = .messages
+        case "messages", "community", "communaute": router.route(toConversation: nil)
         default: break
         }
+    }
+}
+
+/// Accueil réseau : un résumé lisible avant les détails experts, avec accès
+/// direct aux trois tâches principales. Le feed social reste dans Communauté.
+private struct SignalQuestHomeView: View {
+    @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var router: AppRouter
+    @Environment(\.scenePhase) private var scenePhase
+    let user: AuthUser
+
+    @State private var latestMeasurement: SpeedtestRunResult?
+    @State private var networkStatus: NetworkPathStatus = .unknown
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.xl) {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    Text("Carnet de terrain").sqKicker()
+                    Text("Bonjour \(firstName)")
+                        .font(SQType.display)
+                        .foregroundStyle(SQColor.label)
+                    Text("Mesure ton réseau, comprends le signal, puis partage ce qui compte.")
+                        .font(SQType.body)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+
+                networkSummary
+                primaryActions
+                latestMeasurementSection
+            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.md)
+            .padding(.bottom, SQSpace.xxl)
+        }
+        .navigationTitle("Accueil")
+        .toolbarTitleLargeCompat()
+        .signalQuestBackground()
+        .task { await refresh() }
+        .refreshable { await refresh() }
+        .onChangeCompat(of: scenePhase) { _, phase in
+            if phase == .active { Task { await refresh() } }
+        }
+    }
+
+    private var firstName: String {
+        user.name?.split(separator: " ").first.map(String.init) ?? "à toi"
+    }
+
+    private var networkSummary: some View {
+        HStack(spacing: SQSpace.md) {
+            Image(systemName: networkStatus.connection == .cellular
+                  ? "antenna.radiowaves.left.and.right"
+                  : "wifi")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 44, height: 44)
+                .background(SQColor.brandRed.opacity(0.10), in: Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Réseau actuel")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                Text(networkStatus.displayName)
+                    .font(SQType.heading)
+                    .foregroundStyle(SQColor.label)
+            }
+            Spacer()
+        }
+        .padding(SQSpace.lg)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
+                .stroke(SQColor.separator, lineWidth: 1)
+        }
+    }
+
+    private var primaryActions: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            Text("Que veux-tu faire ?")
+                .font(SQType.title)
+                .foregroundStyle(SQColor.label)
+            homeAction(
+                title: "Tester maintenant",
+                detail: "Débit, latence et qualité radio",
+                systemImage: "speedometer",
+                tab: .speed
+            )
+            homeAction(
+                title: "Explorer la carte",
+                detail: "Antennes, couverture et mesures",
+                systemImage: "map",
+                tab: .map
+            )
+            homeAction(
+                title: "Voir la communauté",
+                detail: "Publications, stories et messages",
+                systemImage: "person.2",
+                tab: .community
+            )
+        }
+    }
+
+    private func homeAction(
+        title: String,
+        detail: String,
+        systemImage: String,
+        tab: AppRouter.AppTab
+    ) -> some View {
+        Button {
+            Haptics.selection()
+            router.selectedTab = tab
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                Image(systemName: systemImage)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(SQColor.brandRed)
+                    .frame(width: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.label)
+                    Text(detail)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(SQColor.labelTertiary)
+            }
+            .padding(.vertical, SQSpace.md)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .bottom) { Divider().overlay(SQColor.separator) }
+        .accessibilityHint("Ouvre l’onglet \(title)")
+    }
+
+    @ViewBuilder
+    private var latestMeasurementSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            Text("Dernière mesure")
+                .font(SQType.title)
+                .foregroundStyle(SQColor.label)
+            if let measurement = latestMeasurement {
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.md) {
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        Text(measurement.downloadAverageMbps.formatted(.number.precision(.fractionLength(0))))
+                            .font(SQType.display)
+                            .foregroundStyle(SQColor.label)
+                        Text("Mbps en téléchargement")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: SQSpace.xs) {
+                        Text("\((measurement.pingMinMs ?? measurement.pingMs ?? 0).formatted(.number.precision(.fractionLength(0)))) ms")
+                            .font(SQType.heading)
+                            .foregroundStyle(SQColor.label)
+                        Text(measurement.createdAt.formatted(date: .abbreviated, time: .shortened))
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                }
+                .padding(SQSpace.lg)
+                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            } else {
+                EmptyStateView(
+                    title: "Aucune mesure locale",
+                    message: "Lance un premier test pour créer ton repère.",
+                    systemImage: "waveform.path.ecg"
+                )
+            }
+        }
+    }
+
+    private func refresh() async {
+        services.networkPath.refreshNow()
+        networkStatus = services.networkPath.status
+        latestMeasurement = await services.speedtest.history().first
     }
 }

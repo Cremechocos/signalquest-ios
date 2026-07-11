@@ -3,6 +3,26 @@ import XCTest
 @testable import SignalQuest
 
 final class E2EETests: XCTestCase {
+    func testV2AADBindsConversationContentTypeAndDevice() throws {
+        let context = EncryptedMessageEnvelopeV2AAD(
+            conversationId: "conversation-42",
+            contentType: .poll,
+            senderDeviceId: "device-ios-1",
+            operationId: "poll-create-1"
+        )
+        let decoded = try JSONDecoder().decode(
+            EncryptedMessageEnvelopeV2AAD.self,
+            from: context.encoded()
+        )
+
+        XCTAssertEqual(decoded.cryptoVersion, 2)
+        XCTAssertEqual(decoded.schema, "signalquest.encrypted-message")
+        XCTAssertEqual(decoded.conversationId, "conversation-42")
+        XCTAssertEqual(decoded.contentType, .poll)
+        XCTAssertEqual(decoded.senderDeviceId, "device-ios-1")
+        XCTAssertEqual(decoded.operationId, "poll-create-1")
+    }
+
     func testAESGCMV1RoundtripPayloadShape() throws {
         let key = SymmetricKey(size: .bits256)
         let nonce = AES.GCM.Nonce()
@@ -245,4 +265,3 @@ final class E2EETests: XCTestCase {
         }
     }
 }
-

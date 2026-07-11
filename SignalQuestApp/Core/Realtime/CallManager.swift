@@ -2,7 +2,57 @@ import Foundation
 import CallKit
 import PushKit
 import AVFAudio
+import CryptoKit
 import os
+
+enum CallTerminationAction: Equatable {
+    case reject
+    case leave
+}
+
+struct CallLifecyclePolicy {
+    static let ringingStatuses: Set<String> = ["pending", "ringing"]
+    static let maximumParticipants = 8
+
+    static func isRinging(_ status: String?, pending: Bool? = nil) -> Bool {
+        // Un transfert vers un nouveau participant garde l'appel global ACTIVE,
+        // tout en renvoyant `pending: true` pour ce destinataire.
+        if pending == true { return true }
+        guard let status else { return false }
+        return ringingStatuses.contains(status.lowercased())
+    }
+
+    static func terminationAction(
+        isOutgoing: Bool,
+        isAnswered: Bool,
+        serverStatus: String? = nil
+    ) -> CallTerminationAction {
+        // Dans un groupe, l'appel global devient ACTIVE dès qu'une personne
+        // répond, tandis que les autres destinataires peuvent encore sonner.
+        // `/reject` n'accepte que RINGING ; un destinataire transféré/encore en
+        // sonnerie sur un appel ACTIVE doit donc passer par `/end` (alias leave).
+        isOutgoing || isAnswered || serverStatus?.lowercased() == "active" ? .leave : .reject
+    }
+
+    static func canStartCall(participantCount: Int) -> Bool {
+        (2...maximumParticipants).contains(participantCount)
+    }
+
+    /// Stable mapping so the same backend call cannot create several CallKit
+    /// entries when PushKit delivery and foreground reconciliation race.
+    static func callKitUUID(callId: String) -> UUID {
+        let digest = Array(SHA256.hash(data: Data(callId.utf8)))
+        var bytes = Array(digest.prefix(16))
+        bytes[6] = (bytes[6] & 0x0F) | 0x50 // namespace-style UUID version
+        bytes[8] = (bytes[8] & 0x3F) | 0x80 // RFC 4122 variant
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
+    }
+}
 
 /// Bridges SignalQuest calls to the system via CallKit, and receives incoming
 /// calls via PushKit VoIP pushes. CallKit gives us the native incoming-call
@@ -25,18 +75,22 @@ final class CallManager: NSObject, ObservableObject {
         let handle: String
         let hasVideo: Bool
         var isOutgoing: Bool
+        var serverStatus: String? = nil
         /// Passe à true quand un appel ENTRANT a été décroché — distingue
         /// « jamais répondu » (reject) de « répondu puis raccroché » (end). CALL-BUG-02.
         var isAnswered: Bool = false
+        var isEnding: Bool = false
     }
 
     enum CallError: LocalizedError {
         case missingCredentials
         case connectionFailed(String)
+        case connectionEnded
         var errorDescription: String? {
             switch self {
             case .missingCredentials: return "Identifiants d'appel manquants."
             case .connectionFailed(let m): return "Connexion à l'appel impossible : \(m)"
+            case .connectionEnded: return "L'appel s'est terminé pendant la connexion."
             }
         }
     }
@@ -51,6 +105,9 @@ final class CallManager: NSObject, ObservableObject {
     private let provider: CXProvider
     private let callController = CXCallController()
     private var voipRegistry: PKPushRegistry?
+    private var incomingReconciliationTask: Task<Void, Never>?
+    private var recentlyTerminatedCallIDs: [String: Date] = [:]
+    private let deviceID = InstallationIdentity().deviceID()
     private let logger = Logger(subsystem: "fr.signalquest.ios", category: "CallKit")
 
     init(callsService: CallsServicing, api: APIClient) {
@@ -82,6 +139,7 @@ final class CallManager: NSObject, ObservableObject {
 
     func startOutgoingCall(conversationId: String, mode: String, displayName: String) {
         guard activeCall == nil else { return }
+        liveKit.prepareForCall()
         let uuid = UUID()
         let hasVideo = mode.lowercased() == "video"
         activeCall = ActiveCall(id: uuid, callId: nil, conversationId: conversationId, handle: displayName, hasVideo: hasVideo, isOutgoing: true)
@@ -89,7 +147,12 @@ final class CallManager: NSObject, ObservableObject {
         let action = CXStartCallAction(call: uuid, handle: CXHandle(type: .generic, value: displayName))
         action.isVideo = hasVideo
         callController.request(CXTransaction(action: action)) { [weak self] error in
-            if let error { self?.logger.error("startCall request failed: \(error.localizedDescription, privacy: .public)") }
+            guard let error else { return }
+            Task { @MainActor in
+                guard let self, self.activeCall?.id == uuid else { return }
+                self.logger.error("startCall request failed: \(error.localizedDescription, privacy: .public)")
+                await self.tearDown()
+            }
         }
     }
 
@@ -99,12 +162,17 @@ final class CallManager: NSObject, ObservableObject {
             showCallScreen = false
             return
         }
+        guard !call.isEnding else { return }
+        activeCall?.isEnding = true
         let action = CXEndCallAction(call: call.id)
         callController.request(CXTransaction(action: action)) { [weak self] error in
             if let error {
-                self?.logger.error("endCall request failed: \(error.localizedDescription, privacy: .public)")
-                // Force local teardown if CallKit refused the transaction.
-                Task { @MainActor in await self?.tearDown() }
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.logger.error("endCall request failed: \(error.localizedDescription, privacy: .public)")
+                    if let call = self.activeCall { await self.notifyBackendCallTerminated(call) }
+                    await self.tearDown()
+                }
             }
         }
     }
@@ -117,12 +185,78 @@ final class CallManager: NSObject, ObservableObject {
 
     // MARK: Incoming
 
-    func reportIncomingCall(uuid: UUID, callId: String?, conversationId: String?, handle: String, hasVideo: Bool, completion: (() -> Void)?) {
+    private func reportInvalidIncomingPush(
+        uuid: UUID,
+        handle: String,
+        hasVideo: Bool,
+        completion: (() -> Void)?
+    ) {
         let update = CXCallUpdate()
         update.remoteHandle = CXHandle(type: .generic, value: handle)
         update.localizedCallerName = handle
         update.hasVideo = hasVideo
         let completionBox = UnsafeMainActorBox(value: completion)
+        provider.reportNewIncomingCall(with: uuid, update: update) { [weak self] error in
+            let errorMessage = error?.localizedDescription
+            Task { @MainActor in
+                if let errorMessage {
+                    self?.logger.error("invalid incoming payload report failed: \(errorMessage, privacy: .public)")
+                } else {
+                    self?.provider.reportCall(with: uuid, endedAt: Date(), reason: .failed)
+                }
+                completionBox.value?()
+            }
+        }
+    }
+
+    func reportIncomingCall(
+        uuid: UUID,
+        callId: String?,
+        conversationId: String?,
+        handle: String,
+        hasVideo: Bool,
+        serverStatus: String? = nil,
+        completion: (() -> Void)?
+    ) {
+        let update = CXCallUpdate()
+        update.remoteHandle = CXHandle(type: .generic, value: handle)
+        update.localizedCallerName = handle
+        update.hasVideo = hasVideo
+        let completionBox = UnsafeMainActorBox(value: completion)
+
+        // Une push APNs peut arriver après un refus/raccrochage déjà traité.
+        // Elle doit toujours être reportée à CallKit (contrat PushKit), puis
+        // clôturée immédiatement sans recréer l'état applicatif ni une sonnerie.
+        if let callId, wasRecentlyTerminated(callId) {
+            provider.reportNewIncomingCall(with: uuid, update: update) { [weak self] error in
+                let errorMessage = error?.localizedDescription
+                Task { @MainActor in
+                    if let errorMessage {
+                        self?.logger.error("stale incoming report failed: \(errorMessage, privacy: .public)")
+                    } else {
+                        self?.provider.reportCall(with: uuid, endedAt: Date(), reason: .declinedElsewhere)
+                    }
+                    completionBox.value?()
+                }
+            }
+            return
+        }
+
+        // PushKit peut relivrer le même appel alors que la réconciliation HTTP l'a
+        // déjà présenté. On réutilise le même UUID CallKit, sans créer un second
+        // appel système ni remplacer l'état actif.
+        if let current = activeCall, let callId, current.callId == callId {
+            provider.reportNewIncomingCall(with: current.id, update: update) { [weak self] error in
+                let errorMessage = error?.localizedDescription
+                Task { @MainActor in
+                    if let errorMessage {
+                        self?.logger.error("duplicate incoming report failed: \(errorMessage, privacy: .public)")
+                    }
+                    completionBox.value?()
+                }
+            }
+            return
+        }
 
         // CALL-RTC-04 : un appel est déjà actif → on NE touche PAS activeCall ni la
         // session LiveKit en cours. On satisfait quand même l'exigence PushKit (tout
@@ -130,26 +264,68 @@ final class CallManager: NSObject, ObservableObject {
         // puis on décline immédiatement le nouvel UUID, sans impacter l'appel courant.
         if activeCall != nil {
             provider.reportNewIncomingCall(with: uuid, update: update) { [weak self] error in
-                if let error {
-                    self?.logger.error("2nd reportNewIncomingCall failed: \(error.localizedDescription, privacy: .public)")
-                } else {
-                    self?.provider.reportCall(with: uuid, endedAt: Date(), reason: .declinedElsewhere)
+                let errorMessage = error?.localizedDescription
+                Task { @MainActor in
+                    if let errorMessage {
+                        self?.logger.error("2nd reportNewIncomingCall failed: \(errorMessage, privacy: .public)")
+                    } else {
+                        self?.provider.reportCall(with: uuid, endedAt: Date(), reason: .declinedElsewhere)
+                    }
+                    // PushKit doit être libéré dès que le report CallKit est
+                    // terminé. La requête HTTP de refus est best-effort et ne doit
+                    // jamais retenir le watchdog système.
+                    completionBox.value?()
+                    if let self, let callId {
+                        await self.notifyBackendCallTerminated(
+                            callId: callId,
+                            action: CallLifecyclePolicy.terminationAction(
+                                isOutgoing: false,
+                                isAnswered: false,
+                                serverStatus: serverStatus
+                            )
+                        )
+                    }
                 }
-                completionBox.value?()
             }
             return
         }
 
-        activeCall = ActiveCall(id: uuid, callId: callId, conversationId: conversationId, handle: handle, hasVideo: hasVideo, isOutgoing: false)
+        activeCall = ActiveCall(
+            id: uuid,
+            callId: callId,
+            conversationId: conversationId,
+            handle: handle,
+            hasVideo: hasVideo,
+            isOutgoing: false,
+            serverStatus: serverStatus?.lowercased()
+        )
         provider.reportNewIncomingCall(with: uuid, update: update) { [weak self] error in
-            if let error {
-                // Échec du report du SEUL nouvel appel : nettoyage local (aucun appel
-                // n'était actif avant), pas de tearDown global.
-                self?.logger.error("reportNewIncomingCall failed: \(error.localizedDescription, privacy: .public)")
-                self?.activeCall = nil
-                self?.showCallScreen = false
+            let errorMessage = error?.localizedDescription
+            Task { @MainActor in
+                if let errorMessage {
+                    // Échec du report du SEUL nouvel appel : nettoyage local (aucun
+                    // appel n'était actif avant), pas de teardown d'une autre room.
+                    self?.logger.error("reportNewIncomingCall failed: \(errorMessage, privacy: .public)")
+                    self?.activeCall = nil
+                    self?.showCallScreen = false
+                    completionBox.value?()
+                    if let self, let callId {
+                        await self.notifyBackendCallTerminated(
+                            callId: callId,
+                            action: CallLifecyclePolicy.terminationAction(
+                                isOutgoing: false,
+                                isAnswered: false,
+                                serverStatus: serverStatus
+                            )
+                        )
+                    }
+                } else if let callId {
+                    self?.startIncomingReconciliation(callId: callId)
+                    completionBox.value?()
+                } else {
+                    completionBox.value?()
+                }
             }
-            completionBox.value?()
         }
     }
 
@@ -157,15 +333,57 @@ final class CallManager: NSObject, ObservableObject {
     /// plan (et après login) : demande au serveur les appels en attente et, si un appel
     /// « ringing »/« pending » n'est pas déjà actif, le présente via CallKit.
     func reconcilePendingIncomingCall() async {
-        guard activeCall == nil else { return }
-        guard let pending = try? await callsService.pending() else { return }
-        guard let call = pending.first(where: { $0.status == "ringing" || $0.status == "pending" }) else { return }
+        let pending: [CallSession]
+        do {
+            pending = try await callsService.pending()
+        } catch {
+            logger.error("pending call reconciliation failed: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        let call = pending.first(where: {
+            CallLifecyclePolicy.isRinging($0.status, pending: $0.isPending)
+        })
+
+        if let active = activeCall {
+            guard !active.isOutgoing, !active.isAnswered, !active.isEnding else { return }
+            if let call {
+                if call.id == active.callId {
+                    // Un autre membre du groupe peut avoir répondu : l'appel global
+                    // passe alors ACTIVE pendant que cet appareil sonne encore. On
+                    // conserve ce statut pour choisir leave plutôt que reject.
+                    activeCall?.serverStatus = call.status?.lowercased()
+                    return
+                }
+                // `/pending` ne renvoie qu'un appel (le plus récent). Si un second
+                // appel arrive sans push pendant que CallKit sonne déjà, décliner
+                // ce nouveau call plutôt que de supprimer arbitrairement l'appel
+                // système courant. Le prochain poll retrouvera l'appel initial.
+                await notifyBackendCallTerminated(
+                    callId: call.id,
+                    action: CallLifecyclePolicy.terminationAction(
+                        isOutgoing: false,
+                        isAnswered: false,
+                        serverStatus: call.status
+                    )
+                )
+                return
+            }
+            // L'appel n'est plus en attente côté serveur : annulé par l'appelant,
+            // refusé/répondu sur un autre appareil ou expiré. Fermer CallKit évite
+            // une sonnerie fantôme.
+            reportCallEnded(active.id, reason: .remoteEnded)
+            await tearDown()
+            return
+        }
+
+        guard let call, !wasRecentlyTerminated(call.id) else { return }
         reportIncomingCall(
-            uuid: UUID(),
+            uuid: CallLifecyclePolicy.callKitUUID(callId: call.id),
             callId: call.id,
             conversationId: call.conversationId,
-            handle: call.participants?.first ?? "Appel SignalQuest",
+            handle: call.displayName ?? call.participants?.first ?? "Appel SignalQuest",
             hasVideo: call.mode == "video",
+            serverStatus: call.status,
             completion: nil
         )
     }
@@ -185,9 +403,13 @@ final class CallManager: NSObject, ObservableObject {
             logger.error("LiveKit connect failed: \(message, privacy: .public)")
             throw CallError.connectionFailed(message)
         }
+        guard liveKit.state == .connected else { throw CallError.connectionEnded }
     }
 
     private func tearDown() async {
+        incomingReconciliationTask?.cancel()
+        incomingReconciliationTask = nil
+        if let callId = activeCall?.callId { markRecentlyTerminated(callId) }
         await liveKit.disconnect()
         activeCall = nil
         showCallScreen = false
@@ -206,10 +428,41 @@ final class CallManager: NSObject, ObservableObject {
     /// décroché = end). Réutilisé par CXEndCallAction et providerDidReset.
     private func notifyBackendCallTerminated(_ call: ActiveCall) async {
         guard let callId = call.callId else { return }
-        if call.isOutgoing == false && call.isAnswered == false {
-            try? await callsService.reject(callId: callId)
-        } else {
-            try? await callsService.end(callId: callId)
+        await notifyBackendCallTerminated(
+            callId: callId,
+            action: CallLifecyclePolicy.terminationAction(
+                isOutgoing: call.isOutgoing,
+                isAnswered: call.isAnswered,
+                serverStatus: call.serverStatus
+            )
+        )
+    }
+
+    private func notifyBackendCallTerminated(
+        callId: String,
+        action: CallTerminationAction
+    ) async {
+        markRecentlyTerminated(callId)
+        do {
+            switch action {
+            case .reject:
+                do {
+                    try await callsService.reject(callId: callId)
+                } catch {
+                    // Course groupe : l'appel peut devenir ACTIVE entre le dernier
+                    // polling et le geste de refus. `/end` (leave) sait retirer un
+                    // participant encore `ringing` dans les deux états et reste
+                    // sans effet destructif si l'appel est déjà terminal.
+                    logger.info("reject raced with call state; retrying leave")
+                    try await callsService.end(callId: callId)
+                }
+            case .leave:
+                try await callsService.end(callId: callId)
+            }
+        } catch {
+            // Les routes sont idempotentes ; un échec réseau peut être réconcilié
+            // par le serveur/timeout sans retenir une UI CallKit fantôme.
+            logger.error("backend call termination failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -219,7 +472,52 @@ final class CallManager: NSObject, ObservableObject {
     private func handleRemoteDisconnect() {
         guard let call = activeCall else { return }
         reportCallEnded(call.id, reason: .remoteEnded)
-        Task { await tearDown() }
+        Task {
+            await notifyBackendCallTerminated(call)
+            await tearDown()
+        }
+    }
+
+    private func startIncomingReconciliation(callId: String) {
+        incomingReconciliationTask?.cancel()
+        incomingReconciliationTask = Task { [weak self] in
+            // Le backend expire les sonneries à 45 s. Une vérification toutes les
+            // trois secondes suffit à retirer rapidement une réponse autre appareil
+            // sans polling agressif.
+            for _ in 0..<15 {
+                do { try await Task.sleep(for: .seconds(3)) } catch { return }
+                guard let self,
+                      self.activeCall?.callId == callId,
+                      self.activeCall?.isAnswered == false else { return }
+                await self.reconcilePendingIncomingCall()
+            }
+
+            // Même si `/pending` reste bloqué sur `ringing` (ou si son expiration
+            // serveur dérive), CallKit ne doit jamais sonner indéfiniment. La
+            // fenêtre produit/backend est de 45 s : on clôt localement et on
+            // rejoue un reject best-effort, idempotent pour l'utilisateur.
+            guard let self,
+                  let call = self.activeCall,
+                  call.callId == callId,
+                  !call.isAnswered,
+                  !call.isEnding else { return }
+            self.reportCallEnded(call.id, reason: .unanswered)
+            await self.notifyBackendCallTerminated(call)
+            await self.tearDown()
+        }
+    }
+
+    private func markRecentlyTerminated(_ callId: String) {
+        let now = Date()
+        recentlyTerminatedCallIDs = recentlyTerminatedCallIDs.filter { now.timeIntervalSince($0.value) < 90 }
+        recentlyTerminatedCallIDs[callId] = now
+    }
+
+    private func wasRecentlyTerminated(_ callId: String) -> Bool {
+        guard let date = recentlyTerminatedCallIDs[callId] else { return false }
+        if Date().timeIntervalSince(date) < 90 { return true }
+        recentlyTerminatedCallIDs[callId] = nil
+        return false
     }
 
     private var lastVoipToken: String?
@@ -233,7 +531,12 @@ final class CallManager: NSObject, ObservableObject {
         do {
             let _: SuccessResponse = try await api.requestJSON(
                 "/api/user/voip-token",
-                body: ["voipToken": token, "platform": "ios"]
+                body: [
+                    "voipToken": token,
+                    "platform": "ios",
+                    "deviceId": deviceID,
+                    "environment": api.config.environment.rawValue,
+                ]
             )
             voipTokenNeedsSync = false
         } catch {
@@ -274,7 +577,12 @@ final class CallManager: NSObject, ObservableObject {
             let _: SuccessResponse = try await api.requestJSON(
                 "/api/user/voip-token",
                 method: .delete,
-                body: ["voipToken": token, "platform": "ios"]
+                body: [
+                    "voipToken": token,
+                    "platform": "ios",
+                    "deviceId": deviceID,
+                    "environment": api.config.environment.rawValue,
+                ]
             )
         } catch {
             // Best-effort : la route DELETE peut ne pas encore exister côté backend.
@@ -328,6 +636,7 @@ extension CallManager: CXProviderDelegate {
                 action.fulfill()
             } catch {
                 self.logger.error("initiate failed: \(error.localizedDescription, privacy: .public)")
+                if let call = self.activeCall { await self.notifyBackendCallTerminated(call) }
                 action.fail()
                 await self.tearDown()
             }
@@ -341,8 +650,11 @@ extension CallManager: CXProviderDelegate {
             guard let call = self.activeCall, let callId = call.callId else { action.fail(); return }
             do {
                 let session = try await self.callsService.answer(callId: callId)
-                try await self.connectLiveKit(for: session, video: call.hasVideo)
+                // L'autorisation serveur a déjà fait passer le participant à
+                // `joined`; tout échec média ultérieur doit donc utiliser leave/end,
+                // jamais reject (qui n'accepte que RINGING).
                 self.activeCall?.isAnswered = true
+                try await self.connectLiveKit(for: session, video: call.hasVideo)
                 self.showCallScreen = true
                 action.fulfill()
             } catch {
@@ -351,6 +663,7 @@ extension CallManager: CXProviderDelegate {
                 // action.fail() ne le retire pas → on le clôt explicitement pour ne
                 // pas laisser une entrée d'appel fantôme côté système.
                 if let id = self.activeCall?.id { self.reportCallEnded(id, reason: .failed) }
+                if let call = self.activeCall { await self.notifyBackendCallTerminated(call) }
                 action.fail()
                 await self.tearDown()
             }
@@ -415,11 +728,20 @@ extension CallManager: PKPushRegistryDelegate {
         let conversationId = CallManager.string(dict, "conversationId", "conversation_id")
         let handle = CallManager.string(dict, "caller", "callerName", "handle", "title") ?? "Appel SignalQuest"
         let hasVideo = CallManager.string(dict, "mode", "type")?.lowercased() == "video"
-        let uuid = CallManager.string(dict, "uuid", "callUuid").flatMap(UUID.init(uuidString:)) ?? UUID()
+        // `callId` est l'identité canonique. Elle prime sur un UUID de push pour
+        // qu'une relivraison APNs (ou un producteur qui régénère son UUID) ne
+        // crée jamais une seconde entrée CallKit pour le même appel.
+        let uuid = callId.map(CallLifecyclePolicy.callKitUUID(callId:))
+            ?? CallManager.string(dict, "uuid", "callUuid").flatMap(UUID.init(uuidString:))
+            ?? UUID()
         // CallKit requires reporting the incoming call before `completion` runs;
         // the provider delivers on the main queue so we report synchronously.
         let completionBox = UnsafeMainActorBox(value: completion)
         Task { @MainActor in
+            guard let callId else {
+                self.reportInvalidIncomingPush(uuid: uuid, handle: handle, hasVideo: hasVideo, completion: completionBox.value)
+                return
+            }
             self.reportIncomingCall(uuid: uuid, callId: callId, conversationId: conversationId, handle: handle, hasVideo: hasVideo, completion: completionBox.value)
         }
     }

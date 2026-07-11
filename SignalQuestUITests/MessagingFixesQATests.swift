@@ -13,9 +13,9 @@ final class MessagingFixesQATests: XCTestCase {
         let app = XCUIApplication()
         app.launchEnvironment["SQ_AUTH_TOKEN"] = token
         app.launch()
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
 
-        XCTAssertTrue(app.tabBars.buttons["Messages"].waitForExistence(timeout: 20))
-        app.tabBars.buttons["Messages"].tap()
+        SignalQuestUITestSupport.openMessages(in: app)
 
         // Le sheet E2EE peut s'auto-présenter (conv chiffrée) : on l'annule pour
         // accéder à la liste.

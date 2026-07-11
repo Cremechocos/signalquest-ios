@@ -2,11 +2,13 @@ import SwiftUI
 
 @MainActor
 final class PrivacySettingsViewModel: ObservableObject {
-    @Published var defaultVisibility: String = "public"
-    @Published var allowMentions = true
-    @Published var allowFollow = true
-    @Published var allowDMs = true
-    @Published var showRadioOnPosts = true
+    @Published var shareLiveLocationWithFriends = false
+    @Published var shareRadioDataWithFriends = false
+    @Published var shareSessionsWithFriends = false
+    @Published var sharePhotosOnFriendMap = false
+    @Published var shareExactMeasurements = false
+    @Published var lastSeenVisibility: LastSeenVisibility = .none
+    @Published var messageRequestPolicy: MessageRequestPolicy = .friendsOnly
     @Published var isLoading = false
     @Published var isSaving = false
     @Published var loaded = false
@@ -34,11 +36,13 @@ final class PrivacySettingsViewModel: ObservableObject {
         savedConfirmation = false
         defer { isSaving = false }
         let patch = UpdatePrivacyRequest(
-            defaultVisibility: defaultVisibility,
-            allowMentions: allowMentions,
-            allowFollow: allowFollow,
-            allowDMs: allowDMs,
-            showRadioOnPosts: showRadioOnPosts
+            shareLiveLocationWithFriends: shareLiveLocationWithFriends,
+            shareRadioDataWithFriends: shareRadioDataWithFriends,
+            shareSessionsWithFriends: shareSessionsWithFriends,
+            sharePhotosOnFriendMap: sharePhotosOnFriendMap,
+            shareExactMeasurements: shareExactMeasurements,
+            lastSeenVisibility: lastSeenVisibility,
+            messageRequestPolicy: messageRequestPolicy
         )
         do {
             apply(try await service.update(patch))
@@ -51,11 +55,17 @@ final class PrivacySettingsViewModel: ObservableObject {
     }
 
     private func apply(_ p: SocialPrivacy) {
-        if let v = p.defaultVisibility { defaultVisibility = v }
-        if let v = p.allowMentions { allowMentions = v }
-        if let v = p.allowFollow { allowFollow = v }
-        if let v = p.allowDMs { allowDMs = v }
-        if let v = p.showRadioOnPosts { showRadioOnPosts = v }
+        shareLiveLocationWithFriends = p.shareLiveLocationWithFriends
+        shareRadioDataWithFriends = p.shareRadioDataWithFriends
+        shareSessionsWithFriends = p.shareSessionsWithFriends
+        sharePhotosOnFriendMap = p.sharePhotosOnFriendMap
+        shareExactMeasurements = p.shareExactMeasurements
+        UserDefaults.standard.set(
+            p.shareExactMeasurements,
+            forKey: MeasurementPrivacySettings.shareExactMeasurementsKey
+        )
+        lastSeenVisibility = p.lastSeenVisibility
+        messageRequestPolicy = p.messageRequestPolicy
     }
 }
 
@@ -69,47 +79,57 @@ struct PrivacySettingsView: View {
         _model = StateObject(wrappedValue: PrivacySettingsViewModel(service: service))
     }
 
-    private let visibilityOptions: [(value: String, label: String)] = [
-        ("public", "Public"),
-        ("friends", "Amis"),
-        ("private", "Privé"),
-    ]
-
     var body: some View {
         Form {
             Section {
-                Picker("Visibilité par défaut", selection: $model.defaultVisibility) {
-                    ForEach(visibilityOptions, id: \.value) { option in
-                        Text(option.label).tag(option.value)
-                    }
-                }
-                .foregroundStyle(SQColor.label)
+                Toggle("Partager ma position en direct", isOn: $model.shareLiveLocationWithFriends)
+                Toggle("Partager mes données radio", isOn: $model.shareRadioDataWithFriends)
+                Toggle("Partager mes sessions", isOn: $model.shareSessionsWithFriends)
+                Toggle("Afficher mes photos sur la carte Amis", isOn: $model.sharePhotosOnFriendMap)
             } header: {
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
                     Text("Confidentialité").sqKicker()
-                    Text("Publications")
+                    Text("Carte des amis")
                         .font(SQType.subhead)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
             } footer: {
-                Text("Qui peut voir tes nouvelles publications par défaut.")
+                Text("Ces partages sont désactivés par défaut. Les désactiver retire aussi les données temps réel déjà publiées.")
             }
             .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
 
-            Section("Interactions") {
-                Toggle("Autoriser les mentions", isOn: $model.allowMentions)
-                Toggle("Autoriser qu’on m’ajoute / me suive", isOn: $model.allowFollow)
-                Toggle("Autoriser les messages privés", isOn: $model.allowDMs)
+            Section {
+                Toggle("Partager la position exacte de mes mesures", isOn: $model.shareExactMeasurements)
+            } header: {
+                Text("Mesures publiques")
+            } footer: {
+                Text("Désactivé par défaut : les coordonnées visibles publiquement sont floutées. Si tu désactives ce réglage, le serveur floute aussi rétroactivement tes mesures déjà publiées.")
+            }
+            .tint(SQColor.brandRed)
+            .foregroundStyle(SQColor.label)
+            .listRowBackground(SQColor.surface)
+
+            Section("Présence") {
+                Picker("Afficher ma dernière activité", selection: $model.lastSeenVisibility) {
+                    Text("À mes amis").tag(LastSeenVisibility.friends)
+                    Text("À personne").tag(LastSeenVisibility.none)
+                }
             }
             .tint(SQColor.brandRed)
             .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
 
             Section {
-                Toggle("Afficher mes données réseau sur mes posts", isOn: $model.showRadioOnPosts)
+                Picker("Qui peut me contacter", selection: $model.messageRequestPolicy) {
+                    Text("Tout le monde").tag(MessageRequestPolicy.everyone)
+                    Text("Mes amis uniquement").tag(MessageRequestPolicy.friendsOnly)
+                    Text("Personne").tag(MessageRequestPolicy.noOne)
+                }
+            } header: {
+                Text("Messages privés")
             } footer: {
-                Text("Quand c’est activé, tes publications peuvent afficher l’opérateur et la technologie réseau associés à la mesure.")
+                Text("Ce réglage contrôle les nouvelles demandes de conversation. Les conversations existantes restent accessibles.")
             }
             .tint(SQColor.brandRed)
             .foregroundStyle(SQColor.label)
