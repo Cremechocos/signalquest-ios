@@ -37,9 +37,23 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
     case hybridAuto = "hybrid_auto"
     case cloudflareR2 = "cloudflare_r2"
     case awsCloudFront = "aws_cloudfront"
+    /// Cible retirée des choix (TTFB 2× supérieur aux CDN) : le case reste
+    /// pour décoder les préférences déjà stockées, migrées vers `.hybridAuto`.
+    /// Le VPS reste le serveur d'UPLOAD (mesure certifiée) et le repli DL si
+    /// les CDN sont injoignables.
     case vpsInternal = "vps_internal"
 
     var id: String { rawValue }
+
+    /// Cases proposés à l'utilisateur (réglages).
+    static var selectableCases: [SpeedtestDownloadTarget] {
+        [.hybridAuto, .cloudflareR2, .awsCloudFront]
+    }
+
+    /// Migration douce : une préférence VPS stockée redevient « Auto ».
+    var migrated: SpeedtestDownloadTarget {
+        self == .vpsInternal ? .hybridAuto : self
+    }
 
     var displayName: String {
         switch self {

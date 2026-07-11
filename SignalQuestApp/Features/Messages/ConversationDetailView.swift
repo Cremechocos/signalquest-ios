@@ -90,6 +90,20 @@ struct ConversationDetailView: View {
     @State private var showNewPoll = false
     @State private var reminderTarget: MessageItem?
 
+    // Photos en grand + publications partagées interactives (parité Android).
+    /// Photo de la conversation ouverte en plein écran (tap sur l'image).
+    @State private var imageViewerTarget: MessageImageTarget?
+    /// Cache mémoire des publications partagées (1 fetch par postId) + actions
+    /// like/repost optimistes, partagé par toutes les bulles de la conversation.
+    @StateObject private var sharedPosts = SharedPostStore()
+    /// Sheet commentaires d'une publication partagée.
+    @State private var sharedPostComments: SharedPostCommentsTarget?
+    /// Sheet « publication complète » (PostDetailView) d'une publication partagée.
+    @State private var sharedPostDetail: SharedPostDetailTarget?
+    /// Clé de cache du dernier post ouvert en sheet — rafraîchi au retour pour
+    /// garder les compteurs de l'embed à jour.
+    @State private var lastSharedPostKey: String?
+
     private var isE2EE: Bool { conversation.e2eeEnabled == true }
     private var canSend: Bool { !isE2EE || isE2EEUnlocked }
     /// L'utilisateur peut-il épingler/désépingler (owner/admin) — le backend
@@ -278,6 +292,26 @@ struct ConversationDetailView: View {
         }
         .sheet(isPresented: $showSaved) {
             SavedMessagesView(service: service, currentUserId: currentUserId)
+        }
+        // Photo de la conversation en plein écran (zoom + glisser pour fermer).
+        .fullScreenCover(item: $imageViewerTarget) { target in
+            MessageImageViewer(target: target)
+        }
+        // Commentaires d'une publication partagée — même sheet que le feed ;
+        // au retour, l'embed est rafraîchi (compteur de commentaires).
+        .sheet(item: $sharedPostComments, onDismiss: { refreshSharedPostAfterSheet() }) { target in
+            CommentsSheet(service: services.comments, postId: target.backendPostId)
+        }
+        // Publication complète (réutilise PostDetailView du feed par composition).
+        .sheet(item: $sharedPostDetail, onDismiss: { refreshSharedPostAfterSheet() }) { target in
+            NavigationStack {
+                PostDetailView(
+                    item: target.item,
+                    feedService: services.feed,
+                    commentsService: services.comments,
+                    reportsService: services.reports
+                )
+            }
         }
         .signalQuestBackground()
         .onAppear {
@@ -583,7 +617,15 @@ struct ConversationDetailView: View {
     }
 
     private func classicBubble(for message: MessageItem, mine: Bool, isGroupStart: Bool) -> some View {
-            VStack(alignment: mine ? .trailing : .leading, spacing: SQSpace.xs + 1) {
+            let card = shareCard(for: message)
+            // Contenu interactif dans la bulle (embed de publication, photo
+            // tappable) : on garde les éléments d'accessibilité séparés
+            // (.contain) pour que VoiceOver atteigne les boutons ; sinon la
+            // bulle reste UN élément combiné, comme avant.
+            let hasInteractiveContent =
+                (card?.socialPostId != nil && !AppEnvironment.usesDemoData)
+                || message.attachments.contains { $0.url != nil && isImageAttachment($0) }
+            return VStack(alignment: mine ? .trailing : .leading, spacing: SQSpace.xs + 1) {
                 if !mine, conversation.isGroup, isGroupStart, let name = message.sender?.displayName {
                     Text(name)
                         .font(SQType.micro)
@@ -618,11 +660,29 @@ struct ConversationDetailView: View {
                     Text("Message supprimé")
                         .font(SQType.caption.italic())
                         .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary)
-                } else if let shareCard = shareCard(for: message) {
+                } else if let shareCard = card {
                     // Partage envoyé par Android (publication / signal / speedtest / session…).
                     // La publication (`social_post`) est testée EN PREMIER car elle peut
-                    // aussi porter une mesure : elle se rend en carte riche fidèle.
-                    if shareCard.kind.lowercased() == "social_post" {
+                    // aussi porter une mesure : elle se rend en publication réelle
+                    // interactive (embed) quand l'id du post est connu, sinon en
+                    // carte compacte statique.
+                    if let postId = shareCard.socialPostId, !AppEnvironment.usesDemoData {
+                        SharedPostEmbedBubble(
+                            card: shareCard,
+                            postId: postId,
+                            mine: mine,
+                            service: services.feed,
+                            store: sharedPosts,
+                            onComment: { item in
+                                lastSharedPostKey = postId
+                                sharedPostComments = SharedPostCommentsTarget(id: postId, backendPostId: item.backendPostId)
+                            },
+                            onOpen: { item in
+                                lastSharedPostKey = postId
+                                sharedPostDetail = SharedPostDetailTarget(id: postId, item: item)
+                            }
+                        )
+                    } else if shareCard.kind.lowercased() == "social_post" {
                         SharedPostCardBubble(card: shareCard, mine: mine)
                     } else if let signal = shareCard.signal {
                         SignalCardBubble(card: shareCard, signal: signal, mine: mine)
@@ -673,7 +733,7 @@ struct ConversationDetailView: View {
             .padding(.vertical, 11)
             .padding(.horizontal, 15)
             .background(mine ? SQColor.brandRed : SQColor.surface, in: bubbleShape(mine: mine))
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: hasInteractiveContent ? .contain : .combine)
     }
 
     /// Capsules de réactions posées, regroupées par emoji, chevauchant le bas de
@@ -957,20 +1017,30 @@ struct ConversationDetailView: View {
     /// Photo envoyée : shimmer pendant le chargement, ratio préservé (max ~240 pt).
     /// Dans une bulle avec légende : coin 14. En « photo seule » : la photo
     /// remplit la bulle (coins de bulle) avec l'heure en surimpression.
+    /// Tap : ouvre la photo en plein écran (MessageImageViewer).
     private func attachmentImage(_ attachment: MessageAttachment, message: MessageItem, mine: Bool, standalone: Bool) -> some View {
         let size = imageDisplaySize(for: attachment)
         let shape: AnyShape = standalone
             ? AnyShape(bubbleShape(mine: mine))
             : AnyShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        return RemoteImage(url: attachment.url, maxDimension: 240, contentMode: .fill) {
-            Rectangle().fill(SQColor.surfaceMuted).sqShimmer()
+        return Button {
+            guard let url = attachment.url else { return }
+            Haptics.selection()
+            imageViewerTarget = MessageImageTarget(id: attachment.id ?? url.absoluteString, url: url)
+        } label: {
+            RemoteImage(url: attachment.url, maxDimension: 240, contentMode: .fill) {
+                Rectangle().fill(SQColor.surfaceMuted).sqShimmer()
+            }
+            .frame(width: size.width, height: size.height)
+            .clipShape(shape)
+            .overlay(alignment: .bottomTrailing) {
+                if standalone { photoTimeOverlay(for: message) }
+            }
+            .contentShape(shape)
         }
-        .frame(width: size.width, height: size.height)
-        .clipShape(shape)
-        .overlay(alignment: .bottomTrailing) {
-            if standalone { photoTimeOverlay(for: message) }
-        }
+        .buttonStyle(.plain)
         .accessibilityLabel("Photo envoyée")
+        .accessibilityHint("Toucher pour afficher en plein écran")
     }
 
     /// Taille d'affichage d'une photo : ratio préservé, plus grand côté ≤ 240 pt,
@@ -1247,6 +1317,14 @@ struct ConversationDetailView: View {
     private func location(for message: MessageItem) -> MessageLocationData? {
         guard message.deletedAt == nil, message.metadata != nil else { return nil }
         return MessageLocationData.parse(fromMetadataJSON: message.metadata)
+    }
+
+    /// Au retour d'un sheet (commentaires / publication complète), rafraîchit
+    /// silencieusement l'embed pour resynchroniser les compteurs.
+    private func refreshSharedPostAfterSheet() {
+        guard let key = lastSharedPostKey else { return }
+        lastSharedPostKey = nil
+        sharedPosts.refresh(key)
     }
 
     private var currentUserId: String? {

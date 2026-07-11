@@ -135,6 +135,7 @@
 		819A23CD1C96508D7129E5F0 /* BricolageGrotesque-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F2B897546130656652D9717D /* BricolageGrotesque-SemiBold.ttf */; };
 		81FED606BC8524E427FBB708 /* GamificationV2Service.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94A824085331B8DDD8FD3AEC /* GamificationV2Service.swift */; };
 		820491F93E8015B6ECDD7D2D /* CallSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8366DB9AD97C6EFE27467176 /* CallSessionView.swift */; };
+		82D213CFFAD0F862FFF86CE8 /* MessageImageViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37A33F778EF242CBA6881750 /* MessageImageViewer.swift */; };
 		836D76211D8B12F2E56901A8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AD04EAFD67FBCB63533321A0 /* Assets.xcassets */; };
 		8A4136A5D87AAEDAB5407344 /* ANFRDemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C94749CE21617DB555FC5D6 /* ANFRDemoData.swift */; };
 		8C7659AD0943ED428E44029F /* FriendsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D871487D03A7164E856392DE /* FriendsListView.swift */; };
@@ -210,6 +211,7 @@
 		E156E1B5171E02B1878DA63A /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F378A97EE08A97DD345A432F /* FeedView.swift */; };
 		E4D3352BEA88542E42F96E7B /* ValidationsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8738D9A09B93678F37E5A510 /* ValidationsSheet.swift */; };
 		E53F5CF267D21D6EBCBBB070 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = F2EF657BC1E07920DD9BF7DA /* FirebaseAnalytics */; };
+		E8E8907253FE60FDECEFFD51 /* SharedPostEmbed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AA98E8543E1A0DA35A68E52 /* SharedPostEmbed.swift */; };
 		E92941996F6D38DEF635810C /* SpeedtestTrendWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 188B982997C559D0E38231B7 /* SpeedtestTrendWidget.swift */; };
 		E996989B13437E3678AA43BA /* SQEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B3B3E33665A0D12EB2183E /* SQEffects.swift */; };
 		EB9551322B0DE0869A0B7E2C /* ReportsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF5C473D670B7B2938ABCB45 /* ReportsService.swift */; };
@@ -311,6 +313,7 @@
 		342AD252F576AA2664A4C655 /* SQBrand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQBrand.swift; sourceTree = "<group>"; };
 		366127FDD01986AEE70AE565 /* ReactionPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReactionPicker.swift; sourceTree = "<group>"; };
 		375D2602C108329658B440F9 /* ExploreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreView.swift; sourceTree = "<group>"; };
+		37A33F778EF242CBA6881750 /* MessageImageViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageImageViewer.swift; sourceTree = "<group>"; };
 		389490B290AB8281D5C364D0 /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServices.swift; sourceTree = "<group>"; };
 		39509D5164E7F02622A4D040 /* SpeedtestModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestModels.swift; sourceTree = "<group>"; };
 		3B2B510928CA997F314547B3 /* ANFRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRService.swift; sourceTree = "<group>"; };
@@ -350,6 +353,7 @@
 		649AF22D91CC4ADD75073863 /* NetworkPathMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPathMonitor.swift; sourceTree = "<group>"; };
 		65CA75BF3F0519CFD6B732AE /* market_registry_fallback.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = market_registry_fallback.json; sourceTree = "<group>"; };
 		688909AB965601A75F6DC348 /* SpeedtestControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestControl.swift; sourceTree = "<group>"; };
+		6AA98E8543E1A0DA35A68E52 /* SharedPostEmbed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedPostEmbed.swift; sourceTree = "<group>"; };
 		6B56E287237E42CD44965DC6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		6C7FDA09EB9502659D0A0D15 /* ComposerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerSheet.swift; sourceTree = "<group>"; };
 		6DA29CF4FE66121B9C7C8ECC /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
@@ -951,6 +955,7 @@
 				803DC3DE8DE40D4C7E27111B /* ConversationDetailView.swift */,
 				5B45485E64C72BC0A432936C /* E2EEUnlockSheet.swift */,
 				3E2756E12B4DD8420E4E6FC4 /* GroupSettingsView.swift */,
+				37A33F778EF242CBA6881750 /* MessageImageViewer.swift */,
 				FA8ECC4FB30FDE6210DF221A /* MessageSchedulingSheets.swift */,
 				E65943B243D74D4B50717E71 /* MessageSearchView.swift */,
 				469A66A89495AAE04EF039F3 /* MessagesView.swift */,
@@ -960,6 +965,7 @@
 				FD7AF3FD3C9A5C4D2280D2B5 /* SavedMessagesView.swift */,
 				FA71E3F29A86476A36C8900F /* ScheduledMessagesView.swift */,
 				A01462ACA13AD33221D20FAF /* ShareCardBubble.swift */,
+				6AA98E8543E1A0DA35A68E52 /* SharedPostEmbed.swift */,
 				DF1F41B3B9C7134D4B1810A3 /* ThreadView.swift */,
 			);
 			path = Messages;
@@ -1397,6 +1403,7 @@
 				044254633FC07356DEE15A05 /* MapSnapshotService.swift in Sources */,
 				30311E763161242DA4BEC7EB /* MarketRegistryModels.swift in Sources */,
 				EE47E722A4FE5F89F50C9523 /* MarketRegistryService.swift in Sources */,
+				82D213CFFAD0F862FFF86CE8 /* MessageImageViewer.swift in Sources */,
 				9D8F7A82FABDCB187B9D4B98 /* MessageModels.swift in Sources */,
 				DCC5F897D3A9BEC62D7DB7F6 /* MessageSchedulingSheets.swift in Sources */,
 				D14E7CF676EC9E09D02D37D5 /* MessageSearchView.swift in Sources */,
@@ -1461,6 +1468,7 @@
 				6CF9467F46E13CAEEEDE4FBF /* SettingsView.swift in Sources */,
 				4AE7A6DFDC700D3BAAF84BE6 /* ShareCardBubble.swift in Sources */,
 				0E23C8236637F2291A28E8E2 /* ShareSheet.swift in Sources */,
+				E8E8907253FE60FDECEFFD51 /* SharedPostEmbed.swift in Sources */,
 				B60C238A9E616DB73EF3BB59 /* SignalDetailSheet.swift in Sources */,
 				5B2767E6D1BEDB7E7038F402 /* SignalFormatters.swift in Sources */,
 				254F77D0681DD6680DA80000 /* SignalQuestApp.swift in Sources */,

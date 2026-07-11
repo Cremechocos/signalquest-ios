@@ -84,6 +84,9 @@ struct ShareCardRow: Equatable, Identifiable {
 /// depuis `metadata.shareCard`.
 struct ShareCardData: Equatable {
     let kind: String
+    /// Id de la cible du partage (`shareCard.id`) — pour `social_post`, c'est
+    /// l'id backend de la publication (utilisé pour la charger en direct).
+    let targetId: String?
     let title: String
     let subtitle: String?
     let url: String?
@@ -97,6 +100,14 @@ struct ShareCardData: Equatable {
     let session: SessionShareData?
 
     var openURL: URL? { url.flatMap(URL.init(string:)) }
+
+    /// Id de la publication partagée (kind « social_post ») — clé de chargement
+    /// du post réel dans la conversation. Nil pour les autres kinds ou les
+    /// anciens partages sans id.
+    var socialPostId: String? {
+        guard kind.lowercased() == "social_post" else { return nil }
+        return targetId
+    }
 
     /// Décode la carte depuis la chaîne JSON `message.metadata`. Renvoie nil si la
     /// clé `shareCard` est absente/invalide.
@@ -170,6 +181,7 @@ struct ShareCardData: Equatable {
 
         return ShareCardData(
             kind: kind,
+            targetId: ShareCardData.optString(card["id"]),
             title: title,
             subtitle: ShareCardData.optString(card["subtitle"]),
             url: ShareCardData.optString(card["url"]),

@@ -547,7 +547,7 @@ struct SpeedtestView: View {
                             Text("Serveur de test")
                                 .font(SQFont.archivo(15, .bold))
                                 .foregroundStyle(SQColor.label)
-                            Text("« Auto » compare Cloudflare, AWS et le VPS au démarrage et prend le plus rapide. Le ping est mesuré contre le serveur retenu ; l'upload reste sur le serveur SignalQuest (mesure certifiée).")
+                            Text("« Auto » compare Cloudflare et AWS au démarrage et prend le plus rapide. Le ping est mesuré contre le serveur retenu ; l'upload reste sur le serveur SignalQuest (mesure certifiée).")
                                 .font(.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
@@ -555,8 +555,8 @@ struct SpeedtestView: View {
                             get: { downloadTarget },
                             set: { downloadTargetRaw = $0.rawValue }
                         )) {
-                            ForEach(SpeedtestDownloadTarget.allCases) { target in
-                                Text(target == .vpsInternal ? "VPS" : target.displayName).tag(target)
+                            ForEach(SpeedtestDownloadTarget.selectableCases) { target in
+                                Text(target.displayName).tag(target)
                             }
                         }
                         .pickerStyle(.segmented)
@@ -706,7 +706,7 @@ struct SpeedtestView: View {
     }
 
     private var downloadTarget: SpeedtestDownloadTarget {
-        SpeedtestDownloadTarget(rawValue: downloadTargetRaw) ?? .hybridAuto
+        (SpeedtestDownloadTarget(rawValue: downloadTargetRaw) ?? .hybridAuto).migrated
     }
 
     private var runSettings: SpeedtestRunSettings {

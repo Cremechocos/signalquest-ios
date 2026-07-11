@@ -805,11 +805,12 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     }
 
     /// Sélection automatique « hybride » (parité Android `hybrid_auto`) :
-    /// mini-warmup séquentiel sur chaque candidat — on chronomètre la lecture
-    /// des 256 premiers Ko (GET streamé, annulé ensuite ; PAS de Range : R2
+    /// mini-warmup séquentiel sur chaque CDN — on chronomètre la lecture des
+    /// 256 premiers Ko (GET streamé, annulé ensuite ; PAS de Range : R2
     /// l'ignore) avec timeout 2,5 s — le plus rapide gagne. Le ping du test
-    /// suivra la cible retenue (chemin réellement mesuré). Candidat en échec =
-    /// exclu ; si tous échouent, repli VPS (toujours joignable via la session).
+    /// suivra la cible retenue (chemin réellement mesuré). Le VPS n'est PLUS
+    /// candidat (TTFB 2× supérieur) : il ne sert que de repli si les deux CDN
+    /// sont injoignables (il reste toujours joignable via la session).
     private func preflightBestDownloadTarget(
         sessionResponse: SpeedtestSessionResponse
     ) async -> ResolvedDownloadTarget {
@@ -820,7 +821,6 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         if let cloudFront = cdnTarget(.awsCloudFront, sessionResponse: sessionResponse) {
             candidates.append(cloudFront)
         }
-        candidates.append(vpsTarget(sessionResponse: sessionResponse))
 
         var best: (target: ResolvedDownloadTarget, elapsed: TimeInterval)?
         for candidate in candidates {
