@@ -8,7 +8,7 @@ extension AppConfig {
         speedtestBaseURL: URL(string: "https://speedtest.signalquest.test")!,
         speedtestDownloadURL: URL(string: "https://speedtest.signalquest.test/download")!,
         speedtestCloudFrontDownloadURL: URL(string: "https://d2d31ihf1e95ah.cloudfront.net/1000MB.bin")!,
-        speedtestCloudflareDownloadURL: URL(string: "https://dl.signalquest.test/speedtest/5G.bin")!,
+        speedtestCloudflareDownloadURL: URL(string: "https://dl.signalquest.test/speedtest/300MB.bin")!,
         debugLogsEnabled: false
     )
 }

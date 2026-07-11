@@ -121,7 +121,7 @@ struct AppConfig: Equatable {
                 "https://speedtest.staging.invalid",
                 "https://speedtest.staging.invalid/download",
                 "https://cdn.staging.invalid/1000MB.bin",
-                "https://dl.staging.invalid/speedtest/5G.bin"
+                "https://dl.staging.invalid/speedtest/300MB.bin"
             )
         }
         return (
@@ -130,7 +130,7 @@ struct AppConfig: Equatable {
             "https://speedtest.signalquest.fr",
             "https://speedtest.signalquest.fr/download",
             "https://d2d31ihf1e95ah.cloudfront.net/1000MB.bin",
-            "https://dl.signalquest.fr/speedtest/5G.bin"
+            "https://dl.signalquest.fr/speedtest/300MB.bin"
         )
     }
 
