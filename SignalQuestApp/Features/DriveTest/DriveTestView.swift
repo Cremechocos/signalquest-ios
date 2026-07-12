@@ -103,7 +103,8 @@ final class DriveTestViewModel: ObservableObject {
     var antennaDetailOperator: String { displayedOperatorKey ?? "ALL" }
 
     /// Opérateur effectivement affiché : choix manuel sinon auto-résolution.
-    var displayedOperatorKey: String? { manualOperatorOverride ?? resolvedSim?.operatorKey }
+    // Opérateur TOUJOURS automatique (SIM / IP-ASN / marché GPS) — plus de sélecteur manuel.
+    var displayedOperatorKey: String? { resolvedSim?.operatorKey }
 
     /// Libellé court de l'opérateur affiché, ou nil si indéterminé (→ feedback UI).
     var displayedOperatorLabel: String? {
@@ -553,8 +554,8 @@ final class DriveTestViewModel: ObservableObject {
         let market = resolvedSim?.market
             ?? marketEntry.map { $0.marketCode.isEmpty ? $0.code : $0.marketCode }
             ?? MapMarketStore.lastMarket() ?? MapMarketStore.localeMarketCode()
-        // Priorité au choix manuel de l'utilisateur, sinon SIM résolue, sinon "ALL".
-        let op = manualOperatorOverride ?? resolvedSim?.operatorKey ?? "ALL"
+        // Opérateur automatique : SIM résolue (IP/ASN + marché GPS), sinon "ALL".
+        let op = resolvedSim?.operatorKey ?? "ALL"
 
         // Refetch si on a bougé (~400 m) OU si l'opérateur ciblé vient de changer
         // (ex. SIM résolue après un démarrage en WiFi).
@@ -1122,53 +1123,36 @@ struct DriveTestView: View {
         }
     }
 
-    /// Ligne « Opérateur affiché » + sélecteur manuel. Affiche un état explicite
-    /// quand l'opérateur n'est pas détecté (au lieu du fallback silencieux "ALL").
+    /// Opérateur détecté AUTOMATIQUEMENT (SIM / IP-ASN / marché GPS). Affichage seul :
+    /// plus de sélecteur manuel — la couverture est toujours taguée avec l'opérateur réel,
+    /// pour tous les utilisateurs et tous les pays.
     private var operatorRow: some View {
-        Menu {
-            Button { model.selectOperator(nil) } label: {
-                Label("Automatique", systemImage: model.manualOperatorOverride == nil ? "checkmark" : "wand.and.stars")
+        HStack(spacing: SQSpace.sm) {
+            Circle()
+                .fill(model.operatorColor(model.displayedOperatorKey))
+                .frame(width: 10, height: 10)
+                .opacity(model.displayedOperatorKey == nil ? 0 : 1)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(model.displayedOperatorLabel ?? "Opérateur en cours de détection…")
+                    .font(SQFont.body(15, .semibold))
+                    .foregroundStyle(SQColor.label)
+                Text(operatorRowSubtitle)
+                    .font(SQFont.body(11.5))
+                    .foregroundStyle(model.displayedOperatorLabel == nil ? SQColor.warning : SQColor.labelSecondary)
             }
-            if !model.availableOperators.isEmpty { Divider() }
-            ForEach(model.availableOperators) { op in
-                Button { model.selectOperator(op.key) } label: {
-                    Label(op.label, systemImage: model.manualOperatorOverride == op.key ? "checkmark" : "antenna.radiowaves.left.and.right")
-                }
-            }
-        } label: {
-            HStack(spacing: SQSpace.sm) {
-                Circle()
-                    .fill(model.operatorColor(model.displayedOperatorKey))
-                    .frame(width: 10, height: 10)
-                    .opacity(model.displayedOperatorKey == nil ? 0 : 1)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(model.displayedOperatorLabel ?? "Opérateur non identifié")
-                        .font(SQFont.body(15, .semibold))
-                        .foregroundStyle(SQColor.label)
-                    Text(operatorRowSubtitle)
-                        .font(SQFont.body(11.5))
-                        .foregroundStyle(model.displayedOperatorLabel == nil ? SQColor.warning : SQColor.labelSecondary)
-                }
-                Spacer()
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(SQColor.labelTertiary)
-            }
-            .padding(.horizontal, SQSpace.md)
-            .padding(.vertical, SQSpace.xs + 4)
-            .frame(maxWidth: .infinity)
-            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            Spacer()
         }
-        .accessibilityLabel("Opérateur affiché")
-        .accessibilityValue(model.displayedOperatorLabel ?? "non identifié")
-        .accessibilityHint("Touchez deux fois pour choisir l'opérateur dont vous voyez les antennes")
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.xs + 4)
+        .frame(maxWidth: .infinity)
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Opérateur détecté")
+        .accessibilityValue(model.displayedOperatorLabel ?? "en cours de détection")
     }
 
     private var operatorRowSubtitle: String {
-        if model.displayedOperatorLabel != nil {
-            return model.manualOperatorOverride == nil ? "Détecté automatiquement" : "Choisi manuellement · modifier"
-        }
-        return "Touchez pour choisir votre opérateur"
+        model.displayedOperatorLabel != nil ? "Détecté automatiquement" : "Détection en cours…"
     }
 
     /// Palette UIKit par clé d'opérateur (MAJ), pour colorer les marqueurs carte.
