@@ -5,6 +5,14 @@ import ImageIO
 @MainActor
 final class MapExplorerViewModel: ObservableObject {
     @Published var snapshot: SocialMapSnapshot = .empty
+    /// Amis en temps réel (position + présence + radio) alimentés par le SSE
+    /// `/api/social/map/stream`. Tenu à part de `snapshot.friends` pour ne pas
+    /// entrer en course avec les rechargements bornés de `load()` : le flux n'est
+    /// pas géo-borné et fait autorité dès qu'il a répondu.
+    @Published var liveFriends: [SocialFriendLive] = []
+    /// Vrai dès que le flux temps réel a livré au moins un instantané : `load()`
+    /// cesse alors d'amorcer `liveFriends` depuis le snapshot borné.
+    private var friendsFromStream = false
     @Published var antennas: [AntennaSite] = []
     @Published var antennaClusters: [AndroidMapCluster] = []
     @Published var speedtestTiles: [AndroidSpeedtestTileResponse] = []
@@ -405,6 +413,11 @@ final class MapExplorerViewModel: ObservableObject {
                 snapshot = Self.snapshotInjectingQAPhotos(into: snapshot, around: bounds)
                 publicPhotos = Self.demoPublicPhotos(around: bounds)
             }
+            if ProcessInfo.processInfo.arguments.contains("--qa-demo-friends") {
+                liveFriends = Self.demoFriends(around: bounds)
+                publicPhotos = Self.demoPublicPhotos(around: bounds)
+                snapshot = Self.snapshotInjectingQAPhotos(into: snapshot, around: bounds)
+            }
             errorMessage = nil
             dataVersion &+= 1
             return
@@ -475,7 +488,7 @@ final class MapExplorerViewModel: ObservableObject {
         }()
         async let speedtestRaw: [AndroidSpeedtestTileResponse] = {
             guard wantsSpeedtest else { return [] }
-            return (try? await svc.speedtestTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: stDays, bands: bands)) ?? []
+            return (try? await svc.speedtestTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: stDays, bands: bands, maxAge: nil)) ?? []
         }()
         // Prévisionnels & pannes : respectent le filtre opérateur de la carte
         // (l'opérateur sélectionné `op`, ou ALL quand « Tous » est choisi). Le
@@ -490,7 +503,7 @@ final class MapExplorerViewModel: ObservableObject {
         }()
         async let coverageRaw: (tiles: [AndroidCoverageTileResponse], heat: [CoverageHeatPoint]) = {
             guard wantsCoverage else { return ([], []) }
-            let tiles = (try? await svc.coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: covDays, bands: bands)) ?? []
+            let tiles = (try? await svc.coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: covDays, bands: bands, maxAge: nil)) ?? []
             if tiles.isEmpty {
                 let points = (try? await svc.coveragePoints(bounds: bounds, market: market, operatorName: op, technology: techs.sorted().first, bands: bands)) ?? []
                 return ([], points)
@@ -553,6 +566,24 @@ final class MapExplorerViewModel: ObservableObject {
         } else {
             publicPhotos = photos
         }
+        // Amorçage des amis vivants depuis le snapshot borné tant que le flux
+        // temps réel n'a rien livré (fallback si le SSE est indisponible).
+        if !friendsFromStream {
+            liveFriends = snapshot.friends
+        }
+        // QA (DEBUG) : amis de démo pour visualiser/capturer le rendu « Find My ».
+        if ProcessInfo.processInfo.arguments.contains("--qa-demo-friends") {
+            liveFriends = Self.demoFriends(around: bounds)
+        }
+        dataVersion &+= 1
+    }
+
+    /// Applique un instantané du flux temps réel des amis. Fait autorité sur
+    /// l'amorçage borné : `load()` cesse ensuite de réécrire `liveFriends`.
+    func applyLiveFriends(_ friends: [SocialFriendLive]) {
+        friendsFromStream = true
+        guard friends != liveFriends else { return }
+        liveFriends = friends
         dataVersion &+= 1
     }
 
@@ -573,6 +604,43 @@ final class MapExplorerViewModel: ObservableObject {
                 lat: lat + off.0, lng: lon + off.1,
                 thumbnailUrl: URL(string: seed.1), operator: "SFR",
                 authorId: nil, uploadedAt: Date(), isFriend: false
+            )
+        }
+    }
+
+    /// Amis vivants de démonstration (QA) autour du viewport : présence, cap et
+    /// snapshot radio variés pour visualiser/capturer le rendu « Find My » sans
+    /// amis réels partageant leur position.
+    static func demoFriends(around bounds: MapBounds) -> [SocialFriendLive] {
+        // Coordonnées ABSOLUES fixes (Grenoble). En prod les positions viennent du
+        // serveur, stables entre deux relevés d'un ami immobile ; ici on ne les
+        // ancre PAS au centre du viewport (qui micro-varie à chaque `load()` et
+        // recréerait les annotations en boucle, empêchant l'avatar de se rendre).
+        let lat = 45.1885
+        let lon = 5.7245
+        struct Seed {
+            let name: String; let avatar: String?; let status: String
+            let dLat: Double; let dLon: Double; let heading: Double?
+            let tech: String?; let op: String?; let rsrp: Double?
+        }
+        let seeds: [Seed] = [
+            Seed(name: "Camille", avatar: "https://s3.signalquest.fr/photos/thumbnails/615909_1781215890861_thumb.webp", status: "online", dLat: 0.0032, dLon: 0.0021, heading: 40, tech: "5G", op: "Orange", rsrp: -92),
+            Seed(name: "Malik", avatar: "https://s3.signalquest.fr/photos/thumbnails/615909_1781215888538_thumb.webp", status: "online", dLat: -0.0026, dLon: 0.0040, heading: 175, tech: "4G", op: "Free", rsrp: -105),
+            Seed(name: "Léa", avatar: nil, status: "away", dLat: 0.0041, dLon: -0.0030, heading: nil, tech: nil, op: "SFR", rsrp: nil),
+            Seed(name: "Yannick", avatar: "https://s3.signalquest.fr/photos/thumbnails/615909_1781215885580_thumb.webp", status: "dnd", dLat: -0.0040, dLon: -0.0026, heading: 300, tech: "5G", op: "Bouygues", rsrp: -78)
+        ]
+        return seeds.enumerated().map { index, seed in
+            let radio: SocialRadioSnapshot? = (seed.tech != nil || seed.op != nil)
+                ? SocialRadioSnapshot(technology: seed.tech, rsrp: seed.rsrp, rsrq: nil, snr: nil, pci: nil, enb: nil, gnb: nil, cellId: nil, band: seed.tech == "5G" ? 78 : 7, `operator`: seed.op, city: "Grenoble", updatedAt: Date())
+                : nil
+            return SocialFriendLive(
+                id: "demo-friend-\(index)",
+                name: seed.name,
+                avatarUrl: seed.avatar.flatMap { URL(string: $0) },
+                presence: SocialPresence(status: seed.status, customStatus: nil, lastSeenAt: Date(), isOnline: seed.status == "online"),
+                location: SocialLiveLocation(lat: lat + seed.dLat, lng: lon + seed.dLon, accuracy: 30, heading: seed.heading, speed: seed.heading != nil ? 4 : 0, updatedAt: Date()),
+                radio: radio,
+                privacy: nil
             )
         }
     }
@@ -627,6 +695,27 @@ private extension MapBounds {
     }
 }
 
+/// Données riches d'un ami géolocalisé pour le rendu « Find My » (avatar +
+/// anneau de présence + cône de cap + badge techno). Portées par le payload afin
+/// que la `MKAnnotationView` les rende sans dépendre du reste du modèle.
+private struct FriendAnnotationInfo: Equatable {
+    let userId: String
+    let displayName: String
+    let avatarURL: URL?
+    let presence: SocialPresenceStatus
+    /// Cap en degrés (0 = nord), nil si indisponible → aucun cône dessiné.
+    let heading: Double?
+    let speedMps: Double?
+    let accuracyMeters: Double?
+    let technology: String?
+    let operatorName: String?
+    /// Position périmée (> TTL serveur) : marqueur rendu estompé. On NE porte PAS
+    /// `updatedAt` ici : il changerait à chaque relevé et recréerait inutilement
+    /// l'annotation (annulant le chargement async de l'avatar). La fraîcheur exacte
+    /// est lue depuis le `SocialFriendLive` par la fiche.
+    let isStale: Bool
+}
+
 private struct MapAnnotationPayload: Identifiable, Equatable {
     let id: String
     let kind: MapDisplayItem.Kind
@@ -656,6 +745,8 @@ private struct MapAnnotationPayload: Identifiable, Equatable {
     var glyphOverride: String? = nil
     /// Nombre de photos publiques sur le site (antennes) → badge appareil-photo.
     var contributionPhotos: Int = 0
+    /// Données d'un ami vivant (couche Amis) : pilote le rendu « Find My ».
+    var friend: FriendAnnotationInfo? = nil
 
     static func == (lhs: MapAnnotationPayload, rhs: MapAnnotationPayload) -> Bool {
         lhs.id == rhs.id &&
@@ -676,7 +767,8 @@ private struct MapAnnotationPayload: Identifiable, Equatable {
         lhs.thumbnailURL == rhs.thumbnailURL &&
         lhs.plannedStatus == rhs.plannedStatus &&
         lhs.glyphOverride == rhs.glyphOverride &&
-        lhs.contributionPhotos == rhs.contributionPhotos
+        lhs.contributionPhotos == rhs.contributionPhotos &&
+        lhs.friend == rhs.friend
     }
 }
 
@@ -861,6 +953,20 @@ private enum CoverageGenerationBand: String, CaseIterable, Identifiable {
         if t.contains("3G") || t.contains("UMTS") || t.contains("HSPA") || t.contains("WCDMA") { return .g3 }
         if t.contains("2G") || t.contains("GSM") || t.contains("EDGE") || t.contains("GPRS") { return .g2 }
         return .none
+    }
+
+    /// Rang de priorité pour élire la génération dominante d'un lieu
+    /// (5G > 4G > 3G > 2G > aucun). Sert à ne conserver qu'UNE pastille par point
+    /// logique en 5G NSA, où le backend renvoie des frères co-localisés (ancre
+    /// LTE taguée « 4G » + cellule NR taguée « 5G »).
+    var rank: Int {
+        switch self {
+        case .g5: return 5
+        case .g4: return 4
+        case .g3: return 3
+        case .g2: return 2
+        case .none: return 0
+        }
     }
 
     var title: String {
@@ -1081,6 +1187,7 @@ struct MapExplorerView: View {
     @State private var selectedPhoto: MapPhotoTarget?
     @State private var selectedOutage: OutageSiteLive?
     @State private var selectedPlanned: PlannedSiteLive?
+    @State private var selectedFriend: SocialFriendLive?
     @State private var fetchTask: Task<Void, Never>?
     @State private var lastRegion: MKCoordinateRegion
     @State private var showFilterSheet = false
@@ -1116,6 +1223,11 @@ struct MapExplorerView: View {
         }
         .sheet(item: $selectedPlanned) { site in
             PlannedDetailSheet(site: site, operatorLabel: model.operatorLabel(site.operator ?? "ALL"), operatorAccent: model.operatorAccent(site.operator ?? "ALL"))
+        }
+        .sheet(item: $selectedFriend) { friend in
+            FriendLiveSheet(friend: friend, userLocation: services.location.lastLocation)
+                .presentationDetents([.medium, .large])
+                .presentationBackgroundCompat(SQColor.bg)
         }
         .sheet(item: $selectedAntenna) { site in
             AntennaDetailSheet(site: site, market: model.marketFilter, operatorName: model.operatorFilter, service: services.antennas)
@@ -1153,6 +1265,9 @@ struct MapExplorerView: View {
             if ProcessInfo.processInfo.arguments.contains("--qa-demo-photos") {
                 filters = [.photo]
             }
+            if ProcessInfo.processInfo.arguments.contains("--qa-demo-friends") {
+                filters = [.friend, .photo, .antenna]
+            }
             await model.loadRegistry()
             // Sélection auto du marché + opérateur (SIM/GPS/locale) AVANT le 1er
             // chargement : évite le flash « France/SFR puis Canada/Bell ».
@@ -1166,6 +1281,17 @@ struct MapExplorerView: View {
                 let region = region(forMarketCode: model.marketFilter)
                 mapCenter = region.center
                 mapZoom = Self.zoom(forSpan: region)
+                lastRegion = region
+            }
+            // QA (DEBUG) : cadre ville pour visualiser les marqueurs amis individuels
+            // (avatars, cônes de cap, présence) plutôt qu'un cluster continental.
+            if ProcessInfo.processInfo.arguments.contains("--qa-demo-friends") {
+                let region = MKCoordinateRegion(
+                    center: CLLocationCoordinate2D(latitude: 45.188, longitude: 5.724),
+                    latitudinalMeters: 2200, longitudinalMeters: 2200
+                )
+                mapCenter = region.center
+                mapZoom = 14.5
                 lastRegion = region
             }
             await model.load(region: lastRegion, zoom: mapZoom, filters: filters)
@@ -1190,8 +1316,58 @@ struct MapExplorerView: View {
                     try? await Task.sleep(for: .milliseconds(500))
                 }
             }
+            // QA (DEBUG) : ouvre la fiche du premier ami vivant géolocalisé.
+            if ProcessInfo.processInfo.arguments.contains("--qa-open-friend") {
+                for _ in 0..<16 {
+                    if let first = model.liveFriends.first(where: { $0.location != nil }) {
+                        selectedFriend = first
+                        break
+                    }
+                    try? await Task.sleep(for: .milliseconds(500))
+                }
+            }
+            // QA (DEBUG) : fait « marcher » les amis démo pour visualiser le
+            // déplacement animé du marqueur (mise à jour périodique de la position).
+            if ProcessInfo.processInfo.arguments.contains("--qa-friends-walk") {
+                Task { @MainActor [model] in
+                    var friends = MapExplorerViewModel.demoFriends(around: MapBounds(north: 0, south: 0, east: 0, west: 0))
+                    for _ in 0..<12 {
+                        // ~4 s entre deux fixes (cadence réaliste « observé ») → le
+                        // marqueur glisse en continu sur tout l'intervalle.
+                        try? await Task.sleep(for: .milliseconds(4000))
+                        friends = friends.map { f in
+                            guard let loc = f.location else { return f }
+                            return SocialFriendLive(
+                                id: f.id, name: f.name, avatarUrl: f.avatarUrl, presence: f.presence,
+                                location: SocialLiveLocation(lat: loc.lat + 0.0011, lng: loc.lng + 0.0006,
+                                                             accuracy: loc.accuracy, heading: 55, speed: 7, updatedAt: Date()),
+                                radio: f.radio, privacy: f.privacy
+                            )
+                        }
+                        model.applyLiveFriends(friends)
+                    }
+                }
+            }
             // Notification/deep link antenne reçu avant l'apparition de la carte.
             openSiteFromRouterIfNeeded()
+        }
+        // Couche « Amis » active : publie ma présence/position (selon le toggle de
+        // confidentialité + le mode) et consomme le flux temps réel des amis. Le
+        // `.task(id:)` redémarre quand on active/désactive le calque ; il est
+        // annulé (donc le flux se ferme) à la disparition de la carte.
+        .task(id: filters.contains(.friend)) {
+            guard filters.contains(.friend) else {
+                services.livePresence.mapDidDisappear()
+                return
+            }
+            services.livePresence.mapDidAppear()
+            await services.livePresence.refreshSharingSettings()
+            for await friends in services.map.friendsStream(sse: services.sse) {
+                model.applyLiveFriends(friends)
+            }
+        }
+        .onDisappear {
+            services.livePresence.mapDidDisappear()
         }
         .onChangeCompat(of: filters) { _, newValue in
             // Mémorise les couches localement (restaurées au prochain affichage / relance).
@@ -1789,6 +1965,7 @@ struct MapExplorerView: View {
                 showsAzimuths: false
             )
         }
+        payloads += friendPayloads
         if filters.contains(.antenna) {
             payloads += model.antennaClusters.map { cluster in
                 MapAnnotationPayload(
@@ -2143,6 +2320,39 @@ struct MapExplorerView: View {
         }
     }
 
+    private func coverageFeature(from point: AndroidCoveragePoint) -> CoverageHeatFeature {
+        let parts = coverageColorParts(rsrp: point.rsrp, tech: point.tech)
+        return CoverageHeatFeature(
+            id: "coverage-heat-\(point.id)",
+            coordinate: CLLocationCoordinate2D(latitude: point.lat, longitude: point.lng),
+            weight: coverageHeatWeight(rsrp: point.rsrp),
+            colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed
+        )
+    }
+
+    /// 5G NSA : le backend renvoie, pour une même mesure, des points frères co-localisés
+    /// (ancre LTE taguée « 4G » + cellule NR taguée « 5G ») partageant un `groupId`. Sans
+    /// arbitrage, la pastille 4G (opaque, RSRP réel) recouvre la 5G (souvent sans RSRP).
+    /// On réduit chaque groupe à son point de génération la plus élevée (5G > 4G > 3G > 2G),
+    /// en conservant l'ordre d'apparition. Les points sans `groupId` restent distincts.
+    private static func dominantGenerationPoints<S: Sequence>(_ points: S) -> [AndroidCoveragePoint]
+    where S.Element == AndroidCoveragePoint {
+        var indexByGroup: [String: Int] = [:]
+        var result: [AndroidCoveragePoint] = []
+        for point in points {
+            let key = point.groupId ?? point.id
+            if let index = indexByGroup[key] {
+                if CoverageGenerationBand.band(for: point.tech).rank > CoverageGenerationBand.band(for: result[index].tech).rank {
+                    result[index] = point
+                }
+            } else {
+                indexByGroup[key] = result.count
+                result.append(point)
+            }
+        }
+        return result
+    }
+
     private var coverageHeatFeatures: [CoverageHeatFeature] {
         guard filters.contains(.coverage) else { return [] }
         // La couverture n'a de sens que pour UN opérateur donné (superposer tous les
@@ -2155,7 +2365,11 @@ struct MapExplorerView: View {
                 hasPoints: !tile.points.isEmpty, hasClusters: !tile.clusters.isEmpty, hasBandFilter: hasBandFilter
             )
             if render.useClusters {
-                features += tile.clusters.map { cluster in
+                // Couche SIGNAL : on exclut les clusters de couverture iOS « génération seule »
+                // (source == "ios", sans RSRP), comme pour les points bruts. La couche
+                // génération les conserve.
+                let clusters = coverageByGeneration ? tile.clusters : tile.clusters.filter { $0.source != "ios" }
+                features += clusters.map { cluster in
                     // Clusters (région/pays) : génération dominante (`cluster.tech`) en mode génération.
                     let parts = coverageColorParts(rsrp: cluster.avgRsrp, tech: cluster.tech)
                     return CoverageHeatFeature(
@@ -2167,21 +2381,31 @@ struct MapExplorerView: View {
                 }
             }
             if render.useRawPoints {
-                // Tous les points bruts (cap élevé unifié) — le rendu MKOverlay les tient.
-                features += tile.points.lazy.filter { matchesSelectedBand($0.band) }.prefix(CoverageRenderPolicy.pointCapPerTile).map { point in
-                    let parts = coverageColorParts(rsrp: point.rsrp, tech: point.tech)
-                    return CoverageHeatFeature(
-                        id: "coverage-heat-\(point.id)",
-                        coordinate: CLLocationCoordinate2D(latitude: point.lat, longitude: point.lng),
-                        weight: coverageHeatWeight(rsrp: point.rsrp),
-                        colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed
-                    )
+                // En 5G NSA, le backend éclate une mesure en points frères co-localisés
+                // (ancre LTE taguée « 4G » + cellule NR taguée « 5G ») partageant un
+                // `groupId`. En mode génération on ne garde qu'UNE pastille par groupe — la
+                // génération la plus élevée — sinon la 4G (opaque) recouvre la 5G (parité
+                // carte Android). En mode RSRP on garde tous les points (chacun porte son
+                // signal propre) et la séquence reste paresseuse (rien de matérialisé).
+                let filtered = tile.points.lazy.filter { matchesSelectedBand($0.band) }
+                let cap = CoverageRenderPolicy.pointCapPerTile
+                if coverageByGeneration {
+                    features += Self.dominantGenerationPoints(filtered).prefix(cap).map { coverageFeature(from: $0) }
+                } else {
+                    // Couche SIGNAL (RSRP) : on exclut la couverture iOS « génération seule »
+                    // (source == "ios", aucun RSRP) — elle n'a de sens que sur la couche
+                    // génération. Filtrage par SOURCE et non par rsrp==nil, pour ne pas
+                    // masquer les vraies zones blanches Android (RSRP absent mais réel).
+                    features += filtered.filter { $0.source != "ios" }.prefix(cap).map { coverageFeature(from: $0) }
                 }
             }
         }
         if features.isEmpty {
             features = model.coverageHeat.lazy.filter { point in
-                matchesSelectedBand(point.band) || matchesSelectedBands(in: [point.frequency, point.technology, point.networkType].compactMap { $0 })
+                // Couche SIGNAL : exclure la couverture iOS génération-seule (source == "ios",
+                // sans RSRP) ; la couche génération les conserve. Parité tuiles/points.
+                guard coverageByGeneration || point.source != "ios" else { return false }
+                return matchesSelectedBand(point.band) || matchesSelectedBands(in: [point.frequency, point.technology, point.networkType].compactMap { $0 })
             }.prefix(CoverageRenderPolicy.fallbackCap).map { point in
                 let parts = coverageColorParts(rsrp: point.signalStrength, tech: point.technology ?? point.networkType)
                 return CoverageHeatFeature(
@@ -2379,10 +2603,51 @@ struct MapExplorerView: View {
         //  · speedtests → couche dense `speedtestFeatures` (tout afficher, sans cluster)
         //  · couverture → couche dense (dots RSRP type nPerf)
         //  · prévisionnels/pannes → `plannedPayloads`/`outagePayloads` (statut + couleur)
-        // Ne reste ici que le social du snapshot (amis / validations / sessions).
-        let socialFilters = filters.subtracting([.speedtest, .coverage, .antenna, .photo, .planned, .outage])
+        // Ne restent ici que validations / sessions du snapshot. Les amis passent
+        // par `friendPayloads` (rendu « Find My » riche, alimenté par le flux live).
+        let socialFilters = filters.subtracting([.speedtest, .coverage, .antenna, .photo, .planned, .outage, .friend])
         let items = model.snapshot.displayItems(include: socialFilters)
         return items.filter(matches(filterItem:))
+    }
+
+    /// Amis géolocalisés de la couche « Amis », rendus en marqueur avatar « Find
+    /// My » (avatar + anneau de présence + cône de cap + badge). Alimentés par le
+    /// flux temps réel (`model.liveFriends`), pas par le snapshot borné.
+    private var friendPayloads: [MapAnnotationPayload] {
+        guard filters.contains(.friend) else { return [] }
+        return model.liveFriends.compactMap { friend in
+            guard let location = friend.location else { return nil }
+            let info = FriendAnnotationInfo(
+                userId: friend.id,
+                displayName: friend.name ?? "Ami",
+                avatarURL: friend.avatarUrl,
+                presence: friend.presenceStatus,
+                heading: location.heading.flatMap { $0 >= 0 ? $0 : nil },
+                speedMps: location.speed.flatMap { $0 >= 0 ? $0 : nil },
+                accuracyMeters: location.accuracy.flatMap { $0 > 0 ? $0 : nil },
+                technology: friend.radio?.technology,
+                operatorName: friend.radio?.operator,
+                isStale: friend.hasStaleLocation()
+            )
+            let subtitle = friend.radio?.technology
+                ?? friend.presence?.customStatus
+                ?? friend.presenceStatus.label
+            return MapAnnotationPayload(
+                id: "friend-\(friend.id)",
+                kind: .friend,
+                title: friend.name ?? "Ami",
+                subtitle: subtitle,
+                coordinate: CLLocationCoordinate2D(latitude: location.lat, longitude: location.lng),
+                metric: friend.radio?.operator,
+                backendId: friend.id,
+                details: nil,
+                antennaId: nil,
+                clusterCount: nil,
+                azimuths: [],
+                showsAzimuths: false,
+                friend: info
+            )
+        }
     }
 
     /// Le filtrage opérateur/techno est désormais SERVEUR (paramètre `operator`
@@ -2428,6 +2693,12 @@ struct MapExplorerView: View {
                 selectedPlanned = site
                 return
             }
+        }
+        // Ami vivant : fiche riche (présence, radio, distance, raccourcis message/profil).
+        if annotation.kind == .friend, let friendId = annotation.backendId,
+           let friend = model.liveFriends.first(where: { $0.id == friendId }) {
+            selectedFriend = friend
+            return
         }
         selectedItem = MapDisplayItem(
             id: annotation.id,
@@ -2956,11 +3227,15 @@ private struct MapAdvancedFilterSheet: View {
 
 /// Annotation MapKit portant le payload (pour le dispatch tap → fiche).
 private final class SQMapKitAnnotation: NSObject, MKAnnotation {
-    let payload: MapAnnotationPayload
-    let coordinate: CLLocationCoordinate2D
+    var payload: MapAnnotationPayload
+    /// `@objc dynamic` → MapKit observe (KVO) les changements de position et anime
+    /// le déplacement de la vue lorsqu'on modifie `coordinate` dans un
+    /// `UIView.animate`. Sert au déplacement fluide des amis vivants.
+    @objc dynamic var coordinate: CLLocationCoordinate2D
     init(payload: MapAnnotationPayload) {
         self.payload = payload
         self.coordinate = payload.coordinate
+        super.init()
     }
 }
 
@@ -3039,6 +3314,246 @@ private final class SQMapKitMarkerView: MKAnnotationView {
     }
 }
 
+/// Étiquette compacte avec marges internes (badge techno du marqueur ami).
+private final class SQInsetLabel: UILabel {
+    var insets = UIEdgeInsets(top: 2, left: 6, bottom: 2, right: 6)
+    override func drawText(in rect: CGRect) { super.drawText(in: rect.inset(by: insets)) }
+    override var intrinsicContentSize: CGSize {
+        let base = super.intrinsicContentSize
+        return CGSize(width: base.width + insets.left + insets.right,
+                      height: base.height + insets.top + insets.bottom)
+    }
+}
+
+/// Marqueur d'un ami vivant, façon « Find My » : photo de profil circulaire,
+/// halo coloré par la présence (olive = en ligne, ambre = absent, danger = ne pas
+/// déranger, gris = hors ligne), cône de cap (heading — qu'Android ne rend pas) et
+/// badge technologie. Position périmée → marqueur estompé. Style « Crème & Terre
+/// cuite » : bord crème épais + ombre chaude.
+private final class SQFriendMarkerView: MKAnnotationView {
+    static let reuseID = "sq-friend-marker"
+    private let coneLayer = CAShapeLayer()
+    private let halo = UIView()
+    private let avatarView = UIImageView()
+    private let initials = UILabel()
+    private let techBadge = SQInsetLabel()
+    private var imageTask: Task<Void, Never>?
+    private var currentAvatarURL: URL?
+
+    private let markerSize: CGFloat = 56
+    private let avatarSize: CGFloat = 42
+    private let haloSize: CGFloat = 50
+
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        backgroundColor = .clear
+        // L'ancre géographique reste au centre de l'avatar : le badge déborde
+        // sous le frame sans le décaler.
+        frame = CGRect(x: 0, y: 0, width: markerSize, height: markerSize)
+        clipsToBounds = false
+        let center = CGPoint(x: markerSize / 2, y: markerSize / 2)
+
+        // Cône de cap, dessiné derrière l'avatar (rayon > halo), pointant au nord
+        // par défaut ; orienté ensuite par le heading via une rotation de layer.
+        let coneRadius: CGFloat = 30
+        let coneHalf: CGFloat = 34 * .pi / 180
+        let conePath = UIBezierPath()
+        conePath.move(to: center)
+        conePath.addArc(withCenter: center, radius: coneRadius,
+                        startAngle: -.pi / 2 - coneHalf, endAngle: -.pi / 2 + coneHalf,
+                        clockwise: true)
+        conePath.close()
+        coneLayer.path = conePath.cgPath
+        coneLayer.fillColor = UIColor.clear.cgColor
+        coneLayer.isHidden = true
+        layer.addSublayer(coneLayer)
+
+        halo.frame = CGRect(x: center.x - haloSize / 2, y: center.y - haloSize / 2, width: haloSize, height: haloSize)
+        halo.layer.cornerRadius = haloSize / 2
+        halo.layer.shadowColor = UIColor.black.cgColor
+        halo.layer.shadowOpacity = 0.22
+        halo.layer.shadowRadius = 5
+        halo.layer.shadowOffset = CGSize(width: 0, height: 3)
+        addSubview(halo)
+
+        avatarView.frame = CGRect(x: center.x - avatarSize / 2, y: center.y - avatarSize / 2, width: avatarSize, height: avatarSize)
+        avatarView.layer.cornerRadius = avatarSize / 2
+        avatarView.clipsToBounds = true
+        avatarView.contentMode = .scaleAspectFill
+        avatarView.layer.borderColor = UIColor(SQColor.onAccent).cgColor
+        avatarView.layer.borderWidth = 2.5
+        avatarView.backgroundColor = UIColor(SQColor.brandRed)
+        addSubview(avatarView)
+
+        initials.frame = avatarView.bounds
+        initials.textAlignment = .center
+        initials.textColor = UIColor(SQColor.onAccent)
+        initials.font = .systemFont(ofSize: 16, weight: .semibold)
+        avatarView.addSubview(initials)
+
+        techBadge.font = .systemFont(ofSize: 9, weight: .bold)
+        techBadge.textColor = UIColor(SQColor.label)
+        techBadge.backgroundColor = UIColor(SQColor.surface)
+        techBadge.layer.cornerRadius = 7
+        techBadge.clipsToBounds = true
+        techBadge.layer.borderColor = UIColor(SQColor.onAccent).withAlphaComponent(0.6).cgColor
+        techBadge.layer.borderWidth = 1
+        techBadge.isHidden = true
+        addSubview(techBadge)
+    }
+    required init?(coder: NSCoder) { nil }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        imageTask?.cancel()
+        imageTask = nil
+        currentAvatarURL = nil
+        avatarView.image = nil
+        initials.isHidden = false
+    }
+
+    func apply(_ info: FriendAnnotationInfo, displayScale: CGFloat) {
+        let presence = Self.presenceColor(info.presence)
+        halo.backgroundColor = presence
+
+        if let heading = info.heading {
+            coneLayer.isHidden = false
+            coneLayer.fillColor = presence.withAlphaComponent(0.30).cgColor
+            coneLayer.setAffineTransform(CGAffineTransform(rotationAngle: CGFloat(heading) * .pi / 180))
+        } else {
+            coneLayer.isHidden = true
+        }
+
+        if let tech = info.technology?.trimmingCharacters(in: .whitespaces), !tech.isEmpty {
+            techBadge.isHidden = false
+            techBadge.text = tech.uppercased()
+            techBadge.sizeToFit()
+            let size = techBadge.intrinsicContentSize
+            techBadge.frame = CGRect(x: (markerSize - size.width) / 2, y: markerSize - 6, width: size.width, height: size.height)
+        } else {
+            techBadge.isHidden = true
+        }
+
+        alpha = info.isStale ? 0.55 : 1.0
+
+        initials.text = String(info.displayName.prefix(1)).uppercased()
+        guard info.avatarURL != currentAvatarURL else { return }
+        currentAvatarURL = info.avatarURL
+        imageTask?.cancel()
+        guard let url = info.avatarURL else {
+            avatarView.image = nil
+            initials.isHidden = false
+            return
+        }
+        let maxPixel = avatarSize * displayScale
+        // Cache chaud → affichage SYNCHRONE : les marqueurs sont recréés plus vite
+        // qu'un chargement asynchrone n'aboutit, si bien que l'image se posait sur
+        // une vue déjà remplacée et n'apparaissait jamais. Dès que le cache mémoire
+        // est rempli (après le 1er téléchargement), chaque recréation ré-affiche
+        // l'avatar instantanément.
+        if let cached = ImagePipeline.shared.cachedImage(for: url, maxPixel: maxPixel) {
+            avatarView.image = cached
+            initials.isHidden = true
+            return
+        }
+        avatarView.image = nil
+        initials.isHidden = false
+        imageTask = Task { @MainActor [weak self] in
+            let image = try? await ImagePipeline.shared.image(for: url, maxPixel: maxPixel)
+            guard let self, !Task.isCancelled, self.currentAvatarURL == url, let image else { return }
+            self.avatarView.image = image
+            self.initials.isHidden = true
+        }
+    }
+
+    /// Couleur de présence, alignée sur les tokens DA (olive/ambre/danger/gris).
+    private static func presenceColor(_ status: SocialPresenceStatus) -> UIColor {
+        switch status {
+        case .online: return UIColor(SQColor.success)
+        case .away: return UIColor(SQColor.warning)
+        case .dnd: return UIColor(SQColor.danger)
+        case .offline, .invisible: return UIColor(SQColor.labelTertiary)
+        }
+    }
+}
+
+/// Marqueur photo « polaroïd » : la vignette géolocalisée est rendue directement
+/// sur la carte dans un cadre crème arrondi (marge basse épaissie façon polaroïd)
+/// plutôt qu'en pastille appareil-photo. Chargement async + downsampling via
+/// `ImagePipeline`. Les CLUSTERS de photos gardent la pastille numérotée.
+private final class SQPhotoMarkerView: MKAnnotationView {
+    static let reuseID = "sq-photo-marker"
+    private let card = UIView()
+    private let photo = UIImageView()
+    private let placeholder = UIImageView()
+    private var imageTask: Task<Void, Never>?
+    private var currentURL: URL?
+
+    private let cardWidth: CGFloat = 52
+    private let cardHeight: CGFloat = 60
+    private let inset: CGFloat = 4
+
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        backgroundColor = .clear
+        frame = CGRect(x: 0, y: 0, width: cardWidth, height: cardHeight)
+        clipsToBounds = false
+
+        card.frame = bounds
+        card.backgroundColor = UIColor(SQColor.surface)
+        card.layer.cornerRadius = 12
+        card.layer.cornerCurve = .continuous
+        card.layer.shadowColor = UIColor.black.cgColor
+        card.layer.shadowOpacity = 0.22
+        card.layer.shadowRadius = 5
+        card.layer.shadowOffset = CGSize(width: 0, height: 3)
+        addSubview(card)
+
+        let side = cardWidth - inset * 2
+        let imageRect = CGRect(x: inset, y: inset, width: side, height: side)
+        photo.frame = imageRect
+        photo.layer.cornerRadius = 8
+        photo.layer.cornerCurve = .continuous
+        photo.clipsToBounds = true
+        photo.contentMode = .scaleAspectFill
+        photo.backgroundColor = UIColor(SQColor.surfaceMuted)
+        card.addSubview(photo)
+
+        placeholder.frame = imageRect
+        placeholder.contentMode = .center
+        placeholder.tintColor = UIColor(SQColor.labelTertiary)
+        placeholder.image = UIImage(systemName: "camera.fill")?
+            .withConfiguration(UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold))
+        card.addSubview(placeholder)
+    }
+    required init?(coder: NSCoder) { nil }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        imageTask?.cancel()
+        imageTask = nil
+        currentURL = nil
+        photo.image = nil
+        placeholder.isHidden = false
+    }
+
+    func apply(url: URL?, displayScale: CGFloat) {
+        guard url != currentURL else { return }
+        currentURL = url
+        photo.image = nil
+        placeholder.isHidden = false
+        imageTask?.cancel()
+        guard let url else { return }
+        let maxPixel = (cardWidth - inset * 2) * displayScale
+        imageTask = Task { @MainActor [weak self] in
+            let image = try? await ImagePipeline.shared.image(for: url, maxPixel: maxPixel)
+            guard let self, !Task.isCancelled, self.currentURL == url, let image else { return }
+            self.photo.image = image
+            self.placeholder.isHidden = true
+        }
+    }
+}
+
 /// Overlay « nuage de points » dense (couverture / speedtests) dessiné en une passe
 /// Core Graphics avec culling viewport — tient des milliers de points (pattern repris
 /// de SessionTraceMapView, le moteur de « Mes mesures »).
@@ -3108,6 +3623,8 @@ private struct MapKitMapView: UIViewRepresentable {
         map.showsCompass = true
         context.coordinator.applyBackdrop(backdrop, on: map)
         map.register(SQMapKitMarkerView.self, forAnnotationViewWithReuseIdentifier: SQMapKitMarkerView.reuseID)
+        map.register(SQFriendMarkerView.self, forAnnotationViewWithReuseIdentifier: SQFriendMarkerView.reuseID)
+        map.register(SQPhotoMarkerView.self, forAnnotationViewWithReuseIdentifier: SQPhotoMarkerView.reuseID)
         // Tap pour les points speedtest (overlay non-tappable nativement) → hit-test.
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSpeedtestTap(_:)))
         tap.delegate = context.coordinator
@@ -3142,6 +3659,9 @@ private struct MapKitMapView: UIViewRepresentable {
         private let onSelect: (MapAnnotationPayload) -> Void
         private var annotationsById: [String: SQMapKitAnnotation] = [:]
         private var payloadsById: [String: MapAnnotationPayload] = [:]
+        /// Horodatage du dernier déplacement reçu par ami : sert à caler la durée
+        /// du glissement sur l'intervalle réel entre deux positions.
+        private var lastFriendMoveAt: [String: Date] = [:]
         var lastAppliedCenter: CLLocationCoordinate2D?
         var lastAppliedZoom: Double?
         private var latestCoverageFeatures: [CoverageHeatFeature] = []
@@ -3181,10 +3701,26 @@ private struct MapKitMapView: UIViewRepresentable {
             for p in payloads { incoming[p.id] = p }
 
             var toRemove: [SQMapKitAnnotation] = []
-            for (id, ann) in annotationsById where incoming[id] == nil || incoming[id] != payloadsById[id] {
-                toRemove.append(ann)
-                annotationsById[id] = nil
-                payloadsById[id] = nil
+            for (id, ann) in annotationsById {
+                guard let newPayload = incoming[id] else {
+                    toRemove.append(ann)
+                    annotationsById[id] = nil
+                    payloadsById[id] = nil
+                    lastFriendMoveAt[id] = nil
+                    continue
+                }
+                guard newPayload != payloadsById[id] else { continue }
+                // Un ami qui a bougé/changé est mis à jour EN PLACE : déplacement
+                // animé + avatar conservé (pas de recréation, donc pas de
+                // clignotement). Les autres types sont retirés puis rajoutés.
+                if newPayload.kind == .friend, ann.payload.kind == .friend {
+                    updateFriendInPlace(ann, to: newPayload, on: map)
+                    payloadsById[id] = newPayload
+                } else {
+                    toRemove.append(ann)
+                    annotationsById[id] = nil
+                    payloadsById[id] = nil
+                }
             }
             if !toRemove.isEmpty { map.removeAnnotations(toRemove) }
 
@@ -3196,6 +3732,37 @@ private struct MapKitMapView: UIViewRepresentable {
                 toAdd.append(ann)
             }
             if !toAdd.isEmpty { map.addAnnotations(toAdd) }
+        }
+
+        /// Met à jour un ami existant sans recréer l'annotation : ré-applique ses
+        /// infos (présence, avatar, badge) à la vue visible et anime le déplacement
+        /// de sa position — MapKit interpole la vue via KVO sur `coordinate`.
+        /// Respecte Reduce Motion.
+        private func updateFriendInPlace(_ ann: SQMapKitAnnotation, to payload: MapAnnotationPayload, on map: MKMapView) {
+            ann.payload = payload
+            if let view = map.view(for: ann) as? SQFriendMarkerView, let info = payload.friend {
+                view.apply(info, displayScale: max(map.traitCollection.displayScale, 2))
+            }
+            let moved = ann.coordinate.latitude != payload.coordinate.latitude
+                || ann.coordinate.longitude != payload.coordinate.longitude
+            guard moved else { return }
+            if UIAccessibility.isReduceMotionEnabled {
+                ann.coordinate = payload.coordinate
+                return
+            }
+            // Glissement CONTINU façon Localiser : on étale l'animation sur la durée
+            // réelle écoulée depuis le dernier fix de cet ami (bornée), en courbe
+            // LINÉAIRE, pour que le marqueur avance sans à-coups d'une position à la
+            // suivante plutôt qu'un saut bref suivi d'un temps mort. `.beginFromCurrentState`
+            // reprend en douceur si un nouveau fix arrive avant la fin.
+            let now = Date()
+            let elapsed = lastFriendMoveAt[payload.id].map { now.timeIntervalSince($0) } ?? 4
+            lastFriendMoveAt[payload.id] = now
+            let duration = min(max(elapsed, 1), 8)
+            UIView.animate(withDuration: duration, delay: 0,
+                           options: [.curveLinear, .allowUserInteraction, .beginFromCurrentState]) {
+                ann.coordinate = payload.coordinate
+            }
         }
 
         // MARK: Couches denses (couverture + speedtests) — overlay Core Graphics
@@ -3385,6 +3952,24 @@ private struct MapKitMapView: UIViewRepresentable {
 
         func mapView(_ map: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
             guard let sq = annotation as? SQMapKitAnnotation else { return nil } // position utilisateur → défaut
+            // Ami vivant : marqueur « Find My » dédié (avatar + halo + cône de cap).
+            if sq.payload.kind == .friend, let info = sq.payload.friend {
+                let view = map.dequeueReusableAnnotationView(withIdentifier: SQFriendMarkerView.reuseID, for: annotation) as? SQFriendMarkerView
+                    ?? SQFriendMarkerView(annotation: annotation, reuseIdentifier: SQFriendMarkerView.reuseID)
+                view.annotation = annotation
+                view.canShowCallout = false
+                view.apply(info, displayScale: max(map.traitCollection.displayScale, 2))
+                return view
+            }
+            // Photo géolocalisée (hors cluster) : vignette « polaroïd » sur la carte.
+            if sq.payload.kind == .photo, sq.payload.clusterCount == nil, let thumbnail = sq.payload.thumbnailURL {
+                let view = map.dequeueReusableAnnotationView(withIdentifier: SQPhotoMarkerView.reuseID, for: annotation) as? SQPhotoMarkerView
+                    ?? SQPhotoMarkerView(annotation: annotation, reuseIdentifier: SQPhotoMarkerView.reuseID)
+                view.annotation = annotation
+                view.canShowCallout = false
+                view.apply(url: thumbnail, displayScale: max(map.traitCollection.displayScale, 2))
+                return view
+            }
             let view = map.dequeueReusableAnnotationView(withIdentifier: SQMapKitMarkerView.reuseID, for: annotation) as? SQMapKitMarkerView
                 ?? SQMapKitMarkerView(annotation: annotation, reuseIdentifier: SQMapKitMarkerView.reuseID)
             view.annotation = annotation

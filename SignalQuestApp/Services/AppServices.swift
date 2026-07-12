@@ -15,6 +15,8 @@ final class AppServices: ObservableObject {
     let anfr: ANFRServicing
     let speedtest: SpeedtestService
     let networkOperator: NetworkOperatorServicing
+    /// Verdict de qualité réseau communautaire (opérateur SIM) — pastille d'accueil.
+    let nearbyQuality: NearbyNetworkQualityServicing
     let photos: PhotoServicing
     let messages: MessagesServicing
     let leaderboards: LeaderboardServicing
@@ -35,6 +37,8 @@ final class AppServices: ObservableObject {
     let sse: SSEClient
     let location = LocationService()
     let networkPath = NetworkPathMonitor()
+    /// Émetteur de la position/présence live pour la carte des amis.
+    let livePresence: LivePresenceService
 
     /// Nombre de conversations non lues — alimente le badge de l'onglet Messages.
     @Published var unreadConversations = 0
@@ -53,14 +57,18 @@ final class AppServices: ObservableObject {
         comments = CommentsService(api: api)
         stories = StoriesService(api: api)
         reports = ReportsService(api: api)
-        privacy = PrivacyService(api: api)
-        map = MapSnapshotService(api: api)
+        let privacyService = PrivacyService(api: api)
+        privacy = privacyService
+        livePresence = LivePresenceService(api: api, location: location, networkPath: networkPath, privacy: privacyService)
+        let mapService = MapSnapshotService(api: api)
+        map = mapService
         let marketsService = MarketRegistryService(api: api)
         markets = marketsService
         antennas = AntennasService(api: api)
         anfr = ANFRService(api: api)
         let networkOperatorService = NetworkOperatorService(api: api)
         networkOperator = networkOperatorService
+        nearbyQuality = NearbyNetworkQualityService(map: mapService, markets: marketsService, networkOperator: networkOperatorService)
         speedtest = SpeedtestService(api: api, markets: marketsService, networkOperator: networkOperatorService)
         photos = PhotoService(api: api)
         messages = MessagesService(api: api)

@@ -28,6 +28,13 @@ final class ImagePipeline: @unchecked Sendable {
         memory.totalCostLimit = 64 * 1024 * 1024
     }
 
+    /// Image déjà décodée en cache mémoire, le cas échéant (accès synchrone). Permet
+    /// aux vues recyclées fréquemment (marqueurs carte) d'afficher immédiatement sans
+    /// repasser par une tâche asynchrone annulable.
+    func cachedImage(for url: URL, maxPixel: CGFloat) -> UIImage? {
+        memory.object(forKey: "\(url.absoluteString)|\(Int(maxPixel))" as NSString)
+    }
+
     /// Image décodée et redimensionnée à `maxPixel` (plus grand côté, en pixels).
     func image(for url: URL, maxPixel: CGFloat) async throws -> UIImage {
         let key = "\(url.absoluteString)|\(Int(maxPixel))" as NSString

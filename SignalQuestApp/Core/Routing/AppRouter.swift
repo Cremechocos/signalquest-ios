@@ -35,6 +35,7 @@ final class AppRouter: ObservableObject {
             selectedTab = .speed
         } else if AppEnvironment.startsOnMap
                     || args.contains("--qa-demo-photos")
+                    || args.contains("--qa-demo-friends")
                     || args.contains("--qa-map-layers")
                     || args.contains("--qa-open-antenna") {
             selectedTab = .map

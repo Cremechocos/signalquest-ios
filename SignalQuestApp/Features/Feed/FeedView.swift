@@ -33,7 +33,7 @@ final class FeedViewModel: ObservableObject {
         guard authorized || location.lastLocation != nil else { return }
         guard let coordinate = await location.currentLocation()?.coordinate else { return }
         do {
-            let result = try await service.networkPulse(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            let result = try await service.networkPulse(latitude: coordinate.latitude, longitude: coordinate.longitude, radiusMeters: nil)
             pulse = result.hasData ? result : nil
         } catch {
             // Silencieux : le héro n'est simplement pas affiché.

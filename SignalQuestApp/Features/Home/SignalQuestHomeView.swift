@@ -17,11 +17,25 @@ struct SignalQuestHomeView: View {
     @State private var pulse: NetworkPulse?
     @State private var nearbyMeasures: [AndroidSpeedtestMarker] = []
     @State private var userLocation: CLLocation?
+    /// Verdict de qualité réseau (opérateur SIM, données communautaires) qui pilote
+    /// la pastille d'état. `nil` = pas encore chargé ou zone sans mesures.
+    @State private var networkQuality: NearbyNetworkQuality?
+    /// Sheet expliquant la source et le calcul du verdict réseau.
+    @State private var showQualityDetail = false
+    /// Comparaison des opérateurs au tap sur une tuile du pouls (métrique choisie).
+    @State private var comparisonMetric: NearbyOperatorMetric = .download
+    @State private var showOperatorComparison = false
 
     private let gridColumns = [
         GridItem(.flexible(), spacing: 14),
         GridItem(.flexible(), spacing: 14)
     ]
+
+    /// Rayon commun de la section « Autour de toi » (mesures, pouls, comparaison).
+    private static let nearbyRadiusMeters = 1000
+    /// Demi-fenêtre englobant le cercle de 1 km (le filtrage distance affine ensuite).
+    private static let nearbyHalfSpanLat = 0.011
+    private static let nearbyHalfSpanLng = 0.016
 
     var body: some View {
         ScrollView {
@@ -43,9 +57,14 @@ struct SignalQuestHomeView: View {
         .toolbar(.hidden, for: .navigationBar)
         .signalQuestBackground()
         .task { await refresh() }
-        .refreshable { await refresh() }
+        .refreshable { await refresh(forceFresh: true) }
         .onChangeCompat(of: scenePhase) { _, phase in
             if phase == .active { Task { await refresh() } }
+        }
+        // Revenir sur l'onglet Accueil (après un test, une visite carte…) rafraîchit
+        // les données de zone sans attendre un pull manuel.
+        .onChangeCompat(of: router.selectedTab) { _, tab in
+            if tab == .home { Task { await refreshNearby(forceFresh: false) } }
         }
     }
 
@@ -86,6 +105,28 @@ struct SignalQuestHomeView: View {
     // MARK: Carte état réseau
 
     private var networkSummary: some View {
+        Group {
+            if networkQuality != nil {
+                Button {
+                    Haptics.selection()
+                    showQualityDetail = true
+                } label: { networkSummaryCard }
+                .buttonStyle(SQPressButtonStyle())
+                .accessibilityLabel("\(networkTitle). \(networkSubtitle)")
+                .accessibilityHint("Comprendre d'où vient ce verdict")
+            } else {
+                networkSummaryCard
+                    .accessibilityElement(children: .combine)
+            }
+        }
+        .sheet(isPresented: $showQualityDetail) {
+            if let quality = networkQuality {
+                NearbyNetworkQualityDetailSheet(quality: quality)
+            }
+        }
+    }
+
+    private var networkSummaryCard: some View {
         HStack(spacing: SQSpace.md) {
             Image(systemName: networkStatus.connection == .cellular
                   ? "dot.radiowaves.left.and.right"
@@ -110,23 +151,44 @@ struct SignalQuestHomeView: View {
                 .padding(.vertical, 6)
                 .foregroundStyle(networkTint)
                 .background(networkTintSoft, in: Capsule(style: .continuous))
+            // Indice discret que la carte est cliquable (verdict explicable).
+            if networkQuality != nil {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(SQColor.labelTertiary)
+            }
         }
         .padding(.vertical, SQSpace.lg + 2)
         .padding(.horizontal, SQSpace.xl)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .sqShadowCard()
-        .accessibilityElement(children: .combine)
     }
 
     private var isOnline: Bool { services.networkPath.isOnline }
 
+    // Priorité du verdict affiché : hors-ligne → mode données réduites (contrainte
+    // système réelle) → qualité communautaire de l'opérateur SIM → état neutre en
+    // attendant les données. On n'annonce plus « au top » par défaut : le libellé
+    // vert ne s'affiche que si les mesures de la zone le confirment.
+
     private var networkTitle: String {
         guard isOnline else { return "Hors connexion" }
-        return networkStatus.isConstrained ? "Réseau limité" : "Réseau au top"
+        if networkStatus.isConstrained { return "Réseau limité" }
+        if let quality = networkQuality { return quality.level.homeNetworkTitle }
+        return "Connecté"
     }
 
     private var networkSubtitle: String {
         guard isOnline else { return "Vérifie ta connexion" }
+        // Verdict dispo (hors mode données réduites) : opérateur SIM + le débit
+        // médian communautaire. Le détail RSRP vit dans la sheet explicative
+        // (peu lisible en un coup d'œil sur la pastille).
+        if !networkStatus.isConstrained, let quality = networkQuality {
+            if let mbps = quality.medianDownloadMbps {
+                return "\(quality.operatorLabel) · \(mbps) Mb/s"
+            }
+            return "\(quality.operatorLabel) · \(quality.sampleCount) mesures"
+        }
         switch networkStatus.connection {
         case .cellular:
             let tech = networkStatus.cellularTechnology?.displayName
@@ -141,17 +203,23 @@ struct SignalQuestHomeView: View {
 
     private var networkBadge: String {
         guard isOnline else { return "Coupé" }
-        return networkStatus.isConstrained ? "Limité" : "Stable"
+        if networkStatus.isConstrained { return "Limité" }
+        if let quality = networkQuality { return quality.level.title }
+        return "En ligne"
     }
 
     private var networkTint: Color {
         guard isOnline else { return SQColor.danger }
-        return networkStatus.isConstrained ? SQColor.warning : SQColor.success
+        if networkStatus.isConstrained { return SQColor.warning }
+        if let quality = networkQuality { return quality.level.swiftUIColor }
+        return SQColor.labelSecondary
     }
 
     private var networkTintSoft: Color {
         guard isOnline else { return SQColor.dangerSoft }
-        return networkStatus.isConstrained ? SQColor.warningSoft : SQColor.successSoft
+        if networkStatus.isConstrained { return SQColor.warningSoft }
+        if let quality = networkQuality { return quality.level.swiftUIColor.opacity(0.14) }
+        return SQColor.surfaceMuted
     }
 
     // MARK: Grille 2×2 d'actions
@@ -290,20 +358,46 @@ struct SignalQuestHomeView: View {
     }
 
     /// Agrégat de zone (pouls réseau) : 3 mini-tuiles RSRP / débit médian / meilleur op.
+    /// Tappable vers la comparaison des opérateurs dès qu'au moins deux sont mesurés.
     private func pulseRow(_ pulse: NetworkPulse) -> some View {
         HStack(spacing: SQSpace.sm + 2) {
             if let rsrp = pulse.avgRsrpDbm {
-                pulseTile(value: "\(rsrp)", unit: "dBm moyen")
+                pulseTileButton(value: "\(rsrp)", unit: "dBm moyen", metric: .signal)
             }
             if let median = pulse.medianDownloadMbps {
-                pulseTile(value: "\(median)", unit: "Mb/s médian")
+                pulseTileButton(value: "\(median)", unit: "Mb/s médian", metric: .download)
             }
             if let best = pulse.bestOperator, !best.isEmpty {
-                pulseTile(value: best, unit: "meilleur op.")
+                pulseTileButton(value: best, unit: "meilleur op.", metric: .download)
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Pouls réseau autour de toi")
+        .accessibilityElement(children: .contain)
+        .sheet(isPresented: $showOperatorComparison) {
+            if let location = userLocation {
+                NearbyOperatorComparisonSheet(
+                    metric: comparisonMetric,
+                    latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude,
+                    radiusMeters: Self.nearbyRadiusMeters
+                )
+                .environmentObject(services)
+            }
+        }
+    }
+
+    /// Tuile du pouls, cliquable vers la comparaison des opérateurs sur sa métrique
+    /// (dBm → signal, Mb/s & meilleur op. → débit).
+    private func pulseTileButton(value: String, unit: String, metric: NearbyOperatorMetric) -> some View {
+        Button {
+            guard userLocation != nil else { return }
+            Haptics.selection()
+            comparisonMetric = metric
+            showOperatorComparison = true
+        } label: {
+            pulseTile(value: value, unit: unit)
+        }
+        .buttonStyle(.plain)
+        .disabled(userLocation == nil)
     }
 
     private func pulseTile(value: String, unit: String) -> some View {
@@ -469,48 +563,87 @@ struct SignalQuestHomeView: View {
         }
     }
 
-    private func refresh() async {
+    private func refresh(forceFresh: Bool = false) async {
         services.networkPath.refreshNow()
         networkStatus = services.networkPath.status
         latestMeasurement = await services.speedtest.history().first
-        await refreshNearby()
+        await refreshNearby(forceFresh: forceFresh)
     }
 
-    /// Charge le pouls réseau + les dernières mesures communautaires autour de
-    /// la position. Best-effort : sans position ou sans données, la section
-    /// reste simplement masquée (jamais d'erreur affichée sur l'Accueil).
-    private func refreshNearby() async {
+    /// Charge le pouls réseau, les dernières mesures communautaires et le verdict
+    /// de qualité (opérateur SIM) autour de la position. Best-effort : sans
+    /// position ou sans données, la section reste masquée et la pastille retombe
+    /// sur un état neutre (jamais d'erreur affichée sur l'Accueil).
+    /// `forceFresh` (pull-to-refresh) contourne le cache de tuiles.
+    private func refreshNearby(forceFresh: Bool) async {
         guard let location = await services.location.currentLocation(timeoutSeconds: 6) else { return }
         userLocation = location
         let lat = location.coordinate.latitude
         let lng = location.coordinate.longitude
+        // Pull-to-refresh : tuiles fraîches forcées (bypass du cache disque d'1 h) ;
+        // sinon on tolère jusqu'à 90 s de cache pour ne pas marteler l'API.
+        let maxAge: TimeInterval = forceFresh ? 0 : 90
+        let isCellular = services.networkPath.status.connection == .cellular
+        let simMnc = services.networkPath.simPLMN().mnc
 
-        async let pulseTask: NetworkPulse? = try? services.feed.networkPulse(latitude: lat, longitude: lng)
-        async let markersTask: [AndroidSpeedtestMarker] = nearbyMarkers(latitude: lat, longitude: lng, around: location)
+        // Pouls recadré sur le même rayon que le reste (1 km), tous opérateurs.
+        async let pulseTask: NetworkPulse? = try? services.feed.networkPulse(
+            latitude: lat, longitude: lng, radiusMeters: Self.nearbyRadiusMeters
+        )
+        // Liste = les plus RÉCENTS (le snapshot social porte des timestamps fiables,
+        // contrairement aux tuiles carto). Comparaison = tuiles (volume sur 30 j).
+        async let recentTask: [AndroidSpeedtestMarker] = recentNearbySpeedtests(latitude: lat, longitude: lng)
+        async let tilesTask: [AndroidSpeedtestMarker] = nearbySpeedtests(latitude: lat, longitude: lng, around: location, maxAge: maxAge)
+        async let qualityTask: NearbyNetworkQuality? = services.nearbyQuality.verdict(
+            latitude: lat, longitude: lng, isCellular: isCellular, simMnc: simMnc, maxAge: maxAge
+        )
 
         pulse = await pulseTask
-        nearbyMeasures = await markersTask
+        let tiles = await tilesTask
+        let recent = await recentTask
+        // Liste = les plus RÉCENTS (endpoint dédié) ; repli sur les plus proches
+        // (tuiles) si l'endpoint n'a rien renvoyé (ou n'est pas encore déployé).
+        if !recent.isEmpty {
+            nearbyMeasures = recent
+        } else {
+            let center = location
+            nearbyMeasures = tiles
+                .map { ($0, center.distance(from: CLLocation(latitude: $0.lat, longitude: $0.lng))) }
+                .sorted { $0.1 < $1.1 }
+                .prefix(3)
+                .map { $0.0 }
+        }
+        networkQuality = await qualityTask
     }
 
-    /// Mesures communautaires dans un rayon ~3 km, les plus récentes d'abord.
-    private func nearbyMarkers(latitude: Double, longitude: Double, around location: CLLocation) async -> [AndroidSpeedtestMarker] {
+    /// Tous les speedtests communautaires à ≤ 1 km RÉELS de la position (la maille
+    /// des tuiles déborde largement, d'où le filtrage par distance).
+    private func nearbySpeedtests(latitude: Double, longitude: Double, around location: CLLocation, maxAge: TimeInterval) async -> [AndroidSpeedtestMarker] {
         let market = await services.markets.marketForLocation(latitude: latitude, longitude: longitude)?.code ?? "FR"
-        // ±0,03° ≈ 3,3 km N-S ; l'e-o varie avec la latitude mais reste du même ordre.
         let bounds = MapBounds(
-            north: latitude + 0.03,
-            south: latitude - 0.03,
-            east: longitude + 0.045,
-            west: longitude - 0.045
+            north: latitude + Self.nearbyHalfSpanLat,
+            south: latitude - Self.nearbyHalfSpanLat,
+            east: longitude + Self.nearbyHalfSpanLng,
+            west: longitude - Self.nearbyHalfSpanLng
         )
         guard let tiles = try? await services.map.speedtestTiles(
-            bounds: bounds, zoom: 13, market: market, operatorName: "ALL", days: 30, bands: []
+            bounds: bounds, zoom: 14, market: market, operatorName: "ALL", days: 30, bands: [], maxAge: maxAge
         ) else { return [] }
-
+        let center = location
+        let radius = Double(Self.nearbyRadiusMeters)
         return tiles
             .flatMap(\.markers)
-            .sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
-            .prefix(3)
-            .map { $0 }
+            .filter { center.distance(from: CLLocation(latitude: $0.lat, longitude: $0.lng)) <= radius }
+    }
+
+    /// Les 3 speedtests communautaires les PLUS RÉCENTS à ≤ 1 km, via l'endpoint
+    /// dédié `/api/social/nearby-speedtests` (SELECT trié par date côté serveur —
+    /// les tuiles carto n'ont pas de date fiable, le snapshot social trop peu de points).
+    private func recentNearbySpeedtests(latitude: Double, longitude: Double) async -> [AndroidSpeedtestMarker] {
+        let recent = (try? await services.feed.nearbyRecentSpeedtests(
+            latitude: latitude, longitude: longitude, radiusMeters: Self.nearbyRadiusMeters, limit: 3
+        )) ?? []
+        return Array(recent.prefix(3))
     }
 }
 

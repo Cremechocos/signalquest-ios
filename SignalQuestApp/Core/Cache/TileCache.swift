@@ -33,16 +33,27 @@ actor TileCache {
 
     /// Renvoie la tuile en cache (mémoire puis disque), sinon exécute `fetch`
     /// une seule fois même si plusieurs appelants demandent la même clé.
-    func data(for key: String, fetch: @escaping @Sendable () async throws -> Data) async throws -> Data {
-        if let entry = memory[key], Date().timeIntervalSince(entry.storedAt) <= memoryTTL {
+    ///
+    /// `maxAge` (optionnel) plafonne l'âge accepté pour CET appel, mémoire ET
+    /// disque confondus : `nil` = TTL par défaut (5 min / 1 h) ; `0` = bypass total
+    /// (ignore le cache, refait un fetch frais et réécrit l'entrée pour tous). Sert
+    /// à l'Accueil dont le pull-to-refresh doit ramener des données réellement à
+    /// jour sans attendre l'expiration du cache disque d'une heure.
+    func data(for key: String, maxAge: TimeInterval? = nil, fetch: @escaping @Sendable () async throws -> Data) async throws -> Data {
+        let effectiveMemoryTTL = maxAge ?? memoryTTL
+        let effectiveDiskTTL = maxAge ?? diskTTL
+        if effectiveMemoryTTL > 0,
+           let entry = memory[key],
+           Date().timeIntervalSince(entry.storedAt) <= effectiveMemoryTTL {
             touch(key)
             return entry.data
         }
         if let existing = inFlight[key] {
             return try await existing.value
         }
-        let task = Task<Data, Error> { [disk, diskTTL] in
-            if let cached = try? await disk.read(Data.self, for: key, maxAge: diskTTL) {
+        let task = Task<Data, Error> { [disk] in
+            if effectiveDiskTTL > 0,
+               let cached = try? await disk.read(Data.self, for: key, maxAge: effectiveDiskTTL) {
                 return cached
             }
             let fresh = try await fetch()

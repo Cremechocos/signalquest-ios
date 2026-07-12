@@ -15,9 +15,25 @@ struct CoverageCardView: View {
     var onReact: ((String) -> Void)? = nil
 
     private var signal: SocialSignalSummary? { item.signal }
-    private var accent: Color { TechAccent.color(for: signal?.technology ?? signal?.detectedTechs.first) }
+    private var accent: Color { TechAccent.color(for: signal?.technology ?? bestDetectedTech) }
     private var hasSessionAggregate: Bool {
         signal?.distanceMeters != nil || signal?.pointsCount != nil
+    }
+
+    /// Meilleure génération détectée (5G > 4G > 3G > 2G) plutôt que le premier élément
+    /// du tableau (ordre arbitraire) : une session 5G NSA détecte « 4G » ET « 5G » — il ne
+    /// faut pas afficher « 4G ». Sert de repli quand le backend n'expose pas `technology`.
+    private var bestDetectedTech: String? {
+        signal?.detectedTechs.max { Self.generationRank($0) < Self.generationRank($1) }
+    }
+
+    private static func generationRank(_ tech: String) -> Int {
+        let t = tech.uppercased()
+        if t.contains("5G") || t.contains("NR") { return 5 }
+        if t.contains("4G") || t.contains("LTE") { return 4 }
+        if t.contains("3G") || t.contains("UMTS") || t.contains("HSPA") || t.contains("WCDMA") { return 3 }
+        if t.contains("2G") || t.contains("GSM") || t.contains("EDGE") || t.contains("GPRS") { return 2 }
+        return 0
     }
 
     var body: some View {
@@ -43,7 +59,7 @@ struct CoverageCardView: View {
                             .lineLimit(1)
                     }
                     Spacer()
-                    SQEditorialTag(text: signal?.technology ?? signal?.detectedTechs.first ?? "—", color: accent)
+                    SQEditorialTag(text: signal?.technology ?? bestDetectedTech ?? "—", color: accent)
                 }
 
                 // Tuile mise en avant en accent brique (DA), pas en couleur techno.

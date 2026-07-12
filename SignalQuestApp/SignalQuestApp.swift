@@ -41,6 +41,9 @@ struct SignalQuestApp: App {
     @MainActor
     private func registerPushIfAuthenticated(_ state: AuthSessionViewModel.State) async {
         guard case .authenticated = state, hasCompletedOnboarding else { return }
+        // En démo/QA, ne pas solliciter l'autorisation système de notifications
+        // (la popup masquerait les captures et n'a pas de sens sans vrai compte).
+        guard !AppEnvironment.usesDemoData else { return }
         await services.push.requestAuthorizationAndRegister()
         services.callManager.registerForVoIPPushes()
         // CALL-VOIP-04 : un login dans une session déjà lancée (install→1er login,
@@ -76,6 +79,12 @@ struct SignalQuestApp: App {
                     await registerPushIfAuthenticated(session.state)
                     // Verrouillage biométrique à l'ouverture (si activé + authentifié).
                     if case .authenticated = session.state { appLock.lockOnActivationIfNeeded() }
+                    // Mode « continu » : amorce la diffusion de présence dès le
+                    // lancement (le mode « carte ouverte » démarre, lui, à l'ouverture
+                    // de la couche Amis — inutile de payer un appel réseau ici).
+                    if case .authenticated = session.state, LiveShareModeStore.load() == .foregroundLive {
+                        await services.livePresence.refreshSharingSettings()
+                    }
                 }
                 .onChangeCompat(of: session.state) { _, newState in
                     // Un login effectué dans une session déjà lancée (cas nominal

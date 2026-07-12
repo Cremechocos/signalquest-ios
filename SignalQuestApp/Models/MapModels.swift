@@ -95,6 +95,44 @@ struct SocialFriendLive: Codable, Identifiable, Equatable {
         try c.encodeIfPresent(radio, forKey: .radio)
         try c.encodeIfPresent(privacy, forKey: .privacy)
     }
+
+    /// Init mémberwise (le `init(from:)` custom empêche sa synthèse) — utilisé par
+    /// les tests et l'injection de démo QA.
+    init(
+        id: String,
+        name: String?,
+        avatarUrl: URL?,
+        presence: SocialPresence?,
+        location: SocialLiveLocation?,
+        radio: SocialRadioSnapshot?,
+        privacy: SocialPrivacySettings?
+    ) {
+        self.id = id
+        self.name = name
+        self.avatarUrl = avatarUrl
+        self.presence = presence
+        self.location = location
+        self.radio = radio
+        self.privacy = privacy
+    }
+}
+
+extension SocialFriendLive {
+    /// Statut de présence dérivé (backend `presence.status` + `isOnline`).
+    var presenceStatus: SocialPresenceStatus {
+        if let raw = presence?.status?.lowercased(),
+           let status = SocialPresenceStatus(rawValue: raw) {
+            return status
+        }
+        return presence?.isOnline == true ? .online : .offline
+    }
+
+    /// Vrai quand la dernière position remonte à plus de `maxAge` (défaut 3 min,
+    /// = TTL serveur). Un ami « périmé » est rendu estompé sur la carte.
+    func hasStaleLocation(maxAge: TimeInterval = 180, now: Date = Date()) -> Bool {
+        guard let updatedAt = location?.updatedAt else { return false }
+        return now.timeIntervalSince(updatedAt) > maxAge
+    }
 }
 
 struct SocialPhotoLive: Codable, Identifiable, Equatable {
@@ -516,6 +554,9 @@ struct CoverageHeatPoint: Decodable, Identifiable, Equatable {
     let band: Int?
     let frequency: String?
     let timestamp: Date?
+    /// 'ios' = point de couverture génération-seule (sans RSRP) — exclu de la couche
+    /// SIGNAL/RSRP côté client (n'apparaît que sur la couche génération).
+    let source: String?
 }
 
 struct AndroidMapTile: Codable, Equatable, Hashable, Sendable {
@@ -531,19 +572,23 @@ struct AndroidMapCluster: Codable, Identifiable, Equatable, Sendable {
     let count: Int
     let avgRsrp: Double?
     let tech: String?
+    /// 'ios' = cluster de couverture génération-seule (sans RSRP) ; sinon 'android'.
+    /// Exclu de la couche RSRP/qualité (comme les points).
+    let source: String?
     let latestTimestamp: Date?
 
     enum CodingKeys: String, CodingKey {
-        case id, lat, lng, count, avgRsrp, tech, latestTimestamp
+        case id, lat, lng, count, avgRsrp, tech, source, latestTimestamp
     }
 
-    init(id: String, lat: Double, lng: Double, count: Int, avgRsrp: Double? = nil, tech: String? = nil, latestTimestamp: Date? = nil) {
+    init(id: String, lat: Double, lng: Double, count: Int, avgRsrp: Double? = nil, tech: String? = nil, source: String? = nil, latestTimestamp: Date? = nil) {
         self.id = id
         self.lat = lat
         self.lng = lng
         self.count = count
         self.avgRsrp = avgRsrp
         self.tech = tech
+        self.source = source
         self.latestTimestamp = latestTimestamp
     }
 
@@ -555,6 +600,7 @@ struct AndroidMapCluster: Codable, Identifiable, Equatable, Sendable {
         count = (try? c.decode(Int.self, forKey: .count)) ?? 0
         avgRsrp = try? c.decodeIfPresent(Double.self, forKey: .avgRsrp)
         tech = c.decodeFlexibleString(forKey: .tech)
+        source = c.decodeFlexibleString(forKey: .source)
         latestTimestamp = try? c.decodeIfPresent(Date.self, forKey: .latestTimestamp)
     }
 }
@@ -674,6 +720,10 @@ struct AndroidCoveragePoint: Decodable, Identifiable, Equatable, Sendable {
     let groupId: String?
     let isPrimary: Bool?
     let cellType: String?
+    /// Source de la session : "ios" = couverture génération-seule (sans RSRP), sinon
+    /// "coverage"/"drive_test" (Android). Sert à exclure les points iOS de la couche
+    /// SIGNAL/RSRP (ils n'apparaissent que sur la couche génération).
+    let source: String?
 }
 
 struct AndroidCommunitySiteTileResponse: Decodable, Equatable, Sendable {

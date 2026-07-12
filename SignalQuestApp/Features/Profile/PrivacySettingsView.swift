@@ -7,6 +7,8 @@ final class PrivacySettingsViewModel: ObservableObject {
     @Published var shareSessionsWithFriends = false
     @Published var sharePhotosOnFriendMap = false
     @Published var shareExactMeasurements = false
+    /// Réglage LOCAL (pas backend) : quand publier ma position en direct.
+    @Published var liveShareMode: LiveShareMode = LiveShareModeStore.load()
     @Published var lastSeenVisibility: LastSeenVisibility = .none
     @Published var messageRequestPolicy: MessageRequestPolicy = .friendsOnly
     @Published var isLoading = false
@@ -74,6 +76,7 @@ final class PrivacySettingsViewModel: ObservableObject {
 /// et les interactions le concernant.
 struct PrivacySettingsView: View {
     @StateObject private var model: PrivacySettingsViewModel
+    @EnvironmentObject private var services: AppServices
 
     init(service: PrivacyServicing) {
         _model = StateObject(wrappedValue: PrivacySettingsViewModel(service: service))
@@ -86,10 +89,19 @@ struct PrivacySettingsView: View {
                 Toggle("Partager mes données radio", isOn: $model.shareRadioDataWithFriends)
                 Toggle("Partager mes sessions", isOn: $model.shareSessionsWithFriends)
                 Toggle("Afficher mes photos sur la carte Amis", isOn: $model.sharePhotosOnFriendMap)
+                if model.shareLiveLocationWithFriends {
+                    Picker("Quand partager ma position", selection: $model.liveShareMode) {
+                        ForEach(LiveShareMode.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                }
             } header: {
                 Text("Carte des amis")
             } footer: {
-                Text("Ces partages sont désactivés par défaut. Les désactiver retire aussi les données temps réel déjà publiées.")
+                Text(model.shareLiveLocationWithFriends
+                     ? model.liveShareMode.detail
+                     : "Ces partages sont désactivés par défaut. Les désactiver retire aussi les données temps réel déjà publiées.")
             }
             .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
@@ -144,7 +156,15 @@ struct PrivacySettingsView: View {
 
             Section {
                 GradientButton("Enregistrer", systemImage: "checkmark.circle.fill", isBusy: model.isSaving) {
-                    Task { await model.save() }
+                    Task {
+                        await model.save()
+                        // Propage immédiatement au diffuseur (démarre/arrête la
+                        // publication sans attendre le prochain rafraîchissement).
+                        services.livePresence.applySharingSettings(
+                            shareLocation: model.shareLiveLocationWithFriends,
+                            shareRadio: model.shareRadioDataWithFriends
+                        )
+                    }
                 }
                 .disabled(!model.loaded)
             }
@@ -156,6 +176,9 @@ struct PrivacySettingsView: View {
         .navigationTitle("Confidentialité")
         .navigationBarTitleDisplayMode(.inline)
         .task { if !model.loaded { await model.load() } }
+        .onChangeCompat(of: model.liveShareMode) { _, newMode in
+            services.livePresence.setMode(newMode)
+        }
         .overlay {
             if model.isLoading && !model.loaded {
                 ProgressView().tint(SQColor.brandRed)

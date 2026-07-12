@@ -36,7 +36,11 @@ protocol SocialFeedServicing: Sendable {
     /// Dernier speedtest sauvegardé côté backend (pour l'attacher à un post).
     func myLatestSpeedtest() async throws -> SocialShareableSpeedtest?
     /// Pouls réseau autour d'une position : `GET /api/social/network-pulse`.
-    func networkPulse(latitude: Double, longitude: Double) async throws -> NetworkPulse
+    /// `radiusMeters` optionnel (défaut backend 3 km si nil/≤0).
+    func networkPulse(latitude: Double, longitude: Double, radiusMeters: Int?) async throws -> NetworkPulse
+    /// Derniers speedtests communautaires HORODATÉS dans un rayon, triés par date
+    /// (décroissante) côté serveur : `GET /api/social/nearby-speedtests`.
+    func nearbyRecentSpeedtests(latitude: Double, longitude: Double, radiusMeters: Int, limit: Int) async throws -> [AndroidSpeedtestMarker]
 }
 
 extension SocialFeedServicing {
@@ -171,16 +175,34 @@ final class SocialFeedService: SocialFeedServicing {
         return response.messageId
     }
 
-    /// `radius` volontairement omis : le backend applique 3 km par défaut (et le
-    /// zod rejette un radius à 0 issu d'un coerce null→0).
-    func networkPulse(latitude: Double, longitude: Double) async throws -> NetworkPulse {
-        try await api.request(
-            APIEndpoint(path: "/api/social/network-pulse", query: [
-                URLQueryItem(name: "lat", value: String(latitude)),
-                URLQueryItem(name: "lng", value: String(longitude))
-            ]),
+    /// `radiusMeters` nil/≤0 → le backend applique 3 km par défaut. Un radius > 0
+    /// est transmis tel quel (le zod backend rejette 0, on ne l'envoie donc jamais).
+    func networkPulse(latitude: Double, longitude: Double, radiusMeters: Int? = nil) async throws -> NetworkPulse {
+        var query = [
+            URLQueryItem(name: "lat", value: String(latitude)),
+            URLQueryItem(name: "lng", value: String(longitude))
+        ]
+        if let radiusMeters, radiusMeters > 0 {
+            query.append(URLQueryItem(name: "radius", value: String(radiusMeters)))
+        }
+        return try await api.request(
+            APIEndpoint(path: "/api/social/network-pulse", query: query),
             as: NetworkPulse.self
         )
+    }
+
+    func nearbyRecentSpeedtests(latitude: Double, longitude: Double, radiusMeters: Int, limit: Int) async throws -> [AndroidSpeedtestMarker] {
+        struct Response: Decodable { let speedtests: [AndroidSpeedtestMarker] }
+        let response: Response = try await api.request(
+            APIEndpoint(path: "/api/social/nearby-speedtests", query: [
+                URLQueryItem(name: "lat", value: String(latitude)),
+                URLQueryItem(name: "lng", value: String(longitude)),
+                URLQueryItem(name: "radius", value: String(radiusMeters)),
+                URLQueryItem(name: "limit", value: String(limit))
+            ]),
+            as: Response.self
+        )
+        return response.speedtests
     }
 
     // MARK: - Profils & follow

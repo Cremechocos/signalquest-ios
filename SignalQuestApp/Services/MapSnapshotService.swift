@@ -3,13 +3,16 @@ import CoreLocation
 
 protocol MapSnapshotServicing: Sendable {
     func snapshot(bounds: MapBounds, zoom: Double, lightweight: Bool) async throws -> SocialMapSnapshot
+    /// Flux temps réel des amis (position + présence + radio), branché sur le SSE
+    /// serveur `/api/social/map/stream`. Se reconnecte automatiquement.
+    func friendsStream(sse: SSEClient) -> AsyncStream<[SocialFriendLive]>
     func plannedSites(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> [PlannedSiteLive]
     func outageSites(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> [OutageSiteLive]
     func coveragePoints(bounds: MapBounds, market: String, operatorName: String, technology: String?, bands: Set<Int>) async throws -> [CoverageHeatPoint]
     func publicPhotos(bounds: MapBounds, zoom: Double, market: String, operatorName: String, friendsOnly: Bool) async throws -> [MapPublicPhoto]
     func antennaTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, withAzimuth: Bool, bands: Set<Int>) async throws -> [AndroidAntennaTileResponse]
-    func speedtestTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>) async throws -> [AndroidSpeedtestTileResponse]
-    func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>) async throws -> [AndroidCoverageTileResponse]
+    func speedtestTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?) async throws -> [AndroidSpeedtestTileResponse]
+    func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?) async throws -> [AndroidCoverageTileResponse]
     func communitySiteTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, includeObserved: Bool, bands: Set<Int>) async throws -> [AndroidCommunitySiteTileResponse]
 }
 
@@ -52,6 +55,32 @@ final class MapSnapshotService: MapSnapshotServicing {
         )
         try? await cache.write(snapshot, for: key)
         return snapshot
+    }
+
+    /// Amis en temps réel via le SSE `/api/social/map/stream` (le backend re-poll
+    /// son snapshot toutes les 5 s). `full=false` = snapshot allégé. Le flux n'est
+    /// pas géo-borné : on n'en extrait QUE les amis (peu nombreux), décodés via une
+    /// enveloppe partielle pour rester robuste aux autres couches. Les positions
+    /// sont déjà gatées serveur par `shareLiveLocationWithFriends`.
+    func friendsStream(sse: SSEClient) -> AsyncStream<[SocialFriendLive]> {
+        struct FriendsEnvelope: Decodable { let friends: [SocialFriendLive] }
+        return AsyncStream { continuation in
+            let task = Task {
+                let decoder = JSONDecoder.signalQuest
+                for await (_, data) in sse.dataStream(
+                    path: "/api/social/map/stream",
+                    query: [URLQueryItem(name: "full", value: "false")],
+                    keep: ["snapshot"]
+                ) {
+                    guard let payload = data.data(using: .utf8),
+                          let envelope = try? decoder.decode(FriendsEnvelope.self, from: payload)
+                    else { continue }
+                    continuation.yield(envelope.friends)
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
     }
 
     func plannedSites(market: String, operatorName: String, territory: String? = nil, bands: Set<Int> = []) async throws -> [PlannedSiteLive] {
@@ -158,7 +187,7 @@ final class MapSnapshotService: MapSnapshotServicing {
         )
     }
 
-    func speedtestTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0, bands: Set<Int> = []) async throws -> [AndroidSpeedtestTileResponse] {
+    func speedtestTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0, bands: Set<Int> = [], maxAge: TimeInterval? = nil) async throws -> [AndroidSpeedtestTileResponse] {
         // Speedtests : TOUT afficher, sans cluster ni cap. Le backend plafonne
         // chaque page à 5000 ; on pagine par `offset` (jusqu'à 4 pages = 20 000
         // points/tuile, comme Android) et on fusionne en une seule réponse.
@@ -174,7 +203,8 @@ final class MapSnapshotService: MapSnapshotServicing {
                         market: market,
                         operatorName: operatorName,
                         days: days,
-                        bands: bands
+                        bands: bands,
+                        maxAge: maxAge
                     )
                 }
             }
@@ -196,7 +226,8 @@ final class MapSnapshotService: MapSnapshotServicing {
         market: String,
         operatorName: String,
         days: Int,
-        bands: Set<Int>
+        bands: Set<Int>,
+        maxAge: TimeInterval?
     ) async throws -> AndroidSpeedtestTileResponse? {
         var merged: [AndroidSpeedtestMarker] = []
         var tileMeta: AndroidMapTile?
@@ -204,7 +235,7 @@ final class MapSnapshotService: MapSnapshotServicing {
         for _ in 0..<speedtestMaxPages {
             let pageOffset = offset
             let key = "speedtests:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):days=\(days):bands=\(bandCacheKey(bands)):off=\(pageOffset)"
-            let data = try await tileCache.data(for: key) {
+            let data = try await tileCache.data(for: key, maxAge: maxAge) {
                 var query = [
                     URLQueryItem(name: "market", value: market),
                     URLQueryItem(name: "operator", value: operatorName),
@@ -231,7 +262,7 @@ final class MapSnapshotService: MapSnapshotServicing {
         return AndroidSpeedtestTileResponse(tile: tileMeta, clusters: [], markers: merged, stats: nil)
     }
 
-    func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0, bands: Set<Int> = []) async throws -> [AndroidCoverageTileResponse] {
+    func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0, bands: Set<Int> = [], maxAge: TimeInterval? = nil) async throws -> [AndroidCoverageTileResponse] {
         let bandKey = Self.bandCacheKey(bands)
         // COV-DENSITY : au DÉZOOM uniquement (z<11), tuiles PLUS FINES (tile.z +1). Le
         // backend plafonne ~2000 pts/tuile ; des tuiles plus petites = moins d'écrêtage
@@ -245,6 +276,7 @@ final class MapSnapshotService: MapSnapshotServicing {
             zoom: zoom,
             detailBoost: boost,
             maxTiles: boost > 0 ? 40 : 24,
+            maxAge: maxAge,
             cacheKey: { tile in
                 // Le z fait partie de la clé, donc detail/limit (dérivés du z)
                 // sont couverts ; days et bandes doivent être explicites.
@@ -303,6 +335,7 @@ final class MapSnapshotService: MapSnapshotServicing {
         zoom: Double,
         detailBoost: Int = 0,
         maxTiles: Int = 24,
+        maxAge: TimeInterval? = nil,
         cacheKey: @escaping @Sendable (AndroidMapTile) -> String,
         endpoint: @escaping @Sendable (AndroidMapTile) -> APIEndpoint
     ) async throws -> [T] {
@@ -311,7 +344,7 @@ final class MapSnapshotService: MapSnapshotServicing {
         return try await withThrowingTaskGroup(of: T.self) { group in
             for tile in tiles {
                 group.addTask { [api, tileCache] in
-                    let data = try await tileCache.data(for: cacheKey(tile)) {
+                    let data = try await tileCache.data(for: cacheKey(tile), maxAge: maxAge) {
                         try await api.requestData(endpoint(tile))
                     }
                     return try JSONDecoder.signalQuest.decode(T.self, from: data)

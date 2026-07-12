@@ -226,6 +226,9 @@ struct UserProfileView: View {
     @State private var presentedSheet: ProfileSheet?
     @State private var showBlockConfirm = false
     @State private var showRemoveFriendConfirm = false
+    /// Demande d'ami envoyée pendant cette session (le profil n'expose pas l'état
+    /// « en attente ») : bascule le libellé du menu sur « Demande envoyée ».
+    @State private var friendRequestSent = false
 
     private enum ProfileSheet: Identifiable {
         case detail(UnifiedSocialFeedItem)
@@ -321,6 +324,14 @@ struct UserProfileView: View {
                 } label: {
                     Label("Retirer des amis", systemImage: "person.fill.xmark")
                 }
+            } else if !profile.isSelf {
+                Button {
+                    Task { await addFriend() }
+                } label: {
+                    Label(friendRequestSent ? "Demande envoyée" : "Ajouter en ami",
+                          systemImage: friendRequestSent ? "checkmark" : "person.fill.badge.plus")
+                }
+                .disabled(friendRequestSent)
             }
             Button {
                 presentedSheet = .reportUser
@@ -363,6 +374,20 @@ struct UserProfileView: View {
             try await services.friends.remove(userId: id)
             Haptics.success()
             await model.load()
+        } catch {
+            model.errorMessage = error.localizedDescription
+            Haptics.error()
+        }
+    }
+
+    /// Envoie une demande d'ami. Le profil ne portant pas d'état « en attente »,
+    /// on bascule un drapeau local pour éviter les envois répétés.
+    private func addFriend() async {
+        guard let id = model.profile?.id, !friendRequestSent else { return }
+        do {
+            try await services.friends.sendRequest(toUserId: id)
+            friendRequestSent = true
+            Haptics.success()
         } catch {
             model.errorMessage = error.localizedDescription
             Haptics.error()
