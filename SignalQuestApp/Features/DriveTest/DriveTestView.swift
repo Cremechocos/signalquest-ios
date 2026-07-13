@@ -213,7 +213,7 @@ final class DriveTestViewModel: ObservableObject {
         sessionMode = DriveTestMode.current
         coverageSessionId = nil
         coverageStartedAtMs = nil
-        coverageShowOnMap = publishToMap()
+        coverageShowOnMap = coveragePublishToMap()
         coverageUploadSuppressed = VPNDetector.isActive()
         if sessionMode.recordsCoverage {
             let sessionId = UUID()
@@ -843,6 +843,17 @@ final class DriveTestViewModel: ObservableObject {
         // Opt-in partagé avec le speedtest : une nouvelle installation ne publie
         // jamais un trajet précis tant que l'utilisateur ne l'a pas demandé.
         return (UserDefaults.standard.object(forKey: "speedtest_publish_to_map") as? Bool) ?? false
+    }
+
+    /// Publication carte de la COUVERTURE (Drive Test iOS) : publiée PAR DÉFAUT.
+    /// iOS ne mesure pas le signal — la donnée partagée est la GÉNÉRATION le long du
+    /// trajet ; publier par défaut densifie la carte communautaire. Deux garde-fous
+    /// vie privée conservés : jamais sous VPN, et opt-out honoré (si l'utilisateur a
+    /// explicitement désactivé la publication via le réglage partagé avec le speedtest,
+    /// on ne publie pas). Le speedtest, lui, reste en opt-in (défaut désactivé).
+    private func coveragePublishToMap() -> Bool {
+        guard !VPNDetector.isActive() else { return false }
+        return (UserDefaults.standard.object(forKey: "speedtest_publish_to_map") as? Bool) ?? true
     }
 }
 
