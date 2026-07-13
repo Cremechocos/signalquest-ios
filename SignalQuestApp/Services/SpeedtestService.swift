@@ -4,6 +4,7 @@ import Network
 import UIKit
 import WidgetKit
 import Security
+import SwiftData
 
 // MARK: - Service protocol
 
@@ -282,10 +283,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private let networkOperator: NetworkOperatorServicing
     private let session: URLSession
     private let historyCache: DiskCache
-    private let pendingCache: DiskCache
+    private let pendingStore: SpeedtestPendingStoring
     private let guestReceiptStore: GuestSpeedtestReceiptStore
     private let tcpProbe: SpeedtestTCPProbing
-    private let pendingSaveKey = "pending-speedtest-saves"
+    static let pendingSaveKey = "pending-speedtest-saves"
+    /// Dossier de la file d'attente durable (partagé entre l'init durable et la migration).
+    /// `internal` (pas `private`) : référencé dans une valeur par défaut d'initialiseur.
+    static let pendingFolderName = "SignalQuestSpeedtestPending"
 
     init(
         api: APIClient,
@@ -293,10 +297,22 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         networkOperator: NetworkOperatorServicing? = nil,
         session: URLSession? = nil,
         historyCache: DiskCache = DiskCache(folderName: "SignalQuestSpeedtestHistory"),
-        pendingCache: DiskCache = DiskCache(folderName: "SignalQuestSpeedtestPending"),
+        // File des sauvegardes EN ATTENTE d'envoi : DURABLE (Application Support, non
+        // purgeable par iOS) et protégée — au contraire de l'historique (cache jetable).
+        // Un speedtest non encore envoyé (backend HS, hors-ligne) ne doit jamais être perdu.
+        pendingCache: DiskCache = DiskCache(
+            folderName: SpeedtestService.pendingFolderName,
+            baseDirectory: .applicationSupportDirectory,
+            evicts: false,
+            fileProtection: .completeUntilFirstUserAuthentication
+        ),
         guestReceiptStore: GuestSpeedtestReceiptStore = GuestSpeedtestReceiptStore(),
         tcpProbe: SpeedtestTCPProbing = NetworkSpeedtestTCPProbe()
     ) {
+        // Migration unique : les sauvegardes en attente vivaient dans Caches (purgeable).
+        // On les remonte vers Application Support avant toute lecture, pour ne pas perdre
+        // un test non envoyé lors de la mise à jour de l'app.
+        SpeedtestService.migratePendingSavesFromCachesIfNeeded()
         self.api = api
         self.markets = markets ?? MarketRegistryService(api: api)
         self.networkOperator = networkOperator ?? NetworkOperatorService(api: api)
@@ -308,9 +324,30 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         config.timeoutIntervalForRequest = SpeedtestEngineConfig.chunkTimeoutSeconds
         self.session = session ?? URLSession(configuration: config)
         self.historyCache = historyCache
-        self.pendingCache = pendingCache
+        // iOS 17+ : vraie base SwiftData ; iOS 16 : repli sur la file durable (DiskCache).
+        // La `pendingCache` durable sert de source de migration (17+) ou de backing (16).
+        self.pendingStore = SpeedtestPendingStoreFactory.make(durableCache: pendingCache, key: Self.pendingSaveKey)
         self.guestReceiptStore = guestReceiptStore
         self.tcpProbe = tcpProbe
+    }
+
+    /// Migration unique Caches → Application Support pour la file d'attente durable.
+    /// Idempotente : après le déplacement la source n'existe plus (no-op ensuite).
+    private static func migratePendingSavesFromCachesIfNeeded(fileManager: FileManager = .default) {
+        guard let caches = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first,
+              let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+        let oldFolder = caches.appendingPathComponent(pendingFolderName, isDirectory: true)
+        let newFolder = appSupport.appendingPathComponent(pendingFolderName, isDirectory: true)
+        guard fileManager.fileExists(atPath: oldFolder.path),
+              let files = try? fileManager.contentsOfDirectory(at: oldFolder, includingPropertiesForKeys: nil) else { return }
+        try? fileManager.createDirectory(at: newFolder, withIntermediateDirectories: true)
+        for file in files where file.pathExtension == "json" {
+            let dest = newFolder.appendingPathComponent(file.lastPathComponent)
+            // Ne pas écraser une file déjà présente/plus récente en Application Support.
+            if !fileManager.fileExists(atPath: dest.path) {
+                try? fileManager.moveItem(at: file, to: dest)
+            }
+        }
     }
 
     func run(pathStatus: NetworkPathStatus, location: Coordinates?, settings: SpeedtestRunSettings) async throws -> SpeedtestRunResult {
@@ -660,33 +697,12 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         SQSpotlight.donateLastSpeedtest(snapshot)
     }
 
-    private struct PendingSpeedtestSave: Codable, Equatable, Sendable {
-        let id: String
-        let result: SpeedtestRunResult
-        let streams: Int
-        let deviceModel: String
-        let createdAt: Date
-        /// Choix de publication sur la carte communautaire (opt-in). Optionnel pour
-        /// rester compatible avec les sauvegardes en attente déjà sérialisées avant
-        /// l'ajout du consentement — `nil` est traité comme « non publié ».
-        let isVisibleOnMap: Bool?
-        /// Opt-in explicite. Optionnel pour décoder les anciennes files locales.
-        let shareExactLocation: Bool?
-        /// Généré et persisté dans la file AVANT le POST : le même secret survit
-        /// à un commit serveur dont la réponse aurait été perdue.
-        let guestDeleteToken: String?
-    }
-
     private func pendingSaves() async -> [PendingSpeedtestSave] {
-        (try? await pendingCache.read([PendingSpeedtestSave].self, for: pendingSaveKey)) ?? []
+        await pendingStore.loadAll()
     }
 
     private func writePendingSaves(_ values: [PendingSpeedtestSave]) async throws {
-        if values.isEmpty {
-            await pendingCache.remove(pendingSaveKey)
-        } else {
-            try await pendingCache.write(values, for: pendingSaveKey)
-        }
+        try await pendingStore.replaceAll(values)
     }
 
     private func upsertPendingSave(_ pending: PendingSpeedtestSave) async throws {
@@ -2463,5 +2479,169 @@ final class SpeedtestLiveSampler: @unchecked Sendable {
             emaMbps = (smoothing * instant) + ((1 - smoothing) * emaMbps)
         }
         return emaMbps
+    }
+}
+
+// MARK: - Persistance des sauvegardes speedtest (SwiftData iOS 17+ / repli JSON iOS 16)
+
+/// Sauvegarde speedtest en attente d'envoi (persistée AVANT le POST, renvoyée plus tard).
+/// Au niveau fichier (au lieu d'imbriquée dans SpeedtestService) pour être référencée par
+/// le protocole de store et l'entité SwiftData.
+struct PendingSpeedtestSave: Codable, Equatable, Sendable {
+    let id: String
+    let result: SpeedtestRunResult
+    let streams: Int
+    let deviceModel: String
+    let createdAt: Date
+    /// Choix de publication sur la carte communautaire (opt-in). Optionnel pour rester
+    /// compatible avec les sauvegardes sérialisées avant l'ajout du consentement
+    /// (`nil` = non publié).
+    let isVisibleOnMap: Bool?
+    /// Opt-in explicite. Optionnel pour décoder les anciennes files locales.
+    let shareExactLocation: Bool?
+    /// Généré et persisté AVANT le POST : le même secret survit à un commit serveur dont
+    /// la réponse aurait été perdue.
+    let guestDeleteToken: String?
+}
+
+/// File des sauvegardes speedtest en attente, abstraite pour offrir deux implémentations
+/// derrière la MÊME API asynchrone :
+/// - **iOS 17+** : `SwiftDataSpeedtestPendingStore` (vraie base embarquée SwiftData) ;
+/// - **iOS 16**  : repli `DiskCacheSpeedtestPendingStore` (JSON durable, Application Support).
+protocol SpeedtestPendingStoring: Sendable {
+    func loadAll() async -> [PendingSpeedtestSave]
+    func replaceAll(_ values: [PendingSpeedtestSave]) async throws
+}
+
+/// Fabrique : SwiftData si iOS 17+ ET l'init réussit (migration depuis la file durable),
+/// sinon repli sur la file durable JSON (`DiskCache`).
+enum SpeedtestPendingStoreFactory {
+    static func make(durableCache: DiskCache, key: String) -> SpeedtestPendingStoring {
+        if #available(iOS 17, *) {
+            if let store = SwiftDataSpeedtestPendingStore(legacyCache: durableCache, legacyKey: key) {
+                return store
+            }
+        }
+        return DiskCacheSpeedtestPendingStore(cache: durableCache, key: key)
+    }
+}
+
+/// Repli iOS 16 : lit/écrit tout le tableau dans la file durable (`DiskCache` en
+/// Application Support). Comportement identique à l'accès direct précédent.
+struct DiskCacheSpeedtestPendingStore: SpeedtestPendingStoring {
+    let cache: DiskCache
+    let key: String
+
+    func loadAll() async -> [PendingSpeedtestSave] {
+        (try? await cache.read([PendingSpeedtestSave].self, for: key)) ?? []
+    }
+
+    func replaceAll(_ values: [PendingSpeedtestSave]) async throws {
+        if values.isEmpty {
+            await cache.remove(key)
+        } else {
+            try await cache.write(values, for: key)
+        }
+    }
+}
+
+/// Entité SwiftData d'une sauvegarde en attente : la sauvegarde est stockée telle quelle
+/// en `payload` JSON (toujours lue/écrite d'un bloc) ; `createdAtMs` sert au tri.
+@available(iOS 17, *)
+@Model
+final class SpeedtestPendingEntity {
+    @Attribute(.unique) var saveId: String
+    var createdAtMs: Int
+    var payload: Data
+
+    init(saveId: String, createdAtMs: Int, payload: Data) {
+        self.saveId = saveId
+        self.createdAtMs = createdAtMs
+        self.payload = payload
+    }
+}
+
+/// Store SwiftData des sauvegardes en attente. L'API du protocole étant ASYNCHRONE, on
+/// l'implémente en `actor` : SwiftData n'est utilisé que sous isolation d'acteur (un seul
+/// `ModelContext`, jamais partagé entre threads), sans verrou manuel.
+/// ⚠️ À compiler/tester dans Xcode (indisponible sous Linux).
+@available(iOS 17, *)
+actor SwiftDataSpeedtestPendingStore: SpeedtestPendingStoring {
+    private let container: ModelContainer
+    private let context: ModelContext
+    private let legacyCache: DiskCache?
+    private let legacyKey: String
+    private let encoder = JSONEncoder.signalQuest
+    private let decoder = JSONDecoder.signalQuest
+
+    /// `init?` : si le `ModelContainer` ne peut pas être créé, la fabrique retombe sur JSON.
+    init?(storeURL: URL? = nil, legacyCache: DiskCache? = nil, legacyKey: String) {
+        self.legacyCache = legacyCache
+        self.legacyKey = legacyKey
+        let url = storeURL ?? Self.defaultStoreURL()
+        guard let container = try? ModelContainer(
+            for: SpeedtestPendingEntity.self,
+            configurations: ModelConfiguration(url: url)
+        ) else { return nil }
+        self.container = container
+        self.context = ModelContext(container)
+    }
+
+    func loadAll() async -> [PendingSpeedtestSave] {
+        await importLegacyIfPresent()
+        var descriptor = FetchDescriptor<SpeedtestPendingEntity>()
+        descriptor.sortBy = [SortDescriptor(\SpeedtestPendingEntity.createdAtMs, order: .forward)]
+        let entities = (try? context.fetch(descriptor)) ?? []
+        return entities.compactMap { try? decoder.decode(PendingSpeedtestSave.self, from: $0.payload) }
+    }
+
+    func replaceAll(_ values: [PendingSpeedtestSave]) async throws {
+        // Delete-all + insert-all : fidèle au contrat lecture-tout / écriture-tout du
+        // service (file d'attente petite). L'import legacy est fait par loadAll, qui
+        // précède toujours une écriture (read-modify-write), donc rien n'est perdu.
+        for entity in (try? context.fetch(FetchDescriptor<SpeedtestPendingEntity>())) ?? [] {
+            context.delete(entity)
+        }
+        for save in values {
+            let payload = try encoder.encode(save)
+            context.insert(SpeedtestPendingEntity(
+                saveId: save.id,
+                createdAtMs: Int(save.createdAt.timeIntervalSince1970 * 1_000),
+                payload: payload
+            ))
+        }
+        try context.save()
+    }
+
+    /// Import unique depuis la file durable JSON (`DiskCache`) au premier `loadAll`, puis
+    /// purge de cette file. Idempotent (unicité `saveId`) ; une fois la file legacy vidée,
+    /// cette méthode devient un no-op. La logique d'insertion est synchrone (sans point de
+    /// suspension) → pas de conflit d'unicité en cas de réentrance d'acteur.
+    private func importLegacyIfPresent() async {
+        guard let legacyCache else { return }
+        let legacy = (try? await legacyCache.read([PendingSpeedtestSave].self, for: legacyKey)) ?? []
+        guard !legacy.isEmpty else { return }
+        let existing = Set(((try? context.fetch(FetchDescriptor<SpeedtestPendingEntity>())) ?? []).map(\.saveId))
+        var inserted = false
+        for save in legacy where !existing.contains(save.id) {
+            guard let payload = try? encoder.encode(save) else { continue }
+            context.insert(SpeedtestPendingEntity(
+                saveId: save.id,
+                createdAtMs: Int(save.createdAt.timeIntervalSince1970 * 1_000),
+                payload: payload
+            ))
+            inserted = true
+        }
+        if inserted { try? context.save() }
+        await legacyCache.remove(legacyKey)
+    }
+
+    private static func defaultStoreURL() -> URL {
+        let fileManager = FileManager.default
+        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let dir = appSupport.appendingPathComponent("SignalQuest", isDirectory: true)
+        try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("SpeedtestPending.store", isDirectory: false)
     }
 }

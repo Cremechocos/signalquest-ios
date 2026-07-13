@@ -55,6 +55,14 @@ enum APIError: Error, LocalizedError, Equatable {
         if let code, let mapped = localizedMessages[code.uppercased()] {
             return mapped
         }
+        // Erreurs serveur (5xx) : le corps expose souvent une trace interne (ORM/SQL,
+        // stack, ex. « Invalid `prisma.$queryRaw()` invocation »). Ce message n'a aucun
+        // sens pour l'utilisateur et ne doit JAMAIS s'afficher : on ignore le message
+        // serveur et on retombe sur un repli neutre. Le détail reste dans les logs via
+        // `diagnosticDescription`.
+        if status >= 500 {
+            return statusFallback(status)
+        }
         let trimmed = serverMessage.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty, !looksLikeRawCode(trimmed) {
             return trimmed

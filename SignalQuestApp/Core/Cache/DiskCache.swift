@@ -8,17 +8,27 @@ actor DiskCache {
     private let maxBytes: Int
     /// Âge maximal d'un fichier avant suppression inconditionnelle.
     private let maxAge: TimeInterval
+    /// `false` pour un stockage DURABLE : aucune éviction taille/âge (données en
+    /// attente d'envoi qui ne doivent jamais disparaître). `true` = cache classique.
+    private let evicts: Bool
+    /// Protection de fichier appliquée après écriture (nil = réglage système par défaut).
+    private let fileProtection: FileProtectionType?
     /// Throttle de l'éviction : on ne scanne pas le dossier à chaque write.
     private var lastEvictionAt: Date = .distantPast
 
     init(
         folderName: String = "SignalQuestCache",
+        baseDirectory: FileManager.SearchPathDirectory = .cachesDirectory,
+        evicts: Bool = true,
+        fileProtection: FileProtectionType? = nil,
         maxBytes: Int = 64 * 1024 * 1024,          // 64 Mo
         maxAge: TimeInterval = 7 * 24 * 60 * 60,    // 7 jours
         fileManager: FileManager = .default
     ) {
-        let caches = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        root = caches.appendingPathComponent(folderName, isDirectory: true)
+        let base = fileManager.urls(for: baseDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        root = base.appendingPathComponent(folderName, isDirectory: true)
+        self.evicts = evicts
+        self.fileProtection = fileProtection
         self.maxBytes = maxBytes
         self.maxAge = maxAge
         try? fileManager.createDirectory(at: root, withIntermediateDirectories: true)
@@ -26,8 +36,12 @@ actor DiskCache {
 
     func write<T: Codable>(_ value: T, for key: String) async throws {
         let data = try encoder.encode(CacheEnvelope(createdAt: Date(), value: value))
-        try data.write(to: url(for: key), options: [.atomic])
-        evictIfNeeded()
+        let fileURL = url(for: key)
+        try data.write(to: fileURL, options: [.atomic])
+        if let fileProtection {
+            try? FileManager.default.setAttributes([.protectionKey: fileProtection], ofItemAtPath: fileURL.path)
+        }
+        if evicts { evictIfNeeded() }
     }
 
     func read<T: Codable>(_ type: T.Type, for key: String, maxAge: TimeInterval? = nil) async throws -> T? {

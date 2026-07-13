@@ -213,7 +213,7 @@ final class DriveTestViewModel: ObservableObject {
         sessionMode = DriveTestMode.current
         coverageSessionId = nil
         coverageStartedAtMs = nil
-        coverageShowOnMap = publishToMap()
+        coverageShowOnMap = coveragePublishToMap()
         coverageUploadSuppressed = VPNDetector.isActive()
         if sessionMode.recordsCoverage {
             let sessionId = UUID()
@@ -844,6 +844,17 @@ final class DriveTestViewModel: ObservableObject {
         // jamais un trajet précis tant que l'utilisateur ne l'a pas demandé.
         return (UserDefaults.standard.object(forKey: "speedtest_publish_to_map") as? Bool) ?? false
     }
+
+    /// Publication carte de la COUVERTURE (Drive Test iOS) : publiée PAR DÉFAUT.
+    /// iOS ne mesure pas le signal — la donnée partagée est la GÉNÉRATION le long du
+    /// trajet ; publier par défaut densifie la carte communautaire. Deux garde-fous
+    /// vie privée conservés : jamais sous VPN, et opt-out honoré (si l'utilisateur a
+    /// explicitement désactivé la publication via le réglage partagé avec le speedtest,
+    /// on ne publie pas). Le speedtest, lui, reste en opt-in (défaut désactivé).
+    private func coveragePublishToMap() -> Bool {
+        guard !VPNDetector.isActive() else { return false }
+        return (UserDefaults.standard.object(forKey: "speedtest_publish_to_map") as? Bool) ?? true
+    }
 }
 
 struct DriveTestView: View {
@@ -917,18 +928,24 @@ struct DriveTestView: View {
         .padding(.top, SQSpace.sm)
     }
 
-    // Couleurs data de la légende : mêmes échelles génération/débit que les points
-    // dessinés sur la carte (elles identifient une techno / un débit, pas une surface).
+    // Couleurs de la légende : échelles génération / débit des points dessinés sur la
+    // carte + la ligne du parcours (terre cuite). La génération inclut « Aucun » (gris,
+    // zone sans cellulaire) ; la ligne « Parcours » n'encode AUCUN signal, elle marque
+    // seulement le trajet suivi (visible seul quand la session est en pause WiFi).
     private var mapLegend: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             legendSection("Génération", items: [
                 ("5G", Color(hex: 0x8B5CF6)), ("4G", Color(hex: 0x3B82F6)),
-                ("3G", Color(hex: 0x14B8A6)), ("2G", Color(hex: 0xF59E0B))
-            ], diamond: false)
+                ("3G", Color(hex: 0x14B8A6)), ("2G", Color(hex: 0xF59E0B)),
+                ("Aucun", Color(hex: 0x94A3B8))
+            ], mark: .circle)
+            legendSection("Parcours", items: [
+                ("Trajet suivi", SQColor.brandOrange)
+            ], mark: .line)
             legendSection("Débit speedtest", items: [
                 ("Rapide", Color(hex: 0x22C55E)), ("Moyen", Color(hex: 0xEAB308)),
                 ("Lent", Color(hex: 0xEF4444))
-            ], diamond: true)
+            ], mark: .diamond)
         }
         .padding(SQSpace.sm + 2)
         .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
@@ -938,19 +955,29 @@ struct DriveTestView: View {
         .accessibilityHidden(true)
     }
 
-    private func legendSection(_ title: String, items: [(String, Color)], diamond: Bool) -> some View {
+    private enum LegendMark { case circle, diamond, line }
+
+    private func legendSection(_ title: String, items: [(String, Color)], mark: LegendMark) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(SQFont.body(11, .semibold)).foregroundStyle(SQColor.labelSecondary)
             ForEach(items, id: \.0) { label, color in
                 HStack(spacing: 6) {
-                    if diamond {
-                        Rectangle().fill(color).frame(width: 8, height: 8).rotationEffect(.degrees(45))
-                    } else {
-                        Circle().fill(color).frame(width: 9, height: 9)
-                    }
+                    legendMark(mark, color: color).frame(width: 14, alignment: .center)
                     Text(label).font(SQFont.body(11.5)).foregroundStyle(SQColor.label)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func legendMark(_ mark: LegendMark, color: Color) -> some View {
+        switch mark {
+        case .circle:
+            Circle().fill(color).frame(width: 9, height: 9)
+        case .diamond:
+            Rectangle().fill(color).frame(width: 8, height: 8).rotationEffect(.degrees(45))
+        case .line:
+            Capsule().fill(color).frame(width: 14, height: 3)
         }
     }
 
