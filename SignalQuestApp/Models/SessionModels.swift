@@ -111,6 +111,14 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
         return s == "drive_test" || s.contains("drive")
     }
 
+    /// Couverture contribuée par iOS : GÉNÉRATION seulement, pas de signal radio.
+    /// iOS n'expose pas le RSRP → le backend stocke une sentinelle. Ces sessions
+    /// doivent être colorées par génération, pas par RSRP (sinon tous les points
+    /// tombent dans le gris « aucun signal »).
+    var isIosCoverage: Bool {
+        (source ?? "").lowercased() == "ios"
+    }
+
     /// Libellé court de durée (« 12 min », « 1 h 04 ») si disponible.
     var durationLabel: String? {
         guard let d = durationSeconds, d > 0 else { return nil }

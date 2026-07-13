@@ -202,12 +202,18 @@ struct SessionDetailView: View {
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 SessionTraceMapView(points: detail.points,
                                     antennas: detail.servingAntennas,
-                                    drawPath: model.session.isDriveTest)
+                                    drawPath: model.session.isDriveTest,
+                                    coloring: model.session.isIosCoverage ? .generation : .rsrp)
                     .frame(height: 300)
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
                     .sqShadowCard()
                 if !detail.points.isEmpty {
-                    rsrpLegend
+                    // Couverture iOS = génération seule (pas de RSRP) → légende génération.
+                    if model.session.isIosCoverage {
+                        generationLegend
+                    } else {
+                        rsrpLegend
+                    }
                 }
             }
         } else if model.detail != nil && !model.isLoading {
@@ -228,6 +234,21 @@ struct SessionDetailView: View {
             legendDot(SessionRSRPColor.ui(-95), "Moyen")
             legendDot(SessionRSRPColor.ui(-105), "Faible")
             legendDot(SessionRSRPColor.ui(-115), "Mauvais")
+        }
+        .font(SQFont.body(11, .medium, relativeTo: .caption2))
+        .foregroundStyle(SQColor.labelSecondary)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Légende GÉNÉRATION (couverture iOS) — couleurs de `SessionGenerationColor`,
+    /// identiques aux points de la carte (correspondance légende ↔ tracé).
+    private var generationLegend: some View {
+        HStack(spacing: SQSpace.sm) {
+            legendDot(SessionGenerationColor.ui("5G"), "5G")
+            legendDot(SessionGenerationColor.ui("4G"), "4G")
+            legendDot(SessionGenerationColor.ui("3G"), "3G")
+            legendDot(SessionGenerationColor.ui("2G"), "2G")
+            legendDot(SessionGenerationColor.ui(nil), "Aucun")
         }
         .font(SQFont.body(11, .medium, relativeTo: .caption2))
         .foregroundStyle(SQColor.labelSecondary)
