@@ -59,6 +59,30 @@ final class APIClientTests: XCTestCase {
         }
     }
 
+    /// Un message serveur brut (trace ORM/SQL) sur un 5xx ne doit JAMAIS être affiché :
+    /// on retombe sur le repli neutre. Régression du leak « Invalid `prisma.$queryRaw()` ».
+    func testServerErrorMessageIsNotLeakedToUser() {
+        // 5xx : la prose brute du serveur est masquée par le repli neutre.
+        XCTAssertEqual(
+            APIError.userFacingMessage(status: 500, code: nil, serverMessage: "Invalid `prisma.$queryRaw()` invocation: ..."),
+            APIError.statusFallback(500)
+        )
+        XCTAssertEqual(
+            APIError.http(status: 500, code: nil, message: "Invalid `prisma.$queryRaw()` invocation: ...", requestId: "r1", retryAfter: nil).errorDescription,
+            "Service momentanément indisponible. Réessaie plus tard."
+        )
+        // Un code connu reste prioritaire, même en 5xx.
+        XCTAssertEqual(
+            APIError.userFacingMessage(status: 503, code: "RATE_LIMITED", serverMessage: "peu importe"),
+            "Trop de requêtes. Patiente un instant avant de réessayer."
+        )
+        // Un 4xx avec message FR lisible passe toujours (comportement inchangé).
+        XCTAssertEqual(
+            APIError.userFacingMessage(status: 400, code: nil, serverMessage: "Le nom est déjà pris."),
+            "Le nom est déjà pris."
+        )
+    }
+
     // MARK: - Sprint 1 : idempotence & throttling (429/503)
 
     /// Un POST porte une clé d'idempotence et REJOUE la même clé après un
