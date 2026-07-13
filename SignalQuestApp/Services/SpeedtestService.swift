@@ -603,7 +603,27 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             result,
             streams: streams,
             publishToMap: publishToMap,
-            shareExactLocation: false
+            shareExactLocation: false,
+            driveSessionId: nil
+        )
+    }
+
+    // Surcharge « drive test » : `driveSessionId` (id local de la session en cours)
+    // rattache le speedtest à sa session côté serveur. Paramètre REQUIS (pas de valeur
+    // par défaut) pour ne pas entrer en ambiguïté avec la surcharge sans session
+    // ci-dessus, et pour laisser les 4 méthodes du protocole SpeedtestServicing intactes.
+    func save(
+        _ result: SpeedtestRunResult,
+        streams: Int,
+        publishToMap: Bool,
+        driveSessionId: String?
+    ) async throws {
+        try await save(
+            result,
+            streams: streams,
+            publishToMap: publishToMap,
+            shareExactLocation: false,
+            driveSessionId: driveSessionId
         )
     }
 
@@ -612,6 +632,22 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         streams: Int,
         publishToMap: Bool,
         shareExactLocation: Bool
+    ) async throws {
+        try await save(
+            result,
+            streams: streams,
+            publishToMap: publishToMap,
+            shareExactLocation: shareExactLocation,
+            driveSessionId: nil
+        )
+    }
+
+    func save(
+        _ result: SpeedtestRunResult,
+        streams: Int,
+        publishToMap: Bool,
+        shareExactLocation: Bool,
+        driveSessionId: String?
     ) async throws {
         let guestDeleteToken: String?
         if api.credentials.accessToken() == nil {
@@ -630,7 +666,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             createdAt: Date(),
             isVisibleOnMap: publishToMap,
             shareExactLocation: publishToMap && shareExactLocation,
-            guestDeleteToken: guestDeleteToken
+            guestDeleteToken: guestDeleteToken,
+            driveSessionId: driveSessionId
         )
         try? await upsertPendingSave(pending)
         do {
@@ -723,7 +760,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             deviceModel: pending.deviceModel,
             isVisibleOnMap: pending.isVisibleOnMap ?? false,
             shareExactLocation: pending.shareExactLocation ?? false,
-            guestDeleteToken: pending.guestDeleteToken
+            guestDeleteToken: pending.guestDeleteToken,
+            sessionId: pending.driveSessionId
         )
         let response: SpeedtestSaveResponse = try await api.requestJSON(
             "/api/speedtests",
@@ -2502,6 +2540,10 @@ struct PendingSpeedtestSave: Codable, Equatable, Sendable {
     /// Généré et persisté AVANT le POST : le même secret survit à un commit serveur dont
     /// la réponse aurait été perdue.
     let guestDeleteToken: String?
+    /// Id LOCAL de la session Drive Test en cours (UUID) si ce speedtest a été lancé
+    /// pendant un drive → rattachement serveur. Optionnel pour décoder les files locales
+    /// sérialisées avant cet ajout (`nil` = speedtest hors drive).
+    let driveSessionId: String?
 }
 
 /// File des sauvegardes speedtest en attente, abstraite pour offrir deux implémentations

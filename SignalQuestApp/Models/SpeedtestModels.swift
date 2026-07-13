@@ -385,13 +385,18 @@ struct SpeedtestSubmission: Encodable, Equatable {
     let isVisibleOnMap: Bool
     let shareExactLocation: Bool
     let guestDeleteToken: String?
+    /// Id LOCAL de la session Drive Test en cours (UUID) quand ce speedtest est lancé
+    /// pendant un drive. Le backend rattache le speedtest à la session de couverture via
+    /// cet id (résolu par `CoverageSession.sourceSessionId`, ou backfill à l'import).
+    /// `nil` pour un speedtest manuel hors drive.
+    let sessionId: String?
     let server: String?
     let downloadServerName: String?
     let downloadServerId: String?
     let downloadServerCode: String?
 
     enum CodingKeys: String, CodingKey {
-        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, server, downloadServerName, downloadServerId, downloadServerCode
+        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, server, downloadServerName, downloadServerId, downloadServerCode
         case rsrp, rsrq, snr, cellId, pci, enb, gnb, radioSnapshots
         case pingDl, jitterDl, pingUl, jitterUl
     }
@@ -415,7 +420,8 @@ struct SpeedtestSubmission: Encodable, Equatable {
         mobileOperator: String? = nil,
         isVisibleOnMap: Bool = false,
         shareExactLocation: Bool = false,
-        guestDeleteToken: String? = nil
+        guestDeleteToken: String? = nil,
+        sessionId: String? = nil
     ) -> SpeedtestSubmission {
         SpeedtestSubmission(
             clientSubmissionId: result.id.uuidString,
@@ -462,6 +468,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
             isVisibleOnMap: isVisibleOnMap,
             shareExactLocation: shareExactLocation,
             guestDeleteToken: guestDeleteToken,
+            sessionId: sessionId,
             server: result.serverName,
             downloadServerName: result.downloadServerName ?? result.serverName,
             downloadServerId: result.downloadServerId,
@@ -515,6 +522,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encode(isVisibleOnMap, forKey: .isVisibleOnMap)
         try c.encode(shareExactLocation, forKey: .shareExactLocation)
         try c.encodeIfPresent(guestDeleteToken, forKey: .guestDeleteToken)
+        try c.encodeIfPresent(sessionId, forKey: .sessionId)
         try c.encodeIfPresent(server, forKey: .server)
         try c.encodeIfPresent(downloadServerName, forKey: .downloadServerName)
         try c.encodeIfPresent(downloadServerId, forKey: .downloadServerId)

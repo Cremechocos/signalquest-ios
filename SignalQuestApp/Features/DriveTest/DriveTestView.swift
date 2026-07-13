@@ -753,7 +753,15 @@ final class DriveTestViewModel: ObservableObject {
         )
         try Task.checkCancellation()
         do {
-            try await services.speedtest.save(measured, streams: settings.streams, publishToMap: publishToMap())
+            // Rattache le speedtest à la session Drive Test en cours (id local) : le
+            // backend le reliera à la session de couverture (rattachement direct si déjà
+            // importée, sinon backfill à l'import). nil hors enregistrement de couverture.
+            try await services.speedtest.save(
+                measured,
+                streams: settings.streams,
+                publishToMap: publishToMap(),
+                driveSessionId: coverageSessionId?.uuidString
+            )
         } catch {
             // `save` met déjà la mesure en file d'attente locale (rejeu ultérieur) ;
             // on rend la cause visible au lieu de l'avaler silencieusement.
