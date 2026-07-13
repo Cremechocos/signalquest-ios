@@ -1,5 +1,6 @@
 import Foundation
 import os
+import SwiftData
 
 /// Un point de couverture contribué par iOS (F1). PAS de signal radio (iOS ne
 /// l'expose pas) : seulement génération (`technology`) + connectivité + position,
@@ -73,7 +74,8 @@ struct PendingCoverageSession: Codable, Equatable, Sendable {
     var updatedAtMs: Int
 }
 
-private struct CoverageSessionQueueFile: Codable, Sendable {
+/// `internal` (pas `private`) : lu par la migration SwiftData (`SwiftDataCoverageSessionStore`).
+struct CoverageSessionQueueFile: Codable, Sendable {
     var version = 1
     var sessions: [PendingCoverageSession] = []
 }
@@ -82,7 +84,7 @@ private struct CoverageSessionQueueFile: Codable, Sendable {
 /// purgé par iOS). Chaque mutation est encodée puis remplacée atomiquement.
 /// Le verrou rend les écritures synchrones sûres depuis les callbacks GPS et
 /// garantit qu'un point est sur disque avant que l'UI poursuive son traitement.
-final class CoverageSessionQueue: @unchecked Sendable {
+final class CoverageSessionQueue: CoverageSessionStoring, @unchecked Sendable {
     private let fileURL: URL
     private let fileManager: FileManager
     private let lock = NSLock()
@@ -227,13 +229,14 @@ protocol SessionsServicing: Sendable {
 
 final class SessionsService: SessionsServicing, @unchecked Sendable {
     private let api: APIClient
-    private let queue: CoverageSessionQueue
+    private let queue: CoverageSessionStoring
     /// Coalesce les drains concurrents (lancement, retour écran, fin de session).
     private let flushState = OSAllocatedUnfairLock<Task<Void, Error>?>(initialState: nil)
 
     init(api: APIClient, queueFileURL: URL? = nil) {
         self.api = api
-        self.queue = CoverageSessionQueue(fileURL: queueFileURL)
+        // iOS 17+ : vraie base SwiftData ; iOS 16 (ou fileURL de test) : repli JSON durable.
+        self.queue = CoverageSessionStoreFactory.make(fileURL: queueFileURL)
     }
 
     func persistCoverageDraft(_ session: CoverageSessionUpload) throws {
@@ -333,4 +336,253 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
         }
         if let firstError { throw firstError }
     }
+}
+
+// MARK: - Abstraction du store de couverture (SwiftData iOS 17+ / repli JSON iOS 16)
+
+/// File des sessions de couverture en attente d'envoi, abstraite pour offrir deux
+/// implémentations derrière la MÊME API synchrone (appelée depuis les callbacks GPS,
+/// où un point doit être persisté avant que l'UI poursuive) :
+///
+/// - **iOS 17+** : `SwiftDataCoverageSessionStore` (vraie base embarquée SwiftData) ;
+/// - **iOS 16**  : repli `CoverageSessionQueue` (JSON durable en Application Support).
+///
+/// (Le code vit dans ce fichier — déjà référencé par le `.xcodeproj` committé — car la
+/// CI Xcode Cloud ne régénère pas le projet via xcodegen.)
+protocol CoverageSessionStoring: Sendable {
+    func upsert(_ upload: CoverageSessionUpload, state requestedState: CoverageSessionQueueState) throws
+    func discard(sessionId: UUID) throws
+    func recoverInterruptedRecordings() throws
+    func pendingUploads() throws -> [CoverageSessionUpload]
+    func contains(sessionId: UUID) throws -> Bool
+    func allPending() throws -> [PendingCoverageSession]
+}
+
+/// Fabrique le store de couverture : SwiftData si iOS 17+ ET l'initialisation réussit,
+/// sinon repli JSON durable. Un `fileURL` explicite (tests) force le repli JSON pour
+/// rester déterministe et indépendant de SwiftData.
+enum CoverageSessionStoreFactory {
+    static func make(fileURL: URL? = nil) -> CoverageSessionStoring {
+        if fileURL == nil, #available(iOS 17, *) {
+            if let store = SwiftDataCoverageSessionStore() {
+                return store
+            }
+        }
+        return CoverageSessionQueue(fileURL: fileURL)
+    }
+}
+
+/// Entité SwiftData d'une session de couverture. La session `CoverageSessionUpload`
+/// (points inclus) est stockée telle quelle en `payload` JSON : elle est toujours
+/// lue/écrite d'un bloc, ce qui préserve exactement le contrat existant sans dupliquer
+/// le schéma des points. `pointCount` est dénormalisé pour la garde anti-rétrécissement
+/// sans décoder le payload.
+@available(iOS 17, *)
+@Model
+final class CoverageSessionEntity {
+    @Attribute(.unique) var sessionKey: String
+    var stateRaw: String
+    var updatedAtMs: Int
+    var pointCount: Int
+    var payload: Data
+
+    init(sessionKey: String, stateRaw: String, updatedAtMs: Int, pointCount: Int, payload: Data) {
+        self.sessionKey = sessionKey
+        self.stateRaw = stateRaw
+        self.updatedAtMs = updatedAtMs
+        self.pointCount = pointCount
+        self.payload = payload
+    }
+}
+
+/// Store de couverture adossé à SwiftData. Réplique fidèlement la logique de
+/// `CoverageSessionQueue` (garde anti-rétrécissement, reprise après crash, tri par
+/// ancienneté, idempotence par `sessionId`).
+///
+/// Concurrence : l'API du protocole est SYNCHRONE (callbacks GPS). SwiftData n'étant pas
+/// thread-safe, on sérialise chaque opération avec un `NSLock` et on crée un `ModelContext`
+/// FRAIS par opération (même `ModelContainer`, donc données committées visibles ; aucun
+/// contexte partagé entre threads). ⚠️ À valider en compilation/exécution Xcode
+/// (indisponible dans l'environnement Linux de développement de cette session).
+@available(iOS 17, *)
+final class SwiftDataCoverageSessionStore: CoverageSessionStoring, @unchecked Sendable {
+    private let container: ModelContainer
+    private let lock = NSLock()
+    private let encoder = JSONEncoder.signalQuest
+    private let decoder = JSONDecoder.signalQuest
+
+    /// `init?` : si le `ModelContainer` ne peut pas être créé, la fabrique retombe sur JSON.
+    init?(storeURL: URL? = nil, legacyFileURL: URL? = nil) {
+        let fileManager = FileManager.default
+        let resolvedStoreURL: URL
+        if let storeURL {
+            resolvedStoreURL = storeURL
+        } else {
+            let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            let dir = appSupport.appendingPathComponent("SignalQuest", isDirectory: true)
+            try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+            resolvedStoreURL = dir.appendingPathComponent("CoverageSessions.store", isDirectory: false)
+        }
+        do {
+            let configuration = ModelConfiguration(url: resolvedStoreURL)
+            container = try ModelContainer(for: CoverageSessionEntity.self, configurations: configuration)
+        } catch {
+            return nil
+        }
+        migrateLegacyJSONIfNeeded(explicitURL: legacyFileURL)
+    }
+
+    func upsert(_ upload: CoverageSessionUpload, state requestedState: CoverageSessionQueueState) throws {
+        try withLock {
+            let context = ModelContext(container)
+            let key = upload.sessionId.uuidString
+            let existing = try context.fetch(Self.descriptor(forKey: key)).first
+            let payload = try encoder.encode(upload)
+            let now = Self.nowMs()
+            if let existing {
+                guard upload.points.count >= existing.pointCount else { return }
+                let state: CoverageSessionQueueState = existing.stateRaw == CoverageSessionQueueState.queued.rawValue ? .queued : requestedState
+                existing.stateRaw = state.rawValue
+                existing.updatedAtMs = now
+                existing.pointCount = upload.points.count
+                existing.payload = payload
+            } else {
+                context.insert(CoverageSessionEntity(
+                    sessionKey: key,
+                    stateRaw: requestedState.rawValue,
+                    updatedAtMs: now,
+                    pointCount: upload.points.count,
+                    payload: payload
+                ))
+            }
+            try context.save()
+        }
+    }
+
+    func discard(sessionId: UUID) throws {
+        try withLock {
+            let context = ModelContext(container)
+            let key = sessionId.uuidString
+            for entity in try context.fetch(Self.descriptor(forKey: key)) {
+                context.delete(entity)
+            }
+            try context.save()
+        }
+    }
+
+    func recoverInterruptedRecordings() throws {
+        try withLock {
+            let context = ModelContext(container)
+            let recordingRaw = CoverageSessionQueueState.recording.rawValue
+            let descriptor = FetchDescriptor<CoverageSessionEntity>(
+                predicate: #Predicate { $0.stateRaw == recordingRaw }
+            )
+            var didChange = false
+            for entity in try context.fetch(descriptor) {
+                guard let upload = try? decoder.decode(CoverageSessionUpload.self, from: entity.payload) else { continue }
+                guard upload.points.count >= 2, let last = upload.points.last else {
+                    context.delete(entity)
+                    didChange = true
+                    continue
+                }
+                var recovered = upload
+                recovered.endTime = max(recovered.startTime, last.timestamp)
+                if let data = try? encoder.encode(recovered) { entity.payload = data }
+                entity.stateRaw = CoverageSessionQueueState.queued.rawValue
+                entity.updatedAtMs = Self.nowMs()
+                didChange = true
+            }
+            if didChange { try context.save() }
+        }
+    }
+
+    func pendingUploads() throws -> [CoverageSessionUpload] {
+        try withLock {
+            let context = ModelContext(container)
+            let queuedRaw = CoverageSessionQueueState.queued.rawValue
+            var descriptor = FetchDescriptor<CoverageSessionEntity>(
+                predicate: #Predicate { $0.stateRaw == queuedRaw }
+            )
+            descriptor.sortBy = [SortDescriptor(\CoverageSessionEntity.updatedAtMs, order: .forward)]
+            return try context.fetch(descriptor).compactMap { entity in
+                try? decoder.decode(CoverageSessionUpload.self, from: entity.payload)
+            }
+        }
+    }
+
+    func contains(sessionId: UUID) throws -> Bool {
+        try withLock {
+            let context = ModelContext(container)
+            let key = sessionId.uuidString
+            return try context.fetchCount(Self.descriptor(forKey: key)) > 0
+        }
+    }
+
+    func allPending() throws -> [PendingCoverageSession] {
+        try withLock {
+            let context = ModelContext(container)
+            let descriptor = FetchDescriptor<CoverageSessionEntity>()
+            return try context.fetch(descriptor).compactMap { entity -> PendingCoverageSession? in
+                guard let upload = try? decoder.decode(CoverageSessionUpload.self, from: entity.payload),
+                      let state = CoverageSessionQueueState(rawValue: entity.stateRaw) else { return nil }
+                return PendingCoverageSession(upload: upload, state: state, updatedAtMs: entity.updatedAtMs)
+            }
+        }
+    }
+
+    private static func descriptor(forKey key: String) -> FetchDescriptor<CoverageSessionEntity> {
+        FetchDescriptor<CoverageSessionEntity>(predicate: #Predicate { $0.sessionKey == key })
+    }
+
+    private func withLock<T>(_ operation: () throws -> T) throws -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return try operation()
+    }
+
+    /// Import unique de l'ancienne file JSON (`PendingCoverageSessions.json`) vers
+    /// SwiftData, puis renommage du fichier legacy pour ne pas ré-importer. Non
+    /// destructif : n'écrase pas une session déjà présente en base.
+    private func migrateLegacyJSONIfNeeded(explicitURL: URL?) {
+        let fileManager = FileManager.default
+        let legacyURL: URL
+        if let explicitURL {
+            legacyURL = explicitURL
+        } else {
+            guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+            legacyURL = appSupport
+                .appendingPathComponent("SignalQuest", isDirectory: true)
+                .appendingPathComponent("PendingCoverageSessions.json", isDirectory: false)
+        }
+        guard fileManager.fileExists(atPath: legacyURL.path),
+              let data = try? Data(contentsOf: legacyURL),
+              let file = try? decoder.decode(CoverageSessionQueueFile.self, from: data),
+              !file.sessions.isEmpty else { return }
+        do {
+            try withLock {
+                let context = ModelContext(container)
+                for pending in file.sessions {
+                    let key = pending.upload.sessionId.uuidString
+                    let already = (try? context.fetchCount(Self.descriptor(forKey: key))) ?? 0
+                    guard already == 0, let payload = try? encoder.encode(pending.upload) else { continue }
+                    context.insert(CoverageSessionEntity(
+                        sessionKey: key,
+                        stateRaw: pending.state.rawValue,
+                        updatedAtMs: pending.updatedAtMs,
+                        pointCount: pending.upload.points.count,
+                        payload: payload
+                    ))
+                }
+                try context.save()
+            }
+            let backupURL = legacyURL.appendingPathExtension("migrated")
+            try? fileManager.removeItem(at: backupURL)
+            try? fileManager.moveItem(at: legacyURL, to: backupURL)
+        } catch {
+            // Échec → on garde le JSON legacy intact (réessayé au prochain lancement).
+        }
+    }
+
+    private static func nowMs() -> Int { Int(Date().timeIntervalSince1970 * 1_000) }
 }
