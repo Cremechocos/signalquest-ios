@@ -286,6 +286,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private let guestReceiptStore: GuestSpeedtestReceiptStore
     private let tcpProbe: SpeedtestTCPProbing
     private let pendingSaveKey = "pending-speedtest-saves"
+    /// Dossier de la file d'attente durable (partagé entre l'init durable et la migration).
+    /// `internal` (pas `private`) : référencé dans une valeur par défaut d'initialiseur.
+    static let pendingFolderName = "SignalQuestSpeedtestPending"
 
     init(
         api: APIClient,
@@ -293,10 +296,22 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         networkOperator: NetworkOperatorServicing? = nil,
         session: URLSession? = nil,
         historyCache: DiskCache = DiskCache(folderName: "SignalQuestSpeedtestHistory"),
-        pendingCache: DiskCache = DiskCache(folderName: "SignalQuestSpeedtestPending"),
+        // File des sauvegardes EN ATTENTE d'envoi : DURABLE (Application Support, non
+        // purgeable par iOS) et protégée — au contraire de l'historique (cache jetable).
+        // Un speedtest non encore envoyé (backend HS, hors-ligne) ne doit jamais être perdu.
+        pendingCache: DiskCache = DiskCache(
+            folderName: SpeedtestService.pendingFolderName,
+            baseDirectory: .applicationSupportDirectory,
+            evicts: false,
+            fileProtection: .completeUntilFirstUserAuthentication
+        ),
         guestReceiptStore: GuestSpeedtestReceiptStore = GuestSpeedtestReceiptStore(),
         tcpProbe: SpeedtestTCPProbing = NetworkSpeedtestTCPProbe()
     ) {
+        // Migration unique : les sauvegardes en attente vivaient dans Caches (purgeable).
+        // On les remonte vers Application Support avant toute lecture, pour ne pas perdre
+        // un test non envoyé lors de la mise à jour de l'app.
+        SpeedtestService.migratePendingSavesFromCachesIfNeeded()
         self.api = api
         self.markets = markets ?? MarketRegistryService(api: api)
         self.networkOperator = networkOperator ?? NetworkOperatorService(api: api)
@@ -311,6 +326,25 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         self.pendingCache = pendingCache
         self.guestReceiptStore = guestReceiptStore
         self.tcpProbe = tcpProbe
+    }
+
+    /// Migration unique Caches → Application Support pour la file d'attente durable.
+    /// Idempotente : après le déplacement la source n'existe plus (no-op ensuite).
+    private static func migratePendingSavesFromCachesIfNeeded(fileManager: FileManager = .default) {
+        guard let caches = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first,
+              let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+        let oldFolder = caches.appendingPathComponent(pendingFolderName, isDirectory: true)
+        let newFolder = appSupport.appendingPathComponent(pendingFolderName, isDirectory: true)
+        guard fileManager.fileExists(atPath: oldFolder.path),
+              let files = try? fileManager.contentsOfDirectory(at: oldFolder, includingPropertiesForKeys: nil) else { return }
+        try? fileManager.createDirectory(at: newFolder, withIntermediateDirectories: true)
+        for file in files where file.pathExtension == "json" {
+            let dest = newFolder.appendingPathComponent(file.lastPathComponent)
+            // Ne pas écraser une file déjà présente/plus récente en Application Support.
+            if !fileManager.fileExists(atPath: dest.path) {
+                try? fileManager.moveItem(at: file, to: dest)
+            }
+        }
     }
 
     func run(pathStatus: NetworkPathStatus, location: Coordinates?, settings: SpeedtestRunSettings) async throws -> SpeedtestRunResult {
