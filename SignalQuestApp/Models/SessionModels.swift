@@ -169,6 +169,57 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
     var hasValidCoordinate: Bool { lat != 0 || lng != 0 }
 }
 
+/// Speedtest rattaché à une session Drive Test — renvoyé par le backend SOUS
+/// `session.speedtests` (même niveau que `session.points`). Décodage tolérant.
+struct SessionSpeedtest: Decodable, Identifiable, Equatable {
+    let id: String
+    let lat: Double?
+    let lng: Double?
+    let downloadMbps: Double?
+    let uploadMbps: Double?
+    let pingMs: Double?
+    let jitterMs: Double?
+    let mobileOperator: String?
+    let operatorKey: String?
+    /// Génération/type de connexion au moment du test (ex. "5G", "4G", "LTE").
+    let networkType: String?
+    let timestamp: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, latitude, longitude, lat, lng
+        case downloadSpeed, averageSpeed, uploadAvg, uploadSpeed
+        case ping, pingMin, jitter
+        case mobileOperator, operatorKey, connectionType, networkType, timestamp
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.decodeFlexibleString(forKey: .id) ?? UUID().uuidString
+        lat = (try? c.decodeIfPresent(Double.self, forKey: .latitude))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .lat)) ?? nil
+        lng = (try? c.decodeIfPresent(Double.self, forKey: .longitude))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .lng)) ?? nil
+        // Débit : moyenne si dispo, sinon valeur brute (mêmes replis que le web).
+        downloadMbps = (try? c.decodeIfPresent(Double.self, forKey: .averageSpeed))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .downloadSpeed)) ?? nil
+        uploadMbps = (try? c.decodeIfPresent(Double.self, forKey: .uploadAvg))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .uploadSpeed)) ?? nil
+        pingMs = (try? c.decodeIfPresent(Double.self, forKey: .pingMin))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .ping)) ?? nil
+        jitterMs = (try? c.decodeIfPresent(Double.self, forKey: .jitter)) ?? nil
+        mobileOperator = c.decodeFlexibleString(forKey: .mobileOperator)
+        operatorKey = c.decodeFlexibleString(forKey: .operatorKey)
+        networkType = c.decodeFlexibleString(forKey: .connectionType)
+            ?? c.decodeFlexibleString(forKey: .networkType)
+        timestamp = (try? c.decodeIfPresent(Date.self, forKey: .timestamp)) ?? nil
+    }
+
+    var coordinate: CLLocationCoordinate2D? {
+        guard let lat, let lng, lat != 0 || lng != 0 else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lng)
+    }
+}
+
 // MARK: - Antenne desservante
 
 /// État d'identification d'une antenne desservante, dérivé de
@@ -425,25 +476,29 @@ struct SessionsPagination: Decodable {
 struct CoverageSessionDetail: Decodable {
     let session: CoverageSession
     let points: [CoverageSessionPoint]
+    let speedtests: [SessionSpeedtest]
     let servingAntennas: [ServingAntenna]
 
     enum CodingKeys: String, CodingKey { case session, points, servingAntennas, antennas }
-    enum SessionInnerKeys: String, CodingKey { case points }
+    enum SessionInnerKeys: String, CodingKey { case points, speedtests }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         if let nested = try? c.decodeIfPresent(CoverageSession.self, forKey: .session) {
             session = nested
-            // Les points sont imbriqués sous `session.points`.
+            // Les points ET les speedtests sont imbriqués sous `session`.
             if let inner = try? c.nestedContainer(keyedBy: SessionInnerKeys.self, forKey: .session) {
                 points = inner.decodeLossyArray([CoverageSessionPoint].self, forKey: .points)
+                speedtests = inner.decodeLossyArray([SessionSpeedtest].self, forKey: .speedtests)
             } else {
                 points = []
+                speedtests = []
             }
         } else {
             // Repli : session au niveau racine, points au niveau racine.
             session = try CoverageSession(from: decoder)
             points = c.decodeLossyArray([CoverageSessionPoint].self, forKey: .points)
+            speedtests = []
         }
         let wrappers = c.decodeLossyArray([ServingAntennaWrapper].self, forKey: .servingAntennas)
         let fallback = wrappers.isEmpty ? c.decodeLossyArray([ServingAntennaWrapper].self, forKey: .antennas) : wrappers

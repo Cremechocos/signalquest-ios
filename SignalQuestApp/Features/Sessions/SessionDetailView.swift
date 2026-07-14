@@ -12,6 +12,50 @@ final class SessionDetailViewModel: ObservableObject {
 
     init(session: CoverageSession) { self.session = session }
 
+    struct GenerationShare: Identifiable {
+        let generation: String
+        let count: Int
+        let pct: Double
+        var id: String { generation }
+    }
+
+    /// Génération normalisée d'un point (mêmes règles que SessionGenerationColor).
+    static func generationKey(_ tech: String?) -> String {
+        let t = (tech ?? "").uppercased()
+        if t.contains("5G") { return "5G" }
+        if t.contains("4G") || t == "LTE" { return "4G" }
+        if t.contains("3G") { return "3G" }
+        if t.contains("2G") { return "2G" }
+        return "Aucun"
+    }
+
+    /// Répartition des points par génération (5G→2G→Aucun) : comptes + pourcentages.
+    var generationBreakdown: [GenerationShare] {
+        guard let points = detail?.points, !points.isEmpty else { return [] }
+        var counts: [String: Int] = [:]
+        for p in points { counts[Self.generationKey(p.tech), default: 0] += 1 }
+        let total = points.count
+        return ["5G", "4G", "3G", "2G", "Aucun"].compactMap { gen -> GenerationShare? in
+            guard let c = counts[gen], c > 0 else { return nil }
+            return GenerationShare(generation: gen, count: c, pct: Double(c) / Double(total) * 100)
+        }
+    }
+
+    var speedtests: [SessionSpeedtest] {
+        (detail?.speedtests ?? []).sorted { ($0.timestamp ?? .distantPast) < ($1.timestamp ?? .distantPast) }
+    }
+
+    /// Synthèse speedtests (moyennes ↓/↑/ping + meilleur ↓) pour l'en-tête.
+    var speedtestSummary: (count: Int, avgDown: Double?, maxDown: Double?, avgUp: Double?, avgPing: Double?)? {
+        let sts = speedtests
+        guard !sts.isEmpty else { return nil }
+        func mean(_ v: [Double]) -> Double? { v.isEmpty ? nil : v.reduce(0, +) / Double(v.count) }
+        let downs = sts.compactMap(\.downloadMbps).filter { $0 > 0 }
+        let ups = sts.compactMap(\.uploadMbps).filter { $0 > 0 }
+        let pings = sts.compactMap(\.pingMs).filter { $0 > 0 }
+        return (sts.count, mean(downs), downs.max(), mean(ups), mean(pings))
+    }
+
     func load(service: SessionsServicing) async {
         isLoading = true
         errorMessage = nil
@@ -77,6 +121,8 @@ struct SessionDetailView: View {
                     chipsRow
                 }
                 traceSection
+                generationSection
+                speedtestsSection
                 if let antennas = model.detail?.servingAntennas, !antennas.isEmpty {
                     servingAntennasSection(antennas)
                 } else if model.detail != nil && !model.isLoading {
@@ -202,6 +248,7 @@ struct SessionDetailView: View {
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 SessionTraceMapView(points: detail.points,
                                     antennas: detail.servingAntennas,
+                                    speedtests: detail.speedtests,
                                     drawPath: model.session.isDriveTest,
                                     coloring: model.session.isIosCoverage ? .generation : .rsrp)
                     .frame(height: 300)
@@ -260,6 +307,159 @@ struct SessionDetailView: View {
             Circle().fill(Color(uiColor: color)).frame(width: 7, height: 7)
             Text(label)
         }
+    }
+
+    // MARK: Génération (répartition %)
+
+    @ViewBuilder
+    private var generationSection: some View {
+        let shares = model.generationBreakdown
+        if !shares.isEmpty {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                Text("Répartition par génération")
+                    .font(SQType.heading)
+                    .foregroundStyle(SQColor.label)
+                // Barre empilée : part de chaque génération sur l'ensemble des points.
+                GeometryReader { geo in
+                    HStack(spacing: 0) {
+                        ForEach(shares) { s in
+                            Rectangle()
+                                .fill(Color(uiColor: SessionGenerationColor.ui(genColorKey(s.generation))))
+                                .frame(width: max(2, geo.size.width * s.pct / 100))
+                        }
+                    }
+                }
+                .frame(height: 12)
+                .clipShape(Capsule())
+                .padding(.top, 2)
+                ForEach(shares) { s in
+                    HStack(spacing: SQSpace.sm) {
+                        Circle()
+                            .fill(Color(uiColor: SessionGenerationColor.ui(genColorKey(s.generation))))
+                            .frame(width: 9, height: 9)
+                        Text(s.generation)
+                            .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                            .foregroundStyle(SQColor.label)
+                        Spacer()
+                        Text("\(s.count) pts")
+                            .font(SQFont.body(11.5, relativeTo: .caption2))
+                            .foregroundStyle(SQColor.labelSecondary)
+                        Text("\(Int(s.pct.rounded()))%")
+                            .font(SQFont.display(15, .bold, relativeTo: .subheadline))
+                            .foregroundStyle(SQColor.label)
+                            .frame(width: 46, alignment: .trailing)
+                    }
+                }
+            }
+            .padding(SQSpace.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+            .sqShadowCard()
+        }
+    }
+
+    /// "Aucun" → nil (gris) ; sinon la génération telle quelle pour SessionGenerationColor.
+    private func genColorKey(_ gen: String) -> String? { gen == "Aucun" ? nil : gen }
+
+    // MARK: Speedtests
+
+    @ViewBuilder
+    private var speedtestsSection: some View {
+        let sts = model.speedtests
+        if !sts.isEmpty {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                HStack {
+                    Text("Speedtests")
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.label)
+                    Spacer()
+                    Text("\(sts.count)")
+                        .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                if let sum = model.speedtestSummary {
+                    HStack(spacing: SQSpace.sm) {
+                        speedStat("↓ moy", sum.avgDown, "Mb/s", SQColor.info)
+                        speedStat("↑ moy", sum.avgUp, "Mb/s", SQColor.brandGreen)
+                        speedStat("Ping", sum.avgPing, "ms", SQColor.label)
+                    }
+                    .padding(.bottom, SQSpace.xs)
+                }
+                ForEach(Array(sts.enumerated()), id: \.element.id) { index, st in
+                    speedtestRow(st)
+                    if index != sts.count - 1 {
+                        Rectangle()
+                            .fill(SQColor.separator)
+                            .frame(height: 1)
+                            .padding(.leading, SQSpace.lg)
+                    }
+                }
+            }
+            .padding(SQSpace.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+            .sqShadowCard()
+        }
+    }
+
+    private func speedStat(_ label: String, _ value: Double?, _ unit: String, _ color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label)
+                .font(SQFont.body(10.5, relativeTo: .caption2))
+                .foregroundStyle(SQColor.labelSecondary)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(value.map { "\(Int($0.rounded()))" } ?? "—")
+                    .font(SQFont.display(18, .bold, relativeTo: .title3))
+                    .foregroundStyle(color)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                Text(unit)
+                    .font(SQFont.body(10, relativeTo: .caption2))
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(SQSpace.sm)
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    }
+
+    private func speedtestRow(_ st: SessionSpeedtest) -> some View {
+        HStack(spacing: SQSpace.sm) {
+            Circle().fill(Color(uiColor: SessionSpeedColor.ui(st.downloadMbps))).frame(width: 10, height: 10)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 5) {
+                    Text(st.mobileOperator ?? st.operatorKey ?? "Speedtest")
+                        .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(1)
+                    if let net = st.networkType, !net.isEmpty {
+                        Text(net)
+                            .font(SQFont.body(10.5, .semibold, relativeTo: .caption2))
+                            .foregroundStyle(Color(uiColor: SessionGenerationColor.ui(net)))
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Color(uiColor: SessionGenerationColor.ui(net)).opacity(0.16), in: Capsule(style: .continuous))
+                    }
+                }
+                if let t = st.timestamp {
+                    Text(t.formatted(.dateTime.hour().minute()))
+                        .font(SQFont.body(11.5, relativeTo: .caption2))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 1) {
+                Text("↓ \(st.downloadMbps.map { "\(Int($0.rounded()))" } ?? "—") Mb/s")
+                    .font(SQFont.body(14, .bold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.info)
+                HStack(spacing: 8) {
+                    Text("↑ \(st.uploadMbps.map { "\(Int($0.rounded()))" } ?? "—")")
+                        .foregroundStyle(SQColor.brandGreen)
+                    Text("\(st.pingMs.map { "\(Int($0.rounded()))" } ?? "—") ms")
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .font(SQFont.body(11.5, relativeTo: .caption2))
+            }
+        }
+        .padding(.vertical, SQSpace.xs)
     }
 
     // MARK: Serving antennas

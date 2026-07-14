@@ -9,6 +9,7 @@ import MapKit
 struct SessionTraceMapView: UIViewRepresentable {
     let points: [CoverageSessionPoint]
     let antennas: [ServingAntenna]
+    var speedtests: [SessionSpeedtest] = []
     var drawPath: Bool = false
     /// Mode de coloration des points : par signal (RSRP) ou par génération (carte couverture).
     var coloring: SessionPointColoring = .rsrp
@@ -43,12 +44,21 @@ struct SessionTraceMapView: UIViewRepresentable {
         let locatedAntennas = antennas.filter(\.hasValidCoordinate)
         map.addAnnotations(locatedAntennas.map(ServingAntennaAnnotation.init))
 
+        // Speedtests géolocalisés (marqueur « débit » tappable).
+        let locatedSpeedtests = speedtests.compactMap { st -> SessionSpeedtestAnnotation? in
+            st.coordinate == nil ? nil : SessionSpeedtestAnnotation(st)
+        }
+        map.addAnnotations(locatedSpeedtests)
+
         var rect = MKMapRect.null
         for coord in coords {
             rect = rect.union(MKMapRect(origin: MKMapPoint(coord), size: MKMapSize(width: 1, height: 1)))
         }
         for antenna in locatedAntennas {
             rect = rect.union(MKMapRect(origin: MKMapPoint(antenna.coordinate), size: MKMapSize(width: 1, height: 1)))
+        }
+        for st in locatedSpeedtests {
+            rect = rect.union(MKMapRect(origin: MKMapPoint(st.coordinate), size: MKMapSize(width: 1, height: 1)))
         }
         if !rect.isNull {
             map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 44, left: 44, bottom: 44, right: 44), animated: false)
@@ -73,16 +83,29 @@ struct SessionTraceMapView: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            guard let serving = annotation as? ServingAntennaAnnotation else { return nil }
-            let identifier = "serving-antenna"
-            let view = (mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView)
-                ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
-            view.annotation = annotation
-            view.markerTintColor = serving.tintColor
-            view.glyphImage = UIImage(systemName: "antenna.radiowaves.left.and.right")
-            view.displayPriority = .required
-            view.canShowCallout = true
-            return view
+            if let serving = annotation as? ServingAntennaAnnotation {
+                let identifier = "serving-antenna"
+                let view = (mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView)
+                    ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+                view.annotation = annotation
+                view.markerTintColor = serving.tintColor
+                view.glyphImage = UIImage(systemName: "antenna.radiowaves.left.and.right")
+                view.displayPriority = .required
+                view.canShowCallout = true
+                return view
+            }
+            if let st = annotation as? SessionSpeedtestAnnotation {
+                let identifier = "session-speedtest"
+                let view = (mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView)
+                    ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+                view.annotation = annotation
+                view.markerTintColor = st.tintColor
+                view.glyphImage = UIImage(systemName: "speedometer")
+                view.displayPriority = .defaultHigh
+                view.canShowCallout = true
+                return view
+            }
+            return nil
         }
     }
 }
@@ -118,16 +141,14 @@ final class SessionPointsRenderer: MKOverlayRenderer {
         let radius = max(2.0, 3.0 / zoomScale)
         let pad = radius * 3
         let cull = mapRect.insetBy(dx: -pad, dy: -pad)
-        context.setLineWidth(radius * 0.35)
-        let stroke = UIColor.black.withAlphaComponent(0.25).cgColor
+        // Disques SANS bordure : la couleur vive reste pleinement lisible même
+        // dézoomé (un contour mangeait le disque quand le rayon devient petit).
         for dot in overlay.dots {
             guard cull.contains(dot.point) else { continue }
             let p = point(for: dot.point)
             let rect = CGRect(x: p.x - radius, y: p.y - radius, width: radius * 2, height: radius * 2)
             context.setFillColor(dot.color)
             context.fillEllipse(in: rect)
-            context.setStrokeColor(stroke)
-            context.strokeEllipse(in: rect)
         }
     }
 }
@@ -207,5 +228,53 @@ final class ServingAntennaAnnotation: NSObject, MKAnnotation {
         case .hypothesis: return UIColor(SQColor.brandOrange)
         case .proximity, .unknown: return .systemGray
         }
+    }
+}
+
+/// Annotation MapKit d'un speedtest géolocalisé (marqueur « débit »).
+final class SessionSpeedtestAnnotation: NSObject, MKAnnotation {
+    let speedtest: SessionSpeedtest
+    let coordinate: CLLocationCoordinate2D
+    init?(_ st: SessionSpeedtest) {
+        guard let coord = st.coordinate else { return nil }
+        self.speedtest = st
+        self.coordinate = coord
+    }
+
+    var title: String? {
+        let down = speedtest.downloadMbps.map { "↓ \(Int($0.rounded())) Mb/s" } ?? "↓ —"
+        let up = speedtest.uploadMbps.map { "↑ \(Int($0.rounded()))" } ?? "↑ —"
+        return "\(down) · \(up)"
+    }
+    var subtitle: String? {
+        var parts: [String] = []
+        if let op = speedtest.mobileOperator, !op.isEmpty { parts.append(op) }
+        if let net = speedtest.networkType, !net.isEmpty { parts.append(net) }
+        if let ping = speedtest.pingMs { parts.append("\(Int(ping.rounded())) ms") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+    var tintColor: UIColor { SessionSpeedColor.ui(speedtest.downloadMbps) }
+}
+
+/// Couleur d'un speedtest par débit descendant (Mb/s) — du rouge (lent) au vert (rapide).
+enum SessionSpeedColor {
+    static func ui(_ mbps: Double?) -> UIColor {
+        guard let m = mbps, m > 0 else { return hex(0x94A3B8) }
+        switch m {
+        case 150...:      return hex(0x10B981) // très rapide
+        case 75..<150:    return hex(0x84CC16) // rapide
+        case 30..<75:     return hex(0xF59E0B) // moyen
+        case 10..<30:     return hex(0xF97316) // lent
+        default:          return hex(0xEF4444) // très lent
+        }
+    }
+
+    private static func hex(_ v: UInt32) -> UIColor {
+        UIColor(
+            red: CGFloat((v >> 16) & 0xFF) / 255,
+            green: CGFloat((v >> 8) & 0xFF) / 255,
+            blue: CGFloat(v & 0xFF) / 255,
+            alpha: 1
+        )
     }
 }
