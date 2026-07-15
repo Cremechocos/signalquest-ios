@@ -31,33 +31,45 @@ struct SpeedtestServer: Codable, Equatable {
 }
 
 enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
-    /// Sélection automatique (défaut) : préflight au début de la phase DL —
-    /// 256 Ko lus sur chaque candidat, le plus rapide gagne (parité Android
-    /// `hybrid_auto`). Le ping suit la cible retenue.
     case hybridAuto = "hybrid_auto"
+    case rbx = "rbx"
+    case sbg = "sbg"
+    case gra = "gra"
+    case bom = "bom"
+    case bhs = "bhs"
+    case us = "us"
+    
+    // Legacy cases left for soft migration or parsing safely:
     case cloudflareR2 = "cloudflare_r2"
     case awsCloudFront = "aws_cloudfront"
-    /// Cible retirée des choix (TTFB 2× supérieur aux CDN) : le case reste
-    /// pour décoder les préférences déjà stockées, migrées vers `.hybridAuto`.
-    /// Le VPS reste le serveur d'UPLOAD (mesure certifiée) et le repli DL si
-    /// les CDN sont injoignables.
     case vpsInternal = "vps_internal"
 
     var id: String { rawValue }
 
     /// Cases proposés à l'utilisateur (réglages).
     static var selectableCases: [SpeedtestDownloadTarget] {
-        [.hybridAuto, .cloudflareR2, .awsCloudFront]
+        [.hybridAuto, .rbx, .sbg, .gra, .bom, .bhs, .us]
     }
 
-    /// Migration douce : une préférence VPS stockée redevient « Auto ».
+    /// Migration douce : les anciennes préférences CDN deviennent « Auto ».
     var migrated: SpeedtestDownloadTarget {
-        self == .vpsInternal ? .hybridAuto : self
+        switch self {
+        case .cloudflareR2, .awsCloudFront, .vpsInternal:
+            return .hybridAuto
+        default:
+            return self
+        }
     }
 
     var displayName: String {
         switch self {
         case .hybridAuto: return "Auto"
+        case .rbx: return "RBX proof (Roubaix)"
+        case .sbg: return "SBG proof (Strasbourg)"
+        case .gra: return "GRA proof (Gravelines)"
+        case .bom: return "YNM proof (Mumbai)"
+        case .bhs: return "Beauharnois proof (BHS)"
+        case .us: return "US proof"
         case .cloudflareR2: return "Cloudflare"
         case .awsCloudFront: return "AWS CloudFront"
         case .vpsInternal: return "VPS OVH Gravelines"

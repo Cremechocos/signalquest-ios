@@ -362,116 +362,145 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     ) async throws -> SpeedtestRunResult {
         let startedAt = Date()
 
-        let sessionResponse: SpeedtestSessionResponse = try await api.requestJSON(
-            "/api/speedtest/session",
-            body: ["streams": settings.streams, "durationSec": settings.durationSeconds],
-            authenticated: false
-        )
+        // 1. Resolve selected server
+        let ovhServer = selectOVHServer(for: settings.downloadTarget, location: location)
+        let serverName = ovhServer.name
 
-        let downloadTarget = await resolveDownloadTarget(settings: settings, sessionResponse: sessionResponse)
+        // 2. Find a working port
+        guard let port = await findWorkingOVHPort(host: ovhServer.hostname) else {
+            throw NSError(domain: "iPerfClient", code: -6, userInfo: [NSLocalizedDescriptionKey: "Impossible de se connecter aux serveurs OVH iPerf3 (ports 5201-5210 bloqués)"])
+        }
 
-        // Le serveur de MESURE est le VPS sélectionné par la session : il reçoit
-        // toujours l'upload et reste le « serveur de test » affiché/soumis. Le
-        // download (et désormais le ping, voir plus bas) peut provenir du CDN
-        // CloudFront quand l'utilisateur le sélectionne.
-        // Hôte réel de mesure (le VPS qui sert l'upload), extrait des URL de
-        // session. Sert de repli honnête quand le backend ne renvoie pas de
-        // `selectedServer` nommé — au lieu du générique « Serveur SignalQuest ».
-        let measurementHost = sessionResponse.uploadUrl.host(percentEncoded: false)
-            ?? sessionResponse.downloadUrl.host(percentEncoded: false)
-        let measurementServerName = sessionResponse.selectedServer?.name
-            ?? sessionResponse.selectedServer?.location
-            ?? sessionResponse.selectedServer?.host
-            ?? measurementHost
-            ?? "Serveur SignalQuest"
-
+        // 3. Ping measurement using TCP ping
         progress?(SpeedtestLiveProgress(
             phase: .ping,
             fraction: 0,
-            pingSampleTarget: speedtestPingMeasuredSampleTarget(
-                attemptBudget: SpeedtestEngineConfig.pingAttemptBudget,
-                warmupCount: SpeedtestEngineConfig.pingWarmupCount
-            ),
-            serverName: measurementServerName
+            pingSampleTarget: 8,
+            serverName: serverName
         ))
-        // Cible du ping. Par défaut le VPS (`sessionResponse.downloadUrl`), qui
-        // répond au GET — ce que le repli HTTP du ping exige (l'endpoint d'upload
-        // rejette le GET). Mais quand le download provient réellement d'AWS
-        // CloudFront, on mesure la latence contre l'edge CloudFront pour refléter
-        // le chemin du download. `downloadTarget` encode déjà l'URL + le token
-        // (nil pour le CDN, qui sert le fichier en GET/HEAD avec Range).
-        let pingsAgainstCDN = downloadTarget.url != sessionResponse.downloadUrl
-        let pingURL = pingsAgainstCDN ? downloadTarget.url : sessionResponse.downloadUrl
-        let pingToken = pingsAgainstCDN ? downloadTarget.token : sessionResponse.sessionToken
+
         let pingOutcome = try await measurePings(
-            url: pingURL,
-            token: pingToken,
-            serverName: measurementServerName,
+            url: URL(string: "http://\(ovhServer.hostname):\(port)")!,
+            token: nil,
+            serverName: serverName,
             progress: progress
         )
 
-        progress?(SpeedtestLiveProgress(phase: .download, fraction: 0, serverName: measurementServerName))
-        // Capture du POP edge (x-amz-cf-pop / cf-ray) : télémétrie de diagnostic
-        // des chemins CDN (les colonnes existent déjà côté backend, remplies par
-        // Android — iOS ne les envoyait pas).
-        let edgeCapture = SpeedtestEdgeCaptureBox()
-        let downloadOutcome = try await measureDownload(
-            url: downloadTarget.url,
-            token: downloadTarget.token,
-            chunkBytes: min(sessionResponse.maxDownloadBytesPerRequest ?? 25_000_000, 64_000_000),
-            durationSeconds: settings.durationSeconds,
-            streams: min(settings.streams, sessionResponse.maxStreams ?? settings.streams),
-            reliabilityMode: settings.reliabilityMode,
-            serverName: measurementServerName,
-            pingProtocol: pingOutcome.protocolName,
-            edgeCapture: edgeCapture,
-            progress: progress
+        let pingValue = SpeedMetricCalculator.average(pingOutcome.values)
+        let pingMedianValue = SpeedMetricCalculator.median(pingOutcome.values)
+        let pingMinValue = pingOutcome.values.min()
+        let pingMaxValue = pingOutcome.values.max()
+        let jitterValue = SpeedMetricCalculator.jitter(pingOutcome.values)
+
+        let durationSeconds = max(5, min(settings.durationSeconds, 30))
+        let parallelStreams = min(settings.streams, 16)
+
+        // 4. Download measurement
+        progress?(SpeedtestLiveProgress(phase: .download, fraction: 0, serverName: serverName))
+
+        let dlSamplesBox = SpeedtestSamplesBox()
+        let dlLiveSampler = SpeedtestLiveSampler()
+        let dlState = ProgressState()
+
+        let downloadRunner = IPerf3Runner(
+            hostname: ovhServer.hostname,
+            port: port,
+            streams: parallelStreams,
+            durationSeconds: durationSeconds,
+            isDownload: true,
+            onProgress: { @Sendable bytes, elapsed in
+                let elapsedMs = elapsed * 1000.0
+                let needleMbps = dlLiveSampler.observe(totalBytes: bytes, elapsedMs: elapsedMs)
+                let averageMbps = (Double(bytes) * 8.0 / 1_000_000.0) / max(0.1, elapsed)
+
+                let deltaBytes = dlState.update(bytes: bytes, time: elapsedMs)
+
+                Task {
+                    await dlSamplesBox.append(start: max(0, elapsedMs - 150), end: elapsedMs, bytes: deltaBytes)
+                }
+
+                progress?(SpeedtestLiveProgress(
+                    phase: .download,
+                    currentMbps: needleMbps,
+                    fraction: elapsed / Double(durationSeconds),
+                    downloadLiveMbps: needleMbps,
+                    downloadAverageMbps: averageMbps,
+                    serverName: serverName
+                ))
+            }
         )
 
-        guard let uploadBeginURL = sessionResponse.uploadBeginUrl,
-              let uploadFinalizeURL = sessionResponse.uploadFinalizeUrl else {
-            throw SpeedtestEngineError.uploadUnavailable
-        }
-        progress?(SpeedtestLiveProgress(phase: .upload, fraction: 0, serverName: measurementServerName))
-        let uploadOutcome = try await measureUpload(
-            beginURL: uploadBeginURL,
-            uploadURL: sessionResponse.uploadUrl,
-            finalizeURL: uploadFinalizeURL,
-            token: sessionResponse.sessionToken,
-            maxBytes: boundedUploadRequestBytes(sessionResponse.maxUploadBytesPerRequest),
-            durationSeconds: settings.durationSeconds,
-            streams: min(settings.streams, sessionResponse.maxStreams ?? settings.streams),
-            serverName: measurementServerName,
-            pingProtocol: pingOutcome.protocolName,
-            progress: progress
+        let dlResult = try await downloadRunner.run()
+        let dlStats = await dlSamplesBox.publicStats(windowMs: 1000, graceMs: 2000, endMs: dlResult.duration * 1000)
+        let dlAverageMbps = (Double(dlResult.bytes) * 8.0 / 1_000_000.0) / max(0.1, dlResult.duration)
+
+        // 5. Upload measurement
+        progress?(SpeedtestLiveProgress(phase: .upload, fraction: 0, serverName: serverName))
+
+        let ulSamplesBox = SpeedtestSamplesBox()
+        let ulLiveSampler = SpeedtestLiveSampler()
+        let ulState = ProgressState()
+
+        let uploadRunner = IPerf3Runner(
+            hostname: ovhServer.hostname,
+            port: port,
+            streams: parallelStreams,
+            durationSeconds: durationSeconds,
+            isDownload: false,
+            onProgress: { @Sendable bytes, elapsed in
+                let elapsedMs = elapsed * 1000.0
+                let needleMbps = ulLiveSampler.observe(totalBytes: bytes, elapsedMs: elapsedMs)
+                let averageMbps = (Double(bytes) * 8.0 / 1_000_000.0) / max(0.1, elapsed)
+
+                let deltaBytes = ulState.update(bytes: bytes, time: elapsedMs)
+
+                Task {
+                    await ulSamplesBox.append(start: max(0, elapsedMs - 150), end: elapsedMs, bytes: deltaBytes)
+                }
+
+                progress?(SpeedtestLiveProgress(
+                    phase: .upload,
+                    currentMbps: needleMbps,
+                    fraction: elapsed / Double(durationSeconds),
+                    uploadLiveMbps: needleMbps,
+                    uploadAverageMbps: averageMbps,
+                    serverName: serverName
+                ))
+            }
         )
 
+        let ulResult = try await uploadRunner.run()
+        let ulStats = await ulSamplesBox.publicStats(windowMs: 1000, graceMs: 2000, endMs: ulResult.duration * 1000)
+        let ulAverageMbps = (Double(ulResult.bytes) * 8.0 / 1_000_000.0) / max(0.1, ulResult.duration)
+
+        // 6. Build the result
         let duration = Date().timeIntervalSince(startedAt)
         let resolvedPlace = await reverseGeocodedPlace(for: location)
         let wifiSSID = await currentWiFiSSID(for: pathStatus)
         let operatorContext = await resolveCellularOperatorContext(pathStatus: pathStatus, location: location)
+
         let result = SpeedtestRunResult(
             id: UUID(),
             label: "iOS speedtest",
-            downloadMbps: downloadOutcome.averageMbps,
-            downloadAverageMbps: downloadOutcome.averageMbps,
-            downloadMaxMbps: downloadOutcome.peakMbps,
-            downloadP90Mbps: downloadOutcome.p90Mbps,
-            downloadP95Mbps: downloadOutcome.p95Mbps,
-            uploadMbps: uploadOutcome.averageMbps,
-            uploadAverageMbps: uploadOutcome.averageMbps,
-            uploadMaxMbps: uploadOutcome.peakMbps,
-            uploadP90Mbps: uploadOutcome.p90Mbps,
-            uploadP95Mbps: uploadOutcome.p95Mbps,
-            pingMs: SpeedMetricCalculator.average(pingOutcome.values),
-            pingMedianMs: SpeedMetricCalculator.median(pingOutcome.values),
-            pingMinMs: pingOutcome.values.min(),
-            pingMaxMs: pingOutcome.values.max(),
-            jitterMs: SpeedMetricCalculator.jitter(pingOutcome.values),
-            pingDlMs: downloadOutcome.pingDlMs,
-            jitterDlMs: downloadOutcome.jitterDlMs,
-            pingUlMs: uploadOutcome.pingUlMs,
-            jitterUlMs: uploadOutcome.jitterUlMs,
+            downloadMbps: dlAverageMbps,
+            downloadAverageMbps: dlAverageMbps,
+            downloadMaxMbps: dlStats.peak > 0 ? dlStats.peak : dlAverageMbps,
+            downloadP90Mbps: dlStats.p90,
+            downloadP95Mbps: dlStats.p95,
+            uploadMbps: ulAverageMbps,
+            uploadAverageMbps: ulAverageMbps,
+            uploadMaxMbps: ulStats.peak > 0 ? ulStats.peak : ulAverageMbps,
+            uploadP90Mbps: ulStats.p90,
+            uploadP95Mbps: ulStats.p95,
+            pingMs: pingValue,
+            pingMedianMs: pingMedianValue,
+            pingMinMs: pingMinValue,
+            pingMaxMs: pingMaxValue,
+            jitterMs: jitterValue,
+            pingDlMs: nil,
+            jitterDlMs: nil,
+            pingUlMs: nil,
+            jitterUlMs: nil,
             pingProtocol: pingOutcome.protocolName,
             durationSeconds: duration,
             connectionType: pathStatus.connection,
@@ -485,18 +514,20 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             city: resolvedPlace.city,
             address: resolvedPlace.address,
             coordinate: location,
-            serverName: measurementServerName,
-            downloadServerName: downloadTarget.serverName,
-            downloadServerId: downloadTarget.targetId,
-            downloadServerCode: edgeCapture.code,
+            serverName: serverName,
+            downloadServerName: serverName,
+            downloadServerId: "iperf3_\(ovhServer.hostname)",
+            downloadServerCode: nil,
             createdAt: startedAt,
-            downloadSeriesMbps: downloadOutcome.seriesMbps,
-            uploadSeriesMbps: uploadOutcome.seriesMbps,
-            uploadMeasurementSource: uploadOutcome.measurementSource,
+            downloadSeriesMbps: dlStats.seriesMbps,
+            uploadSeriesMbps: ulStats.seriesMbps,
+            uploadMeasurementSource: "client-written",
             deviceModel: AppleDeviceDescriptor.currentShareModelName,
             osVersion: AppleDeviceDescriptor.currentOSVersionLabel
         )
+
         try? await appendHistory(result)
+
         progress?(SpeedtestLiveProgress(
             phase: .finished,
             currentMbps: result.downloadAverageMbps,
@@ -506,8 +537,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             pingFinalMs: result.pingMinMs ?? result.pingMs,
             jitterMs: result.jitterMs,
             pingProtocol: result.pingProtocol,
-            serverName: measurementServerName
+            serverName: serverName
         ))
+
         return result
     }
 
@@ -833,6 +865,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         case .awsCloudFront:
             if let target = cdnTarget(.awsCloudFront, sessionResponse: sessionResponse) { return target }
         case .vpsInternal:
+            break
+        default:
             break
         }
 
@@ -1826,6 +1860,539 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private func currentWiFiSSID(for pathStatus: NetworkPathStatus) async -> String? {
         guard pathStatus.connection == .wifi else { return nil }
         return await WiFiSSIDProvider.currentSSID()
+    }
+}
+
+struct OVHServer: Sendable {
+    let hostname: String
+    let name: String
+    let latitude: Double
+    let longitude: Double
+}
+
+private let ovhServers = [
+    OVHServer(hostname: "rbx.proof.ovh.net", name: "RBX proof (Roubaix)", latitude: 50.692, longitude: 3.178),
+    OVHServer(hostname: "sbg.proof.ovh.net", name: "SBG proof (Strasbourg)", latitude: 48.573, longitude: 7.752),
+    OVHServer(hostname: "gra.proof.ovh.net", name: "GRA proof (Gravelines)", latitude: 50.986, longitude: 2.124),
+    OVHServer(hostname: "bom.proof.ovh.net", name: "YNM proof (Mumbai)", latitude: 19.076, longitude: 72.877),
+    OVHServer(hostname: "bhs.proof.ovh.ca", name: "Beauharnois proof (BHS)", latitude: 45.312, longitude: -73.875),
+    OVHServer(hostname: "proof.ovh.us", name: "US proof", latitude: 38.744, longitude: -77.673)
+]
+
+class ConcurrencyGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var flag = false
+    
+    func testAndSet() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if flag {
+            return true
+        }
+        flag = true
+        return false
+    }
+}
+
+class AtomicBool: @unchecked Sendable {
+    private let lock = NSLock()
+    private var val: Bool
+    
+    init(_ val: Bool) {
+        self.val = val
+    }
+    
+    var value: Bool {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return val
+        }
+        set {
+            lock.lock()
+            val = newValue
+            lock.unlock()
+        }
+    }
+}
+
+private func haversineDistance(from c1: Coordinates, to c2: Coordinates) -> Double {
+    let lat1 = c1.latitude * .pi / 180.0
+    let lon1 = c1.longitude * .pi / 180.0
+    let lat2 = c2.latitude * .pi / 180.0
+    let lon2 = c2.longitude * .pi / 180.0
+    
+    let dlat = lat2 - lat1
+    let dlon = lon2 - lon1
+    let a = sin(dlat/2) * sin(dlat/2) + cos(lat1) * cos(lat2) * sin(dlon/2) * sin(dlon/2)
+    let c = 2 * atan2(sqrt(a), sqrt(1-a))
+    return 6371.0 * c // Earth radius in km
+}
+
+private func findClosestOVHServer(to location: Coordinates?) -> OVHServer {
+    guard let location else {
+        // Default to Roubaix or Gravelines if no location is available
+        return ovhServers.first(where: { $0.hostname == "gra.proof.ovh.net" }) ?? ovhServers[0]
+    }
+    
+    return ovhServers.min(by: { s1, s2 in
+        let dist1 = haversineDistance(from: location, to: Coordinates(latitude: s1.latitude, longitude: s1.longitude))
+        let dist2 = haversineDistance(from: location, to: Coordinates(latitude: s2.latitude, longitude: s2.longitude))
+        return dist1 < dist2
+    }) ?? ovhServers[0]
+}
+
+private func selectOVHServer(for target: SpeedtestDownloadTarget, location: Coordinates?) -> OVHServer {
+    switch target {
+    case .rbx:
+        return ovhServers.first(where: { $0.hostname == "rbx.proof.ovh.net" }) ?? ovhServers[0]
+    case .sbg:
+        return ovhServers.first(where: { $0.hostname == "sbg.proof.ovh.net" }) ?? ovhServers[0]
+    case .gra:
+        return ovhServers.first(where: { $0.hostname == "gra.proof.ovh.net" }) ?? ovhServers[0]
+    case .bom:
+        return ovhServers.first(where: { $0.hostname == "bom.proof.ovh.net" }) ?? ovhServers[0]
+    case .bhs:
+        return ovhServers.first(where: { $0.hostname == "bhs.proof.ovh.ca" }) ?? ovhServers[0]
+    case .us:
+        return ovhServers.first(where: { $0.hostname == "proof.ovh.us" }) ?? ovhServers[0]
+    default:
+        return findClosestOVHServer(to: location)
+    }
+}
+
+private func findWorkingOVHPort(host: String) async -> UInt16? {
+    for port in UInt16(5201)...UInt16(5210) {
+        do {
+            let connection = NWConnection(host: NWEndpoint.Host(host), port: NWEndpoint.Port(rawValue: port)!, using: .tcp)
+            let gate = ConcurrencyGate()
+            
+            let connected = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
+                let queue = DispatchQueue(label: "fr.signalquest.speedtest.portprobe")
+                
+                connection.stateUpdateHandler = { state in
+                    switch state {
+                    case .ready:
+                        if !gate.testAndSet() {
+                            connection.cancel()
+                            continuation.resume(returning: true)
+                        }
+                    case .failed(let error):
+                        if !gate.testAndSet() {
+                            connection.cancel()
+                            continuation.resume(throwing: error)
+                        }
+                    case .cancelled:
+                        break
+                    default:
+                        break
+                    }
+                }
+                
+                queue.asyncAfter(deadline: .now() + 2.0) {
+                    if !gate.testAndSet() {
+                        connection.cancel()
+                        continuation.resume(returning: false)
+                    }
+                }
+                
+                connection.start(queue: queue)
+            }
+            if connected {
+                return port
+            }
+        } catch {
+            // Try next port
+        }
+    }
+    return nil
+}
+
+class ProgressState: @unchecked Sendable {
+    private let lock = NSLock()
+    var lastBytes = 0
+    var lastTime = 0.0
+    
+    func update(bytes: Int, time: Double) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        let delta = bytes - lastBytes
+        lastBytes = bytes
+        lastTime = time
+        return delta
+    }
+}
+
+class SafeCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var bytes: Int = 0
+    
+    func add(_ count: Int) {
+        lock.lock()
+        bytes += count
+        lock.unlock()
+    }
+    
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return bytes
+    }
+}
+
+actor IPerf3Runner {
+    let hostname: String
+    let port: UInt16
+    let streams: Int
+    let durationSeconds: Int
+    let isDownload: Bool
+    let onProgress: (@Sendable (_ bytesTransferred: Int, _ elapsedSeconds: Double) -> Void)?
+    
+    private var activeSenders: [StreamSender] = []
+    private var activeReceivers: [StreamReceiver] = []
+    
+    init(hostname: String, port: UInt16, streams: Int, durationSeconds: Int, isDownload: Bool, onProgress: (@Sendable (_ bytesTransferred: Int, _ elapsedSeconds: Double) -> Void)? = nil) {
+        self.hostname = hostname
+        self.port = port
+        self.streams = streams
+        self.durationSeconds = durationSeconds
+        self.isDownload = isDownload
+        self.onProgress = onProgress
+    }
+    
+    func makeCookie() -> Data {
+        let chars = "abcdefghijklmnopqrstuvwxyz234567"
+        var result = ""
+        for _ in 0..<36 {
+            let randomIndex = Int.random(in: 0..<chars.count)
+            let char = chars[chars.index(chars.startIndex, offsetBy: randomIndex)]
+            result.append(char)
+        }
+        var data = result.data(using: .ascii) ?? Data()
+        data.append(0) // Null byte terminator
+        return data
+    }
+    
+    func connect(connection: NWConnection, queue: DispatchQueue) async throws {
+        let gate = ConcurrencyGate()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    if !gate.testAndSet() {
+                        continuation.resume()
+                    }
+                case .failed(let error):
+                    if !gate.testAndSet() {
+                        continuation.resume(throwing: error)
+                    }
+                case .cancelled:
+                    if !gate.testAndSet() {
+                        continuation.resume(throwing: NSError(domain: "iPerfClient", code: -3, userInfo: [NSLocalizedDescriptionKey: "Connection cancelled"]))
+                    }
+                default:
+                    break
+                }
+            }
+            connection.start(queue: queue)
+        }
+    }
+    
+    func sendData(connection: NWConnection, data: Data) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            connection.send(content: data, completion: .contentProcessed({ error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }))
+        }
+    }
+    
+    func sendCommand(connection: NWConnection, cmd: UInt8) async throws {
+        try await sendData(connection: connection, data: Data([cmd]))
+    }
+    
+    func sendJSON(connection: NWConnection, dictionary: [String: Any]) async throws {
+        let data = try JSONSerialization.data(withJSONObject: dictionary, options: [])
+        let length = UInt32(data.count)
+        var lengthBigEndian = length.bigEndian
+        let headerData = Data(bytes: &lengthBigEndian, count: 4)
+        
+        try await sendData(connection: connection, data: headerData)
+        try await sendData(connection: connection, data: data)
+    }
+    
+    func readExactBytes(connection: NWConnection, count: Int) async throws -> Data {
+        try await withCheckedThrowingContinuation { continuation in
+            connection.receive(minimumIncompleteLength: count, maximumLength: count) { data, _, isComplete, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else if let data = data, data.count == count {
+                    continuation.resume(returning: data)
+                } else if isComplete {
+                    continuation.resume(throwing: NSError(domain: "iPerfClient", code: -1, userInfo: [NSLocalizedDescriptionKey: "Connection closed prematurely"]))
+                } else {
+                    continuation.resume(throwing: NSError(domain: "iPerfClient", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to read exact bytes"]))
+                }
+            }
+        }
+    }
+    
+    func readCommand(connection: NWConnection) async throws -> UInt8 {
+        let data = try await readExactBytes(connection: connection, count: 1)
+        return data[0]
+    }
+    
+    func readJSON(connection: NWConnection) async throws -> [String: Any] {
+        let lengthData = try await readExactBytes(connection: connection, count: 4)
+        let length = UInt32(bigEndian: lengthData.withUnsafeBytes { $0.load(as: UInt32.self) })
+        let jsonData = try await readExactBytes(connection: connection, count: Int(length))
+        if let json = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
+            return json
+        }
+        throw NSError(domain: "iPerfClient", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON response"])
+    }
+    
+    func readDataChunk(connection: NWConnection, maxLength: Int) async throws -> Data {
+        try await withCheckedThrowingContinuation { continuation in
+            connection.receive(minimumIncompleteLength: 1, maximumLength: maxLength) { data, _, isComplete, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else if let data = data {
+                    continuation.resume(returning: data)
+                } else if isComplete {
+                    continuation.resume(returning: Data())
+                } else {
+                    continuation.resume(throwing: NSError(domain: "iPerfClient", code: -4, userInfo: [NSLocalizedDescriptionKey: "Read failed"]))
+                }
+            }
+        }
+    }
+    
+    func run() async throws -> (bytes: Int, duration: Double) {
+        let host = NWEndpoint.Host(hostname)
+        let portEndpoint = NWEndpoint.Port(rawValue: port)!
+        let queue = DispatchQueue(label: "fr.signalquest.iperf.client")
+        
+        let controlConnection = NWConnection(host: host, port: portEndpoint, using: .tcp)
+        
+        try await connect(connection: controlConnection, queue: queue)
+        defer {
+            controlConnection.cancel()
+        }
+        
+        let cookieData = makeCookie()
+        let cookieString = String(data: cookieData.prefix(36), encoding: .ascii) ?? ""
+        try await sendData(connection: controlConnection, data: cookieData)
+        
+        var dataConnections: [NWConnection] = []
+        defer {
+            for conn in dataConnections {
+                conn.cancel()
+            }
+        }
+        
+        let totalBytesCounter = SafeCounter()
+        var startTestTime: Date?
+        let isTestRunning = AtomicBool(false)
+        
+        var completed = false
+        while !completed {
+            let cmd = try await readCommand(connection: controlConnection)
+            
+            switch cmd {
+            case 9: // PARAM_EXCHANGE
+                var params: [String: Any] = [
+                    "client_version": "3.6",
+                    "omit": 0,
+                    "parallel": streams,
+                    "pacing_timer": 1000,
+                    "time": durationSeconds,
+                    "tcp": true,
+                    "len": 131072,
+                    "cookie": cookieString
+                ]
+                if isDownload {
+                    params["reverse"] = true
+                }
+                try await sendJSON(connection: controlConnection, dictionary: params)
+                
+            case 10: // CREATE_STREAMS
+                for _ in 0..<streams {
+                    let dataConn = NWConnection(host: host, port: portEndpoint, using: .tcp)
+                    try await connect(connection: dataConn, queue: queue)
+                    dataConnections.append(dataConn)
+                    try await sendData(connection: dataConn, data: cookieData)
+                }
+                
+            case 1: // TEST_START
+                break
+                
+            case 2: // TEST_RUNNING
+                isTestRunning.value = true
+                startTestTime = Date()
+                
+                for conn in dataConnections {
+                    if isDownload {
+                        let receiver = StreamReceiver(connection: conn, totalBytes: totalBytesCounter, isRunning: isTestRunning)
+                        activeReceivers.append(receiver)
+                        receiver.start()
+                    } else {
+                        let payload = Data(repeating: 0x5a, count: 131072)
+                        let sender = StreamSender(connection: conn, payload: payload, totalBytes: totalBytesCounter, isRunning: isTestRunning)
+                        activeSenders.append(sender)
+                        sender.start()
+                    }
+                }
+                
+                if isDownload {
+                    Task { [self, isTestRunning, totalBytesCounter, controlConnection] in
+                        let duration = Double(durationSeconds)
+                        let start = Date()
+                        while isTestRunning.value {
+                            try? await Task.sleep(nanoseconds: 150_000_000)
+                            let elapsed = Date().timeIntervalSince(start)
+                            if elapsed >= duration {
+                                break
+                            }
+                            self.onProgress?(totalBytesCounter.value, elapsed)
+                        }
+                        
+                        isTestRunning.value = false
+                        try? await self.sendCommand(connection: controlConnection, cmd: 4) // TEST_END
+                    }
+                } else {
+                    Task { [self, isTestRunning, totalBytesCounter] in
+                        let duration = Double(durationSeconds)
+                        let start = Date()
+                        while isTestRunning.value {
+                            try? await Task.sleep(nanoseconds: 150_000_000)
+                            let elapsed = Date().timeIntervalSince(start)
+                            if elapsed >= duration {
+                                break
+                            }
+                            self.onProgress?(totalBytesCounter.value, elapsed)
+                        }
+                    }
+                }
+                
+            case 4: // TEST_END
+                isTestRunning.value = false
+                
+            case 13: // EXCHANGE_RESULTS
+                isTestRunning.value = false
+                for conn in dataConnections {
+                    conn.cancel()
+                }
+                dataConnections.removeAll()
+                activeSenders.removeAll()
+                activeReceivers.removeAll()
+                
+                let duration = Date().timeIntervalSince(startTestTime ?? Date())
+                let clientResults: [String: Any] = [
+                    "cpu_util_total": 1,
+                    "cpu_util_user": 0.5,
+                    "cpu_util_system": 0.5,
+                    "sender_has_retransmits": 0,
+                    "congestion_used": "cubic",
+                    "streams": [
+                        [
+                            "id": 1,
+                            "bytes": totalBytesCounter.value,
+                            "retransmits": 0,
+                            "jitter": 0,
+                            "errors": 0,
+                            "packets": 0,
+                            "start_time": 0,
+                            "end_time": duration
+                        ]
+                    ]
+                ]
+                try await sendJSON(connection: controlConnection, dictionary: clientResults)
+                
+                _ = try? await readJSON(connection: controlConnection)
+                
+            case 14: // DISPLAY_RESULTS
+                try? await sendCommand(connection: controlConnection, cmd: 16) // IPERF_DONE
+                completed = true
+                
+            default:
+                completed = true
+            }
+        }
+        
+        let duration = Date().timeIntervalSince(startTestTime ?? Date())
+        return (totalBytesCounter.value, duration)
+    }
+}
+
+class StreamSender: @unchecked Sendable {
+    private let connection: NWConnection
+    private let payload: Data
+    private let limit = 4
+    private let outstanding = SafeCounter()
+    private let totalBytes: SafeCounter
+    private let isRunning: AtomicBool
+    
+    init(connection: NWConnection, payload: Data, totalBytes: SafeCounter, isRunning: AtomicBool) {
+        self.connection = connection
+        self.payload = payload
+        self.totalBytes = totalBytes
+        self.isRunning = isRunning
+    }
+    
+    func start() {
+        sendNext()
+    }
+    
+    private func sendNext() {
+        guard isRunning.value else { return }
+        
+        while outstanding.value < limit && isRunning.value {
+            outstanding.add(1)
+            let size = payload.count
+            
+            connection.send(content: payload, completion: .contentProcessed({ [weak self] error in
+                guard let self = self else { return }
+                self.outstanding.add(-1)
+                if error == nil {
+                    self.totalBytes.add(size)
+                    self.sendNext()
+                }
+            }))
+        }
+    }
+}
+
+class StreamReceiver: @unchecked Sendable {
+    private let connection: NWConnection
+    private let totalBytes: SafeCounter
+    private let isRunning: AtomicBool
+    
+    init(connection: NWConnection, totalBytes: SafeCounter, isRunning: AtomicBool) {
+        self.connection = connection
+        self.totalBytes = totalBytes
+        self.isRunning = isRunning
+    }
+    
+    func start() {
+        receiveNext()
+    }
+    
+    private func receiveNext() {
+        guard isRunning.value else { return }
+        
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 131072) { [weak self] data, _, isComplete, error in
+            guard let self = self else { return }
+            if let data = data, !data.isEmpty {
+                self.totalBytes.add(data.count)
+            }
+            if error == nil && !isComplete && self.isRunning.value {
+                self.receiveNext()
+            }
+        }
     }
 }
 

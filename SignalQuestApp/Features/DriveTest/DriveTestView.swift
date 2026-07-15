@@ -836,7 +836,7 @@ final class DriveTestViewModel: ObservableObject {
         let duration = (defaults.object(forKey: "speedtest_duration_seconds") as? Int) ?? 10
         let streams = (defaults.object(forKey: "speedtest_streams") as? Int) ?? 16
         let reliability = (defaults.object(forKey: "speedtest_reliability_mode") as? Bool) ?? true
-        let target = SpeedtestDownloadTarget(rawValue: defaults.string(forKey: "speedtest_download_target") ?? "") ?? .awsCloudFront
+        let target = SpeedtestDownloadTarget(rawValue: defaults.string(forKey: "speedtest_download_target") ?? "") ?? .hybridAuto
         return SpeedtestRunSettings(
             downloadTarget: target,
             durationSeconds: min(max(duration, 5), 30),

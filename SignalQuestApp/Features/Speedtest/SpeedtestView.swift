@@ -269,7 +269,7 @@ struct SpeedtestView: View {
                 // Serveur de download/ping ACTIF (AWS CloudFront par
                 // défaut). On n'affiche plus le VPS de mesure : l'opérateur
                 // prend sa place dans le bandeau.
-                server: result?.downloadServerName ?? downloadTarget.displayName
+                server: result?.downloadServerName ?? (isRunning ? liveProgress.serverName : nil) ?? downloadTarget.displayName
             )
         }
     }
@@ -549,7 +549,7 @@ struct SpeedtestView: View {
                             Text("Serveur de test")
                                 .font(SQFont.archivo(15, .bold))
                                 .foregroundStyle(SQColor.label)
-                            Text("« Auto » compare Cloudflare et AWS au démarrage et prend le plus rapide. Le ping est mesuré contre le serveur retenu ; l'upload reste sur le serveur SignalQuest (mesure certifiée).")
+                            Text("« Auto » sélectionne le serveur iPerf3 OVH le plus proche de vous géographiquement. Les autres choix forcent la connexion au serveur OVH sélectionné.")
                                 .font(.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
