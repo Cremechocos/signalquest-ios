@@ -19,6 +19,9 @@ final class AppRouter: ObservableObject {
     @Published var openUserProfileId: String?
     /// Set to request opening a site sheet on the Map tab (deep link carte).
     @Published var openSiteId: String?
+    /// Coordonnée à cadrer sur la carte (posée depuis un test de l'historique,
+    /// consommée par MapExplorerView une fois l'onglet carte actif).
+    @Published var pendingMapFocus: Coordinates?
     /// Demande de présentation du mode Drive Test (posée par l'App Intent F4 ;
     /// consommée par SpeedtestView une fois l'onglet Speed actif).
     @Published var pendingDriveTest = false

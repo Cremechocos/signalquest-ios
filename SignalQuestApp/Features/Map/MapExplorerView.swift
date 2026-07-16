@@ -1428,6 +1428,23 @@ struct MapExplorerView: View {
         }
         // Notification/deep link antenne : ouvre la fiche du site demandé.
         .onChangeCompat(of: router.openSiteId) { _, _ in openSiteFromRouterIfNeeded() }
+        // Test de l'historique : cadre la carte sur le lieu de la mesure.
+        .onChangeCompat(of: router.pendingMapFocus) { _, _ in focusFromRouterIfNeeded() }
+        .onAppear { focusFromRouterIfNeeded() }
+    }
+
+    /// Cadre la carte sur la coordonnée demandée depuis un test de l'historique.
+    /// Consommée une fois : l'onglet peut réapparaître sans re-cadrer.
+    private func focusFromRouterIfNeeded() {
+        guard let focus = router.pendingMapFocus else { return }
+        router.pendingMapFocus = nil
+        let coordinate = CLLocationCoordinate2D(latitude: focus.latitude, longitude: focus.longitude)
+        mapCenter = coordinate
+        mapZoom = 15
+        scheduleLoad(region: MKCoordinateRegion(
+            center: coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
+        ))
     }
 
     private var mapLayer: some View {

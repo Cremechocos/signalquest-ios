@@ -20,6 +20,7 @@ private enum SpeedtestSharePreparation: Equatable {
 struct SpeedtestView: View {
     private let guestMode: Bool
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
     // Défaut « Auto » : préflight Cloudflare/AWS/VPS, le plus rapide gagne.
@@ -57,6 +58,8 @@ struct SpeedtestView: View {
     /// Échec du MOTEUR de test (≠ échec de synchronisation) : carte dédiée
     /// dont le bouton relance le test au lieu de re-envoyer l'historique.
     @State private var runErrorMessage: String?
+    /// Test de l'historique ouvert en fiche détaillée.
+    @State private var detailResult: SpeedtestRunResult?
     @State private var runTask: Task<Void, Never>?
     @State private var showSettings = false
     @State private var showDriveTest = false
@@ -208,6 +211,17 @@ struct SpeedtestView: View {
             }
         }
         .signalQuestBackground()
+        .sheet(item: $detailResult) { item in
+            SpeedtestDetailSheet(
+                result: item,
+                // Bouton masqué si le test n'a pas de position : on ne cadre
+                // pas la carte sur un lieu qu'on ignore.
+                onShowOnMap: item.coordinate == nil ? nil : { coordinate in
+                    router.pendingMapFocus = coordinate
+                    router.selectedTab = .map
+                }
+            )
+        }
         .sheet(isPresented: $showSettings) { settingsSheet }
         .sheet(isPresented: $showLocationPriming) {
             LocationPrimingSheet(
@@ -691,10 +705,17 @@ struct SpeedtestView: View {
             } else {
                 VStack(spacing: SQSpace.sm + 2) {
                     ForEach(Array(history.enumerated()), id: \.element.id) { _, item in
-                        SpeedtestHistoryRow(result: item)
-                            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                            .sqShadowSoft()
-                            .sqFadeUp()
+                        Button {
+                            Haptics.selection()
+                            detailResult = item
+                        } label: {
+                            SpeedtestHistoryRow(result: item)
+                        }
+                        .buttonStyle(SQPressButtonStyle())
+                        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                        .sqShadowSoft()
+                        .sqFadeUp()
+                        .accessibilityHint("Voir le détail du test")
                     }
                 }
             }

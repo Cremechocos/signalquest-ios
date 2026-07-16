@@ -603,7 +603,7 @@ private struct SpeedtestShareCard: View {
 ///   tracent en pointillé atténué — le régime établi en trait plein.
 /// - Échelle Y depuis 0 jusqu'au max réel.
 /// - Interpolation cubique monotone (Fritsch–Carlson).
-private struct SpeedtestShareGraph: View {
+struct SpeedtestShareGraph: View {
     let series: [Double]
     /// Moyenne mesurée — ancre honnête si la série fine est absente.
     let averageMbps: Double
