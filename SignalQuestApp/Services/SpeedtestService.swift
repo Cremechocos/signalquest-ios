@@ -18,6 +18,12 @@ protocol SpeedtestServicing: Sendable {
     func details(id: String) async throws -> SpeedtestDetail
     func guestDeletionReceipts() -> [GuestSpeedtestDeletionReceipt]
     func deleteGuestSpeedtest(_ receipt: GuestSpeedtestDeletionReceipt) async throws
+    /// Identifiant serveur d'un test de l'historique, `nil` s'il n'a jamais été
+    /// envoyé (hors ligne) ou s'il précède la mémorisation de cet id.
+    func serverId(forClientId clientId: UUID) async -> String?
+    /// Publie a posteriori un test déjà envoyé sur la carte publique.
+    /// Réservé aux comptes : la route exige une authentification.
+    func publishOnMap(clientId: UUID, shareExactLocation: Bool) async throws
 }
 
 struct GuestSpeedtestDeletionReceipt: Codable, Equatable, Identifiable, Sendable {
@@ -1676,15 +1682,59 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             body: payload,
             idempotencyKey: pending.id
         )
-        if let serverId = response.resolvedID,
-           let deleteToken = response.deleteToken ?? pending.guestDeleteToken {
-            guestReceiptStore.upsert(GuestSpeedtestDeletionReceipt(
-                id: serverId,
-                clientSubmissionId: pending.id,
-                deleteToken: deleteToken,
-                createdAt: pending.createdAt
-            ))
+        if let serverId = response.resolvedID {
+            // Mémorisé pour TOUS : sans cet id, un test de l'historique ne peut
+            // plus être ciblé (publication a posteriori). Il n'était conservé
+            // que pour les invités, via le reçu de suppression.
+            await rememberServerId(serverId, forClientId: pending.id)
+            if let deleteToken = response.deleteToken ?? pending.guestDeleteToken {
+                guestReceiptStore.upsert(GuestSpeedtestDeletionReceipt(
+                    id: serverId,
+                    clientSubmissionId: pending.id,
+                    deleteToken: deleteToken,
+                    createdAt: pending.createdAt
+                ))
+            }
         }
+    }
+
+    // MARK: - Correspondance id client → id serveur
+
+    private var serverIdMapKey: String { "serverIds" }
+
+    private func rememberServerId(_ serverId: String, forClientId clientId: String) async {
+        var map = (try? await historyCache.read([String: String].self, for: serverIdMapKey)) ?? [:]
+        guard map[clientId] != serverId else { return }
+        map[clientId] = serverId
+        // Bornée comme l'historique : inutile de garder des ids dont le test a
+        // déjà disparu de la liste.
+        if map.count > 60 {
+            let keep = Set(((try? await history()) ?? []).map(\.id.uuidString))
+            map = map.filter { keep.contains($0.key) || $0.key == clientId }
+        }
+        try? await historyCache.write(map, for: serverIdMapKey)
+    }
+
+    func serverId(forClientId clientId: UUID) async -> String? {
+        let map = (try? await historyCache.read([String: String].self, for: serverIdMapKey)) ?? [:]
+        return map[clientId.uuidString]
+    }
+
+    func publishOnMap(clientId: UUID, shareExactLocation: Bool) async throws {
+        guard let serverId = await serverId(forClientId: clientId) else {
+            throw SpeedtestPublishError.unknownServerId
+        }
+        // PATCH et non POST : re-soumettre le même test renverrait la réponse
+        // idempotente d'origine sans rien modifier — publication silencieusement
+        // sans effet (vérifié côté backend).
+        try await api.requestJSON(
+            "/api/speedtests/\(serverId)",
+            method: .patch,
+            body: SpeedtestVisibilityUpdate(
+                isVisibleOnMap: true,
+                shareExactLocation: shareExactLocation
+            )
+        )
     }
 
     private static func makeGuestDeleteToken() -> String? {

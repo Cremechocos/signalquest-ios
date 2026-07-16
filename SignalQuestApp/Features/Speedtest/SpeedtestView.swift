@@ -60,6 +60,10 @@ struct SpeedtestView: View {
     @State private var runErrorMessage: String?
     /// Test de l'historique ouvert en fiche détaillée.
     @State private var detailResult: SpeedtestRunResult?
+    /// Id serveur du test ouvert : sans lui, pas de publication possible.
+    @State private var detailServerId: String?
+    @State private var isPublishingDetail = false
+    @State private var publishFeedback: String?
     @State private var runTask: Task<Void, Never>?
     @State private var showSettings = false
     @State private var showDriveTest = false
@@ -219,8 +223,24 @@ struct SpeedtestView: View {
                 onShowOnMap: item.coordinate == nil ? nil : { coordinate in
                     router.pendingMapFocus = coordinate
                     router.selectedTab = .map
-                }
+                },
+                // Publication : uniquement quand elle peut RÉELLEMENT aboutir.
+                // Un compte (la route exige une auth), un id serveur mémorisé,
+                // une position à cartographier, et pas de VPN (l'opérateur du
+                // tunnel n'est pas celui qu'on mesure). Sinon aucun bouton,
+                // plutôt qu'un bouton qui échouerait.
+                onPublish: canPublish(item) ? { publishDetail(item) } : nil,
+                isPublishing: isPublishingDetail
             )
+            .task { detailServerId = await services.speedtest.serverId(forClientId: item.id) }
+        }
+        .alert("Publication", isPresented: Binding(
+            get: { publishFeedback != nil },
+            set: { if !$0 { publishFeedback = nil } }
+        )) {
+            Button("OK", role: .cancel) { publishFeedback = nil }
+        } message: {
+            Text(publishFeedback ?? "")
         }
         .sheet(isPresented: $showSettings) { settingsSheet }
         .sheet(isPresented: $showLocationPriming) {
@@ -908,6 +928,35 @@ struct SpeedtestView: View {
             serverName: measured.serverName
         )
         return measured
+    }
+
+    /// La publication n'est proposée que si elle peut aboutir : compte requis
+    /// (la route PATCH rejette les invités), id serveur mémorisé à l'envoi,
+    /// position à cartographier, et hors VPN.
+    private func canPublish(_ result: SpeedtestRunResult) -> Bool {
+        !guestMode
+            && detailServerId != nil
+            && result.coordinate != nil
+            && !isVPNActive
+    }
+
+    private func publishDetail(_ result: SpeedtestRunResult) {
+        guard !isPublishingDetail else { return }
+        isPublishingDetail = true
+        Task {
+            do {
+                try await services.speedtest.publishOnMap(
+                    clientId: result.id,
+                    shareExactLocation: exactLocationEnabled
+                )
+                Haptics.success()
+                publishFeedback = "Test publié sur la carte."
+            } catch {
+                Haptics.warning()
+                publishFeedback = error.localizedDescription
+            }
+            isPublishingDetail = false
+        }
     }
 
     private func performRun(requestLocation: Bool) {

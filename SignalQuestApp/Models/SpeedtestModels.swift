@@ -1,5 +1,23 @@
 import Foundation
 
+/// Corps du PATCH de visibilité d'un speedtest déjà envoyé.
+struct SpeedtestVisibilityUpdate: Encodable, Sendable {
+    let isVisibleOnMap: Bool
+    let shareExactLocation: Bool
+}
+
+enum SpeedtestPublishError: LocalizedError {
+    /// Test antérieur à la mémorisation de l'id serveur, ou jamais envoyé.
+    case unknownServerId
+
+    var errorDescription: String? {
+        switch self {
+        case .unknownServerId:
+            return "Ce test ne peut pas être publié : il a été enregistré avant que l'app ne mémorise sa référence serveur."
+        }
+    }
+}
+
 enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
     case hybridAuto = "hybrid_auto"
     // OVH proof

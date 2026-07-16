@@ -100,4 +100,24 @@ final class SpeedtestDetailSheetTests: XCTestCase {
             print("DETAIL_SHEET_WRITTEN /tmp/sq_detail_\(name).png")
         }
     }
+
+    /// Le PATCH de visibilité doit porter EXACTEMENT ce que le backend lit.
+    /// Un POST re-soumis renverrait sa réponse idempotente sans rien changer :
+    /// la publication serait silencieusement sans effet.
+    func testVisibilityUpdateEncodesBackendContract() throws {
+        let body = SpeedtestVisibilityUpdate(isVisibleOnMap: true, shareExactLocation: false)
+        let data = try JSONEncoder().encode(body)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["isVisibleOnMap"] as? Bool, true)
+        XCTAssertEqual(json["shareExactLocation"] as? Bool, false)
+        XCTAssertEqual(json.keys.count, 2, "aucun champ parasite : le PATCH ne doit rien écraser d'autre")
+    }
+
+    /// Un test antérieur à la mémorisation de l'id serveur n'est pas publiable :
+    /// l'erreur doit l'expliquer, pas échouer en silence.
+    func testUnknownServerIdIsExplained() {
+        let message = SpeedtestPublishError.unknownServerId.errorDescription ?? ""
+        XCTAssertFalse(message.isEmpty)
+        XCTAssertTrue(message.lowercased().contains("publié") || message.lowercased().contains("référence"))
+    }
 }
