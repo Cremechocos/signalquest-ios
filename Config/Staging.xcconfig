@@ -3,10 +3,6 @@
 // placeholders and every production endpoint.
 SQ_APP_BASE_URL = https:/$()/app.staging.invalid
 SQ_API_BASE_URL = https:/$()/api.staging.invalid
-SQ_SPEEDTEST_BASE_URL = https:/$()/speedtest.staging.invalid
-SQ_SPEEDTEST_DOWNLOAD_URL = https:/$()/speedtest.staging.invalid/download
-SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL = https:/$()/cdn.staging.invalid/1000MB.bin
-SQ_SPEEDTEST_CLOUDFLARE_DOWNLOAD_URL = https:/$()/dl.staging.invalid/speedtest/300MB.bin
 SQ_DEBUG_LOGS = NO
 SQ_APS_ENVIRONMENT = production
 SQ_ENVIRONMENT = staging

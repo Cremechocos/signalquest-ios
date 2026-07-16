@@ -168,8 +168,20 @@ struct SpeedGaugeView: View {
     let value: Double
     let phase: SpeedtestPhase
 
-    // Cadran « Crème » : arc 270° (départ 135°), track 22 pt bouts ronds
-    // `SurfaceMuted`, remplissage brique, disque central `SurfaceElevated`.
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// Ratio 0…1 (log, 1 Gbps = plein) pour la palette qualité.
+    private var normalized: Double {
+        guard value > 0 else { return 0 }
+        return max(0, min(1, log10(value) / 3))
+    }
+
+    private var qualityColor: Color {
+        let stops = SpeedtestShareTheme.resolve(colorScheme).qualityStops
+        return SpeedtestQualityPalette.color(forRatio: normalized, stops: stops)
+    }
+
+    // Cadran « Crème » : arc 270°, track muted, remplissage teinté par la qualité.
     var body: some View {
         ZStack {
             Circle()
@@ -177,8 +189,8 @@ struct SpeedGaugeView: View {
                 .stroke(SQColor.surfaceMuted, style: StrokeStyle(lineWidth: 22, lineCap: .round))
                 .rotationEffect(.degrees(135))
             Circle()
-                .trim(from: 0, to: 0.75 * min(value / 1000, 1))
-                .stroke(SQColor.brandRed, style: StrokeStyle(lineWidth: 22, lineCap: .round))
+                .trim(from: 0, to: 0.75 * max(0.0004, min(value / 1000, 1)))
+                .stroke(qualityColor, style: StrokeStyle(lineWidth: 22, lineCap: .round))
                 .rotationEffect(.degrees(135))
                 .sqAnimation(.snappy(duration: 0.32), value: value)
             Circle()

@@ -54,6 +54,9 @@ struct SpeedtestView: View {
     private static let continuousBurst = 0
     @State private var history: [SpeedtestRunResult] = []
     @State private var errorMessage: String?
+    /// Échec du MOTEUR de test (≠ échec de synchronisation) : carte dédiée
+    /// dont le bouton relance le test au lieu de re-envoyer l'historique.
+    @State private var runErrorMessage: String?
     @State private var runTask: Task<Void, Never>?
     @State private var showSettings = false
     @State private var showDriveTest = false
@@ -163,6 +166,14 @@ struct SpeedtestView: View {
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
 
+                if let runErrorMessage {
+                    ErrorStateView(title: "Speedtest impossible", message: runErrorMessage) {
+                        self.runErrorMessage = nil
+                        start()
+                    }
+                    .transition(.opacity)
+                }
+
                 if let errorMessage {
                     ErrorStateView(title: "Speedtest non synchronisé", message: errorMessage) {
                         self.errorMessage = nil
@@ -266,11 +277,18 @@ struct SpeedtestView: View {
                 // (cellulaire). Cf. headerOperatorName.
                 operatorName: headerOperatorName,
                 network: result?.networkDisplayName ?? currentNetworkStatus.displayName,
-                // Serveur de download/ping ACTIF (AWS CloudFront par
-                // défaut). On n'affiche plus le VPS de mesure : l'opérateur
-                // prend sa place dans le bandeau.
+                // Serveur de download/ping ACTIF. On n'affiche plus le VPS de
+                // mesure : l'opérateur prend sa place dans le bandeau.
                 server: result?.downloadServerName ?? (isRunning ? liveProgress.serverName : nil) ?? downloadTarget.displayName
             )
+            if isRunning, let notice = liveProgress.notice {
+                Label(notice, systemImage: "arrow.triangle.swap")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.warning)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .transition(.opacity)
+            }
         }
     }
 
@@ -545,23 +563,15 @@ struct SpeedtestView: View {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
                     SQSheetHandle()
                     VStack(alignment: .leading, spacing: SQSpace.md + 2) {
-                        VStack(alignment: .leading, spacing: SQSpace.xs) {
-                            Text("Serveur de test")
-                                .font(SQFont.archivo(15, .bold))
-                                .foregroundStyle(SQColor.label)
-                            Text("« Auto » sélectionne le serveur iPerf3 OVH le plus proche de vous géographiquement. Les autres choix forcent la connexion au serveur OVH sélectionné.")
-                                .font(.caption)
-                                .foregroundStyle(SQColor.labelSecondary)
-                        }
-                        Picker("Serveur de test", selection: Binding(
-                            get: { downloadTarget },
-                            set: { downloadTargetRaw = $0.rawValue }
-                        )) {
-                            ForEach(SpeedtestDownloadTarget.selectableCases) { target in
-                                Text(target.displayName).tag(target)
-                            }
-                        }
-                        .pickerStyle(.segmented)
+                        Text("Serveur de test")
+                            .font(SQFont.archivo(15, .bold))
+                            .foregroundStyle(SQColor.label)
+                        SpeedtestServerPicker(
+                            selection: Binding(
+                                get: { downloadTarget },
+                                set: { downloadTargetRaw = $0.rawValue }
+                            )
+                        )
 
                         VStack(alignment: .leading, spacing: SQSpace.sm) {
                             HStack {
@@ -666,7 +676,8 @@ struct SpeedtestView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large, .medium])
+        .presentationDragIndicator(.visible)
     }
 
     // MARK: - History
@@ -814,7 +825,6 @@ struct SpeedtestView: View {
         } else {
             location = nil
         }
-        phase = .download
         let measured = try await services.speedtest.run(
             pathStatus: runStatus,
             location: location,
@@ -882,6 +892,7 @@ struct SpeedtestView: View {
     private func performRun(requestLocation: Bool) {
         Haptics.light()
         errorMessage = nil
+        runErrorMessage = nil
         networkAbortMessage = nil
         burstProgress = nil
         burstSummary = nil
@@ -903,7 +914,7 @@ struct SpeedtestView: View {
                 handleCancellation()
             } catch {
                 liveActivity.cancel()
-                errorMessage = error.localizedDescription
+                runErrorMessage = error.localizedDescription
                 phase = .failed(error.localizedDescription)
                 liveProgress = SpeedtestLiveProgress(phase: .failed(error.localizedDescription))
                 Haptics.warning()
@@ -922,6 +933,7 @@ struct SpeedtestView: View {
     private func performBurst(count: Int, requestLocation: Bool) {
         Haptics.light()
         errorMessage = nil
+        runErrorMessage = nil
         networkAbortMessage = nil
         burstSummary = nil
         sessionIsContinuous = false
@@ -991,6 +1003,7 @@ struct SpeedtestView: View {
     private func performContinuousSession(requestLocation: Bool) {
         Haptics.light()
         errorMessage = nil
+        runErrorMessage = nil
         networkAbortMessage = nil
         burstSummary = nil
         sessionIsContinuous = true
@@ -1146,7 +1159,8 @@ struct SpeedtestView: View {
             pingProtocol: new.pingProtocol ?? current.pingProtocol,
             pingSampleCount: new.pingSampleCount > 0 ? new.pingSampleCount : current.pingSampleCount,
             pingSampleTarget: new.pingSampleTarget > 0 ? new.pingSampleTarget : current.pingSampleTarget,
-            serverName: new.serverName ?? current.serverName
+            serverName: new.serverName ?? current.serverName,
+            notice: new.notice ?? current.notice
         )
     }
 }
@@ -1267,7 +1281,7 @@ private struct SpeedtestServerBar: View {
     }
 }
 
-// MARK: - Cadran signature (arc 270° « Crème & Terre cuite »)
+// MARK: - Cadran signature (arc 270° qualité DA danger → ambre → olive)
 
 private struct SignatureSpeedDial: View {
     let value: Double
@@ -1284,6 +1298,7 @@ private struct SignatureSpeedDial: View {
 
     @State private var pulsing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
 
     /// Fraction de remplissage de l'arc : échelle log pour les débits
     /// (1 Gbps = plein), inverse pour la latence (0 ms = plein).
@@ -1293,6 +1308,12 @@ private struct SignatureSpeedDial: View {
             return max(0, min(1, (120 - value) / 120))
         }
         return max(0, min(1, log10(value) / 3))
+    }
+
+    /// Couleur de qualité (brique → ambre → olive) selon le ratio de remplissage.
+    private var qualityColor: Color {
+        let theme = SpeedtestShareTheme.resolve(colorScheme)
+        return SpeedtestQualityPalette.color(forRatio: normalized, stops: theme.qualityStops)
     }
 
     /// Mesure en cours (latence/téléchargement/envoi/synchro) : badge pulsé.
@@ -1312,11 +1333,23 @@ private struct SignatureSpeedDial: View {
                 .rotationEffect(.degrees(135))
                 .padding(21)
 
-            // Arc actif brique, même géométrie. Le trim epsilon conserve un point
-            // brique au départ de l'arc quand la jauge est à zéro (repère visuel).
+            // Arc actif teinté par la qualité de la valeur (danger → olive).
+            // Le trim epsilon conserve un point au départ quand la jauge est à 0.
             Circle()
                 .trim(from: 0, to: max(0.0004, arcSpan * normalized))
-                .stroke(SQColor.brandRed, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            qualityColor.opacity(0.85),
+                            qualityColor,
+                            qualityColor.opacity(0.95)
+                        ]),
+                        center: .center,
+                        startAngle: .degrees(135),
+                        endAngle: .degrees(135 + 270 * max(0.001, normalized))
+                    ),
+                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                )
                 .rotationEffect(.degrees(135))
                 .padding(21)
                 .sqAnimation(.snappy(duration: 0.32), value: normalized)
@@ -1341,7 +1374,7 @@ private struct SignatureSpeedDial: View {
                     .font(SQFont.body(14, .medium))
                     .foregroundStyle(SQColor.labelSecondary)
                 if isRunning {
-                    dialBadge("en cours…", color: SQColor.brandRed, background: SQColor.accentSoft)
+                    dialBadge("en cours…", color: qualityColor, background: qualityColor.opacity(0.14))
                         .opacity(pulsing && !reduceMotion ? 0.35 : 1)
                         .animation(
                             reduceMotion ? nil : .easeInOut(duration: 0.7).repeatForever(autoreverses: true),
@@ -1396,30 +1429,68 @@ private struct SpeedtestTriMetric: View {
     let progress: SpeedtestLiveProgress
     let result: SpeedtestRunResult?
 
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         HStack(spacing: SQSpace.md) {
             cell(
                 title: "Ping",
                 value: pingText,
-                state: state(for: .ping)
+                state: state(for: .ping),
+                quality: pingQuality
             )
             cell(
                 title: "Réception",
-                value: mbpsText(result?.downloadAverageMbps ?? progress.downloadAverageMbps ?? progress.downloadLiveMbps),
-                state: state(for: .download)
+                value: mbpsText(downloadMbps),
+                state: state(for: .download),
+                quality: mbpsQuality(downloadMbps)
             )
             cell(
                 title: "Envoi",
-                value: mbpsText(result?.uploadAverageMbps ?? progress.uploadAverageMbps ?? progress.uploadLiveMbps),
-                state: state(for: .upload)
+                value: mbpsText(uploadMbps),
+                state: state(for: .upload),
+                quality: mbpsQuality(uploadMbps)
             )
         }
     }
 
+    private var qualityStops: [Color] {
+        SpeedtestShareTheme.resolve(colorScheme).qualityStops
+    }
+
+    private var pingMsValue: Double? {
+        let value = result?.pingMinMs ?? progress.pingFinalMs ?? progress.pingLiveMs
+        guard let value, value.isFinite, value >= 0 else { return nil }
+        return value
+    }
+
+    private var downloadMbps: Double? {
+        let value = result?.downloadAverageMbps ?? progress.downloadAverageMbps ?? progress.downloadLiveMbps
+        guard let value, value.isFinite, value > 0 else { return nil }
+        return value
+    }
+
+    private var uploadMbps: Double? {
+        let value = result?.uploadAverageMbps ?? progress.uploadAverageMbps ?? progress.uploadLiveMbps
+        guard let value, value.isFinite, value > 0 else { return nil }
+        return value
+    }
+
     private var pingText: String {
-        guard let value = result?.pingMinMs ?? progress.pingFinalMs ?? progress.pingLiveMs,
-              value.isFinite, value >= 0 else { return "—" }
+        guard let value = pingMsValue else { return "—" }
         return "\(Int(value.rounded())) ms"
+    }
+
+    private var pingQuality: Color? {
+        guard let ms = pingMsValue else { return nil }
+        let ratio = max(0, min(1, (120 - ms) / 120))
+        return SpeedtestQualityPalette.color(forRatio: ratio, stops: qualityStops)
+    }
+
+    private func mbpsQuality(_ mbps: Double?) -> Color? {
+        guard let mbps, mbps > 0 else { return nil }
+        let ratio = max(0, min(1, log10(mbps) / 3))
+        return SpeedtestQualityPalette.color(forRatio: ratio, stops: qualityStops)
     }
 
     /// Débit sans unité (« 403 », « 38.5 ») — le « Mbps » est porté par le cadran.
@@ -1447,24 +1518,23 @@ private struct SpeedtestTriMetric: View {
         }
     }
 
-    private func valueColor(_ value: String, state: CellState) -> Color {
-        if state == .active { return SQColor.brandRed }
+    private func valueColor(_ value: String, state: CellState, quality: Color?) -> Color {
         if value == "—" { return SQColor.labelTertiary }
+        if state == .active { return quality ?? SQColor.brandRed }
         return SQColor.label
     }
 
-    /// Barrette d'état 26×4 : brique = phase active, olive = terminée,
-    /// `SurfaceMuted` = à venir.
-    private func barColor(_ state: CellState) -> Color {
+    /// Barrette : qualité (phase active) / olive (terminée) / muted (à venir).
+    private func barColor(_ state: CellState, quality: Color?) -> Color {
         switch state {
-        case .active: return SQColor.brandRed
+        case .active: return quality ?? SQColor.brandRed
         case .done: return SQColor.success
         case .pending: return SQColor.surfaceMuted
         }
     }
 
     @ViewBuilder
-    private func cell(title: String, value: String, state: CellState) -> some View {
+    private func cell(title: String, value: String, state: CellState, quality: Color?) -> some View {
         VStack(spacing: 3) {
             Text(title)
                 .font(SQFont.body(12))
@@ -1472,12 +1542,12 @@ private struct SpeedtestTriMetric: View {
             Text(value)
                 .font(SQFont.display(20, .bold, relativeTo: .title3))
                 .monospacedDigit()
-                .foregroundStyle(valueColor(value, state: state))
+                .foregroundStyle(valueColor(value, state: state, quality: quality))
                 .contentTransition(.numericText())
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(barColor(state))
+                .fill(barColor(state, quality: quality))
                 .frame(width: 26, height: 4)
         }
         .frame(maxWidth: .infinity)
@@ -1614,6 +1684,150 @@ private extension SpeedtestPhase {
         case .saving, .finished: return 4
         case .failed: return 0
         }
+    }
+}
+
+// MARK: - Server picker (iPerf3 OVH + Bouygues)
+
+/// Sélecteur de serveur iPerf3 groupé et repliable.
+/// Accordion : une seule section provider ouverte à la fois, animation layout
+/// simple (pas de `.move` qui décale le ScrollView parent).
+private struct SpeedtestServerPicker: View {
+    @Binding var selection: SpeedtestDownloadTarget
+    /// `nil` = tout replié (sauf Auto toujours visible).
+    @State private var expandedRegion: String?
+
+    private var collapsibleGroups: [(region: String, targets: [SpeedtestDownloadTarget])] {
+        SpeedtestDownloadTarget.pickerGroups
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Auto + Cloudflare (moteurs, pas des POP) — toujours visibles.
+            ForEach(SpeedtestDownloadTarget.ungroupedCases) { target in
+                serverRow(target)
+            }
+
+            ForEach(collapsibleGroups, id: \.region) { group in
+                let isExpanded = expandedRegion == group.region
+                let selectedInGroup = group.targets.contains(selection)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Button {
+                        Haptics.selection()
+                        // Accordion : ouvrir celle-ci, fermer l'autre.
+                        expandedRegion = isExpanded ? nil : group.region
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(SQColor.labelTertiary)
+                                .frame(width: 12)
+                                .animation(.easeInOut(duration: 0.22), value: isExpanded)
+
+                            Text(group.region)
+                                .font(SQFont.body(14, .semibold))
+                                .foregroundStyle(SQColor.label)
+
+                            Text("\(group.targets.count)")
+                                .font(SQFont.body(11, .semibold))
+                                .foregroundStyle(SQColor.labelTertiary)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background(SQColor.fill, in: Capsule(style: .continuous))
+
+                            Spacer(minLength: 6)
+
+                            if selectedInGroup, !isExpanded {
+                                Text(selection.displayName)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(SQColor.brandRed)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .padding(.horizontal, SQSpace.md)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                                .fill(SQColor.surfaceMuted)
+                        )
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(group.region)
+                    .accessibilityValue(isExpanded ? "ouvert" : "fermé")
+
+                    if isExpanded {
+                        VStack(spacing: 6) {
+                            ForEach(group.targets) { target in
+                                serverRow(target)
+                            }
+                        }
+                        .padding(.top, 6)
+                    }
+                }
+            }
+        }
+        // Animation de hauteur/layout uniquement — fluide dans un ScrollView.
+        .animation(.easeInOut(duration: 0.25), value: expandedRegion)
+        .onAppear {
+            expandGroup(containing: selection)
+        }
+        .onChange(of: selection) { newValue in
+            expandGroup(containing: newValue)
+        }
+    }
+
+    /// Ouvre le groupe du serveur choisi (Auto / Cloudflare n'en ont pas).
+    private func expandGroup(containing target: SpeedtestDownloadTarget) {
+        let region = target.regionLabel
+        guard collapsibleGroups.contains(where: { $0.region == region }) else { return }
+        expandedRegion = region
+    }
+
+    private func serverRow(_ target: SpeedtestDownloadTarget) -> some View {
+        let selected = selection == target
+        return Button {
+            selection = target
+            Haptics.selection()
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                ZStack {
+                    Circle()
+                        .fill(selected ? SQColor.brandRed.opacity(0.16) : SQColor.fill)
+                        .frame(width: 36, height: 36)
+                    Image(systemName: target.systemImage)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(selected ? SQColor.brandRed : SQColor.labelSecondary)
+                }
+
+                Text(target.displayName)
+                    .font(SQFont.body(15, .semibold))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(1)
+
+                Spacer(minLength: 8)
+
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(selected ? SQColor.brandRed : SQColor.labelTertiary.opacity(0.5))
+            }
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, 11)
+            .background(
+                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                    .fill(selected ? SQColor.brandRed.opacity(0.08) : SQColor.surfaceMuted)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                    .strokeBorder(selected ? SQColor.brandRed.opacity(0.4) : Color.clear, lineWidth: 1.2)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(target.displayName)
+        .accessibilityValue(selected ? "sélectionné" : "non sélectionné")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

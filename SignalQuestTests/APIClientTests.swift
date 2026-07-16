@@ -176,10 +176,6 @@ final class APIClientTests: XCTestCase {
             environment: .staging,
             appBaseURL: URL(string: "https://signalquest.fr")!,
             apiBaseURL: URL(string: "https://api.signalquest.fr")!,
-            speedtestBaseURL: URL(string: "https://speedtest.signalquest.fr")!,
-            speedtestDownloadURL: URL(string: "https://speedtest.signalquest.fr/download")!,
-            speedtestCloudFrontDownloadURL: URL(string: "https://d2d31ihf1e95ah.cloudfront.net/1000MB.bin")!,
-            speedtestCloudflareDownloadURL: URL(string: "https://dl.signalquest.fr/speedtest/300MB.bin")!,
             debugLogsEnabled: false
         )
 
@@ -192,10 +188,6 @@ final class APIClientTests: XCTestCase {
             environment: .staging,
             appBaseURL: URL(string: "https://app.staging.invalid")!,
             apiBaseURL: URL(string: "https://api.staging.invalid")!,
-            speedtestBaseURL: URL(string: "https://speedtest.staging.invalid")!,
-            speedtestDownloadURL: URL(string: "https://speedtest.staging.invalid/download")!,
-            speedtestCloudFrontDownloadURL: URL(string: "https://cdn.staging.invalid/1000MB.bin")!,
-            speedtestCloudflareDownloadURL: URL(string: "https://dl.staging.invalid/speedtest/300MB.bin")!,
             debugLogsEnabled: false
         )
 

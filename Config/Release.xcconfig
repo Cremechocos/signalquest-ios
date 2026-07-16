@@ -1,9 +1,5 @@
 SQ_APP_BASE_URL = https:/$()/signalquest.fr
 SQ_API_BASE_URL = https:/$()/api.signalquest.fr
-SQ_SPEEDTEST_BASE_URL = https:/$()/speedtest.signalquest.fr
-SQ_SPEEDTEST_DOWNLOAD_URL = https:/$()/speedtest.signalquest.fr/download
-SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL = https:/$()/d2d31ihf1e95ah.cloudfront.net/1000MB.bin
-SQ_SPEEDTEST_CLOUDFLARE_DOWNLOAD_URL = https:/$()/dl.signalquest.fr/speedtest/300MB.bin
 SQ_DEBUG_LOGS = NO
 SQ_APS_ENVIRONMENT = production
 SQ_ENVIRONMENT = production

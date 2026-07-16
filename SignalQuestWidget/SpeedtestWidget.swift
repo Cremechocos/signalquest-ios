@@ -27,14 +27,14 @@ struct SpeedtestProvider: TimelineProvider {
 
 // MARK: - Échelle de couleur (identique au cadran de l'app : SignatureSpeedDial)
 
-/// Couleurs du cadran (mêmes hex que `gaugeColors` côté app) : du « nul » (rouge)
-/// au « très bon » (vert foncé).
+/// Palette qualité DA « Crème & Terre cuite » (alignée app / share) :
+/// danger brique → ambre → olive (pas le rainbow Tailwind historique).
 let sqGaugeColors: [Color] = [
-    Color(hex: 0xEF4444), // Nul
-    Color(hex: 0xF97316), // Bof
-    Color(hex: 0xFDE047), // Moyen
-    Color(hex: 0x22C55E), // Bon
-    Color(hex: 0x15803D)  // Très bon
+    Color(hex: 0xE37E6B), // Faible
+    Color(hex: 0xDF9364), // Bof
+    Color(hex: 0xDCA95E), // Moyen
+    Color(hex: 0xBFAE6C), // Bon
+    Color(hex: 0xA3B37A)  // Excellent
 ]
 
 /// Position 0…1 d'un débit sur l'échelle log (1→1000 Mbps), comme l'app.

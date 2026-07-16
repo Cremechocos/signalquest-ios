@@ -69,14 +69,6 @@
 	<string>$(SQ_DEBUG_LOGS)</string>
 	<key>SQ_ENVIRONMENT</key>
 	<string>$(SQ_ENVIRONMENT)</string>
-	<key>SQ_SPEEDTEST_BASE_URL</key>
-	<string>$(SQ_SPEEDTEST_BASE_URL)</string>
-	<key>SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL</key>
-	<string>$(SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL)</string>
-	<key>SQ_SPEEDTEST_CLOUDFLARE_DOWNLOAD_URL</key>
-	<string>$(SQ_SPEEDTEST_CLOUDFLARE_DOWNLOAD_URL)</string>
-	<key>SQ_SPEEDTEST_DOWNLOAD_URL</key>
-	<string>$(SQ_SPEEDTEST_DOWNLOAD_URL)</string>
 	<key>SQ_URL_SCHEME</key>
 	<string>$(SQ_URL_SCHEME)</string>
 	<key>UIAppFonts</key>

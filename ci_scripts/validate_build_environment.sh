@@ -21,7 +21,7 @@ url_host() {
 
 is_production_host() {
   case "$1" in
-    signalquest.fr|api.signalquest.fr|speedtest.signalquest.fr|d2d31ihf1e95ah.cloudfront.net) return 0 ;;
+    signalquest.fr|api.signalquest.fr) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -57,9 +57,6 @@ esac
 
 validate_url SQ_APP_BASE_URL "${SQ_APP_BASE_URL:-}"
 validate_url SQ_API_BASE_URL "${SQ_API_BASE_URL:-}"
-validate_url SQ_SPEEDTEST_BASE_URL "${SQ_SPEEDTEST_BASE_URL:-}"
-validate_url SQ_SPEEDTEST_DOWNLOAD_URL "${SQ_SPEEDTEST_DOWNLOAD_URL:-}"
-validate_url SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL "${SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL:-}"
 
 if [ "$environment" = "staging" ] && [ -f "${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist" ]; then
   firebase_bundle="$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' "${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist" 2>/dev/null || true)"

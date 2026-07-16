@@ -1,5 +1,6 @@
 import XCTest
 import CoreTelephony
+import Network
 import SwiftUI
 @testable import SignalQuest
 
@@ -25,154 +26,6 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(speedtestPingMeasuredSampleTarget(attemptBudget: 0, warmupCount: 1), 0)
     }
 
-    func testMeasuredTransferRequiresUsefulBytes() {
-        XCTAssertNil(measuredTransferMbps(effectiveBytes: 0, durationMs: 1_000))
-        XCTAssertNil(measuredTransferMbps(effectiveBytes: 1_024, durationMs: 0))
-        XCTAssertEqual(try XCTUnwrap(measuredTransferMbps(effectiveBytes: 1_000_000, durationMs: 1_000)), 8, accuracy: 0.001)
-    }
-
-    func testUploadRequestSizeUsesServerLimitWithoutTinyOrHugePayloads() {
-        XCTAssertEqual(boundedUploadRequestBytes(32 * 1_024 * 1_024), 32 * 1_024 * 1_024)
-        XCTAssertEqual(boundedUploadRequestBytes(64 * 1_024 * 1_024), 32 * 1_024 * 1_024)
-        XCTAssertEqual(boundedUploadRequestBytes(64 * 1_024), 256 * 1_024)
-    }
-
-    func testUploadConfirmedBytesNeverExceedClientOrServerCounts() {
-        XCTAssertEqual(computeConfirmedUploadBytes(clientWrittenBytes: 4_000, serverConfirmedBytes: 3_000), 3_000)
-        XCTAssertEqual(computeConfirmedUploadBytes(clientWrittenBytes: 4_000, serverConfirmedBytes: 5_000), 4_000)
-        XCTAssertEqual(computeConfirmedUploadBytes(clientWrittenBytes: 4_000, serverConfirmedBytes: nil), 4_000)
-        XCTAssertEqual(computeConfirmedUploadBytes(clientWrittenBytes: 4_000, serverConfirmedBytes: -1), 0)
-    }
-
-    func testCloudFrontGuardRejectsProtectedSessionDownloadEndpoint() throws {
-        let protected = try XCTUnwrap(URL(string: "https://speedtest.signalquest.fr/download"))
-        let session = try XCTUnwrap(URL(string: "https://speedtest.signalquest.fr/download"))
-        let base = try XCTUnwrap(URL(string: "https://speedtest.signalquest.fr"))
-        let cloudFront = try XCTUnwrap(URL(string: "https://d2d31ihf1e95ah.cloudfront.net/1000MB.bin"))
-
-        XCTAssertTrue(isProtectedSpeedtestDownloadURL(protected, protectedDownloadURL: protected, sessionDownloadURL: session, speedtestBaseURL: base))
-        XCTAssertFalse(isProtectedSpeedtestDownloadURL(cloudFront, protectedDownloadURL: protected, sessionDownloadURL: session, speedtestBaseURL: base))
-    }
-
-    func testUploadServerMeasurementRequiresCompleteNonZeroServerData() throws {
-        let usable = try XCTUnwrap(UploadServerMeasurement(data: Data("""
-        {
-          "serverBytesReceived": 32000000,
-          "serverDurationMs": 10000,
-          "serverAvgMbps": 25.6,
-          "serverMeasuredWindows": 8,
-          "serverMeasurementComplete": true
-        }
-        """.utf8)))
-        XCTAssertTrue(usable.isUsable(expectedUsefulDurationMs: 10_000))
-
-        let incomplete = try XCTUnwrap(UploadServerMeasurement(data: Data("""
-        {
-          "serverBytesReceived": 32000000,
-          "serverDurationMs": 10000,
-          "serverAvgMbps": 25.6,
-          "serverMeasuredWindows": 8,
-          "serverMeasurementComplete": false
-        }
-        """.utf8)))
-        XCTAssertTrue(incomplete.isUsable(expectedUsefulDurationMs: 10_000)) // Now allowed and usable!
-
-        let zeroBytes = try XCTUnwrap(UploadServerMeasurement(data: Data("""
-        {
-          "serverBytesReceived": 0,
-          "serverDurationMs": 10000,
-          "serverAvgMbps": 25.6,
-          "serverMeasuredWindows": 8,
-          "serverMeasurementComplete": true
-        }
-        """.utf8)))
-        XCTAssertFalse(zeroBytes.isUsable(expectedUsefulDurationMs: 10_000))
-
-        // Run tronqué côté serveur : fenêtre non représentative → la mesure
-        // serveur ne doit PAS être autoritaire (repli client confirmé).
-        let truncated = try XCTUnwrap(UploadServerMeasurement(data: Data("""
-        {
-          "serverBytesReceived": 32000000,
-          "serverDurationMs": 10000,
-          "serverAvgMbps": 25.6,
-          "serverMeasuredWindows": 8,
-          "serverRunTruncated": true
-        }
-        """.utf8)))
-        XCTAssertFalse(truncated.isUsable(expectedUsefulDurationMs: 10_000))
-    }
-
-    func testUploadAverageIsServerAuthoritativeWhenUsable() throws {
-        // Mesure serveur utilisable → serverAvgMbps DIRECT (octets et durée de
-        // la MÊME fenêtre serveur), pas le mix min(client, serveur)/durée
-        // serveur qui mélangeait deux fenêtres et sous-estimait.
-        let usable = try XCTUnwrap(UploadServerMeasurement(data: Data("""
-        {"serverBytesReceived": 320000000, "serverDurationMs": 10000, "serverAvgMbps": 256.0, "serverMeasuredWindows": 10}
-        """.utf8)))
-        XCTAssertEqual(
-            resolvedUploadAverageMbps(serverMeasurement: usable, expectedUsefulDurationMs: 10_000, clientAverageMbps: 180),
-            256, accuracy: 0.001
-        )
-
-        // Pas de réponse serveur → repli client (borné par les octets confirmés
-        // en amont : l'anti-triche reste intact).
-        XCTAssertEqual(
-            resolvedUploadAverageMbps(serverMeasurement: nil, expectedUsefulDurationMs: 10_000, clientAverageMbps: 42),
-            42, accuracy: 0.001
-        )
-
-        // Run tronqué → la moyenne serveur n'est pas autoritaire.
-        let truncated = try XCTUnwrap(UploadServerMeasurement(data: Data("""
-        {"serverBytesReceived": 320000000, "serverDurationMs": 10000, "serverAvgMbps": 256.0, "serverMeasuredWindows": 10, "serverRunTruncated": true}
-        """.utf8)))
-        XCTAssertEqual(
-            resolvedUploadAverageMbps(serverMeasurement: truncated, expectedUsefulDurationMs: 10_000, clientAverageMbps: 42),
-            42, accuracy: 0.001
-        )
-    }
-
-    func testUploadFinalizeBodyCarriesRunIdAndEffectiveWarmup() throws {
-        // Le finalize doit transmettre le warm-up réellement appliqué (grace
-        // adaptative), pas seulement l'uploadRunId.
-        let body = speedtestUploadFinalizeBody(runId: "run-42", warmupMs: 3_500)
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
-        XCTAssertEqual(json["uploadRunId"] as? String, "run-42")
-        XCTAssertEqual(json["warmupMs"] as? Int, 3_500)
-    }
-
-    func testAdaptiveGraceExtendsOnFastOrRisingLinks() {
-        // > 200 Mbps : 2 s de slow-start pèsent trop lourd → extension.
-        XCTAssertTrue(speedtestShouldExtendGrace(recentMbps: 320, earlierMbps: 315))
-        // Débit encore nettement croissant en fin de warm-up → extension.
-        XCTAssertTrue(speedtestShouldExtendGrace(recentMbps: 90, earlierMbps: 60))
-        // Débit stabilisé sous le seuil → warm-up de base suffisant.
-        XCTAssertFalse(speedtestShouldExtendGrace(recentMbps: 80, earlierMbps: 78))
-        // Pas de débit mesurable ou pas d'historique → pas d'extension.
-        XCTAssertFalse(speedtestShouldExtendGrace(recentMbps: 0, earlierMbps: nil))
-        XCTAssertFalse(speedtestShouldExtendGrace(recentMbps: 150, earlierMbps: nil))
-    }
-
-    func testAdaptivePhaseWindowExtendsOnceBeforeBoundaryAndShiftsDeadline() {
-        let deadline = Date(timeIntervalSince1970: 1_000)
-        let window = SpeedtestAdaptivePhaseWindow(graceMs: 2_000, deadline: deadline)
-
-        // Trop tard (frontière de grace déjà passée) : refusé — les octets
-        // seraient déjà marqués « utiles ».
-        XCTAssertFalse(window.extendGrace(to: 3_500, ifNotPastMs: 2_100))
-        XCTAssertEqual(window.graceMs, 2_000)
-
-        // Avant la frontière : accepté, l'échéance glisse du même délai pour
-        // préserver la durée utile de mesure.
-        XCTAssertTrue(window.extendGrace(to: 3_500, ifNotPastMs: 1_850))
-        XCTAssertEqual(window.graceMs, 3_500)
-        XCTAssertTrue(window.wasExtended)
-        XCTAssertEqual(window.deadline.timeIntervalSince(deadline), 1.5, accuracy: 0.001)
-
-        // Une seule extension par phase.
-        XCTAssertFalse(window.extendGrace(to: 4_000, ifNotPastMs: 1_900))
-        XCTAssertEqual(window.graceMs, 3_500)
-    }
-
     func testLiveSamplerTracksInstantaneousRateOverSlidingWindow() {
         // smoothing 1.0 → valeur brute de la fenêtre glissante (sans EMA), pour
         // vérifier la fenêtre elle-même.
@@ -194,38 +47,6 @@ final class SpeedtestTests: XCTestCase {
             value = sampler.observe(totalBytes: total, elapsedMs: Double(tick) * 150)
         }
         XCTAssertEqual(value, 200, accuracy: 10)
-    }
-
-    func testUploadScalingRatioCorrection() {
-        // Supposons que le client a écrit 32 Mo en local (buffer bloat),
-        // mais que le serveur n'a reçu et confirmé que 2 Mo.
-        let clientWrittenBytes = 32_000_000
-        let serverConfirmedBytes = 2_000_000
-        
-        let clientWrittenBytesMax = max(1, clientWrittenBytes)
-        let scaleRatio = min(1.0, Double(serverConfirmedBytes) / Double(clientWrittenBytesMax))
-        
-        // La vitesse moyenne du client calculée sur 10s serait de 25.6 Mbps
-        // Mais recalibrée à 2 Mo confirmés, elle doit être de 1.6 Mbps
-        let durationMs: Double = 10_000
-        let clientAverageWithBloat = (Double(clientWrittenBytes) * 8.0 / 1_000_000.0) / (durationMs / 1_000.0) // 25.6
-        let correctedAverage = clientAverageWithBloat * scaleRatio // 1.6
-        
-        XCTAssertEqual(scaleRatio, 0.0625, accuracy: 0.001)
-        XCTAssertEqual(correctedAverage, 1.6, accuracy: 0.001)
-        
-        // Les pics de débit et la série graphique doivent aussi être mis à l'échelle
-        let statsPeak = 28.0 // pic mesuré par le client (tamponné)
-        let statsSeries = [12.0, 24.0, 28.0]
-        
-        let scaledPeak = statsPeak * scaleRatio
-        let scaledSeries = statsSeries.map { $0 * scaleRatio }
-        
-        XCTAssertEqual(scaledPeak, 1.75, accuracy: 0.001)
-        XCTAssertEqual(scaledSeries.count, 3)
-        XCTAssertEqual(scaledSeries[0], 0.75, accuracy: 0.001)
-        XCTAssertEqual(scaledSeries[1], 1.5, accuracy: 0.001)
-        XCTAssertEqual(scaledSeries[2], 1.75, accuracy: 0.001)
     }
 
     func testNetworkPathMapping() {
@@ -427,13 +248,13 @@ final class SpeedtestTests: XCTestCase {
     // coller à l'OG du site. On valide les données dérivées + le rendu PNG.
 
     @MainActor
-    func testShareImageRendersAtAndroidCardSize() {
-        // Format Android : 1080×720.
+    func testShareImageRendersAtCardSize() {
+        // Paysage type nPerf/Ookla — dimension source de vérité : cardSize.
         let result = makeSpeedtestResult(downloadSeries: [120, 180], uploadSeries: [40, 90])
         let image = SpeedtestShareImageRenderer.renderImage(result)
         XCTAssertNotNil(image)
-        XCTAssertEqual(image?.size.width ?? 0, 1080, accuracy: 1)
-        XCTAssertEqual(image?.size.height ?? 0, 720, accuracy: 1)
+        XCTAssertEqual(image?.size.width ?? 0, SpeedtestShareImageRenderer.cardSize.width, accuracy: 1)
+        XCTAssertEqual(image?.size.height ?? 0, SpeedtestShareImageRenderer.cardSize.height, accuracy: 1)
     }
 
     func testQualityPaletteRunsRedToGreen() {
@@ -677,5 +498,227 @@ final class SpeedtestTests: XCTestCase {
             deviceModel: deviceModel,
             osVersion: osVersion
         )
+    }
+
+    // MARK: - iPerf3 OVH helpers
+
+    func testIPerf3ExtractStreamBytesSumsExchangeResults() {
+        let json: [String: Any] = [
+            "streams": [
+                ["id": 1, "bytes": 1_000_000],
+                ["id": 3, "bytes": 2_500_000.0],
+            ]
+        ]
+        XCTAssertEqual(iperf3ExtractStreamBytes(from: json), 3_500_000)
+
+        let empty: [String: Any] = ["streams": []]
+        XCTAssertNil(iperf3ExtractStreamBytes(from: empty))
+        XCTAssertNil(iperf3ExtractStreamBytes(from: nil))
+
+        // Repli éventuel sur le format end.sum_*
+        let legacy: [String: Any] = [
+            "end": ["sum_received": ["bytes": 42_000]]
+        ]
+        XCTAssertEqual(iperf3ExtractStreamBytes(from: legacy), 42_000)
+    }
+
+    func testClosestOVHServerPicksNearestPOP() {
+        // Paris → POP Paris prioritaire (Bouygues BBR, pas +90 ms / IPv6-only)
+        let paris = Coordinates(latitude: 48.8566, longitude: 2.3522)
+        let closest = findClosestIPerfServer(to: paris)
+        XCTAssertTrue(
+            closest.hostname == "paris.bbr.iperf.bytel.fr"
+                || closest.hostname == "paris.cubic.iperf.bytel.fr"
+                || closest.hostname == "ping.online.net",
+            "Unexpected Paris POP: \(closest.hostname)"
+        )
+        XCTAssertFalse(closest.hostname.contains("90ms"))
+
+        // Lyon → Bouygues Lyon
+        let lyon = Coordinates(latitude: 45.7640, longitude: 4.8357)
+        let lyo = findClosestIPerfServer(to: lyon)
+        XCTAssertTrue(lyo.hostname.contains("lyo") && lyo.hostname.contains("bytel.fr"))
+
+        // Montréal → Beauharnois OVH
+        let montreal = Coordinates(latitude: 45.5017, longitude: -73.5673)
+        let bhs = findClosestIPerfServer(to: montreal)
+        XCTAssertEqual(bhs.hostname, "bhs.proof.ovh.ca")
+
+        // New York → US proof
+        let nyc = Coordinates(latitude: 40.7128, longitude: -74.0060)
+        let us = findClosestIPerfServer(to: nyc)
+        XCTAssertEqual(us.hostname, "proof.ovh.us")
+
+        // Mumbai → YNM
+        let mumbai = Coordinates(latitude: 19.0760, longitude: 72.8777)
+        let ynm = findClosestIPerfServer(to: mumbai)
+        XCTAssertEqual(ynm.hostname, "bom.proof.ovh.net")
+    }
+
+    func testSelectOVHServerManualAndAuto() {
+        let paris = Coordinates(latitude: 48.8566, longitude: 2.3522)
+        XCTAssertEqual(selectIPerfServer(for: .sbg, location: paris).hostname, "sbg.proof.ovh.net")
+        XCTAssertEqual(selectIPerfServer(for: .us, location: paris).hostname, "proof.ovh.us")
+        XCTAssertEqual(selectIPerfServer(for: .bytelLyoBbr, location: paris).hostname, "lyo.bbr.iperf.bytel.fr")
+        XCTAssertEqual(selectIPerfServer(for: .bytelParisCubic, location: paris).portMin, 9_200)
+        XCTAssertEqual(selectIPerfServer(for: .bytelParisCubic, location: paris).portMax, 9_240)
+        // Auto / legacy → POP Paris proche (bytel ou Scaleway, pas 90 ms)
+        let auto = selectIPerfServer(for: .hybridAuto, location: paris)
+        XCTAssertTrue(
+            auto.hostname.contains("bytel.fr") || auto.hostname == "ping.online.net",
+            "Unexpected auto POP: \(auto.hostname)"
+        )
+        XCTAssertEqual(selectIPerfServer(for: .cloudflareR2, location: paris).hostname, auto.hostname)
+        // Host bytel mort → migré Auto
+        XCTAssertEqual(
+            selectIPerfServer(for: .bytelPoiCubic, location: paris).hostname,
+            auto.hostname
+        )
+    }
+
+    func testIPerf3ResultAverageMbps() {
+        let result = IPerf3Result(
+            measuredBytes: 125_000_000, // 125 Mo
+            clientBytes: 125_000_000,
+            serverBytes: 124_000_000,
+            measuredDuration: 10,
+            wallDuration: 11
+        )
+        // 125e6 * 8 / 1e6 / 10 = 100 Mbps
+        XCTAssertEqual(result.averageMbps, 100, accuracy: 0.01)
+        XCTAssertEqual(result.duration, 10, accuracy: 0.001)
+    }
+
+    func testDownloadTargetPickerMetadata() {
+        XCTAssertEqual(SpeedtestDownloadTarget.hybridAuto.displayName, "Auto")
+        XCTAssertFalse(SpeedtestDownloadTarget.rbx.subtitle.isEmpty)
+        // Auto + 6 OVH + 13 Bouygues sains + 4 Scaleway + 1 MilkyWan + 1 Cloudflare
+        XCTAssertEqual(SpeedtestDownloadTarget.selectableCases.count, 26)
+        XCTAssertEqual(SpeedtestDownloadTarget.ovhCases.count, 6)
+        XCTAssertEqual(SpeedtestDownloadTarget.bouyguesCases.count, 13)
+        XCTAssertEqual(SpeedtestDownloadTarget.scalewayCases.count, 4)
+        XCTAssertEqual(SpeedtestDownloadTarget.milkywanCases.count, 1)
+        XCTAssertEqual(SpeedtestDownloadTarget.cloudflareCases.count, 1)
+        XCTAssertFalse(SpeedtestDownloadTarget.bouyguesCases.contains(.bytelPoiCubic))
+        XCTAssertEqual(SpeedtestDownloadTarget.bom.regionLabel, "OVH")
+        XCTAssertEqual(SpeedtestDownloadTarget.bytelMrsBbr.regionLabel, "Bouygues Telecom")
+        XCTAssertEqual(SpeedtestDownloadTarget.bytelRenCubic.displayName, "Rennes · CUBIC")
+        XCTAssertEqual(SpeedtestDownloadTarget.onlineNet.regionLabel, "Scaleway")
+        XCTAssertEqual(SpeedtestDownloadTarget.onlineNet.displayName, "Paris · Scaleway")
+        XCTAssertEqual(SpeedtestDownloadTarget.milkywan.regionLabel, "MilkyWan")
+        XCTAssertEqual(SpeedtestDownloadTarget.milkywan.displayName, "Croissy-Beaubourg")
+        XCTAssertEqual(SpeedtestDownloadTarget.cloudflare.regionLabel, "Mondial")
+        XCTAssertEqual(SpeedtestDownloadTarget.cloudflare.displayName, "Cloudflare")
+        XCTAssertEqual(SpeedtestDownloadTarget.bytelPoiCubic.migrated, .hybridAuto)
+        // Le nouveau case ne se confond pas avec le legacy CDN (migré Auto).
+        XCTAssertEqual(SpeedtestDownloadTarget.cloudflare.migrated, .cloudflare)
+        XCTAssertEqual(SpeedtestDownloadTarget.cloudflareR2.migrated, .hybridAuto)
+    }
+
+    /// Garde-fou : tout serveur sélectionnable doit être ATTEIGNABLE dans le
+    /// sélecteur (ligne toujours visible ou accordéon d'un fournisseur).
+    /// Sans ce test, un serveur ajouté au catalogue reste invisible dans l'UI.
+    func testEverySelectableTargetIsReachableInPicker() {
+        let grouped = SpeedtestDownloadTarget.pickerGroups.flatMap { $0.targets }
+        let reachable = Set(SpeedtestDownloadTarget.ungroupedCases + grouped)
+        XCTAssertEqual(
+            reachable,
+            Set(SpeedtestDownloadTarget.selectableCases),
+            "Serveurs sélectionnables absents du sélecteur"
+        )
+        // Chaque groupe porte le regionLabel de ses cibles (accordéon cohérent).
+        for group in SpeedtestDownloadTarget.pickerGroups {
+            for target in group.targets {
+                XCTAssertEqual(target.regionLabel, group.region)
+            }
+        }
+    }
+
+    func testMilkywanServerIsInCatalogWithPortRange() {
+        let servers = iperfPublicServers.filter { $0.provider == .milkywan }
+        XCTAssertEqual(servers.count, 1)
+        guard let milkywan = servers.first else { return }
+        XCTAssertEqual(milkywan.hostname, "speedtest.milkywan.fr")
+        XCTAssertEqual(milkywan.portMin, 9_200)
+        XCTAssertEqual(milkywan.portMax, 9_240)
+        XCTAssertEqual(milkywan.countryCode, "FR")
+        XCTAssertEqual(selectIPerfServer(for: .milkywan, location: nil).hostname, "speedtest.milkywan.fr")
+    }
+
+    /// L'edge Cloudflare refuse `__down` avec un 403 dès `bytes >= 1e8`
+    /// (limite vérifiée en ligne). Une taille au-delà fait échouer TOUTES les
+    /// requêtes du download → « serveurs injoignables » trompeur.
+    func testCloudflareDownloadRequestStaysUnderEndpointCap() {
+        XCTAssertLessThan(
+            CloudflareSpeedtestConfig.downloadBytesPerRequest,
+            CloudflareSpeedtestConfig.downloadMaxBytesPerRequest,
+            "__down renvoie 403 au-delà du plafond de l'edge"
+        )
+        XCTAssertGreaterThan(CloudflareSpeedtestConfig.downloadBytesPerRequest, 10_000_000)
+        // L'URL construite doit porter la taille exacte demandée.
+        let url = CloudflareSpeedtestConfig.downURL(bytes: 90_000_000)
+        XCTAssertEqual(url.absoluteString, "https://speed.cloudflare.com/__down?bytes=90000000")
+        XCTAssertEqual(CloudflareSpeedtestConfig.downURL(bytes: 0).absoluteString, "https://speed.cloudflare.com/__down?bytes=0")
+        // Pas de taille négative (bytes=-1 → 403).
+        XCTAssertEqual(CloudflareSpeedtestConfig.downURL(bytes: -5).absoluteString, "https://speed.cloudflare.com/__down?bytes=0")
+    }
+
+    func testCloudflareTraceColoParsing() {
+        let trace = """
+        fl=123abc
+        h=speed.cloudflare.com
+        ip=2001:db8::1
+        colo=cdg
+        http=http/2
+        """
+        XCTAssertEqual(cloudflareParseColo(fromTrace: trace), "CDG")
+        XCTAssertNil(cloudflareParseColo(fromTrace: "h=speed.cloudflare.com\nip=1.2.3.4"))
+        XCTAssertNil(cloudflareParseColo(fromTrace: "colo=\nip=1.2.3.4"))
+    }
+
+    func testCloudflareServerNameMapsKnownColos() {
+        XCTAssertEqual(cloudflareServerName(colo: "CDG"), "Cloudflare · Paris (CDG)")
+        XCTAssertEqual(cloudflareServerName(colo: "yul"), "Cloudflare · Montréal (YUL)")
+        XCTAssertEqual(cloudflareServerName(colo: "XXX"), "Cloudflare · XXX")
+        XCTAssertEqual(cloudflareServerName(colo: nil), "Cloudflare · edge anycast")
+    }
+
+    func testBouyguesServersAreInCatalogWithPortRange() {
+        let servers = iperfPublicServers.filter { $0.provider == .bouygues }
+        XCTAssertEqual(servers.count, 13)
+        for server in servers {
+            XCTAssertEqual(server.portMin, 9_200)
+            XCTAssertEqual(server.portMax, 9_240)
+            XCTAssertTrue(server.hostname.hasSuffix("iperf.bytel.fr"))
+        }
+        XCTAssertNotNil(iperfPublicServers.first(where: { $0.hostname == "paris.bbr.iperf.bytel.fr" }))
+        XCTAssertNotNil(iperfPublicServers.first(where: { $0.hostname == "ren.cubic.iperf.bytel.fr" }))
+        XCTAssertNil(iperfPublicServers.first(where: { $0.hostname == "poi.cubic.iperf.bytel.fr" }))
+    }
+
+    func testScalewayServersAreInCatalogWithPortRange() {
+        let servers = iperfPublicServers.filter { $0.provider == .scaleway }
+        XCTAssertEqual(servers.count, 4)
+        for server in servers {
+            XCTAssertEqual(server.portMin, 5_200)
+            XCTAssertEqual(server.portMax, 5_209)
+        }
+        XCTAssertEqual(selectIPerfServer(for: .onlineNet, location: nil).hostname, "ping.online.net")
+        XCTAssertEqual(selectIPerfServer(for: .onlineNet6, location: nil).hostname, "ping6.online.net")
+        XCTAssertEqual(selectIPerfServer(for: .onlineNet90ms, location: nil).hostname, "ping-90ms.online.net")
+        XCTAssertEqual(selectIPerfServer(for: .onlineNet6_90ms, location: nil).hostname, "ping6-90ms.online.net")
+    }
+
+    func testIperfSiblingPortWrapsWithinRange() {
+        XCTAssertEqual(iperfSiblingPort(preferred: 5_200, min: 5_200, max: 5_209), 5_201)
+        XCTAssertEqual(iperfSiblingPort(preferred: 5_209, min: 5_200, max: 5_209), 5_200)
+        XCTAssertEqual(iperfSiblingPort(preferred: 5_201, min: 5_201, max: 5_201), 5_201)
+    }
+
+    func testConnectionResetIsRetryableIPerfError() {
+        let reset = NWError.posix(.ECONNRESET)
+        XCTAssertTrue(isRetryableIPerfTransportError(reset))
+        XCTAssertTrue(isRetryableIPerfTransportError(IPerf3Error.accessDenied))
+        XCTAssertFalse(isRetryableIPerfTransportError(IPerf3Error.invalidJSON))
     }
 }

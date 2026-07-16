@@ -37,10 +37,6 @@ struct AppConfig: Equatable {
     let environment: SQDeploymentEnvironment
     let appBaseURL: URL
     let apiBaseURL: URL
-    let speedtestBaseURL: URL
-    let speedtestDownloadURL: URL
-    let speedtestCloudFrontDownloadURL: URL
-    let speedtestCloudflareDownloadURL: URL
     let debugLogsEnabled: Bool
 
     static let current = AppConfig(bundle: .main)
@@ -49,19 +45,11 @@ struct AppConfig: Equatable {
         environment: SQDeploymentEnvironment = .test,
         appBaseURL: URL,
         apiBaseURL: URL,
-        speedtestBaseURL: URL,
-        speedtestDownloadURL: URL,
-        speedtestCloudFrontDownloadURL: URL,
-        speedtestCloudflareDownloadURL: URL,
         debugLogsEnabled: Bool
     ) {
         self.environment = environment
         self.appBaseURL = appBaseURL
         self.apiBaseURL = apiBaseURL
-        self.speedtestBaseURL = speedtestBaseURL
-        self.speedtestDownloadURL = speedtestDownloadURL
-        self.speedtestCloudFrontDownloadURL = speedtestCloudFrontDownloadURL
-        self.speedtestCloudflareDownloadURL = speedtestCloudflareDownloadURL
         self.debugLogsEnabled = debugLogsEnabled
     }
 
@@ -72,10 +60,6 @@ struct AppConfig: Equatable {
             environment: environment,
             appBaseURL: Self.url(bundle, "SQ_APP_BASE_URL", fallback: fallback.app),
             apiBaseURL: Self.url(bundle, "SQ_API_BASE_URL", fallback: fallback.api),
-            speedtestBaseURL: Self.url(bundle, "SQ_SPEEDTEST_BASE_URL", fallback: fallback.speedtest),
-            speedtestDownloadURL: Self.url(bundle, "SQ_SPEEDTEST_DOWNLOAD_URL", fallback: fallback.download),
-            speedtestCloudFrontDownloadURL: Self.url(bundle, "SQ_SPEEDTEST_CLOUDFRONT_DOWNLOAD_URL", fallback: fallback.cloudFront),
-            speedtestCloudflareDownloadURL: Self.url(bundle, "SQ_SPEEDTEST_CLOUDFLARE_DOWNLOAD_URL", fallback: fallback.cloudflare),
             debugLogsEnabled: Self.bool(bundle, "SQ_DEBUG_LOGS", fallback: false)
         )
     }
@@ -93,44 +77,29 @@ struct AppConfig: Equatable {
     }
 
     private var serviceURLs: [URL] {
-        [appBaseURL, apiBaseURL, speedtestBaseURL, speedtestDownloadURL, speedtestCloudFrontDownloadURL, speedtestCloudflareDownloadURL]
+        [appBaseURL, apiBaseURL]
     }
 
     private static let productionHosts: Set<String> = [
         "signalquest.fr",
         "api.signalquest.fr",
-        "speedtest.signalquest.fr",
-        "d2d31ihf1e95ah.cloudfront.net",
-        "dl.signalquest.fr",
     ]
 
     /// Une Beta dont les build settings seraient absents doit rester
     /// non-routable. Elle ne doit jamais retomber silencieusement sur production.
     private static func fallbackURLs(for environment: SQDeploymentEnvironment) -> (
         app: String,
-        api: String,
-        speedtest: String,
-        download: String,
-        cloudFront: String,
-        cloudflare: String
+        api: String
     ) {
         if environment == .staging {
             return (
                 "https://app.staging.invalid",
-                "https://api.staging.invalid",
-                "https://speedtest.staging.invalid",
-                "https://speedtest.staging.invalid/download",
-                "https://cdn.staging.invalid/1000MB.bin",
-                "https://dl.staging.invalid/speedtest/300MB.bin"
+                "https://api.staging.invalid"
             )
         }
         return (
             "https://signalquest.fr",
-            "https://signalquest.fr",
-            "https://speedtest.signalquest.fr",
-            "https://speedtest.signalquest.fr/download",
-            "https://d2d31ihf1e95ah.cloudfront.net/1000MB.bin",
-            "https://dl.signalquest.fr/speedtest/300MB.bin"
+            "https://signalquest.fr"
         )
     }
 

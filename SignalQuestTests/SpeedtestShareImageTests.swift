@@ -4,14 +4,28 @@ import SwiftUI
 
 @MainActor
 final class SpeedtestShareImageTests: XCTestCase {
-    private func sample(operator op: String?, download: Double, city: String?) -> SpeedtestRunResult {
-        var dlSeries: [Double] = []
-        var ulSeries: [Double] = []
+    private func sample(
+        operator op: String?,
+        download: Double,
+        city: String?,
+        server: String? = "Paris BBR (Bouygues)",
+        hasUpload: Bool = true,
+        hasLoadedPings: Bool = true,
+        dlSeries: [Double]? = nil,
+        ulSeries: [Double]? = nil,
+        generateSeries: Bool = true,
+        dlGraceCount: Int? = nil,
+        ulGraceCount: Int? = nil
+    ) -> SpeedtestRunResult {
+        var generatedDl: [Double] = []
+        var generatedUl: [Double] = []
         for i in 0..<40 {
             let t = Double(i) / 39.0
-            dlSeries.append(download * (0.25 + 0.75 * t) + Double((i * 37) % 30))
-            ulSeries.append(45.0 * (0.3 + 0.7 * t) + Double((i * 19) % 12))
+            generatedDl.append(download * (0.25 + 0.75 * t) + Double((i * 37) % 30))
+            generatedUl.append(45.0 * (0.3 + 0.7 * t) + Double((i * 19) % 12))
         }
+        let finalDl = dlSeries ?? (generateSeries ? generatedDl : [])
+        let finalUl = ulSeries ?? (generateSeries ? generatedUl : [])
         return SpeedtestRunResult(
             id: UUID(),
             label: "x",
@@ -19,41 +33,80 @@ final class SpeedtestShareImageTests: XCTestCase {
             downloadAverageMbps: download,
             downloadMaxMbps: download + 40,
             downloadP90Mbps: nil, downloadP95Mbps: nil,
-            uploadMbps: 45, uploadAverageMbps: 45, uploadMaxMbps: 60,
+            uploadMbps: hasUpload ? 45 : nil,
+            uploadAverageMbps: hasUpload ? 45 : nil,
+            uploadMaxMbps: hasUpload ? 60 : nil,
             uploadP90Mbps: nil, uploadP95Mbps: nil,
             pingMs: 18, pingMedianMs: 18, pingMinMs: 14, pingMaxMs: 30,
             jitterMs: 3,
-            pingDlMs: 28,
-            jitterDlMs: 4.1,
-            pingUlMs: 36,
-            jitterUlMs: 5.2,
-            pingProtocol: "ICMP", durationSeconds: 10,
+            pingDlMs: hasLoadedPings ? 28 : nil,
+            jitterDlMs: hasLoadedPings ? 4.1 : nil,
+            pingUlMs: hasLoadedPings ? 36 : nil,
+            jitterUlMs: hasLoadedPings ? 5.2 : nil,
+            pingProtocol: "TCP", durationSeconds: 10,
             connectionType: op == nil ? .wifi : .cellular,
             cellularTechnology: op == nil ? nil : .fiveGSA,
             networkOperatorName: op, wifiSSID: op == nil ? "Maison" : nil,
-            city: city, coordinate: nil, serverName: "AWS",
+            city: city, coordinate: nil, serverName: server,
+            downloadServerName: server,
             createdAt: Date(timeIntervalSince1970: 1_780_000_000),
-            downloadSeriesMbps: dlSeries,
-            uploadSeriesMbps: ulSeries,
+            downloadSeriesMbps: finalDl.isEmpty ? nil : finalDl,
+            uploadSeriesMbps: hasUpload ? (finalUl.isEmpty ? nil : finalUl) : nil,
+            downloadGraceWindowCount: dlGraceCount,
+            uploadGraceWindowCount: ulGraceCount,
             uploadMeasurementSource: nil,
             deviceModel: "iPhone 17 Pro", osVersion: "iOS 26"
         )
     }
 
+    /// Série avec montée en charge : quelques fenêtres de grâce (rampe) puis
+    /// le régime établi — le renderer doit tracer la grâce en pointillé.
+    private func graceSample() -> SpeedtestRunResult {
+        let dlGrace: [Double] = [42, 168, 331, 442]
+        var dlUseful: [Double] = []
+        var ulUseful: [Double] = []
+        for i in 0..<40 {
+            let t: Double = Double(i) / 39.0
+            let dlNoise: Double = Double((i * 37) % 30)
+            let ulNoise: Double = Double((i * 19) % 8)
+            dlUseful.append(487.0 * (0.88 + 0.12 * t) + dlNoise)
+            ulUseful.append(45.0 * (0.85 + 0.15 * t) + ulNoise)
+        }
+        let ulGrace: [Double] = [6, 18, 31, 40]
+        return sample(
+            operator: "Orange",
+            download: 487,
+            city: "Grenoble",
+            dlSeries: dlGrace + dlUseful,
+            ulSeries: ulGrace + ulUseful,
+            dlGraceCount: dlGrace.count,
+            ulGraceCount: ulGrace.count
+        )
+    }
+
     func testRendersAndExportsForVisualReview() throws {
-        let cases: [(String, SpeedtestRunResult)] = [
-            ("orange", sample(operator: "Orange", download: 487, city: "Lyon")),
-            ("free", sample(operator: "Free", download: 312, city: "Paris")),
-            ("bouygues", sample(operator: "Bouygues", download: 156, city: "Marseille")),
-            ("default", sample(operator: "SFR", download: 642, city: "Bordeaux")),
-            ("wifi", sample(operator: nil, download: 934, city: "Grenoble")),
-        ]
+        var cases: [(String, SpeedtestRunResult)] = []
+        cases.append(("orange", sample(operator: "Orange", download: 487, city: "Lyon")))
+        cases.append(("free", sample(operator: "Free", download: 312, city: "Paris")))
+        cases.append(("bouygues", sample(operator: "Bouygues", download: 156, city: "Marseille")))
+        cases.append(("default", sample(operator: "SFR", download: 642, city: "Bordeaux")))
+        cases.append(("wifi", sample(operator: nil, download: 934, city: "Grenoble")))
+        cases.append(("longnames", sample(operator: "Bouygues Telecom", download: 231, city: "Saint-Martin-de-Belleville", server: "Marseille CUBIC (Bouygues)")))
+        cases.append(("noupload", sample(operator: "Orange", download: 388, city: "Nantes", hasUpload: false)))
+        cases.append(("noloadedping", sample(operator: "SFR", download: 214, city: "Lille", hasLoadedPings: false)))
+        cases.append(("nocity", sample(operator: "Free", download: 175, city: nil)))
+        cases.append(("gigabit", sample(operator: "Orange", download: 1_420, city: "Paris")))
+        cases.append(("sparse", sample(operator: "Bouygues", download: 230, city: "Rennes", dlSeries: [], ulSeries: [38], generateSeries: false)))
+        cases.append(("grace", graceSample()))
+        cases.append(("cloudflare", sample(operator: "Orange", download: 512, city: "Montréal", server: "Cloudflare · Montréal (YUL)")))
+        let expected = SpeedtestShareImageRenderer.cardSize
         for (name, result) in cases {
             for (suffix, theme) in [("dark", SpeedtestShareTheme.dark), ("light", SpeedtestShareTheme.light)] {
                 let image = try XCTUnwrap(SpeedtestShareImageRenderer.renderImage(result, theme: theme), "rendu nil pour \(name)/\(suffix)")
-                XCTAssertEqual(image.size.width, 1080, accuracy: 1)
-                XCTAssertEqual(image.size.height, 720, accuracy: 1)
+                XCTAssertEqual(image.size.width, expected.width, accuracy: 1)
+                XCTAssertEqual(image.size.height, expected.height, accuracy: 1)
                 let data = try XCTUnwrap(image.pngData())
+                XCTAssertLessThan(data.count, 8_000_000, "PNG de partage trop lourd (\(name)/\(suffix))")
                 let url = URL(fileURLWithPath: "/tmp/sq_share_\(name)_\(suffix).png")
                 try data.write(to: url)
                 print("SHARE_IMAGE_WRITTEN \(url.path)")
@@ -72,9 +125,10 @@ final class SpeedtestShareImageTests: XCTestCase {
             downloadP90Mbps: nil, downloadP95Mbps: nil,
             uploadMbps: 80, uploadAverageMbps: 80, uploadMaxMbps: 82,
             uploadP90Mbps: nil, uploadP95Mbps: nil,
-            pingMs: 12, pingMedianMs: 12, pingMinMs: 10, pingMaxMs: 20, jitterMs: 2, pingProtocol: "ICMP",
+            pingMs: 12, pingMedianMs: 12, pingMinMs: 10, pingMaxMs: 20, jitterMs: 2, pingProtocol: "TCP",
             durationSeconds: 10, connectionType: .cellular, cellularTechnology: .fiveGSA,
-            networkOperatorName: "Orange", wifiSSID: nil, city: "Lyon", coordinate: nil, serverName: "AWS",
+            networkOperatorName: "Orange", wifiSSID: nil, city: "Lyon", coordinate: nil,
+            serverName: "Paris Scaleway", downloadServerName: "Paris Scaleway",
             createdAt: Date(timeIntervalSince1970: 1_780_000_000),
             downloadSeriesMbps: Array(repeating: 900, count: 30).enumerated().map { 900 + Double($0.offset % 5) },
             uploadSeriesMbps: Array(repeating: 80, count: 30).enumerated().map { 80 + Double($0.offset % 3) },

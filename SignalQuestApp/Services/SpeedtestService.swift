@@ -103,6 +103,8 @@ struct SpeedtestLiveProgress: Sendable {
     let pingSampleCount: Int
     let pingSampleTarget: Int
     let serverName: String?
+    /// Message contextuel affichable (ex. serveur manuel injoignable → fallback).
+    let notice: String?
 
     init(
         phase: SpeedtestPhase,
@@ -118,7 +120,8 @@ struct SpeedtestLiveProgress: Sendable {
         pingProtocol: String? = nil,
         pingSampleCount: Int = 0,
         pingSampleTarget: Int = 0,
-        serverName: String? = nil
+        serverName: String? = nil,
+        notice: String? = nil
     ) {
         self.phase = phase
         self.currentMbps = currentMbps
@@ -134,6 +137,7 @@ struct SpeedtestLiveProgress: Sendable {
         self.pingSampleCount = pingSampleCount
         self.pingSampleTarget = pingSampleTarget
         self.serverName = serverName
+        self.notice = notice
     }
 }
 
@@ -203,74 +207,57 @@ struct NetworkSpeedtestTCPProbe: SpeedtestTCPProbing {
 // MARK: - Engine constants (mirrors Android SpeedTestEngine.kt)
 
 private enum SpeedtestEngineConfig {
-    /// Bytes received in the first 2 s are discarded — TCP slow-start would
-    /// otherwise drag the average down on fast links.
-    static let downloadGraceTimeMs: Double = 2_000
-    static let uploadGraceTimeMs: Double = 2_000
-    /// Grace ÉTENDUE, appliquée quand le débit instantané est encore en rampe
-    /// (ou dépasse `fastLinkThresholdMbps`) à l'approche de la frontière des
-    /// 2 s : sur les liens rapides le slow-start TCP dure plus longtemps que le
-    /// warm-up de base et écraserait la moyenne. Reste dans la fourchette
-    /// 3-4 s que le serveur accepte via `warmupMs` au finalize.
-    static let extendedGraceTimeMs: Double = 3_500
-    /// Au-delà de ce débit instantané, 2 s de warm-up ne suffisent jamais.
-    static let fastLinkThresholdMbps: Double = 200
-    /// Croissance relative (+15 %) du débit instantané en fin de warm-up qui
-    /// signe un lien encore en slow-start.
-    static let risingGraceRatio: Double = 1.15
-    /// Recul (ms) utilisé pour comparer débit récent vs antérieur lors de la
-    /// décision de grace adaptative.
-    static let graceComparisonLookbackMs: Double = 600
     /// Window length used to compute Mbps samples post-grace. Android uses
     /// 1000 ms and reads the same value for the public p90/p95/peak stats.
     static let publicPeakWindowMs: Double = 1_000
-    /// Live-progress emission interval. We push a smoothed value to the UI at
-    /// this cadence so the gauge climbs visibly instead of staying at 0.
-    static let sampleIntervalMs: Double = 150
-    /// Per-stream stagger to avoid thundering-herd on the first request and
-    /// match Android's behaviour exactly.
-    static let streamStaggerMs: Double = 200
-    /// If the global byte counter stops increasing for this long after grace,
-    /// the engine aborts the attempt with a stall error.
-    static let downloadStallTimeoutMs: Double = 2_500
-    /// Hard cap on parallel streams.
+    /// Hard cap on parallel streams (download reverse).
     static let hardMaxStreams: Int = 16
-    /// Android caps upload fan-out lower than download to avoid saturating
-    /// client memory while several large POSTs are in flight.
-    static let hardMaxUploadStreams: Int = 12
-    /// HTTP request timeout for a single download chunk.
-    static let chunkTimeoutSeconds: TimeInterval = 25
-    /// Upload chunks can legitimately take longer on asymmetric links.
-    static let uploadTimeoutSeconds: TimeInterval = 90
-    static let minUploadBytesPerRequest: Int = 256 * 1_024
-    static let maxUploadBytesPerRequest: Int = 32 * 1_024 * 1_024
+    /// Upload : plafonner plus bas que le DL. 16 flux × 12 blocs en vol
+    /// provoquent souvent des RST sur les POP publics (Scaleway / Bouygues)
+    /// et sur la montée cellulaire — le test UL plantait en silence.
+    static let hardMaxUploadStreams: Int = 8
+    /// Second essai UL si le premier échoue (RST / busy).
+    static let uploadRetryStreams: Int = 4
+    /// Petite pause entre DL et UL pour laisser le démon iPerf libérer le port.
+    static let interPhaseDelayMs: Double = 300
+    /// OVH proof : 5201–5210. Bouygues : 9200–9240. Scaleway online.net : 5200–5209.
+    static let iperf3PortMin: UInt16 = 5_201
+    static let iperf3PortMax: UInt16 = 5_210
+    static let bytelIperfPortMin: UInt16 = 9_200
+    static let bytelIperfPortMax: UInt16 = 9_240
+    static let onlineNetIperfPortMin: UInt16 = 5_200
+    static let onlineNetIperfPortMax: UInt16 = 5_209
+    /// Warm-up discarded by the iPerf3 protocol itself (TCP slow-start).
+    static let iperf3OmitSeconds: Int = 1
+    /// Block size for iPerf3 data streams (matches stock iperf3 TCP default).
+    static let iperf3BlockSize: Int = 131_072
     /// PingProbe: maximum 8 total attempts. We use one warmup when possible,
     /// then up to 7 measured samples at a short cadence so the phase feels instant.
     static let pingAttemptBudget: Int = 8
     static let pingWarmupCount: Int = 1
+    static let pingMinimumValidSamples: Int = 3
     static let pingIntervalMs: Double = 300
     static let pingTimeoutSeconds: TimeInterval = 1.2
+    /// Probes de rattrapage (cadence rapprochée) quand le budget principal
+    /// n'a pas produit assez d'échantillons valides sur un réseau perdant.
+    static let pingSalvageAttempts: Int = 3
+    static let pingSalvageIntervalMs: Double = 150
+    /// Fenêtre fine de la SÉRIE GRAPHE (courbe de partage) : ~4 points/s pour
+    /// une courbe détaillée du test entier — les stats publiques (moyenne,
+    /// p90/p95, max) restent en fenêtres `publicPeakWindowMs` (1 s).
+    static let graphWindowMs: Double = 250
 }
 
 private enum SpeedtestEngineError: LocalizedError {
-    case downloadProducedNoBytes
-    case uploadUnavailable
-    case uploadProducedNoBytes
-    case uploadHandshakeFailed
     case pingFailed
+    case noServerReachable
 
     var errorDescription: String? {
         switch self {
-        case .downloadProducedNoBytes:
-            return "Le téléchargement n'a reçu aucun octet mesurable. Le speedtest a été annulé pour éviter un résultat faux."
-        case .uploadUnavailable:
-            return "Le serveur speedtest n'a pas fourni d'URL d'upload complète. Le test a été annulé."
-        case .uploadProducedNoBytes:
-            return "L'upload n'a confirmé aucun octet côté serveur. Le speedtest a été annulé pour éviter un résultat faux."
-        case .uploadHandshakeFailed:
-            return "Le serveur speedtest n'a pas accepté l'initialisation de l'upload."
         case .pingFailed:
             return "Impossible de mesurer une latence réseau fiable."
+        case .noServerReachable:
+            return "Les serveurs speedtest sont occupés ou injoignables depuis ce réseau. Réessaie dans un instant."
         }
     }
 }
@@ -281,7 +268,6 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private let api: APIClient
     private let markets: MarketRegistryServicing
     private let networkOperator: NetworkOperatorServicing
-    private let session: URLSession
     private let historyCache: DiskCache
     private let pendingStore: SpeedtestPendingStoring
     private let guestReceiptStore: GuestSpeedtestReceiptStore
@@ -295,7 +281,6 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         api: APIClient,
         markets: MarketRegistryServicing? = nil,
         networkOperator: NetworkOperatorServicing? = nil,
-        session: URLSession? = nil,
         historyCache: DiskCache = DiskCache(folderName: "SignalQuestSpeedtestHistory"),
         // File des sauvegardes EN ATTENTE d'envoi : DURABLE (Application Support, non
         // purgeable par iOS) et protégée — au contraire de l'historique (cache jetable).
@@ -316,13 +301,6 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         self.api = api
         self.markets = markets ?? MarketRegistryService(api: api)
         self.networkOperator = networkOperator ?? NetworkOperatorService(api: api)
-        // Use ephemeral config to bypass system caching of the download payload.
-        let config = URLSessionConfiguration.ephemeral
-        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        config.urlCache = nil
-        config.httpMaximumConnectionsPerHost = 32
-        config.timeoutIntervalForRequest = SpeedtestEngineConfig.chunkTimeoutSeconds
-        self.session = session ?? URLSession(configuration: config)
         self.historyCache = historyCache
         // iOS 17+ : vraie base SwiftData ; iOS 16 : repli sur la file durable (DiskCache).
         // La `pendingCache` durable sert de source de migration (17+) ou de backing (16).
@@ -361,27 +339,117 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         progress: SpeedtestProgressHandler?
     ) async throws -> SpeedtestRunResult {
         let startedAt = Date()
+        let omitSeconds = SpeedtestEngineConfig.iperf3OmitSeconds
+        let durationSeconds = max(5, min(settings.durationSeconds, 30))
+        // Multi-stream is required to saturate 5G / fibre : un seul flux TCP
+        // plafonne souvent sous le débit réel du lien.
+        let parallelStreams = min(max(settings.streams, 4), SpeedtestEngineConfig.hardMaxStreams)
 
-        // 1. Resolve selected server
-        let ovhServer = selectOVHServer(for: settings.downloadTarget, location: location)
-        let serverName = ovhServer.name
+        // 1. Resolve selected server (with fallback to closest if manual choice unreachable)
+        progress?(SpeedtestLiveProgress(phase: .ping, fraction: 0, serverName: nil))
 
-        // 2. Find a working port
-        guard let port = await findWorkingOVHPort(host: ovhServer.hostname) else {
-            throw NSError(domain: "iPerfClient", code: -6, userInfo: [NSLocalizedDescriptionKey: "Impossible de se connecter aux serveurs OVH iPerf3 (ports 5201-5210 bloqués)"])
+        // Cible « Cloudflare » : moteur HTTPS anycast directement (pas d'iPerf3).
+        if settings.downloadTarget == .cloudflare {
+            return try await runCloudflareTest(
+                pathStatus: pathStatus,
+                location: location,
+                durationSeconds: durationSeconds,
+                parallelStreams: parallelStreams,
+                startedAt: startedAt,
+                progress: progress,
+                notice: nil
+            )
         }
 
-        // 3. Ping measurement using TCP ping
+        var iperfServer = selectIPerfServer(for: settings.downloadTarget, location: location)
+        let requestedServer = iperfServer
+        var endpoint = await resolveIPerfEndpoint(for: iperfServer)
+
+        if endpoint == nil && settings.downloadTarget != .hybridAuto {
+            iperfServer = findClosestIPerfServer(to: location)
+            endpoint = await resolveIPerfEndpoint(for: iperfServer)
+        }
+
+        // Dernier filet : essayer chaque serveur public (régions sans iPerf → plus proche).
+        if endpoint == nil {
+            let ordered = iperfServersSortedByDistance(from: location)
+            for candidate in ordered where candidate.hostname != iperfServer.hostname {
+                if let found = await resolveIPerfEndpoint(for: candidate) {
+                    iperfServer = candidate
+                    endpoint = found
+                    break
+                }
+            }
+        }
+
+        guard let endpoint else {
+            // Chaîne de secours : tous les iPerf3 injoignables → edge Cloudflare
+            // (HTTPS). L'erreur sèche n'arrive que si l'edge échoue aussi.
+            return try await runCloudflareTest(
+                pathStatus: pathStatus,
+                location: location,
+                durationSeconds: durationSeconds,
+                parallelStreams: parallelStreams,
+                startedAt: startedAt,
+                progress: progress,
+                notice: "Serveurs iPerf3 injoignables — test via Cloudflare"
+            )
+        }
+
+        var port = endpoint.port
+        let serverName = iperfServer.name
+
+        // Choix manuel écrasé par le fallback : le dire, pas le cacher
+        // (ex. serveur IPv6-only sur un réseau cellulaire IPv4).
+        if settings.downloadTarget.migrated != .hybridAuto, iperfServer.hostname != requestedServer.hostname {
+            progress?(SpeedtestLiveProgress(
+                phase: .ping,
+                fraction: 0,
+                serverName: serverName,
+                notice: "\(requestedServer.name) injoignable — test sur \(serverName)"
+            ))
+        }
+
+        // Mode Auto : si l'edge anycast Cloudflare est NETTEMENT plus proche
+        // que le meilleur iPerf3 du catalogue (voyage hors zones couvertes),
+        // il devient le serveur de test — couverture mondiale automatique.
+        // Le seuil garde les serveurs opérateurs prioritaires en France.
+        if settings.downloadTarget.migrated == .hybridAuto {
+            let iperfMs = try? await tcpProbe.connectLatencyMs(
+                host: iperfServer.hostname,
+                port: port,
+                timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
+            )
+            let cloudflareMs = try? await tcpProbe.connectLatencyMs(
+                host: CloudflareSpeedtestConfig.host,
+                port: 443,
+                timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
+            )
+            if let cloudflareMs, cloudflareMs + CloudflareSpeedtestConfig.autoAdvantageMs < (iperfMs ?? .infinity) {
+                return try await runCloudflareTest(
+                    pathStatus: pathStatus,
+                    location: location,
+                    durationSeconds: durationSeconds,
+                    parallelStreams: parallelStreams,
+                    startedAt: startedAt,
+                    progress: progress,
+                    notice: nil
+                )
+            }
+        }
+
+        // 2. Ping TCP pur sur le port iPerf (pas de fallback HTTP : ATS bloquerait
+        // les hosts Bouygues/OVH en clair, et le port iPerf n'est pas un serveur HTTP).
         progress?(SpeedtestLiveProgress(
             phase: .ping,
             fraction: 0,
-            pingSampleTarget: 8,
+            pingSampleTarget: SpeedtestEngineConfig.pingAttemptBudget,
             serverName: serverName
         ))
 
-        let pingOutcome = try await measurePings(
-            url: URL(string: "http://\(ovhServer.hostname):\(port)")!,
-            token: nil,
+        let pingOutcome = try await measureIPerfTcpPings(
+            host: iperfServer.hostname,
+            port: port,
             serverName: serverName,
             progress: progress
         )
@@ -392,116 +460,460 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let pingMaxValue = pingOutcome.values.max()
         let jitterValue = SpeedMetricCalculator.jitter(pingOutcome.values)
 
-        let durationSeconds = max(5, min(settings.durationSeconds, 30))
-        let parallelStreams = min(settings.streams, 16)
-
-        // 4. Download measurement
+        // 3. Download measurement (iPerf3 reverse) — démarre immédiatement après le ping.
         progress?(SpeedtestLiveProgress(phase: .download, fraction: 0, serverName: serverName))
 
         let dlSamplesBox = SpeedtestSamplesBox()
         let dlLiveSampler = SpeedtestLiveSampler()
         let dlState = ProgressState()
+        let usefulDuration = Double(durationSeconds)
+        /// Octets et temps cumulés pendant l'omit — permettent au live sampler
+        /// de voir un flux continu (omit + utile) pour une aiguille sans saut.
+        let dlOmitBridge = OmitBridge()
+        // Boîte GRAPHE : timeline complète (grâce [0, omit] + utile décalé de
+        // l'omit) en fenêtres fines — la courbe de partage montre le test en
+        // totalité, montée en charge comprise. Les stats restent sur l'utile.
+        let dlGraphBox = SpeedtestSamplesBox()
+        let dlGraphWarmupState = ProgressState()
+        let omitMs = Double(omitSeconds) * 1_000
 
-        let downloadRunner = IPerf3Runner(
-            hostname: ovhServer.hostname,
-            port: port,
+        // Ping / jitter en charge pendant le DL — sur un port voisin (pas le port
+        // de mesure) pour ne pas RST le démon iPerf3 en cours de test.
+        let dlLoadedHost = iperfServer.hostname
+        let dlLoadedPort = iperfSiblingPort(preferred: port, min: iperfServer.portMin, max: iperfServer.portMax)
+        let dlLoadedOmit = omitSeconds
+        let dlLoadedDeadline = Date().addingTimeInterval(Double(omitSeconds + durationSeconds) + 2)
+        let dlLoadedProbe = tcpProbe
+        let dlLoadedPingsTask = Task.detached(priority: .utility) {
+            try? await Task.sleep(nanoseconds: UInt64(dlLoadedOmit) * 1_000_000_000)
+            guard !Task.isCancelled else { return [Double]() }
+            return await SpeedtestService.collectIPerfLoadedPings(
+                host: dlLoadedHost,
+                port: dlLoadedPort,
+                deadline: dlLoadedDeadline,
+                tcpProbe: dlLoadedProbe
+            )
+        }
+        // Sur les chemins d'erreur du DL, la sonde continuait à pinger jusqu'à
+        // sa deadline ; le defer la coupe quoi qu'il arrive (no-op sinon).
+        defer { dlLoadedPingsTask.cancel() }
+
+        let dlResult: IPerf3Result
+        let dlPort: UInt16
+        do {
+            (dlResult, dlPort) = try await runIPerf3WithPortFallback(
+            hostname: iperfServer.hostname,
+            preferredPort: port,
+            portMin: iperfServer.portMin,
+            portMax: iperfServer.portMax,
             streams: parallelStreams,
             durationSeconds: durationSeconds,
+            omitSeconds: omitSeconds,
             isDownload: true,
+            knownOpenPorts: endpoint.openPorts,
             onProgress: { @Sendable bytes, elapsed in
                 let elapsedMs = elapsed * 1000.0
-                let needleMbps = dlLiveSampler.observe(totalBytes: bytes, elapsedMs: elapsedMs)
+                // Flux continu : omit + utile → aiguille sans discontinuité.
+                let bridged = dlOmitBridge.bridged(usefulBytes: bytes, usefulMs: elapsedMs)
+                let needleMbps = dlLiveSampler.observe(totalBytes: bridged.totalBytes, elapsedMs: bridged.totalMs)
                 let averageMbps = (Double(bytes) * 8.0 / 1_000_000.0) / max(0.1, elapsed)
-
                 let deltaBytes = dlState.update(bytes: bytes, time: elapsedMs)
-
-                Task {
-                    await dlSamplesBox.append(start: max(0, elapsedMs - 150), end: elapsedMs, bytes: deltaBytes)
-                }
-
+                dlSamplesBox.append(start: max(0, elapsedMs - 150), end: elapsedMs, bytes: deltaBytes)
+                dlGraphBox.append(start: omitMs + max(0, elapsedMs - 150), end: omitMs + elapsedMs, bytes: deltaBytes)
                 progress?(SpeedtestLiveProgress(
                     phase: .download,
                     currentMbps: needleMbps,
-                    fraction: elapsed / Double(durationSeconds),
+                    fraction: min(1, elapsed / usefulDuration),
                     downloadLiveMbps: needleMbps,
                     downloadAverageMbps: averageMbps,
                     serverName: serverName
                 ))
+            },
+            onWarmup: { @Sendable rawBytes, wallSeconds in
+                let wallMs = wallSeconds * 1000.0
+                dlOmitBridge.capture(rawBytes: rawBytes, rawMs: wallMs)
+                // Rampe réelle enregistrée pour la courbe (segment de grâce).
+                let warmupDelta = dlGraphWarmupState.update(bytes: rawBytes, time: wallMs)
+                dlGraphBox.append(start: max(0, wallMs - 150), end: wallMs, bytes: warmupDelta)
+                let needleMbps = dlLiveSampler.observe(totalBytes: rawBytes, elapsedMs: wallMs)
+                progress?(SpeedtestLiveProgress(
+                    phase: .download,
+                    currentMbps: needleMbps,
+                    fraction: 0,
+                    downloadLiveMbps: needleMbps,
+                    downloadAverageMbps: 0,
+                    serverName: serverName
+                ))
+            },
+            onPortAttempt: { @Sendable _, _ in
+                progress?(SpeedtestLiveProgress(phase: .download, fraction: 0, serverName: serverName))
             }
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            // Sauvetage : DL iPerf3 impossible sur toute la plage → moteur
+            // Cloudflare (résultat complet plutôt qu'une erreur sèche).
+            print("[SpeedtestService] DL iPerf3 KO (\(error.localizedDescription)) — bascule Cloudflare")
+            return try await runCloudflareTest(
+                pathStatus: pathStatus,
+                location: location,
+                durationSeconds: durationSeconds,
+                parallelStreams: parallelStreams,
+                startedAt: startedAt,
+                progress: progress,
+                notice: "\(serverName) indisponible — test via Cloudflare"
+            )
+        }
+        port = dlPort
+        dlLoadedPingsTask.cancel()
+        let downloadPings = await dlLoadedPingsTask.value
+        let pingDlMs = downloadPings.isEmpty ? nil : SpeedMetricCalculator.average(downloadPings)
+        let jitterDlMs = downloadPings.isEmpty ? nil : SpeedMetricCalculator.jitter(downloadPings)
+
+        guard dlResult.measuredBytes > 100_000, dlResult.measuredDuration >= 1.0 else {
+            // Même sauvetage : un DL quasi vide (POP saturé) vaut une bascule,
+            // pas un échec du test.
+            print("[SpeedtestService] DL iPerf3 incomplet (\(dlResult.measuredBytes) octets) — bascule Cloudflare")
+            return try await runCloudflareTest(
+                pathStatus: pathStatus,
+                location: location,
+                durationSeconds: durationSeconds,
+                parallelStreams: parallelStreams,
+                startedAt: startedAt,
+                progress: progress,
+                notice: "\(serverName) indisponible — test via Cloudflare"
+            )
+        }
+
+        // Les samples live sont déjà post-omit (progress ne pousse que la phase utile).
+        let dlStats = dlSamplesBox.publicStats(
+            windowMs: SpeedtestEngineConfig.publicPeakWindowMs,
+            graceMs: 0,
+            endMs: max(dlResult.measuredDuration, 0.001) * 1_000
         )
+        let dlAverageMbps = dlResult.averageMbps
+        let dlPeakMbps = max(dlStats.peak, dlAverageMbps)
 
-        let dlResult = try await downloadRunner.run()
-        let dlStats = await dlSamplesBox.publicStats(windowMs: 1000, graceMs: 2000, endMs: dlResult.duration * 1000)
-        let dlAverageMbps = (Double(dlResult.bytes) * 8.0 / 1_000_000.0) / max(0.1, dlResult.duration)
+        // Série GRAPHE du test entier : fenêtres fines de grâce [0, omit] puis
+        // utiles — la frontière (nombre de fenêtres de grâce) part au renderer.
+        let dlGraceSeries = dlGraphBox.publicStats(
+            windowMs: SpeedtestEngineConfig.graphWindowMs,
+            graceMs: 0,
+            endMs: omitMs
+        ).seriesMbps
+        let dlUsefulSeries = dlGraphBox.publicStats(
+            windowMs: SpeedtestEngineConfig.graphWindowMs,
+            graceMs: omitMs,
+            endMs: omitMs + max(dlResult.measuredDuration, 0.001) * 1_000
+        ).seriesMbps
+        let dlGraphSeries = dlGraceSeries + dlUsefulSeries
 
-        // 5. Upload measurement
+        // 4. Upload — best-effort. Après un reverse DL, le démon iPerf3 public
+        // a souvent besoin d'un court délai + d'un **autre port** de la plage
+        // (un process par port). Les RST immédiats sur le même port étaient
+        // avalés sans retry → UL systématiquement vide.
         progress?(SpeedtestLiveProgress(phase: .upload, fraction: 0, serverName: serverName))
+
+        // Contexte de résultat (géocodage inverse, SSID, opérateur) résolu EN
+        // PARALLÈLE de l'upload — jusqu'à ~2-3 s de gagnés avant `.finished`.
+        let contextTask = resultContextTask(pathStatus: pathStatus, location: location)
 
         let ulSamplesBox = SpeedtestSamplesBox()
         let ulLiveSampler = SpeedtestLiveSampler()
         let ulState = ProgressState()
+        let ulOmitBridge = OmitBridge()
+        let ulGraphBox = SpeedtestSamplesBox()
+        let ulGraphWarmupState = ProgressState()
 
-        let uploadRunner = IPerf3Runner(
-            hostname: ovhServer.hostname,
-            port: port,
-            streams: parallelStreams,
-            durationSeconds: durationSeconds,
-            isDownload: false,
-            onProgress: { @Sendable bytes, elapsed in
-                let elapsedMs = elapsed * 1000.0
-                let needleMbps = ulLiveSampler.observe(totalBytes: bytes, elapsedMs: elapsedMs)
-                let averageMbps = (Double(bytes) * 8.0 / 1_000_000.0) / max(0.1, elapsed)
+        var ulAverageMbps: Double?
+        var ulPeakMbps: Double?
+        var ulStats = SpeedtestSamplesBox.PublicStats(p90: nil, p95: nil, peak: 0, windowCount: 0, seriesMbps: [])
+        var ulGraphSeries: [Double] = []
+        var ulGraceCount = 0
+        var uploadSource = "client-written"
+        var pingUlMs: Double?
+        var jitterUlMs: Double?
 
-                let deltaBytes = ulState.update(bytes: bytes, time: elapsedMs)
+        // Pause courte : laisse le serveur fermer proprement la session reverse.
+        try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.interPhaseDelayMs * 1_000_000))
 
-                Task {
-                    await ulSamplesBox.append(start: max(0, elapsedMs - 150), end: elapsedMs, bytes: deltaBytes)
+        // Port UL : de préférence un port CONFIRMÉ ouvert au probe initial
+        // (≠ port DL, occupé côté démon) — zéro re-scan entre les phases.
+        let ulPreferredPort = endpoint.openPorts.first(where: { $0 != port })
+            ?? iperfSiblingPort(
+                preferred: port,
+                min: iperfServer.portMin,
+                max: iperfServer.portMax
+            )
+        let ulStreamAttempts = [
+            min(parallelStreams, SpeedtestEngineConfig.hardMaxUploadStreams),
+            SpeedtestEngineConfig.uploadRetryStreams
+        ]
+        // Loaded pings sur un 3e port si possible, jamais le port d'upload actif.
+        let ulLoadedHost = iperfServer.hostname
+        let ulLoadedPort = endpoint.openPorts.first(where: { $0 != port && $0 != ulPreferredPort })
+            ?? iperfSiblingPort(
+                preferred: ulPreferredPort,
+                min: iperfServer.portMin,
+                max: iperfServer.portMax
+            )
+        let ulLoadedOmit = omitSeconds
+        let ulLoadedDeadline = Date().addingTimeInterval(Double(omitSeconds + durationSeconds) + 3)
+        let ulLoadedProbe = tcpProbe
+        let ulLoadedPingsTask = Task.detached(priority: .utility) {
+            try? await Task.sleep(nanoseconds: UInt64(ulLoadedOmit) * 1_000_000_000)
+            guard !Task.isCancelled else { return [Double]() }
+            return await SpeedtestService.collectIPerfLoadedPings(
+                host: ulLoadedHost,
+                port: ulLoadedPort,
+                deadline: ulLoadedDeadline,
+                tcpProbe: ulLoadedProbe
+            )
+        }
+        defer { ulLoadedPingsTask.cancel() }
+
+        do {
+            var lastULError: Error?
+            var didUpload = false
+            for (attemptIndex, ulStreams) in ulStreamAttempts.enumerated() {
+                // 1er essai : port voisin ; 2e essai : port du DL (souvent libre).
+                let preferred = attemptIndex == 0 ? ulPreferredPort : port
+                do {
+                    let (ulResult, ulPort) = try await runIPerf3WithPortFallback(
+                        hostname: iperfServer.hostname,
+                        preferredPort: preferred,
+                        portMin: iperfServer.portMin,
+                        portMax: iperfServer.portMax,
+                        streams: max(1, ulStreams),
+                        durationSeconds: durationSeconds,
+                        omitSeconds: omitSeconds,
+                        isDownload: false,
+                        knownOpenPorts: endpoint.openPorts,
+                        onProgress: { @Sendable bytes, elapsed in
+                            let elapsedMs = elapsed * 1000.0
+                            let bridged = ulOmitBridge.bridged(usefulBytes: bytes, usefulMs: elapsedMs)
+                            let needleMbps = ulLiveSampler.observe(totalBytes: bridged.totalBytes, elapsedMs: bridged.totalMs)
+                            let averageMbps = (Double(bytes) * 8.0 / 1_000_000.0) / max(0.1, elapsed)
+                            let deltaBytes = ulState.update(bytes: bytes, time: elapsedMs)
+                            ulSamplesBox.append(start: max(0, elapsedMs - 150), end: elapsedMs, bytes: deltaBytes)
+                            ulGraphBox.append(start: omitMs + max(0, elapsedMs - 150), end: omitMs + elapsedMs, bytes: deltaBytes)
+                            progress?(SpeedtestLiveProgress(
+                                phase: .upload,
+                                currentMbps: needleMbps,
+                                fraction: min(1, elapsed / usefulDuration),
+                                uploadLiveMbps: needleMbps,
+                                uploadAverageMbps: averageMbps,
+                                serverName: serverName
+                            ))
+                        },
+                        onWarmup: { @Sendable rawBytes, wallSeconds in
+                            let wallMs = wallSeconds * 1000.0
+                            ulOmitBridge.capture(rawBytes: rawBytes, rawMs: wallMs)
+                            let warmupDelta = ulGraphWarmupState.update(bytes: rawBytes, time: wallMs)
+                            ulGraphBox.append(start: max(0, wallMs - 150), end: wallMs, bytes: warmupDelta)
+                            let needleMbps = ulLiveSampler.observe(totalBytes: rawBytes, elapsedMs: wallMs)
+                            progress?(SpeedtestLiveProgress(
+                                phase: .upload,
+                                currentMbps: needleMbps,
+                                fraction: 0,
+                                uploadLiveMbps: needleMbps,
+                                uploadAverageMbps: 0,
+                                serverName: serverName
+                            ))
+                        },
+                        onPortAttempt: { @Sendable _, _ in
+                            progress?(SpeedtestLiveProgress(phase: .upload, fraction: 0, serverName: serverName))
+                        }
+                    )
+                    port = ulPort
+                    if ulResult.measuredBytes > 100_000, ulResult.measuredDuration >= 1.0 {
+                        ulStats = ulSamplesBox.publicStats(
+                            windowMs: SpeedtestEngineConfig.publicPeakWindowMs,
+                            graceMs: 0,
+                            endMs: max(ulResult.measuredDuration, 0.001) * 1_000
+                        )
+                        let ulGraceSeries = ulGraphBox.publicStats(
+                            windowMs: SpeedtestEngineConfig.graphWindowMs,
+                            graceMs: 0,
+                            endMs: omitMs
+                        ).seriesMbps
+                        let ulUsefulSeries = ulGraphBox.publicStats(
+                            windowMs: SpeedtestEngineConfig.graphWindowMs,
+                            graceMs: omitMs,
+                            endMs: omitMs + max(ulResult.measuredDuration, 0.001) * 1_000
+                        ).seriesMbps
+                        ulGraphSeries = ulGraceSeries + ulUsefulSeries
+                        ulGraceCount = ulGraceSeries.count
+                        ulAverageMbps = ulResult.averageMbps
+                        ulPeakMbps = max(ulStats.peak, ulAverageMbps ?? 0)
+                        uploadSource = ulResult.serverBytes != nil ? "server-received" : "client-written"
+                        didUpload = true
+                        break
+                    }
+                    lastULError = NSError(
+                        domain: "iPerfClient",
+                        code: -8,
+                        userInfo: [NSLocalizedDescriptionKey: "Upload incomplet (\(ulResult.measuredBytes) octets)"]
+                    )
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    lastULError = error
+                    print("[SpeedtestService] Upload attempt \(attemptIndex + 1) failed (streams=\(ulStreams) portPref=\(preferred)): \(error.localizedDescription)")
+                    // Court backoff avant le second essai (RST / busy).
+                    try? await Task.sleep(nanoseconds: 350_000_000)
                 }
-
-                progress?(SpeedtestLiveProgress(
-                    phase: .upload,
-                    currentMbps: needleMbps,
-                    fraction: elapsed / Double(durationSeconds),
-                    uploadLiveMbps: needleMbps,
-                    uploadAverageMbps: averageMbps,
-                    serverName: serverName
-                ))
             }
-        )
+            if !didUpload, let lastULError {
+                print("[SpeedtestService] Upload failed (best-effort, DL only): \(lastULError.localizedDescription)")
+            }
+        } catch is CancellationError {
+            ulLoadedPingsTask.cancel()
+            throw CancellationError()
+        }
 
-        let ulResult = try await uploadRunner.run()
-        let ulStats = await ulSamplesBox.publicStats(windowMs: 1000, graceMs: 2000, endMs: ulResult.duration * 1000)
-        let ulAverageMbps = (Double(ulResult.bytes) * 8.0 / 1_000_000.0) / max(0.1, ulResult.duration)
+        ulLoadedPingsTask.cancel()
+        let uploadPings = await ulLoadedPingsTask.value
+        if !uploadPings.isEmpty {
+            pingUlMs = SpeedMetricCalculator.average(uploadPings)
+            jitterUlMs = SpeedMetricCalculator.jitter(uploadPings)
+        }
 
-        // 6. Build the result
-        let duration = Date().timeIntervalSince(startedAt)
-        let resolvedPlace = await reverseGeocodedPlace(for: location)
-        let wifiSSID = await currentWiFiSSID(for: pathStatus)
-        let operatorContext = await resolveCellularOperatorContext(pathStatus: pathStatus, location: location)
-
-        let result = SpeedtestRunResult(
-            id: UUID(),
-            label: "iOS speedtest",
-            downloadMbps: dlAverageMbps,
-            downloadAverageMbps: dlAverageMbps,
-            downloadMaxMbps: dlStats.peak > 0 ? dlStats.peak : dlAverageMbps,
-            downloadP90Mbps: dlStats.p90,
-            downloadP95Mbps: dlStats.p95,
-            uploadMbps: ulAverageMbps,
-            uploadAverageMbps: ulAverageMbps,
-            uploadMaxMbps: ulStats.peak > 0 ? ulStats.peak : ulAverageMbps,
-            uploadP90Mbps: ulStats.p90,
-            uploadP95Mbps: ulStats.p95,
+        // 5. Assemblage partagé (commun aux moteurs iPerf3 et Cloudflare).
+        let measurements = EngineMeasurements(
+            serverName: serverName,
+            downloadServerId: "iperf3_\(iperfServer.hostname):\(port)",
+            downloadServerCode: "\(port)",
+            pingProtocol: pingOutcome.protocolName,
             pingMs: pingValue,
             pingMedianMs: pingMedianValue,
             pingMinMs: pingMinValue,
             pingMaxMs: pingMaxValue,
             jitterMs: jitterValue,
-            pingDlMs: nil,
-            jitterDlMs: nil,
-            pingUlMs: nil,
-            jitterUlMs: nil,
-            pingProtocol: pingOutcome.protocolName,
+            downloadAverageMbps: dlAverageMbps,
+            downloadMaxMbps: dlPeakMbps,
+            downloadP90Mbps: dlStats.p90,
+            downloadP95Mbps: dlStats.p95,
+            downloadSeriesMbps: dlGraphSeries.isEmpty ? dlStats.seriesMbps : dlGraphSeries,
+            uploadAverageMbps: ulAverageMbps,
+            uploadMaxMbps: ulPeakMbps,
+            uploadP90Mbps: ulStats.p90,
+            uploadP95Mbps: ulStats.p95,
+            uploadSeriesMbps: ulGraphSeries.isEmpty
+                ? (ulStats.seriesMbps.isEmpty ? nil : ulStats.seriesMbps)
+                : ulGraphSeries,
+            downloadGraceWindowCount: dlGraphSeries.isEmpty ? 0 : dlGraceSeries.count,
+            uploadGraceWindowCount: ulGraphSeries.isEmpty ? 0 : ulGraceCount,
+            uploadMeasurementSource: uploadSource,
+            pingDlMs: pingDlMs,
+            jitterDlMs: jitterDlMs,
+            pingUlMs: pingUlMs,
+            jitterUlMs: jitterUlMs
+        )
+        return await finalizeRun(
+            measurements,
+            startedAt: startedAt,
+            pathStatus: pathStatus,
+            location: location,
+            context: contextTask,
+            progress: progress
+        )
+    }
+
+    /// Sorties communes des moteurs de mesure (iPerf3 / Cloudflare),
+    /// consommées par `finalizeRun` pour l'assemblage du résultat.
+    private struct EngineMeasurements: Sendable {
+        let serverName: String
+        let downloadServerId: String
+        let downloadServerCode: String
+        let pingProtocol: String
+        let pingMs: Double
+        let pingMedianMs: Double?
+        let pingMinMs: Double?
+        let pingMaxMs: Double?
+        let jitterMs: Double?
+        let downloadAverageMbps: Double
+        let downloadMaxMbps: Double
+        let downloadP90Mbps: Double?
+        let downloadP95Mbps: Double?
+        let downloadSeriesMbps: [Double]
+        let uploadAverageMbps: Double?
+        let uploadMaxMbps: Double?
+        let uploadP90Mbps: Double?
+        let uploadP95Mbps: Double?
+        let uploadSeriesMbps: [Double]?
+        let downloadGraceWindowCount: Int
+        let uploadGraceWindowCount: Int
+        let uploadMeasurementSource: String
+        let pingDlMs: Double?
+        let jitterDlMs: Double?
+        let pingUlMs: Double?
+        let jitterUlMs: Double?
+    }
+
+    /// Contexte de résultat (lieu, SSID, opérateur) — résolu en tâche
+    /// parallèle pendant la phase d'upload pour ne pas retarder `.finished`.
+    private struct RunContextInfo: Sendable {
+        let place: ResolvedPlace
+        let wifiSSID: String?
+        let operatorContext: CellularOperatorContext
+    }
+
+    private func resultContextTask(pathStatus: NetworkPathStatus, location: Coordinates?) -> Task<RunContextInfo, Never> {
+        Task {
+            async let place = self.reverseGeocodedPlace(for: location)
+            async let ssid = self.currentWiFiSSID(for: pathStatus)
+            async let operatorContext = self.resolveCellularOperatorContext(pathStatus: pathStatus, location: location)
+            return await RunContextInfo(place: place, wifiSSID: ssid, operatorContext: operatorContext)
+        }
+    }
+
+    /// Assemblage + persistance + émission `.finished` — indépendant du moteur.
+    /// `context` : tâche lancée pendant l'upload (géocodage/SSID/opérateur en
+    /// parallèle du transfert) ; sinon résolution concurrente ici.
+    private func finalizeRun(
+        _ m: EngineMeasurements,
+        startedAt: Date,
+        pathStatus: NetworkPathStatus,
+        location: Coordinates?,
+        context: Task<RunContextInfo, Never>? = nil,
+        progress: SpeedtestProgressHandler?
+    ) async -> SpeedtestRunResult {
+        let duration = Date().timeIntervalSince(startedAt)
+        let info: RunContextInfo
+        if let context {
+            info = await context.value
+        } else {
+            info = await resultContextTask(pathStatus: pathStatus, location: location).value
+        }
+        let resolvedPlace = info.place
+        let wifiSSID = info.wifiSSID
+        let operatorContext = info.operatorContext
+
+        let result = SpeedtestRunResult(
+            id: UUID(),
+            label: "iOS speedtest",
+            downloadMbps: m.downloadAverageMbps,
+            downloadAverageMbps: m.downloadAverageMbps,
+            downloadMaxMbps: m.downloadMaxMbps,
+            downloadP90Mbps: m.downloadP90Mbps,
+            downloadP95Mbps: m.downloadP95Mbps,
+            uploadMbps: m.uploadAverageMbps,
+            uploadAverageMbps: m.uploadAverageMbps,
+            uploadMaxMbps: m.uploadMaxMbps,
+            uploadP90Mbps: m.uploadP90Mbps,
+            uploadP95Mbps: m.uploadP95Mbps,
+            pingMs: m.pingMs,
+            pingMedianMs: m.pingMedianMs,
+            pingMinMs: m.pingMinMs,
+            pingMaxMs: m.pingMaxMs,
+            jitterMs: m.jitterMs,
+            pingDlMs: m.pingDlMs,
+            jitterDlMs: m.jitterDlMs,
+            pingUlMs: m.pingUlMs,
+            jitterUlMs: m.jitterUlMs,
+            pingProtocol: m.pingProtocol,
             durationSeconds: duration,
             connectionType: pathStatus.connection,
             cellularTechnology: pathStatus.cellularTechnology,
@@ -514,19 +926,25 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             city: resolvedPlace.city,
             address: resolvedPlace.address,
             coordinate: location,
-            serverName: serverName,
-            downloadServerName: serverName,
-            downloadServerId: "iperf3_\(ovhServer.hostname)",
-            downloadServerCode: nil,
+            serverName: m.serverName,
+            downloadServerName: m.serverName,
+            downloadServerId: m.downloadServerId,
+            downloadServerCode: m.downloadServerCode,
             createdAt: startedAt,
-            downloadSeriesMbps: dlStats.seriesMbps,
-            uploadSeriesMbps: ulStats.seriesMbps,
-            uploadMeasurementSource: "client-written",
+            downloadSeriesMbps: m.downloadSeriesMbps,
+            uploadSeriesMbps: m.uploadSeriesMbps,
+            downloadGraceWindowCount: m.downloadGraceWindowCount > 0 ? m.downloadGraceWindowCount : nil,
+            uploadGraceWindowCount: m.uploadGraceWindowCount > 0 ? m.uploadGraceWindowCount : nil,
+            uploadMeasurementSource: m.uploadMeasurementSource,
             deviceModel: AppleDeviceDescriptor.currentShareModelName,
             osVersion: AppleDeviceDescriptor.currentOSVersionLabel
         )
 
-        try? await appendHistory(result)
+        do {
+            try await appendHistory(result)
+        } catch {
+            print("SQ_IPERF history save failed: \(error.localizedDescription)")
+        }
 
         progress?(SpeedtestLiveProgress(
             phase: .finished,
@@ -537,10 +955,464 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             pingFinalMs: result.pingMinMs ?? result.pingMs,
             jitterMs: result.jitterMs,
             pingProtocol: result.pingProtocol,
-            serverName: serverName
+            serverName: m.serverName
         ))
 
         return result
+    }
+
+    // MARK: - Moteur Cloudflare (mesures)
+
+    private enum CloudflareTransferDirection: Sendable { case download, upload }
+
+    private struct CloudflareTransferOutcome: Sendable {
+        let bytes: Int
+        let duration: Double
+
+        var averageMbps: Double {
+            guard bytes > 0, duration > 0 else { return 0 }
+            let mbps = (Double(bytes) * 8.0 / 1_000_000.0) / duration
+            return mbps.isFinite && mbps >= 0 ? mbps : 0
+        }
+    }
+
+    /// Test complet via l'edge anycast Cloudflare — ping (TTFB), download
+    /// `__down`, upload `__up` et pings chargés sur le MÊME edge. HTTPS pur
+    /// (ATS OK), utilisé comme cible manuelle, choix Auto hors zone iPerf3,
+    /// et filet de secours quand les serveurs iPerf3 sont injoignables.
+    private func runCloudflareTest(
+        pathStatus: NetworkPathStatus,
+        location: Coordinates?,
+        durationSeconds: Int,
+        parallelStreams: Int,
+        startedAt: Date,
+        progress: SpeedtestProgressHandler?,
+        notice: String?
+    ) async throws -> SpeedtestRunResult {
+        let dlStreams = min(max(2, parallelStreams), CloudflareSpeedtestConfig.maxStreams)
+        let ulStreams = min(dlStreams, CloudflareSpeedtestConfig.maxUploadStreams)
+        let session = makeMeasurementSession(
+            maxConnectionsPerHost: dlStreams + 2,
+            requestTimeout: Double(durationSeconds) + 15
+        )
+        defer { session.finishTasksAndInvalidate() }
+
+        let colo = await fetchCloudflareColo(session: session)
+        let serverName = cloudflareServerName(colo: colo)
+
+        progress?(SpeedtestLiveProgress(
+            phase: .ping,
+            fraction: 0,
+            pingSampleTarget: SpeedtestEngineConfig.pingAttemptBudget,
+            serverName: serverName,
+            notice: notice
+        ))
+
+        // 1. Ping HTTPS (TTFB sur __down?bytes=0).
+        let pingValues = try await measureCloudflarePings(serverName: serverName, progress: progress)
+        let pingValue = SpeedMetricCalculator.average(pingValues)
+        let pingMedianValue = SpeedMetricCalculator.median(pingValues)
+        let pingMinValue = pingValues.min()
+        let pingMaxValue = pingValues.max()
+        let jitterValue = SpeedMetricCalculator.jitter(pingValues)
+
+        // 2. Download.
+        progress?(SpeedtestLiveProgress(phase: .download, fraction: 0, serverName: serverName))
+        let usefulDuration = Double(durationSeconds)
+        let dlSamplesBox = SpeedtestSamplesBox()
+        let dlLiveSampler = SpeedtestLiveSampler()
+        let dlState = ProgressState()
+        let dlLoadedDeadline = Date().addingTimeInterval(usefulDuration + 1)
+        let cfLoadedProbe = tcpProbe
+        let dlLoadedTask = Task.detached(priority: .utility) {
+            await SpeedtestService.collectIPerfLoadedPings(
+                host: CloudflareSpeedtestConfig.host,
+                port: CloudflareSpeedtestConfig.httpsPort,
+                deadline: dlLoadedDeadline,
+                tcpProbe: cfLoadedProbe
+            )
+        }
+        defer { dlLoadedTask.cancel() }
+
+        let dlOutcome = await measureCloudflareTransfer(
+            direction: .download,
+            session: session,
+            streams: dlStreams,
+            duration: usefulDuration,
+            onProgress: { @Sendable bytes, elapsed in
+                let elapsedMs = elapsed * 1000.0
+                let needleMbps = dlLiveSampler.observe(totalBytes: bytes, elapsedMs: elapsedMs)
+                let averageMbps = (Double(bytes) * 8.0 / 1_000_000.0) / max(0.1, elapsed)
+                let deltaBytes = dlState.update(bytes: bytes, time: elapsedMs)
+                dlSamplesBox.append(start: max(0, elapsedMs - 150), end: elapsedMs, bytes: deltaBytes)
+                progress?(SpeedtestLiveProgress(
+                    phase: .download,
+                    currentMbps: needleMbps,
+                    fraction: min(1, elapsed / usefulDuration),
+                    downloadLiveMbps: needleMbps,
+                    downloadAverageMbps: averageMbps,
+                    serverName: serverName
+                ))
+            }
+        )
+        dlLoadedTask.cancel()
+        let downloadPings = await dlLoadedTask.value
+        let pingDlMs = downloadPings.isEmpty ? nil : SpeedMetricCalculator.average(downloadPings)
+        let jitterDlMs = downloadPings.isEmpty ? nil : SpeedMetricCalculator.jitter(downloadPings)
+
+        try Task.checkCancellation()
+        guard dlOutcome.bytes > 100_000, dlOutcome.duration >= 1.0 else {
+            print("SQ_CLOUDFLARE DL insuffisant : \(dlOutcome.bytes) octets en \(String(format: "%.1f", dlOutcome.duration))s (edge \(colo ?? "?"))")
+            throw SpeedtestEngineError.noServerReachable
+        }
+        let dlStats = dlSamplesBox.publicStats(
+            windowMs: SpeedtestEngineConfig.publicPeakWindowMs,
+            graceMs: 0,
+            endMs: max(dlOutcome.duration, 0.001) * 1_000
+        )
+        // Pas d'omit protocolaire côté Cloudflare : la série fine couvre le
+        // test entier dès le premier octet (rampe réelle visible, grâce = 0).
+        let dlGraphSeries = dlSamplesBox.publicStats(
+            windowMs: SpeedtestEngineConfig.graphWindowMs,
+            graceMs: 0,
+            endMs: max(dlOutcome.duration, 0.001) * 1_000
+        ).seriesMbps
+        let dlAverageMbps = dlOutcome.averageMbps
+        let dlPeakMbps = max(dlStats.peak, dlAverageMbps)
+
+        // 3. Upload — best effort, le DL seul reste un résultat valide.
+        progress?(SpeedtestLiveProgress(phase: .upload, fraction: 0, serverName: serverName))
+
+        // Contexte (géocodage/SSID/opérateur) en parallèle de l'upload.
+        let contextTask = resultContextTask(pathStatus: pathStatus, location: location)
+        let ulSamplesBox = SpeedtestSamplesBox()
+        let ulLiveSampler = SpeedtestLiveSampler()
+        let ulState = ProgressState()
+        var ulAverageMbps: Double?
+        var ulPeakMbps: Double?
+        var ulStats = SpeedtestSamplesBox.PublicStats(p90: nil, p95: nil, peak: 0, windowCount: 0, seriesMbps: [])
+        var pingUlMs: Double?
+        var jitterUlMs: Double?
+
+        let ulLoadedDeadline = Date().addingTimeInterval(usefulDuration + 1)
+        let ulLoadedTask = Task.detached(priority: .utility) {
+            await SpeedtestService.collectIPerfLoadedPings(
+                host: CloudflareSpeedtestConfig.host,
+                port: CloudflareSpeedtestConfig.httpsPort,
+                deadline: ulLoadedDeadline,
+                tcpProbe: cfLoadedProbe
+            )
+        }
+        defer { ulLoadedTask.cancel() }
+
+        let ulOutcome = await measureCloudflareTransfer(
+            direction: .upload,
+            session: session,
+            streams: ulStreams,
+            duration: usefulDuration,
+            onProgress: { @Sendable bytes, elapsed in
+                let elapsedMs = elapsed * 1000.0
+                let needleMbps = ulLiveSampler.observe(totalBytes: bytes, elapsedMs: elapsedMs)
+                let averageMbps = (Double(bytes) * 8.0 / 1_000_000.0) / max(0.1, elapsed)
+                let deltaBytes = ulState.update(bytes: bytes, time: elapsedMs)
+                ulSamplesBox.append(start: max(0, elapsedMs - 150), end: elapsedMs, bytes: deltaBytes)
+                progress?(SpeedtestLiveProgress(
+                    phase: .upload,
+                    currentMbps: needleMbps,
+                    fraction: min(1, elapsed / usefulDuration),
+                    uploadLiveMbps: needleMbps,
+                    uploadAverageMbps: averageMbps,
+                    serverName: serverName
+                ))
+            }
+        )
+        ulLoadedTask.cancel()
+        let uploadPings = await ulLoadedTask.value
+        if !uploadPings.isEmpty {
+            pingUlMs = SpeedMetricCalculator.average(uploadPings)
+            jitterUlMs = SpeedMetricCalculator.jitter(uploadPings)
+        }
+        try Task.checkCancellation()
+        var ulGraphSeries: [Double] = []
+        if ulOutcome.bytes > 100_000, ulOutcome.duration >= 1.0 {
+            ulStats = ulSamplesBox.publicStats(
+                windowMs: SpeedtestEngineConfig.publicPeakWindowMs,
+                graceMs: 0,
+                endMs: max(ulOutcome.duration, 0.001) * 1_000
+            )
+            ulGraphSeries = ulSamplesBox.publicStats(
+                windowMs: SpeedtestEngineConfig.graphWindowMs,
+                graceMs: 0,
+                endMs: max(ulOutcome.duration, 0.001) * 1_000
+            ).seriesMbps
+            ulAverageMbps = ulOutcome.averageMbps
+            ulPeakMbps = max(ulStats.peak, ulAverageMbps ?? 0)
+        }
+
+        let measurements = EngineMeasurements(
+            serverName: serverName,
+            downloadServerId: "cloudflare_\(colo ?? "edge")",
+            downloadServerCode: colo ?? "edge",
+            pingProtocol: "TCP",
+            pingMs: pingValue,
+            pingMedianMs: pingMedianValue,
+            pingMinMs: pingMinValue,
+            pingMaxMs: pingMaxValue,
+            jitterMs: jitterValue,
+            downloadAverageMbps: dlAverageMbps,
+            downloadMaxMbps: dlPeakMbps,
+            downloadP90Mbps: dlStats.p90,
+            downloadP95Mbps: dlStats.p95,
+            downloadSeriesMbps: dlGraphSeries.isEmpty ? dlStats.seriesMbps : dlGraphSeries,
+            uploadAverageMbps: ulAverageMbps,
+            uploadMaxMbps: ulPeakMbps,
+            uploadP90Mbps: ulStats.p90,
+            uploadP95Mbps: ulStats.p95,
+            uploadSeriesMbps: ulGraphSeries.isEmpty
+                ? (ulStats.seriesMbps.isEmpty ? nil : ulStats.seriesMbps)
+                : ulGraphSeries,
+            downloadGraceWindowCount: 0,
+            uploadGraceWindowCount: 0,
+            uploadMeasurementSource: "client-written",
+            pingDlMs: pingDlMs,
+            jitterDlMs: jitterDlMs,
+            pingUlMs: pingUlMs,
+            jitterUlMs: jitterUlMs
+        )
+        return await finalizeRun(
+            measurements,
+            startedAt: startedAt,
+            pathStatus: pathStatus,
+            location: location,
+            context: contextTask,
+            progress: progress
+        )
+    }
+
+    /// Colo (code IATA) de l'edge joint — best effort, nil si trace KO.
+    private func fetchCloudflareColo(session: URLSession) async -> String? {
+        var request = URLRequest(url: CloudflareSpeedtestConfig.traceURL)
+        request.timeoutInterval = 5
+        guard let (data, response) = try? await session.data(for: request),
+              let http = response as? HTTPURLResponse, (200..<400).contains(http.statusCode),
+              let text = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return cloudflareParseColo(fromTrace: text)
+    }
+
+    /// Ping Cloudflare : **connexion TCP pure** sur l'edge (:443), exactement
+    /// l'instrument du chemin iPerf3 → chiffres comparables entre serveurs.
+    ///
+    /// Un aller-retour HTTPS `__down?bytes=0` mesurerait aussi l'exécution du
+    /// Worker et la surcouche URLSession : 44–222 ms observés là où le RTT
+    /// réseau réel est de 17 ms (RTT confirmé par le header `server-timing:
+    /// cfL4` de l'edge et par ICMP). Le handshake TCP, lui, colle au RTT.
+    private func measureCloudflarePings(
+        serverName: String,
+        progress: SpeedtestProgressHandler?
+    ) async throws -> [Double] {
+        let result = await measureTcpPings(
+            host: CloudflareSpeedtestConfig.host,
+            port: CloudflareSpeedtestConfig.httpsPort,
+            serverName: serverName,
+            progress: progress,
+            minimumValidSamples: 2
+        )
+        guard !result.values.isEmpty else { throw SpeedtestEngineError.pingFailed }
+        return result.values
+    }
+
+
+    /// Transfert borné par une deadline : N flux concurrents qui enchaînent
+    /// les requêtes `__down`/`__up` jusqu'à la fin de la fenêtre ; les octets
+    /// sont comptés au fil de l'eau par les delegates de streaming.
+    private func measureCloudflareTransfer(
+        direction: CloudflareTransferDirection,
+        session: URLSession,
+        streams: Int,
+        duration: Double,
+        onProgress: @escaping @Sendable (_ bytes: Int, _ elapsedSeconds: Double) -> Void
+    ) async -> CloudflareTransferOutcome {
+        let counter = SafeCounter()
+        let start = Date()
+        let deadline = start.addingTimeInterval(duration)
+        // Corps UL partagé (Data immuable, copy-on-write → 1 seule allocation).
+        let uploadBody = direction == .upload ? Data(count: CloudflareSpeedtestConfig.uploadBytesPerRequest) : Data()
+
+        let ticker = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                let elapsed = Date().timeIntervalSince(start)
+                onProgress(counter.value, min(elapsed, duration))
+                if elapsed >= duration { break }
+            }
+        }
+        defer { ticker.cancel() }
+
+        // Une rafale d'échecs (endpoint refusé, réseau coupé) doit laisser une
+        // trace : sans ça, un transfert vide se lit comme « serveurs occupés »
+        // sans aucun indice de la vraie cause.
+        let didLogFailure = AtomicBool(false)
+
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<max(1, streams) {
+                group.addTask { [counter, uploadBody, didLogFailure] in
+                    while Date() < deadline, !Task.isCancelled {
+                        do {
+                            switch direction {
+                            case .download:
+                                var request = URLRequest(url: CloudflareSpeedtestConfig.downURL(bytes: CloudflareSpeedtestConfig.downloadBytesPerRequest))
+                                request.timeoutInterval = duration + 10
+                                let delegate = SpeedtestDownloadDelegate(deadline: deadline, onBytes: { counter.add($0) })
+                                let task = session.dataTask(with: request)
+                                task.delegate = delegate
+                                try await delegate.run(task: task)
+                            case .upload:
+                                var request = URLRequest(url: CloudflareSpeedtestConfig.upURL)
+                                request.httpMethod = "POST"
+                                request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+                                request.timeoutInterval = duration + 10
+                                let delegate = SpeedtestUploadDelegate(deadline: deadline, onBytesSent: { counter.add($0) })
+                                let task = session.uploadTask(with: request, from: uploadBody)
+                                task.delegate = delegate
+                                _ = try await delegate.run(task: task)
+                            }
+                        } catch {
+                            if Task.isCancelled || Date() >= deadline { break }
+                            if !didLogFailure.value {
+                                didLogFailure.value = true
+                                print("SQ_CLOUDFLARE \(direction == .download ? "DL" : "UL") requête échouée : \(error.localizedDescription)")
+                            }
+                            // Requête ratée : court répit puis nouvel essai
+                            // dans la fenêtre restante.
+                            try? await Task.sleep(nanoseconds: 250_000_000)
+                        }
+                    }
+                }
+            }
+        }
+        ticker.cancel()
+        let elapsed = min(Date().timeIntervalSince(start), duration)
+        return CloudflareTransferOutcome(bytes: counter.value, duration: max(0.001, elapsed))
+    }
+
+    /// Lance iPerf3 en essayant la plage de ports du serveur si le port préféré
+    /// est occupé (ACCESS_DENIED) ou refuse la connexion.
+    ///
+    /// **Fast path** : le `preferredPort` est tenté **immédiatement** (sans
+    /// re-scan TCP de toute la plage). C’est critique entre DL et UL : le port
+    /// qui a réussi le download est déjà connu — un probe 1.5 s bloquait
+    /// artificiellement le démarrage de l’upload.
+    ///
+    /// **Fallback** : seulement si le preferred échoue, on sonde les autres
+    /// ports de la plage puis on réessaie.
+    private func runIPerf3WithPortFallback(
+        hostname: String,
+        preferredPort: UInt16,
+        portMin: UInt16,
+        portMax: UInt16,
+        streams: Int,
+        durationSeconds: Int,
+        omitSeconds: Int,
+        isDownload: Bool,
+        knownOpenPorts: [UInt16] = [],
+        onProgress: (@Sendable (_ bytesTransferred: Int, _ elapsedSeconds: Double) -> Void)?,
+        onWarmup: (@Sendable (_ rawTotalBytes: Int, _ wallSeconds: Double) -> Void)? = nil,
+        onPortAttempt: (@Sendable (_ port: UInt16, _ attempt: Int) -> Void)? = nil
+    ) async throws -> (IPerf3Result, UInt16) {
+        let lo = min(portMin, portMax)
+        let hi = max(portMin, portMax)
+        var siblingPorts = Array(lo...hi).filter { $0 != preferredPort }
+        // Plages larges (Bouygues 9200–9240) : échantillonner les siblings.
+        if siblingPorts.count > 15 {
+            let sampleStride = max(1, siblingPorts.count / 12)
+            var sampled: [UInt16] = []
+            for p in stride(from: Int(lo), through: Int(hi), by: sampleStride) {
+                let port = UInt16(p)
+                if port != preferredPort { sampled.append(port) }
+            }
+            if !sampled.contains(lo), lo != preferredPort { sampled.insert(lo, at: 0) }
+            if !sampled.contains(hi), hi != preferredPort { sampled.append(hi) }
+            siblingPorts = sampled
+        }
+
+        var lastError: Error?
+        var attempt = 0
+
+        // 1) Preferred d’abord — zéro latence de discovery (cas UL après DL).
+        onPortAttempt?(preferredPort, attempt)
+        attempt += 1
+        do {
+            let runner = IPerf3Runner(
+                hostname: hostname,
+                port: preferredPort,
+                streams: streams,
+                durationSeconds: durationSeconds,
+                omitSeconds: omitSeconds,
+                isDownload: isDownload,
+                onProgress: onProgress,
+                onWarmup: onWarmup
+            )
+            return (try await runner.run(), preferredPort)
+        } catch {
+            // Un « Arrêter » utilisateur ne doit JAMAIS déclencher le re-scan
+            // de la plage : l'erreur .cancelled est retryable côté serveur,
+            // pas côté tâche annulée.
+            if Task.isCancelled || error is CancellationError {
+                throw CancellationError()
+            }
+            if isRetryableIPerfTransportError(error) {
+                lastError = error
+            } else {
+                throw error
+            }
+        }
+
+        // 2) Preferred KO → ports déjà confirmés ouverts au probe initial
+        // (zéro re-scan en cours de test), sinon sonde rapide des siblings.
+        try Task.checkCancellation()
+        let orderedPorts: [UInt16]
+        let knownCandidates = knownOpenPorts.filter { $0 != preferredPort }
+        if !knownCandidates.isEmpty {
+            orderedPorts = knownCandidates
+        } else {
+            let probedOpen = await probeOpenTCPPorts(
+                host: hostname,
+                ports: siblingPorts,
+                timeoutSeconds: 0.9
+            )
+            orderedPorts = probedOpen.isEmpty ? siblingPorts : probedOpen
+        }
+
+        for candidatePort in orderedPorts {
+            try Task.checkCancellation()
+            onPortAttempt?(candidatePort, attempt)
+            attempt += 1
+            do {
+                let runner = IPerf3Runner(
+                    hostname: hostname,
+                    port: candidatePort,
+                    streams: streams,
+                    durationSeconds: durationSeconds,
+                    omitSeconds: omitSeconds,
+                    isDownload: isDownload,
+                    onProgress: onProgress,
+                    onWarmup: onWarmup
+                )
+                return (try await runner.run(), candidatePort)
+            } catch {
+                if Task.isCancelled || error is CancellationError {
+                    throw CancellationError()
+                }
+                if isRetryableIPerfTransportError(error) {
+                    lastError = error
+                    continue
+                }
+                throw error
+            }
+        }
+        throw lastError ?? SpeedtestEngineError.noServerReachable
     }
 
     private struct CellularOperatorContext: Sendable {
@@ -701,7 +1573,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             guestDeleteToken: guestDeleteToken,
             driveSessionId: driveSessionId
         )
-        try? await upsertPendingSave(pending)
+        try await upsertPendingSave(pending)
         do {
             try await submitPendingSave(pending)
             await removePendingSave(id: pending.id)
@@ -782,7 +1654,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 
     private func removePendingSave(id: String) async {
         let values = await pendingSaves().filter { $0.id != id }
-        try? await writePendingSaves(values)
+        do {
+            try await writePendingSaves(values)
+        } catch {
+            print("SQ_IPERF pending save cleanup failed: \(error.localizedDescription)")
+        }
     }
 
     private func submitPendingSave(_ pending: PendingSpeedtestSave) async throws {
@@ -838,131 +1714,12 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         for item in pending where excludedIds.contains(item.id) {
             remaining.append(item)
         }
-        try? await writePendingSaves(remaining)
-        if let firstError { throw firstError }
-    }
-
-    // MARK: - Target resolution
-
-    private struct ResolvedDownloadTarget: Sendable {
-        let url: URL
-        let token: String?
-        let serverName: String
-        /// Id de cible soumis au backend (`downloadServerId`) : cloudflare_r2 /
-        /// aws_cloudfront / vps_internal — pour diagnostiquer les chemins CDN.
-        let targetId: String
-    }
-
-    private func resolveDownloadTarget(
-        settings: SpeedtestRunSettings,
-        sessionResponse: SpeedtestSessionResponse
-    ) async -> ResolvedDownloadTarget {
-        switch settings.downloadTarget {
-        case .hybridAuto:
-            return await preflightBestDownloadTarget(sessionResponse: sessionResponse)
-        case .cloudflareR2:
-            if let target = cdnTarget(.cloudflareR2, sessionResponse: sessionResponse) { return target }
-        case .awsCloudFront:
-            if let target = cdnTarget(.awsCloudFront, sessionResponse: sessionResponse) { return target }
-        case .vpsInternal:
-            break
-        default:
-            break
-        }
-
-        return vpsTarget(sessionResponse: sessionResponse)
-    }
-
-    private func vpsTarget(sessionResponse: SpeedtestSessionResponse) -> ResolvedDownloadTarget {
-        ResolvedDownloadTarget(
-            url: sessionResponse.downloadUrl,
-            token: sessionResponse.sessionToken,
-            serverName: sessionResponse.selectedServer?.name ?? SpeedtestDownloadTarget.vpsInternal.displayName,
-            targetId: SpeedtestDownloadTarget.vpsInternal.rawValue
-        )
-    }
-
-    /// Cible CDN (CloudFront / Cloudflare R2) si son URL configurée ne pointe
-    /// pas par erreur vers l'endpoint protégé du VPS (garde-fou historique).
-    private func cdnTarget(
-        _ target: SpeedtestDownloadTarget,
-        sessionResponse: SpeedtestSessionResponse
-    ) -> ResolvedDownloadTarget? {
-        let url: URL
-        switch target {
-        case .awsCloudFront: url = api.config.speedtestCloudFrontDownloadURL
-        case .cloudflareR2: url = api.config.speedtestCloudflareDownloadURL
-        default: return nil
-        }
-        guard !isProtectedSpeedtestDownloadURL(
-            url,
-            protectedDownloadURL: api.config.speedtestDownloadURL,
-            sessionDownloadURL: sessionResponse.downloadUrl,
-            speedtestBaseURL: api.config.speedtestBaseURL
-        ) else { return nil }
-        return ResolvedDownloadTarget(url: url, token: nil, serverName: target.displayName, targetId: target.rawValue)
-    }
-
-    /// Sélection automatique « hybride » (parité Android `hybrid_auto`) :
-    /// mini-warmup séquentiel sur chaque CDN — on chronomètre la lecture des
-    /// 256 premiers Ko (GET streamé, annulé ensuite ; PAS de Range : R2
-    /// l'ignore) avec timeout 2,5 s — le plus rapide gagne. Le ping du test
-    /// suivra la cible retenue (chemin réellement mesuré). Le VPS n'est PLUS
-    /// candidat (TTFB 2× supérieur) : il ne sert que de repli si les deux CDN
-    /// sont injoignables (il reste toujours joignable via la session).
-    private func preflightBestDownloadTarget(
-        sessionResponse: SpeedtestSessionResponse
-    ) async -> ResolvedDownloadTarget {
-        var candidates: [ResolvedDownloadTarget] = []
-        if let cloudflare = cdnTarget(.cloudflareR2, sessionResponse: sessionResponse) {
-            candidates.append(cloudflare)
-        }
-        if let cloudFront = cdnTarget(.awsCloudFront, sessionResponse: sessionResponse) {
-            candidates.append(cloudFront)
-        }
-
-        var best: (target: ResolvedDownloadTarget, elapsed: TimeInterval)?
-        for candidate in candidates {
-            if let elapsed = await preflightElapsed(candidate) {
-                if best == nil || elapsed < best!.elapsed {
-                    best = (candidate, elapsed)
-                }
-            }
-        }
-        return best?.target ?? vpsTarget(sessionResponse: sessionResponse)
-    }
-
-    /// Temps de lecture des 256 premiers Ko du candidat (nil = échec/timeout).
-    /// PAS de cache-buster : on veut mesurer le chemin que le vrai test
-    /// empruntera — l'edge (cache compris), pas l'origine.
-    private func preflightElapsed(_ target: ResolvedDownloadTarget) async -> TimeInterval? {
-        let sampleBytes = 262_144
-        let url = target.url
-
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 2.5
-        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
-        if let token = target.token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        let started = Date()
         do {
-            let (bytes, response) = try await session.bytes(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return nil }
-            var received = 0
-            for try await _ in bytes {
-                received += 1
-                if received >= sampleBytes { break }
-                // Garde-fou timeout vérifié tous les 16 Ko (pas à chaque octet).
-                if received & 0x3FFF == 0, Date().timeIntervalSince(started) > 2.5 { return nil }
-            }
-            guard received >= min(sampleBytes, 1) else { return nil }
-            return Date().timeIntervalSince(started)
+            try await writePendingSaves(remaining)
         } catch {
-            return nil
+            print("SQ_IPERF flush save failed: \(error.localizedDescription)")
         }
+        if let firstError { throw firstError }
     }
 
     // MARK: - Ping
@@ -977,33 +1734,62 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let attemptsUsed: Int
     }
 
-    private func measurePings(
-        url: URL,
-        token: String?,
+    /// Ping TCP dédié iPerf : jamais de fallback HTTP (ATS / ports non-HTTP).
+    /// Exige ≥ 2 échantillons (jitter/médiane sans signification à 1) — avec
+    /// salvage intégré à `measureTcpPings` avant d'échouer le run.
+    private func measureIPerfTcpPings(
+        host: String,
+        port: UInt16,
         serverName: String,
         progress: SpeedtestProgressHandler?
     ) async throws -> PingOutcome {
-        guard let host = url.host(percentEncoded: false) ?? url.host else {
-            throw SpeedtestEngineError.pingFailed
-        }
-        let port = UInt16(url.port ?? (url.scheme?.lowercased() == "http" ? 80 : 443))
+        let result = await measureTcpPings(
+            host: host,
+            port: port,
+            serverName: serverName,
+            progress: progress,
+            minimumValidSamples: 2
+        )
+        guard !result.values.isEmpty else { throw SpeedtestEngineError.pingFailed }
+        return PingOutcome(values: result.values, protocolName: "TCP")
+    }
 
-        let tcp = await measureTcpPings(host: host, port: port, serverName: serverName, progress: progress)
-        if !tcp.values.isEmpty {
-            return PingOutcome(values: tcp.values, protocolName: "TCP")
+    /// RTT TCP sous charge (pendant DL/UL iPerf) : connect latency uniquement,
+    /// sans handshake iPerf3, pour peupler pingDl/Ul + jitterDl/Ul.
+    private static func collectIPerfLoadedPings(
+        host: String,
+        port: UInt16,
+        deadline: Date,
+        tcpProbe: SpeedtestTCPProbing
+    ) async -> [Double] {
+        var values: [Double] = []
+        while Date() < deadline && !Task.isCancelled {
+            do {
+                let elapsed = try await tcpProbe.connectLatencyMs(
+                    host: host,
+                    port: port,
+                    timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
+                )
+                if !Task.isCancelled,
+                   elapsed > 0,
+                   elapsed < SpeedtestEngineConfig.pingTimeoutSeconds * 1_000 {
+                    values.append(elapsed)
+                }
+            } catch {
+                // Échantillon raté sous charge : on continue.
+            }
+            if Task.isCancelled || Date() >= deadline { break }
+            try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.pingIntervalMs * 1_000_000))
         }
-
-        let remainingBudget = max(0, SpeedtestEngineConfig.pingAttemptBudget - tcp.attemptsUsed)
-        let http = try await measureHttpPings(url: url, token: token, attemptBudget: remainingBudget, serverName: serverName, progress: progress)
-        guard !http.values.isEmpty else { throw SpeedtestEngineError.pingFailed }
-        return PingOutcome(values: http.values, protocolName: "HTTP")
+        return values
     }
 
     private func measureTcpPings(
         host: String,
         port: UInt16,
         serverName: String,
-        progress: SpeedtestProgressHandler?
+        progress: SpeedtestProgressHandler?,
+        minimumValidSamples: Int = SpeedtestEngineConfig.pingMinimumValidSamples
     ) async -> PingAttemptResult {
         var values: [Double] = []
         var attemptsUsed = 0
@@ -1012,6 +1798,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             warmupCount: SpeedtestEngineConfig.pingWarmupCount
         )
 
+        // Warm-up (non compté) — un échec n'abandonne pas tout le run iPerf.
         do {
             attemptsUsed += 1
             _ = try await tcpProbe.connectLatencyMs(
@@ -1020,7 +1807,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
             )
         } catch {
-            return PingAttemptResult(values: [], attemptsUsed: attemptsUsed)
+            // Continuer : le premier connect peut échouer (DNS / cold start).
         }
 
         try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.pingIntervalMs * 1_000_000))
@@ -1032,55 +1819,72 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     port: port,
                     timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
                 )
-                values.append(elapsed)
-                emitPingProgress(values: values, protocolName: "TCP", target: measuredTarget, serverName: serverName, progress: progress)
+                // Filtre les outliers aberrants (timeout partiel → latence saturée).
+                if elapsed > 0, elapsed < SpeedtestEngineConfig.pingTimeoutSeconds * 1_000 {
+                    values.append(elapsed)
+                    emitPingProgress(
+                        values: values,
+                        protocolName: "TCP",
+                        target: measuredTarget,
+                        serverName: serverName,
+                        progress: progress
+                    )
+                } else {
+                    emitPingAttemptTick(attemptsUsed: attemptsUsed, values: values, target: measuredTarget, serverName: serverName, progress: progress)
+                }
             } catch {
-                break
+                // Échantillon raté : on continue pour maximiser le nombre de mesures,
+                // mais la barre avance quand même (réseau perdant ≠ UI figée).
+                emitPingAttemptTick(attemptsUsed: attemptsUsed, values: values, target: measuredTarget, serverName: serverName, progress: progress)
             }
             try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.pingIntervalMs * 1_000_000))
+        }
+        // Salvage : sur réseau perdant, quelques probes rapprochées valent
+        // mieux qu'un run entier avorté faute d'échantillons.
+        var salvageUsed = 0
+        while values.count < minimumValidSamples, salvageUsed < SpeedtestEngineConfig.pingSalvageAttempts {
+            salvageUsed += 1
+            attemptsUsed += 1
+            do {
+                let elapsed = try await tcpProbe.connectLatencyMs(
+                    host: host,
+                    port: port,
+                    timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
+                )
+                if elapsed > 0, elapsed < SpeedtestEngineConfig.pingTimeoutSeconds * 1_000 {
+                    values.append(elapsed)
+                    emitPingProgress(values: values, protocolName: "TCP", target: measuredTarget, serverName: serverName, progress: progress)
+                }
+            } catch {
+                // Dernier recours déjà : rien d'autre à faire.
+            }
+            try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.pingSalvageIntervalMs * 1_000_000))
+        }
+        if values.count < minimumValidSamples {
+            return PingAttemptResult(values: [], attemptsUsed: attemptsUsed)
         }
         return PingAttemptResult(values: values, attemptsUsed: attemptsUsed)
     }
 
-    private func measureHttpPings(
-        url: URL,
-        token: String?,
-        attemptBudget: Int,
+    /// Tick de progression émis sur tentative ratée : la fraction suit les
+    /// tentatives consommées pour que la phase ping ne paraisse jamais figée.
+    private func emitPingAttemptTick(
+        attemptsUsed: Int,
+        values: [Double],
+        target: Int,
         serverName: String,
         progress: SpeedtestProgressHandler?
-    ) async throws -> PingAttemptResult {
-        guard attemptBudget > 0 else { return PingAttemptResult(values: [], attemptsUsed: 0) }
-        var values: [Double] = []
-        var attemptsUsed = 0
-        let warmupCount = min(SpeedtestEngineConfig.pingWarmupCount, max(0, attemptBudget - 1))
-        let measuredTarget = max(0, attemptBudget - warmupCount)
+    ) {
+        let budget = SpeedtestEngineConfig.pingAttemptBudget
         progress?(SpeedtestLiveProgress(
             phase: .ping,
-            fraction: 0,
-            pingProtocol: "HTTP",
-            pingSampleTarget: measuredTarget,
+            fraction: budget > 0 ? min(1, Double(attemptsUsed) / Double(budget)) : 0,
+            pingLiveMs: values.last,
+            pingProtocol: "TCP",
+            pingSampleCount: values.count,
+            pingSampleTarget: target,
             serverName: serverName
         ))
-
-        let total = warmupCount + measuredTarget
-        for index in 0..<total {
-            guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { continue }
-            var query = components.queryItems ?? []
-            if token != nil {
-                query.append(URLQueryItem(name: "bytes", value: "1"))
-            }
-            components.queryItems = query
-            let start = Date()
-            try await performPingRequest(url: components.url ?? url, token: token)
-            attemptsUsed += 1
-            let elapsed = Date().timeIntervalSince(start) * 1_000
-            if index >= warmupCount {
-                values.append(elapsed)
-                emitPingProgress(values: values, protocolName: "HTTP", target: measuredTarget, serverName: serverName, progress: progress)
-            }
-            try await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.pingIntervalMs * 1_000_000))
-        }
-        return PingAttemptResult(values: values, attemptsUsed: attemptsUsed)
     }
 
     private func emitPingProgress(
@@ -1104,416 +1908,6 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         ))
     }
 
-    private func performPingRequest(url: URL, token: String?) async throws {
-        var head = URLRequest(url: url)
-        head.httpMethod = "HEAD"
-        head.timeoutInterval = SpeedtestEngineConfig.pingTimeoutSeconds
-        if let token { head.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
-        do {
-            let (_, response) = try await session.data(for: head)
-            if let http = response as? HTTPURLResponse, (200..<400).contains(http.statusCode) { return }
-        } catch {
-            // Some CDNs reject HEAD — fall back to a tiny GET.
-        }
-        var get = URLRequest(url: url)
-        get.httpMethod = "GET"
-        get.timeoutInterval = SpeedtestEngineConfig.pingTimeoutSeconds
-        get.setValue("bytes=0-0", forHTTPHeaderField: "Range")
-        if let token { get.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
-        let (_, response) = try await session.data(for: get)
-        if let http = response as? HTTPURLResponse, !(200..<400).contains(http.statusCode) {
-            throw APIError.http(
-                status: http.statusCode,
-                code: nil,
-                message: HTTPURLResponse.localizedString(forStatusCode: http.statusCode),
-                requestId: nil,
-                retryAfter: nil
-            )
-        }
-    }
-
-    /// `deadline` est une closure : l'échéance de la phase peut glisser quand la
-    /// grace adaptative est étendue.
-    private func measureLoadedPings(
-        url: URL,
-        token: String?,
-        deadline: @escaping @Sendable () -> Date,
-        protocolName: String
-    ) async -> [Double] {
-        var values: [Double] = []
-        guard let host = url.host(percentEncoded: false) ?? url.host else {
-            return []
-        }
-        let port = UInt16(url.port ?? (url.scheme?.lowercased() == "http" ? 80 : 443))
-
-        while Date() < deadline() && !Task.isCancelled {
-            let start = Date()
-            do {
-                if protocolName == "TCP" {
-                    let elapsed = try await tcpProbe.connectLatencyMs(
-                        host: host,
-                        port: port,
-                        timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
-                    )
-                    if !Task.isCancelled {
-                        values.append(elapsed)
-                    }
-                } else {
-                    guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { continue }
-                    var query = components.queryItems ?? []
-                    if token != nil {
-                        query.append(URLQueryItem(name: "bytes", value: "1"))
-                    }
-                    components.queryItems = query
-                    try await performPingRequest(url: components.url ?? url, token: token)
-                    if !Task.isCancelled {
-                        let elapsed = Date().timeIntervalSince(start) * 1_000
-                        values.append(elapsed)
-                    }
-                }
-            } catch {
-                // Ignore individual failures under load
-            }
-            try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.pingIntervalMs * 1_000_000))
-        }
-        return values
-    }
-
-    // MARK: - Download (Android-aligned)
-
-    /// Aggregate outcome produced by the engine: a final average plus percentile / peak.
-    private struct DownloadOutcome: Sendable {
-        let averageMbps: Double
-        let p90Mbps: Double?
-        let p95Mbps: Double?
-        let peakMbps: Double
-        let measuredWindows: Int
-        let seriesMbps: [Double]
-        let pingDlMs: Double?
-        let jitterDlMs: Double?
-    }
-
-    private struct UploadOutcome: Sendable {
-        let averageMbps: Double
-        let p90Mbps: Double?
-        let p95Mbps: Double?
-        let peakMbps: Double
-        let confirmedBytes: Int
-        let measurementSource: String
-        let seriesMbps: [Double]
-        let pingUlMs: Double?
-        let jitterUlMs: Double?
-    }
-
-    private func measureDownload(
-        url: URL,
-        token: String?,
-        chunkBytes: Int,
-        durationSeconds: Int,
-        streams: Int,
-        reliabilityMode: Bool,
-        serverName: String,
-        pingProtocol: String,
-        edgeCapture: SpeedtestEdgeCaptureBox? = nil,
-        progress: SpeedtestProgressHandler?
-    ) async throws -> DownloadOutcome {
-        do {
-            let outcome = try await measureDownloadAttempt(
-                url: url,
-                token: token,
-                chunkBytes: chunkBytes,
-                durationSeconds: durationSeconds,
-                streams: streams,
-                serverName: serverName,
-                pingProtocol: pingProtocol,
-                edgeCapture: edgeCapture,
-                progress: progress
-            )
-            // If the multi-stream attempt yielded a meaningful number of windows
-            // we keep it. Otherwise (network refused parallelism, hit 429, …) we
-            // fall back to a single-stream run that's more conservative.
-            if outcome.measuredWindows >= 2 || !reliabilityMode || streams <= 1 {
-                return outcome
-            }
-        } catch {
-            if !reliabilityMode || streams <= 1 { throw error }
-        }
-        return try await measureDownloadAttempt(
-            url: url,
-            token: token,
-            chunkBytes: chunkBytes,
-            durationSeconds: durationSeconds,
-            streams: 1,
-            serverName: serverName,
-            pingProtocol: pingProtocol,
-            edgeCapture: edgeCapture,
-            progress: progress
-        )
-    }
-
-    /// Core download algorithm — ported from Android SpeedTestEngine.measureDownload().
-    private func measureDownloadAttempt(
-        url: URL,
-        token: String?,
-        chunkBytes: Int,
-        durationSeconds: Int,
-        streams: Int,
-        serverName: String,
-        pingProtocol: String,
-        edgeCapture: SpeedtestEdgeCaptureBox? = nil,
-        progress: SpeedtestProgressHandler?
-    ) async throws -> DownloadOutcome {
-        let baseGraceMs = SpeedtestEngineConfig.downloadGraceTimeMs
-        let usefulDurationMs = Double(max(5, min(durationSeconds, 30))) * 1_000
-        let attemptStart = Date()
-        // Grace ADAPTATIVE : la fenêtre démarre au warm-up de base (2 s) et
-        // peut être étendue UNE fois, avant son expiration, si le lien est
-        // encore en slow-start — l'échéance glisse d'autant pour préserver la
-        // durée utile de mesure.
-        let window = SpeedtestAdaptivePhaseWindow(
-            graceMs: baseGraceMs,
-            deadline: attemptStart.addingTimeInterval((usefulDurationMs + baseGraceMs) / 1_000)
-        )
-
-        let totals = SpeedtestSyncByteCounter()
-        let liveAggregator = SpeedtestLiveSampler()
-        let samplesBox = SpeedtestSamplesBox()
-        let progressMonitor = SpeedtestStallMonitor(timeoutMs: SpeedtestEngineConfig.downloadStallTimeoutMs)
-
-        // Session PERSISTANTE pour toute la phase : les streams se partagent le
-        // pool (une connexion par stream) et chaque rotation de requête réutilise
-        // sa connexion (keep-alive) au lieu de repayer handshake TLS + slow-start
-        // TCP — cause n°1 de sous-estimation avec l'ancienne session éphémère.
-        let streamCount = max(1, min(streams, SpeedtestEngineConfig.hardMaxStreams))
-        let phaseSession = makeMeasurementSession(
-            maxConnectionsPerHost: streamCount,
-            requestTimeout: SpeedtestEngineConfig.chunkTimeoutSeconds
-        )
-
-        let loadedPingsTask = Task { [weak self] in
-            guard let self else { return [Double]() }
-            try? await Task.sleep(nanoseconds: UInt64(baseGraceMs * 1_000_000))
-            // La grace a pu être étendue pendant le warm-up de base : attendre le
-            // complément pour ne mesurer la latence en charge que sur la fenêtre utile.
-            let extraMs = window.graceMs - baseGraceMs
-            if extraMs > 0 { try? await Task.sleep(nanoseconds: UInt64(extraMs * 1_000_000)) }
-            guard !Task.isCancelled else { return [Double]() }
-            return await self.measureLoadedPings(url: url, token: token, deadline: { window.deadline }, protocolName: pingProtocol)
-        }
-
-        // Live progress sampler — pulses the UI every 150 ms.
-        let progressTask = Task { [weak self] in
-            guard self != nil else { return }
-            var lastSampleMs: Double?
-            var lastSampleTotalBytes = 0
-            var instantHistory: [(ms: Double, mbps: Double)] = []
-            var graceDecided = false
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.sampleIntervalMs * 1_000_000))
-                if Task.isCancelled { return }
-                let now = Date()
-                if now >= window.deadline { return }
-                let elapsedMs = now.timeIntervalSince(attemptStart) * 1_000
-                let snapshot = totals.snapshot()
-
-                // Aiguille = débit INSTANTANÉ (fenêtre glissante 1 s + léger EMA),
-                // émis dès le warm-up. La moyenne (valeur finale) reste cumulée
-                // post-grace, inchangée.
-                let needleMbps = liveAggregator.observe(totalBytes: snapshot.total, elapsedMs: elapsedMs)
-                instantHistory.append((ms: elapsedMs, mbps: liveAggregator.lastInstantMbps))
-
-                // Grace adaptative : décidée au dernier tick AVANT la frontière du
-                // warm-up (jamais après — les octets seraient déjà comptés utiles).
-                if !graceDecided, elapsedMs >= baseGraceMs - SpeedtestEngineConfig.sampleIntervalMs * 1.5 {
-                    graceDecided = true
-                    let earlier = instantHistory.last(where: { $0.ms <= elapsedMs - SpeedtestEngineConfig.graceComparisonLookbackMs })?.mbps
-                    if speedtestShouldExtendGrace(recentMbps: liveAggregator.lastInstantMbps, earlierMbps: earlier) {
-                        window.extendGrace(to: SpeedtestEngineConfig.extendedGraceTimeMs, ifNotPastMs: elapsedMs)
-                    }
-                }
-
-                let graceMs = window.graceMs
-                if elapsedMs >= graceMs {
-                    if let startMs = lastSampleMs, startMs >= graceMs {
-                        let bytesDiff = max(0, snapshot.total - lastSampleTotalBytes)
-                        if bytesDiff > 0, elapsedMs > startMs {
-                            await samplesBox.append(start: startMs, end: elapsedMs, bytes: bytesDiff)
-                        }
-                    }
-                    lastSampleMs = elapsedMs
-                    lastSampleTotalBytes = snapshot.total
-
-                    let effectiveBytes = max(0, snapshot.total - snapshot.grace)
-                    let averageMbps = boundedMbps(bytes: effectiveBytes, durationMs: elapsedMs - graceMs)
-                    let fraction = max(0, min(1, (elapsedMs - graceMs) / usefulDurationMs))
-                    progress?(SpeedtestLiveProgress(
-                        phase: .download,
-                        currentMbps: needleMbps,
-                        fraction: fraction,
-                        downloadLiveMbps: needleMbps,
-                        downloadAverageMbps: averageMbps,
-                        serverName: serverName
-                    ))
-                    await progressMonitor.observe(elapsedMs: elapsedMs, totalBytes: snapshot.total)
-                } else {
-                    lastSampleMs = elapsedMs
-                    lastSampleTotalBytes = snapshot.total
-                    // Pendant le warm-up : l'aiguille bouge (débit réel instantané),
-                    // mais aucune moyenne n'est encore publiée.
-                    progress?(SpeedtestLiveProgress(
-                        phase: .download,
-                        currentMbps: needleMbps,
-                        fraction: 0,
-                        downloadLiveMbps: needleMbps,
-                        serverName: serverName
-                    ))
-                }
-            }
-        }
-        defer {
-            progressTask.cancel()
-            loadedPingsTask.cancel()
-            phaseSession.invalidateAndCancel()
-        }
-
-        // Concurrent streams (staggered).
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            for streamIndex in 0..<streamCount {
-                group.addTask { [self] in
-                    try await Task.sleep(nanoseconds: UInt64(Double(streamIndex) * SpeedtestEngineConfig.streamStaggerMs * 1_000_000))
-                    try await runDownloadStream(
-                        streamIndex: streamIndex,
-                        url: url,
-                        token: token,
-                        chunkBytes: chunkBytes,
-                        session: phaseSession,
-                        window: window,
-                        attemptStart: attemptStart,
-                        totals: totals,
-                        stallMonitor: progressMonitor,
-                        edgeCapture: edgeCapture
-                    )
-                }
-            }
-            try await group.waitForAll()
-        }
-
-        progressTask.cancel()
-
-        let downloadPings = await loadedPingsTask.value
-        let pingDlMs = downloadPings.isEmpty ? nil : SpeedMetricCalculator.average(downloadPings)
-        let jitterDlMs = downloadPings.isEmpty ? nil : SpeedMetricCalculator.jitter(downloadPings)
-
-        // Aggregate: avg = effectiveBytes * 8 / (effectiveDurationSec) / 1e6.
-        let finalGraceMs = window.graceMs
-        let snapshot = totals.snapshot()
-        let measurementEndMs = min(Date().timeIntervalSince(attemptStart) * 1_000, usefulDurationMs + finalGraceMs)
-        let effectiveBytes = max(0, snapshot.total - snapshot.grace)
-        let effectiveDurationMs = max(1, measurementEndMs - finalGraceMs)
-        guard let averageMbps = measuredTransferMbps(effectiveBytes: effectiveBytes, durationMs: effectiveDurationMs) else {
-            throw SpeedtestEngineError.downloadProducedNoBytes
-        }
-
-        // p90 / p95 / peak via 1 s windows.
-        let stats = await samplesBox.publicStats(windowMs: SpeedtestEngineConfig.publicPeakWindowMs, graceMs: finalGraceMs, endMs: measurementEndMs)
-
-        return DownloadOutcome(
-            averageMbps: averageMbps,
-            p90Mbps: stats.p90,
-            p95Mbps: stats.p95,
-            peakMbps: max(averageMbps, stats.peak),
-            measuredWindows: stats.windowCount,
-            seriesMbps: stats.seriesMbps,
-            pingDlMs: pingDlMs,
-            jitterDlMs: jitterDlMs
-        )
-    }
-
-    /// One download stream — pulls bytes through a `URLSessionDataDelegate` so
-    /// we count real received chunks without a Swift byte-by-byte loop. Toutes
-    /// les requêtes du stream passent par la session PERSISTANTE de la phase :
-    /// la rotation de chunk réutilise la connexion (keep-alive).
-    private func runDownloadStream(
-        streamIndex: Int,
-        url: URL,
-        token: String?,
-        chunkBytes: Int,
-        session: URLSession,
-        window: SpeedtestAdaptivePhaseWindow,
-        attemptStart: Date,
-        totals: SpeedtestSyncByteCounter,
-        stallMonitor: SpeedtestStallMonitor,
-        edgeCapture: SpeedtestEdgeCaptureBox? = nil
-    ) async throws {
-        while Date() < window.deadline && !Task.isCancelled {
-            if await stallMonitor.stalled { return }
-
-            guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { continue }
-            var query = components.queryItems ?? []
-            if token != nil {
-                // VPS (session) : cache-buster + taille demandée — l'endpoint
-                // génère le flux, aucun cache à préserver.
-                query.append(URLQueryItem(name: "r", value: "\(UUID().uuidString)-\(streamIndex)"))
-                query.append(URLQueryItem(name: "bytes", value: "\(chunkBytes)"))
-            }
-            // CDN (CloudFront / Cloudflare R2) : PAS de cache-buster. Sur un CDN
-            // HTTPS c'est l'edge qu'on veut mesurer : une query aléatoire par
-            // requête casserait la clé de cache Cloudflare (MISS permanent →
-            // on mesurerait l'origine R2, pas l'edge — cf. cas Bell/Canada).
-            // La session éphémère + reloadIgnoringLocalAndRemoteCacheData
-            // suffisent à neutraliser tout cache LOCAL.
-            if !query.isEmpty {
-                components.queryItems = query
-            }
-
-            var request = URLRequest(url: components.url ?? url)
-            request.timeoutInterval = SpeedtestEngineConfig.chunkTimeoutSeconds
-            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-            request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
-            if let token {
-                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            } else {
-                request.setValue("bytes=0-\(chunkBytes - 1)", forHTTPHeaderField: "Range")
-            }
-
-            do {
-                try await performStreamingDownload(request: request, session: session, deadline: window.deadline, edgeCapture: edgeCapture) { byteCount in
-                    guard byteCount > 0 else { return }
-                    let elapsedMs = Date().timeIntervalSince(attemptStart) * 1_000
-                    guard elapsedMs <= window.deadline.timeIntervalSince(attemptStart) * 1_000 else { return }
-                    totals.add(byteCount, isGrace: elapsedMs < window.graceMs)
-                }
-            } catch is SpeedtestRateLimitedError {
-                try? await Task.sleep(nanoseconds: UInt64(250 + (streamIndex * 50)) * 1_000_000)
-                continue
-            } catch is CancellationError {
-                return
-            } catch {
-                // Stream errors are non-fatal — let other streams keep working.
-                // We back off briefly to avoid hammering the server.
-                try? await Task.sleep(nanoseconds: 120_000_000)
-                continue
-            }
-        }
-    }
-
-    /// Exécute une requête de download sur la session PERSISTANTE de la phase,
-    /// avec un délégué PAR TÂCHE (iOS 15+) qui compte les octets reçus. La
-    /// connexion survit à la requête (keep-alive) — plus de handshake TLS ni de
-    /// slow-start TCP à chaque rotation de chunk.
-    private func performStreamingDownload(
-        request: URLRequest,
-        session: URLSession,
-        deadline: Date,
-        edgeCapture: SpeedtestEdgeCaptureBox? = nil,
-        onBytes: @escaping @Sendable (Int) -> Void
-    ) async throws {
-        let delegate = SpeedtestDownloadDelegate(deadline: deadline, onBytes: onBytes, edgeCapture: edgeCapture)
-        let task = session.dataTask(with: request)
-        task.delegate = delegate
-        try await delegate.run(task: task)
-    }
-
     /// Session de MESURE persistante pour une phase (download OU upload),
     /// partagée par tous les streams : `httpMaximumConnectionsPerHost` = nombre
     /// de streams pour qu'ils conservent chacun leur connexion. Invalidée par
@@ -1525,286 +1919,6 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         config.httpMaximumConnectionsPerHost = max(1, maxConnectionsPerHost)
         config.timeoutIntervalForRequest = requestTimeout
         return URLSession(configuration: config)
-    }
-
-    // MARK: - Upload (Android-aligned, simpler — single chunk POSTs)
-
-    private func measureUpload(
-        beginURL: URL,
-        uploadURL: URL,
-        finalizeURL: URL,
-        token: String,
-        maxBytes: Int,
-        durationSeconds: Int,
-        streams: Int,
-        serverName: String,
-        pingProtocol: String,
-        progress: SpeedtestProgressHandler?
-    ) async throws -> UploadOutcome {
-        let baseGraceMs = SpeedtestEngineConfig.uploadGraceTimeMs
-        let usefulDurationMs = Double(max(5, min(durationSeconds, 30))) * 1_000
-        let beginBody = Data(#"{"warmupMs":\#(Int(baseGraceMs)),"durationMs":\#(Int(usefulDurationMs)),"windowMs":1000}"#.utf8)
-        var begin = URLRequest(url: beginURL)
-        begin.httpMethod = "POST"
-        begin.timeoutInterval = SpeedtestEngineConfig.uploadTimeoutSeconds
-        begin.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        begin.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        begin.httpBody = beginBody
-        let (beginData, beginResponse) = try await session.data(for: begin)
-        if let http = beginResponse as? HTTPURLResponse, !(200..<400).contains(http.statusCode) {
-            throw APIError.http(
-                status: http.statusCode, code: nil,
-                message: HTTPURLResponse.localizedString(forStatusCode: http.statusCode),
-                requestId: nil, retryAfter: nil
-            )
-        }
-        let beginJson = try JSONSerialization.jsonObject(with: beginData) as? [String: Any]
-        guard let runId = beginJson?["uploadRunId"] as? String, !runId.isEmpty else {
-            throw SpeedtestEngineError.uploadHandshakeFailed
-        }
-
-        let payload = Data(repeating: 0x5A, count: maxBytes)
-        let attemptStart = Date()
-        // Grace ADAPTATIVE (cf. download) : extension possible une seule fois,
-        // avant la frontière du warm-up, échéance repoussée d'autant.
-        let window = SpeedtestAdaptivePhaseWindow(
-            graceMs: baseGraceMs,
-            deadline: attemptStart.addingTimeInterval((usefulDurationMs + baseGraceMs) / 1_000)
-        )
-        let totals = SpeedtestSyncByteCounter()
-        let samples = SpeedtestSamplesBox()
-        let liveAggregator = SpeedtestLiveSampler()
-
-        // Session PERSISTANTE pour toute la phase upload : les POSTs successifs
-        // d'un même stream réutilisent leur connexion (keep-alive) — plus de
-        // handshake TLS + slow-start TCP à chaque rotation de 32 Mo, qui
-        // plafonnaient artificiellement l'upload (~100 Mbps à 4 streams).
-        let streamCount = max(1, min(streams, SpeedtestEngineConfig.hardMaxUploadStreams))
-        let phaseSession = makeMeasurementSession(
-            maxConnectionsPerHost: streamCount,
-            requestTimeout: SpeedtestEngineConfig.uploadTimeoutSeconds
-        )
-
-        let loadedPingsTask = Task { [weak self] in
-            guard let self else { return [Double]() }
-            try? await Task.sleep(nanoseconds: UInt64(baseGraceMs * 1_000_000))
-            let extraMs = window.graceMs - baseGraceMs
-            if extraMs > 0 { try? await Task.sleep(nanoseconds: UInt64(extraMs * 1_000_000)) }
-            guard !Task.isCancelled else { return [Double]() }
-            return await self.measureLoadedPings(url: uploadURL, token: token, deadline: { window.deadline }, protocolName: pingProtocol)
-        }
-
-        let progressTask = Task { [weak self] in
-            guard self != nil else { return }
-            var lastSampleMs: Double?
-            var lastSampleTotalBytes = 0
-            var instantHistory: [(ms: Double, mbps: Double)] = []
-            var graceDecided = false
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.sampleIntervalMs * 1_000_000))
-                if Task.isCancelled { return }
-                let now = Date()
-                if now >= window.deadline { return }
-                let elapsedMs = now.timeIntervalSince(attemptStart) * 1_000
-                let snapshot = totals.snapshot()
-
-                // Aiguille = débit INSTANTANÉ (fenêtre glissante 1 s + léger EMA).
-                let needleMbps = liveAggregator.observe(totalBytes: snapshot.total, elapsedMs: elapsedMs)
-                instantHistory.append((ms: elapsedMs, mbps: liveAggregator.lastInstantMbps))
-
-                if !graceDecided, elapsedMs >= baseGraceMs - SpeedtestEngineConfig.sampleIntervalMs * 1.5 {
-                    graceDecided = true
-                    let earlier = instantHistory.last(where: { $0.ms <= elapsedMs - SpeedtestEngineConfig.graceComparisonLookbackMs })?.mbps
-                    if speedtestShouldExtendGrace(recentMbps: liveAggregator.lastInstantMbps, earlierMbps: earlier) {
-                        window.extendGrace(to: SpeedtestEngineConfig.extendedGraceTimeMs, ifNotPastMs: elapsedMs)
-                    }
-                }
-
-                let graceMs = window.graceMs
-                if elapsedMs >= graceMs {
-                    if let startMs = lastSampleMs, startMs >= graceMs {
-                        let bytesDiff = max(0, snapshot.total - lastSampleTotalBytes)
-                        if bytesDiff > 0, elapsedMs > startMs {
-                            await samples.append(start: startMs, end: elapsedMs, bytes: bytesDiff)
-                        }
-                    }
-                    lastSampleMs = elapsedMs
-                    lastSampleTotalBytes = snapshot.total
-
-                    let effectiveBytes = max(0, snapshot.total - snapshot.grace)
-                    let averageMbps = boundedMbps(bytes: effectiveBytes, durationMs: elapsedMs - graceMs)
-                    let fraction = max(0, min(1, (elapsedMs - graceMs) / usefulDurationMs))
-                    progress?(SpeedtestLiveProgress(
-                        phase: .upload,
-                        currentMbps: needleMbps,
-                        fraction: fraction,
-                        uploadLiveMbps: needleMbps,
-                        uploadAverageMbps: averageMbps,
-                        serverName: serverName
-                    ))
-                } else {
-                    lastSampleMs = elapsedMs
-                    lastSampleTotalBytes = snapshot.total
-                    progress?(SpeedtestLiveProgress(
-                        phase: .upload,
-                        currentMbps: needleMbps,
-                        fraction: 0,
-                        uploadLiveMbps: needleMbps,
-                        serverName: serverName
-                    ))
-                }
-            }
-        }
-        defer {
-            progressTask.cancel()
-            loadedPingsTask.cancel()
-            phaseSession.invalidateAndCancel()
-        }
-
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            for streamIndex in 0..<streamCount {
-                group.addTask { [self] in
-                    try await Task.sleep(nanoseconds: UInt64(Double(streamIndex) * SpeedtestEngineConfig.streamStaggerMs * 1_000_000))
-                    while Date() < window.deadline && !Task.isCancelled {
-                        guard var components = URLComponents(url: uploadURL, resolvingAgainstBaseURL: false) else { continue }
-                        var query = components.queryItems ?? []
-                        query.append(URLQueryItem(name: "r", value: "\(UUID().uuidString)-\(streamIndex)"))
-                        components.queryItems = query
-                        var upload = URLRequest(url: components.url ?? uploadURL)
-                        upload.httpMethod = "POST"
-                        upload.timeoutInterval = SpeedtestEngineConfig.uploadTimeoutSeconds
-                        upload.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                        do {
-                            let requestTimeout = max(
-                                3,
-                                min(SpeedtestEngineConfig.uploadTimeoutSeconds, window.deadline.timeIntervalSinceNow + 3)
-                            )
-                            let requestDeadline = min(window.deadline, Date().addingTimeInterval(requestTimeout))
-                            let result = try await performStreamingUpload(
-                                upload,
-                                session: phaseSession,
-                                payload: payload,
-                                deadline: requestDeadline
-                            ) { sentBytes in
-                                guard sentBytes > 0 else { return }
-                                let elapsedMs = Date().timeIntervalSince(attemptStart) * 1_000
-                                guard elapsedMs <= window.deadline.timeIntervalSince(attemptStart) * 1_000 else { return }
-                                totals.add(sentBytes, isGrace: elapsedMs < window.graceMs)
-                            }
-                            guard result.receivedResponse else { continue }
-                            if let statusCode = result.httpStatusCode, !(200..<400).contains(statusCode) {
-                                if statusCode == 429 {
-                                    try? await Task.sleep(nanoseconds: 250_000_000)
-                                    continue
-                                }
-                                continue
-                            }
-                            let serverConfirmed = parseUploadAckBytes(from: result.data)
-                            let confirmedBytes = computeConfirmedUploadBytes(
-                                clientWrittenBytes: result.sentBytes,
-                                serverConfirmedBytes: serverConfirmed
-                            )
-                            guard confirmedBytes > 0 else { continue }
-                        } catch {
-                            try? await Task.sleep(nanoseconds: 120_000_000)
-                            continue
-                        }
-                    }
-                }
-            }
-            try await group.waitForAll()
-        }
-
-        progressTask.cancel()
-
-        let uploadPings = await loadedPingsTask.value
-        let pingUlMs = uploadPings.isEmpty ? nil : SpeedMetricCalculator.average(uploadPings)
-        let jitterUlMs = uploadPings.isEmpty ? nil : SpeedMetricCalculator.jitter(uploadPings)
-
-        // Finalize on the server (best-effort). Transmet le warm-up réellement
-        // appliqué (grace adaptative) pour que la fenêtre serveur exclue
-        // exactement la même rampe — `warmupMs` au finalize est accepté par le
-        // protocole existant.
-        var finalize = URLRequest(url: finalizeURL)
-        finalize.httpMethod = "POST"
-        finalize.timeoutInterval = SpeedtestEngineConfig.uploadTimeoutSeconds
-        finalize.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        finalize.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        finalize.httpBody = speedtestUploadFinalizeBody(runId: runId, warmupMs: window.graceMs)
-        let serverMeasurement: UploadServerMeasurement?
-        do {
-            let (finalData, finalResponse) = try await session.data(for: finalize)
-            if let http = finalResponse as? HTTPURLResponse, !(200..<400).contains(http.statusCode) {
-                serverMeasurement = nil
-            } else {
-                serverMeasurement = UploadServerMeasurement(data: finalData)
-            }
-        } catch {
-            serverMeasurement = nil
-        }
-
-        let finalGraceMs = window.graceMs
-        let snapshot = totals.snapshot()
-        let measurementEndMs = min(Date().timeIntervalSince(attemptStart) * 1_000, usefulDurationMs + finalGraceMs)
-        let effectiveBytes = max(0, snapshot.total - snapshot.grace)
-        let effectiveDurationMs = max(1, measurementEndMs - finalGraceMs)
-        let confirmedBytes = computeConfirmedUploadBytes(
-            clientWrittenBytes: effectiveBytes,
-            serverConfirmedBytes: serverMeasurement?.serverBytesReceived
-        )
-        let clientAverage = measuredTransferMbps(effectiveBytes: confirmedBytes, durationMs: effectiveDurationMs) ?? 0
-        let stats = await samples.publicStats(windowMs: SpeedtestEngineConfig.publicPeakWindowMs, graceMs: finalGraceMs, endMs: measurementEndMs)
-
-        let usableServerMeasurement = serverMeasurement?.isUsable(expectedUsefulDurationMs: usefulDurationMs) == true
-        // Mesure serveur utilisable → `serverAvgMbps` est AUTORITAIRE : octets et
-        // durée proviennent de la MÊME fenêtre serveur. L'ancien mix
-        // min(client, serveur) / durée serveur mélangeait deux fenêtres et
-        // sous-estimait. Sinon, repli client borné par les octets confirmés
-        // (anti-triche conservé).
-        let averageMbps = resolvedUploadAverageMbps(
-            serverMeasurement: serverMeasurement,
-            expectedUsefulDurationMs: usefulDurationMs,
-            clientAverageMbps: clientAverage
-        )
-        guard confirmedBytes > 0, averageMbps > 0 else {
-            throw SpeedtestEngineError.uploadProducedNoBytes
-        }
-
-        // Scale client-side series and peaks by the confirmation ratio to prevent socket buffer inflation
-        let clientWrittenBytes = max(1, effectiveBytes)
-        let scaleRatio = min(1.0, Double(confirmedBytes) / Double(clientWrittenBytes))
-
-        let scaledP90 = stats.p90.map { $0 * scaleRatio }
-        let scaledP95 = stats.p95.map { $0 * scaleRatio }
-        let scaledPeak = stats.peak * scaleRatio
-        let scaledSeries = stats.seriesMbps.map { $0 * scaleRatio }
-
-        return UploadOutcome(
-            averageMbps: averageMbps,
-            p90Mbps: usableServerMeasurement ? (serverMeasurement?.serverP90Mbps ?? scaledP90) : scaledP90,
-            p95Mbps: usableServerMeasurement ? (serverMeasurement?.serverP95Mbps ?? scaledP95) : scaledP95,
-            peakMbps: max(averageMbps, usableServerMeasurement ? (serverMeasurement?.serverPeakMbps ?? scaledPeak) : scaledPeak),
-            confirmedBytes: confirmedBytes,
-            measurementSource: usableServerMeasurement ? "server-confirmed" : "client-written",
-            seriesMbps: scaledSeries,
-            pingUlMs: pingUlMs,
-            jitterUlMs: jitterUlMs
-        )
-    }
-
-    /// Exécute un POST d'upload sur la session PERSISTANTE de la phase, avec un
-    /// délégué PAR TÂCHE (iOS 15+) qui compte les octets réellement envoyés.
-    private func performStreamingUpload(
-        _ request: URLRequest,
-        session: URLSession,
-        payload: Data,
-        deadline: Date,
-        onBytesSent: @escaping @Sendable (Int) -> Void
-    ) async throws -> SpeedtestUploadTaskResult {
-        let delegate = SpeedtestUploadDelegate(deadline: deadline, onBytesSent: onBytesSent)
-        let task = session.uploadTask(with: request, from: payload)
-        task.delegate = delegate
-        return try await delegate.run(task: task)
     }
 
     struct ResolvedPlace: Sendable {
@@ -1863,32 +1977,79 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     }
 }
 
-struct OVHServer: Sendable {
+struct IPerfPublicServer: Sendable, Equatable {
     let hostname: String
     let name: String
     let latitude: Double
     let longitude: Double
+    /// Code court (RBX, PAR-BBR, …).
+    let code: String
+    let countryCode: String
+    let provider: IPerfServerProvider
+    let portMin: UInt16
+    let portMax: UInt16
+
+    var defaultPort: UInt16 { portMin }
 }
 
-private let ovhServers = [
-    OVHServer(hostname: "rbx.proof.ovh.net", name: "RBX proof (Roubaix)", latitude: 50.692, longitude: 3.178),
-    OVHServer(hostname: "sbg.proof.ovh.net", name: "SBG proof (Strasbourg)", latitude: 48.573, longitude: 7.752),
-    OVHServer(hostname: "gra.proof.ovh.net", name: "GRA proof (Gravelines)", latitude: 50.986, longitude: 2.124),
-    OVHServer(hostname: "bom.proof.ovh.net", name: "YNM proof (Mumbai)", latitude: 19.076, longitude: 72.877),
-    OVHServer(hostname: "bhs.proof.ovh.ca", name: "Beauharnois proof (BHS)", latitude: 45.312, longitude: -73.875),
-    OVHServer(hostname: "proof.ovh.us", name: "US proof", latitude: 38.744, longitude: -77.673)
-]
+enum IPerfServerProvider: String, Sendable {
+    case ovh
+    case bouygues
+    case scaleway
+    case milkywan
+}
+
+/// Catalogue des serveurs iPerf3 publics (OVH + Bouygues sains + Scaleway online.net).
+/// `poi.cubic.iperf.bytel.fr` est volontairement absent (host non joignable).
+let iperfPublicServers: [IPerfPublicServer] = {
+    let ovhMin = SpeedtestEngineConfig.iperf3PortMin
+    let ovhMax = SpeedtestEngineConfig.iperf3PortMax
+    let bytMin = SpeedtestEngineConfig.bytelIperfPortMin
+    let bytMax = SpeedtestEngineConfig.bytelIperfPortMax
+    let scwMin = SpeedtestEngineConfig.onlineNetIperfPortMin
+    let scwMax = SpeedtestEngineConfig.onlineNetIperfPortMax
+    let parisLat = 48.8566
+    let parisLon = 2.3522
+    return [
+        // OVH proof (ports 5201–5210)
+        IPerfPublicServer(hostname: "rbx.proof.ovh.net", name: "Roubaix (OVH RBX)", latitude: 50.692, longitude: 3.178, code: "RBX", countryCode: "FR", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
+        IPerfPublicServer(hostname: "sbg.proof.ovh.net", name: "Strasbourg (OVH SBG)", latitude: 48.573, longitude: 7.752, code: "SBG", countryCode: "FR", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
+        IPerfPublicServer(hostname: "gra.proof.ovh.net", name: "Gravelines (OVH GRA)", latitude: 50.986, longitude: 2.124, code: "GRA", countryCode: "FR", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
+        IPerfPublicServer(hostname: "bom.proof.ovh.net", name: "Mumbai (OVH YNM)", latitude: 19.076, longitude: 72.877, code: "YNM", countryCode: "IN", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
+        IPerfPublicServer(hostname: "bhs.proof.ovh.ca", name: "Beauharnois (OVH BHS)", latitude: 45.312, longitude: -73.875, code: "BHS", countryCode: "CA", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
+        IPerfPublicServer(hostname: "proof.ovh.us", name: "Ashburn (OVH US)", latitude: 39.0438, longitude: -77.4874, code: "US", countryCode: "US", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
+        // Bouygues Telecom (ports 9200–9240) — BBR & CUBIC (poi.cubic exclu)
+        IPerfPublicServer(hostname: "paris.bbr.iperf.bytel.fr", name: "Paris BBR (Bouygues)", latitude: parisLat, longitude: parisLon, code: "PAR-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
+        IPerfPublicServer(hostname: "paris.cubic.iperf.bytel.fr", name: "Paris CUBIC (Bouygues)", latitude: parisLat, longitude: parisLon, code: "PAR-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
+        IPerfPublicServer(hostname: "mrs.bbr.iperf.bytel.fr", name: "Marseille BBR (Bouygues)", latitude: 43.2965, longitude: 5.3698, code: "MRS-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
+        IPerfPublicServer(hostname: "mrs.cubic.iperf.bytel.fr", name: "Marseille CUBIC (Bouygues)", latitude: 43.2965, longitude: 5.3698, code: "MRS-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
+        IPerfPublicServer(hostname: "lyo.bbr.iperf.bytel.fr", name: "Lyon BBR (Bouygues)", latitude: 45.7640, longitude: 4.8357, code: "LYO-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
+        IPerfPublicServer(hostname: "lyo.cubic.iperf.bytel.fr", name: "Lyon CUBIC (Bouygues)", latitude: 45.7640, longitude: 4.8357, code: "LYO-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
+        IPerfPublicServer(hostname: "tls.bbr.iperf.bytel.fr", name: "Toulouse BBR (Bouygues)", latitude: 43.6047, longitude: 1.4442, code: "TLS-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
+        IPerfPublicServer(hostname: "tls.cubic.iperf.bytel.fr", name: "Toulouse CUBIC (Bouygues)", latitude: 43.6047, longitude: 1.4442, code: "TLS-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
+        IPerfPublicServer(hostname: "str.bbr.iperf.bytel.fr", name: "Strasbourg BBR (Bouygues)", latitude: 48.5734, longitude: 7.7521, code: "STR-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
+        IPerfPublicServer(hostname: "str.cubic.iperf.bytel.fr", name: "Strasbourg CUBIC (Bouygues)", latitude: 48.5734, longitude: 7.7521, code: "STR-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
+        IPerfPublicServer(hostname: "poi.bbr.iperf.bytel.fr", name: "Poitiers BBR (Bouygues)", latitude: 46.5802, longitude: 0.3404, code: "POI-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
+        IPerfPublicServer(hostname: "ren.bbr.iperf.bytel.fr", name: "Rennes BBR (Bouygues)", latitude: 48.1173, longitude: -1.6778, code: "REN-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
+        IPerfPublicServer(hostname: "ren.cubic.iperf.bytel.fr", name: "Rennes CUBIC (Bouygues)", latitude: 48.1173, longitude: -1.6778, code: "REN-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
+        // Scaleway / online.net (ports 5200–5209 TCP) — filet de secours + IPv6
+        IPerfPublicServer(hostname: "ping.online.net", name: "Paris Scaleway", latitude: parisLat, longitude: parisLon, code: "SCW", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax),
+        IPerfPublicServer(hostname: "ping6.online.net", name: "Paris Scaleway IPv6", latitude: parisLat, longitude: parisLon, code: "SCW6", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax),
+        IPerfPublicServer(hostname: "ping-90ms.online.net", name: "Paris Scaleway +90 ms", latitude: parisLat, longitude: parisLon, code: "SCW90", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax),
+        IPerfPublicServer(hostname: "ping6-90ms.online.net", name: "Paris Scaleway IPv6 +90 ms", latitude: parisLat, longitude: parisLon, code: "SCW690", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax),
+        // MilkyWan AS2027 (ports 9200–9240 TCP, BBR, 40 Gbit/s) — vérifié en ligne 2026-07
+        IPerfPublicServer(hostname: "speedtest.milkywan.fr", name: "Croissy-Beaubourg (MilkyWan)", latitude: 48.8412, longitude: 2.6724, code: "CBO", countryCode: "FR", provider: .milkywan, portMin: bytMin, portMax: bytMax),
+    ]
+}()
 
 class ConcurrencyGate: @unchecked Sendable {
     private let lock = NSLock()
     private var flag = false
-    
+
     func testAndSet() -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        if flag {
-            return true
-        }
+        if flag { return true }
         flag = true
         return false
     }
@@ -1897,126 +2058,345 @@ class ConcurrencyGate: @unchecked Sendable {
 class AtomicBool: @unchecked Sendable {
     private let lock = NSLock()
     private var val: Bool
-    
-    init(_ val: Bool) {
-        self.val = val
-    }
-    
+
+    init(_ val: Bool) { self.val = val }
+
     var value: Bool {
         get {
-            lock.lock()
-            defer { lock.unlock() }
+            lock.lock(); defer { lock.unlock() }
             return val
         }
         set {
-            lock.lock()
-            val = newValue
-            lock.unlock()
+            lock.lock(); val = newValue; lock.unlock()
         }
     }
 }
 
-private func haversineDistance(from c1: Coordinates, to c2: Coordinates) -> Double {
+func haversineDistanceKm(from c1: Coordinates, to c2: Coordinates) -> Double {
     let lat1 = c1.latitude * .pi / 180.0
     let lon1 = c1.longitude * .pi / 180.0
     let lat2 = c2.latitude * .pi / 180.0
     let lon2 = c2.longitude * .pi / 180.0
-    
     let dlat = lat2 - lat1
     let dlon = lon2 - lon1
-    let a = sin(dlat/2) * sin(dlat/2) + cos(lat1) * cos(lat2) * sin(dlon/2) * sin(dlon/2)
-    let c = 2 * atan2(sqrt(a), sqrt(1-a))
-    return 6371.0 * c // Earth radius in km
+    let a = sin(dlat / 2) * sin(dlat / 2) + cos(lat1) * cos(lat2) * sin(dlon / 2) * sin(dlon / 2)
+    let c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return 6371.0 * c
 }
 
-private func findClosestOVHServer(to location: Coordinates?) -> OVHServer {
+func iperfServersSortedByDistance(from location: Coordinates?) -> [IPerfPublicServer] {
     guard let location else {
-        // Default to Roubaix or Gravelines if no location is available
-        return ovhServers.first(where: { $0.hostname == "gra.proof.ovh.net" }) ?? ovhServers[0]
-    }
-    
-    return ovhServers.min(by: { s1, s2 in
-        let dist1 = haversineDistance(from: location, to: Coordinates(latitude: s1.latitude, longitude: s1.longitude))
-        let dist2 = haversineDistance(from: location, to: Coordinates(latitude: s2.latitude, longitude: s2.longitude))
-        return dist1 < dist2
-    }) ?? ovhServers[0]
-}
-
-private func selectOVHServer(for target: SpeedtestDownloadTarget, location: Coordinates?) -> OVHServer {
-    switch target {
-    case .rbx:
-        return ovhServers.first(where: { $0.hostname == "rbx.proof.ovh.net" }) ?? ovhServers[0]
-    case .sbg:
-        return ovhServers.first(where: { $0.hostname == "sbg.proof.ovh.net" }) ?? ovhServers[0]
-    case .gra:
-        return ovhServers.first(where: { $0.hostname == "gra.proof.ovh.net" }) ?? ovhServers[0]
-    case .bom:
-        return ovhServers.first(where: { $0.hostname == "bom.proof.ovh.net" }) ?? ovhServers[0]
-    case .bhs:
-        return ovhServers.first(where: { $0.hostname == "bhs.proof.ovh.ca" }) ?? ovhServers[0]
-    case .us:
-        return ovhServers.first(where: { $0.hostname == "proof.ovh.us" }) ?? ovhServers[0]
-    default:
-        return findClosestOVHServer(to: location)
-    }
-}
-
-private func findWorkingOVHPort(host: String) async -> UInt16? {
-    for port in UInt16(5201)...UInt16(5210) {
-        do {
-            let connection = NWConnection(host: NWEndpoint.Host(host), port: NWEndpoint.Port(rawValue: port)!, using: .tcp)
-            let gate = ConcurrencyGate()
-            
-            let connected = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
-                let queue = DispatchQueue(label: "fr.signalquest.speedtest.portprobe")
-                
-                connection.stateUpdateHandler = { state in
-                    switch state {
-                    case .ready:
-                        if !gate.testAndSet() {
-                            connection.cancel()
-                            continuation.resume(returning: true)
-                        }
-                    case .failed(let error):
-                        if !gate.testAndSet() {
-                            connection.cancel()
-                            continuation.resume(throwing: error)
-                        }
-                    case .cancelled:
-                        break
-                    default:
-                        break
-                    }
-                }
-                
-                queue.asyncAfter(deadline: .now() + 2.0) {
-                    if !gate.testAndSet() {
-                        connection.cancel()
-                        continuation.resume(returning: false)
-                    }
-                }
-                
-                connection.start(queue: queue)
-            }
-            if connected {
-                return port
-            }
-        } catch {
-            // Try next port
+        // Sans GPS : POP FR stables d'abord ; IPv6 / +90 ms en bas de liste.
+        let preferred = [
+            "paris.bbr.iperf.bytel.fr",
+            "ping.online.net",
+            "speedtest.milkywan.fr",
+            "gra.proof.ovh.net",
+            "rbx.proof.ovh.net",
+            "sbg.proof.ovh.net",
+            "lyo.bbr.iperf.bytel.fr",
+            "paris.cubic.iperf.bytel.fr",
+            "ping6.online.net",
+            "ping-90ms.online.net",
+            "ping6-90ms.online.net",
+        ]
+        return iperfPublicServers.sorted { a, b in
+            let ia = preferred.firstIndex(of: a.hostname) ?? 99
+            let ib = preferred.firstIndex(of: b.hostname) ?? 99
+            if ia != ib { return ia < ib }
+            return a.name < b.name
         }
     }
+    // Avec GPS : distance, mais déprioriser les hosts à latence artificielle (+90 ms)
+    // et les IPv6-only pour éviter de les choisir en Auto sur un réseau IPv4.
+    return iperfPublicServers.sorted { s1, s2 in
+        let p1 = iperfAutoPriorityBoost(s1)
+        let p2 = iperfAutoPriorityBoost(s2)
+        if p1 != p2 { return p1 < p2 }
+        let d1 = haversineDistanceKm(from: location, to: Coordinates(latitude: s1.latitude, longitude: s1.longitude))
+        let d2 = haversineDistanceKm(from: location, to: Coordinates(latitude: s2.latitude, longitude: s2.longitude))
+        return d1 < d2
+    }
+}
+
+/// 0 = prioritaire Auto, 1 = IPv6, 2 = latence artificielle +90 ms.
+private func iperfAutoPriorityBoost(_ server: IPerfPublicServer) -> Int {
+    switch server.hostname {
+    case "ping-90ms.online.net", "ping6-90ms.online.net": return 2
+    case "ping6.online.net": return 1
+    default: return 0
+    }
+}
+
+func findClosestIPerfServer(to location: Coordinates?) -> IPerfPublicServer {
+    iperfServersSortedByDistance(from: location).first ?? iperfPublicServers[0]
+}
+
+func selectIPerfServer(for target: SpeedtestDownloadTarget, location: Coordinates?) -> IPerfPublicServer {
+    let host: String?
+    switch target.migrated {
+    case .rbx: host = "rbx.proof.ovh.net"
+    case .sbg: host = "sbg.proof.ovh.net"
+    case .gra: host = "gra.proof.ovh.net"
+    case .bom: host = "bom.proof.ovh.net"
+    case .bhs: host = "bhs.proof.ovh.ca"
+    case .us: host = "proof.ovh.us"
+    case .bytelParisBbr: host = "paris.bbr.iperf.bytel.fr"
+    case .bytelParisCubic: host = "paris.cubic.iperf.bytel.fr"
+    case .bytelMrsBbr: host = "mrs.bbr.iperf.bytel.fr"
+    case .bytelMrsCubic: host = "mrs.cubic.iperf.bytel.fr"
+    case .bytelLyoBbr: host = "lyo.bbr.iperf.bytel.fr"
+    case .bytelLyoCubic: host = "lyo.cubic.iperf.bytel.fr"
+    case .bytelTlsBbr: host = "tls.bbr.iperf.bytel.fr"
+    case .bytelTlsCubic: host = "tls.cubic.iperf.bytel.fr"
+    case .bytelStrBbr: host = "str.bbr.iperf.bytel.fr"
+    case .bytelStrCubic: host = "str.cubic.iperf.bytel.fr"
+    case .bytelPoiBbr: host = "poi.bbr.iperf.bytel.fr"
+    case .bytelRenBbr: host = "ren.bbr.iperf.bytel.fr"
+    case .bytelRenCubic: host = "ren.cubic.iperf.bytel.fr"
+    case .onlineNet: host = "ping.online.net"
+    case .onlineNet6: host = "ping6.online.net"
+    case .onlineNet90ms: host = "ping-90ms.online.net"
+    case .onlineNet6_90ms: host = "ping6-90ms.online.net"
+    case .milkywan: host = "speedtest.milkywan.fr"
+    // .cloudflare n'est pas un serveur iPerf3 : le moteur HTTPS est choisi en
+    // amont dans run() ; ici on retombe sur le plus proche par sécurité.
+    case .hybridAuto, .cloudflare, .bytelPoiCubic, .cloudflareR2, .awsCloudFront, .vpsInternal:
+        host = nil
+    }
+    if let host, let server = iperfPublicServers.first(where: { $0.hostname == host }) {
+        return server
+    }
+    return findClosestIPerfServer(to: location)
+}
+
+struct IPerfEndpoint: Sendable {
+    let port: UInt16
+    /// Ports confirmés ouverts au probe initial — réutilisés entre DL et UL
+    /// pour éviter un re-scan TCP de la plage en cours de test.
+    let openPorts: [UInt16]
+
+    init(port: UInt16, openPorts: [UInt16] = []) {
+        self.port = port
+        self.openPorts = openPorts
+    }
+}
+
+/// Probe TCP parallèle de la plage de ports du serveur.
+/// Les ports « busy » (ACCESS_DENIED) sont gérés ensuite par
+/// `runIPerf3WithPortFallback` au moment du vrai test.
+func resolveIPerfEndpoint(for server: IPerfPublicServer) async -> IPerfEndpoint? {
+    let lo = server.portMin
+    let hi = server.portMax
+    let allPorts = Array(lo...hi)
+    // Plages larges : sonder un sous-ensemble + min/max pour rester rapide.
+    let ports: [UInt16]
+    if allPorts.count <= 16 {
+        ports = allPorts
+    } else {
+        let strideN = max(1, allPorts.count / 12)
+        var sample: [UInt16] = [lo]
+        for p in stride(from: Int(lo) + strideN, through: Int(hi), by: strideN) {
+            sample.append(UInt16(p))
+        }
+        if sample.last != hi { sample.append(hi) }
+        ports = sample
+    }
+    let openPorts = await probeOpenTCPPorts(host: server.hostname, ports: ports, timeoutSeconds: 1.0)
+    if let first = openPorts.first {
+        return IPerfEndpoint(port: first, openPorts: openPorts)
+    }
+    // Aucun port ouvert — retourner nil pour permettre au fallback serveur
+    // de tenter un autre hôte au lieu de perdre 30s en port scanning séquentiel.
     return nil
+}
+
+private func probeOpenTCPPorts(host: String, ports: [UInt16], timeoutSeconds: TimeInterval) async -> [UInt16] {
+    await withTaskGroup(of: UInt16?.self) { group in
+        for port in ports {
+            group.addTask {
+                await tcpPortIsOpen(host: host, port: port, timeoutSeconds: timeoutSeconds) ? port : nil
+            }
+        }
+        var open: [UInt16] = []
+        for await result in group {
+            if let port = result { open.append(port) }
+        }
+        return open.sorted()
+    }
+}
+
+private func tcpPortIsOpen(host: String, port: UInt16, timeoutSeconds: TimeInterval) async -> Bool {
+    // Port 0 est le seul rawValue invalide : un port improbable = fermé, pas un crash.
+    guard let nwPort = NWEndpoint.Port(rawValue: port) else { return false }
+    let gate = ConcurrencyGate()
+    return await withCheckedContinuation { continuation in
+        let queue = DispatchQueue(label: "fr.signalquest.speedtest.portprobe.\(port)")
+        let connection = NWConnection(
+            host: NWEndpoint.Host(host),
+            port: nwPort,
+            using: iperfTCPParameters()
+        )
+        connection.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                if !gate.testAndSet() {
+                    connection.cancel()
+                    continuation.resume(returning: true)
+                }
+            case .failed:
+                if !gate.testAndSet() {
+                    connection.cancel()
+                    continuation.resume(returning: false)
+                }
+            default:
+                break
+            }
+        }
+        queue.asyncAfter(deadline: .now() + timeoutSeconds) {
+            if !gate.testAndSet() {
+                connection.cancel()
+                continuation.resume(returning: false)
+            }
+        }
+        connection.start(queue: queue)
+    }
+}
+
+func iperfTCPParameters() -> NWParameters {
+    let tcp = NWProtocolTCP.Options()
+    tcp.noDelay = true
+    tcp.enableKeepalive = false
+    tcp.connectionTimeout = 3
+    let params = NWParameters(tls: nil, tcp: tcp)
+    params.serviceClass = .responsiveData
+    params.allowLocalEndpointReuse = true
+    return params
+}
+
+/// Erreurs transport / serveur iPerf qu'on peut retenter (autre port / moins de flux).
+/// Inclut explicitement ECONNRESET (54) — cause n°1 des UL vides sur POP publics.
+func isRetryableIPerfTransportError(_ error: Error) -> Bool {
+    if let e = error as? IPerf3Error { return e.isRetryable }
+    if let nw = error as? NWError {
+        switch nw {
+        case .posix(let code):
+            switch code {
+            case .ECONNRESET, .ECONNREFUSED, .ETIMEDOUT, .ENETDOWN,
+                 .EHOSTUNREACH, .ENETUNREACH, .EPIPE, .ECONNABORTED:
+                return true
+            default:
+                break
+            }
+        case .dns:
+            return true
+        default:
+            break
+        }
+    }
+    let desc = (error as NSError).localizedDescription.lowercased()
+    return desc.contains("reset")
+        || desc.contains("refused")
+        || desc.contains("timed out")
+        || desc.contains("timeout")
+        || desc.contains("network is down")
+        || desc.contains("broken pipe")
+        || desc.contains("aborted")
+        || desc.contains("socket is not connected")
+}
+
+/// Port voisin public (hors classe service) — tests / helpers.
+func iperfSiblingPort(preferred: UInt16, min portMin: UInt16, max portMax: UInt16) -> UInt16 {
+    let lo = min(portMin, portMax)
+    let hi = max(portMin, portMax)
+    guard hi > lo else { return preferred }
+    if preferred < hi { return preferred &+ 1 }
+    return lo
+}
+
+private func connectNW(_ connection: NWConnection, queue: DispatchQueue, timeoutSeconds: TimeInterval) async throws {
+    let gate = ConcurrencyGate()
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+        connection.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                if !gate.testAndSet() { continuation.resume() }
+            case .failed(let error):
+                if !gate.testAndSet() { continuation.resume(throwing: error) }
+            case .cancelled:
+                if !gate.testAndSet() {
+                    continuation.resume(throwing: IPerf3Error.cancelled)
+                }
+            default:
+                break
+            }
+        }
+        queue.asyncAfter(deadline: .now() + timeoutSeconds) {
+            if !gate.testAndSet() {
+                connection.cancel()
+                continuation.resume(throwing: IPerf3Error.timeout)
+            }
+        }
+        connection.start(queue: queue)
+    }
+}
+
+private func sendNW(_ connection: NWConnection, _ data: Data) async throws {
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+        connection.send(content: data, completion: .contentProcessed { error in
+            if let error { continuation.resume(throwing: error) }
+            else { continuation.resume() }
+        })
+    }
+}
+
+private func readExactNW(_ connection: NWConnection, count: Int, timeoutSeconds: TimeInterval = 30) async throws -> Data {
+    var buffer = Data()
+    buffer.reserveCapacity(count)
+    let deadline = Date().addingTimeInterval(timeoutSeconds)
+    while buffer.count < count {
+        let remaining = count - buffer.count
+        let remainingTime = deadline.timeIntervalSinceNow
+        guard remainingTime > 0 else { throw IPerf3Error.timeout }
+        let alreadyRead = buffer.count
+        let chunk: Data = try await withCheckedThrowingContinuation { continuation in
+            let gate = ConcurrencyGate()
+            // Échéance ferme : un serveur qui accepte le TCP puis se tait ne
+            // doit pas suspendre la boucle de contrôle indéfiniment. Le gate
+            // absorbe la complétion tardive du receive.
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + remainingTime) {
+                if !gate.testAndSet() {
+                    continuation.resume(throwing: IPerf3Error.timeout)
+                }
+            }
+            connection.receive(minimumIncompleteLength: 1, maximumLength: remaining) { data, _, isComplete, error in
+                if !gate.testAndSet() {
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else if let data, !data.isEmpty {
+                        continuation.resume(returning: data)
+                    } else if isComplete {
+                        continuation.resume(throwing: IPerf3Error.connectionClosed(got: alreadyRead, expected: count))
+                    } else {
+                        continuation.resume(throwing: IPerf3Error.emptyRead)
+                    }
+                }
+            }
+        }
+        buffer.append(chunk)
+    }
+    return buffer
 }
 
 class ProgressState: @unchecked Sendable {
     private let lock = NSLock()
     var lastBytes = 0
     var lastTime = 0.0
-    
+
     func update(bytes: Int, time: Double) -> Int {
         lock.lock()
         defer { lock.unlock() }
-        let delta = bytes - lastBytes
+        let delta = max(0, bytes - lastBytes)
         lastBytes = bytes
         lastTime = time
         return delta
@@ -2026,17 +2406,236 @@ class ProgressState: @unchecked Sendable {
 class SafeCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var bytes: Int = 0
-    
+
     func add(_ count: Int) {
         lock.lock()
         bytes += count
         lock.unlock()
     }
-    
+
     var value: Int {
+        lock.lock(); defer { lock.unlock() }
+        return bytes
+    }
+
+    func snapshot() -> Int { value }
+}
+
+/// Pont de continuité omit → utile pour le `SpeedtestLiveSampler`.
+/// Pendant l'omit le live sampler reçoit les octets bruts ; quand la phase
+/// utile démarre, les octets repartent de zéro (post-omit). L'OmitBridge
+/// ajoute l'offset omit aux valeurs utiles pour que le sampler voie un flux
+/// **continu** et que l'aiguille ne saute pas à zéro puis remonte.
+final class OmitBridge: @unchecked Sendable {
+    struct Bridged: Sendable { let totalBytes: Int; let totalMs: Double }
+
+    private let lock = NSLock()
+    private var rawBytes: Int = 0
+    private var rawMs: Double = 0
+
+    /// À appeler depuis `onWarmup` avec les octets bruts cumulés.
+    func capture(rawBytes: Int, rawMs: Double) {
+        lock.lock()
+        self.rawBytes = rawBytes
+        self.rawMs = rawMs
+        lock.unlock()
+    }
+
+    /// À appeler depuis `onProgress` : ajoute l'offset omit aux valeurs utiles.
+    func bridged(usefulBytes: Int, usefulMs: Double) -> Bridged {
+        lock.lock()
+        let b = rawBytes
+        let m = rawMs
+        lock.unlock()
+        return Bridged(totalBytes: b + usefulBytes, totalMs: m + usefulMs)
+    }
+}
+
+enum IPerf3Error: Error, LocalizedError {
+    case cancelled
+    case timeout
+    case emptyRead
+    case connectionClosed(got: Int, expected: Int)
+    case accessDenied
+    case serverError
+    case invalidJSON
+    case incomplete
+    case invalidPort
+    case unexpectedState(Int8)
+
+    var isRetryable: Bool {
+        switch self {
+        case .accessDenied, .timeout, .cancelled, .connectionClosed, .serverError:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var errorDescription: String? {
+        switch self {
+        case .cancelled: return "Connexion iPerf3 annulée"
+        case .timeout: return "Délai dépassé sur le serveur iPerf3"
+        case .emptyRead: return "Lecture iPerf3 vide"
+        case .connectionClosed(let got, let expected):
+            return "Connexion iPerf3 fermée (\(got)/\(expected) octets)"
+        case .accessDenied: return "Serveur iPerf3 occupé (ACCESS_DENIED)"
+        case .serverError: return "Erreur serveur iPerf3"
+        case .invalidJSON: return "Réponse iPerf3 JSON invalide"
+        case .incomplete: return "Test iPerf3 incomplet"
+        case .invalidPort: return "Port iPerf3 invalide"
+        case .unexpectedState(let s): return "État iPerf3 inattendu (\(s))"
+        }
+    }
+}
+
+struct IPerf3Result: Sendable {
+    /// Octets utiles après omit (côté client, ou serveur si disponible pour l'upload).
+    let measuredBytes: Int
+    let clientBytes: Int
+    let serverBytes: Int?
+    /// Durée utile (hors omit) en secondes.
+    let measuredDuration: Double
+    /// Durée murale totale (omit + mesure).
+    let wallDuration: Double
+
+    var averageMbps: Double {
+        guard measuredBytes > 0, measuredDuration > 0 else { return 0 }
+        let mbps = (Double(measuredBytes) * 8.0 / 1_000_000.0) / measuredDuration
+        return mbps.isFinite && mbps >= 0 ? mbps : 0
+    }
+
+    /// Compat : ancien champ `duration`.
+    var duration: Double { measuredDuration }
+}
+
+/// Somme les `bytes` de chaque entrée du tableau `streams` renvoyé à EXCHANGE_RESULTS.
+func iperf3ExtractStreamBytes(from json: [String: Any]?) -> Int? {
+    guard let json,
+          let streams = json["streams"] as? [[String: Any]],
+          !streams.isEmpty else {
+        // Ancien format éventuel end.sum_*
+        if let end = json?["end"] as? [String: Any] {
+            for key in ["sum_received", "sum_sent", "sum"] {
+                if let sum = end[key] as? [String: Any] {
+                    if let b = sum["bytes"] as? Int { return b }
+                    if let b = sum["bytes"] as? Double { return Int(b) }
+                }
+            }
+        }
+        return nil
+    }
+    var total = 0
+    var any = false
+    for stream in streams {
+        if let b = stream["bytes"] as? Int {
+            total += b; any = true
+        } else if let b = stream["bytes"] as? Double {
+            total += Int(b); any = true
+        }
+    }
+    return any ? total : nil
+}
+
+// MARK: - Moteur Cloudflare (HTTPS anycast, couverture mondiale)
+
+/// Endpoints du speedtest Cloudflare (`speed.cloudflare.com`) — mêmes
+/// endpoints que le client officiel open-source `cloudflare/speedtest`.
+/// DL, UL, ping et pings chargés touchent le MÊME edge anycast.
+enum CloudflareSpeedtestConfig {
+    static let host = "speed.cloudflare.com"
+    /// Port sondé pour le ping (handshake TCP pur = 1 RTT, comme iPerf3).
+    static let httpsPort: UInt16 = 443
+    static let traceURL = URL(string: "https://speed.cloudflare.com/cdn-cgi/trace")!
+    static let upURL = URL(string: "https://speed.cloudflare.com/__up")!
+    /// Plafond dur de `__down` : l'edge répond **403** dès `bytes >= 1e8`
+    /// (vérifié en ligne : 99 999 999 → 200, 100 000 000 → 403). Dépasser ce
+    /// seuil fait échouer TOUTES les requêtes du download.
+    static let downloadMaxBytesPerRequest = 100_000_000
+    /// Octets par requête DL : sous le plafond avec marge, et assez gros pour
+    /// qu'un lien rapide n'enchaîne pas les requêtes (la deadline borne le
+    /// transfert, la boucle relance tant qu'il reste du temps).
+    static let downloadBytesPerRequest = 90_000_000
+    /// Corps UL partagé entre les flux (Data immuable → une seule allocation).
+    static let uploadBytesPerRequest = 32_000_000
+    /// Flux concurrents maximum vers l'edge (politesse anycast).
+    static let maxStreams = 6
+    static let maxUploadStreams = 4
+    /// Avantage de latence exigé pour préférer Cloudflare en mode Auto —
+    /// garde les serveurs opérateurs iPerf3 prioritaires en France.
+    static let autoAdvantageMs: Double = 20
+
+    static func downURL(bytes: Int) -> URL {
+        var components = URLComponents(string: "https://speed.cloudflare.com/__down")!
+        components.queryItems = [URLQueryItem(name: "bytes", value: String(max(0, bytes)))]
+        return components.url!
+    }
+}
+
+/// Parse le champ `colo=` (code IATA de l'edge) d'une réponse
+/// `/cdn-cgi/trace` (lignes `clé=valeur`).
+func cloudflareParseColo(fromTrace text: String) -> String? {
+    for line in text.split(separator: "\n") {
+        guard line.hasPrefix("colo=") else { continue }
+        let value = line.dropFirst("colo=".count).trimmingCharacters(in: .whitespaces)
+        return value.isEmpty ? nil : value.uppercased()
+    }
+    return nil
+}
+
+/// Nom lisible d'un colo Cloudflare — villes FR/CA + voisines usuelles,
+/// repli sur le code IATA brut sinon.
+func cloudflareServerName(colo: String?) -> String {
+    guard let colo, !colo.isEmpty else { return "Cloudflare · edge anycast" }
+    let cities: [String: String] = [
+        "CDG": "Paris", "ORY": "Paris", "MRS": "Marseille", "LYS": "Lyon",
+        "BOD": "Bordeaux", "LIL": "Lille", "NCE": "Nice", "TLS": "Toulouse",
+        "YUL": "Montréal", "YYZ": "Toronto", "YVR": "Vancouver", "YYC": "Calgary",
+        "YOW": "Ottawa", "YHZ": "Halifax", "YWG": "Winnipeg", "YXE": "Saskatoon",
+        "LHR": "Londres", "AMS": "Amsterdam", "FRA": "Francfort", "BRU": "Bruxelles",
+        "GVA": "Genève", "ZRH": "Zurich", "MAD": "Madrid", "BCN": "Barcelone",
+        "MXP": "Milan", "FCO": "Rome", "LIS": "Lisbonne", "DUB": "Dublin",
+        "LUX": "Luxembourg", "EWR": "Newark", "JFK": "New York", "IAD": "Washington",
+        "LAX": "Los Angeles", "BOM": "Mumbai", "DXB": "Dubaï", "SIN": "Singapour",
+        "NRT": "Tokyo", "HND": "Tokyo", "GRU": "São Paulo", "SYD": "Sydney",
+    ]
+    let code = colo.uppercased()
+    if let city = cities[code] {
+        return "Cloudflare · \(city) (\(code))"
+    }
+    return "Cloudflare · \(code)"
+}
+
+/// Sac de connexions annulable : `NWConnection` ignore `Task.isCancelled`,
+/// donc l'annulation coopérative passe par la coupure des connexions — les
+/// receive/send en vol échouent et la boucle de contrôle se déroule en erreur
+/// au lieu de continuer à transférer (ou de fuiter) après un « Arrêter ».
+final class IPerf3ConnectionBag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var connections: [NWConnection] = []
+    private var cancelled = false
+
+    var isCancelled: Bool {
         lock.lock()
         defer { lock.unlock() }
-        return bytes
+        return cancelled
+    }
+
+    func register(_ connection: NWConnection) {
+        lock.lock()
+        let wasCancelled = cancelled
+        if !wasCancelled { connections.append(connection) }
+        lock.unlock()
+        if wasCancelled { connection.cancel() }
+    }
+
+    func cancelAll() {
+        lock.lock()
+        cancelled = true
+        let toCancel = connections
+        connections.removeAll()
+        lock.unlock()
+        for connection in toCancel { connection.cancel() }
     }
 }
 
@@ -2045,319 +2644,351 @@ actor IPerf3Runner {
     let port: UInt16
     let streams: Int
     let durationSeconds: Int
+    let omitSeconds: Int
     let isDownload: Bool
     let onProgress: (@Sendable (_ bytesTransferred: Int, _ elapsedSeconds: Double) -> Void)?
-    
+    /// Callback émis toutes les ~150 ms PENDANT la phase omit (warm-up TCP)
+    /// avec les octets bruts cumulés et le temps mural. Permet au cadran de
+    /// montrer le débit dès le début du transfert sans attendre la fin de l'omit.
+    let onWarmup: (@Sendable (_ rawTotalBytes: Int, _ wallSeconds: Double) -> Void)?
+
     private var activeSenders: [StreamSender] = []
     private var activeReceivers: [StreamReceiver] = []
-    
-    init(hostname: String, port: UInt16, streams: Int, durationSeconds: Int, isDownload: Bool, onProgress: (@Sendable (_ bytesTransferred: Int, _ elapsedSeconds: Double) -> Void)? = nil) {
+
+    init(
+        hostname: String,
+        port: UInt16,
+        streams: Int,
+        durationSeconds: Int,
+        omitSeconds: Int = SpeedtestEngineConfig.iperf3OmitSeconds,
+        isDownload: Bool,
+        onProgress: (@Sendable (_ bytesTransferred: Int, _ elapsedSeconds: Double) -> Void)? = nil,
+        onWarmup: (@Sendable (_ rawTotalBytes: Int, _ wallSeconds: Double) -> Void)? = nil
+    ) {
         self.hostname = hostname
         self.port = port
-        self.streams = streams
-        self.durationSeconds = durationSeconds
+        self.streams = max(1, streams)
+        self.durationSeconds = max(1, durationSeconds)
+        self.omitSeconds = max(0, omitSeconds)
         self.isDownload = isDownload
         self.onProgress = onProgress
+        self.onWarmup = onWarmup
     }
-    
-    func makeCookie() -> Data {
-        let chars = "abcdefghijklmnopqrstuvwxyz234567"
-        var result = ""
+
+    private func makeCookie() -> Data {
+        let chars = Array("abcdefghijklmnopqrstuvwxyz234567".utf8)
+        var data = Data(capacity: 37)
         for _ in 0..<36 {
-            let randomIndex = Int.random(in: 0..<chars.count)
-            let char = chars[chars.index(chars.startIndex, offsetBy: randomIndex)]
-            result.append(char)
+            data.append(chars[Int.random(in: 0..<chars.count)])
         }
-        var data = result.data(using: .ascii) ?? Data()
-        data.append(0) // Null byte terminator
+        data.append(0)
         return data
     }
-    
-    func connect(connection: NWConnection, queue: DispatchQueue) async throws {
-        let gate = ConcurrencyGate()
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            connection.stateUpdateHandler = { state in
-                switch state {
-                case .ready:
-                    if !gate.testAndSet() {
-                        continuation.resume()
-                    }
-                case .failed(let error):
-                    if !gate.testAndSet() {
-                        continuation.resume(throwing: error)
-                    }
-                case .cancelled:
-                    if !gate.testAndSet() {
-                        continuation.resume(throwing: NSError(domain: "iPerfClient", code: -3, userInfo: [NSLocalizedDescriptionKey: "Connection cancelled"]))
-                    }
-                default:
-                    break
-                }
-            }
-            connection.start(queue: queue)
+
+    func run() async throws -> IPerf3Result {
+        guard let portEndpoint = NWEndpoint.Port(rawValue: port) else {
+            throw IPerf3Error.invalidPort
+        }
+        let bag = IPerf3ConnectionBag()
+        let isTestRunning = AtomicBool(false)
+        return try await withTaskCancellationHandler {
+            try await runInternal(portEndpoint: portEndpoint, bag: bag, isTestRunning: isTestRunning)
+        } onCancel: {
+            // Stoppe l'ender-task et coupe toutes les connexions : les
+            // receive/send en vol échouent → la boucle de contrôle se déroule.
+            isTestRunning.value = false
+            bag.cancelAll()
         }
     }
-    
-    func sendData(connection: NWConnection, data: Data) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            connection.send(content: data, completion: .contentProcessed({ error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
-                }
-            }))
-        }
-    }
-    
-    func sendCommand(connection: NWConnection, cmd: UInt8) async throws {
-        try await sendData(connection: connection, data: Data([cmd]))
-    }
-    
-    func sendJSON(connection: NWConnection, dictionary: [String: Any]) async throws {
-        let data = try JSONSerialization.data(withJSONObject: dictionary, options: [])
-        let length = UInt32(data.count)
-        var lengthBigEndian = length.bigEndian
-        let headerData = Data(bytes: &lengthBigEndian, count: 4)
-        
-        try await sendData(connection: connection, data: headerData)
-        try await sendData(connection: connection, data: data)
-    }
-    
-    func readExactBytes(connection: NWConnection, count: Int) async throws -> Data {
-        try await withCheckedThrowingContinuation { continuation in
-            connection.receive(minimumIncompleteLength: count, maximumLength: count) { data, _, isComplete, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else if let data = data, data.count == count {
-                    continuation.resume(returning: data)
-                } else if isComplete {
-                    continuation.resume(throwing: NSError(domain: "iPerfClient", code: -1, userInfo: [NSLocalizedDescriptionKey: "Connection closed prematurely"]))
-                } else {
-                    continuation.resume(throwing: NSError(domain: "iPerfClient", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to read exact bytes"]))
-                }
-            }
-        }
-    }
-    
-    func readCommand(connection: NWConnection) async throws -> UInt8 {
-        let data = try await readExactBytes(connection: connection, count: 1)
-        return data[0]
-    }
-    
-    func readJSON(connection: NWConnection) async throws -> [String: Any] {
-        let lengthData = try await readExactBytes(connection: connection, count: 4)
-        let length = UInt32(bigEndian: lengthData.withUnsafeBytes { $0.load(as: UInt32.self) })
-        let jsonData = try await readExactBytes(connection: connection, count: Int(length))
-        if let json = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
-            return json
-        }
-        throw NSError(domain: "iPerfClient", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON response"])
-    }
-    
-    func readDataChunk(connection: NWConnection, maxLength: Int) async throws -> Data {
-        try await withCheckedThrowingContinuation { continuation in
-            connection.receive(minimumIncompleteLength: 1, maximumLength: maxLength) { data, _, isComplete, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else if let data = data {
-                    continuation.resume(returning: data)
-                } else if isComplete {
-                    continuation.resume(returning: Data())
-                } else {
-                    continuation.resume(throwing: NSError(domain: "iPerfClient", code: -4, userInfo: [NSLocalizedDescriptionKey: "Read failed"]))
-                }
-            }
-        }
-    }
-    
-    func run() async throws -> (bytes: Int, duration: Double) {
+
+    private func runInternal(
+        portEndpoint: NWEndpoint.Port,
+        bag: IPerf3ConnectionBag,
+        isTestRunning: AtomicBool
+    ) async throws -> IPerf3Result {
         let host = NWEndpoint.Host(hostname)
-        let portEndpoint = NWEndpoint.Port(rawValue: port)!
-        let queue = DispatchQueue(label: "fr.signalquest.iperf.client")
-        
-        let controlConnection = NWConnection(host: host, port: portEndpoint, using: .tcp)
-        
-        try await connect(connection: controlConnection, queue: queue)
-        defer {
-            controlConnection.cancel()
-        }
-        
+        let queue = DispatchQueue(label: "fr.signalquest.iperf.client.\(port)", qos: .userInitiated)
+        let params = iperfTCPParameters()
+
+        let controlConnection = NWConnection(host: host, port: portEndpoint, using: params)
+        bag.register(controlConnection)
+        try await connectNW(controlConnection, queue: queue, timeoutSeconds: 5)
+        defer { controlConnection.cancel() }
+
         let cookieData = makeCookie()
         let cookieString = String(data: cookieData.prefix(36), encoding: .ascii) ?? ""
-        try await sendData(connection: controlConnection, data: cookieData)
-        
+        try await sendNW(controlConnection, cookieData)
+
         var dataConnections: [NWConnection] = []
         defer {
-            for conn in dataConnections {
-                conn.cancel()
-            }
+            for conn in dataConnections { conn.cancel() }
         }
-        
+
         let totalBytesCounter = SafeCounter()
+        let omitBytesCounter = SafeCounter()
         var startTestTime: Date?
-        let isTestRunning = AtomicBool(false)
-        
-        var completed = false
-        while !completed {
-            let cmd = try await readCommand(connection: controlConnection)
-            
-            switch cmd {
+        var transferEndTime: Date?
+        let serverEnded = AtomicBool(false)
+        var finishedResult: IPerf3Result?
+        var enderStarted = false
+
+        while finishedResult == nil {
+            let raw = try await readExactNW(controlConnection, count: 1, timeoutSeconds: 60)
+            let signed = Int8(bitPattern: raw[0])
+
+            switch signed {
             case 9: // PARAM_EXCHANGE
-                var params: [String: Any] = [
-                    "client_version": "3.6",
-                    "omit": 0,
+                var paramsJSON: [String: Any] = [
+                    "client_version": "3.17.1",
+                    "omit": omitSeconds,
                     "parallel": streams,
                     "pacing_timer": 1000,
                     "time": durationSeconds,
+                    "num": 0,
+                    "blockcount": 0,
                     "tcp": true,
-                    "len": 131072,
+                    "len": SpeedtestEngineConfig.iperf3BlockSize,
                     "cookie": cookieString
                 ]
                 if isDownload {
-                    params["reverse"] = true
+                    paramsJSON["reverse"] = true
                 }
-                try await sendJSON(connection: controlConnection, dictionary: params)
-                
+                try await sendJSON(controlConnection, paramsJSON)
+
             case 10: // CREATE_STREAMS
                 for _ in 0..<streams {
-                    let dataConn = NWConnection(host: host, port: portEndpoint, using: .tcp)
-                    try await connect(connection: dataConn, queue: queue)
+                    let dataConn = NWConnection(host: host, port: portEndpoint, using: params)
+                    bag.register(dataConn)
+                    try await connectNW(dataConn, queue: queue, timeoutSeconds: 5)
                     dataConnections.append(dataConn)
-                    try await sendData(connection: dataConn, data: cookieData)
+                    try await sendNW(dataConn, cookieData)
                 }
-                
+
             case 1: // TEST_START
                 break
-                
+
             case 2: // TEST_RUNNING
+                guard !enderStarted else { break }
+                enderStarted = true
                 isTestRunning.value = true
                 startTestTime = Date()
-                
+
                 for conn in dataConnections {
                     if isDownload {
-                        let receiver = StreamReceiver(connection: conn, totalBytes: totalBytesCounter, isRunning: isTestRunning)
+                        let receiver = StreamReceiver(
+                            connection: conn,
+                            totalBytes: totalBytesCounter,
+                            isRunning: isTestRunning
+                        )
                         activeReceivers.append(receiver)
                         receiver.start()
                     } else {
-                        let payload = Data(repeating: 0x5a, count: 131072)
-                        let sender = StreamSender(connection: conn, payload: payload, totalBytes: totalBytesCounter, isRunning: isTestRunning)
+                        let payload = Data(repeating: 0x5a, count: SpeedtestEngineConfig.iperf3BlockSize)
+                        let sender = StreamSender(
+                            connection: conn,
+                            payload: payload,
+                            totalBytes: totalBytesCounter,
+                            isRunning: isTestRunning
+                        )
                         activeSenders.append(sender)
                         sender.start()
                     }
                 }
-                
-                if isDownload {
-                    Task { [self, isTestRunning, totalBytesCounter, controlConnection] in
-                        let duration = Double(durationSeconds)
-                        let start = Date()
-                        while isTestRunning.value {
-                            try? await Task.sleep(nanoseconds: 150_000_000)
-                            let elapsed = Date().timeIntervalSince(start)
-                            if elapsed >= duration {
-                                break
-                            }
-                            self.onProgress?(totalBytesCounter.value, elapsed)
-                        }
-                        
-                        isTestRunning.value = false
-                        try? await self.sendCommand(connection: controlConnection, cmd: 4) // TEST_END
+
+                // Client always ends the test after omit + duration (both directions).
+                let progressHandler = onProgress
+                let warmupHandler = onWarmup
+                let omitCap = omitSeconds
+                let measureCap = durationSeconds
+                Task {
+                    let omit = Double(omitCap)
+                    let measure = Double(measureCap)
+                    let start = Date()
+                    // Phase omit — feedback live pour l'aiguille du cadran.
+                    while isTestRunning.value {
+                        try? await Task.sleep(nanoseconds: 150_000_000)
+                        let wall = Date().timeIntervalSince(start)
+                        if wall >= omit { break }
+                        warmupHandler?(totalBytesCounter.value, wall)
                     }
-                } else {
-                    Task { [self, isTestRunning, totalBytesCounter] in
-                        let duration = Double(durationSeconds)
-                        let start = Date()
-                        while isTestRunning.value {
-                            try? await Task.sleep(nanoseconds: 150_000_000)
-                            let elapsed = Date().timeIntervalSince(start)
-                            if elapsed >= duration {
-                                break
-                            }
-                            self.onProgress?(totalBytesCounter.value, elapsed)
-                        }
+                    let bytesAtOmit = totalBytesCounter.value
+                    if omitBytesCounter.value == 0, bytesAtOmit > 0 {
+                        omitBytesCounter.add(bytesAtOmit)
+                    }
+                    // Phase de mesure utile.
+                    while isTestRunning.value {
+                        try? await Task.sleep(nanoseconds: 150_000_000)
+                        let wall = Date().timeIntervalSince(start)
+                        let usefulElapsed = max(0, wall - omit)
+                        let usefulBytes = max(0, totalBytesCounter.value - omitBytesCounter.value)
+                        progressHandler?(usefulBytes, usefulElapsed)
+                        if wall >= omit + measure { break }
+                    }
+                    isTestRunning.value = false
+                    // Inutile (et parfois RST) si le serveur a déjà clos le
+                    // test, ou si le run a été annulé (connexions coupées).
+                    if !serverEnded.value, !bag.isCancelled {
+                        try? await sendCommand(controlConnection, 4) // TEST_END
                     }
                 }
-                
-            case 4: // TEST_END
+
+            case 4: // TEST_END (server-initiated)
+                serverEnded.value = true
                 isTestRunning.value = false
-                
+                if transferEndTime == nil { transferEndTime = Date() }
+
             case 13: // EXCHANGE_RESULTS
+                serverEnded.value = true
                 isTestRunning.value = false
-                for conn in dataConnections {
-                    conn.cancel()
-                }
+                if transferEndTime == nil { transferEndTime = Date() }
+                for conn in dataConnections { conn.cancel() }
                 dataConnections.removeAll()
                 activeSenders.removeAll()
                 activeReceivers.removeAll()
-                
-                let duration = Date().timeIntervalSince(startTestTime ?? Date())
+
+                let wall = (transferEndTime ?? Date()).timeIntervalSince(startTestTime ?? Date())
+                let omit = Double(omitSeconds)
+                let measuredDuration = max(0.001, wall - omit)
+                let clientTotal = totalBytesCounter.value
+                let omitBytes = omitBytesCounter.value > 0
+                    ? omitBytesCounter.value
+                    : 0
+                let clientUseful = max(0, clientTotal - omitBytes)
+
+                // Un seul stream id=1 avec le total : accepté par le serveur
+                // (évite le quirk d'IDs 1,3,4… et l'erreur « invalid id »).
                 let clientResults: [String: Any] = [
-                    "cpu_util_total": 1,
-                    "cpu_util_user": 0.5,
-                    "cpu_util_system": 0.5,
-                    "sender_has_retransmits": 0,
+                    "cpu_util_total": 0.0,
+                    "cpu_util_user": 0.0,
+                    "cpu_util_system": 0.0,
+                    "sender_has_retransmits": isDownload ? -1 : 0,
                     "congestion_used": "cubic",
-                    "streams": [
-                        [
-                            "id": 1,
-                            "bytes": totalBytesCounter.value,
-                            "retransmits": 0,
-                            "jitter": 0,
-                            "errors": 0,
-                            "packets": 0,
-                            "start_time": 0,
-                            "end_time": duration
-                        ]
-                    ]
+                    "streams": [[
+                        "id": 1,
+                        "bytes": clientUseful,
+                        "retransmits": isDownload ? -1 : 0,
+                        "jitter": 0.0,
+                        "errors": 0,
+                        "packets": 0,
+                        "start_time": 0.0,
+                        "end_time": measuredDuration
+                    ]]
                 ]
-                try await sendJSON(connection: controlConnection, dictionary: clientResults)
-                
-                _ = try? await readJSON(connection: controlConnection)
-                
+                try await sendJSON(controlConnection, clientResults)
+
+                let serverResults = try? await readJSON(controlConnection)
+                let serverBytes = iperf3ExtractStreamBytes(from: serverResults)
+
+                // Download : octets reçus client = vérité terrain.
+                // Upload : octets reçus serveur si dispo (évite le buffer-bloat client).
+                let measuredBytes: Int
+                if isDownload {
+                    measuredBytes = clientUseful > 0 ? clientUseful : (serverBytes ?? 0)
+                } else if let serverBytes, serverBytes > 0 {
+                    measuredBytes = serverBytes
+                } else {
+                    measuredBytes = clientUseful
+                }
+
+                finishedResult = IPerf3Result(
+                    measuredBytes: measuredBytes,
+                    clientBytes: clientUseful,
+                    serverBytes: serverBytes,
+                    measuredDuration: measuredDuration,
+                    wallDuration: max(measuredDuration, wall)
+                )
+
             case 14: // DISPLAY_RESULTS
-                try? await sendCommand(connection: controlConnection, cmd: 16) // IPERF_DONE
-                completed = true
-                
+                try? await sendCommand(controlConnection, 16) // IPERF_DONE
+                if finishedResult == nil {
+                    let wall = (transferEndTime ?? Date()).timeIntervalSince(startTestTime ?? Date())
+                    let measuredDuration = max(0.001, wall - Double(omitSeconds))
+                    let useful = max(0, totalBytesCounter.value - omitBytesCounter.value)
+                    finishedResult = IPerf3Result(
+                        measuredBytes: useful,
+                        clientBytes: useful,
+                        serverBytes: nil,
+                        measuredDuration: measuredDuration,
+                        wallDuration: max(measuredDuration, wall)
+                    )
+                }
+
+            case -1: // ACCESS_DENIED (busy)
+                throw IPerf3Error.accessDenied
+
+            case -2: // SERVER_ERROR
+                throw IPerf3Error.serverError
+
+            case 11: // SERVER_TERMINATE
+                throw IPerf3Error.serverError
+
             default:
-                completed = true
+                throw IPerf3Error.unexpectedState(signed)
             }
         }
-        
-        let duration = Date().timeIntervalSince(startTestTime ?? Date())
-        return (totalBytesCounter.value, duration)
+
+        guard let result = finishedResult, result.measuredBytes > 0 else {
+            throw IPerf3Error.incomplete
+        }
+        return result
+    }
+
+    private func sendCommand(_ connection: NWConnection, _ cmd: UInt8) async throws {
+        try await sendNW(connection, Data([cmd]))
+    }
+
+    private func sendJSON(_ connection: NWConnection, _ dictionary: [String: Any]) async throws {
+        let data = try JSONSerialization.data(withJSONObject: dictionary, options: [])
+        var length = UInt32(data.count).bigEndian
+        var packet = Data(bytes: &length, count: 4)
+        packet.append(data)
+        // Envoyer en un seul write (évite une race rare sur le framing).
+        try await sendNW(connection, packet)
+    }
+
+    private func readJSON(_ connection: NWConnection) async throws -> [String: Any] {
+        let lengthData = try await readExactNW(connection, count: 4, timeoutSeconds: 15)
+        let length = UInt32(bigEndian: lengthData.withUnsafeBytes { $0.load(as: UInt32.self) })
+        guard length > 0, length < 16_000_000 else { throw IPerf3Error.invalidJSON }
+        let jsonData = try await readExactNW(connection, count: Int(length), timeoutSeconds: 15)
+        guard let json = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] else {
+            throw IPerf3Error.invalidJSON
+        }
+        return json
     }
 }
 
 class StreamSender: @unchecked Sendable {
     private let connection: NWConnection
     private let payload: Data
-    private let limit = 4
+    /// Fenêtre d'envois concurrents par flux. 8 × 128 KiB ≈ 1 Mo en vol —
+    /// assez pour saturer un lien asymétrique sans provoquer de RST sur les
+    /// POP publics (l'ancien 12 avec 16 flux tuait l'UL).
+    private let limit = 8
     private let outstanding = SafeCounter()
     private let totalBytes: SafeCounter
     private let isRunning: AtomicBool
-    
+
     init(connection: NWConnection, payload: Data, totalBytes: SafeCounter, isRunning: AtomicBool) {
         self.connection = connection
         self.payload = payload
         self.totalBytes = totalBytes
         self.isRunning = isRunning
     }
-    
-    func start() {
-        sendNext()
-    }
-    
+
+    func start() { sendNext() }
+
     private func sendNext() {
         guard isRunning.value else { return }
-        
         while outstanding.value < limit && isRunning.value {
             outstanding.add(1)
             let size = payload.count
-            
             connection.send(content: payload, completion: .contentProcessed({ [weak self] error in
-                guard let self = self else { return }
+                guard let self else { return }
                 self.outstanding.add(-1)
-                if error == nil {
+                // Erreur (RST) : on arrête ce flux mais on ne propage pas —
+                // le runner contrôle la fin via TEST_END / EXCHANGE_RESULTS.
+                if error == nil, self.isRunning.value {
                     self.totalBytes.add(size)
                     self.sendNext()
                 }
@@ -2370,23 +3001,20 @@ class StreamReceiver: @unchecked Sendable {
     private let connection: NWConnection
     private let totalBytes: SafeCounter
     private let isRunning: AtomicBool
-    
+
     init(connection: NWConnection, totalBytes: SafeCounter, isRunning: AtomicBool) {
         self.connection = connection
         self.totalBytes = totalBytes
         self.isRunning = isRunning
     }
-    
-    func start() {
-        receiveNext()
-    }
-    
+
+    func start() { receiveNext() }
+
     private func receiveNext() {
         guard isRunning.value else { return }
-        
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 131072) { [weak self] data, _, isComplete, error in
-            guard let self = self else { return }
-            if let data = data, !data.isEmpty {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 256 * 1024) { [weak self] data, _, isComplete, error in
+            guard let self else { return }
+            if let data, !data.isEmpty {
                 self.totalBytes.add(data.count)
             }
             if error == nil && !isComplete && self.isRunning.value {
@@ -2404,96 +3032,11 @@ private func boundedMbps(bytes: Int, durationMs: Double) -> Double {
     return mbps.isFinite && mbps >= 0 ? mbps : 0
 }
 
-func measuredTransferMbps(effectiveBytes: Int, durationMs: Double) -> Double? {
-    let mbps = boundedMbps(bytes: effectiveBytes, durationMs: durationMs)
-    guard effectiveBytes > 0, mbps > 0 else { return nil }
-    return mbps
-}
-
 func speedtestPingMeasuredSampleTarget(attemptBudget: Int, warmupCount: Int) -> Int {
     let budget = max(0, attemptBudget)
     guard budget > 0 else { return 0 }
     let warmups = min(max(0, warmupCount), max(0, budget - 1))
     return max(0, budget - warmups)
-}
-
-func boundedUploadRequestBytes(_ serverValue: Int?) -> Int {
-    let value = serverValue ?? SpeedtestEngineConfig.maxUploadBytesPerRequest
-    return min(
-        max(value, SpeedtestEngineConfig.minUploadBytesPerRequest),
-        SpeedtestEngineConfig.maxUploadBytesPerRequest
-    )
-}
-
-func computeConfirmedUploadBytes(clientWrittenBytes: Int, serverConfirmedBytes: Int?) -> Int {
-    guard clientWrittenBytes > 0 else { return 0 }
-    guard let serverConfirmedBytes else { return clientWrittenBytes }
-    return max(0, min(clientWrittenBytes, serverConfirmedBytes))
-}
-
-/// Décide si la grace (warm-up) doit être étendue au-delà de la fenêtre de
-/// base : oui quand le débit instantané dépasse `fastLinkThresholdMbps`
-/// (2 s de slow-start pèsent lourd sur la moyenne des liens rapides) ou quand
-/// il croît encore nettement (≥ `risingGraceRatio`) par rapport au début de
-/// fenêtre — signature d'un lien toujours en rampe TCP.
-func speedtestShouldExtendGrace(recentMbps: Double, earlierMbps: Double?) -> Bool {
-    guard recentMbps > 0 else { return false }
-    if recentMbps > SpeedtestEngineConfig.fastLinkThresholdMbps { return true }
-    guard let earlierMbps, earlierMbps > 0 else { return false }
-    return recentMbps >= earlierMbps * SpeedtestEngineConfig.risingGraceRatio
-}
-
-/// Corps du POST de finalize upload : `uploadRunId` + le `warmupMs` réellement
-/// appliqué côté client (grace adaptative), pour que la fenêtre de mesure
-/// serveur exclue la même rampe. Paramètre déjà accepté par le serveur.
-func speedtestUploadFinalizeBody(runId: String, warmupMs: Double) -> Data {
-    Data("{\"uploadRunId\":\"\(runId)\",\"warmupMs\":\(Int(warmupMs.rounded()))}".utf8)
-}
-
-/// Moyenne finale d'upload. Quand la mesure serveur est utilisable (et non
-/// tronquée), `serverAvgMbps` est AUTORITAIRE : octets et durée proviennent de
-/// la même fenêtre serveur — c'est aussi la valeur anti-triche par excellence
-/// (mesurée côté serveur). Sinon, repli sur la moyenne client bornée par les
-/// octets confirmés (min client/serveur), qui ne peut jamais gonfler le score.
-func resolvedUploadAverageMbps(
-    serverMeasurement: UploadServerMeasurement?,
-    expectedUsefulDurationMs: Double,
-    clientAverageMbps: Double
-) -> Double {
-    if let serverMeasurement,
-       serverMeasurement.isUsable(expectedUsefulDurationMs: expectedUsefulDurationMs),
-       let serverAverage = serverMeasurement.serverAvgMbps {
-        return serverAverage
-    }
-    return clientAverageMbps
-}
-
-func isProtectedSpeedtestDownloadURL(
-    _ candidate: URL,
-    protectedDownloadURL: URL,
-    sessionDownloadURL: URL,
-    speedtestBaseURL: URL
-) -> Bool {
-    func normalizedKey(_ url: URL) -> String {
-        let scheme = (url.scheme ?? "https").lowercased()
-        let host = (url.host ?? "").lowercased()
-        let port = url.port.map { ":\($0)" } ?? ""
-        let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        return "\(scheme)://\(host)\(port)/\(path)"
-    }
-
-    let candidateKey = normalizedKey(candidate)
-    let canonicalProtected = speedtestBaseURL.appendingPathComponent("download")
-    return candidateKey == normalizedKey(protectedDownloadURL)
-        || candidateKey == normalizedKey(sessionDownloadURL)
-        || candidateKey == normalizedKey(canonicalProtected)
-}
-
-private func parseUploadAckBytes(from data: Data) -> Int? {
-    guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-        return nil
-    }
-    return json.intValue("bytesReceived")
 }
 
 private struct SpeedtestRateLimitedError: Error {}
@@ -2503,125 +3046,6 @@ private struct SpeedtestUploadTaskResult: Sendable {
     let httpStatusCode: Int?
     let receivedResponse: Bool
     let sentBytes: Int
-}
-
-struct UploadServerMeasurement: Equatable, Sendable {
-    let serverBytesReceived: Int?
-    let serverDurationMs: Double?
-    let serverAvgMbps: Double?
-    let serverP90Mbps: Double?
-    let serverP95Mbps: Double?
-    let serverPeakMbps: Double?
-    let serverMeasuredWindows: Int?
-    let serverMeasurementComplete: Bool?
-    /// Run interrompu prématurément côté serveur : sa fenêtre de mesure n'est
-    /// pas représentative — la moyenne serveur ne doit PAS être autoritaire.
-    let serverRunTruncated: Bool?
-
-    init?(data: Data) {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
-        }
-        serverBytesReceived = json.intValue("serverBytesReceived")
-        serverDurationMs = json.doubleValue("serverDurationMs")
-        serverAvgMbps = json.doubleValue("serverAvgMbps")
-        serverP90Mbps = json.doubleValue("serverP90Mbps")
-        serverP95Mbps = json.doubleValue("serverP95Mbps")
-        serverPeakMbps = json.doubleValue("serverPeakMbps")
-        serverMeasuredWindows = json.intValue("serverMeasuredWindows")
-        serverMeasurementComplete = json.boolValue("serverMeasurementComplete")
-        serverRunTruncated = json.boolValue("serverRunTruncated")
-    }
-
-    func isUsable(expectedUsefulDurationMs: Double) -> Bool {
-        guard let bytes = serverBytesReceived, bytes > 0,
-              let duration = serverDurationMs, duration >= expectedUsefulDurationMs * 0.7,
-              let average = serverAvgMbps, average.isFinite, average > 0 else {
-            return false
-        }
-        if let windows = serverMeasuredWindows, windows <= 0 {
-            return false
-        }
-        // Respect de `serverRunTruncated` (ignoré auparavant) : un run tronqué
-        // retombe sur le calcul client borné par les octets confirmés.
-        if serverRunTruncated == true {
-            return false
-        }
-        return true
-    }
-}
-
-/// Thread-safe byte counter for URLSession delegate callbacks. Delegates are
-/// synchronous callbacks, so an actor would add avoidable scheduling overhead
-/// on fast links.
-final class SpeedtestSyncByteCounter: @unchecked Sendable {
-    struct Snapshot: Sendable { let total: Int; let grace: Int }
-
-    private let lock = NSLock()
-    private var total: Int = 0
-    private var grace: Int = 0
-
-    func add(_ count: Int, isGrace: Bool) {
-        let safeCount = max(0, count)
-        guard safeCount > 0 else { return }
-        lock.lock()
-        total += safeCount
-        if isGrace { grace += safeCount }
-        lock.unlock()
-    }
-
-    func add(total count: Int, grace graceCount: Int) {
-        let safeCount = max(0, count)
-        guard safeCount > 0 else { return }
-        lock.lock()
-        total += safeCount
-        grace += max(0, min(safeCount, graceCount))
-        lock.unlock()
-    }
-
-    func snapshot() -> Snapshot {
-        lock.lock()
-        let snapshot = Snapshot(total: total, grace: grace)
-        lock.unlock()
-        return snapshot
-    }
-}
-
-/// Fenêtre temporelle ADAPTATIVE d'une phase de mesure : la grace (warm-up)
-/// démarre à sa valeur de base et peut être étendue UNE seule fois, avant son
-/// expiration, quand le lien est encore en slow-start à la frontière (liens
-/// rapides). L'échéance de la phase glisse du même délai pour préserver la
-/// durée utile de mesure. Thread-safe : lue depuis les callbacks URLSession et
-/// les boucles de streams, étendue depuis la tâche de progression.
-final class SpeedtestAdaptivePhaseWindow: @unchecked Sendable {
-    private let lock = NSLock()
-    private var graceMsValue: Double
-    private var deadlineValue: Date
-    private var extended = false
-
-    init(graceMs: Double, deadline: Date) {
-        self.graceMsValue = graceMs
-        self.deadlineValue = deadline
-    }
-
-    var graceMs: Double { lock.withLock { graceMsValue } }
-    var deadline: Date { lock.withLock { deadlineValue } }
-    var wasExtended: Bool { lock.withLock { extended } }
-
-    /// Étend la grace à `newGraceMs` et repousse l'échéance du même délai.
-    /// Sans effet (renvoie false) si déjà étendue, si la frontière de grace est
-    /// déjà passée (`elapsedMs`), ou si la nouvelle valeur ne l'allonge pas —
-    /// une extension tardive fausserait le marquage grace/utile des octets.
-    @discardableResult
-    func extendGrace(to newGraceMs: Double, ifNotPastMs elapsedMs: Double) -> Bool {
-        lock.withLock {
-            guard !extended, elapsedMs < graceMsValue, newGraceMs > graceMsValue else { return false }
-            deadlineValue = deadlineValue.addingTimeInterval((newGraceMs - graceMsValue) / 1_000)
-            graceMsValue = newGraceMs
-            extended = true
-            return true
-        }
-    }
 }
 
 private final class SpeedtestURLSessionTaskBox: @unchecked Sendable {
@@ -2642,45 +3066,17 @@ private final class SpeedtestURLSessionTaskBox: @unchecked Sendable {
     }
 }
 
-/// Boîte thread-safe qui capture UNE fois le POP edge du CDN qui a servi le
-/// download (diagnostic Bell/Canada : sans ce champ, impossible de savoir si
-/// un test lent a été servi par un edge local ou un POP lointain).
-/// - CloudFront : header `x-amz-cf-pop` (« CDG52-P1 » → « CDG »)
-/// - Cloudflare : header `cf-ray` (« a1996735e8f7e165-MRS » → « MRS »)
-final class SpeedtestEdgeCaptureBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _code: String?
-
-    var code: String? {
-        lock.lock(); defer { lock.unlock() }
-        return _code
-    }
-
-    func capture(from response: HTTPURLResponse) {
-        lock.lock(); defer { lock.unlock() }
-        guard _code == nil else { return }
-        if let pop = response.value(forHTTPHeaderField: "x-amz-cf-pop") {
-            _code = String(pop.prefix(3)).uppercased()
-        } else if let ray = response.value(forHTTPHeaderField: "cf-ray"),
-                  let colo = ray.split(separator: "-").last, colo.count == 3 {
-            _code = colo.uppercased()
-        }
-    }
-}
-
 private final class SpeedtestDownloadDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private let deadline: Date
     private let onBytes: @Sendable (Int) -> Void
-    private let edgeCapture: SpeedtestEdgeCaptureBox?
     private let lock = NSLock()
     private var continuation: CheckedContinuation<Void, Error>?
     private var responseError: Error?
     private var receivedBytes = 0
 
-    init(deadline: Date, onBytes: @escaping @Sendable (Int) -> Void, edgeCapture: SpeedtestEdgeCaptureBox? = nil) {
+    init(deadline: Date, onBytes: @escaping @Sendable (Int) -> Void) {
         self.deadline = deadline
         self.onBytes = onBytes
-        self.edgeCapture = edgeCapture
     }
 
     func run(task: URLSessionDataTask) async throws {
@@ -2732,7 +3128,6 @@ private final class SpeedtestDownloadDelegate: NSObject, URLSessionDataDelegate,
             completionHandler(.cancel)
             return
         }
-        edgeCapture?.capture(from: http)
         completionHandler(.allow)
     }
 
@@ -2903,59 +3298,23 @@ private func isCancellation(_ error: Error) -> Bool {
     (error as? CancellationError) != nil || (error as? URLError)?.code == .cancelled
 }
 
-private extension Dictionary where Key == String, Value == Any {
-    func intValue(_ key: String) -> Int? {
-        if let value = self[key] as? Int { return value }
-        if let value = self[key] as? Double { return Int(value) }
-        if let value = self[key] as? String { return Int(value) }
-        return nil
-    }
-
-    func doubleValue(_ key: String) -> Double? {
-        if let value = self[key] as? Double { return value }
-        if let value = self[key] as? Int { return Double(value) }
-        if let value = self[key] as? String { return Double(value) }
-        return nil
-    }
-
-    func boolValue(_ key: String) -> Bool? {
-        if let value = self[key] as? Bool { return value }
-        if let value = self[key] as? String {
-            return ["1", "true", "yes"].contains(value.lowercased())
-        }
-        return nil
-    }
-}
-
-/// Tracks the global byte total and the bytes received during the grace window
-/// so we can subtract them at the end.
-actor SpeedtestByteCounter {
-    struct Snapshot: Sendable { let total: Int; let grace: Int }
-    private var total: Int = 0
-    private var grace: Int = 0
-
-    func add(_ count: Int, isGrace: Bool) {
-        total += count
-        if isGrace { grace += count }
-    }
-
-    func add(total count: Int, grace graceCount: Int) {
-        total += max(0, count)
-        grace += max(0, min(count, graceCount))
-    }
-
-    func snapshot() -> Snapshot { Snapshot(total: total, grace: grace) }
-}
-
 /// Collected (start, end, bytes) samples used to derive p90 / p95 / peak via
 /// 1-second windows post-test, mirroring `measuredThroughputWindows` on
 /// Android.
-actor SpeedtestSamplesBox {
+///
+/// Lock-based (pas actor) : les callbacks iPerf poussaient `append` via
+/// `Task { await box.append }` sans attendre, ce qui faisait perdre des
+/// samples au moment de `publicStats` → séries vides / graphes plats faux.
+final class SpeedtestSamplesBox: @unchecked Sendable {
     struct Sample: Sendable { let startMs: Double; let endMs: Double; let bytes: Int }
+    private let lock = NSLock()
     private var samples: [Sample] = []
 
     func append(start: Double, end: Double, bytes: Int) {
+        guard bytes > 0, end > start else { return }
+        lock.lock()
         samples.append(Sample(startMs: start, endMs: end, bytes: bytes))
+        lock.unlock()
     }
 
     struct PublicStats: Sendable {
@@ -2967,6 +3326,9 @@ actor SpeedtestSamplesBox {
     }
 
     func publicStats(windowMs: Double, graceMs: Double, endMs: Double) -> PublicStats {
+        lock.lock()
+        let snapshot = samples
+        lock.unlock()
         guard endMs > graceMs else { return PublicStats(p90: nil, p95: nil, peak: 0, windowCount: 0, seriesMbps: []) }
         var windowSpeeds: [Double] = []
         var windowIndex = 0
@@ -2975,7 +3337,7 @@ actor SpeedtestSamplesBox {
             let windowEnd = windowStart + windowMs
             if windowStart >= endMs { break }
             var bytesInWindow = 0
-            for sample in samples {
+            for sample in snapshot {
                 let overlapStart = max(sample.startMs, windowStart)
                 let overlapEnd = min(sample.endMs, windowEnd)
                 guard overlapEnd > overlapStart else { continue }
@@ -3007,33 +3369,6 @@ actor SpeedtestSamplesBox {
             windowCount: sorted.count,
             seriesMbps: windowSpeeds
         )
-    }
-}
-
-/// Simple monotonic stall detector: aborts the attempt when the total byte
-/// counter has not progressed for `timeoutMs` after the grace period.
-actor SpeedtestStallMonitor {
-    private let timeoutMs: Double
-    private var lastBytes: Int = 0
-    private var lastProgressAtMs: Double = 0
-    var stalled: Bool = false
-
-    init(timeoutMs: Double) { self.timeoutMs = timeoutMs }
-
-    func observe(elapsedMs: Double, totalBytes: Int) {
-        if totalBytes > lastBytes {
-            lastBytes = totalBytes
-            lastProgressAtMs = elapsedMs
-            stalled = false
-            return
-        }
-        if lastProgressAtMs == 0 {
-            lastProgressAtMs = elapsedMs
-            return
-        }
-        if elapsedMs - lastProgressAtMs > timeoutMs {
-            stalled = true
-        }
     }
 }
 

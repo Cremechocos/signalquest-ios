@@ -1,44 +1,40 @@
 import Foundation
 
-struct SpeedtestSessionResponse: Codable, Equatable {
-    let sessionToken: String
-    let sessionId: String
-    let expiresAt: Date?
-    let expiresAtEpochMs: Double?
-    let downloadUrl: URL
-    let uploadUrl: URL
-    let uploadBeginUrl: URL?
-    let uploadFinalizeUrl: URL?
-    let maxDownloadBytesPerRequest: Int?
-    let maxUploadBytesPerRequest: Int?
-    let sessionMaxDownloadBytes: Int?
-    let sessionMaxUploadBytes: Int?
-    let maxStreams: Int?
-    let requestedStreams: Int?
-    let durationSec: Int?
-    let maxDurationSec: Int?
-    let selectedServer: SpeedtestServer?
-}
-
-struct SpeedtestServer: Codable, Equatable {
-    let id: String?
-    let name: String?
-    let host: String?
-    let location: String?
-    let lat: Double?
-    let lon: Double?
-    let country: String?
-}
-
 enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
     case hybridAuto = "hybrid_auto"
+    // OVH proof
     case rbx = "rbx"
     case sbg = "sbg"
     case gra = "gra"
     case bom = "bom"
     case bhs = "bhs"
     case us = "us"
-    
+    // Bouygues Telecom iPerf (BBR / CUBIC) — poi.cubic retiré du sélecteur (host down)
+    case bytelParisBbr = "bytel_paris_bbr"
+    case bytelParisCubic = "bytel_paris_cubic"
+    case bytelMrsBbr = "bytel_mrs_bbr"
+    case bytelMrsCubic = "bytel_mrs_cubic"
+    case bytelLyoBbr = "bytel_lyo_bbr"
+    case bytelLyoCubic = "bytel_lyo_cubic"
+    case bytelTlsBbr = "bytel_tls_bbr"
+    case bytelTlsCubic = "bytel_tls_cubic"
+    case bytelStrBbr = "bytel_str_bbr"
+    case bytelStrCubic = "bytel_str_cubic"
+    case bytelPoiBbr = "bytel_poi_bbr"
+    /// Legacy : host `poi.cubic` non joignable — migre vers Auto.
+    case bytelPoiCubic = "bytel_poi_cubic"
+    case bytelRenBbr = "bytel_ren_bbr"
+    case bytelRenCubic = "bytel_ren_cubic"
+    // Scaleway / online.net public iPerf (ports 5200–5209)
+    case onlineNet = "online_net"
+    case onlineNet6 = "online_net6"
+    case onlineNet90ms = "online_net_90ms"
+    case onlineNet6_90ms = "online_net6_90ms"
+    // MilkyWan (AS2027) — iPerf3 public, même plage de ports que Bouygues
+    case milkywan = "milkywan_cbo"
+    // Cloudflare — moteur HTTPS anycast (couverture mondiale, DL/UL/ping même edge)
+    case cloudflare = "cloudflare_edge"
+
     // Legacy cases left for soft migration or parsing safely:
     case cloudflareR2 = "cloudflare_r2"
     case awsCloudFront = "aws_cloudfront"
@@ -48,31 +44,185 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
 
     /// Cases proposés à l'utilisateur (réglages).
     static var selectableCases: [SpeedtestDownloadTarget] {
-        [.hybridAuto, .rbx, .sbg, .gra, .bom, .bhs, .us]
+        [.hybridAuto]
+            + ovhCases
+            + bouyguesCases
+            + scalewayCases
+            + milkywanCases
+            + cloudflareCases
     }
 
-    /// Migration douce : les anciennes préférences CDN deviennent « Auto ».
+    static var ovhCases: [SpeedtestDownloadTarget] {
+        [.rbx, .sbg, .gra, .bom, .bhs, .us]
+    }
+
+    /// Hosts Bouygues sains (poi.cubic exclu du sélecteur).
+    static var bouyguesCases: [SpeedtestDownloadTarget] {
+        [
+            .bytelParisBbr, .bytelParisCubic,
+            .bytelMrsBbr, .bytelMrsCubic,
+            .bytelLyoBbr, .bytelLyoCubic,
+            .bytelTlsBbr, .bytelTlsCubic,
+            .bytelStrBbr, .bytelStrCubic,
+            .bytelPoiBbr,
+            .bytelRenBbr, .bytelRenCubic,
+        ]
+    }
+
+    static var scalewayCases: [SpeedtestDownloadTarget] {
+        [.onlineNet, .onlineNet6, .onlineNet90ms, .onlineNet6_90ms]
+    }
+
+    static var milkywanCases: [SpeedtestDownloadTarget] {
+        [.milkywan]
+    }
+
+    static var cloudflareCases: [SpeedtestDownloadTarget] {
+        [.cloudflare]
+    }
+
+    /// Toujours visibles dans le sélecteur : ce sont des moteurs (auto,
+    /// edge anycast mondial), pas des POP d'un fournisseur.
+    static var ungroupedCases: [SpeedtestDownloadTarget] {
+        [.hybridAuto, .cloudflare]
+    }
+
+    /// Accordéons du sélecteur, par fournisseur. Source unique : la vue
+    /// dérive ses groupes d'ici, sinon un serveur ajouté au catalogue reste
+    /// invisible dans l'UI.
+    static var pickerGroups: [(region: String, targets: [SpeedtestDownloadTarget])] {
+        [
+            ("OVH", ovhCases),
+            ("Bouygues Telecom", bouyguesCases),
+            ("Scaleway", scalewayCases),
+            ("MilkyWan", milkywanCases),
+        ]
+    }
+
+    /// Migration douce : CDN legacy + host bytel mort → « Auto ».
     var migrated: SpeedtestDownloadTarget {
         switch self {
-        case .cloudflareR2, .awsCloudFront, .vpsInternal:
+        case .cloudflareR2, .awsCloudFront, .vpsInternal, .bytelPoiCubic:
             return .hybridAuto
         default:
             return self
         }
     }
 
+    /// Libellé court (cartes, badges, historique).
     var displayName: String {
         switch self {
         case .hybridAuto: return "Auto"
-        case .rbx: return "RBX proof (Roubaix)"
-        case .sbg: return "SBG proof (Strasbourg)"
-        case .gra: return "GRA proof (Gravelines)"
-        case .bom: return "YNM proof (Mumbai)"
-        case .bhs: return "Beauharnois proof (BHS)"
-        case .us: return "US proof"
+        case .rbx: return "Roubaix"
+        case .sbg: return "Strasbourg"
+        case .gra: return "Gravelines"
+        case .bom: return "Mumbai"
+        case .bhs: return "Beauharnois"
+        case .us: return "Ashburn"
+        case .bytelParisBbr: return "Paris · BBR"
+        case .bytelParisCubic: return "Paris · CUBIC"
+        case .bytelMrsBbr: return "Marseille · BBR"
+        case .bytelMrsCubic: return "Marseille · CUBIC"
+        case .bytelLyoBbr: return "Lyon · BBR"
+        case .bytelLyoCubic: return "Lyon · CUBIC"
+        case .bytelTlsBbr: return "Toulouse · BBR"
+        case .bytelTlsCubic: return "Toulouse · CUBIC"
+        case .bytelStrBbr: return "Strasbourg · BBR"
+        case .bytelStrCubic: return "Strasbourg · CUBIC"
+        case .bytelPoiBbr: return "Poitiers · BBR"
+        case .bytelPoiCubic: return "Poitiers · CUBIC"
+        case .bytelRenBbr: return "Rennes · BBR"
+        case .bytelRenCubic: return "Rennes · CUBIC"
+        case .onlineNet: return "Paris · Scaleway"
+        case .onlineNet6: return "Paris · Scaleway IPv6"
+        case .onlineNet90ms: return "Paris · +90 ms"
+        case .onlineNet6_90ms: return "Paris · IPv6 +90 ms"
+        case .milkywan: return "Croissy-Beaubourg"
+        case .cloudflare: return "Cloudflare"
         case .cloudflareR2: return "Cloudflare"
         case .awsCloudFront: return "AWS CloudFront"
         case .vpsInternal: return "VPS OVH Gravelines"
+        }
+    }
+
+    /// Sous-titre pour le sélecteur (ville / région).
+    var subtitle: String {
+        switch self {
+        case .hybridAuto: return "POP iPerf3 le plus proche"
+        case .rbx: return "OVH · RBX · France"
+        case .sbg: return "OVH · SBG · France"
+        case .gra: return "OVH · GRA · France"
+        case .bom: return "OVH · YNM · Inde"
+        case .bhs: return "OVH · BHS · Canada"
+        case .us: return "OVH · US-EAST · États-Unis"
+        case .bytelParisBbr: return "Bouygues · paris.bbr · :9200–9240"
+        case .bytelParisCubic: return "Bouygues · paris.cubic · :9200–9240"
+        case .bytelMrsBbr: return "Bouygues · mrs.bbr · :9200–9240"
+        case .bytelMrsCubic: return "Bouygues · mrs.cubic · :9200–9240"
+        case .bytelLyoBbr: return "Bouygues · lyo.bbr · :9200–9240"
+        case .bytelLyoCubic: return "Bouygues · lyo.cubic · :9200–9240"
+        case .bytelTlsBbr: return "Bouygues · tls.bbr · :9200–9240"
+        case .bytelTlsCubic: return "Bouygues · tls.cubic · :9200–9240"
+        case .bytelStrBbr: return "Bouygues · str.bbr · :9200–9240"
+        case .bytelStrCubic: return "Bouygues · str.cubic · :9200–9240"
+        case .bytelPoiBbr: return "Bouygues · poi.bbr · :9200–9240"
+        case .bytelPoiCubic: return "Bouygues · poi.cubic · indisponible"
+        case .bytelRenBbr: return "Bouygues · ren.bbr · :9200–9240"
+        case .bytelRenCubic: return "Bouygues · ren.cubic · :9200–9240"
+        case .onlineNet: return "Scaleway · ping.online.net · :5200–5209"
+        case .onlineNet6: return "Scaleway · ping6.online.net · :5200–5209"
+        case .onlineNet90ms: return "Scaleway · latence artificielle +90 ms (test)"
+        case .onlineNet6_90ms: return "Scaleway · IPv6 · latence artificielle +90 ms (test)"
+        case .milkywan: return "MilkyWan · speedtest.milkywan.fr · :9200–9240"
+        case .cloudflare: return "Edge anycast mondial · HTTPS · DL/UL/ping même serveur"
+        case .cloudflareR2: return "CDN Cloudflare"
+        case .awsCloudFront: return "CDN AWS"
+        case .vpsInternal: return "VPS SignalQuest"
+        }
+    }
+
+    /// Groupe collapsible du sélecteur.
+    var regionLabel: String {
+        switch self {
+        case .hybridAuto: return "Recommandé"
+        case .rbx, .sbg, .gra, .bom, .bhs, .us: return "OVH"
+        case .bytelParisBbr, .bytelParisCubic,
+             .bytelMrsBbr, .bytelMrsCubic,
+             .bytelLyoBbr, .bytelLyoCubic,
+             .bytelTlsBbr, .bytelTlsCubic,
+             .bytelStrBbr, .bytelStrCubic,
+             .bytelPoiBbr, .bytelPoiCubic,
+             .bytelRenBbr, .bytelRenCubic:
+            return "Bouygues Telecom"
+        case .onlineNet, .onlineNet6, .onlineNet90ms, .onlineNet6_90ms:
+            return "Scaleway"
+        case .milkywan: return "MilkyWan"
+        case .cloudflare: return "Mondial"
+        case .cloudflareR2, .awsCloudFront, .vpsInternal: return "Legacy"
+        }
+    }
+
+    /// SF Symbol du sélecteur.
+    var systemImage: String {
+        switch self {
+        case .hybridAuto: return "location.magnifyingglass"
+        case .rbx, .sbg, .gra: return "building.2.fill"
+        case .bhs: return "leaf.fill"
+        case .us: return "globe.americas.fill"
+        case .bom: return "globe.asia.australia.fill"
+        case .bytelParisBbr, .bytelParisCubic,
+             .bytelMrsBbr, .bytelMrsCubic,
+             .bytelLyoBbr, .bytelLyoCubic,
+             .bytelTlsBbr, .bytelTlsCubic,
+             .bytelStrBbr, .bytelStrCubic,
+             .bytelPoiBbr, .bytelPoiCubic,
+             .bytelRenBbr, .bytelRenCubic:
+            return "antenna.radiowaves.left.and.right"
+        case .onlineNet, .onlineNet90ms: return "server.rack"
+        case .onlineNet6, .onlineNet6_90ms: return "network"
+        case .milkywan: return "server.rack"
+        case .cloudflare: return "globe"
+        case .cloudflareR2, .awsCloudFront, .vpsInternal: return "server.rack"
         }
     }
 }
@@ -144,6 +294,11 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     let createdAt: Date
     let downloadSeriesMbps: [Double]?
     let uploadSeriesMbps: [Double]?
+    /// Nombre de fenêtres de GRÂCE (warm-up/omit) en tête des séries — le
+    /// renderer distingue visuellement la montée en charge du régime établi.
+    /// nil/0 = pas de segment de grâce (ex. moteur Cloudflare, historique).
+    let downloadGraceWindowCount: Int?
+    let uploadGraceWindowCount: Int?
     let uploadMeasurementSource: String?
     let deviceModel: String?
     let osVersion: String?
@@ -190,6 +345,8 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         createdAt: Date = Date(),
         downloadSeriesMbps: [Double]? = nil,
         uploadSeriesMbps: [Double]? = nil,
+        downloadGraceWindowCount: Int? = nil,
+        uploadGraceWindowCount: Int? = nil,
         uploadMeasurementSource: String? = nil,
         deviceModel: String? = nil,
         osVersion: String? = nil
@@ -235,6 +392,8 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         self.createdAt = createdAt
         self.downloadSeriesMbps = downloadSeriesMbps
         self.uploadSeriesMbps = uploadSeriesMbps
+        self.downloadGraceWindowCount = downloadGraceWindowCount
+        self.uploadGraceWindowCount = uploadGraceWindowCount
         self.uploadMeasurementSource = uploadMeasurementSource
         self.deviceModel = deviceModel
         self.osVersion = osVersion
@@ -329,6 +488,8 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         createdAt: Date(),
         downloadSeriesMbps: nil,
         uploadSeriesMbps: nil,
+        downloadGraceWindowCount: nil,
+        uploadGraceWindowCount: nil,
         uploadMeasurementSource: nil,
         deviceModel: nil,
         osVersion: nil
