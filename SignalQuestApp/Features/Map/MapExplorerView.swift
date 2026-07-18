@@ -28,6 +28,10 @@ final class MapExplorerViewModel: ObservableObject {
     /// O(1) pour reconstruire le cache d'annotations de la vue uniquement quand
     /// les données changent — et non à chaque invalidation de `body`.
     @Published private(set) var dataVersion = 0
+    /// Signal SÉPARÉ des instantanés d'amis temps réel (SSE), distinct de
+    /// `dataVersion` : à chaque tick la vue ne reconstruit QUE la couche amis
+    /// (PERF-MAP-05) au lieu de recalculer antennes / speedtests / couverture.
+    @Published private(set) var friendsVersion = 0
     @Published var isLoading = false
     @Published var errorMessage: String?
     // Marché + opérateur initiaux : dernier choix persisté, sinon le pays de la
@@ -471,51 +475,72 @@ final class MapExplorerViewModel: ObservableObject {
             do { return (try await svc.snapshot(bounds: bounds, zoom: zoom, lightweight: snapshotLightweight), nil) }
             catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
-        // tiles non-nil → tuiles disponibles ; tiles nil → repli sur la liste bbox.
-        async let antennaRaw: (tiles: [AndroidAntennaTileResponse]?, list: [AntennaSite]) = {
-            guard wantsAntenna else { return (nil, []) }
+        // tiles non-nil → tuiles disponibles ; list non-nil → repli sur la liste bbox.
+        // ROB-08 : `tiles`/`list` nil AVEC `error` non-nil ⇒ échec réseau réel (la
+        // couche précédente sera conservée + toast) ; nil SANS error ⇒ annulation
+        // (couche conservée, sans toast). Le repli tuiles→liste reste silencieux
+        // (best-effort) ; seul l'échec TERMINAL (liste indisponible) est signalé.
+        async let antennaRaw: (tiles: [AndroidAntennaTileResponse]?, list: [AntennaSite]?, error: String?) = {
+            guard wantsAntenna else { return (nil, [], nil) }
             let usesAdvancedAntennaFilters = !techs.isEmpty || !bands.isEmpty || !sharing.isEmpty
             if !usesAdvancedAntennaFilters,
                let tiles = try? await svc.antennaTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, withAzimuth: true, bands: bands) {
-                return (tiles, [])
+                return (tiles, nil, nil)
             }
-            let list = (try? await antennasSvc.list(bbox: bounds.asBoundingBox, market: market, operatorName: op, technologies: techs, bands: bands, sharing: sharing)) ?? []
-            return (nil, list)
+            do {
+                let list = try await antennasSvc.list(bbox: bounds.asBoundingBox, market: market, operatorName: op, technologies: techs, bands: bands, sharing: sharing)
+                return (nil, list, nil)
+            } catch {
+                return (nil, nil, error.isCancellation ? nil : error.localizedDescription)
+            }
         }()
-        async let communityRaw: [AndroidCommunitySiteTileResponse] = {
-            guard wantsCommunitySites else { return [] }
-            return (try? await svc.communitySiteTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, includeObserved: includeObserved, bands: bands)) ?? []
+        async let communityRaw: (value: [AndroidCommunitySiteTileResponse]?, error: String?) = {
+            guard wantsCommunitySites else { return ([], nil) }
+            do { return (try await svc.communitySiteTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, includeObserved: includeObserved, bands: bands), nil) }
+            catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
-        async let speedtestRaw: [AndroidSpeedtestTileResponse] = {
-            guard wantsSpeedtest else { return [] }
-            return (try? await svc.speedtestTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: stDays, bands: bands, maxAge: nil)) ?? []
+        async let speedtestRaw: (value: [AndroidSpeedtestTileResponse]?, error: String?) = {
+            guard wantsSpeedtest else { return ([], nil) }
+            do { return (try await svc.speedtestTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: stDays, bands: bands, maxAge: nil), nil) }
+            catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
         // Prévisionnels & pannes : respectent le filtre opérateur de la carte
         // (l'opérateur sélectionné `op`, ou ALL quand « Tous » est choisi). Le
         // backend FR accepte ALL comme un opérateur précis.
-        async let plannedRaw: [PlannedSiteLive] = {
-            guard wantsPlanned else { return [] }
-            return ((try? await svc.plannedSites(market: market, operatorName: op, territory: territory, bands: bands)) ?? []).filter { bounds.contains(lat: $0.lat, lon: $0.lon) }
+        async let plannedRaw: (value: [PlannedSiteLive]?, error: String?) = {
+            guard wantsPlanned else { return ([], nil) }
+            do {
+                let sites = try await svc.plannedSites(market: market, operatorName: op, territory: territory, bands: bands)
+                return (sites.filter { bounds.contains(lat: $0.lat, lon: $0.lon) }, nil)
+            } catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
-        async let outageRaw: [OutageSiteLive] = {
-            guard wantsOutage else { return [] }
-            return ((try? await svc.outageSites(market: market, operatorName: op, territory: territory, bands: bands)) ?? []).filter { bounds.contains(lat: $0.lat, lon: $0.lon) }
+        async let outageRaw: (value: [OutageSiteLive]?, error: String?) = {
+            guard wantsOutage else { return ([], nil) }
+            do {
+                let sites = try await svc.outageSites(market: market, operatorName: op, territory: territory, bands: bands)
+                return (sites.filter { bounds.contains(lat: $0.lat, lon: $0.lon) }, nil)
+            } catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
-        async let coverageRaw: (tiles: [AndroidCoverageTileResponse], heat: [CoverageHeatPoint]) = {
-            guard wantsCoverage else { return ([], []) }
+        async let coverageRaw: (value: (tiles: [AndroidCoverageTileResponse], heat: [CoverageHeatPoint])?, error: String?) = {
+            guard wantsCoverage else { return (([], []), nil) }
             let tiles = (try? await svc.coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: covDays, bands: bands, maxAge: nil)) ?? []
             if tiles.isEmpty {
-                let points = (try? await svc.coveragePoints(bounds: bounds, market: market, operatorName: op, technology: techs.sorted().first, bands: bands)) ?? []
-                return ([], points)
+                // Repli points bruts : source TERMINALE de la couche → son échec est
+                // signalé (couche conservée) au lieu d'être avalé en « vide ».
+                do {
+                    let points = try await svc.coveragePoints(bounds: bounds, market: market, operatorName: op, technology: techs.sorted().first, bands: bands)
+                    return (([], points), nil)
+                } catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
             }
-            return (tiles, [])
+            return ((tiles, []), nil)
         }()
-        async let photosRaw: [MapPublicPhoto] = {
-            guard wantsPhoto else { return [] }
+        async let photosRaw: (value: [MapPublicPhoto]?, error: String?) = {
+            guard wantsPhoto else { return ([], nil) }
             // Couche communautaire : on veut TOUTES les photos des membres, quel que
             // soit le filtre opérateur des antennes → opérateur forcé à "ALL". Seul le
             // mode « Amis » restreint l'ensemble.
-            return (try? await svc.publicPhotos(bounds: bounds, zoom: zoom, market: market, operatorName: "ALL", friendsOnly: photosFriendsOnly)) ?? []
+            do { return (try await svc.publicPhotos(bounds: bounds, zoom: zoom, market: market, operatorName: "ALL", friendsOnly: photosFriendsOnly), nil) }
+            catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
 
         // --- On attend TOUS les résultats AVANT d'assigner ---
@@ -533,11 +558,18 @@ final class MapExplorerViewModel: ObservableObject {
         // une erreur « Requête annulée ». (Régression du chargement parallèle.)
         if Task.isCancelled { return }
 
+        // ROB-08 : agrège les échecs RÉELS de couche. Chaque assignation ci-dessous
+        // est gardée — une couche qui échoue CONSERVE ses données précédentes et
+        // alimente ce message ; une couche « chargée mais vide » écrase normalement
+        // (état vide légitime). Publié en fin de `load` via le toast d'erreur existant.
+        var layerError: String?
+
         if let value = snap.snapshot {
             snapshot = value
         } else if let error = snap.error {
-            errorMessage = error
-            snapshot = .empty
+            // Snapshot indisponible : on conserve le précédent (validations / sessions
+            // / amorçage amis déjà affichés) plutôt que de tout vider en « aucune donnée ».
+            layerError = error
         }
         // QA (DEBUG) : injecte de vraies photos publiques géolocalisées pour
         // vérifier le rendu des vignettes + le viewer.
@@ -548,23 +580,41 @@ final class MapExplorerViewModel: ObservableObject {
         if let tiles = antenna.tiles {
             antennaClusters = tiles.flatMap(\.clusters)
             antennas = Self.antennas(from: tiles).filter(\.hasValidCoordinate)
-        } else {
+        } else if let list = antenna.list {
             antennaClusters = []
-            antennas = antenna.list.filter(\.hasValidCoordinate)
+            antennas = list.filter(\.hasValidCoordinate)
+        } else if let error = antenna.error {
+            // Échec réseau : on garde les antennes/clusters déjà affichés.
+            layerError = layerError ?? error
         }
 
-        communitySiteTiles = community
-        speedtestTiles = speedtest
-        plannedSites = planned
-        outages = outage
-        coverageTiles = coverage.tiles
-        coverageHeat = coverage.heat
+        if let value = community.value { communitySiteTiles = value }
+        else if let error = community.error { layerError = layerError ?? error }
+
+        if let value = speedtest.value { speedtestTiles = value }
+        else if let error = speedtest.error { layerError = layerError ?? error }
+
+        if let value = planned.value { plannedSites = value }
+        else if let error = planned.error { layerError = layerError ?? error }
+
+        if let value = outage.value { outages = value }
+        else if let error = outage.error { layerError = layerError ?? error }
+
+        if let value = coverage.value {
+            coverageTiles = value.tiles
+            coverageHeat = value.heat
+        } else if let error = coverage.error {
+            layerError = layerError ?? error
+        }
         // QA (DEBUG) : injecte des photos publiques de démo pour visualiser la
         // couche (le compte de test n'a pas forcément de photos géolocalisées).
         if ProcessInfo.processInfo.arguments.contains("--qa-demo-photos") {
             publicPhotos = Self.demoPublicPhotos(around: bounds)
-        } else {
-            publicPhotos = photos
+        } else if let value = photos.value {
+            publicPhotos = value
+        } else if let error = photos.error {
+            // Échec réseau : on garde les photos déjà affichées.
+            layerError = layerError ?? error
         }
         // Amorçage des amis vivants depuis le snapshot borné tant que le flux
         // temps réel n'a rien livré (fallback si le SSE est indisponible).
@@ -575,6 +625,9 @@ final class MapExplorerViewModel: ObservableObject {
         if ProcessInfo.processInfo.arguments.contains("--qa-demo-friends") {
             liveFriends = Self.demoFriends(around: bounds)
         }
+        // ROB-08 : nil si tout a réussi (errorMessage déjà remis à nil en début de
+        // `load`) ; sinon signale l'indisponibilité sans avoir écrasé les couches.
+        errorMessage = layerError
         dataVersion &+= 1
     }
 
@@ -582,9 +635,13 @@ final class MapExplorerViewModel: ObservableObject {
     /// l'amorçage borné : `load()` cesse ensuite de réécrire `liveFriends`.
     func applyLiveFriends(_ friends: [SocialFriendLive]) {
         friendsFromStream = true
+        // PERF-MAP-05 : garde de diff — un tick identique (ami immobile, même
+        // présence/radio) ne déclenche AUCUN travail de rendu.
         guard friends != liveFriends else { return }
         liveFriends = friends
-        dataVersion &+= 1
+        // Ne bumpe PAS `dataVersion` (qui reconstruirait TOUTES les couches) : seul
+        // `friendsVersion` → la vue ne rafraîchit que la couche amis (PERF-MAP-05).
+        friendsVersion &+= 1
     }
 
     /// Photos publiques de démonstration (QA) réparties autour du viewport.
@@ -1428,6 +1485,8 @@ struct MapExplorerView: View {
         }
         // Données rechargées → reconstruit le cache des couches une seule fois.
         .onChangeCompat(of: model.dataVersion) { _, _ in refreshMapRender() }
+        // Tick SSE amis → ne reconstruit QUE la couche amis (PERF-MAP-05).
+        .onChangeCompat(of: model.friendsVersion) { _, _ in refreshFriendsRender() }
         // Le zoom modifie les seuils (azimuts ≥ 14, clustering) : reconstruit aussi.
         .onChangeCompat(of: mapZoom) { _, _ in
             // Ne reconstruire les couches que si le zoom franchit une frontière de
@@ -1962,6 +2021,16 @@ struct MapExplorerView: View {
         renderedAnnotations = annotationPayloads
         renderedCoverageFeatures = coverageHeatFeatures
         renderedSpeedtestFeatures = speedtestFeatures
+        renderVersion &+= 1
+    }
+
+    /// PERF-MAP-05 : ne reconstruit QUE la couche amis (marqueurs de présence).
+    /// Appelée à chaque instantané SSE d'amis (`model.friendsVersion`). Les couches
+    /// lourdes (antennes, speedtests, couverture, photos, prévisionnels, pannes)
+    /// restent telles quelles dans `renderedAnnotations` : on n'y remplace que le
+    /// sous-ensemble `.friend`, au lieu de recalculer des milliers de structs par tick.
+    private func refreshFriendsRender() {
+        renderedAnnotations = renderedAnnotations.filter { $0.kind != .friend } + friendPayloads
         renderVersion &+= 1
     }
 

@@ -622,6 +622,10 @@ struct SpeedtestSubmission: Encodable, Equatable {
             clientSubmissionId: result.id.uuidString,
             downloadSpeed: result.downloadAverageMbps,
             averageSpeed: result.downloadAverageMbps,
+            // `maxSpeed` (champ legacy backend) reçoit délibérément le P90, pas le
+            // pic réel : c'est un « max robuste » qui écrête les rafales aberrantes
+            // pour l'affichage. Le vrai maximum instantané est transmis à part dans
+            // `downloadMax`/`downloadPeakMbps` (TEL-14).
             maxSpeed: result.downloadP90Mbps ?? result.downloadAverageMbps,
             uploadSpeed: result.uploadAverageMbps,
             uploadAvg: result.uploadAverageMbps,

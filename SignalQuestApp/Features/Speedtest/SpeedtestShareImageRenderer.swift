@@ -15,7 +15,12 @@ import SwiftUI
 enum SpeedtestShareImageRenderer {
     /// Hauteur calée sur le contenu (footer affleurant, aucun vide résiduel).
     static let cardSize = CGSize(width: 1080, height: 664)
-    private static let exportScale: CGFloat = 3
+    // 2× → 2160×1328 px : reste parfaitement net pour une image partagée
+    // (récepteurs sociaux ≤ 1080 px de large) tout en divisant par ~2,25 le
+    // coût de rastérisation `ImageRenderer` (obligatoirement sur le main actor,
+    // contrainte SwiftUI). L'ancien 3× produisait un 3240×1992 surdimensionné
+    // qui pouvait provoquer un à-coup à l'apparition du résultat (PERF-SHARE-01).
+    private static let exportScale: CGFloat = 2
 
     static func shareText(for result: SpeedtestRunResult) -> String {
         let download = Int(result.downloadAverageMbps.rounded())

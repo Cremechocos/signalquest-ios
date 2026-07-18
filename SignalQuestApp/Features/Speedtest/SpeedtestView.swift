@@ -23,7 +23,8 @@ struct SpeedtestView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
-    // Défaut « Auto » : préflight Cloudflare/AWS/VPS, le plus rapide gagne.
+    // Défaut « Auto » : préflight hybride iPerf3 (OVH/Bouygues/Scaleway/MilkyWan)
+    // + Cloudflare, le plus rapide gagne.
     @AppStorage("speedtest_download_target") private var downloadTargetRaw = SpeedtestDownloadTarget.hybridAuto.rawValue
     @AppStorage("speedtest_duration_seconds") private var durationSeconds = 10
     @AppStorage("speedtest_streams") private var streams = 16
