@@ -21,16 +21,12 @@ enum SQBrand {
     // MARK: Technologies (web --color-5g/4g/3g/2g)
 
     static func techColor(_ tech: String) -> Color {
-        switch tech.uppercased() {
-        // Alignées sur l'échelle de génération de la carte (MapAnnotation/DriveTest)
-        // pour qu'un badge « 3G »/« 2G » d'une fiche ait la MÊME couleur que le point
-        // correspondant sur la carte (UI-05). 5G/4G étaient déjà identiques.
-        case "5G", "NR", "5G_SA", "5G_NSA": return Color(hex: 0x8B5CF6)
-        case "4G", "LTE": return Color(hex: 0x3B82F6)
-        case "3G", "UMTS": return Color(hex: 0x14B8A6)
-        case "2G", "GSM": return Color(hex: 0xF59E0B)
-        default: return Color(hex: 0x6B7280)
-        }
+        // Délègue à l'échelle de génération canonique (SQNetworkColors), la même
+        // que la carte (MapAnnotation/DriveTest) : un badge « 3G »/« 2G » d'une
+        // fiche a la MÊME couleur que le point correspondant sur la carte (UI-05).
+        // Le fallback « inconnu » est le gris 0x94A3B8 de la carte (auparavant
+        // 0x6B7280, divergent).
+        SQNetworkColors.generationColor(tech)
     }
 
     // MARK: Opérateurs (gradients hero du SidePanel web)

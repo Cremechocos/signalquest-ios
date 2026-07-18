@@ -468,26 +468,17 @@ struct MapItemSheet: View {
     }
 
     private func speedColor(_ speed: Double?) -> Color {
+        // Échelle canonique unique (SQNetworkColors) ; `nil` garde le bleu
+        // « pas de donnée » propre à cette fiche.
         guard let speed else { return SQColor.brandBlue }
-        switch speed {
-        case 1000...: return SQColor.success
-        case 500..<1000: return Color(red: 0.13, green: 0.77, blue: 0.37)
-        case 200..<500: return Color(red: 0.34, green: 0.78, blue: 0.27)
-        case 100..<200: return SQColor.warning
-        case 40..<100: return SQColor.brandOrange
-        default: return SQColor.danger
-        }
+        return SQNetworkColors.speedColor(speed)
     }
 
     private func coverageColor(_ rsrp: Double?) -> Color {
+        // Échelle canonique unique (SQNetworkColors) ; `nil` garde le bleu
+        // « pas de donnée » propre à cette fiche.
         guard let rsrp else { return SQColor.brandBlue }
-        switch rsrp {
-        case (-85)...: return SQColor.success
-        case -95..<(-85): return Color(red: 0.52, green: 0.80, blue: 0.09)
-        case -105..<(-95): return SQColor.warning
-        case -115..<(-105): return SQColor.brandOrange
-        default: return SQColor.danger
-        }
+        return SQNetworkColors.rsrpColor(rsrp)
     }
 }
 

@@ -983,9 +983,14 @@ struct DriveTestView: View {
             legendSection("Parcours", items: [
                 ("Trajet suivi", SQColor.brandOrange)
             ], mark: .line)
-            legendSection("Débit speedtest", items: [
-                ("Rapide", Color(hex: 0x22C55E)), ("Moyen", Color(hex: 0xEAB308)),
-                ("Lent", Color(hex: 0xEF4444))
+            // Échelle complète (7 paliers) réellement dessinée pour les losanges
+            // (DriveTestMapView.speedColor), au lieu de 3 couleurs incomplètes qui
+            // laissaient les points bleus/cyans/lime sans clé de lecture (UI-06).
+            legendSection("Débit speedtest (Mbps)", items: [
+                ("1000+", Color(hex: 0x3B82F6)), ("600", Color(hex: 0x06B6D4)),
+                ("300", Color(hex: 0x22C55E)), ("100", Color(hex: 0x84CC16)),
+                ("30", Color(hex: 0xEAB308)), ("10", Color(hex: 0xF97316)),
+                ("<10", Color(hex: 0xEF4444))
             ], mark: .diamond)
         }
         .padding(SQSpace.sm + 2)

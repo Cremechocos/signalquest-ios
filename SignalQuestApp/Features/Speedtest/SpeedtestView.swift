@@ -508,9 +508,9 @@ struct SpeedtestView: View {
                 .frame(height: 1)
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: SQSpace.md), GridItem(.flexible(), spacing: SQSpace.md)], spacing: SQSpace.md) {
-                detailItem(label: "DL moyen", value: speed(result.downloadAverageMbps), highlight: true)
+                detailItem(label: "Réception moy.", value: speed(result.downloadAverageMbps), highlight: true)
                 detailItem(label: "DL max", value: speed(result.downloadMaxMbps), highlight: true)
-                detailItem(label: "UL moyen", value: speed(result.uploadAverageMbps))
+                detailItem(label: "Envoi moy.", value: speed(result.uploadAverageMbps))
                 detailItem(label: "UL max", value: speed(result.uploadMaxMbps))
                 detailItem(label: "Ping", value: ms(result.pingMinMs ?? result.pingMs), trailing: result.pingProtocol)
                 detailItem(label: "Jitter", value: ms(result.jitterMs))
@@ -578,9 +578,9 @@ struct SpeedtestView: View {
                 .fill(SQColor.separator)
                 .frame(height: 1)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: SQSpace.md), GridItem(.flexible(), spacing: SQSpace.md)], spacing: SQSpace.md) {
-                detailItem(label: "DL moyen", value: speed(s.avgDownload), highlight: true)
+                detailItem(label: "Réception moy.", value: speed(s.avgDownload), highlight: true)
                 detailItem(label: "DL max", value: speed(s.maxDownload), highlight: true)
-                detailItem(label: "UL moyen", value: speed(s.avgUpload))
+                detailItem(label: "Envoi moy.", value: speed(s.avgUpload))
                 detailItem(label: "Ping min", value: ms(s.minPing))
             }
         }

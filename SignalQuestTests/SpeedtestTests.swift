@@ -592,11 +592,13 @@ final class SpeedtestTests: XCTestCase {
     func testDownloadTargetPickerMetadata() {
         XCTAssertEqual(SpeedtestDownloadTarget.hybridAuto.displayName, "Auto")
         XCTAssertFalse(SpeedtestDownloadTarget.rbx.subtitle.isEmpty)
-        // Auto + 6 OVH + 13 Bouygues sains + 4 Scaleway + 1 MilkyWan + 1 Cloudflare
-        XCTAssertEqual(SpeedtestDownloadTarget.selectableCases.count, 26)
+        // Auto + 6 OVH + 13 Bouygues sains + 2 Scaleway + 1 MilkyWan + 1 Cloudflare.
+        // Les 2 cibles Scaleway « +90 ms » (latence artificielle, debug) ne sont plus
+        // proposées à l'utilisateur (INT-02) : 24 entrées au lieu de 26.
+        XCTAssertEqual(SpeedtestDownloadTarget.selectableCases.count, 24)
         XCTAssertEqual(SpeedtestDownloadTarget.ovhCases.count, 6)
         XCTAssertEqual(SpeedtestDownloadTarget.bouyguesCases.count, 13)
-        XCTAssertEqual(SpeedtestDownloadTarget.scalewayCases.count, 4)
+        XCTAssertEqual(SpeedtestDownloadTarget.scalewayCases.count, 2)
         XCTAssertEqual(SpeedtestDownloadTarget.milkywanCases.count, 1)
         XCTAssertEqual(SpeedtestDownloadTarget.cloudflareCases.count, 1)
         XCTAssertFalse(SpeedtestDownloadTarget.bouyguesCases.contains(.bytelPoiCubic))

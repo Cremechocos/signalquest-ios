@@ -313,13 +313,10 @@ struct SharedPostCardBubble: View {
                     in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
-    /// Seuils qualité RSRP alignés sur Android : ≥−85 vert, ≥−100 ambre, sinon rouge.
+    /// Échelle RSRP canonique unique (SQNetworkColors) — mêmes couleurs que la
+    /// carte et les fiches.
     private func rsrpColor(_ rsrp: Int) -> Color {
-        switch rsrp {
-        case (-85)...: return SQColor.success
-        case (-100)...: return SQColor.warning
-        default: return SQColor.danger
-        }
+        SQNetworkColors.rsrpColor(Double(rsrp))
     }
 
     private func formatMbps(_ value: Double?) -> String {
