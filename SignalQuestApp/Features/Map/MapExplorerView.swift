@@ -1562,7 +1562,7 @@ struct MapExplorerView: View {
                         Spacer()
                     }
                     .padding(.leading, SQSpace.md)
-                    .padding(.bottom, SQSpace.lg + 2)
+                    .padding(.bottom, SQSpace.lg + 2 + SQDock.clearance)
                 }
 
                 // Bas-droite : 2 boutons flottants (localiser + rafraîchir).
@@ -1573,7 +1573,7 @@ struct MapExplorerView: View {
                         mapFabStack
                     }
                     .padding(.trailing, SQSpace.md)
-                    .padding(.bottom, SQSpace.lg + 2)
+                    .padding(.bottom, SQSpace.lg + 2 + SQDock.clearance)
                 }
 
                 if model.isLoading {

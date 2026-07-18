@@ -22,10 +22,13 @@ enum SQBrand {
 
     static func techColor(_ tech: String) -> Color {
         switch tech.uppercased() {
+        // Alignées sur l'échelle de génération de la carte (MapAnnotation/DriveTest)
+        // pour qu'un badge « 3G »/« 2G » d'une fiche ait la MÊME couleur que le point
+        // correspondant sur la carte (UI-05). 5G/4G étaient déjà identiques.
         case "5G", "NR", "5G_SA", "5G_NSA": return Color(hex: 0x8B5CF6)
         case "4G", "LTE": return Color(hex: 0x3B82F6)
-        case "3G", "UMTS": return Color(hex: 0x10B981)
-        case "2G", "GSM": return Color(hex: 0x6B7280)
+        case "3G", "UMTS": return Color(hex: 0x14B8A6)
+        case "2G", "GSM": return Color(hex: 0xF59E0B)
         default: return Color(hex: 0x6B7280)
         }
     }
