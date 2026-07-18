@@ -25,6 +25,9 @@ struct SignalQuestHomeView: View {
     /// Comparaison des opérateurs au tap sur une tuile du pouls (métrique choisie).
     @State private var comparisonMetric: NearbyOperatorMetric = .download
     @State private var showOperatorComparison = false
+    /// Horodatage du dernier rafraîchissement réel de « Autour de toi » (throttle
+    /// des refetch pouls/mesures à chaque foreground/retour d'onglet — PERF-HOME-01).
+    @State private var lastNearbyRefreshAt: Date = .distantPast
 
     private let gridColumns = [
         GridItem(.flexible(), spacing: 14),
@@ -579,6 +582,10 @@ struct SignalQuestHomeView: View {
     /// sur un état neutre (jamais d'erreur affichée sur l'Accueil).
     /// `forceFresh` (pull-to-refresh) contourne le cache de tuiles.
     private func refreshNearby(forceFresh: Bool) async {
+        // Throttle : refresh() est relancé à CHAQUE foreground + retour d'onglet.
+        // Sans garde, pouls et mesures récentes repartaient sur le réseau à chaque
+        // fois. On tolère 20 s entre deux rafraîchissements réels (PERF-HOME-01).
+        if !forceFresh, Date().timeIntervalSince(lastNearbyRefreshAt) < 20 { return }
         // Ne JAMAIS déclencher le prompt système de localisation depuis l'Accueil
         // (même garde que le feed) : sinon il tombe hors contexte au premier
         // lancement et court-circuite le LocationPrimingSheet du speedtest (UXP-01).
@@ -589,6 +596,7 @@ struct SignalQuestHomeView: View {
         guard authorized || services.location.lastLocation != nil else { return }
         guard let location = await services.location.currentLocation(timeoutSeconds: 6) else { return }
         userLocation = location
+        lastNearbyRefreshAt = Date()
         let lat = location.coordinate.latitude
         let lng = location.coordinate.longitude
         // Pull-to-refresh : tuiles fraîches forcées (bypass du cache disque d'1 h) ;

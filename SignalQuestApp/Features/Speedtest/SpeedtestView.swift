@@ -1516,6 +1516,9 @@ private struct SignatureSpeedDial: View {
         .frame(width: diameter, height: diameter)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityText)
+        // Le cadran change en continu pendant la mesure : VoiceOver doit relire la
+        // valeur au lieu de la lire une seule fois (A11Y-11).
+        .accessibilityAddTraits(.updatesFrequently)
     }
 
     /// Graduations + libellés de décade : rendent l'échelle log lisible.

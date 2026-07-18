@@ -1826,7 +1826,7 @@ struct MapExplorerView: View {
     private var coverageQualityLegend: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
-                legendTitlePill("Qualité RSRP (dBm)")
+                legendTitlePill("Qualité RSRP (dBm, proche de 0 = mieux)")
                 ForEach(CoverageQualityBand.visibleBands) { band in
                     legendPill(color: band.swiftUIColor, text: "\(band.title) \(band.rangeLabel)")
                 }

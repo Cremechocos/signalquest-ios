@@ -152,6 +152,8 @@ final class DriveTestViewModel: ObservableObject {
     private var sessionMode: DriveTestMode = .both
     /// Nombre de points de couverture capturés (affiché en mode couverture).
     @Published private(set) var coveragePointCount = 0
+    /// Dernière persistance du brouillon de couverture (debounce — PERF-DT-01).
+    private var lastCoveragePersistAt: Date = .distantPast
     /// Points de couverture pour l'affichage TEMPS RÉEL sur la carte (par génération).
     @Published private(set) var coverageTrail: [DriveCoveragePoint] = []
     /// Points speedtest géolocalisés (carte Drive Test) — colorés par débit, tappables.
@@ -456,7 +458,7 @@ final class DriveTestViewModel: ObservableObject {
     /// Écrit chaque nouveau point dans le JSON atomique avant toute tentative
     /// réseau. L'opération est volontairement synchrone : un retour de cette méthode
     /// signifie que le point est déjà durable sur disque.
-    private func persistCoverageSnapshot() {
+    private func persistCoverageSnapshot(force: Bool = false) {
         guard sessionMode.recordsCoverage, let sessionId = coverageSessionId else { return }
         if VPNDetector.isActive() {
             if !coverageUploadSuppressed {
@@ -465,7 +467,14 @@ final class DriveTestViewModel: ObservableObject {
             coverageUploadSuppressed = true
             return
         }
-        guard !coverageUploadSuppressed, let draft = makeCoverageSessionUpload() else { return }
+        guard !coverageUploadSuppressed else { return }
+        // Debounce : ne PAS ré-encoder+écrire toute la session (coût O(n) croissant
+        // sur le main thread) à CHAQUE point capturé. Au plus une persistance toutes
+        // les 3 s ; stop()/finalize écrivent de toute façon l'état complet (PERF-DT-01).
+        let now = Date()
+        guard force || now.timeIntervalSince(lastCoveragePersistAt) >= 3 else { return }
+        guard let draft = makeCoverageSessionUpload() else { return }
+        lastCoveragePersistAt = now
         do {
             try services.sessions.persistCoverageDraft(draft)
         } catch {
