@@ -277,6 +277,13 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
         try finalizeCoverageDraft(session)
         do {
             try await flushPendingCoverageSessions()
+            // F-07 : un flush déjà en vol (coalescé) a pu lire la file AVANT la
+            // finalisation de cette session ; l'await se termine alors sans l'avoir
+            // soumise. Si elle est toujours en file, on relance un flush DÉDIÉ pour
+            // ne pas annoncer « Couverture envoyée » alors qu'elle n'est que mise en file.
+            if (try? queue.contains(sessionId: session.sessionId)) == true {
+                try await flushPendingCoverageSessions()
+            }
         } catch {
             // Une autre entrée de la file peut avoir échoué après que celle demandée
             // a réussi. Dans ce cas, l'appel courant est bien un succès.

@@ -1199,7 +1199,16 @@ struct AntennaSitePickerSheet: View {
                     }
                 }
             }
-            .task { locationService.requestOneShotLocation() }
+            // Ne PAS déclencher le prompt système à l'apparition (hors contexte) :
+            // on ne demande une position que si l'autorisation est déjà accordée.
+            // Sinon l'utilisateur reste maître (le bouton localisation de la barre
+            // déclenche la demande sur action explicite) — UXP-11.
+            .task {
+                let status = locationService.authorizationStatus
+                if status == .authorizedWhenInUse || status == .authorizedAlways {
+                    locationService.requestOneShotLocation()
+                }
+            }
             .onReceive(locationService.$lastLocation.compactMap { $0 }) { location in
                 let target = MKCoordinateRegion(
                     center: location.coordinate,

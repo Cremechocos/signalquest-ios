@@ -1,4 +1,5 @@
 import Foundation
+@testable import SignalQuest
 
 final class MockURLProtocol: URLProtocol {
     typealias Handler = (URLRequest) throws -> (HTTPURLResponse, Data)

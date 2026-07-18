@@ -95,6 +95,12 @@ struct SQDock: View {
             .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(SQDockPressStyle())
+        // Large Content Viewer : appui long = HUD agrandi de l'onglet, seul moyen
+        // de lire les libellés du dock (9,5 pt fixes) aux grandes tailles Dynamic
+        // Type pour les malvoyants non-VoiceOver (A11Y-09).
+        .accessibilityShowsLargeContentViewer {
+            Label(item.label, systemImage: item.icon)
+        }
         .accessibilityLabel(badge > 0 ? "\(item.label), \(badge) non lus" : item.label)
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
     }

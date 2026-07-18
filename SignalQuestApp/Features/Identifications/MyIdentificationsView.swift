@@ -99,7 +99,7 @@ struct MyIdentificationsView: View {
             }
 
             if model.conflictCount > 0 {
-                Label("\(model.conflictCount) en conflit — un autre site domine ce nœud. Vérifie ou retire.", systemImage: "exclamationmark.triangle.fill")
+                Label("\(model.conflictCount) en conflit — un autre site est majoritaire sur cette antenne. Vérifie ou retire.", systemImage: "exclamationmark.triangle.fill")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.warning)
                     .padding(SQSpace.md)
@@ -141,7 +141,7 @@ struct MyIdentificationsView: View {
                         }
 
                         if group.cells.isEmpty {
-                            Text("Aucun PCI/CI associé pour ce nœud.")
+                            Text("Aucun identifiant de cellule (PCI/CI) associé à cette antenne.")
                                 .font(SQType.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
                                 .listRowBackground(SQColor.surface)
@@ -385,7 +385,7 @@ private struct IdentificationDetailSheet: View {
     @ViewBuilder
     private var conflictSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Label("Conflit : un autre site domine ce nœud en validations.", systemImage: "exclamationmark.triangle.fill")
+            Label("Conflit : un autre site a plus de validations sur cette antenne.", systemImage: "exclamationmark.triangle.fill")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.warning)
             if let consensusId = item.conflictSiteId {

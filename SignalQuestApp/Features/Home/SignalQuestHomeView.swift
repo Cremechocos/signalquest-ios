@@ -363,7 +363,9 @@ struct SignalQuestHomeView: View {
     private func pulseRow(_ pulse: NetworkPulse) -> some View {
         HStack(spacing: SQSpace.sm + 2) {
             if let rsrp = pulse.avgRsrpDbm {
-                pulseTileButton(value: "\(rsrp)", unit: "dBm moyen", metric: .signal)
+                // Clé de lecture du dBm (négatif, contre-intuitif) directement sur la
+                // tuile grand public : plus proche de 0 = meilleur signal (INT-16).
+                pulseTileButton(value: "\(rsrp)", unit: "dBm · proche de 0 = mieux", metric: .signal)
             }
             if let median = pulse.medianDownloadMbps {
                 pulseTileButton(value: "\(median)", unit: "Mbps médian", metric: .download)

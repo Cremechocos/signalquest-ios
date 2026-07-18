@@ -1811,7 +1811,14 @@ struct MapExplorerView: View {
                     span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
                 ))
             } else {
-                model.errorMessage = "Position actuelle indisponible"
+                // Distinguer le refus d'autorisation (l'utilisateur peut agir) d'une
+                // simple indisponibilité, au lieu d'un message générique opaque (UXP-08).
+                let status = services.location.authorizationStatus
+                if status == .denied || status == .restricted {
+                    model.errorMessage = "Localisation désactivée. Active-la dans Réglages > SignalQuest pour te localiser sur la carte."
+                } else {
+                    model.errorMessage = "Position actuelle indisponible"
+                }
             }
         }
     }
