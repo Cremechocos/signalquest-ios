@@ -5,6 +5,17 @@ struct PhotoListResponse: Codable {
     let meta: PhotoPaginationMeta?
 }
 
+extension PhotoListResponse {
+    private enum CodingKeys: String, CodingKey { case photos, meta }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // Décodage par élément : une photo à URL/champ malformé est ignorée au lieu
+        // de faire échouer toute la liste (ROB-04).
+        photos = c.decodeLossyElementArray([Photo].self, forKey: .photos)
+        meta = try? c.decodeIfPresent(PhotoPaginationMeta.self, forKey: .meta)
+    }
+}
+
 struct PhotoPaginationMeta: Codable, Equatable {
     let page: Int?
     let limit: Int?

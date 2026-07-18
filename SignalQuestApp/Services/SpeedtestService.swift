@@ -560,7 +560,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         } catch {
             // Sauvetage : DL iPerf3 impossible sur toute la plage → moteur
             // Cloudflare (résultat complet plutôt qu'une erreur sèche).
-            print("[SpeedtestService] DL iPerf3 KO (\(error.localizedDescription)) — bascule Cloudflare")
+            sqDebugLog("[SpeedtestService] DL iPerf3 KO (\(error.localizedDescription)) — bascule Cloudflare")
             return try await runCloudflareTest(
                 pathStatus: pathStatus,
                 location: location,
@@ -580,7 +580,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         guard dlResult.measuredBytes > 100_000, dlResult.measuredDuration >= 1.0 else {
             // Même sauvetage : un DL quasi vide (POP saturé) vaut une bascule,
             // pas un échec du test.
-            print("[SpeedtestService] DL iPerf3 incomplet (\(dlResult.measuredBytes) octets) — bascule Cloudflare")
+            sqDebugLog("[SpeedtestService] DL iPerf3 incomplet (\(dlResult.measuredBytes) octets) — bascule Cloudflare")
             return try await runCloudflareTest(
                 pathStatus: pathStatus,
                 location: location,
@@ -766,13 +766,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     throw CancellationError()
                 } catch {
                     lastULError = error
-                    print("[SpeedtestService] Upload attempt \(attemptIndex + 1) failed (streams=\(ulStreams) portPref=\(preferred)): \(error.localizedDescription)")
+                    sqDebugLog("[SpeedtestService] Upload attempt \(attemptIndex + 1) failed (streams=\(ulStreams) portPref=\(preferred)): \(error.localizedDescription)")
                     // Court backoff avant le second essai (RST / busy).
                     try? await Task.sleep(nanoseconds: 350_000_000)
                 }
             }
             if !didUpload, let lastULError {
-                print("[SpeedtestService] Upload failed (best-effort, DL only): \(lastULError.localizedDescription)")
+                sqDebugLog("[SpeedtestService] Upload failed (best-effort, DL only): \(lastULError.localizedDescription)")
             }
         } catch is CancellationError {
             ulLoadedPingsTask.cancel()
@@ -949,7 +949,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         do {
             try await appendHistory(result)
         } catch {
-            print("SQ_IPERF history save failed: \(error.localizedDescription)")
+            sqDebugLog("SQ_IPERF history save failed: \(error.localizedDescription)")
         }
 
         progress?(SpeedtestLiveProgress(
@@ -1068,7 +1068,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 
         try Task.checkCancellation()
         guard dlOutcome.bytes > 100_000, dlOutcome.duration >= 1.0 else {
-            print("SQ_CLOUDFLARE DL insuffisant : \(dlOutcome.bytes) octets en \(String(format: "%.1f", dlOutcome.duration))s (edge \(colo ?? "?"))")
+            sqDebugLog("SQ_CLOUDFLARE DL insuffisant : \(dlOutcome.bytes) octets en \(String(format: "%.1f", dlOutcome.duration))s (edge \(colo ?? "?"))")
             throw SpeedtestEngineError.noServerReachable
         }
         let dlStats = dlSamplesBox.publicStats(
@@ -1288,7 +1288,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                             if Task.isCancelled || Date() >= deadline { break }
                             if !didLogFailure.value {
                                 didLogFailure.value = true
-                                print("SQ_CLOUDFLARE \(direction == .download ? "DL" : "UL") requête échouée : \(error.localizedDescription)")
+                                sqDebugLog("SQ_CLOUDFLARE \(direction == .download ? "DL" : "UL") requête échouée : \(error.localizedDescription)")
                             }
                             // Requête ratée : court répit puis nouvel essai
                             // dans la fenêtre restante.
@@ -1663,7 +1663,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         do {
             try await writePendingSaves(values)
         } catch {
-            print("SQ_IPERF pending save cleanup failed: \(error.localizedDescription)")
+            sqDebugLog("SQ_IPERF pending save cleanup failed: \(error.localizedDescription)")
         }
     }
 
@@ -1767,7 +1767,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         do {
             try await writePendingSaves(remaining)
         } catch {
-            print("SQ_IPERF flush save failed: \(error.localizedDescription)")
+            sqDebugLog("SQ_IPERF flush save failed: \(error.localizedDescription)")
         }
         if let firstError { throw firstError }
     }

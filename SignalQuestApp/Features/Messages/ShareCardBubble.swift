@@ -268,9 +268,9 @@ struct SharedPostCardBubble: View {
         } else if let speedtest = card.speedtest, speedtest.downloadMbps != nil {
             measurementBanner(
                 primary: formatMbps(speedtest.downloadMbps),
-                unit: "Mb/s",
+                unit: "Mbps",
                 tint: mine ? SQColor.onAccent : SQColor.brandRed,
-                chips: [speedtest.uploadMbps.map { "↑ \(formatMbps($0)) Mb/s" },
+                chips: [speedtest.uploadMbps.map { "↑ \(formatMbps($0)) Mbps" },
                         speedtest.pingMs.map { "\(Int($0.rounded())) ms" },
                         speedtest.operatorName, speedtest.technology]
             )

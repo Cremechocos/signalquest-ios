@@ -24,9 +24,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     /// Push silencieux `e2ee_sync` : un destinataire (ex. un appareil Android
     /// fraîchement configuré) demande le re-partage de la clé de conversation.
-    /// On re-partage la clé en arrière-plan — possible car le matériel E2EE est
-    /// stocké en Keychain `AfterFirstUnlock`, donc lisible ici. Best-effort :
-    /// si l'app est verrouillée / sans clé, `shareConversationKeyIfNeeded` no-op.
+    /// Best-effort : le matériel E2EE est stocké en Keychain `whenUnlocked`
+    /// (`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`), donc lisible SEULEMENT
+    /// écran déverrouillé — verrouillé, `shareConversationKeyIfNeeded` no-op (voulu :
+    /// ne pas abaisser la protection des clés). Le re-partage se fera à la prochaine
+    /// ouverture/déverrouillage (SEC-06).
     func application(_ application: UIApplication,
                      didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
         guard (userInfo["type"] as? String) == "e2ee_sync",

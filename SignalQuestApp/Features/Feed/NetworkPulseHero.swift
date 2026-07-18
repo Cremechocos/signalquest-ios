@@ -28,7 +28,7 @@ struct NetworkPulseHero: View {
             HStack(spacing: 0) {
                 stat(value: rsrpText, label: "dBm moyen")
                 divider
-                stat(value: mbpsText, label: "Mb/s médian")
+                stat(value: mbpsText, label: "Mbps médian")
                 divider
                 stat(value: operatorText, label: operatorLabel, compact: hasOperator)
             }

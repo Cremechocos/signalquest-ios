@@ -1,5 +1,7 @@
 import SwiftUI
 import AuthenticationServices
+import UserNotifications
+import UIKit
 
 /// Enveloppe `Identifiable` autour de l'URL de l'archive exportée, pour piloter une
 /// `.sheet(item:)` (l'URL seule n'est pas `Identifiable`).
@@ -117,6 +119,10 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var appleError: String?
     @State private var showUnlinkAppleConfirm = false
+    /// Statut système réel des notifications : si l'utilisateur a refusé le prompt,
+    /// aucune push n'arrive quels que soient les toggles ci-dessous (UXP-02). On le
+    /// signale et on propose les Réglages plutôt que de laisser des toggles aveugles.
+    @State private var systemNotificationsDenied = false
 
     private var appleLinked: Bool {
         if case .authenticated(let user) = session.state { return user.appleLinked == true }
@@ -243,6 +249,19 @@ struct SettingsView: View {
             .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
             Section("Notifications") {
+                if systemNotificationsDenied {
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        Label("Les notifications sont désactivées pour SignalQuest. Aucune alerte n’arrivera tant qu’elles ne sont pas réactivées dans les Réglages iOS.", systemImage: "bell.slash.fill")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.warning)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            Link("Ouvrir les Réglages", destination: url)
+                                .font(SQType.caption.weight(.semibold))
+                                .foregroundStyle(SQColor.brandRed)
+                        }
+                    }
+                }
                 Toggle("Messages (push)", isOn: bind(\.notifyMessagesPush))
                 Toggle("Messages (in-app)", isOn: bind(\.notifyMessagesInApp))
                 Toggle("Mises à jour ANFR (push)", isOn: bind(\.notifyAnfrUpdatesPush))
@@ -347,10 +366,15 @@ struct SettingsView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Réglages")
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
+        .task {
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            systemNotificationsDenied = settings.authorizationStatus == .denied
+        }
         .sheet(isPresented: $show2FASetup) {
             NavigationStack { TwoFactorSetupView(service: services.auth) }
         }

@@ -110,6 +110,7 @@ struct GamificationView: View {
                 }
             }
             .padding(18)
+            .sqReadableWidth()
         }
         .signalQuestBackground()
         .navigationTitle("Récompenses")

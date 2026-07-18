@@ -91,6 +91,13 @@ final class SSEClient: Sendable {
                     } catch is CancellationError {
                         break
                     } catch {
+                        // Refus DÉFINITIF (403 membre retiré, 404 ressource disparue) :
+                        // inutile de reboucler toutes les 30 s vers un endpoint qui
+                        // refusera toujours — on arrête proprement (ROB-10).
+                        if case APIError.http(let status, _, _, _, _) = error, status == 403 || status == 404 {
+                            logger.debug("SSE refusé (\(status, privacy: .public)) — arrêt de la reconnexion")
+                            break
+                        }
                         logger.debug("SSE interrompu: \(error.localizedDescription, privacy: .public)")
                     }
                     if Task.isCancelled { break }
@@ -163,6 +170,11 @@ final class SSEClient: Sendable {
                     } catch is CancellationError {
                         break
                     } catch {
+                        // Refus définitif (403/404) : arrêt de la reconnexion (ROB-10).
+                        if case APIError.http(let status, _, _, _, _) = error, status == 403 || status == 404 {
+                            logger.debug("SSE data refusé (\(status, privacy: .public)) — arrêt de la reconnexion")
+                            break
+                        }
                         logger.debug("SSE data interrompu: \(error.localizedDescription, privacy: .public)")
                     }
                     if Task.isCancelled { break }

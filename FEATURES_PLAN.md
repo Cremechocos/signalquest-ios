@@ -77,7 +77,7 @@
 
 ## F7 — « Mes mesures sur la carte » *(version honnête de l'ancien « ma couverture »)*
 **Objectif.** Une carte **personnelle** de **tes** mesures (tes speedtests + tes sessions F1), colorées par **débit** ou **génération**. Points épars (là où tu as testé/roulé), **pas** une couverture continue.
-**iOS.** Couche/filtre MapLibre lisant `/api/user/speedtests` (**déjà consommé** par [SocialFeedService:252](SignalQuestApp/Services/SocialFeedService.swift:252)) + tes sessions F1 ; bascule « débit / génération ».
+**iOS.** Couche/filtre MapKit lisant `/api/user/speedtests` (**déjà consommé** par [SocialFeedService:252](SignalQuestApp/Services/SocialFeedService.swift:252)) + tes sessions F1 ; bascule « débit / génération ».
 **Effort.** Moyen. **Backend.** Aucun (route existe ; complète F1). **Done.** Vue « mes mesures » filtrable. **Note.** Complète F1 (F1 = enregistrer/contribuer ; F7 = parcourir ton empreinte). **Dépend de F1** pour inclure les sessions.
 
 ## F8 — Widget d'accueil « réseau autour de moi »

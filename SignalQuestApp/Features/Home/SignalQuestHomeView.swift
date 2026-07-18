@@ -49,6 +49,7 @@ struct SignalQuestHomeView: View {
             .padding(.horizontal, SQSpace.xl)
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
+            .sqReadableWidth()
         }
         // Directement sur le ScrollView : signalQuestBackground() enveloppe
         // dans un ZStack, et onScrollGeometryChange n'observe que la vue à
@@ -185,7 +186,7 @@ struct SignalQuestHomeView: View {
         // (peu lisible en un coup d'œil sur la pastille).
         if !networkStatus.isConstrained, let quality = networkQuality {
             if let mbps = quality.medianDownloadMbps {
-                return "\(quality.operatorLabel) · \(mbps) Mb/s"
+                return "\(quality.operatorLabel) · \(mbps) Mbps"
             }
             return "\(quality.operatorLabel) · \(quality.sampleCount) mesures"
         }
@@ -365,7 +366,7 @@ struct SignalQuestHomeView: View {
                 pulseTileButton(value: "\(rsrp)", unit: "dBm moyen", metric: .signal)
             }
             if let median = pulse.medianDownloadMbps {
-                pulseTileButton(value: "\(median)", unit: "Mb/s médian", metric: .download)
+                pulseTileButton(value: "\(median)", unit: "Mbps médian", metric: .download)
             }
             if let best = pulse.bestOperator, !best.isEmpty {
                 pulseTileButton(value: best, unit: "meilleur op.", metric: .download)
@@ -503,7 +504,7 @@ struct SignalQuestHomeView: View {
             } label: {
                 HStack(spacing: SQSpace.md) {
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Dernière mesure · \(measurement.createdAt.formatted(date: .omitted, time: .shortened))")
+                        Text("Dernière mesure · \(measurement.createdAt.formatted(date: .abbreviated, time: .shortened))")
                             .font(SQFont.body(13.5))
                             .foregroundStyle(SQColor.labelSecondary)
                         HStack(alignment: .firstTextBaseline, spacing: 5) {
@@ -576,6 +577,14 @@ struct SignalQuestHomeView: View {
     /// sur un état neutre (jamais d'erreur affichée sur l'Accueil).
     /// `forceFresh` (pull-to-refresh) contourne le cache de tuiles.
     private func refreshNearby(forceFresh: Bool) async {
+        // Ne JAMAIS déclencher le prompt système de localisation depuis l'Accueil
+        // (même garde que le feed) : sinon il tombe hors contexte au premier
+        // lancement et court-circuite le LocationPrimingSheet du speedtest (UXP-01).
+        // On n'interroge la position que si l'autorisation est déjà accordée ou
+        // qu'un fix est déjà connu.
+        let status = services.location.authorizationStatus
+        let authorized = status == .authorizedWhenInUse || status == .authorizedAlways
+        guard authorized || services.location.lastLocation != nil else { return }
         guard let location = await services.location.currentLocation(timeoutSeconds: 6) else { return }
         userLocation = location
         let lat = location.coordinate.latitude

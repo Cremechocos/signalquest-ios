@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Liste des messages programmés de la conversation, avec suppression. Affiche le
-/// contenu déchiffré quand c'est possible (messages planifiés non chiffrés en
-/// pratique sur iOS — voir MessagesService.createScheduledMessage).
+/// contenu déchiffré quand c'est possible : les messages planifiés SONT chiffrés
+/// (payload v2) quand la conversation est E2EE (voir MessagesService.createScheduledMessage).
+/// Le repli « 🔒 » apparaît si la conversation n'est pas encore déverrouillée.
 struct ScheduledMessagesView: View {
     let conversation: MessageConversation
     let service: MessagesServicing
@@ -78,6 +79,8 @@ struct ScheduledMessagesView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .sqShadowSoft()
+        // Regroupe date + contenu + statut en un seul élément VoiceOver (A11Y-1).
+        .accessibilityElement(children: .combine)
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: SQSpace.xs + 2, leading: SQSpace.lg, bottom: SQSpace.xs + 2, trailing: SQSpace.lg))

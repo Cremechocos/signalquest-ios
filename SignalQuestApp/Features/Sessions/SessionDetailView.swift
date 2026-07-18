@@ -140,6 +140,7 @@ struct SessionDetailView: View {
                 }
             }
             .padding()
+            .sqReadableWidth()
         }
         .background(SQColor.bg.ignoresSafeArea())
         .navigationTitle(model.session.name ?? (model.session.isDriveTest ? "Drive-test" : "Couverture"))
@@ -379,8 +380,8 @@ struct SessionDetailView: View {
                 }
                 if let sum = model.speedtestSummary {
                     HStack(spacing: SQSpace.sm) {
-                        speedStat("↓ moy", sum.avgDown, "Mb/s", SQColor.info)
-                        speedStat("↑ moy", sum.avgUp, "Mb/s", SQColor.brandGreen)
+                        speedStat("↓ moy", sum.avgDown, "Mbps", SQColor.info)
+                        speedStat("↑ moy", sum.avgUp, "Mbps", SQColor.brandGreen)
                         speedStat("Ping", sum.avgPing, "ms", SQColor.label)
                     }
                     .padding(.bottom, SQSpace.xs)
@@ -447,7 +448,7 @@ struct SessionDetailView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 1) {
-                Text("↓ \(st.downloadMbps.map { "\(Int($0.rounded()))" } ?? "—") Mb/s")
+                Text("↓ \(st.downloadMbps.map { "\(Int($0.rounded()))" } ?? "—") Mbps")
                     .font(SQFont.body(14, .bold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.info)
                 HStack(spacing: 8) {

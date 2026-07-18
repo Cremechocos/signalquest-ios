@@ -180,6 +180,10 @@ struct SpeedtestDetailContent: View {
                 labelColor: SQColor.labelSecondary
             )
             .frame(height: 108)
+            // Alternative non visuelle (A11Y-08) : la courbe de débit n'a aucun
+            // descripteur accessible, on la résume pour VoiceOver.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Self.graphAccessibilityLabel(title: title, average: average, maxValue: maxValue))
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -336,6 +340,26 @@ struct SpeedtestDetailContent: View {
         if mbps >= 1_000 { return (decimal(mbps / 1_000, digits: 2), "Gbps") }
         if mbps >= 100 { return (decimal(mbps, digits: 0), "Mbps") }
         return (decimal(mbps, digits: 1), "Mbps")
+    }
+
+    /// Résumé textuel de la courbe de débit pour VoiceOver : direction (Réception /
+    /// Envoi), débit moyen et pic, à partir des valeurs déjà affichées dans la carte.
+    static func graphAccessibilityLabel(title: String, average: Double?, maxValue: Double?) -> String {
+        let avgText: String
+        if let average, average.isFinite, average > 0 {
+            let parts = formatSpeedParts(average)
+            avgText = "moyenne \(parts.value) \(parts.unit)"
+        } else {
+            avgText = "moyenne indisponible"
+        }
+        let maxText: String
+        if let maxValue, maxValue.isFinite, maxValue > 0 {
+            let parts = formatSpeedParts(maxValue)
+            maxText = "pic \(parts.value) \(parts.unit)"
+        } else {
+            maxText = "pic indisponible"
+        }
+        return "Courbe de débit \(title) : \(avgText), \(maxText)."
     }
 
     private static func decimal(_ value: Double, digits: Int) -> String {

@@ -115,6 +115,7 @@ struct SessionsListView: View {
             .padding(.horizontal, SQSpace.lg)
             .padding(.top, SQSpace.md)
             .padding(.bottom, SQSpace.xxl)
+            .sqReadableWidth()
         }
         .signalQuestBackground()
         .navigationTitle("Mes sessions")

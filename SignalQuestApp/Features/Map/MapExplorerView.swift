@@ -748,6 +748,18 @@ private struct MapAnnotationPayload: Identifiable, Equatable {
     /// Données d'un ami vivant (couche Amis) : pilote le rendu « Find My ».
     var friend: FriendAnnotationInfo? = nil
 
+    /// Étiquette VoiceOver du marqueur : sans elle, antennes/clusters/speedtests/
+    /// amis/photos sont des éléments anonymes non lisibles (A11Y-03/T1-6).
+    var accessibilityLabel: String {
+        if let count = clusterCount, count > 1 {
+            return "Groupe de \(count) éléments. \(title)"
+        }
+        var parts = [title]
+        if !subtitle.isEmpty { parts.append(subtitle) }
+        if let metric, !metric.isEmpty { parts.append(metric) }
+        return parts.joined(separator: ", ")
+    }
+
     static func == (lhs: MapAnnotationPayload, rhs: MapAnnotationPayload) -> Bool {
         lhs.id == rhs.id &&
         lhs.kind == rhs.kind &&
@@ -1474,7 +1486,10 @@ struct MapExplorerView: View {
             },
             onSelect: selectAnnotation
         )
-        .ignoresSafeArea(edges: .bottom)
+        // La carte file sous la barre de statut / Dynamic Island (comme Plans),
+        // au lieu de laisser une bande systemBackground non-crème en haut (UI-09).
+        // Les contrôles du haut sont dans un overlay qui respecte la safe area.
+        .ignoresSafeArea()
     }
 
     /// Hook QA (DEBUG) : `SQ_QA_PAN_TO="lat,lng[,zoom]"` déplace la caméra
@@ -2877,7 +2892,7 @@ private struct MapAdvancedFilterSheet: View {
             (.speedtest, "Speedtests", "speedometer"),
             (.photo, "Photos", "photo"),
             (.friend, "Amis", "person.2"),
-            (.coverage, "Couverture backend", "dot.radiowaves.left.and.right")
+            (.coverage, "Couverture communautaire", "dot.radiowaves.left.and.right")
         ]
         // Pannes & Prévisionnels : données ANFR FR/DROM uniquement (le backend ne
         // répond que pour ces marchés ; ailleurs `load()` ne les charge jamais).
@@ -3057,8 +3072,11 @@ private struct MapAdvancedFilterSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Réinitialiser") {
-                        market = "FR"
-                        operatorName = "SFR"
+                        // Réinitialiser vers le marché/opérateur AUTO-détectés (SIM/GPS/
+                        // locale), pas vers un FR + SFR codés en dur qui vidaient la carte
+                        // pour un utilisateur belge/suisse (INT-04).
+                        market = MapMarketStore.initialMarketCode()
+                        operatorName = MapMarketStore.initialOperatorKey()
                         technologies.removeAll()
                         bands.removeAll()
                         sharing.removeAll()
@@ -3976,6 +3994,8 @@ private struct MapKitMapView: UIViewRepresentable {
                 view.annotation = annotation
                 view.canShowCallout = false
                 view.apply(info, displayScale: max(map.traitCollection.displayScale, 2))
+                view.isAccessibilityElement = true
+                view.accessibilityLabel = sq.payload.accessibilityLabel
                 return view
             }
             // Photo géolocalisée (hors cluster) : vignette « polaroïd » sur la carte.
@@ -3985,6 +4005,8 @@ private struct MapKitMapView: UIViewRepresentable {
                 view.annotation = annotation
                 view.canShowCallout = false
                 view.apply(url: thumbnail, displayScale: max(map.traitCollection.displayScale, 2))
+                view.isAccessibilityElement = true
+                view.accessibilityLabel = sq.payload.accessibilityLabel
                 return view
             }
             let view = map.dequeueReusableAnnotationView(withIdentifier: SQMapKitMarkerView.reuseID, for: annotation) as? SQMapKitMarkerView
@@ -3992,6 +4014,8 @@ private struct MapKitMapView: UIViewRepresentable {
             view.annotation = annotation
             view.canShowCallout = false
             view.apply(sq.payload)
+            view.isAccessibilityElement = true
+            view.accessibilityLabel = sq.payload.accessibilityLabel
             return view
         }
 

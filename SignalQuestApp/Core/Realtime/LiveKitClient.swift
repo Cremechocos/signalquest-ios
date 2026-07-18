@@ -29,6 +29,14 @@ final class LiveKitClient: ObservableObject {
     }
 
     @Published private(set) var state: State = .idle
+    /// CALL-RTC-C : vrai quand LiveKit a perdu la liaison d'un appel ÉTABLI et
+    /// tente de la rétablir (reconnexion quick ou full). On garde volontairement
+    /// `state == .connected` plutôt que d'ajouter un cas `.reconnecting` à `State` :
+    /// cela évite de rompre la logique existante et les `switch` exhaustifs sur
+    /// `State` hors de ce fichier (CallSessionView). L'UI superpose un indicateur
+    /// « Reconnexion… » tant que ce drapeau est vrai ; il revient à false dès que la
+    /// liaison est rétablie ou que l'appel se termine.
+    @Published private(set) var isReconnecting = false
     @Published private(set) var isMicMuted = false
     @Published private(set) var isCameraOn = false
     @Published private(set) var canSwitchCamera = false
@@ -61,12 +69,23 @@ final class LiveKitClient: ObservableObject {
     private var managesAudioSession = true
     /// Observateur des interruptions audio (appel entrant, Siri, alarme…).
     private var interruptionObserver: NSObjectProtocol?
+    /// Vrai quand c'est NOUS qui avons coupé le micro à cause d'une interruption
+    /// audio (appel GSM, Siri, alarme). Sert à le rétablir à la fin — sinon
+    /// l'utilisateur reste muet pour le reste de l'appel sans le savoir (CALL-RTC-A).
+    private var micAutoMutedByInterruption = false
     /// CALL-RTC-05 : invalidé à chaque disconnect()/nouvelle connect() pour fermer
     /// une room devenue orpheline si un raccrochage survient pendant le connect.
     private var connectGeneration = 0
     /// CALL-RTC-01 : vrai pendant un disconnect() local, pour NE PAS traiter le
     /// didDisconnect provoqué par notre propre raccrochage comme une fin distante.
     private var isTearingDown = false
+    /// CALL-RTC-B : mis à vrai par onDisconnect si la room se déconnecte pendant la
+    /// fenêtre `.connecting` — c.-à-d. une fin distante / chute réseau survenue
+    /// AVANT que connect() ait pu passer à `.connected`, notamment aux points de
+    /// suspension `await media.toggleMicrophone()` / `toggleCamera()`. connect() le
+    /// consulte avant de marquer l'appel connecté pour NE PAS forcer `.connected`
+    /// sur une room morte (« appel fantôme »). Réinitialisé à chaque connect().
+    private var didDisconnectDuringConnect = false
     private var emptyRoomTask: Task<Void, Never>?
     private var mediaCancellables = Set<AnyCancellable>()
 #if os(iOS) && canImport(LiveKit)
@@ -90,6 +109,8 @@ final class LiveKitClient: ObservableObject {
         connectGeneration &+= 1
         let myGeneration = connectGeneration
         isTearingDown = false
+        didDisconnectDuringConnect = false
+        isReconnecting = false
         emptyRoomTask?.cancel()
         emptyRoomTask = nil
         state = .connecting
@@ -133,12 +154,26 @@ final class LiveKitClient: ObservableObject {
             let observer = RoomConnectionObserver(
                 onDisconnect: { [weak self] in
                     Task { @MainActor in
-                        guard let self, !self.isTearingDown, self.state == .connected else { return }
+                        guard let self, !self.isTearingDown else { return }
+                        // CALL-RTC-B : la room est tombée pendant la fenêtre
+                        // `.connecting` (avant que connect() ait pu passer à
+                        // `.connected`, p.ex. aux await toggleMic/toggleCamera).
+                        // La mémoriser pour que connect() termine proprement au lieu
+                        // de forcer `.connected` sur une room morte.
+                        if self.state == .connecting {
+                            self.didDisconnectDuringConnect = true
+                            return
+                        }
+                        guard self.state == .connected else { return }
                         // Déconnexion de LA ROOM (fin distante / chute réseau). Le
                         // départ d'un participant d'un groupe ne termine pas l'appel.
+                        self.isReconnecting = false
                         self.state = .ended
                         self.onRemoteDisconnect?()
                     }
+                },
+                onReconnectingChanged: { [weak self] reconnecting in
+                    Task { @MainActor in self?.setReconnecting(reconnecting) }
                 },
                 onMediaChanged: { [weak self] in
                     Task { @MainActor in self?.refreshRemoteMedia() }
@@ -160,6 +195,21 @@ final class LiveKitClient: ObservableObject {
             }
             if video && !media.isCameraEnabled {
                 await media.toggleCamera()
+            }
+            // CALL-RTC-B : une déconnexion de room (fin distante / chute réseau) a
+            // pu survenir pendant la fenêtre `.connecting` — au retour de
+            // liveRoom.connect() ou aux points de suspension toggleMicrophone/
+            // toggleCamera ci-dessus. onDisconnect l'a alors signalée via
+            // didDisconnectDuringConnect (et la room est retombée à .disconnected).
+            // Marquer `.connected` créerait un « appel fantôme » sur une room morte,
+            // nettoyé seulement par le filet de secours 45 s : terminer proprement
+            // à la place. connectLiveKit() traite tout état != .connected comme un
+            // échec et défait CallKit. (À partir d'ici plus aucun await ne précède
+            // `state = .connected`, la fenêtre est donc close.)
+            if didDisconnectDuringConnect || liveRoom.connectionState == .disconnected {
+                await liveRoom.disconnect()
+                state = .ended
+                return
             }
             self.room = liveRoom
             self.localMedia = media
@@ -220,11 +270,31 @@ final class LiveKitClient: ObservableObject {
             try? session.setActive(false, options: [.notifyOthersOnDeactivation])
         }
         state = .ended
+        isReconnecting = false
         isMicMuted = false
         isCameraOn = false
         canSwitchCamera = false
         canStartPictureInPicture = false
         isPictureInPictureActive = false
+    }
+
+    /// CALL-RTC-C : reflète l'état de reconnexion remonté par LiveKit
+    /// (`didUpdateConnectionState` `.reconnecting`/`.connected`, ou
+    /// `didStart`/`didCompleteReconnectWithMode` que le SDK émet pour le mode
+    /// `quick` — non couvert par `didUpdateConnectionState`). On ne signale une
+    /// reconnexion que pour un appel DÉJÀ établi (`state == .connected`) afin de ne
+    /// pas confondre avec l'établissement initial (`.connecting`, piloté par
+    /// connect()). `state` reste `.connected` : la liaison est rétablie sans
+    /// repasser par `.connecting`, et un échec définitif suit le flux `onDisconnect`
+    /// habituel (didDisconnectWithError).
+    private func setReconnecting(_ reconnecting: Bool) {
+        guard !isTearingDown else { return }
+        if reconnecting {
+            guard state == .connected else { return }
+            isReconnecting = true
+        } else {
+            isReconnecting = false
+        }
     }
 
     // MARK: Interruptions audio
@@ -259,9 +329,13 @@ final class LiveKitClient: ObservableObject {
         switch type {
         case .began:
             // Interruption (appel téléphonique, Siri, alarme) : couper le micro
-            // proprement pour ne pas diffuser pendant la suspension.
+            // proprement pour ne pas diffuser pendant la suspension. On mémorise que
+            // c'est automatique afin de le rétablir à la fin.
             logger.info("Audio session interrupted")
-            if !isMicMuted { toggleMic() }
+            if !isMicMuted {
+                micAutoMutedByInterruption = true
+                toggleMic()
+            }
         case .ended:
             let options = optionsRaw
                 .map(AVAudioSession.InterruptionOptions.init(rawValue:)) ?? []
@@ -270,6 +344,12 @@ final class LiveKitClient: ObservableObject {
             if managesAudioSession, options.contains(.shouldResume) {
                 try? session.setActive(true, options: [])
             }
+            // Rétablir le micro SI c'est nous qui l'avions coupé et qu'il l'est
+            // toujours (l'utilisateur n'y a pas retouché entre-temps).
+            if micAutoMutedByInterruption, isMicMuted {
+                toggleMic()
+            }
+            micAutoMutedByInterruption = false
             logger.info("Audio session interruption ended (resume=\(options.contains(.shouldResume), privacy: .public))")
         @unknown default:
             break
@@ -470,17 +550,35 @@ final class LiveKitClient: ObservableObject {
 /// notifie LiveKitClient via le closure (qui hop sur le MainActor). CALL-RTC-01.
 private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked Sendable {
     private let onDisconnect: @Sendable () -> Void
+    private let onReconnectingChanged: @Sendable (Bool) -> Void
     private let onMediaChanged: @Sendable () -> Void
 
     init(
         onDisconnect: @escaping @Sendable () -> Void,
+        onReconnectingChanged: @escaping @Sendable (Bool) -> Void,
         onMediaChanged: @escaping @Sendable () -> Void
     ) {
         self.onDisconnect = onDisconnect
+        self.onReconnectingChanged = onReconnectingChanged
         self.onMediaChanged = onMediaChanged
         super.init()
     }
     func room(_ room: Room, didDisconnectWithError error: LiveKitError?) { onDisconnect() }
+    // CALL-RTC-C : état de connexion de la room. `.reconnecting`/`.connected`
+    // pilotent l'indicateur de reconnexion ; `.disconnected` est déjà traité par
+    // didDisconnectWithError. `ConnectionState` est Sendable, on n'en dérive qu'un
+    // Bool avant le hop MainActor côté LiveKitClient.
+    func room(_ room: Room, didUpdateConnectionState connectionState: ConnectionState, from oldConnectionState: ConnectionState) {
+        switch connectionState {
+        case .reconnecting: onReconnectingChanged(true)
+        case .connected: onReconnectingChanged(false)
+        default: break
+        }
+    }
+    // CALL-RTC-C : le SDK N'émet PAS didUpdateConnectionState pour le mode de
+    // reconnexion `.quick` ; ces deux callbacks couvrent quick ET full.
+    func room(_ room: Room, didStartReconnectWithMode reconnectMode: ReconnectMode) { onReconnectingChanged(true) }
+    func room(_ room: Room, didCompleteReconnectWithMode reconnectMode: ReconnectMode) { onReconnectingChanged(false) }
     func room(_ room: Room, participantDidConnect participant: RemoteParticipant) { onMediaChanged() }
     func room(_ room: Room, participantDidDisconnect participant: RemoteParticipant) { onMediaChanged() }
     func room(_ room: Room, participant: RemoteParticipant, didSubscribeTrack publication: RemoteTrackPublication) { onMediaChanged() }

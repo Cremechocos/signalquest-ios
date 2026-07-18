@@ -54,7 +54,7 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>SignalQuest utilise Face ID pour verrouiller l&apos;app et déverrouiller ta messagerie chiffrée.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>SignalQuest utilise ta position uniquement si tu l&apos;autorises pour placer tes speedtests et contributions sur la carte.</string>
+	<string>SignalQuest utilise ta position, si tu l&apos;autorises, pour placer tes speedtests et contributions sur la carte, suivre un Drive Test (y compris écran verrouillé) et, si tu l&apos;actives, partager ta position en direct avec tes amis.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>SignalQuest utilise le micro uniquement pendant les appels audio ou vidéo que tu démarres ou acceptes.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

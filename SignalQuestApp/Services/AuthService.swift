@@ -271,6 +271,11 @@ final class AuthSessionViewModel: ObservableObject {
                 // Network problem at launch — keep the session and offer a retry
                 // instead of bouncing a logged-in user to the login screen.
                 state = service.hasStoredCredentials() ? .offline : .loggedOut
+            case .http(let status, _, _, _, _) where status >= 500 || status == 429:
+                // Panne / backpressure serveur au lancement : ne pas déconnecter un
+                // utilisateur authentifié (le login échouerait aussi). Proposer un
+                // réessai via l'écran « offline » plutôt que l'écran de login (ROB-03).
+                state = service.hasStoredCredentials() ? .offline : .loggedOut
             default:
                 state = .loggedOut
             }

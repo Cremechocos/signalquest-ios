@@ -128,7 +128,16 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
         try await api.request(APIEndpoint(path: "/api/e2ee/bootstrap"), as: E2EEBootstrapResponse.self)
     }
 
+    /// Plancher défensif d'itérations PBKDF2 accepté au déverrouillage. Très en
+    /// dessous de la valeur canonique partagée (210 000) pour ne jamais rejeter un
+    /// compte légitime, mais rejette un KDF trivialement cassable qu'un backend
+    /// compromis annoncerait (ex. `iterations = 1`) — défense en profondeur (SEC-05).
+    static let minAcceptableKdfIterations = 100_000
+
     func unlock(userId: String, password: String, bootstrapKey: E2EEBootstrapKey) async throws {
+        guard bootstrapKey.kdfIterations >= Self.minAcceptableKdfIterations else {
+            throw E2EEError.invalidKey
+        }
         let privateJwk = try Self.decryptPrivateJWK(
             password: password,
             encryptedPrivateJwkB64: bootstrapKey.encryptedPrivateJwk,

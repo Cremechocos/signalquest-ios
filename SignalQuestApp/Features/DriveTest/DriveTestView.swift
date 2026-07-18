@@ -63,6 +63,10 @@ final class DriveTestViewModel: ObservableObject {
     @Published private(set) var lastResult: SpeedtestRunResult?
     @Published private(set) var statusLabel = "Prêt"
     @Published private(set) var errorMessage: String?
+    /// Vrai quand la localisation est refusée/restreinte : le Drive Test ne peut
+    /// enregistrer ni trace ni couverture. La vue propose alors les Réglages plutôt
+    /// que de lancer une session muette qui n'enregistre rien (UXP-03/F-05).
+    @Published private(set) var locationDenied = false
 
     // Carte / secteur.
     @Published private(set) var antennas: [AntennaSite] = []
@@ -202,6 +206,18 @@ final class DriveTestViewModel: ObservableObject {
     func start() {
         guard !isRunning else { return }
         errorMessage = nil
+        // Un Drive Test sans position n'enregistre ni trace ni couverture : plutôt
+        // que lancer une session muette (statut « Enregistrement… » puis « 0 point »),
+        // on explique et on renvoie vers les Réglages si la localisation est refusée.
+        switch services.location.authorizationStatus {
+        case .denied, .restricted:
+            locationDenied = true
+            statusLabel = "Localisation désactivée"
+            errorMessage = "Le Drive Test a besoin de ta position pour tracer le trajet et la couverture. Active la localisation dans les Réglages, puis relance."
+            return
+        default:
+            locationDenied = false
+        }
         accumulator = ContinuousSessionAccumulator()
         summary = nil
         testCount = 0
@@ -365,6 +381,12 @@ final class DriveTestViewModel: ObservableObject {
         if coveragePoints.count > coveragePointCap {
             coveragePoints.removeFirst(coveragePoints.count - coveragePointCap)
             coverageTrail.removeFirst(coverageTrail.count - coveragePointCap)
+            // Recaler le début de session sur le premier point RESTANT : sinon
+            // startTime restait celui du départ alors que la portion initiale a été
+            // tronquée, produisant un horodatage incohérent (TEL-15).
+            if let firstKept = coveragePoints.first?.timestamp {
+                coverageStartedAtMs = firstKept
+            }
         }
         coveragePointCount = coveragePoints.count
         persistCoverageSnapshot()
@@ -425,7 +447,9 @@ final class DriveTestViewModel: ObservableObject {
             operatorKey: displayedOperatorKey,
             marketCode: market,
             showOnMap: coverageShowOnMap,
-            points: coveragePoints
+            // Coordonnées tronquées (~111 m) avant persistance/envoi : la trace
+            // publiée sur la carte communautaire ne révèle pas le trajet au mètre.
+            points: coveragePoints.map { $0.minimizedCoordinates() }
         )
     }
 
@@ -1027,14 +1051,22 @@ struct DriveTestView: View {
                 if model.displayedOperatorLabel != nil { sectorBanner }
             }
             if let errorMessage = model.errorMessage {
-                Text(errorMessage)
-                    .font(SQFont.body(12.5, .medium))
-                    .foregroundStyle(SQColor.danger)
-                    .padding(.horizontal, SQSpace.sm + 2)
-                    .padding(.vertical, SQSpace.xs + 2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .lineLimit(2)
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    Text(errorMessage)
+                        .font(SQFont.body(12.5, .medium))
+                        .foregroundStyle(SQColor.danger)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(3)
+                    if model.locationDenied, let url = URL(string: UIApplication.openSettingsURLString) {
+                        Link("Ouvrir les Réglages", destination: url)
+                            .font(SQFont.body(12.5, .semibold))
+                            .foregroundStyle(SQColor.brandRed)
+                    }
+                }
+                .padding(.horizontal, SQSpace.sm + 2)
+                .padding(.vertical, SQSpace.xs + 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
             actionButton
         }

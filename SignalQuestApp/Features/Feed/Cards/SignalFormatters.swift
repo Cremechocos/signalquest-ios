@@ -195,6 +195,8 @@ struct CardActionsBar: View {
             Button(action: onFavorite) {
                 Image(systemName: item.favoritedByMe ? "bookmark.fill" : "bookmark")
                     .foregroundStyle(item.favoritedByMe ? SQColor.brandRed : SQColor.labelSecondary)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel(item.favoritedByMe ? "Retirer des favoris" : "Ajouter aux favoris")
             .accessibilityAddTraits(item.favoritedByMe ? .isSelected : [])
@@ -202,6 +204,8 @@ struct CardActionsBar: View {
             Button(action: onShare) {
                 Image(systemName: "paperplane")
                     .foregroundStyle(SQColor.labelSecondary)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel("Partager")
         }
@@ -233,6 +237,7 @@ struct CardActionsBar: View {
         }
         .foregroundStyle(item.likedByMe ? SQColor.like : SQColor.labelSecondary)
         .sqLikePop(trigger: item.likedByMe)
+        .frame(minHeight: 44)
         .contentShape(Rectangle())
         .onTapGesture {
             if showReactionPicker { dismissPicker() } else { onLike() }
@@ -273,6 +278,8 @@ struct CardActionsBar: View {
                 }
             }
             .foregroundStyle(tint)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .accessibilityLabel(label)
         .accessibilityValue(count > 0 ? "\(count)" : "")

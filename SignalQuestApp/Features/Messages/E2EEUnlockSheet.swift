@@ -35,8 +35,8 @@ struct E2EEUnlockSheet: View {
                             .foregroundStyle(SQColor.label)
                             .multilineTextAlignment(.center)
                         Text(needsCreation
-                             ? "Aucune clé E2EE n'existe encore pour ce compte. Choisis un mot de passe : il chiffre ta clé privée et lui seul peut la déverrouiller — ne le perds pas."
-                             : "Ton mot de passe SignalQuest déverrouille la clé de chiffrement en mémoire, le temps de la session.")
+                             ? "Aucune clé de chiffrement de bout en bout n'existe encore pour ce compte. Choisis un mot de passe : il chiffre ta clé privée et lui seul peut la déverrouiller — ne le perds pas."
+                             : "Ton mot de passe déverrouille la clé de chiffrement en mémoire, le temps de la session.")
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
                             .multilineTextAlignment(.center)
@@ -98,7 +98,7 @@ struct E2EEUnlockSheet: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .signalQuestBackground()
-            .navigationTitle("Chiffrement E2EE")
+            .navigationTitle("Messagerie chiffrée")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

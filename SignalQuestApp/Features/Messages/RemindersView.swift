@@ -81,6 +81,8 @@ struct RemindersView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .sqShadowSoft()
+        // Regroupe date + motif + contenu en un seul élément VoiceOver (A11Y-1).
+        .accessibilityElement(children: .combine)
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: SQSpace.xs + 2, leading: SQSpace.lg, bottom: SQSpace.xs + 2, trailing: SQSpace.lg))

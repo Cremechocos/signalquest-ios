@@ -97,6 +97,7 @@ struct NotificationsCenterView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)

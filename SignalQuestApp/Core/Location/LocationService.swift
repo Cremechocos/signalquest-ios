@@ -7,9 +7,18 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     @Published private(set) var lastLocation: CLLocation?
     @Published private(set) var errorMessage: String?
 
+    /// Âge maximal d'un fix réutilisé tel quel par `currentLocation()`. Au-delà,
+    /// on redemande une position fraîche au lieu de renvoyer un cache périmé —
+    /// sinon une app gardée en mémoire géotague les mesures (et les publie sur la
+    /// carte communautaire) à une position quittée depuis longtemps (TEL-01/ROB-04).
+    static let defaultMaxLocationAge: TimeInterval = 60
+
     private let manager: CLLocationManager
     private var locationContinuation: CheckedContinuation<CLLocation?, Never>?
     private var authorizationContinuation: CheckedContinuation<CLAuthorizationStatus, Never>?
+    /// Jeton incrémenté à chaque requête one-shot : un timeout ne doit résoudre
+    /// que SA propre continuation, jamais celle d'un appel plus récent (ROB-13).
+    private var locationRequestGeneration = 0
     /// Suivi continu demandé (drive test) : permet de (re)démarrer le tracking dès
     /// que l'autorisation est accordée, même si l'utilisateur valide le prompt après.
     private var wantsTracking = false
@@ -77,8 +86,16 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         manager.requestLocation()
     }
 
-    func currentLocation(timeoutSeconds: UInt64 = 8) async -> CLLocation? {
-        if let lastLocation { return lastLocation }
+    func currentLocation(
+        timeoutSeconds: UInt64 = 8,
+        maxAge: TimeInterval = LocationService.defaultMaxLocationAge
+    ) async -> CLLocation? {
+        // En suivi continu (drive test), `lastLocation` est rafraîchi en flux : on
+        // peut le renvoyer directement. Hors suivi, on ne le réutilise que s'il est
+        // récent ; périmé, on redemande un fix au lieu de renvoyer une vieille position.
+        if let lastLocation, wantsTracking || lastLocation.timestamp.timeIntervalSinceNow > -maxAge {
+            return lastLocation
+        }
         if authorizationStatus == .notDetermined {
             requestWhenInUse()
             let status = await withCheckedContinuation { continuation in
@@ -100,6 +117,8 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
             return nil
         }
         manager.requestLocation()
+        locationRequestGeneration &+= 1
+        let generation = locationRequestGeneration
         return await withCheckedContinuation { continuation in
             // Idem : résoudre toute continuation de localisation déjà en attente
             // avant d'en installer une nouvelle, pour éviter une fuite/blocage.
@@ -107,7 +126,9 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
             locationContinuation = continuation
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: timeoutSeconds * 1_000_000_000)
-                if locationContinuation != nil {
+                // Ne résoudre que si c'est TOUJOURS notre requête : un appel plus
+                // récent a pu remplacer la continuation entre-temps (ROB-13).
+                if locationRequestGeneration == generation, locationContinuation != nil {
                     locationContinuation?.resume(returning: lastLocation)
                     locationContinuation = nil
                 }

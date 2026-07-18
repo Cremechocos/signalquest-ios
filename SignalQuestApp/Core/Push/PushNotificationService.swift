@@ -151,6 +151,18 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         [.banner, .sound, .badge]
     }
 
+    /// Cible du lien « Réglages de notifications » exposé par iOS grâce à l'option
+    /// `.providesAppNotificationSettings`. Sans cette implémentation, le lien
+    /// n'ouvrait l'app nulle part (UXP-09). On amène l'utilisateur aux Réglages iOS
+    /// de l'app (notifications), point d'action réel.
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            openSettingsFor notification: UNNotification?) {
+        Task { @MainActor in
+            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+            UIApplication.shared.open(url)
+        }
+    }
+
     /// Handles a notification tap. We extract the identifiers off the (non-Sendable)
     /// payload here, then hand only `String?` values to the MainActor router so a
     /// tap reliably deep-links instead of doing nothing.

@@ -189,8 +189,11 @@ private extension KeyedDecodingContainer where Key == CallSession.CodingKeys {
     func decodeLossyParticipants(forKey key: Key) throws -> [String]? {
         guard contains(key) else { return nil }
         if let values = try? decodeIfPresent([[String: String]].self, forKey: key) {
-            return values.compactMap { $0["name"] ?? $0["email"] ?? $0["id"] ?? $0["userId"] }
+            let names = values.compactMap { $0["name"] ?? $0["email"] ?? $0["id"] ?? $0["userId"] }
+            // Renvoyer nil (et non []) en cas d'échec/vide : un [] non-nil stoppait le
+            // repli `?? otherParticipants` et perdait tous les noms (CALL-DEC-A).
+            return names.isEmpty ? nil : names
         }
-        return []
+        return nil
     }
 }

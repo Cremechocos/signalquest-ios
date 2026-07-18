@@ -3,8 +3,12 @@ import PhotosUI
 
 struct EditProfileView: View {
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var session: AuthSessionViewModel
     @Environment(\.dismiss) private var dismiss
     let user: AuthUser
+
+    /// Limite de caractères de la bio, alignée sur une valeur serveur raisonnable.
+    static let bioCharacterLimit = 300
 
     @State private var name: String
     @State private var currentHandle: String
@@ -64,6 +68,18 @@ struct EditProfileView: View {
                         TextField("Bio", text: $bio, axis: .vertical)
                             .lineLimit(2...4)
                             .textFieldStyle(SQTextFieldStyle())
+                            // Limite + compteur côté client (EDITPROFILE-AVATAR-BIO-07) :
+                            // évite qu'une bio trop longue soit rejetée par le serveur
+                            // sans indication.
+                            .onChangeCompat(of: bio) { _, newValue in
+                                if newValue.count > Self.bioCharacterLimit {
+                                    bio = String(newValue.prefix(Self.bioCharacterLimit))
+                                }
+                            }
+                        Text("\(bio.count)/\(Self.bioCharacterLimit)")
+                            .font(SQType.micro)
+                            .foregroundStyle(SQColor.labelTertiary)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
                     }
                     .sqFadeUp()
 
@@ -145,6 +161,14 @@ struct EditProfileView: View {
     private func save() async {
         isBusy = true
         defer { isBusy = false }
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Vider le nom était ignoré en silence (nilIfEmpty → clé omise) : l'action
+        // « réussissait » sans rien changer. On refuse un nom vide explicitement
+        // plutôt que de laisser croire à un enregistrement (EDITPROFILE-NAME-EMPTY-06).
+        guard !trimmedName.isEmpty else {
+            error = "Le nom ne peut pas être vide."
+            return
+        }
         do {
             // Le @handle se choisit/modifie via ChooseHandleSheet (vérif live + cooldown 30 j).
             // Ici on n'enregistre que le nom (partageable) et la bio.
@@ -154,14 +178,23 @@ struct EditProfileView: View {
             let trimmedBio = bio.trimmingCharacters(in: .whitespacesAndNewlines)
             let bioChanged = trimmedBio != loadedBio.trimmingCharacters(in: .whitespacesAndNewlines)
             _ = try await services.users.updateProfile(UserProfilePatch(
-                name: name.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+                name: trimmedName,
                 handle: nil,
                 bio: bioChanged ? trimmedBio : nil,
                 avatarUrl: nil
             ))
-            if let image = avatarPreview, let data = image.jpegData(compressionQuality: 0.85) {
+            if let image = avatarPreview,
+               let original = image.jpegData(compressionQuality: 1),
+               // Redimensionnement de l'avatar (≤512 px) HORS du main thread : une photo
+               // pleine résolution pesait plusieurs Mo à l'upload (EDITPROFILE-AVATAR-BIO-07).
+               let data = await Task.detached(priority: .userInitiated, operation: {
+                   PhotoUploadPreparation.downscaledJPEG(from: original, maxSide: 512, quality: 0.85)
+               }).value {
                 _ = try await services.users.uploadAvatar(data: data, filename: "avatar.jpg", mimeType: "image/jpeg")
             }
+            // Rafraîchir la session : sans ça, l'en-tête du profil gardait l'ancien nom/
+            // avatar jusqu'au relancement de l'app (EDITPROFILE-STALE-03).
+            await session.refreshUser()
             Haptics.success()
             dismiss()
         } catch {

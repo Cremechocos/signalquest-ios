@@ -53,6 +53,14 @@ extension View {
         }
     }
 
+    /// Limite la largeur de lecture et centre le contenu sur les classes de taille
+    /// « regular » (iPad, Split View large) pour éviter des lignes de texte et des
+    /// cartes étirées sur ~1024 pt (« iPhone étiré »). AUCUN effet sur iPhone
+    /// (compact) : sûr à appliquer sur les écrans à contenu texte (UI-01/UXP-04/F-04).
+    func sqReadableWidth(_ maxWidth: CGFloat = 700) -> some View {
+        modifier(SQReadableWidthModifier(maxWidth: maxWidth))
+    }
+
     /// `.presentationBackground(_:)` est iOS 16.4+ ; sur 16.0–16.3, fond de sheet par défaut.
     @ViewBuilder
     func presentationBackgroundCompat<S: ShapeStyle>(_ style: S) -> some View {
@@ -126,6 +134,23 @@ extension UNUserNotificationCenter {
             setBadgeCount(count)
         } else {
             Task { @MainActor in UIApplication.shared.applicationIconBadgeNumber = count }
+        }
+    }
+}
+
+/// Cf. `View.sqReadableWidth(_:)` : cape la largeur de lecture et centre le contenu
+/// sur iPad / Split View large, sans effet sur iPhone (compact).
+private struct SQReadableWidthModifier: ViewModifier {
+    let maxWidth: CGFloat
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    func body(content: Content) -> some View {
+        if horizontalSizeClass == .regular {
+            content
+                .frame(maxWidth: maxWidth)
+                .frame(maxWidth: .infinity)
+        } else {
+            content
         }
     }
 }

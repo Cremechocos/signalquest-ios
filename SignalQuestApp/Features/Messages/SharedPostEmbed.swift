@@ -442,7 +442,7 @@ struct SharedPostEmbedBubble: View {
                 if let down = signal.downloadMbps {
                     return EmbedMeasure(
                         primary: formatMbps(down),
-                        unit: "Mb/s",
+                        unit: "Mbps",
                         tint: SQColor.brandRed,
                         chips: [
                             signal.uploadMbps.map { "↑ \(formatMbps($0))" },
@@ -491,7 +491,7 @@ struct SharedPostEmbedBubble: View {
         if let sp = card.speedtest, let down = sp.downloadMbps {
             return EmbedMeasure(
                 primary: formatMbps(down),
-                unit: "Mb/s",
+                unit: "Mbps",
                 tint: SQColor.brandRed,
                 chips: [
                     sp.uploadMbps.map { "↑ \(formatMbps($0))" },

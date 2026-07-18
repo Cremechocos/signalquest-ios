@@ -326,6 +326,15 @@ struct FeedView: View {
                         ErrorStateView(title: "Feed indisponible", message: error) {
                             Task { await model.load() }
                         }
+                    } else if (model.page?.items.isEmpty ?? true), !model.isLoading {
+                        // État vide explicite : sans lui, un nouveau compte (onglet par
+                        // défaut) voit un écran quasi nu, l'app paraît cassée (INT-01).
+                        EmptyStateView(
+                            title: "Ton fil est encore vide",
+                            message: "Suis des membres, lance un speedtest ou publie ta première mesure : le fil se remplira au fur et à mesure.",
+                            systemImage: "sparkles"
+                        )
+                        .padding(.top, SQSpace.xxl)
                     }
                     ForEach(model.page?.items ?? []) { item in
                         FeedItemCard(
@@ -365,6 +374,7 @@ struct FeedView: View {
             .padding(.horizontal, SQSpace.xl)
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
+            .sqReadableWidth()
         }
         // Directement sur le ScrollView (avant le ZStack de signalQuestBackground).
         .sqDockAutoMinimize()
@@ -736,6 +746,11 @@ private struct PostShareSheet: View {
                         ProgressView()
                     }
                     ForEach(conversations) { conversation in
+                        // Le partage de publication est inséré en CLAIR (aperçu texte,
+                        // auteur, image) côté serveur : on ne le propose donc PAS vers
+                        // une conversation chiffrée, pour ne pas briser la promesse
+                        // E2EE sous un badge « Chiffrée » (SEC-1).
+                        let isE2EE = conversation.e2eeEnabled == true
                         Button {
                             Task { await share(conversation) }
                         } label: {
@@ -745,7 +760,7 @@ private struct PostShareSheet: View {
                                     Text(conversation.displayTitle.isEmpty ? "Conversation" : conversation.displayTitle)
                                         .font(.subheadline.weight(.semibold))
                                         .foregroundStyle(SQColor.label)
-                                    Text(conversation.e2eeEnabled == true ? "Chiffrée" : "Conversation")
+                                    Text(isE2EE ? "Chiffrée · partage indisponible" : "Conversation")
                                         .font(.caption)
                                         .foregroundStyle(SQColor.labelSecondary)
                                 }
@@ -753,13 +768,13 @@ private struct PostShareSheet: View {
                                 if busyConversationId == conversation.id {
                                     ProgressView().tint(SQColor.brandRed)
                                 } else {
-                                    Image(systemName: "paperplane.fill")
-                                        .foregroundStyle(SQColor.brandRed)
+                                    Image(systemName: isE2EE ? "lock.slash" : "paperplane.fill")
+                                        .foregroundStyle(isE2EE ? SQColor.labelTertiary : SQColor.brandRed)
                                         .accessibilityHidden(true)
                                 }
                             }
                         }
-                        .disabled(busyConversationId != nil)
+                        .disabled(busyConversationId != nil || isE2EE)
                     }
                 }
 

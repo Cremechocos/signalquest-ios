@@ -1,6 +1,6 @@
 # SignalQuest iOS
 
-Native SwiftUI skeleton for a social-first SignalQuest companion app. It does not attempt to reproduce Android radio scanning because iOS public APIs do not expose fine cellular metrics such as RSRP, RSRQ, SINR, PCI, Cell ID, eNB/gNB, bands, ARFCN/EARFCN, timing advance, handovers, or neighbor cells.
+Native SwiftUI app (180+ Swift files) for a social-first SignalQuest companion: end-to-end-encrypted (E2EE) messaging, LiveKit real-time calls, a WidgetKit extension with Live Activities, and MapKit-based coverage/antenna maps. It does not attempt to reproduce Android radio scanning because iOS public APIs do not expose fine cellular metrics such as RSRP, RSRQ, SINR, PCI, Cell ID, eNB/gNB, bands, ARFCN/EARFCN, timing advance, handovers, or neighbor cells.
 
 ## Scope
 
@@ -14,7 +14,7 @@ Native SwiftUI skeleton for a social-first SignalQuest companion app. It does no
 This repo uses XcodeGen to keep project generation deterministic.
 
 ```bash
-cd /Users/alexandregermain/Site/signalquest-ios/ios/SignalQuest
+cd /Users/alexandregermain/Site/iOS
 brew install xcodegen
 xcodegen generate
 open SignalQuest.xcodeproj
@@ -23,7 +23,7 @@ open SignalQuest.xcodeproj
 If XcodeGen is already installed:
 
 ```bash
-cd /Users/alexandregermain/Site/signalquest-ios/ios/SignalQuest
+cd /Users/alexandregermain/Site/iOS
 xcodegen generate
 ```
 
@@ -34,7 +34,7 @@ Current Codex environment note: `xcodegen` was not installed, so `SignalQuest.xc
 The local machine has Xcode 26.4.1, Swift 6.3.1, and the iOS 26.4 SDK available. Device types for iPhone 17 Pro and iPhone 16 Pro are available, but `xcrun simctl list runtimes` returned no installed iOS Simulator runtime in this Codex environment. If the runtime is installed later, use:
 
 ```bash
-cd /Users/alexandregermain/Site/signalquest-ios/ios/SignalQuest
+cd /Users/alexandregermain/Site/iOS
 xcodegen generate
 xcodebuild test -scheme SignalQuest -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
@@ -63,14 +63,12 @@ xcrun swiftc -target "$APP_TARGET" -sdk "$APP_SDK" -swift-version 6 -typecheck $
 
 ## Configuration
 
-Default config values:
+Default config values (`Config/Debug.xcconfig` and `Config/Release.xcconfig`):
 
 - `SQ_APP_BASE_URL=https://signalquest.fr`
-- `SQ_API_BASE_URL=https://signalquest.fr`
-- `SQ_SPEEDTEST_BASE_URL=https://speedtest.signalquest.fr`
-- `SQ_SPEEDTEST_DOWNLOAD_URL=https://speedtest.signalquest.fr/download`
+- `SQ_API_BASE_URL=https://api.signalquest.fr`
 
-`Config/Staging.xcconfig` currently points to production because no staging host is defined. Override those values locally when a staging environment exists.
+`Config/Staging.xcconfig` ships safe-by-default placeholder hosts (`app.staging.invalid` / `api.staging.invalid`), not production. A Beta build must override them with the real isolated staging services. The `ci_scripts/validate_build_environment.sh` build phase fails the build when a staging configuration still uses the placeholder hosts or points to a production host.
 
 ## iOS Radio Limits
 
@@ -109,6 +107,6 @@ xcodebuild -exportArchive \
 ## Backend Notes
 
 - Auth uses `auth_token` from `Set-Cookie` and sends it back as `Cookie: auth_token=...`.
-- `/api/social/radio-snapshot` is intentionally not called by default on iOS.
+- `/api/social/radio-snapshot` is called by `LivePresenceService.publishRadio` only while live radio sharing is active (technology/operator only — iOS does not expose raw RSRP); it is not called otherwise.
 - Photo upload uses authenticated multipart `POST /api/photos`; external v1 photo write routes require API key scopes and are not used by the app.
 - E2EE messages never fall back to cleartext in encrypted conversations.

@@ -49,6 +49,7 @@ struct ProfileView: View {
             .padding(.horizontal, SQSpace.xl)
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
+            .sqReadableWidth()
         }
         // Directement sur le ScrollView (avant le ZStack de signalQuestBackground).
         .sqDockAutoMinimize()

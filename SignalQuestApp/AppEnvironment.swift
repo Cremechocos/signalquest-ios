@@ -1,5 +1,15 @@
 import Foundation
 
+/// Journalisation de debug : compilée uniquement hors Release, pour qu'aucun
+/// `print()` (erreurs moteur speedtest, échecs de sauvegarde…) ne s'exécute en
+/// production. Remplace les `print()` bruts des services (cf. audit SEC-09).
+@inline(__always)
+func sqDebugLog(_ message: @autoclosure () -> String) {
+    #if DEBUG
+    print(message())
+    #endif
+}
+
 enum AppEnvironment {
     private static func boolEnvironmentValue(_ key: String) -> Bool {
         let value = ProcessInfo.processInfo.environment[key]?

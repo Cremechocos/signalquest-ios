@@ -119,7 +119,7 @@ struct MessagesView: View {
                 .listRowInsets(cardRowInsets)
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                     Button {
-                        Task { await model.markRead(conversation); await services.refreshInboxBadge() }
+                        Task { await model.markRead(conversation); await services.refreshInboxBadge(force: true) }
                     } label: {
                         Label("Lu", systemImage: "checkmark.message")
                     }
@@ -127,7 +127,7 @@ struct MessagesView: View {
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
-                        Task { await model.leave(conversation); await services.refreshInboxBadge() }
+                        Task { await model.leave(conversation); await services.refreshInboxBadge(force: true) }
                     } label: {
                         Label("Quitter", systemImage: "rectangle.portrait.and.arrow.right")
                     }
@@ -145,12 +145,15 @@ struct MessagesView: View {
             }
 
             if let error = model.errorMessage {
-                Text(error)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.danger)
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(cardRowInsets)
+                // Pattern maison (titre + message + « Réessayer ») au lieu d'une ligne
+                // rouge brute peu visible et sans action de relance (INT-09).
+                ErrorStateView(title: "Messagerie indisponible", message: error) {
+                    Task { await model.load() }
+                }
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(cardRowInsets)
             }
         }
         .listStyle(.plain)
@@ -212,7 +215,12 @@ struct MessagesView: View {
     private func openRoutedConversationIfNeeded() async {
         guard let id = router.openConversationId else { return }
         router.openConversationId = nil
-        if model.conversations.isEmpty { await model.load() }
+        // Recharger si la liste est vide OU si le fil ciblé n'y est pas encore : le
+        // cas fréquent d'une notification pour un NOUVEAU fil (premier message d'un
+        // nouveau contact) échouait sinon en silence (UXP-10).
+        if model.conversations.isEmpty || !model.conversations.contains(where: { $0.id == id }) {
+            await model.load()
+        }
         if model.conversations.contains(where: { $0.id == id }) {
             routedConversationId = id
         }

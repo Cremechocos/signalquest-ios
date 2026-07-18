@@ -1021,6 +1021,11 @@ struct PhotoShareSheet: View {
                             .listRowBackground(SQColor.surface)
                     }
                     ForEach(conversations) { conversation in
+                        // Partage indisponible vers une conversation chiffrée : soit la
+                        // carte de partage passerait en clair (SEC-1), soit l'envoi de
+                        // pièce jointe échouerait en E2EE (UX-3). On désactive plutôt
+                        // qu'échouer après coup sous un badge « Chiffrée ».
+                        let isE2EE = conversation.e2eeEnabled == true
                         Button {
                             Task { await share(conversation) }
                         } label: {
@@ -1034,7 +1039,7 @@ struct PhotoShareSheet: View {
                                     Text(conversation.displayTitle.isEmpty ? "Conversation" : conversation.displayTitle)
                                         .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                                         .foregroundStyle(SQColor.label)
-                                    Text(conversation.e2eeEnabled == true ? "Chiffrée" : "Conversation")
+                                    Text(isE2EE ? "Chiffrée · partage indisponible" : "Conversation")
                                         .font(SQType.caption)
                                         .foregroundStyle(SQColor.labelSecondary)
                                 }
@@ -1042,12 +1047,12 @@ struct PhotoShareSheet: View {
                                 if busyConversationId == conversation.id {
                                     ProgressView().tint(SQColor.brandRed)
                                 } else {
-                                    Image(systemName: "paperplane.fill")
-                                        .foregroundStyle(SQColor.brandRed)
+                                    Image(systemName: isE2EE ? "lock.slash" : "paperplane.fill")
+                                        .foregroundStyle(isE2EE ? SQColor.labelTertiary : SQColor.brandRed)
                                 }
                             }
                         }
-                        .disabled(busyConversationId != nil)
+                        .disabled(busyConversationId != nil || isE2EE)
                         .listRowBackground(SQColor.surface)
                     }
                 } header: {

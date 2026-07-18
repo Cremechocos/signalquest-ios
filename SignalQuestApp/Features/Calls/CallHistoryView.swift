@@ -49,7 +49,7 @@ struct CallHistoryView: View {
                             .background(style.soft, in: Circle())
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(call.participants?.joined(separator: ", ") ?? "Conversation")
+                            Text(call.displayName ?? call.participants?.joined(separator: ", ") ?? "Conversation")
                                 .font(SQFont.body(15, .medium))
                                 .foregroundStyle(style.isMissed ? SQColor.danger : SQColor.label)
                             if let date = call.createdAt {
@@ -73,7 +73,9 @@ struct CallHistoryView: View {
                         Image(systemName: call.mode == "video" ? "video.fill" : "phone.fill")
                             .font(.caption)
                             .foregroundStyle(SQColor.labelTertiary)
-                            .accessibilityHidden(true)
+                            // Le mode (audio/vidéo) n'existait que via cette icône masquée :
+                            // on l'expose à VoiceOver (fusionné dans la ligne, CALL-HIST-C).
+                            .accessibilityLabel(call.mode == "video" ? "Appel vidéo" : "Appel audio")
                     }
                     .listRowBackground(SQColor.surface)
                     .accessibilityElement(children: .combine)

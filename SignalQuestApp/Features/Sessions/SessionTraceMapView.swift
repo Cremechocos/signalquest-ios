@@ -242,7 +242,7 @@ final class SessionSpeedtestAnnotation: NSObject, MKAnnotation {
     }
 
     var title: String? {
-        let down = speedtest.downloadMbps.map { "↓ \(Int($0.rounded())) Mb/s" } ?? "↓ —"
+        let down = speedtest.downloadMbps.map { "↓ \(Int($0.rounded())) Mbps" } ?? "↓ —"
         let up = speedtest.uploadMbps.map { "↑ \(Int($0.rounded()))" } ?? "↑ —"
         return "\(down) · \(up)"
     }

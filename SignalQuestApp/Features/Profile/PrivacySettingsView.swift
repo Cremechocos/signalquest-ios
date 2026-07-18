@@ -32,7 +32,11 @@ final class PrivacySettingsViewModel: ObservableObject {
         }
     }
 
-    func save() async {
+    /// Renvoie `true` si l'enregistrement serveur a réussi. Le caller ne doit
+    /// démarrer la diffusion locale que dans ce cas (sinon on diffuse une position
+    /// dont l'activation n'a pas été persistée — PRIV-SAVE-UNCOND-05).
+    @discardableResult
+    func save() async -> Bool {
         isSaving = true
         errorMessage = nil
         savedConfirmation = false
@@ -50,9 +54,11 @@ final class PrivacySettingsViewModel: ObservableObject {
             apply(try await service.update(patch))
             savedConfirmation = true
             Haptics.success()
+            return true
         } catch {
             errorMessage = error.localizedDescription
             Haptics.error()
+            return false
         }
     }
 
@@ -157,9 +163,9 @@ struct PrivacySettingsView: View {
             Section {
                 GradientButton("Enregistrer", systemImage: "checkmark.circle.fill", isBusy: model.isSaving) {
                     Task {
-                        await model.save()
-                        // Propage immédiatement au diffuseur (démarre/arrête la
-                        // publication sans attendre le prochain rafraîchissement).
+                        // Ne propager au diffuseur QUE si l'enregistrement serveur a
+                        // réussi (PRIV-SAVE-UNCOND-05).
+                        guard await model.save() else { return }
                         services.livePresence.applySharingSettings(
                             shareLocation: model.shareLiveLocationWithFriends,
                             shareRadio: model.shareRadioDataWithFriends

@@ -129,9 +129,26 @@ extension JSONEncoder {
     }()
 }
 
+/// Élément de tableau tolérant : décode `T` ou retombe sur `nil` sans propager
+/// l'erreur, pour ignorer un élément malformé au lieu de casser tout le tableau.
+private struct LossyElement<T: Decodable>: Decodable {
+    let value: T?
+    init(from decoder: Decoder) throws {
+        value = try? decoder.singleValueContainer().decode(T.self)
+    }
+}
+
 extension KeyedDecodingContainer {
     func decodeLossyArray<T: Decodable>(_ type: [T].Type, forKey key: Key) -> [T] {
         (try? decode(type, forKey: key)) ?? []
+    }
+
+    /// Décode un tableau élément par élément, en IGNORANT les éléments invalides
+    /// au lieu de vider tout le tableau (contrairement à `decodeLossyArray` qui est
+    /// tout-ou-rien). Clé absente → tableau vide (ROB-01/ROB-02/T1-9).
+    func decodeLossyElementArray<T: Decodable>(_ type: [T].Type, forKey key: Key) -> [T] {
+        guard let wrapped = try? decode([LossyElement<T>].self, forKey: key) else { return [] }
+        return wrapped.compactMap(\.value)
     }
 
     func decodeFlexibleString(forKey key: Key) -> String? {

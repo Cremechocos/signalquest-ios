@@ -225,10 +225,16 @@ struct AntennaDetails: Decodable {
             bands = antenna.frequencyBands
             sectors = antenna.azimuts.map { Int($0.rounded()) }
             address = antenna.fullAddress
+            // « Hauteur » = hauteur du SUPPORT (pylône/mât) uniquement. Ne plus
+            // retomber sur la hauteur d'ANTENNE (position de l'antenne sur le
+            // support), qui est une grandeur physique différente : les confondre
+            // sous un même label induisait en erreur (TEL-03). nil → « — ».
             height = antenna.siteInfo.supportHeightMeters
-                ?? antenna.siteInfo.antennaHeight5g.map(Double.init)
-                ?? antenna.siteInfo.antennaHeight4g.map(Double.init)
-            validationsCount = decodedSignalStats?.measurementCount
+            // Le chemin « wrapper » n'expose pas de compteur de validations
+            // communautaires distinct : ne PAS le confondre avec le nombre de
+            // mesures (sinon deux tuiles identiques dont « Validations » est fausse,
+            // TEL-01). Laisser nil → la tuile affiche « — ».
+            validationsCount = nil
             photosCount = decodedPhotos.count
             speedtestsCount = decodedSpeedtests.count
             raw = nil

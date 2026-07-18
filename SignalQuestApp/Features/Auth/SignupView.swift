@@ -92,7 +92,12 @@ struct SignupView: View {
                 .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
                 .frame(height: 56)
                 .clipShape(Capsule(style: .continuous))
+                // Même exigence contractuelle que le formulaire e-mail : sans
+                // acceptation des CGU, on ne crée pas de compte (UXP-12).
+                .disabled(!acceptedTerms)
+                .opacity(acceptedTerms ? 1 : 0.5)
                 .accessibilityLabel("S’inscrire avec Apple")
+                .accessibilityHint(acceptedTerms ? "" : "Accepte d’abord les conditions d’utilisation")
                 .sqAuthAppear(appeared, delay: 0.12)
 
                 Button("J'ai déjà un compte") { dismiss() }

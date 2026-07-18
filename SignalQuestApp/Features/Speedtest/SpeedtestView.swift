@@ -246,8 +246,8 @@ struct SpeedtestView: View {
         .sheet(isPresented: $showLocationPriming) {
             LocationPrimingSheet(
                 isDenied: primingDenied,
-                onAllow: { showLocationPriming = false; performRun(requestLocation: true) },
-                onSkip: { showLocationPriming = false; performRun(requestLocation: false) }
+                onAllow: { showLocationPriming = false; dispatchConfiguredRun(requestLocation: true) },
+                onSkip: { showLocationPriming = false; dispatchConfiguredRun(requestLocation: false) }
             )
             .presentationDetents([.medium])
         }
@@ -753,7 +753,9 @@ struct SpeedtestView: View {
     /// hors VPN, sans erreur de sync), sinon simple confirmation de fin.
     private var dialCompletionLabel: String? {
         guard case .finished = phase else { return nil }
-        if errorMessage == nil, mapPublicationEnabled, !isVPNActive {
+        // N'annoncer « publié sur la carte » que si le test a réellement une position
+        // (un test sans coordonnée ne peut PAS être cartographié — TEL-04).
+        if errorMessage == nil, mapPublicationEnabled, !isVPNActive, result?.coordinate != nil {
             return "publié sur la carte ✓"
         }
         return "test terminé ✓"
@@ -825,6 +827,13 @@ struct SpeedtestView: View {
             return
         }
         let requestLocation = !AppEnvironment.runsSpeedtestQA && (!guestMode || mapPublicationEnabled)
+        dispatchConfiguredRun(requestLocation: requestLocation)
+    }
+
+    /// Lance le test dans le mode CONFIGURÉ (simple / rafale ×N / continu). Utilisé
+    /// aussi par les callbacks du priming localisation, qui appelaient auparavant
+    /// `performRun` en dur — ignorant la config rafale/continu au 1er test (UXP-07).
+    private func dispatchConfiguredRun(requestLocation: Bool) {
         if burstCount == Self.continuousBurst {
             performContinuousSession(requestLocation: requestLocation)
         } else if burstCount > 1 {
@@ -1017,7 +1026,10 @@ struct SpeedtestView: View {
             loop: for index in 1...total {
                 burstProgress = (index, total)
                 do {
-                    let measured = try await executeRun(requestLocation: requestLocation && index == 1, runIndex: index, runTotal: total)
+                    // Géolocaliser CHAQUE test de la rafale (pas seulement le 1er) :
+                    // sinon les tests 2..N étaient enregistrés/publiés sans position
+                    // (TEL-06). currentLocation renvoie le fix récent en cache (peu coûteux).
+                    let measured = try await executeRun(requestLocation: requestLocation, runIndex: index, runTotal: total)
                     results.append(measured)
                 } catch is CancellationError {
                     truncatedAt = max(0, index - 1)

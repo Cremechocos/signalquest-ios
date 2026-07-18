@@ -29,7 +29,7 @@ struct ChooseHandleSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    Text("C’est votre identifiant unique (@pseudo) pour être mentionné dans le fil et la messagerie, et il s’affiche sur votre profil. Modifiable une fois tous les 30 jours.")
+                    Text("C’est ton identifiant unique (@pseudo) pour être mentionné dans le fil et la messagerie ; il s’affiche sur ton profil. Modifiable une fois tous les 30 jours.")
                         .font(SQType.body)
                         .foregroundStyle(SQColor.labelSecondary)
                         .sqFadeUp()
