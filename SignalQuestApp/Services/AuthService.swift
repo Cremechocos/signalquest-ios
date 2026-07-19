@@ -300,6 +300,10 @@ final class AuthSessionViewModel: ObservableObject {
     /// 401 concurrentes) voie déjà l'état déconnecté et devienne un no-op (pas de
     /// boucle, pas de POST logout qui re-échouerait).
     private func handleSessionExpired() {
+        // Mode démo / QA : la session est un utilisateur mock SANS vrai token — tout
+        // appel authentifié renvoie 401, ce qui déclencherait à tort une déconnexion.
+        // On ne réagit jamais au signal dans ce mode (parité avec le guard de bootstrap).
+        guard !AppEnvironment.usesDemoData else { return }
         guard case .authenticated = state else { return }
         state = .loggedOut
         infoMessage = "Ta session a expiré. Reconnecte-toi pour continuer."
