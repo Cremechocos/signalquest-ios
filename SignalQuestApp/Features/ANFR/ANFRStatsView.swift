@@ -379,6 +379,22 @@ struct ANFRStatsView: View {
             .padding(.vertical, SQSpace.xs)
             .background(positive ? SQColor.successSoft : SQColor.dangerSoft, in: Capsule(style: .continuous))
             .accessibilityLabel(positive ? "en hausse de \(delta) cette semaine" : "en baisse de \(abs(delta)) cette semaine")
+        } else {
+            // Delta nul MAIS donnée présente (la pastille n'est rendue que pour un
+            // opérateur/total ayant des données) → indicateur NEUTRE « stable »,
+            // distinct de « aucune donnée » (rien). Corrige le cas Free, dont
+            // l'`operational` n'a pas bougé cette semaine et qui paraissait « vide ».
+            HStack(spacing: 3) {
+                Image(systemName: "equal")
+                    .font(.system(size: 10, weight: .semibold))
+                Text("stable")
+                    .font(SQFont.body(12, .semibold))
+            }
+            .foregroundStyle(SQColor.labelSecondary)
+            .padding(.horizontal, SQSpace.sm)
+            .padding(.vertical, SQSpace.xs)
+            .background(SQColor.fill, in: Capsule(style: .continuous))
+            .accessibilityLabel("stable cette semaine")
         }
     }
 
