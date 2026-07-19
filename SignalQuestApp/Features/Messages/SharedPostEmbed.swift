@@ -442,7 +442,7 @@ struct SharedPostEmbedBubble: View {
                 if let down = signal.downloadMbps {
                     return EmbedMeasure(
                         primary: formatMbps(down),
-                        unit: "Mb/s",
+                        unit: "Mbps",
                         tint: SQColor.brandRed,
                         chips: [
                             signal.uploadMbps.map { "↑ \(formatMbps($0))" },
@@ -491,7 +491,7 @@ struct SharedPostEmbedBubble: View {
         if let sp = card.speedtest, let down = sp.downloadMbps {
             return EmbedMeasure(
                 primary: formatMbps(down),
-                unit: "Mb/s",
+                unit: "Mbps",
                 tint: SQColor.brandRed,
                 chips: [
                     sp.uploadMbps.map { "↑ \(formatMbps($0))" },
@@ -516,13 +516,10 @@ struct SharedPostEmbedBubble: View {
         return nil
     }
 
-    /// Seuils qualité RSRP alignés sur Android : ≥−85 vert, ≥−100 ambre, sinon rouge.
+    /// Échelle RSRP canonique unique (SQNetworkColors) — mêmes couleurs que la
+    /// carte et les fiches.
     private func rsrpColor(_ rsrp: Int) -> Color {
-        switch rsrp {
-        case (-85)...: return SQColor.success
-        case (-100)...: return SQColor.warning
-        default: return SQColor.danger
-        }
+        SQNetworkColors.rsrpColor(Double(rsrp))
     }
 
     private func formatMbps(_ value: Double) -> String {

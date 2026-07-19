@@ -19,11 +19,6 @@ enum SQMotion {
         if #available(iOS 17.0, *) { return .bouncy(duration: 0.55, extraBounce: 0.15) }
         return .spring(response: 0.55, dampingFraction: 0.66)
     }
-    static let micro: Animation = .interpolatingSpring(stiffness: 320, damping: 24)
-
-    /// A long, soft transition used for big screen changes (sheet → detail).
-    static let heroSpring: Animation = .interpolatingSpring(stiffness: 220, damping: 26)
-
     // Durées Material-expressive de la DA web (globals.css --motion-*).
     /// Micro-interactions : hover, pressed, toggles (web 160 ms).
     static let fast: Animation = .easeOut(duration: 0.16)
@@ -48,27 +43,6 @@ enum SQMotion {
 }
 
 extension View {
-    /// Mark this view as a transition source for a matched zoom effect, when
-    /// the SwiftUI / iOS version supports it. Falls back to a no-op below 18.
-    @ViewBuilder
-    func sqMatchedTransitionSource(id: some Hashable, in namespace: Namespace.ID) -> some View {
-        if #available(iOS 18.0, *) {
-            self.matchedTransitionSource(id: id, in: namespace)
-        } else {
-            self
-        }
-    }
-
-    /// Apply a zoom navigation transition for the given source, when available.
-    @ViewBuilder
-    func sqZoomNavigationTransition(id: some Hashable, in namespace: Namespace.ID) -> some View {
-        if #available(iOS 18.0, *) {
-            self.navigationTransition(.zoom(sourceID: id, in: namespace))
-        } else {
-            self
-        }
-    }
-
     /// Animation that is automatically suppressed when Reduce Motion is enabled.
     /// Prefer this over `.animation(_:value:)` so motion honours accessibility.
     func sqAnimation<V: Equatable>(_ animation: Animation, value: V) -> some View {

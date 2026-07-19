@@ -8,6 +8,33 @@ struct LeaderboardResult: Codable, Equatable {
     let myRank: LeaderboardMyRank?
     let generatedAt: Date?
     let requestId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case category, period, scope, entries, myRank, generatedAt, requestId
+    }
+
+    init(category: String, period: String, scope: String, entries: [LeaderboardEntry], myRank: LeaderboardMyRank?, generatedAt: Date?, requestId: String?) {
+        self.category = category
+        self.period = period
+        self.scope = scope
+        self.entries = entries
+        self.myRank = myRank
+        self.generatedAt = generatedAt
+        self.requestId = requestId
+    }
+
+    // Décodage défensif aligné sur le classement « points » : une entrée malformée
+    // ou une date non parsable ne doit pas faire échouer TOUT le classement (ROB-05).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        category = c.decodeFlexibleString(forKey: .category) ?? "download"
+        period = c.decodeFlexibleString(forKey: .period) ?? "all"
+        scope = c.decodeFlexibleString(forKey: .scope) ?? "global"
+        entries = c.decodeLossyElementArray([LeaderboardEntry].self, forKey: .entries)
+        myRank = try? c.decodeIfPresent(LeaderboardMyRank.self, forKey: .myRank)
+        generatedAt = try? c.decodeIfPresent(Date.self, forKey: .generatedAt)
+        requestId = try? c.decodeIfPresent(String.self, forKey: .requestId)
+    }
 }
 
 struct LeaderboardEntry: Codable, Identifiable, Equatable {

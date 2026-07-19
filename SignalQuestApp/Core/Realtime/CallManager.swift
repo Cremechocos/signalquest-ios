@@ -734,10 +734,13 @@ extension CallManager: PKPushRegistryDelegate {
         let uuid = callId.map(CallLifecyclePolicy.callKitUUID(callId:))
             ?? CallManager.string(dict, "uuid", "callUuid").flatMap(UUID.init(uuidString:))
             ?? UUID()
-        // CallKit requires reporting the incoming call before `completion` runs;
-        // the provider delivers on the main queue so we report synchronously.
+        // CallKit exige de rapporter l'appel entrant DANS LE MÊME run loop, avant que
+        // `completion` ne s'exécute — sinon iOS termine l'app et finit par cesser de
+        // livrer les pushes VoIP. Le registre est créé avec `queue: .main` (l.132) et
+        // ce delegate est `nonisolated` : on est donc déjà sur le MainActor, on rapporte
+        // SYNCHRONEMENT via `assumeIsolated` au lieu d'un `Task` différé (ROB-06).
         let completionBox = UnsafeMainActorBox(value: completion)
-        Task { @MainActor in
+        MainActor.assumeIsolated {
             guard let callId else {
                 self.reportInvalidIncomingPush(uuid: uuid, handle: handle, hasVideo: hasVideo, completion: completionBox.value)
                 return

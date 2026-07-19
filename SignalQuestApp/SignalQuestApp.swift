@@ -127,7 +127,12 @@ struct SignalQuestApp: App {
                 }
                 .fullScreenCover(isPresented: Binding(
                     get: { !hasCompletedOnboarding },
-                    set: { presented in if !presented { hasCompletedOnboarding = true } }
+                    // Ne PAS marquer l'onboarding « vu » sur une simple fermeture du
+                    // cover : une dismissal système ou un cover concurrent (appel
+                    // entrant au 1er lancement) le complétait sans que l'utilisateur
+                    // l'ait parcouru (UXP-06). Seul `onFinish` valide la complétion ;
+                    // sinon le cover se re-présente.
+                    set: { _ in }
                 )) {
                     OnboardingView { hasCompletedOnboarding = true }
                 }
@@ -227,24 +232,19 @@ struct OfflineRetryView: View {
                     .font(.system(size: 52))
                     .foregroundStyle(SQColor.brandOrange)
                 Text("Connexion indisponible")
-                    .font(.title3.weight(.semibold))
+                    .font(SQType.title)
                     .foregroundStyle(SQColor.label)
                 Text("Impossible de joindre SignalQuest. Vérifie ta connexion puis réessaie.")
-                    .font(.subheadline)
+                    .font(SQType.body)
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)
-                Button {
+                // Système typographique + bouton DA (capsule 56 pt) comme le reste de
+                // l'app, au lieu d'un .borderedProminent système détonnant (UI-13).
+                GradientButton("Réessayer", systemImage: "arrow.clockwise") {
                     Task { await session.retryBootstrap() }
-                } label: {
-                    Text("Réessayer")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, SQSpace.sm + 2)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(SQColor.brandOrange)
                 Button("Se déconnecter") { Task { await session.logout() } }
-                    .font(.subheadline)
+                    .font(SQType.body)
                     .tint(SQColor.labelSecondary)
             }
             .padding(SQSpace.xxl)

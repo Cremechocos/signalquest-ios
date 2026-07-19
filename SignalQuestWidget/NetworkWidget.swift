@@ -32,7 +32,9 @@ struct NetworkGlanceProvider: TimelineProvider {
 
 struct NetworkWidgetEntryView: View {
     var entry: NetworkGlanceEntry
-    private let brandRed = Color(red: 0.89, green: 0.0, blue: 0.10)
+    // DA « Crème & Terre cuite » : brique (#B04A3C), pas l'ancien rouge vif #E30019.
+    // La cible widget n'a pas accès à SQColor → valeur codée en dur (UI-07).
+    private let brandRed = Color(red: 0.69, green: 0.29, blue: 0.235)
 
     private var distanceText: String? {
         guard let d = entry.glance?.nearestDistanceMeters else { return nil }
@@ -72,6 +74,14 @@ struct NetworkWidgetEntryView: View {
                 Label("Antenne à \(distanceText)", systemImage: "mappin.and.ellipse")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            // Horodatage relatif : ne pas présenter comme « actuelles » des données
+            // qui peuvent dater d'un Drive Test d'il y a des jours (TEL-09/F-09).
+            if let date = g?.date {
+                Text(date, style: .relative)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
                     .lineLimit(1)
             }
         }

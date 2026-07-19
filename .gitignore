@@ -41,5 +41,8 @@ output/
 .env.local
 
 # Identifiants de comptes de test — NE JAMAIS committer (rotation backend requise)
-TestArtifacts/.test-account-credentials
-TestArtifacts/.test-account-b-credentials
+# Artefacts de QA/interop locaux : captures de mocks + harnais E2EE (contient du
+# matériel de test sensible). Ne doivent jamais être suivis dans un repo public.
+# ⚠️ Rotation de la clé de test exposée + purge de l'historique restent à faire
+# séparément (git filter-repo / BFG) — cf. plan T0-6.
+TestArtifacts/

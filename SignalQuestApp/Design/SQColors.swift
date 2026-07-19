@@ -7,8 +7,6 @@ enum SQColor {
     // MARK: Brand
     /// Brique signature de la DA « Crème & Terre cuite ». Accent primaire unique.
     static let brandRed = Color("BrandRed")
-    /// Brique foncée pour les états pressés/hover.
-    static let brandRedDeep = Color("BrandRedDeep")
     /// Alias rétro-compat : l'ancien orange/rose pointe désormais sur le rouge,
     /// pour ne pas casser les vues existantes pendant le réalignement.
     static let brandOrange = Color("BrandOrange")
@@ -18,11 +16,8 @@ enum SQColor {
 
     // MARK: Surfaces
     static let bg = Color("BackgroundPrimary")
-    static let bgSecondary = Color("BackgroundSecondary")
     static let surface = Color("SurfaceElevated")
     static let surfaceMuted = Color("SurfaceMuted")
-    /// Cartes au-dessus d'une surface déjà élevée (web --card-elevated).
-    static let surfaceRaised = Color("SurfaceRaised")
 
     // MARK: Labels
     static let label = Color("LabelPrimary")
@@ -80,9 +75,10 @@ enum SQColor {
     static let dockBackground = dynamicTint(
         light: (0xFB, 0xF7, 0xEF, 0.95), dark: (0x26, 0x20, 0x19, 0.94)
     )
-    /// Items inactifs du dock : bruns discrets.
+    /// Items inactifs du dock : bruns discrets. Clair assombri à #8D7E68 (3,7:1 sur
+    /// le fond du dock) pour rester lisible en basse vision / plein soleil (A11Y-10).
     static let dockInactive = dynamicTint(
-        light: (0xA6, 0x94, 0x7A, 1.0), dark: (0x8A, 0x7A, 0x61, 1.0)
+        light: (0x8D, 0x7E, 0x68, 1.0), dark: (0x8A, 0x7A, 0x61, 1.0)
     )
 
     // MARK: Ombres (encre chaude en clair, noir en sombre)

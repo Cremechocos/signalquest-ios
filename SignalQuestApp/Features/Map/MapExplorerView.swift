@@ -2,6 +2,29 @@ import SwiftUI
 import MapKit
 import ImageIO
 
+/// Un lieu géocodé (ville / adresse / POI) via `MKLocalSearch`, unifié avec les
+/// antennes dans les résultats de recherche de la carte.
+struct PlaceResult: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let subtitle: String?
+    let latitude: Double
+    let longitude: Double
+}
+
+/// Résultat de recherche unifié : une antenne/site OU un lieu (ville/adresse).
+enum MapSearchResult: Identifiable, Equatable {
+    case antenna(AntennaSite)
+    case place(PlaceResult)
+
+    var id: String {
+        switch self {
+        case .antenna(let site): return "antenna-\(site.id)"
+        case .place(let place): return place.id
+        }
+    }
+}
+
 @MainActor
 final class MapExplorerViewModel: ObservableObject {
     @Published var snapshot: SocialMapSnapshot = .empty
@@ -28,6 +51,10 @@ final class MapExplorerViewModel: ObservableObject {
     /// O(1) pour reconstruire le cache d'annotations de la vue uniquement quand
     /// les données changent — et non à chaque invalidation de `body`.
     @Published private(set) var dataVersion = 0
+    /// Signal SÉPARÉ des instantanés d'amis temps réel (SSE), distinct de
+    /// `dataVersion` : à chaque tick la vue ne reconstruit QUE la couche amis
+    /// (PERF-MAP-05) au lieu de recalculer antennes / speedtests / couverture.
+    @Published private(set) var friendsVersion = 0
     @Published var isLoading = false
     @Published var errorMessage: String?
     // Marché + opérateur initiaux : dernier choix persisté, sinon le pays de la
@@ -47,7 +74,11 @@ final class MapExplorerViewModel: ObservableObject {
     @Published var speedtestDays = 0
     @Published var coverageDays = 0
     @Published var searchQuery: String = ""
-    @Published var searchResults: [AntennaSite] = []
+    @Published var searchResults: [MapSearchResult] = []
+    /// Recherche en cours (spinner de la barre) — distinct du chargement des tuiles.
+    @Published var isSearching = false
+    /// Dernière recherche en échec (réseau/géocodage) → message distinct de « aucun résultat ».
+    @Published var searchFailed = false
     /// Marchés sélectionnables du registre (picker manuel).
     @Published var registryMarkets: [MarketRegistryEntry] = []
     /// Entrée du registre correspondant au marché courant.
@@ -61,6 +92,10 @@ final class MapExplorerViewModel: ObservableObject {
 
     private var marketDetectionTask: Task<Void, Never>?
     private var noticeTask: Task<Void, Never>?
+    /// Recherche courante (annulée à chaque nouvelle frappe → pas de résultat obsolète).
+    private var searchTask: Task<Void, Never>?
+    /// Dernier centre caméra connu — biais de proximité de la recherche de lieux.
+    private var lastCenter: CLLocationCoordinate2D?
     /// Code détecté au passage précédent : un switch auto exige deux
     /// détections consécutives du même marché.
     private var pendingAutoMarketCode: String?
@@ -324,6 +359,7 @@ final class MapExplorerViewModel: ObservableObject {
     /// Appelé à chaque fin de déplacement caméra. Debounce 600 ms puis
     /// résolution du marché sous le centre de la carte.
     func scheduleMarketDetection(center: CLLocationCoordinate2D) {
+        lastCenter = center   // biais de proximité pour la recherche de lieux (MKLocalSearch)
         MessageSyncLog.logger.debug("market detect schedule lat=\(center.latitude, privacy: .private) lng=\(center.longitude, privacy: .private)")
         marketDetectionTask?.cancel()
         marketDetectionTask = Task { [weak self] in
@@ -471,51 +507,72 @@ final class MapExplorerViewModel: ObservableObject {
             do { return (try await svc.snapshot(bounds: bounds, zoom: zoom, lightweight: snapshotLightweight), nil) }
             catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
-        // tiles non-nil → tuiles disponibles ; tiles nil → repli sur la liste bbox.
-        async let antennaRaw: (tiles: [AndroidAntennaTileResponse]?, list: [AntennaSite]) = {
-            guard wantsAntenna else { return (nil, []) }
+        // tiles non-nil → tuiles disponibles ; list non-nil → repli sur la liste bbox.
+        // ROB-08 : `tiles`/`list` nil AVEC `error` non-nil ⇒ échec réseau réel (la
+        // couche précédente sera conservée + toast) ; nil SANS error ⇒ annulation
+        // (couche conservée, sans toast). Le repli tuiles→liste reste silencieux
+        // (best-effort) ; seul l'échec TERMINAL (liste indisponible) est signalé.
+        async let antennaRaw: (tiles: [AndroidAntennaTileResponse]?, list: [AntennaSite]?, error: String?) = {
+            guard wantsAntenna else { return (nil, [], nil) }
             let usesAdvancedAntennaFilters = !techs.isEmpty || !bands.isEmpty || !sharing.isEmpty
             if !usesAdvancedAntennaFilters,
                let tiles = try? await svc.antennaTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, withAzimuth: true, bands: bands) {
-                return (tiles, [])
+                return (tiles, nil, nil)
             }
-            let list = (try? await antennasSvc.list(bbox: bounds.asBoundingBox, market: market, operatorName: op, technologies: techs, bands: bands, sharing: sharing)) ?? []
-            return (nil, list)
+            do {
+                let list = try await antennasSvc.list(bbox: bounds.asBoundingBox, market: market, operatorName: op, technologies: techs, bands: bands, sharing: sharing)
+                return (nil, list, nil)
+            } catch {
+                return (nil, nil, error.isCancellation ? nil : error.localizedDescription)
+            }
         }()
-        async let communityRaw: [AndroidCommunitySiteTileResponse] = {
-            guard wantsCommunitySites else { return [] }
-            return (try? await svc.communitySiteTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, includeObserved: includeObserved, bands: bands)) ?? []
+        async let communityRaw: (value: [AndroidCommunitySiteTileResponse]?, error: String?) = {
+            guard wantsCommunitySites else { return ([], nil) }
+            do { return (try await svc.communitySiteTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, includeObserved: includeObserved, bands: bands), nil) }
+            catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
-        async let speedtestRaw: [AndroidSpeedtestTileResponse] = {
-            guard wantsSpeedtest else { return [] }
-            return (try? await svc.speedtestTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: stDays, bands: bands, maxAge: nil)) ?? []
+        async let speedtestRaw: (value: [AndroidSpeedtestTileResponse]?, error: String?) = {
+            guard wantsSpeedtest else { return ([], nil) }
+            do { return (try await svc.speedtestTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: stDays, bands: bands, maxAge: nil), nil) }
+            catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
         // Prévisionnels & pannes : respectent le filtre opérateur de la carte
         // (l'opérateur sélectionné `op`, ou ALL quand « Tous » est choisi). Le
         // backend FR accepte ALL comme un opérateur précis.
-        async let plannedRaw: [PlannedSiteLive] = {
-            guard wantsPlanned else { return [] }
-            return ((try? await svc.plannedSites(market: market, operatorName: op, territory: territory, bands: bands)) ?? []).filter { bounds.contains(lat: $0.lat, lon: $0.lon) }
+        async let plannedRaw: (value: [PlannedSiteLive]?, error: String?) = {
+            guard wantsPlanned else { return ([], nil) }
+            do {
+                let sites = try await svc.plannedSites(market: market, operatorName: op, territory: territory, bands: bands)
+                return (sites.filter { bounds.contains(lat: $0.lat, lon: $0.lon) }, nil)
+            } catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
-        async let outageRaw: [OutageSiteLive] = {
-            guard wantsOutage else { return [] }
-            return ((try? await svc.outageSites(market: market, operatorName: op, territory: territory, bands: bands)) ?? []).filter { bounds.contains(lat: $0.lat, lon: $0.lon) }
+        async let outageRaw: (value: [OutageSiteLive]?, error: String?) = {
+            guard wantsOutage else { return ([], nil) }
+            do {
+                let sites = try await svc.outageSites(market: market, operatorName: op, territory: territory, bands: bands)
+                return (sites.filter { bounds.contains(lat: $0.lat, lon: $0.lon) }, nil)
+            } catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
-        async let coverageRaw: (tiles: [AndroidCoverageTileResponse], heat: [CoverageHeatPoint]) = {
-            guard wantsCoverage else { return ([], []) }
+        async let coverageRaw: (value: (tiles: [AndroidCoverageTileResponse], heat: [CoverageHeatPoint])?, error: String?) = {
+            guard wantsCoverage else { return (([], []), nil) }
             let tiles = (try? await svc.coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: covDays, bands: bands, maxAge: nil)) ?? []
             if tiles.isEmpty {
-                let points = (try? await svc.coveragePoints(bounds: bounds, market: market, operatorName: op, technology: techs.sorted().first, bands: bands)) ?? []
-                return ([], points)
+                // Repli points bruts : source TERMINALE de la couche → son échec est
+                // signalé (couche conservée) au lieu d'être avalé en « vide ».
+                do {
+                    let points = try await svc.coveragePoints(bounds: bounds, market: market, operatorName: op, technology: techs.sorted().first, bands: bands)
+                    return (([], points), nil)
+                } catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
             }
-            return (tiles, [])
+            return ((tiles, []), nil)
         }()
-        async let photosRaw: [MapPublicPhoto] = {
-            guard wantsPhoto else { return [] }
+        async let photosRaw: (value: [MapPublicPhoto]?, error: String?) = {
+            guard wantsPhoto else { return ([], nil) }
             // Couche communautaire : on veut TOUTES les photos des membres, quel que
             // soit le filtre opérateur des antennes → opérateur forcé à "ALL". Seul le
             // mode « Amis » restreint l'ensemble.
-            return (try? await svc.publicPhotos(bounds: bounds, zoom: zoom, market: market, operatorName: "ALL", friendsOnly: photosFriendsOnly)) ?? []
+            do { return (try await svc.publicPhotos(bounds: bounds, zoom: zoom, market: market, operatorName: "ALL", friendsOnly: photosFriendsOnly), nil) }
+            catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
 
         // --- On attend TOUS les résultats AVANT d'assigner ---
@@ -533,11 +590,18 @@ final class MapExplorerViewModel: ObservableObject {
         // une erreur « Requête annulée ». (Régression du chargement parallèle.)
         if Task.isCancelled { return }
 
+        // ROB-08 : agrège les échecs RÉELS de couche. Chaque assignation ci-dessous
+        // est gardée — une couche qui échoue CONSERVE ses données précédentes et
+        // alimente ce message ; une couche « chargée mais vide » écrase normalement
+        // (état vide légitime). Publié en fin de `load` via le toast d'erreur existant.
+        var layerError: String?
+
         if let value = snap.snapshot {
             snapshot = value
         } else if let error = snap.error {
-            errorMessage = error
-            snapshot = .empty
+            // Snapshot indisponible : on conserve le précédent (validations / sessions
+            // / amorçage amis déjà affichés) plutôt que de tout vider en « aucune donnée ».
+            layerError = error
         }
         // QA (DEBUG) : injecte de vraies photos publiques géolocalisées pour
         // vérifier le rendu des vignettes + le viewer.
@@ -548,23 +612,41 @@ final class MapExplorerViewModel: ObservableObject {
         if let tiles = antenna.tiles {
             antennaClusters = tiles.flatMap(\.clusters)
             antennas = Self.antennas(from: tiles).filter(\.hasValidCoordinate)
-        } else {
+        } else if let list = antenna.list {
             antennaClusters = []
-            antennas = antenna.list.filter(\.hasValidCoordinate)
+            antennas = list.filter(\.hasValidCoordinate)
+        } else if let error = antenna.error {
+            // Échec réseau : on garde les antennes/clusters déjà affichés.
+            layerError = layerError ?? error
         }
 
-        communitySiteTiles = community
-        speedtestTiles = speedtest
-        plannedSites = planned
-        outages = outage
-        coverageTiles = coverage.tiles
-        coverageHeat = coverage.heat
+        if let value = community.value { communitySiteTiles = value }
+        else if let error = community.error { layerError = layerError ?? error }
+
+        if let value = speedtest.value { speedtestTiles = value }
+        else if let error = speedtest.error { layerError = layerError ?? error }
+
+        if let value = planned.value { plannedSites = value }
+        else if let error = planned.error { layerError = layerError ?? error }
+
+        if let value = outage.value { outages = value }
+        else if let error = outage.error { layerError = layerError ?? error }
+
+        if let value = coverage.value {
+            coverageTiles = value.tiles
+            coverageHeat = value.heat
+        } else if let error = coverage.error {
+            layerError = layerError ?? error
+        }
         // QA (DEBUG) : injecte des photos publiques de démo pour visualiser la
         // couche (le compte de test n'a pas forcément de photos géolocalisées).
         if ProcessInfo.processInfo.arguments.contains("--qa-demo-photos") {
             publicPhotos = Self.demoPublicPhotos(around: bounds)
-        } else {
-            publicPhotos = photos
+        } else if let value = photos.value {
+            publicPhotos = value
+        } else if let error = photos.error {
+            // Échec réseau : on garde les photos déjà affichées.
+            layerError = layerError ?? error
         }
         // Amorçage des amis vivants depuis le snapshot borné tant que le flux
         // temps réel n'a rien livré (fallback si le SSE est indisponible).
@@ -575,6 +657,9 @@ final class MapExplorerViewModel: ObservableObject {
         if ProcessInfo.processInfo.arguments.contains("--qa-demo-friends") {
             liveFriends = Self.demoFriends(around: bounds)
         }
+        // ROB-08 : nil si tout a réussi (errorMessage déjà remis à nil en début de
+        // `load`) ; sinon signale l'indisponibilité sans avoir écrasé les couches.
+        errorMessage = layerError
         dataVersion &+= 1
     }
 
@@ -582,9 +667,13 @@ final class MapExplorerViewModel: ObservableObject {
     /// l'amorçage borné : `load()` cesse ensuite de réécrire `liveFriends`.
     func applyLiveFriends(_ friends: [SocialFriendLive]) {
         friendsFromStream = true
+        // PERF-MAP-05 : garde de diff — un tick identique (ami immobile, même
+        // présence/radio) ne déclenche AUCUN travail de rendu.
         guard friends != liveFriends else { return }
         liveFriends = friends
-        dataVersion &+= 1
+        // Ne bumpe PAS `dataVersion` (qui reconstruirait TOUTES les couches) : seul
+        // `friendsVersion` → la vue ne rafraîchit que la couche amis (PERF-MAP-05).
+        friendsVersion &+= 1
     }
 
     /// Photos publiques de démonstration (QA) réparties autour du viewport.
@@ -645,13 +734,77 @@ final class MapExplorerViewModel: ObservableObject {
         }
     }
 
+    /// Recherche à la frappe : anti-rebond ~300 ms + annulation de la précédente.
+    /// Appelée depuis `.onChange(searchQuery)`.
+    func scheduleSearch() {
+        searchTask?.cancel()
+        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else {
+            searchResults = []; isSearching = false; searchFailed = false
+            return
+        }
+        searchTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.performSearch(q)
+        }
+    }
+
+    /// Recherche immédiate (touche Entrée) : annule tout anti-rebond en cours.
     func search() async {
+        searchTask?.cancel()
         let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { searchResults = []; return }
-        do {
-            searchResults = try await antennasService.quickSearch(query: q)
-        } catch {
-            searchResults = []
+        await performSearch(q)
+    }
+
+    /// Exécute la recherche : antennes (backend) ET lieux (ville/adresse via
+    /// MKLocalSearch, Apple) EN PARALLÈLE, puis fusionne. Annulable.
+    private func performSearch(_ q: String) async {
+        isSearching = true
+        searchFailed = false
+        async let antennasResult = (try? await antennasService.quickSearch(query: q)) ?? []
+        async let placesResult = geocodePlaces(q)
+        let antennas = await antennasResult
+        let places = await placesResult
+        guard !Task.isCancelled, searchQuery.trimmingCharacters(in: .whitespacesAndNewlines) == q else { return }
+        let merged = Self.mergeSearchResults(places: places, antennas: antennas)
+        searchResults = merged
+        searchFailed = merged.isEmpty && !q.isEmpty
+        isSearching = false
+    }
+
+    /// Fusionne lieux (ville/adresse) et antennes : **lieux d'abord** (l'intention
+    /// « ville/adresse » prime), jusqu'à 4, puis les antennes ; plafonné à 8. Pur et
+    /// testable.
+    static func mergeSearchResults(places: [PlaceResult], antennas: [AntennaSite]) -> [MapSearchResult] {
+        Array((places.prefix(4).map { MapSearchResult.place($0) }
+            + antennas.map { MapSearchResult.antenna($0) }).prefix(8))
+    }
+
+    /// Géocodage ville / adresse / POI via MapKit (moteur carte unique). Biaisé vers
+    /// la région courante de la carte. Ne jette jamais (échec → liste vide).
+    private func geocodePlaces(_ q: String) async -> [PlaceResult] {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = q
+        if let center = lastCenter {
+            request.region = MKCoordinateRegion(
+                center: center,
+                span: MKCoordinateSpan(latitudeDelta: 2, longitudeDelta: 2)
+            )
+        }
+        guard let response = try? await MKLocalSearch(request: request).start() else { return [] }
+        return response.mapItems.prefix(6).compactMap { item -> PlaceResult? in
+            let coord = item.placemark.coordinate
+            guard CLLocationCoordinate2DIsValid(coord), !(coord.latitude == 0 && coord.longitude == 0) else { return nil }
+            let name = item.name ?? item.placemark.title ?? q
+            return PlaceResult(
+                id: "place-\(coord.latitude)-\(coord.longitude)-\(name)",
+                name: name,
+                subtitle: item.placemark.title == name ? nil : item.placemark.title,
+                latitude: coord.latitude,
+                longitude: coord.longitude
+            )
         }
     }
 
@@ -748,6 +901,18 @@ private struct MapAnnotationPayload: Identifiable, Equatable {
     /// Données d'un ami vivant (couche Amis) : pilote le rendu « Find My ».
     var friend: FriendAnnotationInfo? = nil
 
+    /// Étiquette VoiceOver du marqueur : sans elle, antennes/clusters/speedtests/
+    /// amis/photos sont des éléments anonymes non lisibles (A11Y-03/T1-6).
+    var accessibilityLabel: String {
+        if let count = clusterCount, count > 1 {
+            return "Groupe de \(count) éléments. \(title)"
+        }
+        var parts = [title]
+        if !subtitle.isEmpty { parts.append(subtitle) }
+        if let metric, !metric.isEmpty { parts.append(metric) }
+        return parts.joined(separator: ", ")
+    }
+
     static func == (lhs: MapAnnotationPayload, rhs: MapAnnotationPayload) -> Bool {
         lhs.id == rhs.id &&
         lhs.kind == rhs.kind &&
@@ -834,6 +999,13 @@ private struct CoverageHeatFeature: Equatable {
     let colorHex: UInt32
     /// Opacité réduite pour les bandes « inconnu » (RSRP) / « aucun » (génération).
     let dimmed: Bool
+    /// Rang de génération (5..2, 0 = aucun/RSRP) — pilote le z-order en mode « par
+    /// génération » : les features de rang supérieur sont dessinées EN DERNIER (au
+    /// -dessus), donc un vrai 5G n'est jamais recouvert par une 4G chevauchante. Vaut
+    /// 0 en mode RSRP (le tri est alors neutralisé). Défaut `0` → l'init memberwise
+    /// reste rétro-compatible ; volontairement absent de `==` (covariant de `colorHex`
+    /// en mode génération, comme `dimmed` déjà omis).
+    var generationRank: Int = 0
 
     static func == (lhs: CoverageHeatFeature, rhs: CoverageHeatFeature) -> Bool {
         lhs.id == rhs.id &&
@@ -885,19 +1057,6 @@ enum CoverageQualityBand: String, CaseIterable, Identifiable {
         case .weak: return "Faible"
         case .poor: return "Très faible"
         case .unknown: return "Inconnu"
-        }
-    }
-
-    /// Intervalle RSRP explicite (dBm) — l'unité est rappelée une fois dans le titre
-    /// de la légende (TEL-MAP-01 : un seul nombre par bande était ambigu).
-    var rangeLabel: String {
-        switch self {
-        case .excellent: return "≥ -80"
-        case .good: return "-90 à -80"
-        case .fair: return "-100 à -90"
-        case .weak: return "-110 à -100"
-        case .poor: return "< -110"
-        case .unknown: return "n/a"
         }
     }
 
@@ -1416,6 +1575,8 @@ struct MapExplorerView: View {
         }
         // Données rechargées → reconstruit le cache des couches une seule fois.
         .onChangeCompat(of: model.dataVersion) { _, _ in refreshMapRender() }
+        // Tick SSE amis → ne reconstruit QUE la couche amis (PERF-MAP-05).
+        .onChangeCompat(of: model.friendsVersion) { _, _ in refreshFriendsRender() }
         // Le zoom modifie les seuils (azimuts ≥ 14, clustering) : reconstruit aussi.
         .onChangeCompat(of: mapZoom) { _, _ in
             // Ne reconstruire les couches que si le zoom franchit une frontière de
@@ -1474,7 +1635,10 @@ struct MapExplorerView: View {
             },
             onSelect: selectAnnotation
         )
-        .ignoresSafeArea(edges: .bottom)
+        // La carte file sous la barre de statut / Dynamic Island (comme Plans),
+        // au lieu de laisser une bande systemBackground non-crème en haut (UI-09).
+        // Les contrôles du haut sont dans un overlay qui respecte la safe area.
+        .ignoresSafeArea()
     }
 
     /// Hook QA (DEBUG) : `SQ_QA_PAN_TO="lat,lng[,zoom]"` déplace la caméra
@@ -1519,15 +1683,12 @@ struct MapExplorerView: View {
                     // Chips de couches : composant transverse déjà restylé
                     // (capsules casse normale, actif brique plein).
                     MapFilterBar(filters: $filters)
-                    if filters.contains(.coverage) {
-                        coverageColoringToggle
-                        if coverageByGeneration {
-                            coverageGenerationLegend
-                        } else {
-                            coverageQualityLegend
-                        }
-                    }
-                    if !model.searchResults.isEmpty {
+                    // Les contrôles de coloration couverture (bascule + légende) ont
+                    // quitté la colonne haute (surchargée) → carte flottante bas-centre
+                    // (cf. `coverageControlsOverlay`).
+                    // Panneau de recherche : visible dès qu'une requête est saisie
+                    // (résultats, ou message « aucun résultat »/erreur).
+                    if !model.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
                         searchSuggestions
                             .padding(.horizontal, SQSpace.md)
                     }
@@ -1536,21 +1697,19 @@ struct MapExplorerView: View {
                 .frame(maxWidth: 640)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-                // Bas-gauche : sélecteur d'opérateur compact + statut.
+                // Bas-gauche : pilule opérateur seule (le statut/toast est passé au
+                // centre pour ne plus se disputer la place avec les contrôles couverture).
                 VStack {
                     Spacer()
-                    HStack(alignment: .bottom) {
-                        VStack(alignment: .leading, spacing: SQSpace.sm) {
-                            mapStatusToast
-                            operatorPill
-                        }
+                    HStack {
+                        operatorPill
                         Spacer()
                     }
                     .padding(.leading, SQSpace.md)
-                    .padding(.bottom, SQSpace.lg + 2)
+                    .padding(.bottom, mapControlsBottomInset)
                 }
 
-                // Bas-droite : 2 boutons flottants (localiser + rafraîchir).
+                // Bas-droite : FAB localiser (unique).
                 VStack {
                     Spacer()
                     HStack {
@@ -1558,30 +1717,104 @@ struct MapExplorerView: View {
                         mapFabStack
                     }
                     .padding(.trailing, SQSpace.md)
-                    .padding(.bottom, SQSpace.lg + 2)
+                    .padding(.bottom, mapControlsBottomInset)
                 }
 
-                if model.isLoading {
-                    VStack {
-                        Spacer()
-                        ProgressView()
-                            .tint(SQColor.brandRed)
-                            .padding(SQSpace.md)
-                            .background { mapGlassBackground(Circle()) }
-                            .sqShadowCard()
-                            .padding(.bottom, 18)
-                    }
-                }
+                // Bas-centre : statut transitoire + contrôles de coloration couverture,
+                // empilés au-dessus de la rangée pilule/FAB (jamais au même niveau
+                // qu'elles). Le spinner de chargement a rejoint la barre de recherche.
+                coverageControlsOverlay
 
                 marketSwitchNoticeOverlay
             }
         }
     }
 
+    /// Dégagement bas des contrôles flottants de la carte pour la barre de navigation.
+    /// Avec la barre NATIVE Liquid Glass (iOS 26+), la safe area est DÉJÀ décalée par
+    /// la barre → un petit dégagement suffit. Avec le dock custom (avant iOS 26, ou QA
+    /// `--qa-legacy-dock`), c'est une simple superposition qui ne décale PAS la safe
+    /// area → il faut réserver toute sa hauteur (`SQDock.clearance`). Sans cette
+    /// distinction, les 98 pt du dock custom s'ajoutaient PAR-DESSUS l'inset natif →
+    /// grand vide entre les boutons et la barre.
+    private var mapControlsBottomInset: CGFloat {
+        if #available(iOS 26.0, *), !Self.forcesLegacyDock {
+            return SQSpace.lg
+        } else {
+            return SQSpace.lg + 2 + SQDock.clearance
+        }
+    }
+
+    private static var forcesLegacyDock: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--qa-legacy-dock")
+        #else
+        false
+        #endif
+    }
+
+    /// Contrôles de coloration couverture (bascule Signal/Génération + légende),
+    /// affichés seulement quand la couche Couverture est active. Déplacés de la
+    /// colonne haute (qui empilait jusqu'à 5 blocs). Empilé avec le statut transitoire
+    /// (toast) dans une colonne centrée, ancrée juste au-dessus de la rangée basse
+    /// (pilule opérateur à gauche, FAB à droite) — plus jamais en conflit avec elles.
+    private var coverageControlsOverlay: some View {
+        VStack(spacing: SQSpace.sm) {
+            Spacer()
+            if filters.contains(.coverage) {
+                coverageColoringToggle
+                coverageLegendCompact
+            }
+            mapStatusToast
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, SQSpace.md)
+        // Juste au-dessus de la rangée basse (pilule/FAB) : on part du même dégagement
+        // qu'elle + la hauteur d'une rangée, pour empiler sans la chevaucher.
+        .padding(.bottom, mapControlsBottomInset + 50)
+    }
+
+    /// Légende couverture COMPACTE : une seule capsule avec des pastilles inline
+    /// (au lieu d'une pastille par bande) — beaucoup moins de « boutons » à l'écran.
+    /// Suit le mode courant (génération ou RSRP).
+    private var coverageLegendCompact: some View {
+        HStack(spacing: SQSpace.sm + 1) {
+            if coverageByGeneration {
+                ForEach(CoverageGenerationBand.visibleBands) { band in
+                    legendDot(color: band.swiftUIColor, text: band.title)
+                }
+            } else {
+                ForEach(CoverageQualityBand.visibleBands) { band in
+                    legendDot(color: band.swiftUIColor, text: band.title)
+                }
+            }
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.xs + 3)
+        .background { mapGlassBackground(Capsule(style: .continuous)) }
+        .sqShadowSoft()
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(coverageByGeneration ? "Légende génération" : "Légende qualité du signal")
+    }
+
+    private func legendDot(color: Color, text: String) -> some View {
+        HStack(spacing: 3) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(text)
+                .font(SQFont.body(10.5, .semibold))
+                .foregroundStyle(SQColor.label)
+                .lineLimit(1)
+        }
+    }
+
     /// Bandeau discret « Marché : X » affiché 2 s après un switch automatique :
     /// capsule crème + point brique, ombre douce (langage des surfaces carte).
+    /// Ancré EN BAS (toast transitoire au-dessus du dock) : à ~124 pt du haut il
+    /// chevauchait la zone haute (chips / bascule couverture / légende).
     private var marketSwitchNoticeOverlay: some View {
         VStack {
+            Spacer()
             if let notice = model.marketSwitchNotice {
                 HStack(spacing: SQSpace.sm) {
                     Circle()
@@ -1596,11 +1829,10 @@ struct MapExplorerView: View {
                 .padding(.vertical, SQSpace.sm + 2)
                 .background { mapGlassBackground(Capsule(style: .continuous)) }
                 .sqShadowCard()
-                .transition(.move(edge: .top).combined(with: .opacity))
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            Spacer()
         }
-        .padding(.top, 124)
+        .padding(.bottom, mapControlsBottomInset)
         .animation(SQMotion.resolve(SQMotion.snappy, reduceMotion), value: model.marketSwitchNotice)
         .allowsHitTesting(false)
     }
@@ -1616,15 +1848,32 @@ struct MapExplorerView: View {
     /// loupe + placeholder Figtree 15 secondaire, ombre carte — sans bordure.
     private var mapSearchField: some View {
         HStack(spacing: SQSpace.sm) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(SQColor.labelSecondary)
-            TextField("Rechercher une ville, un site…", text: $model.searchQuery)
+            // Slot de tête à largeur fixe : loupe au repos, spinner pendant un
+            // chargement de carte (remplace l'ancien ProgressView bas-centre qui
+            // chevauchait le dock). Largeur figée → pas de saut de mise en page.
+            ZStack {
+                if model.isLoading || model.isSearching {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .tint(SQColor.brandRed)
+                } else {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .frame(width: 18, height: 18)
+            .accessibilityHidden(!(model.isLoading || model.isSearching))
+            .accessibilityLabel(model.isSearching ? "Recherche en cours" : (model.isLoading ? "Chargement de la carte" : ""))
+            TextField("Rechercher une ville, une adresse, un site…", text: $model.searchQuery)
                 .textFieldStyle(.plain)
                 .font(SQFont.body(15))
                 .foregroundStyle(SQColor.label)
                 .submitLabel(.search)
+                .autocorrectionDisabled()
                 .onSubmit { Task { await model.search() } }
+                // Suggestions à la frappe (anti-rebond + annulation côté modèle).
+                .onChangeCompat(of: model.searchQuery) { _, _ in model.scheduleSearch() }
             if !model.searchQuery.isEmpty {
                 Button {
                     model.searchQuery = ""
@@ -1711,13 +1960,11 @@ struct MapExplorerView: View {
     /// Cercles 46 pt « verre crème » + blur : flèche de localisation brique,
     /// second bouton encre — ombre carte, sans bordure.
     private var mapFabStack: some View {
-        VStack(spacing: SQSpace.sm + 2) {
-            mapFab(icon: "location", tint: SQColor.brandRed, label: "Recentrer sur ma position") {
-                centerOnCurrentLocation()
-            }
-            mapFab(icon: "arrow.clockwise", label: "Rafraîchir la carte") {
-                scheduleLoad(region: lastRegion)
-            }
+        // Un seul FAB (recentrage GPS) : le bouton « rafraîchir » a été retiré — la
+        // carte recharge déjà automatiquement à chaque déplacement/zoom (onMoveEnd),
+        // il faisait doublon et alourdissait la bande basse.
+        mapFab(icon: "location", tint: SQColor.brandRed, label: "Recentrer sur ma position") {
+            centerOnCurrentLocation()
         }
     }
 
@@ -1770,12 +2017,18 @@ struct MapExplorerView: View {
         .padding(.vertical, SQSpace.sm + 2)
         .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
         .sqShadowCard()
-        .frame(maxWidth: 280, alignment: .leading)
+        // Bornée à 280 (repli 2 lignes pour les erreurs longues) et CENTRÉE dans la
+        // colonne bas-centre (alignement centré par défaut du `.frame`) — plus
+        // d'alignement `.leading` hérité de l'ancienne position bas-gauche.
+        .frame(maxWidth: 280)
     }
 
     private var activeFilterCount: Int {
         var count = 0
-        if model.operatorFilter != model.defaultOperatorKeyForCurrentMarket { count += 1 }
+        // L'opérateur n'est plus compté ici : il n'est plus dans la feuille (section
+        // retirée, source unique = la pilule bas-gauche qui affiche déjà son état +
+        // sa couleur). Le badge ne reflète donc que ce qui est réellement filtrable
+        // dans la feuille.
         if !model.techFilters.isEmpty { count += 1 }
         if !model.bandFilters.isEmpty { count += 1 }
         if !model.sharingFilters.isEmpty { count += 1 }
@@ -1796,52 +2049,16 @@ struct MapExplorerView: View {
                     span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
                 ))
             } else {
-                model.errorMessage = "Position actuelle indisponible"
-            }
-        }
-    }
-
-    private var coverageQualityLegend: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SQSpace.sm) {
-                legendTitlePill("Qualité RSRP (dBm)")
-                ForEach(CoverageQualityBand.visibleBands) { band in
-                    legendPill(color: band.swiftUIColor, text: "\(band.title) \(band.rangeLabel)")
+                // Distinguer le refus d'autorisation (l'utilisateur peut agir) d'une
+                // simple indisponibilité, au lieu d'un message générique opaque (UXP-08).
+                let status = services.location.authorizationStatus
+                if status == .denied || status == .restricted {
+                    model.errorMessage = "Localisation désactivée. Active-la dans Réglages > SignalQuest pour te localiser sur la carte."
+                } else {
+                    model.errorMessage = "Position actuelle indisponible"
                 }
             }
-            .padding(.horizontal, SQSpace.md)
-            .padding(.vertical, SQSpace.xs)
         }
-        .frame(height: 40)
-    }
-
-    /// Pastille-titre d'une légende : capsule verre crème, texte secondaire.
-    private func legendTitlePill(_ text: String) -> some View {
-        Text(text)
-            .font(SQFont.body(11, .semibold))
-            .foregroundStyle(SQColor.labelSecondary)
-            .lineLimit(1)
-            .padding(.horizontal, SQSpace.sm + 2)
-            .padding(.vertical, SQSpace.xs + 2)
-            .background { mapGlassBackground(Capsule(style: .continuous)) }
-            .sqShadowSoft()
-    }
-
-    /// Pastille d'une bande de légende : point coloré + libellé, capsule crème.
-    private func legendPill(color: Color, text: String) -> some View {
-        HStack(spacing: SQSpace.xs + 1) {
-            Circle()
-                .fill(color)
-                .frame(width: 9, height: 9)
-            Text(text)
-                .font(SQFont.body(11, .semibold))
-                .foregroundStyle(SQColor.label)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, SQSpace.sm + 2)
-        .padding(.vertical, SQSpace.xs + 2)
-        .background { mapGlassBackground(Capsule(style: .continuous)) }
-        .sqShadowSoft()
     }
 
     /// Bascule de coloration de la couche Couverture : Signal (RSRP) ↔ Génération.
@@ -1859,62 +2076,111 @@ struct MapExplorerView: View {
         .accessibilityLabel("Coloration de la couverture : signal ou génération")
     }
 
-    /// Légende de la couche Couverture en mode GÉNÉRATION (distincte du RSRP).
-    private var coverageGenerationLegend: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SQSpace.sm) {
-                legendTitlePill("Génération")
-                ForEach(CoverageGenerationBand.visibleBands) { band in
-                    legendPill(color: band.swiftUIColor, text: band.title)
-                }
-            }
-            .padding(.horizontal, SQSpace.md)
-            .padding(.vertical, SQSpace.xs)
-        }
-        .frame(height: 40)
-    }
-
     private var searchSuggestions: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
-                ForEach(model.searchResults.prefix(8)) { site in
-                    Button {
-                        if let lat = site.latitude, let lng = site.longitude {
-                            let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
-                            mapCenter = coordinate
-                            mapZoom = 15
-                            model.searchResults = []
-                            selectedAntenna = site
+                if model.searchResults.isEmpty {
+                    searchStatusRow
+                } else {
+                    ForEach(model.searchResults) { result in
+                        Button { selectSearchResult(result) } label: {
+                            searchResultRow(result)
                         }
-                    } label: {
-                        HStack(spacing: SQSpace.sm) {
-                            Image(systemName: "antenna.radiowaves.left.and.right")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(SQColor.brandRed)
-                            Text(site.siteId ?? site.id)
-                                .font(SQFont.body(14, .semibold))
-                            if let address = site.address {
-                                Text(address)
-                                    .font(SQFont.body(13))
-                                    .foregroundStyle(SQColor.labelSecondary)
-                                    .lineLimit(1)
-                            }
-                            Spacer()
-                        }
-                        .padding(.horizontal, SQSpace.md + 2)
-                        .padding(.vertical, SQSpace.sm + 2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
-                        .sqShadowSoft()
+                        .buttonStyle(SQPressButtonStyle())
+                        .foregroundStyle(SQColor.label)
                     }
-                    .buttonStyle(SQPressButtonStyle())
-                    .foregroundStyle(SQColor.label)
                 }
             }
             .padding(.horizontal, SQSpace.xs)
             .padding(.top, SQSpace.xs)
         }
         .frame(maxHeight: 240)
+    }
+
+    /// Rangée « aucun résultat » / « recherche indisponible » (rien pendant la
+    /// recherche : le spinner de la barre suffit). Distingue vide d'erreur.
+    @ViewBuilder
+    private var searchStatusRow: some View {
+        if !model.isSearching {
+            HStack(spacing: SQSpace.sm) {
+                Image(systemName: model.searchFailed ? "exclamationmark.triangle" : "magnifyingglass")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                Text(model.searchFailed ? "Recherche indisponible" : "Aucun résultat")
+                    .font(SQFont.body(14, .medium))
+                    .foregroundStyle(SQColor.labelSecondary)
+                Spacer()
+            }
+            .padding(.horizontal, SQSpace.md + 2)
+            .padding(.vertical, SQSpace.sm + 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+            .sqShadowSoft()
+        }
+    }
+
+    @ViewBuilder
+    private func searchResultRow(_ result: MapSearchResult) -> some View {
+        HStack(spacing: SQSpace.sm) {
+            switch result {
+            case .antenna(let site):
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SQColor.brandRed)
+                Text(site.siteId ?? site.id)
+                    .font(SQFont.body(14, .semibold))
+                    .lineLimit(1)
+                if let address = site.address {
+                    Text(address)
+                        .font(SQFont.body(13))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(1)
+                }
+            case .place(let place):
+                Image(systemName: "mappin.circle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(SQColor.brandRed)
+                Text(place.name)
+                    .font(SQFont.body(14, .semibold))
+                    .lineLimit(1)
+                if let subtitle = place.subtitle {
+                    Text(subtitle)
+                        .font(SQFont.body(13))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, SQSpace.md + 2)
+        .padding(.vertical, SQSpace.sm + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+        .sqShadowSoft()
+    }
+
+    private func selectSearchResult(_ result: MapSearchResult) {
+        dismissSearch()
+        switch result {
+        case .place(let place):
+            mapCenter = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
+            mapZoom = 14
+        case .antenna(let site):
+            if site.hasValidCoordinate, let lat = site.latitude, let lng = site.longitude {
+                mapCenter = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                mapZoom = 15
+            }
+            // Ouvre la fiche même sans coordonnées valides (corrige l'ancien tap mort).
+            selectedAntenna = site
+        }
+    }
+
+    private func dismissSearch() {
+        model.searchQuery = ""
+        model.searchResults = []
+        model.isSearching = false
+        model.searchFailed = false
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     /// Reconstruit le cache des couches lourdes. Appelé uniquement sur changement
@@ -1940,6 +2206,16 @@ struct MapExplorerView: View {
         renderedAnnotations = annotationPayloads
         renderedCoverageFeatures = coverageHeatFeatures
         renderedSpeedtestFeatures = speedtestFeatures
+        renderVersion &+= 1
+    }
+
+    /// PERF-MAP-05 : ne reconstruit QUE la couche amis (marqueurs de présence).
+    /// Appelée à chaque instantané SSE d'amis (`model.friendsVersion`). Les couches
+    /// lourdes (antennes, speedtests, couverture, photos, prévisionnels, pannes)
+    /// restent telles quelles dans `renderedAnnotations` : on n'y remplace que le
+    /// sous-ensemble `.friend`, au lieu de recalculer des milliers de structs par tick.
+    private func refreshFriendsRender() {
+        renderedAnnotations = renderedAnnotations.filter { $0.kind != .friend } + friendPayloads
         renderVersion &+= 1
     }
 
@@ -2327,13 +2603,16 @@ struct MapExplorerView: View {
     /// Couleur + clé de regroupement d'un point de couverture selon le mode courant :
     /// par RSRP (signal) ou par génération réseau. Modes mutuellement exclusifs
     /// (jamais mélangés) — la légende suit `coverageByGeneration`.
-    private func coverageColorParts(rsrp: Double?, tech: String?) -> (key: String, hex: UInt32, dimmed: Bool) {
+    private func coverageColorParts(rsrp: Double?, tech: String?) -> (key: String, hex: UInt32, dimmed: Bool, rank: Int) {
         if coverageByGeneration {
             let band = CoverageGenerationBand.band(for: tech)
-            return ("g-\(band.rawValue)", band.colorHex, band == .none)
+            // `band.rank` (5G=5 > 4G=4 > … > aucun=0) pilote le z-order (cf. tri en
+            // fin de `coverageHeatFeatures`).
+            return ("g-\(band.rawValue)", band.colorHex, band == .none, band.rank)
         } else {
             let band = CoverageQualityBand.band(for: rsrp)
-            return ("q-\(band.rawValue)", band.colorHex, band == .unknown)
+            // Rang neutre en mode RSRP → le tri par génération est un no-op.
+            return ("q-\(band.rawValue)", band.colorHex, band == .unknown, 0)
         }
     }
 
@@ -2343,7 +2622,8 @@ struct MapExplorerView: View {
             id: "coverage-heat-\(point.id)",
             coordinate: CLLocationCoordinate2D(latitude: point.lat, longitude: point.lng),
             weight: coverageHeatWeight(rsrp: point.rsrp),
-            colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed
+            colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed,
+            generationRank: parts.rank
         )
     }
 
@@ -2370,6 +2650,27 @@ struct MapExplorerView: View {
         return result
     }
 
+    /// Pendant de `dominantGenerationPoints` pour le REPLI bbox `/api/coverage/points`.
+    /// Le modèle `CoverageHeatPoint` n'a pas de `groupId` → on regroupe par COORDONNÉE
+    /// (les frères NSA 4G+5G sont co-localisés à lat/lng identiques) et on ne conserve
+    /// que la génération la plus élevée du groupe. Ordre d'apparition préservé.
+    private static func dominantGenerationHeatPoints(_ points: [CoverageHeatPoint]) -> [CoverageHeatPoint] {
+        var indexByKey: [String: Int] = [:]
+        var result: [CoverageHeatPoint] = []
+        for point in points {
+            let key = "\(point.latitude),\(point.longitude)"
+            let rank = CoverageGenerationBand.band(for: point.technology ?? point.networkType).rank
+            if let index = indexByKey[key] {
+                let current = CoverageGenerationBand.band(for: result[index].technology ?? result[index].networkType).rank
+                if rank > current { result[index] = point }
+            } else {
+                indexByKey[key] = result.count
+                result.append(point)
+            }
+        }
+        return result
+    }
+
     private var coverageHeatFeatures: [CoverageHeatFeature] {
         guard filters.contains(.coverage) else { return [] }
         // La couverture n'a de sens que pour UN opérateur donné (superposer tous les
@@ -2387,13 +2688,20 @@ struct MapExplorerView: View {
                 // génération les conserve.
                 let clusters = coverageByGeneration ? tile.clusters : tile.clusters.filter { $0.source != "ios" }
                 features += clusters.map { cluster in
-                    // Clusters (région/pays) : génération dominante (`cluster.tech`) en mode génération.
+                    // Clusters (région/pays) : couleur = génération dominante backend
+                    // (`cluster.tech`), gardée VERBATIM — le backend ne renvoie qu'UNE
+                    // génération + `count` + `avgRsrp`, pas la distribution par génération,
+                    // donc iOS ne peut pas ré-arbitrer un cluster vers le 5G sans donnée
+                    // supplémentaire (ce serait une modif backend). Le tri par génération
+                    // (fin de `coverageHeatFeatures`) s'applique néanmoins : un cluster 5G
+                    // passe au-dessus d'un cluster 4G chevauchant.
                     let parts = coverageColorParts(rsrp: cluster.avgRsrp, tech: cluster.tech)
                     return CoverageHeatFeature(
                         id: "coverage-heat-cluster-\(cluster.id)",
                         coordinate: CLLocationCoordinate2D(latitude: cluster.lat, longitude: cluster.lng),
                         weight: min(max(Double(cluster.count), 1), 40) / 8,
-                        colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed
+                        colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed,
+                        generationRank: parts.rank
                     )
                 }
             }
@@ -2418,20 +2726,46 @@ struct MapExplorerView: View {
             }
         }
         if features.isEmpty {
-            features = model.coverageHeat.lazy.filter { point in
+            let matches = model.coverageHeat.lazy.filter { point in
                 // Couche SIGNAL : exclure la couverture iOS génération-seule (source == "ios",
                 // sans RSRP) ; la couche génération les conserve. Parité tuiles/points.
                 guard coverageByGeneration || point.source != "ios" else { return false }
                 return matchesSelectedBand(point.band) || matchesSelectedBands(in: [point.frequency, point.technology, point.networkType].compactMap { $0 })
-            }.prefix(CoverageRenderPolicy.fallbackCap).map { point in
+            }
+            // Mode génération : dédupliquer les frères NSA co-localisés (le repli
+            // `CoverageHeatPoint` n'a PAS de `groupId` → clé = coordonnée) et ne garder
+            // que la génération la plus élevée, comme `dominantGenerationPoints` pour les
+            // tuiles. Idempotent : `/api/coverage/points?expanded=false` collapse déjà
+            // côté serveur → filet de sécurité. En RSRP : chemin paresseux inchangé.
+            let source: [CoverageHeatPoint] = coverageByGeneration
+                ? Self.dominantGenerationHeatPoints(Array(matches))
+                : Array(matches.prefix(CoverageRenderPolicy.fallbackCap))
+            features = source.prefix(CoverageRenderPolicy.fallbackCap).map { point in
                 let parts = coverageColorParts(rsrp: point.signalStrength, tech: point.technology ?? point.networkType)
                 return CoverageHeatFeature(
                     id: "coverage-heat-api-\(point.id)",
                     coordinate: CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude),
                     weight: coverageHeatWeight(rsrp: point.signalStrength),
-                    colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed
+                    colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed,
+                    generationRank: parts.rank
                 )
             }
+        }
+        // Tri STABLE par rang de génération croissant → la génération la plus élevée
+        // est dessinée EN DERNIER (au-dessus) par le renderer (ordre du tableau), donc
+        // un vrai 5G n'est jamais recouvert par une 4G chevauchante — y compris entre
+        // tuiles voisines. `Array.sorted` n'étant pas stable en Swift, on départage par
+        // l'index d'origine pour préserver l'ordre backend/temporel à rang égal (sortie
+        // déterministe → le garde de diff de `setCoverage` tient). Mode génération
+        // uniquement ; en RSRP `generationRank == 0` partout → no-op de toute façon.
+        if coverageByGeneration {
+            features = features.enumerated()
+                .sorted { lhs, rhs in
+                    lhs.element.generationRank != rhs.element.generationRank
+                        ? lhs.element.generationRank < rhs.element.generationRank
+                        : lhs.offset < rhs.offset
+                }
+                .map(\.element)
         }
         return features
     }
@@ -2877,7 +3211,7 @@ private struct MapAdvancedFilterSheet: View {
             (.speedtest, "Speedtests", "speedometer"),
             (.photo, "Photos", "photo"),
             (.friend, "Amis", "person.2"),
-            (.coverage, "Couverture backend", "dot.radiowaves.left.and.right")
+            (.coverage, "Couverture communautaire", "dot.radiowaves.left.and.right")
         ]
         // Pannes & Prévisionnels : données ANFR FR/DROM uniquement (le backend ne
         // répond que pour ces marchés ; ailleurs `load()` ne les charge jamais).
@@ -2990,19 +3324,10 @@ private struct MapAdvancedFilterSheet: View {
                         }
                     }
 
-                    filterSection("Opérateur", icon: "antenna.radiowaves.left.and.right") {
-                        LazyVGrid(columns: filterColumns, spacing: 8) {
-                        ForEach(operatorOptions, id: \.self) { op in
-                                filterChip(
-                                    title: operatorLabel(op),
-                                    icon: op == "ALL" ? "circle.grid.2x2.fill" : "dot.radiowaves.left.and.right",
-                                    active: operatorName == op
-                                ) {
-                                    operatorName = op
-                                }
-                            }
-                        }
-                    }
+                    // Section « Opérateur » retirée : source unique = la pilule opérateur
+                    // bas-gauche de la carte (toujours visible, pastille couleur + libellé
+                    // + accès rapide au menu). Évite le doublon feuille ⇄ canevas. Le
+                    // binding `operatorName` reste lu par le gating Couverture des Calques.
 
                     filterSection("Technologies", icon: "cellularbars") {
                         LazyVGrid(columns: filterColumns, spacing: 8) {
@@ -3057,8 +3382,11 @@ private struct MapAdvancedFilterSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Réinitialiser") {
-                        market = "FR"
-                        operatorName = "SFR"
+                        // Réinitialiser vers le marché/opérateur AUTO-détectés (SIM/GPS/
+                        // locale), pas vers un FR + SFR codés en dur qui vidaient la carte
+                        // pour un utilisateur belge/suisse (INT-04).
+                        market = MapMarketStore.initialMarketCode()
+                        operatorName = MapMarketStore.initialOperatorKey()
                         technologies.removeAll()
                         bands.removeAll()
                         sharing.removeAll()
@@ -3637,7 +3965,19 @@ private struct MapKitMapView: UIViewRepresentable {
         let map = MKMapView(frame: .zero)
         map.delegate = context.coordinator
         map.showsUserLocation = true
-        map.showsCompass = true
+        // Boussole native désactivée puis re-ajoutée au MILIEU-DROIT : par défaut elle
+        // apparaît en haut-droite (carte tournée) et entre en collision avec le bouton
+        // « Calques & filtres ». `.adaptive` conserve le comportement natif (masquée
+        // nord-up, visible carte tournée, tap = retour au nord).
+        map.showsCompass = false
+        let compass = MKCompassButton(mapView: map)
+        compass.compassVisibility = .adaptive
+        compass.translatesAutoresizingMaskIntoConstraints = false
+        map.addSubview(compass)
+        NSLayoutConstraint.activate([
+            compass.trailingAnchor.constraint(equalTo: map.trailingAnchor, constant: -SQSpace.md),
+            compass.centerYAnchor.constraint(equalTo: map.centerYAnchor)
+        ])
         context.coordinator.applyBackdrop(backdrop, on: map)
         map.register(SQMapKitMarkerView.self, forAnnotationViewWithReuseIdentifier: SQMapKitMarkerView.reuseID)
         map.register(SQFriendMarkerView.self, forAnnotationViewWithReuseIdentifier: SQFriendMarkerView.reuseID)
@@ -3976,6 +4316,8 @@ private struct MapKitMapView: UIViewRepresentable {
                 view.annotation = annotation
                 view.canShowCallout = false
                 view.apply(info, displayScale: max(map.traitCollection.displayScale, 2))
+                view.isAccessibilityElement = true
+                view.accessibilityLabel = sq.payload.accessibilityLabel
                 return view
             }
             // Photo géolocalisée (hors cluster) : vignette « polaroïd » sur la carte.
@@ -3985,6 +4327,8 @@ private struct MapKitMapView: UIViewRepresentable {
                 view.annotation = annotation
                 view.canShowCallout = false
                 view.apply(url: thumbnail, displayScale: max(map.traitCollection.displayScale, 2))
+                view.isAccessibilityElement = true
+                view.accessibilityLabel = sq.payload.accessibilityLabel
                 return view
             }
             let view = map.dequeueReusableAnnotationView(withIdentifier: SQMapKitMarkerView.reuseID, for: annotation) as? SQMapKitMarkerView
@@ -3992,6 +4336,8 @@ private struct MapKitMapView: UIViewRepresentable {
             view.annotation = annotation
             view.canShowCallout = false
             view.apply(sq.payload)
+            view.isAccessibilityElement = true
+            view.accessibilityLabel = sq.payload.accessibilityLabel
             return view
         }
 

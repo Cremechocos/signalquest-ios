@@ -550,56 +550,6 @@ struct ANFRMarkerStyle: Equatable {
     }
 }
 
-// MARK: - Cluster aggregation (porté d'Android AnfrClusterAggregator)
-
-/// Résultat d'agrégation d'un cluster de sites : opérateur dominant (≥ 60 %) ou
-/// répartition multi-opérateur (anneau parts).
-enum ANFRClusterAggregate: Equatable {
-    case single(pointCount: Int, operator: ANFROperator, share: Double)
-    case multi(pointCount: Int, shares: [ANFRClusterShare])
-
-    var pointCount: Int {
-        switch self {
-        case let .single(count, _, _): return count
-        case let .multi(count, _): return count
-        }
-    }
-}
-
-struct ANFRClusterShare: Equatable {
-    let `operator`: ANFROperator
-    let count: Int
-    let share: Double
-}
-
-enum ANFRClusterAggregator {
-    /// Seuil de dominance (60 %) repris d'Android pour éviter le scintillement
-    /// près des mélanges 50/50.
-    static let dominanceThreshold = 0.60
-
-    static func aggregate(_ sites: [ANFRMapSite]) -> ANFRClusterAggregate {
-        var counts: [ANFROperator: Int] = [:]
-        var total = 0
-        for site in sites {
-            for antenna in site.antennas {
-                guard let op = antenna.operator else { continue }
-                counts[op, default: 0] += 1
-                total += 1
-            }
-        }
-        guard total > 0 else {
-            return .multi(pointCount: sites.count, shares: [])
-        }
-        let shares = counts
-            .map { ANFRClusterShare(operator: $0.key, count: $0.value, share: Double($0.value) / Double(total)) }
-            .sorted { $0.share > $1.share }
-        if let top = shares.first, top.share >= dominanceThreshold {
-            return .single(pointCount: sites.count, operator: top.operator, share: top.share)
-        }
-        return .multi(pointCount: sites.count, shares: shares)
-    }
-}
-
 // MARK: - Site history derived accessors
 
 extension ANFRSiteHistoryChange {

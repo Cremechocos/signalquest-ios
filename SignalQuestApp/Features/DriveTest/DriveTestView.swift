@@ -63,6 +63,10 @@ final class DriveTestViewModel: ObservableObject {
     @Published private(set) var lastResult: SpeedtestRunResult?
     @Published private(set) var statusLabel = "Prêt"
     @Published private(set) var errorMessage: String?
+    /// Vrai quand la localisation est refusée/restreinte : le Drive Test ne peut
+    /// enregistrer ni trace ni couverture. La vue propose alors les Réglages plutôt
+    /// que de lancer une session muette qui n'enregistre rien (UXP-03/F-05).
+    @Published private(set) var locationDenied = false
 
     // Carte / secteur.
     @Published private(set) var antennas: [AntennaSite] = []
@@ -148,6 +152,8 @@ final class DriveTestViewModel: ObservableObject {
     private var sessionMode: DriveTestMode = .both
     /// Nombre de points de couverture capturés (affiché en mode couverture).
     @Published private(set) var coveragePointCount = 0
+    /// Dernière persistance du brouillon de couverture (debounce — PERF-DT-01).
+    private var lastCoveragePersistAt: Date = .distantPast
     /// Points de couverture pour l'affichage TEMPS RÉEL sur la carte (par génération).
     @Published private(set) var coverageTrail: [DriveCoveragePoint] = []
     /// Points speedtest géolocalisés (carte Drive Test) — colorés par débit, tappables.
@@ -202,6 +208,18 @@ final class DriveTestViewModel: ObservableObject {
     func start() {
         guard !isRunning else { return }
         errorMessage = nil
+        // Un Drive Test sans position n'enregistre ni trace ni couverture : plutôt
+        // que lancer une session muette (statut « Enregistrement… » puis « 0 point »),
+        // on explique et on renvoie vers les Réglages si la localisation est refusée.
+        switch services.location.authorizationStatus {
+        case .denied, .restricted:
+            locationDenied = true
+            statusLabel = "Localisation désactivée"
+            errorMessage = "Le Drive Test a besoin de ta position pour tracer le trajet et la couverture. Active la localisation dans les Réglages, puis relance."
+            return
+        default:
+            locationDenied = false
+        }
         accumulator = ContinuousSessionAccumulator()
         summary = nil
         testCount = 0
@@ -365,6 +383,12 @@ final class DriveTestViewModel: ObservableObject {
         if coveragePoints.count > coveragePointCap {
             coveragePoints.removeFirst(coveragePoints.count - coveragePointCap)
             coverageTrail.removeFirst(coverageTrail.count - coveragePointCap)
+            // Recaler le début de session sur le premier point RESTANT : sinon
+            // startTime restait celui du départ alors que la portion initiale a été
+            // tronquée, produisant un horodatage incohérent (TEL-15).
+            if let firstKept = coveragePoints.first?.timestamp {
+                coverageStartedAtMs = firstKept
+            }
         }
         coveragePointCount = coveragePoints.count
         persistCoverageSnapshot()
@@ -425,14 +449,16 @@ final class DriveTestViewModel: ObservableObject {
             operatorKey: displayedOperatorKey,
             marketCode: market,
             showOnMap: coverageShowOnMap,
-            points: coveragePoints
+            // Coordonnées tronquées (~111 m) avant persistance/envoi : la trace
+            // publiée sur la carte communautaire ne révèle pas le trajet au mètre.
+            points: coveragePoints.map { $0.minimizedCoordinates() }
         )
     }
 
     /// Écrit chaque nouveau point dans le JSON atomique avant toute tentative
     /// réseau. L'opération est volontairement synchrone : un retour de cette méthode
     /// signifie que le point est déjà durable sur disque.
-    private func persistCoverageSnapshot() {
+    private func persistCoverageSnapshot(force: Bool = false) {
         guard sessionMode.recordsCoverage, let sessionId = coverageSessionId else { return }
         if VPNDetector.isActive() {
             if !coverageUploadSuppressed {
@@ -441,7 +467,14 @@ final class DriveTestViewModel: ObservableObject {
             coverageUploadSuppressed = true
             return
         }
-        guard !coverageUploadSuppressed, let draft = makeCoverageSessionUpload() else { return }
+        guard !coverageUploadSuppressed else { return }
+        // Debounce : ne PAS ré-encoder+écrire toute la session (coût O(n) croissant
+        // sur le main thread) à CHAQUE point capturé. Au plus une persistance toutes
+        // les 3 s ; stop()/finalize écrivent de toute façon l'état complet (PERF-DT-01).
+        let now = Date()
+        guard force || now.timeIntervalSince(lastCoveragePersistAt) >= 3 else { return }
+        guard let draft = makeCoverageSessionUpload() else { return }
+        lastCoveragePersistAt = now
         do {
             try services.sessions.persistCoverageDraft(draft)
         } catch {
@@ -950,9 +983,14 @@ struct DriveTestView: View {
             legendSection("Parcours", items: [
                 ("Trajet suivi", SQColor.brandOrange)
             ], mark: .line)
-            legendSection("Débit speedtest", items: [
-                ("Rapide", Color(hex: 0x22C55E)), ("Moyen", Color(hex: 0xEAB308)),
-                ("Lent", Color(hex: 0xEF4444))
+            // Échelle complète (7 paliers) réellement dessinée pour les losanges
+            // (DriveTestMapView.speedColor), au lieu de 3 couleurs incomplètes qui
+            // laissaient les points bleus/cyans/lime sans clé de lecture (UI-06).
+            legendSection("Débit speedtest (Mbps)", items: [
+                ("1000+", Color(hex: 0x3B82F6)), ("600", Color(hex: 0x06B6D4)),
+                ("300", Color(hex: 0x22C55E)), ("100", Color(hex: 0x84CC16)),
+                ("30", Color(hex: 0xEAB308)), ("10", Color(hex: 0xF97316)),
+                ("<10", Color(hex: 0xEF4444))
             ], mark: .diamond)
         }
         .padding(SQSpace.sm + 2)
@@ -1027,14 +1065,22 @@ struct DriveTestView: View {
                 if model.displayedOperatorLabel != nil { sectorBanner }
             }
             if let errorMessage = model.errorMessage {
-                Text(errorMessage)
-                    .font(SQFont.body(12.5, .medium))
-                    .foregroundStyle(SQColor.danger)
-                    .padding(.horizontal, SQSpace.sm + 2)
-                    .padding(.vertical, SQSpace.xs + 2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .lineLimit(2)
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    Text(errorMessage)
+                        .font(SQFont.body(12.5, .medium))
+                        .foregroundStyle(SQColor.danger)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(3)
+                    if model.locationDenied, let url = URL(string: UIApplication.openSettingsURLString) {
+                        Link("Ouvrir les Réglages", destination: url)
+                            .font(SQFont.body(12.5, .semibold))
+                            .foregroundStyle(SQColor.brandRed)
+                    }
+                }
+                .padding(.horizontal, SQSpace.sm + 2)
+                .padding(.vertical, SQSpace.xs + 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
             actionButton
         }

@@ -11,7 +11,6 @@ struct GlassCard<Content: View>: View {
     init(
         cornerRadius: CGFloat = SQRadius.xl,
         padding: CGFloat = SQSpace.lg + 2,
-        variant: SQGlassBackground.Variant = .regular,
         @ViewBuilder content: () -> Content
     ) {
         self.cornerRadius = cornerRadius

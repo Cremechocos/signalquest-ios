@@ -88,7 +88,11 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
     }
 
     static var scalewayCases: [SpeedtestDownloadTarget] {
-        [.onlineNet, .onlineNet6, .onlineNet90ms, .onlineNet6_90ms]
+        // Les variantes « +90 ms » (latence artificielle) sont des cibles de DEBUG :
+        // elles faussent volontairement la mesure et ne doivent pas être proposées à
+        // l'utilisateur (INT-02). Les cases restent définies pour la compat de décodage
+        // d'une sélection persistée éventuelle.
+        [.onlineNet, .onlineNet6]
     }
 
     static var milkywanCases: [SpeedtestDownloadTarget] {
@@ -618,6 +622,10 @@ struct SpeedtestSubmission: Encodable, Equatable {
             clientSubmissionId: result.id.uuidString,
             downloadSpeed: result.downloadAverageMbps,
             averageSpeed: result.downloadAverageMbps,
+            // `maxSpeed` (champ legacy backend) reçoit délibérément le P90, pas le
+            // pic réel : c'est un « max robuste » qui écrête les rafales aberrantes
+            // pour l'affichage. Le vrai maximum instantané est transmis à part dans
+            // `downloadMax`/`downloadPeakMbps` (TEL-14).
             maxSpeed: result.downloadP90Mbps ?? result.downloadAverageMbps,
             uploadSpeed: result.uploadAverageMbps,
             uploadAvg: result.uploadAverageMbps,

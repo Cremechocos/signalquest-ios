@@ -55,6 +55,10 @@ struct OnboardingView: View {
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
+                // L'animation est portée par le TabView lui-même (piloté par `page`).
+                // Envelopper le changement de page dans `withAnimation` tronquait la
+                // transition programmatique vers la dernière slide (bug juil. 2026).
+                .animation(reduceMotion ? nil : SQMotion.smooth, value: page)
 
                 pageDots
                     .padding(.bottom, SQSpace.lg)
@@ -63,7 +67,7 @@ struct OnboardingView: View {
                     if isLastPage {
                         onFinish()
                     } else {
-                        withAnimation(reduceMotion ? nil : SQMotion.smooth) { page += 1 }
+                        page += 1
                     }
                 }
                 .padding(.horizontal, SQSpace.xl)

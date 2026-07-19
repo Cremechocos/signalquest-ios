@@ -42,6 +42,9 @@ final class ComposerViewModel: ObservableObject {
     }
     @Published var selectedItem: PhotosPickerItem?
     @Published var previewImage: UIImage?
+    /// Données brutes de la photo choisie, conservées pour l'encodage/downscale
+    /// hors du main thread au moment de publier (PERF-COMP-01).
+    private var pickedImageData: Data?
     @Published var isBusy = false
     @Published var errorMessage: String?
     @Published var didPublish = false
@@ -71,7 +74,7 @@ final class ComposerViewModel: ObservableObject {
         do {
             currentUser = try await userService.profile()
         } catch {
-            print("Error loading user profile: \(error)")
+            sqDebugLog("Error loading user profile: \(error)")
         }
     }
 
@@ -141,6 +144,7 @@ final class ComposerViewModel: ObservableObject {
             if let data = try await item.loadTransferable(type: Data.self),
                let image = UIImage(data: data) {
                 previewImage = image
+                pickedImageData = data
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -180,6 +184,16 @@ final class ComposerViewModel: ObservableObject {
         Haptics.selection()
     }
 
+    /// Encode/redimensionne la photo choisie (≤1600 px) hors du main thread, sur
+    /// le même patron que les autres uploads (messages/photos). Renvoie nil s'il
+    /// n'y a pas de photo.
+    private func preparedImageData() async -> Data? {
+        guard let data = pickedImageData else { return nil }
+        return await Task.detached(priority: .userInitiated) {
+            PhotoUploadPreparation.downscaledJPEG(from: data, maxSide: 1600, quality: 0.84)
+        }.value
+    }
+
     func publish() async {
         let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !body.isEmpty || previewImage != nil || attachedSpeedtest != nil else { return }
@@ -188,7 +202,9 @@ final class ComposerViewModel: ObservableObject {
         defer { isBusy = false }
         do {
             var attachments: [CreatePostAttachment] = []
-            if let imageData = previewImage?.jpegData(compressionQuality: 0.84) {
+            // Encodage + downscale (≤1600 px) HORS du main thread pour ne pas geler
+            // l'UI au tap « Publier » avec une photo pleine résolution (PERF-COMP-01).
+            if let imageData = await preparedImageData() {
                 attachments.append(try await service.uploadImage(data: imageData, mimeType: "image/jpeg"))
             }
             let fallback = attachedSpeedtest != nil ? "Mon dernier speedtest SignalQuest" : "Photo SignalQuest"

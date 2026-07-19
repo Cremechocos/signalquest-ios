@@ -94,7 +94,7 @@ struct NearbyNetworkQualityDetailSheet: View {
                     icon: "speedometer",
                     title: "Débit",
                     band: quality.speedBand,
-                    valueText: quality.medianDownloadMbps.map { "\($0) Mb/s" } ?? "—",
+                    valueText: quality.medianDownloadMbps.map { "\($0) Mbps" } ?? "—",
                     caption: "Vitesse de téléchargement typique mesurée par la communauté sur ce réseau."
                 )
             }

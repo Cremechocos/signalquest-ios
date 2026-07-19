@@ -67,7 +67,17 @@ final class FriendsService: FriendsServicing {
     init(api: APIClient) { self.api = api }
 
     func list() async throws -> [Friend] {
-        struct Response: Codable { let friends: [Friend]?; let items: [Friend]? }
+        struct Response: Decodable {
+            let friends: [Friend]?
+            let items: [Friend]?
+            enum CodingKeys: String, CodingKey { case friends, items }
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                // Un ami à avatarUrl malformée est ignoré au lieu de casser la liste (ROB-04).
+                friends = c.contains(.friends) ? c.decodeLossyElementArray([Friend].self, forKey: .friends) : nil
+                items = c.contains(.items) ? c.decodeLossyElementArray([Friend].self, forKey: .items) : nil
+            }
+        }
         let r: Response = try await api.request(APIEndpoint(path: "/api/friends"), as: Response.self)
         return r.friends ?? r.items ?? []
     }

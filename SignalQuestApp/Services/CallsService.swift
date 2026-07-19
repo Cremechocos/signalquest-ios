@@ -137,6 +137,35 @@ struct CallInitiateRequest: Codable {
     let type: String
 }
 
+/// DTO de cache disque de l'historique des appels (stale-while-revalidate). N'inclut
+/// PAS les jetons LiveKit éphémères (inutiles au journal, et périssables).
+struct CachedCallSession: Codable {
+    let id: String
+    let mode: String?
+    let conversationId: String?
+    let createdAt: Date?
+    let endedAt: Date?
+    let participants: [String]?
+    let status: String?
+    let isPending: Bool?
+    let displayName: String?
+    let isGroup: Bool
+
+    init(_ c: CallSession) {
+        id = c.id; mode = c.mode; conversationId = c.conversationId
+        createdAt = c.createdAt; endedAt = c.endedAt; participants = c.participants
+        status = c.status; isPending = c.isPending; displayName = c.displayName; isGroup = c.isGroup
+    }
+
+    var session: CallSession {
+        CallSession(
+            id: id, mode: mode, conversationId: conversationId, createdAt: createdAt,
+            endedAt: endedAt, participants: participants, liveKitToken: nil, liveKitUrl: nil,
+            liveKitRoom: nil, status: status, isPending: isPending, displayName: displayName, isGroup: isGroup
+        )
+    }
+}
+
 protocol CallsServicing: Sendable {
     func initiate(conversationId: String, mode: String) async throws -> CallSession
     func answer(callId: String) async throws -> CallSession
@@ -144,11 +173,26 @@ protocol CallsServicing: Sendable {
     func end(callId: String) async throws
     func pending() async throws -> [CallSession]
     func history() async throws -> [CallSession]
+    /// Page d'historique (pagination). Écrit la 1re page en cache disque.
+    func history(page: Int, limit: Int) async throws -> [CallSession]
+    /// Dernière page mémorisée (affichage instantané avant le rafraîchissement réseau).
+    func cachedHistory() async -> [CallSession]
+}
+
+extension CallsServicing {
+    func history(page: Int, limit: Int) async throws -> [CallSession] { try await history() }
+    func cachedHistory() async -> [CallSession] { [] }
 }
 
 final class CallsService: CallsServicing {
     private let api: APIClient
-    init(api: APIClient) { self.api = api }
+    private let cache: DiskCache
+    private static let historyCacheKey = "history"
+
+    init(api: APIClient, cache: DiskCache = DiskCache(folderName: "SignalQuestCallsHistory")) {
+        self.api = api
+        self.cache = cache
+    }
 
     func initiate(conversationId: String, mode: String) async throws -> CallSession {
         let type = mode.uppercased() == "VIDEO" || mode.lowercased() == "video" ? "VIDEO" : "AUDIO"
@@ -179,9 +223,29 @@ final class CallsService: CallsServicing {
     }
 
     func history() async throws -> [CallSession] {
+        try await history(page: 1, limit: 20)
+    }
+
+    func history(page: Int, limit: Int) async throws -> [CallSession] {
         struct Response: Decodable { let calls: [CallSession]?; let items: [CallSession]? }
-        let r: Response = try await api.request(APIEndpoint(path: "/api/calls/history"), as: Response.self)
-        return r.calls ?? r.items ?? []
+        let r: Response = try await api.request(
+            APIEndpoint(path: "/api/calls/history", query: [
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "limit", value: String(limit)),
+            ]),
+            as: Response.self
+        )
+        let calls = r.calls ?? r.items ?? []
+        if page == 1 {
+            // 1re page mémorisée pour un affichage instantané à la prochaine ouverture.
+            try? await cache.write(calls.map(CachedCallSession.init), for: Self.historyCacheKey)
+        }
+        return calls
+    }
+
+    func cachedHistory() async -> [CallSession] {
+        guard let cached = try? await cache.read([CachedCallSession].self, for: Self.historyCacheKey) else { return [] }
+        return cached.map(\.session)
     }
 }
 
@@ -189,8 +253,11 @@ private extension KeyedDecodingContainer where Key == CallSession.CodingKeys {
     func decodeLossyParticipants(forKey key: Key) throws -> [String]? {
         guard contains(key) else { return nil }
         if let values = try? decodeIfPresent([[String: String]].self, forKey: key) {
-            return values.compactMap { $0["name"] ?? $0["email"] ?? $0["id"] ?? $0["userId"] }
+            let names = values.compactMap { $0["name"] ?? $0["email"] ?? $0["id"] ?? $0["userId"] }
+            // Renvoyer nil (et non []) en cas d'échec/vide : un [] non-nil stoppait le
+            // repli `?? otherParticipants` et perdait tous les noms (CALL-DEC-A).
+            return names.isEmpty ? nil : names
         }
-        return []
+        return nil
     }
 }

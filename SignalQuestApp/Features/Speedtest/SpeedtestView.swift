@@ -23,7 +23,8 @@ struct SpeedtestView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
-    // Défaut « Auto » : préflight Cloudflare/AWS/VPS, le plus rapide gagne.
+    // Défaut « Auto » : préflight hybride iPerf3 (OVH/Bouygues/Scaleway/MilkyWan)
+    // + Cloudflare, le plus rapide gagne.
     @AppStorage("speedtest_download_target") private var downloadTargetRaw = SpeedtestDownloadTarget.hybridAuto.rawValue
     @AppStorage("speedtest_duration_seconds") private var durationSeconds = 10
     @AppStorage("speedtest_streams") private var streams = 16
@@ -246,8 +247,8 @@ struct SpeedtestView: View {
         .sheet(isPresented: $showLocationPriming) {
             LocationPrimingSheet(
                 isDenied: primingDenied,
-                onAllow: { showLocationPriming = false; performRun(requestLocation: true) },
-                onSkip: { showLocationPriming = false; performRun(requestLocation: false) }
+                onAllow: { showLocationPriming = false; dispatchConfiguredRun(requestLocation: true) },
+                onSkip: { showLocationPriming = false; dispatchConfiguredRun(requestLocation: false) }
             )
             .presentationDetents([.medium])
         }
@@ -508,9 +509,9 @@ struct SpeedtestView: View {
                 .frame(height: 1)
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: SQSpace.md), GridItem(.flexible(), spacing: SQSpace.md)], spacing: SQSpace.md) {
-                detailItem(label: "DL moyen", value: speed(result.downloadAverageMbps), highlight: true)
+                detailItem(label: "Réception moy.", value: speed(result.downloadAverageMbps), highlight: true)
                 detailItem(label: "DL max", value: speed(result.downloadMaxMbps), highlight: true)
-                detailItem(label: "UL moyen", value: speed(result.uploadAverageMbps))
+                detailItem(label: "Envoi moy.", value: speed(result.uploadAverageMbps))
                 detailItem(label: "UL max", value: speed(result.uploadMaxMbps))
                 detailItem(label: "Ping", value: ms(result.pingMinMs ?? result.pingMs), trailing: result.pingProtocol)
                 detailItem(label: "Jitter", value: ms(result.jitterMs))
@@ -578,9 +579,9 @@ struct SpeedtestView: View {
                 .fill(SQColor.separator)
                 .frame(height: 1)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: SQSpace.md), GridItem(.flexible(), spacing: SQSpace.md)], spacing: SQSpace.md) {
-                detailItem(label: "DL moyen", value: speed(s.avgDownload), highlight: true)
+                detailItem(label: "Réception moy.", value: speed(s.avgDownload), highlight: true)
                 detailItem(label: "DL max", value: speed(s.maxDownload), highlight: true)
-                detailItem(label: "UL moyen", value: speed(s.avgUpload))
+                detailItem(label: "Envoi moy.", value: speed(s.avgUpload))
                 detailItem(label: "Ping min", value: ms(s.minPing))
             }
         }
@@ -753,7 +754,9 @@ struct SpeedtestView: View {
     /// hors VPN, sans erreur de sync), sinon simple confirmation de fin.
     private var dialCompletionLabel: String? {
         guard case .finished = phase else { return nil }
-        if errorMessage == nil, mapPublicationEnabled, !isVPNActive {
+        // N'annoncer « publié sur la carte » que si le test a réellement une position
+        // (un test sans coordonnée ne peut PAS être cartographié — TEL-04).
+        if errorMessage == nil, mapPublicationEnabled, !isVPNActive, result?.coordinate != nil {
             return "publié sur la carte ✓"
         }
         return "test terminé ✓"
@@ -825,6 +828,13 @@ struct SpeedtestView: View {
             return
         }
         let requestLocation = !AppEnvironment.runsSpeedtestQA && (!guestMode || mapPublicationEnabled)
+        dispatchConfiguredRun(requestLocation: requestLocation)
+    }
+
+    /// Lance le test dans le mode CONFIGURÉ (simple / rafale ×N / continu). Utilisé
+    /// aussi par les callbacks du priming localisation, qui appelaient auparavant
+    /// `performRun` en dur — ignorant la config rafale/continu au 1er test (UXP-07).
+    private func dispatchConfiguredRun(requestLocation: Bool) {
         if burstCount == Self.continuousBurst {
             performContinuousSession(requestLocation: requestLocation)
         } else if burstCount > 1 {
@@ -1017,7 +1027,10 @@ struct SpeedtestView: View {
             loop: for index in 1...total {
                 burstProgress = (index, total)
                 do {
-                    let measured = try await executeRun(requestLocation: requestLocation && index == 1, runIndex: index, runTotal: total)
+                    // Géolocaliser CHAQUE test de la rafale (pas seulement le 1er) :
+                    // sinon les tests 2..N étaient enregistrés/publiés sans position
+                    // (TEL-06). currentLocation renvoie le fix récent en cache (peu coûteux).
+                    let measured = try await executeRun(requestLocation: requestLocation, runIndex: index, runTotal: total)
                     results.append(measured)
                 } catch is CancellationError {
                     truncatedAt = max(0, index - 1)
@@ -1504,6 +1517,9 @@ private struct SignatureSpeedDial: View {
         .frame(width: diameter, height: diameter)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityText)
+        // Le cadran change en continu pendant la mesure : VoiceOver doit relire la
+        // valeur au lieu de la lire une seule fois (A11Y-11).
+        .accessibilityAddTraits(.updatesFrequently)
     }
 
     /// Graduations + libellés de décade : rendent l'échelle log lisible.

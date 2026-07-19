@@ -163,6 +163,7 @@ struct LeaderboardsView: View {
             .padding(.horizontal, SQSpace.xl)
             .padding(.top, SQSpace.sm)
             .padding(.bottom, 96)
+            .sqReadableWidth()
         }
         .toolbar(.hidden, for: .navigationBar)
         .signalQuestBackground()

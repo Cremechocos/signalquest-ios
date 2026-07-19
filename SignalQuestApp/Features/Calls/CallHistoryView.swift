@@ -4,18 +4,50 @@ import SwiftUI
 final class CallHistoryViewModel: ObservableObject {
     @Published var calls: [CallSession] = []
     @Published var isLoading = false
+    @Published var isLoadingMore = false
     @Published var errorMessage: String?
 
     private let service: CallsServicing
+    private let pageSize = 20
+    private var page = 1
+    private var hasMore = true
     init(service: CallsServicing) { self.service = service }
 
     func load() async {
-        isLoading = true
+        // Stale-while-revalidate : afficher immédiatement la dernière liste connue
+        // (cache disque) pour ne plus bloquer sur un spinner plein écran à chaque
+        // visite, puis rafraîchir en arrière-plan.
+        if calls.isEmpty {
+            let cached = await service.cachedHistory()
+            if !cached.isEmpty { calls = cached }
+        }
+        isLoading = calls.isEmpty
         defer { isLoading = false }
+        errorMessage = nil
         do {
-            calls = try await service.history()
+            let fresh = try await service.history(page: 1, limit: pageSize)
+            calls = fresh
+            page = 1
+            hasMore = fresh.count >= pageSize
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            // Ne montrer l'erreur que si on n'a rien à afficher (sinon on garde le cache).
+            if !error.isCancellation && calls.isEmpty { errorMessage = error.localizedDescription }
+        }
+    }
+
+    func loadMore() async {
+        guard hasMore, !isLoadingMore, !isLoading else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+        do {
+            let next = try await service.history(page: page + 1, limit: pageSize)
+            guard !next.isEmpty else { hasMore = false; return }
+            let existing = Set(calls.map(\.id))
+            calls.append(contentsOf: next.filter { !existing.contains($0.id) })
+            page += 1
+            hasMore = next.count >= pageSize
+        } catch {
+            // Silencieux : on conserve la liste déjà affichée.
         }
     }
 }
@@ -49,7 +81,7 @@ struct CallHistoryView: View {
                             .background(style.soft, in: Circle())
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(call.participants?.joined(separator: ", ") ?? "Conversation")
+                            Text(call.displayName ?? call.participants?.joined(separator: ", ") ?? "Conversation")
                                 .font(SQFont.body(15, .medium))
                                 .foregroundStyle(style.isMissed ? SQColor.danger : SQColor.label)
                             if let date = call.createdAt {
@@ -73,10 +105,25 @@ struct CallHistoryView: View {
                         Image(systemName: call.mode == "video" ? "video.fill" : "phone.fill")
                             .font(.caption)
                             .foregroundStyle(SQColor.labelTertiary)
-                            .accessibilityHidden(true)
+                            // Le mode (audio/vidéo) n'existait que via cette icône masquée :
+                            // on l'expose à VoiceOver (fusionné dans la ligne, CALL-HIST-C).
+                            .accessibilityLabel(call.mode == "video" ? "Appel vidéo" : "Appel audio")
                     }
                     .listRowBackground(SQColor.surface)
                     .accessibilityElement(children: .combine)
+                    .onAppear {
+                        // Défilement infini : charge la page suivante à l'apparition
+                        // de la dernière ligne.
+                        if call.id == model.calls.last?.id {
+                            Task { await model.loadMore() }
+                        }
+                    }
+                }
+                if model.isLoadingMore {
+                    ProgressView()
+                        .tint(SQColor.brandRed)
+                        .frame(maxWidth: .infinity)
+                        .listRowBackground(Color.clear)
                 }
             } header: {
                 Text("Journal")

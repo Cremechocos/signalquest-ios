@@ -3,8 +3,16 @@ import SwiftUI
 struct StoryViewer: View {
     let stories: [SocialStory]
     @State private var index: Int = 0
-    @State private var progress: Double = 0
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverOn
+
+    /// Instant d'auto-avancement de la story courante (nil = minuteur suspendu :
+    /// clavier/feuille ouverts ou VoiceOver actif). Source de vérité unique pour la
+    /// barre de progression (via TimelineView) et l'auto-avancement (via .task),
+    /// en remplacement de l'ancien polling `while` + `Task.sleep(50ms)` (PERF-STORY-01).
+    @State private var deadline: Date? = nil
+    /// Secondes restantes gelées pendant une pause (valide quand `deadline == nil`).
+    @State private var pausedRemaining: Double? = nil
 
     var onMarkViewed: (SocialStory) -> Void = { _ in }
     /// Tap sur l'auteur dans le header — le parent ferme le viewer et pousse le profil.
@@ -44,7 +52,12 @@ struct StoryViewer: View {
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
             VStack {
-                progressBars
+                // PERF-STORY-01 : la barre se remplit via TimelineView (recalcul
+                // scopé aux seules barres, pas de mutation @State réévaluant tout
+                // le body). `paused` fige le rendu pendant les pauses.
+                TimelineView(.animation(minimumInterval: nil, paused: timerPaused)) { context in
+                    progressBars(now: context.date)
+                }
                 header
                 Spacer()
                 if currentStory?.isMine == true {
@@ -73,23 +86,26 @@ struct StoryViewer: View {
                     if value.translation.height > 80 { dismiss() }
                 }
         )
-        .task(id: index) {
-            guard !stories.isEmpty else { return }
-            if let story = currentStory { onMarkViewed(story) }
-            progress = 0
-            var elapsed: Double = 0
-            while !Task.isCancelled {
-                // En pause pendant la saisie d'une réponse (le clavier est ouvert).
-                if !replyFocused && !showViewers && !showDeleteConfirm {
-                    elapsed += 0.05
-                    progress = min(1, elapsed / duration)
-                    if elapsed >= duration {
-                        await MainActor.run { forward() }
-                        return
-                    }
-                }
-                try? await Task.sleep(nanoseconds: 50_000_000)
+        // A11Y-04 : la navigation repose sur des zones de tap invisibles pour
+        // VoiceOver ; on l'expose en actions personnalisées « précédent/suivant ».
+        .accessibilityAction(named: Text("Story suivante")) { forward() }
+        .accessibilityAction(named: Text("Story précédente")) { back() }
+        .onAppear { startStory() }
+        .onChange(of: index) { _ in startStory() }
+        // Pause/reprise du minuteur : saisie clavier, feuille « Vu par… », dialogue
+        // de suppression, ou VoiceOver actif (auto-avancement suspendu, cf. A11Y-04).
+        .onChange(of: shouldPause) { paused in
+            if paused { pause() } else { resume() }
+        }
+        // Auto-avancement : un unique sleep jusqu'à `deadline` (aucun polling 20 Hz).
+        .task(id: deadline) {
+            guard let deadline else { return }
+            let remaining = deadline.timeIntervalSinceNow
+            if remaining > 0 {
+                try? await Task.sleep(nanoseconds: UInt64((remaining * 1_000_000_000).rounded()))
             }
+            guard !Task.isCancelled else { return }
+            await MainActor.run { forward() }
         }
     }
 
@@ -100,6 +116,9 @@ struct StoryViewer: View {
                 Color.black
             }
             .ignoresSafeArea()
+            // A11Y-04 : le média n'avait aucun label VoiceOver.
+            .accessibilityElement()
+            .accessibilityLabel(mediaLabel(for: story))
         } else {
             // Story texte : canevas crème uni (nuit en sombre), typo display encre.
             ZStack {
@@ -116,7 +135,7 @@ struct StoryViewer: View {
         }
     }
 
-    private var progressBars: some View {
+    private func progressBars(now: Date) -> some View {
         HStack(spacing: SQSpace.xs) {
             ForEach(stories.indices, id: \.self) { i in
                 GeometryReader { proxy in
@@ -124,7 +143,7 @@ struct StoryViewer: View {
                         .overlay(alignment: .leading) {
                             // Jauge au langage Crème : remplissage brique uni.
                             Capsule().fill(SQColor.brandRed)
-                                .frame(width: proxy.size.width * fillRatio(for: i))
+                                .frame(width: proxy.size.width * fillRatio(for: i, now: now))
                         }
                 }
                 .frame(height: 3)
@@ -292,10 +311,70 @@ struct StoryViewer: View {
         return stories[index]
     }
 
-    private func fillRatio(for i: Int) -> Double {
-        if i < index { return 1 }
-        if i == index { return progress }
+    // MARK: - Minuteur de progression (sans polling)
+
+    /// Le minuteur est suspendu (barre figée) dès que `deadline` est nil.
+    private var timerPaused: Bool { deadline == nil }
+
+    /// Conditions qui suspendent le minuteur : saisie clavier, feuilles/dialogues
+    /// ouverts, ou VoiceOver actif (l'utilisateur avance manuellement, cf. A11Y-04).
+    private var shouldPause: Bool {
+        replyFocused || showViewers || showDeleteConfirm || voiceOverOn
+    }
+
+    /// Secondes écoulées sur la story courante à l'instant `now`.
+    private func currentElapsed(now: Date) -> Double {
+        if let deadline {
+            return min(duration, max(0, duration - deadline.timeIntervalSince(now)))
+        }
+        if let pausedRemaining {
+            return min(duration, max(0, duration - pausedRemaining))
+        }
         return 0
+    }
+
+    private func fillRatio(for i: Int, now: Date) -> Double {
+        if i < index { return 1 }
+        if i > index { return 0 }
+        // Sous VoiceOver, aucun minuteur : la barre active est montrée pleine.
+        if voiceOverOn { return 1 }
+        return currentElapsed(now: now) / duration
+    }
+
+    /// Démarre (ou redémarre) la story courante : marque « vue » puis arme le
+    /// minuteur — sauf si une pause est déjà active (clavier/feuille/VoiceOver).
+    private func startStory() {
+        guard let story = currentStory else { return }
+        onMarkViewed(story)
+        if shouldPause {
+            pausedRemaining = duration
+            deadline = nil
+        } else {
+            pausedRemaining = nil
+            deadline = Date().addingTimeInterval(duration)
+        }
+    }
+
+    /// Gèle le temps restant et suspend l'auto-avancement.
+    private func pause() {
+        guard let deadline else { return }
+        pausedRemaining = max(0, deadline.timeIntervalSinceNow)
+        self.deadline = nil
+    }
+
+    /// Reprend le décompte à partir du temps restant gelé.
+    private func resume() {
+        guard let pausedRemaining else { return }
+        deadline = Date().addingTimeInterval(pausedRemaining)
+        self.pausedRemaining = nil
+    }
+
+    /// Label VoiceOver du média d'une story (aucun n'existait auparavant, A11Y-04).
+    private func mediaLabel(for story: SocialStory) -> String {
+        if let text = story.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
+            return "Story de \(story.author.displayName) : \(text)"
+        }
+        return "Story de \(story.author.displayName)"
     }
 
     private func forward() {

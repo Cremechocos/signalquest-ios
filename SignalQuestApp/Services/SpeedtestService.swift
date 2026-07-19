@@ -560,7 +560,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         } catch {
             // Sauvetage : DL iPerf3 impossible sur toute la plage → moteur
             // Cloudflare (résultat complet plutôt qu'une erreur sèche).
-            print("[SpeedtestService] DL iPerf3 KO (\(error.localizedDescription)) — bascule Cloudflare")
+            sqDebugLog("[SpeedtestService] DL iPerf3 KO (\(error.localizedDescription)) — bascule Cloudflare")
             return try await runCloudflareTest(
                 pathStatus: pathStatus,
                 location: location,
@@ -580,7 +580,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         guard dlResult.measuredBytes > 100_000, dlResult.measuredDuration >= 1.0 else {
             // Même sauvetage : un DL quasi vide (POP saturé) vaut une bascule,
             // pas un échec du test.
-            print("[SpeedtestService] DL iPerf3 incomplet (\(dlResult.measuredBytes) octets) — bascule Cloudflare")
+            sqDebugLog("[SpeedtestService] DL iPerf3 incomplet (\(dlResult.measuredBytes) octets) — bascule Cloudflare")
             return try await runCloudflareTest(
                 pathStatus: pathStatus,
                 location: location,
@@ -766,13 +766,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     throw CancellationError()
                 } catch {
                     lastULError = error
-                    print("[SpeedtestService] Upload attempt \(attemptIndex + 1) failed (streams=\(ulStreams) portPref=\(preferred)): \(error.localizedDescription)")
+                    sqDebugLog("[SpeedtestService] Upload attempt \(attemptIndex + 1) failed (streams=\(ulStreams) portPref=\(preferred)): \(error.localizedDescription)")
                     // Court backoff avant le second essai (RST / busy).
                     try? await Task.sleep(nanoseconds: 350_000_000)
                 }
             }
             if !didUpload, let lastULError {
-                print("[SpeedtestService] Upload failed (best-effort, DL only): \(lastULError.localizedDescription)")
+                sqDebugLog("[SpeedtestService] Upload failed (best-effort, DL only): \(lastULError.localizedDescription)")
             }
         } catch is CancellationError {
             ulLoadedPingsTask.cancel()
@@ -949,7 +949,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         do {
             try await appendHistory(result)
         } catch {
-            print("SQ_IPERF history save failed: \(error.localizedDescription)")
+            sqDebugLog("SQ_IPERF history save failed: \(error.localizedDescription)")
         }
 
         progress?(SpeedtestLiveProgress(
@@ -1068,7 +1068,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 
         try Task.checkCancellation()
         guard dlOutcome.bytes > 100_000, dlOutcome.duration >= 1.0 else {
-            print("SQ_CLOUDFLARE DL insuffisant : \(dlOutcome.bytes) octets en \(String(format: "%.1f", dlOutcome.duration))s (edge \(colo ?? "?"))")
+            sqDebugLog("SQ_CLOUDFLARE DL insuffisant : \(dlOutcome.bytes) octets en \(String(format: "%.1f", dlOutcome.duration))s (edge \(colo ?? "?"))")
             throw SpeedtestEngineError.noServerReachable
         }
         let dlStats = dlSamplesBox.publicStats(
@@ -1288,7 +1288,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                             if Task.isCancelled || Date() >= deadline { break }
                             if !didLogFailure.value {
                                 didLogFailure.value = true
-                                print("SQ_CLOUDFLARE \(direction == .download ? "DL" : "UL") requête échouée : \(error.localizedDescription)")
+                                sqDebugLog("SQ_CLOUDFLARE \(direction == .download ? "DL" : "UL") requête échouée : \(error.localizedDescription)")
                             }
                             // Requête ratée : court répit puis nouvel essai
                             // dans la fenêtre restante.
@@ -1648,23 +1648,14 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         await pendingStore.loadAll()
     }
 
-    private func writePendingSaves(_ values: [PendingSpeedtestSave]) async throws {
-        try await pendingStore.replaceAll(values)
-    }
-
     private func upsertPendingSave(_ pending: PendingSpeedtestSave) async throws {
-        var values = await pendingSaves().filter { $0.id != pending.id }
-        values.append(pending)
-        try await writePendingSaves(values)
+        // Atomique côté store (iOS 17+) : plus de read-modify-write dans ce service
+        // non isolé, donc plus de perte si deux sauvegardes s'enchaînent (ROB-11).
+        try await pendingStore.upsert(pending)
     }
 
     private func removePendingSave(id: String) async {
-        let values = await pendingSaves().filter { $0.id != id }
-        do {
-            try await writePendingSaves(values)
-        } catch {
-            print("SQ_IPERF pending save cleanup failed: \(error.localizedDescription)")
-        }
+        await pendingStore.remove(id: id)
     }
 
     private func submitPendingSave(_ pending: PendingSpeedtestSave) async throws {
@@ -1751,23 +1742,18 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private func flushPendingSaves(excluding excludedIds: Set<String> = []) async throws {
         let pending = await pendingSaves()
         guard !pending.isEmpty else { return }
-        var remaining: [PendingSpeedtestSave] = []
         var firstError: Error?
+        // Retrait par id APRÈS chaque envoi réussi, plutôt qu'un `replaceAll` final
+        // depuis ce snapshot périmé : un test sauvegardé hors-ligne pendant la
+        // fenêtre réseau du flush n'est plus écrasé (ROB-11). Les entrées exclues
+        // et les échecs restent simplement en place.
         for item in pending where !excludedIds.contains(item.id) {
             do {
                 try await submitPendingSave(item)
+                await pendingStore.remove(id: item.id)
             } catch {
-                remaining.append(item)
                 if firstError == nil { firstError = error }
             }
-        }
-        for item in pending where excludedIds.contains(item.id) {
-            remaining.append(item)
-        }
-        do {
-            try await writePendingSaves(remaining)
-        } catch {
-            print("SQ_IPERF flush save failed: \(error.localizedDescription)")
         }
         if let firstError { throw firstError }
     }
@@ -3505,6 +3491,12 @@ struct PendingSpeedtestSave: Codable, Equatable, Sendable {
 protocol SpeedtestPendingStoring: Sendable {
     func loadAll() async -> [PendingSpeedtestSave]
     func replaceAll(_ values: [PendingSpeedtestSave]) async throws
+    /// Insère/remplace UNE entrée (par `id`) de façon atomique côté store. Évite le
+    /// read-modify-write multi-appels de l'ancien chemin, où deux ajouts concurrents
+    /// (ou un ajout concurrent d'un flush réseau en cours) s'écrasaient (ROB-11).
+    func upsert(_ value: PendingSpeedtestSave) async throws
+    /// Retire UNE entrée par `id` de façon atomique (no-op si absente).
+    func remove(id: String) async
 }
 
 /// Fabrique : SwiftData si iOS 17+ ET l'init réussit (migration depuis la file durable),
@@ -3536,6 +3528,20 @@ struct DiskCacheSpeedtestPendingStore: SpeedtestPendingStoring {
         } else {
             try await cache.write(values, for: key)
         }
+    }
+
+    // Repli iOS 16 : read-modify-write (la fenêtre de course subsiste sur ce
+    // chemin minoritaire, mais l'opération est centralisée et la file reste
+    // petite). Le chemin principal iOS 17+ (SwiftData) est, lui, atomique.
+    func upsert(_ value: PendingSpeedtestSave) async throws {
+        var values = await loadAll().filter { $0.id != value.id }
+        values.append(value)
+        try await replaceAll(values)
+    }
+
+    func remove(id: String) async {
+        let values = await loadAll().filter { $0.id != id }
+        try? await replaceAll(values)
     }
 }
 
@@ -3605,6 +3611,36 @@ actor SwiftDataSpeedtestPendingStore: SpeedtestPendingStoring {
             ))
         }
         try context.save()
+    }
+
+    func upsert(_ value: PendingSpeedtestSave) async throws {
+        await importLegacyIfPresent()
+        // Après ce point de suspension, tout est synchrone (encode/fetch/delete/
+        // insert/save) : la réentrance d'acteur ne peut PAS s'intercaler, donc le
+        // remplacement de cette entrée est atomique vis-à-vis d'un autre upsert /
+        // remove concurrent (ROB-11).
+        let payload = try encoder.encode(value)
+        let targetId = value.id
+        let existing = (try? context.fetch(FetchDescriptor<SpeedtestPendingEntity>(
+            predicate: #Predicate { $0.saveId == targetId }
+        ))) ?? []
+        for entity in existing { context.delete(entity) }
+        context.insert(SpeedtestPendingEntity(
+            saveId: value.id,
+            createdAtMs: Int(value.createdAt.timeIntervalSince1970 * 1_000),
+            payload: payload
+        ))
+        try context.save()
+    }
+
+    func remove(id: String) async {
+        await importLegacyIfPresent()
+        let matches = (try? context.fetch(FetchDescriptor<SpeedtestPendingEntity>(
+            predicate: #Predicate { $0.saveId == id }
+        ))) ?? []
+        guard !matches.isEmpty else { return }
+        for entity in matches { context.delete(entity) }
+        try? context.save()
     }
 
     /// Import unique depuis la file durable JSON (`DiskCache`) au premier `loadAll`, puis

@@ -1,6 +1,14 @@
 import Foundation
 import os
 
+extension Notification.Name {
+    /// Émis quand une requête AUTHENTIFIÉE reçoit un 401 que le refresh n'a PAS pu
+    /// récupérer (session réellement expirée : cookie JWT périmé, pas de refresh
+    /// glissant). `AuthSessionViewModel` l'observe pour re-router globalement vers
+    /// l'écran de login au lieu de laisser des écritures échouer en silence (ROB-02).
+    static let sqAuthSessionExpired = Notification.Name("fr.signalquest.ios.authSessionExpired")
+}
+
 protocol APIClientProtocol: Sendable {
     func request<T: Decodable>(_ endpoint: APIEndpoint, as type: T.Type) async throws -> T
     func request(_ endpoint: APIEndpoint) async throws
@@ -257,9 +265,19 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             do {
                 try await ensureRefreshed()
             } catch {
+                // Refresh impossible → session morte : signaler globalement pour
+                // re-router vers login (ROB-02) plutôt que laisser l'appelant avaler
+                // le 401 (souvent via `try?`).
+                notifySessionExpired()
                 throw APIError.http(status: status, code: code, message: message, requestId: requestId, retryAfter: retryAfter)
             }
-            return try await perform(endpoint)
+            do {
+                return try await perform(endpoint)
+            } catch APIError.http(let retryStatus, let retryCode, let retryMessage, let retryRequestId, let retryRetryAfter) where retryStatus == 401 {
+                // Refresh « réussi » mais le token reste rejeté → session morte.
+                notifySessionExpired()
+                throw APIError.http(status: retryStatus, code: retryCode, message: retryMessage, requestId: retryRequestId, retryAfter: retryRetryAfter)
+            }
         } catch APIError.http(let status, let code, let message, let requestId, let retryAfter)
             where (status == 429 || status == 503) && attempt < Self.maxThrottleRetries {
             // Rate-limited / unavailable: back off (honoring a reasonable Retry-After)
@@ -279,6 +297,13 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     /// refresh laisse simplement la reconnexion suivante échouer puis reboucler.
     func refreshSession() async {
         try? await ensureRefreshed()
+    }
+
+    /// Diffuse « session expirée » (ROB-02). `NotificationCenter` est thread-safe ;
+    /// l'observateur (AuthSessionViewModel) rebascule sur le main actor. Idempotent :
+    /// plusieurs posts rapprochés se résolvent en un seul passage `.loggedOut`.
+    private func notifySessionExpired() {
+        NotificationCenter.default.post(name: .sqAuthSessionExpired, object: nil)
     }
 
     private func ensureRefreshed() async throws {

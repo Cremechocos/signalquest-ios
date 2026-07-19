@@ -91,6 +91,9 @@ struct SavedMessagesView: View {
                     }
                 }
             }
+            // Regroupe conversation + extrait + auteur/date en un seul élément
+            // VoiceOver, sans absorber le bouton « Retirer » (A11Y-1).
+            .accessibilityElement(children: .combine)
             Spacer(minLength: SQSpace.sm)
             Button {
                 Task { await remove(entry) }

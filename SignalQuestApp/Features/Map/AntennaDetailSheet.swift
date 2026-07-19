@@ -384,7 +384,7 @@ struct AntennaDetailSheet: View {
                 detailRow("Hauteur support", core.siteInfo.supportHeight)
                 detailRow("Propriétaire", core.siteInfo.supportOwner ?? core.rawLicenseeName)
                 detailRow("Secteurs", core.siteInfo.sectorCount.map(String.init))
-                detailRow("FH", core.technical.hasFh.map { $0 ? "Oui" : "Non" })
+                detailRow("Faisceau hertzien", core.technical.hasFh.map { $0 ? "Oui" : "Non" })
                 detailRow("Première activation", core.siteInfo.firstActivation)
                 detailRow("Dernière mise en service", core.siteInfo.lastCommissioned)
             }
@@ -393,7 +393,7 @@ struct AntennaDetailSheet: View {
 
             if !core.cellIdentifiers.enb.isEmpty || !core.cellIdentifiers.gnb.isEmpty || !core.cellIdentifiers.pci.isEmpty || !core.cellIdentifiers.cellId.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
-                        AntennaSectionHeader(kicker: "Réseau", title: "Identifiants serveur", systemImage: "number")
+                        AntennaSectionHeader(kicker: "Réseau", title: "Identifiants radio", systemImage: "number")
                         detailRow("eNB", core.cellIdentifiers.enb.prefix(8).joined(separator: " · "))
                         detailRow("gNB", core.cellIdentifiers.gnb.prefix(8).joined(separator: " · "))
                         if !core.cellIdentifiers.pci.isEmpty {
@@ -435,7 +435,7 @@ struct AntennaDetailSheet: View {
                                 HStack {
                                     SQEditorialTag(text: carrier.bandLabel ?? carrier.technology ?? "Radio", color: SQBrand.techColor(carrier.technology ?? ""))
                                     Spacer()
-                                    Text(carrier.source ?? "Backend")
+                                    Text(carrier.source ?? "Officiel")
                                         .font(SQType.micro)
                                         .foregroundStyle(SQColor.labelTertiary)
                                 }

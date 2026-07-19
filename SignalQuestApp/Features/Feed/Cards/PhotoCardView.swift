@@ -101,6 +101,17 @@ struct PhotoCardView: View {
                 withAnimation(SQMotion.resolve(.snappy(duration: 0.25), reduceMotion)) { likeBurst = false }
             }
         }
-        .accessibilityLabel("Photo du site")
+        .accessibilityLabel(photoAccessibilityLabel)
+    }
+
+    /// Décrit la photo pour VoiceOver à partir de la légende du post ou du lieu,
+    /// au lieu d'un générique « Photo du site » (A11Y-12).
+    private var photoAccessibilityLabel: String {
+        let caption = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !caption.isEmpty { return "Photo. \(caption)" }
+        if let place = (item.signal?.city ?? item.placeLabel), !place.isEmpty {
+            return "Photo à \(place)"
+        }
+        return "Photo partagée"
     }
 }

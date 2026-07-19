@@ -41,6 +41,26 @@ struct CoveragePointUpload: Codable, Equatable, Sendable {
     }
 }
 
+extension CoveragePointUpload {
+    /// Réduit la précision des coordonnées avant persistance/envoi au backend, pour
+    /// respecter la minimisation (RGPD art. 5.1.c). 3 décimales ≈ 111 m, aligné sur
+    /// la troncature des speedtests (`SpeedtestPayload.minimizedCoordinates`). La
+    /// trace locale du Drive Test (`coverageTrail`) conserve, elle, la précision.
+    func minimizedCoordinates() -> CoveragePointUpload {
+        func round3(_ value: Double) -> Double { (value * 1000).rounded() / 1000 }
+        return CoveragePointUpload(
+            localId: localId,
+            latitude: round3(latitude),
+            longitude: round3(longitude),
+            timestamp: timestamp,
+            technology: technology,
+            downloadMbps: downloadMbps,
+            uploadMbps: uploadMbps,
+            pingMs: pingMs
+        )
+    }
+}
+
 /// Session de couverture iOS à téléverser (`POST /api/coverage/session/import-ios`).
 /// `sessionId` est repris par le backend dans `sourceSessionId` et sert aussi à
 /// construire l'en-tête d'idempotence stable lors de chaque rejeu.
@@ -257,6 +277,13 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
         try finalizeCoverageDraft(session)
         do {
             try await flushPendingCoverageSessions()
+            // F-07 : un flush déjà en vol (coalescé) a pu lire la file AVANT la
+            // finalisation de cette session ; l'await se termine alors sans l'avoir
+            // soumise. Si elle est toujours en file, on relance un flush DÉDIÉ pour
+            // ne pas annoncer « Couverture envoyée » alors qu'elle n'est que mise en file.
+            if (try? queue.contains(sessionId: session.sessionId)) == true {
+                try await flushPendingCoverageSessions()
+            }
         } catch {
             // Une autre entrée de la file peut avoir échoué après que celle demandée
             // a réussi. Dans ce cas, l'appel courant est bien un succès.

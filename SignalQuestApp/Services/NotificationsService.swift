@@ -44,7 +44,10 @@ struct AppNotification: Codable, Identifiable, Equatable {
         type = try c.decodeIfPresent(String.self, forKey: .type)
         title = try c.decodeIfPresent(String.self, forKey: .title)
         message = try c.decodeIfPresent(String.self, forKey: .message)
-        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
+        // `try?` (et non `try`) : la stratégie de date JETTE sur une chaîne non
+        // parsable (ex. ""), ce que decodeIfPresent n'avale pas → une seule notif
+        // à date invalide faisait échouer toute la liste (ROB-03).
+        createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt)
         read = try c.decodeIfPresent(Bool.self, forKey: .read)
         link = try c.decodeIfPresent(String.self, forKey: .link)
         if let object = try? c.decodeIfPresent([String: JSONValue].self, forKey: .metadata) {
@@ -71,9 +74,17 @@ final class NotificationsService: NotificationsServicing {
     init(api: APIClient) { self.api = api }
 
     func list(cursor: String? = nil) async throws -> [AppNotification] {
-        struct Response: Codable {
+        struct Response: Decodable {
             let notifications: [AppNotification]?
             let items: [AppNotification]?
+            enum CodingKeys: String, CodingKey { case notifications, items }
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                // Décodage par élément : une notification malformée est ignorée au
+                // lieu de faire échouer toute la liste (ROB-03).
+                notifications = c.contains(.notifications) ? c.decodeLossyElementArray([AppNotification].self, forKey: .notifications) : nil
+                items = c.contains(.items) ? c.decodeLossyElementArray([AppNotification].self, forKey: .items) : nil
+            }
         }
         var query: [URLQueryItem] = []
         if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }

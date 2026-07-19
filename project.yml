@@ -65,14 +65,16 @@ targets:
     dependencies:
       - package: LiveKit
         product: LiveKit
-      # Firebase (Analytics inclut FirebaseCore, importé dans AppDelegate/SignalQuestApp).
-      # NB: doit rester dans project.yml — sinon `xcodegen generate` retire le lien.
-      - package: Firebase
-        product: FirebaseAnalytics
-      # FirebaseMessaging est importé dans AppDelegate (push FCM) — doit aussi être
+      # FirebaseMessaging (push FCM, importé dans AppDelegate) tire FirebaseCore :
+      # pas besoin de lier FirebaseAnalytics (retiré — collecte sans consentement +
+      # ~9,4 Mo de SDK, dont le SDK publicitaire, embarqués pour rien). Doit rester
       # déclaré ici, sinon `xcodegen generate` retire le lien (module non résolu).
       - package: Firebase
         product: FirebaseMessaging
+      # Crash reporting en production. Auto-initialisé après FirebaseApp.configure().
+      # (L'upload des dSYM se fait via une étape CI dédiée — cf. plan T1-11.)
+      - package: Firebase
+        product: FirebaseCrashlytics
       # Extension widget (embarquée dans l'app).
       - target: SignalQuestWidget
         embed: true
@@ -153,6 +155,7 @@ schemes:
       gatherCoverageData: true
     run:
       config: Debug
+      storeKitConfiguration: SignalQuest.storekit
     archive:
       config: Release
   SignalQuest Beta:

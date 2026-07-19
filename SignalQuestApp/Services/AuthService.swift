@@ -25,6 +25,15 @@ protocol AuthServicing: Sendable {
     /// QA `--reset-auth` : efface la session LOCALE (credentials + clés E2EE)
     /// sans révoquer le token côté serveur — contrairement à `logout()`.
     func clearLocalSessionForDebugQA() async
+    /// Efface la session LOCALE (credentials + clés E2EE + utilisateur en cache)
+    /// SANS appel réseau. Utilisé sur session expirée (ROB-02) : pas de POST logout
+    /// (qui re-échouerait en 401 et boucherait), juste le nettoyage local.
+    func clearLocalSession() async
+    /// PERF-START-01 : mémorise le dernier utilisateur authentifié pour un démarrage
+    /// à froid optimiste (affichage immédiat + revalidation en arrière-plan).
+    func cacheUser(_ user: AuthUser)
+    /// Dernier utilisateur authentifié connu (Keychain), ou `nil`.
+    func cachedUser() -> AuthUser?
     /// E2EE-WIPE-02 : purge les clés E2EE si l'utilisateur authentifié diffère du
     /// dernier connu sur cet appareil (changement de compte sans logout, ex.
     /// expiration de session). À appeler avant de passer en `.authenticated`.
@@ -34,6 +43,9 @@ protocol AuthServicing: Sendable {
 extension AuthServicing {
     func installAuthTokenForDebugQA(_ token: String) {}
     func clearLocalSessionForDebugQA() async {}
+    func clearLocalSession() async {}
+    func cacheUser(_ user: AuthUser) {}
+    func cachedUser() -> AuthUser? { nil }
     func hasStoredCredentials() -> Bool { false }
     func wipeE2EEIfIdentityChanged(to userId: String) async {}
 }
@@ -41,10 +53,15 @@ extension AuthServicing {
 final class AuthService: AuthServicing {
     private let api: APIClient
     private let e2ee: E2EEServicing?
+    /// Keychain AUTH (`fr.signalquest.ios`, `afterFirstUnlock`) : même service que le
+    /// token, donc lisible au cold start dans les mêmes conditions.
+    private let sessionStore: TokenStore
+    private static let cachedUserKey = "cachedAuthUser"
 
-    init(api: APIClient, e2ee: E2EEServicing? = nil) {
+    init(api: APIClient, e2ee: E2EEServicing? = nil, sessionStore: TokenStore = KeychainStore()) {
         self.api = api
         self.e2ee = e2ee
+        self.sessionStore = sessionStore
     }
 
     // MARK: Login / signup
@@ -166,13 +183,36 @@ final class AuthService: AuthServicing {
         // different account on this device can never reuse the keys.
         await e2ee?.wipeLocalKeys()
         api.credentials.clearAll()
+        try? sessionStore.remove(Self.cachedUserKey)
+    }
+
+    func clearLocalSession() async {
+        // Purge locale complète, sans appel réseau (utilisée sur session expirée).
+        await e2ee?.wipeLocalKeys()
+        api.credentials.clearAll()
+        try? sessionStore.remove(Self.cachedUserKey)
     }
 
     func clearLocalSessionForDebugQA() async {
         // Même purge locale que `logout()`, sans l'appel serveur : le JWT reste
         // valide pour les autres passes QA (tours UI avec token injecté).
-        await e2ee?.wipeLocalKeys()
-        api.credentials.clearAll()
+        await clearLocalSession()
+    }
+
+    func cacheUser(_ user: AuthUser) {
+        guard
+            let data = try? JSONEncoder.signalQuest.encode(user),
+            let json = String(data: data, encoding: .utf8)
+        else { return }
+        try? sessionStore.set(json, for: Self.cachedUserKey)
+    }
+
+    func cachedUser() -> AuthUser? {
+        guard
+            let json = try? sessionStore.string(for: Self.cachedUserKey),
+            let data = json.data(using: .utf8)
+        else { return nil }
+        return try? JSONDecoder.signalQuest.decode(AuthUser.self, from: data)
     }
 
     func wipeE2EEIfIdentityChanged(to userId: String) async {
@@ -228,12 +268,46 @@ final class AuthSessionViewModel: ObservableObject {
     @Published var isBusy = false
 
     private let service: AuthServicing
+    // Écrit une seule fois (init, MainActor), lu une seule fois (deinit, quand plus
+    // aucune autre référence n'existe) → `nonisolated(unsafe)` sûr pour permettre le
+    // retrait de l'observateur depuis le deinit nonisolé.
+    private nonisolated(unsafe) var sessionExpiredObserver: NSObjectProtocol?
 
     init(service: AuthServicing) {
         self.service = service
         if AppEnvironment.usesDemoData {
             state = .authenticated(AuthUser.mock)
         }
+        // ROB-02 : une requête authentifiée dont le 401 n'a pas pu être récupéré
+        // par le refresh diffuse `sqAuthSessionExpired`. On rebascule alors
+        // globalement vers l'écran de login au lieu de laisser des écritures
+        // échouer en silence.
+        sessionExpiredObserver = NotificationCenter.default.addObserver(
+            forName: .sqAuthSessionExpired, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.handleSessionExpired() }
+        }
+    }
+
+    deinit {
+        if let sessionExpiredObserver {
+            NotificationCenter.default.removeObserver(sessionExpiredObserver)
+        }
+    }
+
+    /// ROB-02 : bascule vers login sur session expirée. `.loggedOut` est posé AVANT
+    /// le nettoyage asynchrone pour qu'une notification ré-entrante (autres requêtes
+    /// 401 concurrentes) voie déjà l'état déconnecté et devienne un no-op (pas de
+    /// boucle, pas de POST logout qui re-échouerait).
+    private func handleSessionExpired() {
+        // Mode démo / QA : la session est un utilisateur mock SANS vrai token — tout
+        // appel authentifié renvoie 401, ce qui déclencherait à tort une déconnexion.
+        // On ne réagit jamais au signal dans ce mode (parité avec le guard de bootstrap).
+        guard !AppEnvironment.usesDemoData else { return }
+        guard case .authenticated = state else { return }
+        state = .loggedOut
+        infoMessage = "Ta session a expiré. Reconnecte-toi pour continuer."
+        Task { await service.clearLocalSession() }
     }
 
     /// E2EE-WIPE-02 : centralise tous les passages RÉELS en `.authenticated`. Purge
@@ -243,6 +317,8 @@ final class AuthSessionViewModel: ObservableObject {
     private func setAuthenticated(_ user: AuthUser) async {
         await service.wipeE2EEIfIdentityChanged(to: user.id)
         state = .authenticated(user)
+        // PERF-START-01 : mémorise l'utilisateur pour un prochain cold start optimiste.
+        service.cacheUser(user)
     }
 
     func bootstrap() async {
@@ -260,6 +336,16 @@ final class AuthSessionViewModel: ObservableObject {
             state = .loggedOut
             return
         }
+        // PERF-START-01 : démarrage à froid optimiste. Si on a un token ET un
+        // utilisateur en cache, afficher l'app IMMÉDIATEMENT puis revalider
+        // `/api/auth/me` en arrière-plan (stale-while-revalidate) au lieu de bloquer
+        // l'UI jusqu'à 30 s sur le réseau. La revalidation corrige l'utilisateur
+        // affiché et déconnecte proprement si la session a été révoquée.
+        if service.hasStoredCredentials(), let cached = service.cachedUser() {
+            state = .authenticated(cached)
+            Task { await revalidateSession() }
+            return
+        }
         do {
             let user = try await service.me()
             await setAuthenticated(user)
@@ -271,11 +357,34 @@ final class AuthSessionViewModel: ObservableObject {
                 // Network problem at launch — keep the session and offer a retry
                 // instead of bouncing a logged-in user to the login screen.
                 state = service.hasStoredCredentials() ? .offline : .loggedOut
+            case .http(let status, _, _, _, _) where status >= 500 || status == 429:
+                // Panne / backpressure serveur au lancement : ne pas déconnecter un
+                // utilisateur authentifié (le login échouerait aussi). Proposer un
+                // réessai via l'écran « offline » plutôt que l'écran de login (ROB-03).
+                state = service.hasStoredCredentials() ? .offline : .loggedOut
             default:
                 state = .loggedOut
             }
         } catch {
             state = .loggedOut
+        }
+    }
+
+    /// Revalidation d'arrière-plan après un affichage optimiste (PERF-START-01).
+    /// Succès → rafraîchit l'utilisateur affiché ; 401/403 → déconnexion propre ;
+    /// réseau/serveur → on conserve l'affichage optimiste (déjà `.authenticated`).
+    private func revalidateSession() async {
+        do {
+            let user = try await service.me()
+            await setAuthenticated(user)
+        } catch let error as APIError {
+            if case .http(let status, _, _, _, _) = error, status == 401 || status == 403 {
+                state = .loggedOut
+                await service.clearLocalSession()
+            }
+            // transport / 5xx / annulation : garder l'affichage optimiste.
+        } catch {
+            // garder l'affichage optimiste.
         }
     }
 
@@ -291,6 +400,7 @@ final class AuthSessionViewModel: ObservableObject {
         guard case .authenticated = state else { return }
         if let user = try? await service.me() {
             state = .authenticated(user)
+            service.cacheUser(user)
         }
     }
 

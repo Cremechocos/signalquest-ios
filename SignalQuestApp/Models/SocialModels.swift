@@ -9,6 +9,27 @@ struct SocialFeedPage: Codable, Equatable {
     let requestId: String?
 }
 
+extension SocialFeedPage {
+    private enum CodingKeys: String, CodingKey {
+        case items, nextCursor, stories, trendingHashtags, suggestedUsers, requestId
+    }
+
+    // init(from:) en EXTENSION pour préserver l'init memberwise (utilisé pour le
+    // mode démo et les mises à jour locales du feed). Décodage tolérant : un post
+    // malformé ne vide pas tout le feed (décodage par élément), et les sections non
+    // demandées selon `include=` (stories/trends/suggestions) peuvent être absentes
+    // sans faire échouer tout l'appel — au lieu du `keyNotFound` fatal (ROB-02).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        items = c.decodeLossyElementArray([UnifiedSocialFeedItem].self, forKey: .items)
+        nextCursor = try c.decodeIfPresent(String.self, forKey: .nextCursor)
+        stories = c.decodeLossyElementArray([SocialStory].self, forKey: .stories)
+        trendingHashtags = c.decodeLossyElementArray([TrendingHashtag].self, forKey: .trendingHashtags)
+        suggestedUsers = c.decodeLossyElementArray([SocialFeedAuthor].self, forKey: .suggestedUsers)
+        requestId = try c.decodeIfPresent(String.self, forKey: .requestId)
+    }
+}
+
 struct TrendingHashtag: Codable, Identifiable, Equatable {
     let tag: String
     let postCount: Int
@@ -150,7 +171,9 @@ struct NetworkPulse: Decodable, Equatable {
         avgRsrpDbm = intFlex(.avgRsrpDbm)
         medianDownloadMbps = intFlex(.medianDownloadMbps)
         measurementsCount = intFlex(.measurementsCount) ?? 0
-        bestOperator = try c.decodeIfPresent(String.self, forKey: .bestOperator)
+        // Tolérant comme les autres champs : un bestOperator renvoyé en nombre ne
+        // doit pas faire échouer tout le décodage du pouls réseau (ROB-06).
+        bestOperator = c.decodeFlexibleString(forKey: .bestOperator)
         radiusMeters = intFlex(.radiusMeters)
     }
 

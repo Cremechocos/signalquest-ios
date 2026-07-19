@@ -29,8 +29,11 @@ enum LiveShareMode: String, Codable, Sendable, CaseIterable, Identifiable {
     /// Position publiée uniquement pendant que la carte des amis est ouverte
     /// (défaut). Économe, aucune permission « Toujours » requise.
     case mapOpenOnly = "map_open_only"
-    /// Position publiée en continu via un suivi de premier plan, même carte
-    /// fermée. Exige la localisation « Toujours » + un usage background.
+    /// Position publiée en continu tant que l'app est ouverte au premier plan,
+    /// même quand la carte des amis est fermée. Ne fonctionne PAS app fermée :
+    /// la boucle de présence se suspend en arrière-plan (aucune autorisation
+    /// « Toujours » n'est demandée), sauf pendant un Drive Test qui garde l'app
+    /// active.
     case foregroundLive = "foreground_live"
 
     var id: String { rawValue }
@@ -38,7 +41,7 @@ enum LiveShareMode: String, Codable, Sendable, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .mapOpenOnly: return "Carte ouverte seulement"
-        case .foregroundLive: return "Continu en arrière-plan"
+        case .foregroundLive: return "Continu (app ouverte)"
         }
     }
 
@@ -47,7 +50,7 @@ enum LiveShareMode: String, Codable, Sendable, CaseIterable, Identifiable {
         case .mapOpenOnly:
             return "Ta position n'est partagée que lorsque tu consultes la carte des amis."
         case .foregroundLive:
-            return "Ta position reste partagée même l'app fermée, tant que le partage est actif."
+            return "Ta position reste partagée en continu tant que SignalQuest est ouverte, même sans consulter la carte des amis, ou pendant un Drive Test actif. Le partage se met en pause dès que l'app passe en arrière-plan."
         }
     }
 }

@@ -25,6 +25,9 @@ struct SignalQuestHomeView: View {
     /// Comparaison des opérateurs au tap sur une tuile du pouls (métrique choisie).
     @State private var comparisonMetric: NearbyOperatorMetric = .download
     @State private var showOperatorComparison = false
+    /// Horodatage du dernier rafraîchissement réel de « Autour de toi » (throttle
+    /// des refetch pouls/mesures à chaque foreground/retour d'onglet — PERF-HOME-01).
+    @State private var lastNearbyRefreshAt: Date = .distantPast
 
     private let gridColumns = [
         GridItem(.flexible(), spacing: 14),
@@ -49,6 +52,7 @@ struct SignalQuestHomeView: View {
             .padding(.horizontal, SQSpace.xl)
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
+            .sqReadableWidth()
         }
         // Directement sur le ScrollView : signalQuestBackground() enveloppe
         // dans un ZStack, et onScrollGeometryChange n'observe que la vue à
@@ -185,7 +189,7 @@ struct SignalQuestHomeView: View {
         // (peu lisible en un coup d'œil sur la pastille).
         if !networkStatus.isConstrained, let quality = networkQuality {
             if let mbps = quality.medianDownloadMbps {
-                return "\(quality.operatorLabel) · \(mbps) Mb/s"
+                return "\(quality.operatorLabel) · \(mbps) Mbps"
             }
             return "\(quality.operatorLabel) · \(quality.sampleCount) mesures"
         }
@@ -362,10 +366,12 @@ struct SignalQuestHomeView: View {
     private func pulseRow(_ pulse: NetworkPulse) -> some View {
         HStack(spacing: SQSpace.sm + 2) {
             if let rsrp = pulse.avgRsrpDbm {
-                pulseTileButton(value: "\(rsrp)", unit: "dBm moyen", metric: .signal)
+                // Clé de lecture du dBm (négatif, contre-intuitif) directement sur la
+                // tuile grand public : plus proche de 0 = meilleur signal (INT-16).
+                pulseTileButton(value: "\(rsrp)", unit: "dBm · proche de 0 = mieux", metric: .signal)
             }
             if let median = pulse.medianDownloadMbps {
-                pulseTileButton(value: "\(median)", unit: "Mb/s médian", metric: .download)
+                pulseTileButton(value: "\(median)", unit: "Mbps médian", metric: .download)
             }
             if let best = pulse.bestOperator, !best.isEmpty {
                 pulseTileButton(value: best, unit: "meilleur op.", metric: .download)
@@ -503,7 +509,7 @@ struct SignalQuestHomeView: View {
             } label: {
                 HStack(spacing: SQSpace.md) {
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Dernière mesure · \(measurement.createdAt.formatted(date: .omitted, time: .shortened))")
+                        Text("Dernière mesure · \(measurement.createdAt.formatted(date: .abbreviated, time: .shortened))")
                             .font(SQFont.body(13.5))
                             .foregroundStyle(SQColor.labelSecondary)
                         HStack(alignment: .firstTextBaseline, spacing: 5) {
@@ -576,8 +582,21 @@ struct SignalQuestHomeView: View {
     /// sur un état neutre (jamais d'erreur affichée sur l'Accueil).
     /// `forceFresh` (pull-to-refresh) contourne le cache de tuiles.
     private func refreshNearby(forceFresh: Bool) async {
+        // Throttle : refresh() est relancé à CHAQUE foreground + retour d'onglet.
+        // Sans garde, pouls et mesures récentes repartaient sur le réseau à chaque
+        // fois. On tolère 20 s entre deux rafraîchissements réels (PERF-HOME-01).
+        if !forceFresh, Date().timeIntervalSince(lastNearbyRefreshAt) < 20 { return }
+        // Ne JAMAIS déclencher le prompt système de localisation depuis l'Accueil
+        // (même garde que le feed) : sinon il tombe hors contexte au premier
+        // lancement et court-circuite le LocationPrimingSheet du speedtest (UXP-01).
+        // On n'interroge la position que si l'autorisation est déjà accordée ou
+        // qu'un fix est déjà connu.
+        let status = services.location.authorizationStatus
+        let authorized = status == .authorizedWhenInUse || status == .authorizedAlways
+        guard authorized || services.location.lastLocation != nil else { return }
         guard let location = await services.location.currentLocation(timeoutSeconds: 6) else { return }
         userLocation = location
+        lastNearbyRefreshAt = Date()
         let lat = location.coordinate.latitude
         let lng = location.coordinate.longitude
         // Pull-to-refresh : tuiles fraîches forcées (bypass du cache disque d'1 h) ;

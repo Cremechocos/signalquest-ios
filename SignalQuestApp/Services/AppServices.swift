@@ -78,6 +78,11 @@ final class AppServices: ObservableObject {
         // Rejoue au lancement les Drive Tests finalisés hors ligne ou interrompus
         // par une terminaison du processus. Un échec conserve la file sur disque.
         Task { await sessionsService.retryPendingCoverageSessions() }
+        // Idem pour les speedtests sauvés hors-ligne : sans ça, un test réalisé
+        // hors couverture restait non synchronisé tant que l'utilisateur ne rouvrait
+        // pas l'onglet Tester/Drive Test (ROB-07). La file durable est idempotente.
+        let speedtestService = speedtest
+        Task { await speedtestService.retryPendingSaves() }
         validations = ValidationsService(api: api)
         identify = IdentifyService(api: api)
         friends = FriendsService(api: api)
@@ -87,18 +92,30 @@ final class AppServices: ObservableObject {
         let callsService = CallsService(api: api)
         calls = callsService
         users = UserService(api: api)
-        // Le synchroniseur Apple reste volontairement absent tant que le
-        // backend ne valide pas les JWS StoreKit. Le store peut néanmoins lire
-        // les droits canoniques et restaurer l'état local sans débiter.
-        entitlements = EntitlementsStore(api: api)
+        // Synchroniseur Apple branché : livre les transactions StoreKit vérifiées
+        // au backend et lit l'entitlement canonique. Les achats restent malgré
+        // tout fermés tant que les flags `SQFeatures.storeKit*` sont à `false`
+        // (activés uniquement en build staging le temps de valider la chaîne
+        // serveur) : sa seule présence n'autorise aucun débit.
+        entitlements = EntitlementsStore(
+            api: api,
+            synchronizer: AppStoreTransactionSynchronizer(api: api)
+        )
         push = PushNotificationService(api: api, router: appRouter)
         callManager = CallManager(callsService: callsService, api: api)
     }
 
+    /// Horodatage du dernier rafraîchissement du badge, pour throttler les GET
+    /// complets déclenchés à CHAQUE changement d'onglet (PERF-BADGE-01).
+    private var lastInboxBadgeRefresh: Date = .distantPast
+
     /// Recalcule le nombre de conversations non lues (dernier message postérieur à
     /// la dernière lecture). Approximation côté client, sans appel dédié.
-    func refreshInboxBadge() async {
+    /// `force` (retour foreground) contourne le throttle de 20 s.
+    func refreshInboxBadge(force: Bool = false) async {
+        if !force, Date().timeIntervalSince(lastInboxBadgeRefresh) < 20 { return }
         guard let conversations = try? await messages.conversations() else { return }
+        lastInboxBadgeRefresh = Date()
         unreadConversations = conversations.reduce(into: 0) { count, conversation in
             guard let lastMessageAt = conversation.lastMessageAt else { return }
             let lastReadAt = conversation.lastReadAt ?? .distantPast

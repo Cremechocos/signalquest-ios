@@ -1,0 +1,111 @@
+{
+  "identifier" : "5C9F1A20-0001-4000-A000-000000000000",
+  "nonRenewingSubscriptions" : [],
+  "products" : [],
+  "settings" : {
+    "_applicationInternalID" : "signalquest",
+    "_developerTeamID" : "835X2977R7",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 0,
+    "_locale" : "fr_FR",
+    "_storefront" : "FRA",
+    "_storeKitErrors" : []
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21491001",
+      "localizations" : [],
+      "name" : "SignalQuest Abonnements",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "2.99",
+          "familyShareable" : false,
+          "groupLevel" : 2,
+          "internalID" : "5C9F1A20-0002-4000-A000-000000000001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Journal synchronisé et accès anticipé à certains outils communautaires.",
+              "displayName" : "Basic mensuel",
+              "locale" : "fr_FR"
+            }
+          ],
+          "productID" : "fr.signalquest.ios.basic.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Basic mensuel",
+          "subscriptionGroupID" : "21491001",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "29.99",
+          "familyShareable" : false,
+          "groupLevel" : 2,
+          "internalID" : "5C9F1A20-0002-4000-A000-000000000002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Journal synchronisé et accès anticipé, facturé annuellement.",
+              "displayName" : "Basic annuel",
+              "locale" : "fr_FR"
+            }
+          ],
+          "productID" : "fr.signalquest.ios.basic.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Basic annuel",
+          "subscriptionGroupID" : "21491001",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "7.99",
+          "familyShareable" : false,
+          "groupLevel" : 1,
+          "internalID" : "5C9F1A20-0002-4000-A000-000000000003",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Analyses détaillées, tendances du journal et stories personnalisées.",
+              "displayName" : "Premium mensuel",
+              "locale" : "fr_FR"
+            }
+          ],
+          "productID" : "fr.signalquest.ios.premium.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Premium mensuel",
+          "subscriptionGroupID" : "21491001",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "79.99",
+          "familyShareable" : false,
+          "groupLevel" : 1,
+          "internalID" : "5C9F1A20-0002-4000-A000-000000000004",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Analyses détaillées, tendances du journal et stories personnalisées, facturé annuellement.",
+              "displayName" : "Premium annuel",
+              "locale" : "fr_FR"
+            }
+          ],
+          "productID" : "fr.signalquest.ios.premium.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Premium annuel",
+          "subscriptionGroupID" : "21491001",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

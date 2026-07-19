@@ -22,15 +22,27 @@ enum SQFeatures {
     /// n'est pas explicitement ouvert après la campagne de tests.
     static let callScreenSharingEnabled = false
 
-    /// Achat App Store. Reste fermé tant que les produits App Store Connect,
-    /// l'endpoint de validation serveur et les App Store Server Notifications
-    /// ne sont pas validés ensemble en staging.
+    /// Achat App Store. Ouvert en build **staging uniquement** le temps de
+    /// valider la chaîne complète (produits App Store Connect + endpoint de
+    /// validation serveur + App Store Server Notifications) contre un backend de
+    /// pré-production. Debug (services prod) et Release restent fermés : passer
+    /// ces deux flags à `true` inconditionnellement une fois la recette prod faite.
+    #if STAGING
+    static let storeKitPurchasesEnabled = true
+    #else
     static let storeKitPurchasesEnabled = false
+    #endif
 
     /// Livraison d'une transaction StoreKit vérifiée au backend. Ce second
     /// verrou empêche qu'un simple changement du flag d'UI autorise un achat
-    /// local sans octroyer les droits multiplateformes côté serveur.
+    /// local sans octroyer les droits multiplateformes côté serveur. Aligné sur
+    /// `storeKitPurchasesEnabled` : les deux doivent être vrais (et le
+    /// synchroniseur présent) pour qu'un achat soit éligible.
+    #if STAGING
+    static let storeKitServerVerificationEnabled = true
+    #else
     static let storeKitServerVerificationEnabled = false
+    #endif
 }
 
 struct AppConfig: Equatable {

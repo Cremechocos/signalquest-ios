@@ -224,6 +224,7 @@ struct ANFRStatsView: View {
             }
             .padding(SQSpace.lg)
             .padding(.bottom, SQSpace.huge + SQSpace.huge)
+            .sqReadableWidth()
         }
         .navigationTitle("Statistiques ANFR")
         .toolbarTitleInlineCompat()
@@ -246,7 +247,7 @@ struct ANFRStatsView: View {
             HStack(spacing: SQSpace.xs + 2) {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.caption.weight(.semibold))
-                Text("Observatoire ANFR · relevé du \(model.latestDateLabel)")
+                Text("Observatoire ANFR — Agence nationale des fréquences · relevé du \(model.latestDateLabel)")
                     .font(SQType.subhead)
             }
             .foregroundStyle(SQColor.labelSecondary)
@@ -378,6 +379,22 @@ struct ANFRStatsView: View {
             .padding(.vertical, SQSpace.xs)
             .background(positive ? SQColor.successSoft : SQColor.dangerSoft, in: Capsule(style: .continuous))
             .accessibilityLabel(positive ? "en hausse de \(delta) cette semaine" : "en baisse de \(abs(delta)) cette semaine")
+        } else {
+            // Delta nul MAIS donnée présente (la pastille n'est rendue que pour un
+            // opérateur/total ayant des données) → indicateur NEUTRE « stable »,
+            // distinct de « aucune donnée » (rien). Corrige le cas Free, dont
+            // l'`operational` n'a pas bougé cette semaine et qui paraissait « vide ».
+            HStack(spacing: 3) {
+                Image(systemName: "equal")
+                    .font(.system(size: 10, weight: .semibold))
+                Text("stable")
+                    .font(SQFont.body(12, .semibold))
+            }
+            .foregroundStyle(SQColor.labelSecondary)
+            .padding(.horizontal, SQSpace.sm)
+            .padding(.vertical, SQSpace.xs)
+            .background(SQColor.fill, in: Capsule(style: .continuous))
+            .accessibilityLabel("stable cette semaine")
         }
     }
 
@@ -439,6 +456,11 @@ struct ANFRStatsView: View {
             operatorPicker
             ANFRTrendChart(points: model.trendSeries, animate: appeared && !reduceMotion)
                 .frame(height: 196)
+                // Alternative non visuelle (A11Y-08) : la légende étant masquée et la
+                // distinction 4G/5G ne passant que par la couleur, on résume la courbe
+                // pour VoiceOver en nommant explicitement la génération.
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(trendAccessibilityLabel)
             HStack(spacing: SQSpace.lg) {
                 if model.selectedFilter == .g4 {
                     legendDot(color: SQColor.success, label: "4G globale")
@@ -488,6 +510,28 @@ struct ANFRStatsView: View {
                 .font(SQType.micro)
                 .foregroundStyle(SQColor.labelSecondary)
         }
+    }
+
+    /// Résumé textuel de la courbe d'évolution pour VoiceOver : nomme la génération
+    /// (4G / 5G), l'opérateur et la variation du début à la fin de la période.
+    private var trendAccessibilityLabel: String {
+        let points = model.trendSeries
+        let scope = model.selectedFilter.label
+        let opName = model.selectedOperator.label
+        guard !points.isEmpty else {
+            return "Évolution des supports \(opName) en \(scope) : aucune donnée disponible sur la période."
+        }
+        let metric = model.showProjected ? "opérationnels et projetés" : "opérationnels"
+        let segments = ANFRGeneration.allCases
+            .filter { gen in points.contains { $0.generation == gen } }
+            .map { gen -> String in
+                let series = points.filter { $0.generation == gen }.sorted { $0.date < $1.date }
+                let start = (series.first?.value ?? 0).formatted(.number.grouping(.automatic))
+                let end = (series.last?.value ?? 0).formatted(.number.grouping(.automatic))
+                return "\(gen.label) de \(start) à \(end) supports"
+            }
+        return "Évolution des supports \(opName) en \(scope), \(metric) : "
+            + segments.joined(separator: " ; ") + " sur la période."
     }
 
     // MARK: Bandes (opérateur sélectionné)

@@ -5,29 +5,15 @@ import SwiftUI
 /// identiques en light et dark : elles identifient un opérateur ou une
 /// technologie, pas une surface.
 enum SQBrand {
-    // MARK: Accent signature (rouge plat de la landing --red / --red-deep)
-
-    static let signatureStart = SQColor.brandRed
-    static let signatureEnd = SQColor.brandRedDeep
-
-    static var signatureGradient: LinearGradient {
-        LinearGradient(
-            colors: [signatureStart, signatureEnd],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
     // MARK: Technologies (web --color-5g/4g/3g/2g)
 
     static func techColor(_ tech: String) -> Color {
-        switch tech.uppercased() {
-        case "5G", "NR", "5G_SA", "5G_NSA": return Color(hex: 0x8B5CF6)
-        case "4G", "LTE": return Color(hex: 0x3B82F6)
-        case "3G", "UMTS": return Color(hex: 0x10B981)
-        case "2G", "GSM": return Color(hex: 0x6B7280)
-        default: return Color(hex: 0x6B7280)
-        }
+        // Délègue à l'échelle de génération canonique (SQNetworkColors), la même
+        // que la carte (MapAnnotation/DriveTest) : un badge « 3G »/« 2G » d'une
+        // fiche a la MÊME couleur que le point correspondant sur la carte (UI-05).
+        // Le fallback « inconnu » est le gris 0x94A3B8 de la carte (auparavant
+        // 0x6B7280, divergent).
+        SQNetworkColors.generationColor(tech)
     }
 
     // MARK: Opérateurs (gradients hero du SidePanel web)
@@ -36,10 +22,6 @@ enum SQBrand {
         let start: Color
         let end: Color
         let name: String
-
-        var gradient: LinearGradient {
-            LinearGradient(colors: [start, end], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
 
         /// Couleur unique (marqueurs carte, pastilles) — le départ du gradient.
         var solid: Color { start }

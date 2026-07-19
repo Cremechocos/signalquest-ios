@@ -53,7 +53,7 @@ Gravité : **P0** bloquant/sécurité/données fausses · **P1** régression/UX 
 ### C. Performance carte (transverse)
 | Grav. | Constat | Référence |
 |---|---|---|
-| P1 | Recréation d'annotations sans diff id→annotation (DriveTest ; à vérifier sur Map/ANFR qui ont déjà reçu du travail perf au Lot 7). | DriveTestMapView, MapExplorerView, ANFRMapLibreView |
+| P1 | Recréation d'annotations sans diff id→annotation (DriveTest ; à vérifier sur Map/ANFR qui ont déjà reçu du travail perf au Lot 7). | DriveTestMapView, MapExplorerView, ANFRMapView |
 | P2 | `MapExplorerView` = **3843 lignes** (ViewModel + modèles + store + vue + coordinateurs) → maintenabilité limite, décomposition prudente justifiée. | `Features/Map/MapExplorerView.swift` |
 | P2 | `DiskCache` : éviction bornée en taille/âge (Lot 7) mais pas en **nombre de fichiers** → scan disque lent après usage prolongé. **(à confirmer)** | `Core/Cache/DiskCache.swift` |
 
@@ -149,7 +149,7 @@ Gravité : **P0** bloquant/sécurité/données fausses · **P1** régression/UX 
 
 ### 🟡 Lot 4 — Perf carte transverse (P1/P2)
 - **Objectif** : fluidité au pan/zoom/filtre sur zone dense.
-- **Fichiers** : DriveTestMapView, MapExplorerView, ANFRMapLibreView, `Core/Cache/DiskCache`.
+- **Fichiers** : DriveTestMapView, MapExplorerView, ANFRMapView, `Core/Cache/DiskCache`.
 - **Changements** : diff incrémental id→annotation partout où il manque ; chargement de couches parallèle (`async let`) ; borne de nombre de fichiers DiskCache (à confirmer).
 - **Risque** : moyen (rendu carte). Mitigation : mesurer avant/après, fichier par fichier.
 - **Done** : pas de flicker, framerate stable zone dense.
@@ -193,7 +193,7 @@ Toutes **ancrées sur l'API SignalQuest réellement consommée** (inventaire rel
 | F4 | **App Intents / Siri & Spotlight élargis** : « Quel opérateur/réseau ici ? », « Lancer un Drive Test » | Mains-libres, en voiture | `SQSpotlight` + `SpeedtestIntents` existent → AppShortcuts | `/api/speedtest/operator` + network path | Faible |
 | F5 | **ANFR : timeline & historique d'un site** (évolution bandes/opérateurs) | Forte valeur informative, lecture pure | sheets ANFR existent | `/api/anfr/archives`, `/api/anfr/site-history/{supId}` **existent** | Faible |
 | F6 | **Quêtes & easter-eggs de contribution** (boucle d'engagement pour densifier la donnée) | Densité de données (objectif produit) | surtout UI ; `GamificationView` existe | `/api/gamification/catalog\|events\|easter-eggs/claim` **existent** | Faible-moyen (design) |
-| F7 | **Carte « ma couverture »** (heatmap de mes propres mesures) | Personnalisation, rétention | MapLibre déjà en place | `/api/user/speedtests` + coverage tiles | Faible |
+| F7 | **Carte « ma couverture »** (heatmap de mes propres mesures) | Personnalisation, rétention | MapKit déjà en place | `/api/user/speedtests` + coverage tiles | Faible |
 | F8 | **Widget home « réseau autour de moi »** (antenne/opérateur/dernier speedtest) | Glanceable, viralité | WidgetKit + `WidgetSharedStore` déjà câblés | snapshot local + `/api/speedtest/operator` | Faible |
 
 > Recommandation features : prioriser **F1+F2** (finir Drive Test) après le Lot 1, puis **F4/F3** (effort faible, effet « moderne »), puis F5/F7/F8 selon appétit. F6 = chantier produit.

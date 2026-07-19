@@ -153,31 +153,11 @@ final class SessionPointsRenderer: MKOverlayRenderer {
     }
 }
 
-/// Couleurs RSRP — mêmes seuils que la couche couverture de la carte principale.
+/// Couleurs RSRP — délègue à l'échelle canonique unique (SQNetworkColors), la
+/// même que la couche couverture de la carte principale et les fiches.
 enum SessionRSRPColor {
-    static func ui(_ rsrp: Double?) -> UIColor {
-        // Sentinelle iOS (0) ou valeur non physique → « aucun signal » : le RSRP réel
-        // est toujours négatif (≤ -40 dBm). Évite de colorer un point iOS en « excellent ».
-        guard let rsrp, rsrp < -1 else { return hex(0x94A3B8) }
-        switch rsrp {
-        case (-80)...:      return hex(0x10B981) // excellent
-        case -90..<(-80):   return hex(0x84CC16) // bon
-        case -100..<(-90):  return hex(0xF59E0B) // moyen
-        case -110..<(-100): return hex(0xF97316) // faible
-        default:            return hex(0xEF4444) // très faible
-        }
-    }
-
+    static func ui(_ rsrp: Double?) -> UIColor { SQNetworkColors.rsrpUIColor(rsrp) }
     static func cg(_ rsrp: Double?) -> CGColor { ui(rsrp).cgColor }
-
-    private static func hex(_ v: UInt32) -> UIColor {
-        UIColor(
-            red: CGFloat((v >> 16) & 0xFF) / 255,
-            green: CGFloat((v >> 8) & 0xFF) / 255,
-            blue: CGFloat(v & 0xFF) / 255,
-            alpha: 1
-        )
-    }
 }
 
 /// Mode de coloration du nuage de points : RSRP (signal) ou GÉNÉRATION.
@@ -185,26 +165,10 @@ enum SessionRSRPColor {
 enum SessionPointColoring { case rsrp, generation }
 
 /// Couleurs par GÉNÉRATION (carte de couverture génération, distincte du RSRP).
+/// Délègue à l'échelle canonique unique (SQNetworkColors).
 enum SessionGenerationColor {
-    static func ui(_ tech: String?) -> UIColor {
-        let t = (tech ?? "").uppercased()
-        if t.contains("5G") { return hex(0x8B5CF6) }            // 5G — violet
-        if t.contains("4G") || t == "LTE" { return hex(0x3B82F6) } // 4G — bleu
-        if t.contains("3G") { return hex(0x14B8A6) }            // 3G — teal
-        if t.contains("2G") { return hex(0xF59E0B) }            // 2G — ambre
-        return hex(0x94A3B8)                                     // Aucun / inconnu — gris
-    }
-
+    static func ui(_ tech: String?) -> UIColor { SQNetworkColors.generationUIColor(tech) }
     static func cg(_ tech: String?) -> CGColor { ui(tech).cgColor }
-
-    private static func hex(_ v: UInt32) -> UIColor {
-        UIColor(
-            red: CGFloat((v >> 16) & 0xFF) / 255,
-            green: CGFloat((v >> 8) & 0xFF) / 255,
-            blue: CGFloat(v & 0xFF) / 255,
-            alpha: 1
-        )
-    }
 }
 
 /// Annotation MapKit d'une antenne desservante.
@@ -242,7 +206,7 @@ final class SessionSpeedtestAnnotation: NSObject, MKAnnotation {
     }
 
     var title: String? {
-        let down = speedtest.downloadMbps.map { "↓ \(Int($0.rounded())) Mb/s" } ?? "↓ —"
+        let down = speedtest.downloadMbps.map { "↓ \(Int($0.rounded())) Mbps" } ?? "↓ —"
         let up = speedtest.uploadMbps.map { "↑ \(Int($0.rounded()))" } ?? "↑ —"
         return "\(down) · \(up)"
     }
@@ -256,25 +220,11 @@ final class SessionSpeedtestAnnotation: NSObject, MKAnnotation {
     var tintColor: UIColor { SessionSpeedColor.ui(speedtest.downloadMbps) }
 }
 
-/// Couleur d'un speedtest par débit descendant (Mb/s) — du rouge (lent) au vert (rapide).
+/// Couleur d'un speedtest par débit descendant (Mb/s) — échelle canonique unique
+/// (SQNetworkColors), identique à la carte. `nil`/0 → gris « pas de mesure ».
 enum SessionSpeedColor {
     static func ui(_ mbps: Double?) -> UIColor {
-        guard let m = mbps, m > 0 else { return hex(0x94A3B8) }
-        switch m {
-        case 150...:      return hex(0x10B981) // très rapide
-        case 75..<150:    return hex(0x84CC16) // rapide
-        case 30..<75:     return hex(0xF59E0B) // moyen
-        case 10..<30:     return hex(0xF97316) // lent
-        default:          return hex(0xEF4444) // très lent
-        }
-    }
-
-    private static func hex(_ v: UInt32) -> UIColor {
-        UIColor(
-            red: CGFloat((v >> 16) & 0xFF) / 255,
-            green: CGFloat((v >> 8) & 0xFF) / 255,
-            blue: CGFloat(v & 0xFF) / 255,
-            alpha: 1
-        )
+        guard let m = mbps, m > 0 else { return SQNetworkColors.unknownUIColor }
+        return SQNetworkColors.speedUIColor(m)
     }
 }

@@ -48,10 +48,15 @@ struct MessageSearchView: View {
                 .padding()
             Spacer()
         } else if hasSearched && results.isEmpty {
+            // En conversation chiffrée, le serveur ne voit que du texte chiffré : la
+            // recherche par mot-clé ne peut rien matcher. On l'explique plutôt que
+            // de laisser croire à tort que le message n'existe pas (UX-1).
             EmptyStateView(
-                title: "Aucun résultat",
-                message: "Aucun message ne correspond à « \(query) ».",
-                systemImage: "magnifyingglass"
+                title: isE2EE ? "Recherche limitée" : "Aucun résultat",
+                message: isE2EE
+                    ? "Cette conversation est chiffrée de bout en bout : la recherche par mot-clé n’est pas disponible côté serveur."
+                    : "Aucun message ne correspond à « \(query) ».",
+                systemImage: isE2EE ? "lock.fill" : "magnifyingglass"
             )
             Spacer()
         } else if !hasSearched {

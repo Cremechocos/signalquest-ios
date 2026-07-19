@@ -28,7 +28,11 @@ struct LoginView: View {
                             .foregroundStyle(SQColor.label)
 
                         if isTwoFactor {
-                            TextField("Code TOTP", text: $code)
+                            Text("Saisis le code à 6 chiffres de ton application d’authentification (Google Authenticator, Authy…).")
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            TextField("Code à 6 chiffres", text: $code)
                                 .textContentType(.oneTimeCode)
                                 .keyboardType(.numberPad)
                                 .font(SQFont.display(28, .bold))

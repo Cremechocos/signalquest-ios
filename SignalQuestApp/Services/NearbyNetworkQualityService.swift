@@ -181,7 +181,10 @@ final class NearbyNetworkQualityService: NearbyNetworkQualityServicing {
             }
             return groups.compactMap { name, items -> OperatorMetricStat? in
                 let downloads = items.map(\.downloadMbps).filter { $0 > 0 }
-                guard let median = Self.median(downloads, minCount: 1) else { return nil }
+                // Exiger le même minimum d'échantillons que le verdict (3) : un
+                // opérateur ne doit pas être « couronné » leader sur une seule mesure
+                // statistiquement non significative (TEL-07).
+                guard let median = Self.median(downloads, minCount: Self.minSamplesPerMetric) else { return nil }
                 let pings = items.compactMap(\.pingMs).filter { $0 > 0 }
                 let detail = Self.median(pings, minCount: 1).map { "\(Int($0.rounded())) ms" }
                 return OperatorMetricStat(

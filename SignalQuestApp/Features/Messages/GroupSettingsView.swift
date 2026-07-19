@@ -22,6 +22,8 @@ struct GroupSettingsView: View {
     @State private var isBusy = false
     @State private var errorMessage: String?
     @State private var confirmLeave = false
+    /// Membre en attente de confirmation de retrait (UX-4 : pas de retrait d'un tap).
+    @State private var participantToRemove: ConversationParticipant?
     /// URL de la photo de groupe courante (mise à jour après upload).
     @State private var groupPhotoURL: URL?
     /// Aperçu local immédiat de la photo choisie (optimiste, avant l'aller-retour réseau).
@@ -93,7 +95,9 @@ struct GroupSettingsView: View {
                                         )
                                     }
                                     Button(role: .destructive) {
-                                        Task { await remove(participant) }
+                                        // Confirmer avant de retirer (comme « Quitter le
+                                        // groupe ») : évite un retrait accidentel d'un tap (UX-4).
+                                        participantToRemove = participant
                                     } label: {
                                         Label("Retirer du groupe", systemImage: "person.fill.xmark")
                                     }
@@ -172,6 +176,18 @@ struct GroupSettingsView: View {
             }
             .confirmationDialog("Quitter le groupe ?", isPresented: $confirmLeave, titleVisibility: .visible) {
                 Button("Quitter", role: .destructive) { Task { await leave() } }
+            }
+            .confirmationDialog(
+                participantToRemove.map { "Retirer \($0.user.displayName) du groupe ?" } ?? "Retirer du groupe ?",
+                isPresented: Binding(get: { participantToRemove != nil }, set: { if !$0 { participantToRemove = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button("Retirer", role: .destructive) {
+                    if let participant = participantToRemove {
+                        participantToRemove = nil
+                        Task { await remove(participant) }
+                    }
+                }
             }
             .onChangeCompat(of: searchQuery) { _, _ in
                 Task {
