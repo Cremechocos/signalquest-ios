@@ -224,6 +224,7 @@
 		E8E8907253FE60FDECEFFD51 /* SharedPostEmbed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AA98E8543E1A0DA35A68E52 /* SharedPostEmbed.swift */; };
 		E92941996F6D38DEF635810C /* SpeedtestTrendWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 188B982997C559D0E38231B7 /* SpeedtestTrendWidget.swift */; };
 		E996989B13437E3678AA43BA /* SQEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B3B3E33665A0D12EB2183E /* SQEffects.swift */; };
+		E9D5E1E145866A01C6966810 /* MapSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB3FB8DEBAD180B509683C8D /* MapSearchTests.swift */; };
 		EB9551322B0DE0869A0B7E2C /* ReportsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF5C473D670B7B2938ABCB45 /* ReportsService.swift */; };
 		ECBDC1919F95968B3CBB37C0 /* ThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF1F41B3B9C7134D4B1810A3 /* ThreadView.swift */; };
 		ECC09E7CA1AB0F9C9BE01F32 /* DriveTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07ACC9D1192AB45142AE044 /* DriveTestView.swift */; };
@@ -434,6 +435,7 @@
 		A7FCE24EAE6C3426959B07BC /* FriendLiveSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendLiveSheet.swift; sourceTree = "<group>"; };
 		A9594367DF3047FDF3B240AB /* MockURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockURLProtocol.swift; sourceTree = "<group>"; };
 		AA6A9E12FB0C1755E79A6216 /* SpeedtestIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestIntents.swift; sourceTree = "<group>"; };
+		AB3FB8DEBAD180B509683C8D /* MapSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapSearchTests.swift; sourceTree = "<group>"; };
 		AC02787ABEAE06188ADF7D1F /* LeaderboardService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardService.swift; sourceTree = "<group>"; };
 		AC51F8CACA66BE964E15F919 /* APIEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIEndpoint.swift; sourceTree = "<group>"; };
 		ACB33739AFC84C313844322C /* MapExplorerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapExplorerView.swift; sourceTree = "<group>"; };
@@ -1062,6 +1064,7 @@
 				F23ED8BD3711812342EC5C19 /* EntitlementsTests.swift */,
 				74CF7E1DDA21B03198307ED6 /* Info.plist */,
 				B1F4DC14B58C08DADF46E158 /* MapFilterStoreTests.swift */,
+				AB3FB8DEBAD180B509683C8D /* MapSearchTests.swift */,
 				A9594367DF3047FDF3B240AB /* MockURLProtocol.swift */,
 				D6FFA250C4BE27D4200678E2 /* ModelDecodeTests.swift */,
 				4A30FBE643735E6E375B3948 /* NewModelDecodeTests.swift */,
@@ -1582,6 +1585,7 @@
 				A9AA093F88B7A4E23A7EE3A7 /* E2EETests.swift in Sources */,
 				4EA76BC1BEB2621F9B74C6ED /* EntitlementsTests.swift in Sources */,
 				5BB7F333FAEBC17CD67A33C2 /* MapFilterStoreTests.swift in Sources */,
+				E9D5E1E145866A01C6966810 /* MapSearchTests.swift in Sources */,
 				FA8A1167522105F2D6EBEFB7 /* MockURLProtocol.swift in Sources */,
 				15606EDE03FC5483778DB980 /* ModelDecodeTests.swift in Sources */,
 				8027C2DE7425912942340D4B /* NewModelDecodeTests.swift in Sources */,
