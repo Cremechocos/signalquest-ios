@@ -74,12 +74,6 @@ enum SQFont {
         return .custom(figtreeName(weight), size: size, relativeTo: inferredStyle(forSize: size))
     }
 
-    /// Variante UI à taille strictement fixe (rendus déterministes).
-    static func archivoFixed(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {
-        guard figtreeAvailable else { return .system(size: size, weight: weight) }
-        return .custom(figtreeName(weight), fixedSize: size)
-    }
-
     static func archivo(_ size: CGFloat, _ weight: Font.Weight = .semibold, relativeTo style: Font.TextStyle) -> Font {
         guard figtreeAvailable else { return .system(size: size, weight: weight) }
         return .custom(figtreeName(weight), size: size, relativeTo: style)
@@ -103,18 +97,4 @@ enum SQFont {
         return .custom(figtreeName(weight), size: size, relativeTo: style)
     }
 
-    // MARK: Compat — ancien `dmSans`
-
-    /// Pont rétro-compat depuis l'ancienne API DM Sans. Les grosses tailles
-    /// (≥ 24) basculent sur Bricolage Grotesque (display de marque), les autres
-    /// sur Figtree. À remplacer progressivement par `display`/`archivo`/`body`.
-    static func dmSans(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        size >= 24 ? display(size, weight == .regular ? .bold : weight) : archivo(size, weight)
-    }
-
-    static func dmSans(_ size: CGFloat, _ weight: Font.Weight = .regular, relativeTo style: Font.TextStyle) -> Font {
-        size >= 24
-            ? display(size, weight == .regular ? .bold : weight, relativeTo: style)
-            : archivo(size, weight, relativeTo: style)
-    }
 }

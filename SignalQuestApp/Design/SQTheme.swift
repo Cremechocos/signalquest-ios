@@ -34,13 +34,6 @@ extension View {
     }
 }
 
-extension Text {
-    func sqSectionTitle() -> some View {
-        font(SQType.title)
-            .foregroundStyle(SQColor.label)
-    }
-}
-
 /// Typographie de la DA « Crème & Terre cuite ». Deux familles :
 /// Bricolage Grotesque (titres, chiffres, boutons) et Figtree (corps, UI).
 /// Tailles relatives aux styles système pour préserver Dynamic Type.

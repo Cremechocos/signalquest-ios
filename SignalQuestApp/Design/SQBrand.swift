@@ -5,19 +5,6 @@ import SwiftUI
 /// identiques en light et dark : elles identifient un opérateur ou une
 /// technologie, pas une surface.
 enum SQBrand {
-    // MARK: Accent signature (rouge plat de la landing --red / --red-deep)
-
-    static let signatureStart = SQColor.brandRed
-    static let signatureEnd = SQColor.brandRedDeep
-
-    static var signatureGradient: LinearGradient {
-        LinearGradient(
-            colors: [signatureStart, signatureEnd],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
     // MARK: Technologies (web --color-5g/4g/3g/2g)
 
     static func techColor(_ tech: String) -> Color {
@@ -35,10 +22,6 @@ enum SQBrand {
         let start: Color
         let end: Color
         let name: String
-
-        var gradient: LinearGradient {
-            LinearGradient(colors: [start, end], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
 
         /// Couleur unique (marqueurs carte, pastilles) — le départ du gradient.
         var solid: Color { start }

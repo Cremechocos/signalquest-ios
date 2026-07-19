@@ -266,11 +266,6 @@ struct SignalDetailSheet: View {
         }
     }
 
-    private var speedtestBackendId: String? {
-        guard item.kind.lowercased() == "speedtest" else { return nil }
-        return item.targetId ?? item.sourceId
-    }
-
     private func coordinatesText(lat: Double?, lon: Double?) -> String {
         guard let lat, let lon else { return "" }
         return String(format: "%.5f, %.5f", lat, lon)

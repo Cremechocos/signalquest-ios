@@ -23,9 +23,6 @@ enum Haptics {
 
     static func light()  { impact(.light) }
     static func medium() { impact(.medium) }
-    static func heavy()  { impact(.heavy) }
-    static func rigid()  { impact(.rigid) }
-    static func soft()   { impact(.soft) }
 
     static func success()  { notification.notificationOccurred(.success); notification.prepare() }
     static func warning()  { notification.notificationOccurred(.warning); notification.prepare() }

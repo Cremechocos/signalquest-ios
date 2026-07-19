@@ -21,7 +21,6 @@ enum SQNetworkColors {
     /// Teinte neutre partagée par les bandes « inconnu » (RSRP) et « aucun »
     /// (génération). Identique au web (`QUALITY_HEX.unknown`).
     static let unknownHex: UInt32 = 0x94A3B8
-    static var unknownColor: Color { Color(hex: unknownHex) }
     static var unknownUIColor: UIColor { uiColor(unknownHex) }
 
     // MARK: Débit (Mb/s) → couleur

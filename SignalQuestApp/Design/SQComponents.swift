@@ -546,8 +546,6 @@ struct LoadingSkeleton: View {
         }
     }
 
-    private var block: some View { SkeletonBlock() }
-
     private var card: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack(spacing: SQSpace.sm) {

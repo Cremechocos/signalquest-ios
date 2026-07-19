@@ -13,41 +13,11 @@ extension View {
         modifier(OnChangeCompatModifier(value: value, action: action))
     }
 
-    /// `.contentTransition(.numericText())` quand dispo, sinon un fondu discret.
-    @ViewBuilder
-    func contentTransitionNumericTextCompat() -> some View {
-        if #available(iOS 17.0, *) {
-            self.contentTransition(.numericText())
-        } else {
-            self.contentTransition(.opacity)
-        }
-    }
-
-    /// `.symbolEffect(.pulse, options: .repeating)` (iOS 17+), sinon no-op.
-    @ViewBuilder
-    func symbolEffectPulseCompat() -> some View {
-        if #available(iOS 17.0, *) {
-            self.symbolEffect(.pulse, options: .repeating)
-        } else {
-            self
-        }
-    }
-
     /// `.symbolEffect(.bounce, value:)` (iOS 17+), sinon no-op.
     @ViewBuilder
     func symbolEffectBounceCompat<V: Equatable>(value: V) -> some View {
         if #available(iOS 17.0, *) {
             self.symbolEffect(.bounce, value: value)
-        } else {
-            self
-        }
-    }
-
-    /// `.tabViewStyle(.sidebarAdaptable)` (iOS 18+, iPad/large) sinon style par défaut.
-    @ViewBuilder
-    func sqSidebarAdaptableTabStyle() -> some View {
-        if #available(iOS 18.0, *) {
-            self.tabViewStyle(.sidebarAdaptable)
         } else {
             self
         }
