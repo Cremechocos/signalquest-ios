@@ -50,8 +50,20 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
     case onlineNet6_90ms = "online_net6_90ms"
     // MilkyWan (AS2027) — iPerf3 public, même plage de ports que Bouygues
     case milkywan = "milkywan_cbo"
+    // POP iPerf3 publics France & Europe (vérifiés vivants juil. 2026 : handshake
+    // iPerf3 réel). Serveurs mono-slot → toujours enregistrer la PLAGE de ports.
+    case mojiParis = "moji_paris"          // iperf3.moji.fr, Paris, 41 ports (top FR)
+    case clouviderFra = "clouvider_fra"    // fra.speedtest.clouvider.net, Francfort
+    case clouviderAms = "clouvider_ams"    // ams.speedtest.clouvider.net, Amsterdam
+    case clouviderLon = "clouvider_lon"    // lon.speedtest.clouvider.net, Londres
+    case clouviderMan = "clouvider_man"    // man.speedtest.clouvider.net, Manchester
+    case leasewebFra = "leaseweb_fra"      // speedtest.fra1.de.leaseweb.net, Francfort
+    case init7 = "init7_ch"                // speedtest.init7.net, Suisse (FAI premium)
     // Cloudflare — moteur HTTPS anycast (couverture mondiale, DL/UL/ping même edge)
     case cloudflare = "cloudflare_edge"
+    // LibreSpeed — moteur HTTPS (garbage.php/empty.php) sur le POP LibreSpeed le
+    // plus proche ; licence LGPL propre, aucune contrainte Ookla.
+    case libreSpeed = "librespeed_auto"
 
     // Legacy cases left for soft migration or parsing safely:
     case cloudflareR2 = "cloudflare_r2"
@@ -67,7 +79,9 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
             + bouyguesCases
             + scalewayCases
             + milkywanCases
+            + publicEuropeCases
             + cloudflareCases
+            + [.libreSpeed]
     }
 
     static var ovhCases: [SpeedtestDownloadTarget] {
@@ -99,6 +113,11 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         [.milkywan]
     }
 
+    /// POP iPerf3 publics FR/EU vérifiés (Moji Paris + Clouvider/Leaseweb/Init7).
+    static var publicEuropeCases: [SpeedtestDownloadTarget] {
+        [.mojiParis, .clouviderFra, .clouviderAms, .clouviderLon, .clouviderMan, .leasewebFra, .init7]
+    }
+
     static var cloudflareCases: [SpeedtestDownloadTarget] {
         [.cloudflare]
     }
@@ -106,7 +125,7 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
     /// Toujours visibles dans le sélecteur : ce sont des moteurs (auto,
     /// edge anycast mondial), pas des POP d'un fournisseur.
     static var ungroupedCases: [SpeedtestDownloadTarget] {
-        [.hybridAuto, .cloudflare]
+        [.hybridAuto, .cloudflare, .libreSpeed]
     }
 
     /// Accordéons du sélecteur, par fournisseur. Source unique : la vue
@@ -118,6 +137,7 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
             ("Bouygues Telecom", bouyguesCases),
             ("Scaleway", scalewayCases),
             ("MilkyWan", milkywanCases),
+            ("iPerf3 · France & Europe", publicEuropeCases),
         ]
     }
 
@@ -160,7 +180,15 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .onlineNet90ms: return "Paris · +90 ms"
         case .onlineNet6_90ms: return "Paris · IPv6 +90 ms"
         case .milkywan: return "Croissy-Beaubourg"
+        case .mojiParis: return "Paris · Moji"
+        case .clouviderFra: return "Francfort · Clouvider"
+        case .clouviderAms: return "Amsterdam · Clouvider"
+        case .clouviderLon: return "Londres · Clouvider"
+        case .clouviderMan: return "Manchester · Clouvider"
+        case .leasewebFra: return "Francfort · Leaseweb"
+        case .init7: return "Suisse · Init7"
         case .cloudflare: return "Cloudflare"
+        case .libreSpeed: return "LibreSpeed"
         case .cloudflareR2: return "Cloudflare"
         case .awsCloudFront: return "AWS CloudFront"
         case .vpsInternal: return "VPS OVH Gravelines"
@@ -196,7 +224,15 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .onlineNet90ms: return "Scaleway · latence artificielle +90 ms (test)"
         case .onlineNet6_90ms: return "Scaleway · IPv6 · latence artificielle +90 ms (test)"
         case .milkywan: return "MilkyWan · speedtest.milkywan.fr · :9200–9240"
+        case .mojiParis: return "Moji · iperf3.moji.fr · :5200–5240"
+        case .clouviderFra: return "Clouvider · fra.speedtest.clouvider.net · :5200–5209"
+        case .clouviderAms: return "Clouvider · ams.speedtest.clouvider.net · :5200–5209"
+        case .clouviderLon: return "Clouvider · lon.speedtest.clouvider.net · :5200–5209"
+        case .clouviderMan: return "Clouvider · man.speedtest.clouvider.net · :5200–5209"
+        case .leasewebFra: return "Leaseweb · speedtest.fra1.de.leaseweb.net · :5201–5210"
+        case .init7: return "Init7 · speedtest.init7.net · :5201–5204"
         case .cloudflare: return "Edge anycast mondial · HTTPS · DL/UL/ping même serveur"
+        case .libreSpeed: return "POP LibreSpeed le plus proche · HTTPS · DL/UL/ping"
         case .cloudflareR2: return "CDN Cloudflare"
         case .awsCloudFront: return "CDN AWS"
         case .vpsInternal: return "VPS SignalQuest"
@@ -219,7 +255,9 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .onlineNet, .onlineNet6, .onlineNet90ms, .onlineNet6_90ms:
             return "Scaleway"
         case .milkywan: return "MilkyWan"
-        case .cloudflare: return "Mondial"
+        case .mojiParis, .clouviderFra, .clouviderAms, .clouviderLon, .clouviderMan, .leasewebFra, .init7:
+            return "iPerf3 · France & Europe"
+        case .cloudflare, .libreSpeed: return "Mondial"
         case .cloudflareR2, .awsCloudFront, .vpsInternal: return "Legacy"
         }
     }
@@ -243,7 +281,9 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .onlineNet, .onlineNet90ms: return "server.rack"
         case .onlineNet6, .onlineNet6_90ms: return "network"
         case .milkywan: return "server.rack"
+        case .mojiParis, .clouviderFra, .clouviderAms, .clouviderLon, .clouviderMan, .leasewebFra, .init7: return "server.rack"
         case .cloudflare: return "globe"
+        case .libreSpeed: return "speedometer"
         case .cloudflareR2, .awsCloudFront, .vpsInternal: return "server.rack"
         }
     }
@@ -254,6 +294,30 @@ struct SpeedtestRunSettings: Codable, Equatable {
     var durationSeconds: Int
     var streams: Int
     var reliabilityMode: Bool
+    /// Serveur LibreSpeed choisi manuellement (hostname du catalogue). `nil` =
+    /// le plus proche automatiquement. Ignoré si `downloadTarget != .libreSpeed`.
+    var libreSpeedHost: String?
+
+    // Rétro-compat de décodage : `libreSpeedHost` absent des réglages persistés
+    // avant l'ajout du choix manuel LibreSpeed.
+    enum CodingKeys: String, CodingKey {
+        case downloadTarget, durationSeconds, streams, reliabilityMode, libreSpeedHost
+    }
+    init(downloadTarget: SpeedtestDownloadTarget, durationSeconds: Int, streams: Int, reliabilityMode: Bool, libreSpeedHost: String? = nil) {
+        self.downloadTarget = downloadTarget
+        self.durationSeconds = durationSeconds
+        self.streams = streams
+        self.reliabilityMode = reliabilityMode
+        self.libreSpeedHost = libreSpeedHost
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        downloadTarget = try c.decode(SpeedtestDownloadTarget.self, forKey: .downloadTarget)
+        durationSeconds = try c.decode(Int.self, forKey: .durationSeconds)
+        streams = try c.decode(Int.self, forKey: .streams)
+        reliabilityMode = try c.decode(Bool.self, forKey: .reliabilityMode)
+        libreSpeedHost = try c.decodeIfPresent(String.self, forKey: .libreSpeedHost)
+    }
 
     static let androidDefault = SpeedtestRunSettings(
         downloadTarget: .hybridAuto,

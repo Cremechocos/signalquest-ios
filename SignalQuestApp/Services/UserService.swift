@@ -120,6 +120,11 @@ struct NotificationPreferences: Codable {
     var notifyMessagesInApp: Bool?
     var notifyAnfrUpdatesPush: Bool?
     var notifyAnfrUpdatesEmail: Bool?
+    // Réponses de la modération à mes signalements d'antenne. Push/in-app sont
+    // toujours délivrés (réponse importante) ; seul l'e-mail est opt-out ici.
+    // `= nil` : garde le memberwise init synthétisé compatible avec l'appelant
+    // existant (SettingsViewModel), qui ne fournit pas ce nouveau champ.
+    var notifyAntennaReportsEmail: Bool? = nil
     var callsDoNotDisturb: Bool?
 }
 

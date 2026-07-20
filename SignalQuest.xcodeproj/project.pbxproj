@@ -30,6 +30,7 @@
 		1642DC7B7E50D2260F79770D /* SQColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 522FEF871CE53739FE2CB92C /* SQColors.swift */; };
 		165AEDB9CA42FCFB3872E10A /* PhotoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E39D8D7ADDF4C4A7FF55C92C /* PhotoModels.swift */; };
 		1903FFA116C3304098389589 /* NewPollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAB8735E7BA1CEC81DED95F9 /* NewPollView.swift */; };
+		1907B4188D8BEDD97540DC8A /* AntennaReportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 969394914FD409108A452239 /* AntennaReportModels.swift */; };
 		19D4A156D2AA675F72CB2A16 /* WidgetSharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E5547A4163714BB45440475 /* WidgetSharedStore.swift */; };
 		1B116A111A1CC99607DB968E /* MessageSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A392F27A37DB201C942F22D /* MessageSyncEngine.swift */; };
 		1B46DD506F06F337F9743269 /* SectorEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C58605C20828352068B1EE /* SectorEditSheet.swift */; };
@@ -48,6 +49,7 @@
 		25E51616DFCEE545AE04E5EF /* ExploreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 375D2602C108329658B440F9 /* ExploreView.swift */; };
 		25FB0A6A120E43D0B2E89C8F /* PhotosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8285E18A8C25FEC98790A174 /* PhotosView.swift */; };
 		261ACB1D58A0E45AD45658FE /* SocialCommentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C59360081D5DC685451E0D8D /* SocialCommentModels.swift */; };
+		27D2E1F55983085A8E4C501B /* AntennaReportThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65484622445B106E95030CE3 /* AntennaReportThreadView.swift */; };
 		280856D3EB97C75ED97A90A4 /* LaunchLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B1F180671AE87E17BF1EC7A /* LaunchLoadingView.swift */; };
 		29E12F800448A8C0B72CFC17 /* PhotoCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 763622AD001158FA3157D839 /* PhotoCardView.swift */; };
 		2A75C227B62E74818271FE0A /* E2EEService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */; };
@@ -66,6 +68,7 @@
 		3544D1A314DE63A90BF89006 /* DriveTestMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF6741C3A6C32E6A351617E7 /* DriveTestMapView.swift */; };
 		38D0EA9A66A425D012948A8E /* SpeedtestShareImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C011703B46C9CCF1394D3BA4 /* SpeedtestShareImageRenderer.swift */; };
 		3AE2A1D61D1D7996E56BC9CF /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D755436C239643387D984492 /* LocationService.swift */; };
+		3B35AD691B8C4B53BD19DC6F /* AntennaReportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0616550E274CD9D726FFF1 /* AntennaReportSheet.swift */; };
 		3D1F0588D592CF8DED9BD1EB /* FluidityQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFDF16B243853AE40E37D07C /* FluidityQATests.swift */; };
 		4062FC76DAFABCDD6E5C6901 /* AntennasService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB24C8F6F0931F6D99B18115 /* AntennasService.swift */; };
 		410070C7BCF48B0D6C417526 /* SmokeTourQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB7D271F7EF3536DB6B7C1A1 /* SmokeTourQATests.swift */; };
@@ -106,12 +109,15 @@
 		5F15D1940A0B15ACFD423499 /* ReactionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 366127FDD01986AEE70AE565 /* ReactionPicker.swift */; };
 		5F7AF0A6DEEB9A788A1199E7 /* AutoRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B7D91FD53A512C0A154BCFB /* AutoRefreshTests.swift */; };
 		5FC825F33AD5AE53302210C6 /* AuthSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 670C9CDB66FCC050C0142C58 /* AuthSessionTests.swift */; };
+		606E7522E0DD527D31CF2E01 /* RadioLogImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E28A9C023F0003B4E68771A /* RadioLogImportService.swift */; };
+		60EBDACADAAACBFFF77481DA /* AntennaReportsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01B521A888A6F354C88F21D1 /* AntennaReportsService.swift */; };
 		6132F896B54ED9F1ED730465 /* SQFont.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0447B79F47CDC0258E0BEA27 /* SQFont.swift */; };
 		628A0E2F091280CD8DECB629 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = F031B14E382FDADDEAEFECE1 /* AppEnvironment.swift */; };
 		62E1E8A453959C316BFF3444 /* BackgroundTaskScope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A136AAB9556457EEA80A8F /* BackgroundTaskScope.swift */; };
 		633DC6F9C6F272906A7E7363 /* LeaderboardService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC02787ABEAE06188ADF7D1F /* LeaderboardService.swift */; };
 		6355B681F28A5EB94BEBF576 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3208FA15F4116CDD6FB4BF47 /* PrivacyInfo.xcprivacy */; };
 		6651F3A94F7A12751A676CC2 /* SpeedtestShareImageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 879A6D651EB7605DE38CD230 /* SpeedtestShareImageTests.swift */; };
+		681DBC1F202BA2A5486B5F4E /* RadioLogImportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E04E544B4C215F036CD9B609 /* RadioLogImportModels.swift */; };
 		696D8CC9612CF18EA3CEFE62 /* EntitlementsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 510C718208A0F0CD33A6405E /* EntitlementsService.swift */; };
 		69C6356C453ED3AA2B0CFFEC /* SpeedtestModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39509D5164E7F02622A4D040 /* SpeedtestModels.swift */; };
 		6ACAAE95B6D7025523DE3DB5 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92E156E2B3CA6D911D4A0C30 /* AuthService.swift */; };
@@ -125,6 +131,7 @@
 		7220D3B2D9DBFAF86B9BAC43 /* SpeedtestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B011EC6077C3E8E806D4F94C /* SpeedtestView.swift */; };
 		73A2B7B1908FB3B6415DC31B /* AuditTourQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4F5346C853F95E32F253D7B /* AuditTourQATests.swift */; };
 		750DF6CED7C8F7426AB950AB /* CallManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3E12C14EC03895F48D39245 /* CallManager.swift */; };
+		75BFED4817463517F5991DE3 /* AntennaReportsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C73A379F93D002ADB36740 /* AntennaReportsListView.swift */; };
 		75C095DBB43F66C37DF4A51F /* SQSpotlight.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD56FDC7488816633CC5202E /* SQSpotlight.swift */; };
 		7646C39F8B3F70170191AA50 /* SQTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86CF3B083A9BF65407412BBF /* SQTheme.swift */; };
 		76BB800EF2BE8540711AEF12 /* DriveSpeedtestDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47CD806E692BAA9C67319EE /* DriveSpeedtestDetailSheet.swift */; };
@@ -135,6 +142,7 @@
 		7E8B1CCCA9F6BE070514C050 /* SpeedtestIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6A9E12FB0C1755E79A6216 /* SpeedtestIntents.swift */; };
 		8027C2DE7425912942340D4B /* NewModelDecodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A30FBE643735E6E375B3948 /* NewModelDecodeTests.swift */; };
 		80E825877A511351EBDCAE08 /* LiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = BB84BCC804AE4D6D0E2FF2FF /* LiveKit */; };
+		81468AFF5A5E22F90CD47B5A /* RadioLogImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E68316AF4C10942F8D8F691 /* RadioLogImportView.swift */; };
 		81672BA3E386570C6398A008 /* CoverageCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91DE6C62E4954951C0A2419C /* CoverageCardView.swift */; };
 		819A23CD1C96508D7129E5F0 /* BricolageGrotesque-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F2B897546130656652D9717D /* BricolageGrotesque-SemiBold.ttf */; };
 		81FED606BC8524E427FBB708 /* GamificationV2Service.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94A824085331B8DDD8FD3AEC /* GamificationV2Service.swift */; };
@@ -207,6 +215,7 @@
 		D1A58B2BB8DD3C9F24E5DAC3 /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB3FB0048F8A13762D3E9A7 /* EditProfileView.swift */; };
 		D2340128A9E3CD58F55CCAB0 /* LiveKitClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91AD5F784D0FCE84CBC6FC8 /* LiveKitClient.swift */; };
 		D7A64FBC491AB29258026F4B /* RemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B47BDB4D6F4BC76820FA3D2 /* RemoteImage.swift */; };
+		D89CD7D071BFF52EB1D1B693 /* RadioLogImportParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCFFAF3AD50336630849451C /* RadioLogImportParser.swift */; };
 		D8B502074515888EFFA296B9 /* GroupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E2756E12B4DD8420E4E6FC4 /* GroupSettingsView.swift */; };
 		D8D71CD3AB926175688AD739 /* ScheduledMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA71E3F29A86476A36C8900F /* ScheduledMessagesView.swift */; };
 		D9270EE5F2BA3509FBF72312 /* SavedMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD7AF3FD3C9A5C4D2280D2B5 /* SavedMessagesView.swift */; };
@@ -283,6 +292,7 @@
 
 /* Begin PBXFileReference section */
 		01A136AAB9556457EEA80A8F /* BackgroundTaskScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTaskScope.swift; sourceTree = "<group>"; };
+		01B521A888A6F354C88F21D1 /* AntennaReportsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaReportsService.swift; sourceTree = "<group>"; };
 		02B8E44000E7F6CDC6104D82 /* NearbyNetworkQualityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbyNetworkQualityService.swift; sourceTree = "<group>"; };
 		0412AAD8AE4FABC8AFE66ADE /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		0447B79F47CDC0258E0BEA27 /* SQFont.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQFont.swift; sourceTree = "<group>"; };
@@ -366,10 +376,12 @@
 		5E03418AAFBEEEBDF356739B /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
 		5E552A9B78EBBE744667DDC4 /* market_location_areas.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = market_location_areas.json; sourceTree = "<group>"; };
 		5E5547A4163714BB45440475 /* WidgetSharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSharedStore.swift; sourceTree = "<group>"; };
+		5E68316AF4C10942F8D8F691 /* RadioLogImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogImportView.swift; sourceTree = "<group>"; };
 		5EF26DB7319D9F10927854D0 /* SocialModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialModels.swift; sourceTree = "<group>"; };
 		610EE8D2CB67E2741D6E1701 /* PlannedDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannedDetailSheet.swift; sourceTree = "<group>"; };
 		63F121F16DC7FF76A1D7D6ED /* SQMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQMotion.swift; sourceTree = "<group>"; };
 		649AF22D91CC4ADD75073863 /* NetworkPathMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPathMonitor.swift; sourceTree = "<group>"; };
+		65484622445B106E95030CE3 /* AntennaReportThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaReportThreadView.swift; sourceTree = "<group>"; };
 		6570A8819FE179AAFE0B2546 /* NearbyOperatorStat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbyOperatorStat.swift; sourceTree = "<group>"; };
 		65CA75BF3F0519CFD6B732AE /* market_registry_fallback.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = market_registry_fallback.json; sourceTree = "<group>"; };
 		670C9CDB66FCC050C0142C58 /* AuthSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSessionTests.swift; sourceTree = "<group>"; };
@@ -392,6 +404,7 @@
 		7AE018DD5313EE91ADC34F09 /* JSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONValue.swift; sourceTree = "<group>"; };
 		7B3358D3E2CFEC772D02F2D2 /* MyIdentificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyIdentificationsView.swift; sourceTree = "<group>"; };
 		7C43EF0BBA838F55D6E4EF78 /* IdentifyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentifyService.swift; sourceTree = "<group>"; };
+		7D0616550E274CD9D726FFF1 /* AntennaReportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaReportSheet.swift; sourceTree = "<group>"; };
 		7DA8C938A4852ED844A5CBC1 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		7DE13CA2784C45B1F0EDF3B2 /* GamificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamificationService.swift; sourceTree = "<group>"; };
 		803DC3DE8DE40D4C7E27111B /* ConversationDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationDetailView.swift; sourceTree = "<group>"; };
@@ -415,11 +428,13 @@
 		8C29B55C40CE44D0AA0D262A /* LeaderboardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardsView.swift; sourceTree = "<group>"; };
 		8C94749CE21617DB555FC5D6 /* ANFRDemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRDemoData.swift; sourceTree = "<group>"; };
 		8DA025CCAC0DF6A4A8AD5A6E /* AntennaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaModels.swift; sourceTree = "<group>"; };
+		8E28A9C023F0003B4E68771A /* RadioLogImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogImportService.swift; sourceTree = "<group>"; };
 		91551435A0AA4D676F97FDCB /* StoryViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryViewer.swift; sourceTree = "<group>"; };
 		91DE6C62E4954951C0A2419C /* CoverageCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageCardView.swift; sourceTree = "<group>"; };
 		92E156E2B3CA6D911D4A0C30 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		94A824085331B8DDD8FD3AEC /* GamificationV2Service.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamificationV2Service.swift; sourceTree = "<group>"; };
 		958A673DD4304B8B309E66C5 /* NotificationsCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsCenterView.swift; sourceTree = "<group>"; };
+		969394914FD409108A452239 /* AntennaReportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaReportModels.swift; sourceTree = "<group>"; };
 		9D849C59293B6E1D70C5F88A /* MessagingE2EEQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagingE2EEQATests.swift; sourceTree = "<group>"; };
 		9E54BD3EC5237CAE037E9ABB /* SignalQuestWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalQuestWidgetBundle.swift; sourceTree = "<group>"; };
 		9E978EE2EBFDAD88C880B9C9 /* DockMinimizeQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockMinimizeQATests.swift; sourceTree = "<group>"; };
@@ -448,6 +463,7 @@
 		B070C4F0FF01A239CDF93570 /* CallReliabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallReliabilityTests.swift; sourceTree = "<group>"; };
 		B1F4DC14B58C08DADF46E158 /* MapFilterStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapFilterStoreTests.swift; sourceTree = "<group>"; };
 		B3E12C14EC03895F48D39245 /* CallManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallManager.swift; sourceTree = "<group>"; };
+		B4C73A379F93D002ADB36740 /* AntennaReportsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaReportsListView.swift; sourceTree = "<group>"; };
 		B4D1C18861E6114F7226BF02 /* BricolageGrotesque-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BricolageGrotesque-Bold.ttf"; sourceTree = "<group>"; };
 		B5CA16A2D1341E0245F06DB9 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
 		BA923675E56186A1BD8D5B7F /* PostCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostCardView.swift; sourceTree = "<group>"; };
@@ -466,6 +482,7 @@
 		C770C2B428D4F156C88972B0 /* SpeedtestDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestDetailSheet.swift; sourceTree = "<group>"; };
 		C82A89658CFF511C4133BD31 /* NetworkPulseHero.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPulseHero.swift; sourceTree = "<group>"; };
 		C8A8D289A6D4E7B0C9C621A4 /* PushNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationService.swift; sourceTree = "<group>"; };
+		CCFFAF3AD50336630849451C /* RadioLogImportParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogImportParser.swift; sourceTree = "<group>"; };
 		CD352558B0E98E08EE91AFF6 /* MessageShareModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageShareModels.swift; sourceTree = "<group>"; };
 		CD92F7CAEF5CE9D9F233D172 /* NearbyNetworkQualityDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbyNetworkQualityDetailSheet.swift; sourceTree = "<group>"; };
 		CE9C7190AEB0D08E27839A20 /* CallsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsService.swift; sourceTree = "<group>"; };
@@ -482,6 +499,7 @@
 		DB7D271F7EF3536DB6B7C1A1 /* SmokeTourQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTourQATests.swift; sourceTree = "<group>"; };
 		DF1F41B3B9C7134D4B1810A3 /* ThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadView.swift; sourceTree = "<group>"; };
 		E03FBD9147DB71215729DD82 /* Figtree-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-Regular.ttf"; sourceTree = "<group>"; };
+		E04E544B4C215F036CD9B609 /* RadioLogImportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogImportModels.swift; sourceTree = "<group>"; };
 		E1D216600CE3DCF8B267BD70 /* PhotoUploadPreparation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoUploadPreparation.swift; sourceTree = "<group>"; };
 		E31D4A2FC853B46DC0196738 /* SessionTraceMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTraceMapView.swift; sourceTree = "<group>"; };
 		E39D8D7ADDF4C4A7FF55C92C /* PhotoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoModels.swift; sourceTree = "<group>"; };
@@ -573,6 +591,7 @@
 			children = (
 				4C859D91AFCEFBFEE4E43C47 /* ANFRModels.swift */,
 				8DA025CCAC0DF6A4A8AD5A6E /* AntennaModels.swift */,
+				969394914FD409108A452239 /* AntennaReportModels.swift */,
 				4DBC54E804678243BC1BCC4C /* AuthModels.swift */,
 				D89B6EA883CAE3151D38ABEB /* IdentificationModels.swift */,
 				7AE018DD5313EE91ADC34F09 /* JSONValue.swift */,
@@ -583,6 +602,7 @@
 				CD352558B0E98E08EE91AFF6 /* MessageShareModels.swift */,
 				E39D8D7ADDF4C4A7FF55C92C /* PhotoModels.swift */,
 				4710561B73DB096826FAEEDE /* PresenceModels.swift */,
+				E04E544B4C215F036CD9B609 /* RadioLogImportModels.swift */,
 				FD5D954E6102D732D621D8E6 /* SessionModels.swift */,
 				C59360081D5DC685451E0D8D /* SocialCommentModels.swift */,
 				5EF26DB7319D9F10927854D0 /* SocialModels.swift */,
@@ -669,6 +689,7 @@
 			isa = PBXGroup;
 			children = (
 				0FE865B70163BD2809C7BC25 /* ANFR */,
+				941DC1D42FF42AA13451E00E /* AntennaReports */,
 				D40C57858C17CDFD6A57AE9D /* Auth */,
 				BB1642FE30D9B66E5354809C /* Calls */,
 				9C66BCBAE2A50921A5D5C8B4 /* DriveTest */,
@@ -684,6 +705,7 @@
 				E75734A43E4CB4B262E74719 /* Onboarding */,
 				2A10CEC1AE5133DC2359EA2B /* Photos */,
 				3C6C0845A097E28771A42C47 /* Profile */,
+				3CC07B050C55A8241E5FDD9F /* RadioLogImport */,
 				B367C49F9620A202AB659ACA /* Sessions */,
 				BB98C3F61016E4C3E6F242E0 /* Speedtest */,
 			);
@@ -741,6 +763,14 @@
 				F3B11B2DAF5DED109A1CA2CE /* SettingsView.swift */,
 			);
 			path = Profile;
+			sourceTree = "<group>";
+		};
+		3CC07B050C55A8241E5FDD9F /* RadioLogImport */ = {
+			isa = PBXGroup;
+			children = (
+				5E68316AF4C10942F8D8F691 /* RadioLogImportView.swift */,
+			);
+			path = RadioLogImport;
 			sourceTree = "<group>";
 		};
 		4263B4A10B58D6999A1AB948 /* Resources */ = {
@@ -883,6 +913,16 @@
 			path = Reports;
 			sourceTree = "<group>";
 		};
+		941DC1D42FF42AA13451E00E /* AntennaReports */ = {
+			isa = PBXGroup;
+			children = (
+				7D0616550E274CD9D726FFF1 /* AntennaReportSheet.swift */,
+				B4C73A379F93D002ADB36740 /* AntennaReportsListView.swift */,
+				65484622445B106E95030CE3 /* AntennaReportThreadView.swift */,
+			);
+			path = AntennaReports;
+			sourceTree = "<group>";
+		};
 		947CDFB421A69E616D1D4C36 /* Identifications */ = {
 			isa = PBXGroup;
 			children = (
@@ -1017,6 +1057,7 @@
 			isa = PBXGroup;
 			children = (
 				3B2B510928CA997F314547B3 /* ANFRService.swift */,
+				01B521A888A6F354C88F21D1 /* AntennaReportsService.swift */,
 				FB24C8F6F0931F6D99B18115 /* AntennasService.swift */,
 				389490B290AB8281D5C364D0 /* AppServices.swift */,
 				754787A246D3FF9F9B99202D /* AppStoreTransactionSynchronizer.swift */,
@@ -1039,6 +1080,8 @@
 				BEAB0F4B51977FF72375533F /* NotificationsService.swift */,
 				D2F641884A080F0EC459B546 /* PhotoService.swift */,
 				9EC5960ABF8C24952322E392 /* PrivacyService.swift */,
+				CCFFAF3AD50336630849451C /* RadioLogImportParser.swift */,
+				8E28A9C023F0003B4E68771A /* RadioLogImportService.swift */,
 				BF5C473D670B7B2938ABCB45 /* ReportsService.swift */,
 				413FB8DE8180198C52ED7167 /* SessionsService.swift */,
 				109A301B55F7538F8267E4DB /* SocialFeedService.swift */,
@@ -1380,6 +1423,11 @@
 				BEBAE07954EA046AB8BFA0F8 /* APIError.swift in Sources */,
 				5D4E6FA318972C48443A9F8A /* AntennaDetailSheet.swift in Sources */,
 				223A9CEC6280B585F98FB578 /* AntennaModels.swift in Sources */,
+				1907B4188D8BEDD97540DC8A /* AntennaReportModels.swift in Sources */,
+				3B35AD691B8C4B53BD19DC6F /* AntennaReportSheet.swift in Sources */,
+				27D2E1F55983085A8E4C501B /* AntennaReportThreadView.swift in Sources */,
+				75BFED4817463517F5991DE3 /* AntennaReportsListView.swift in Sources */,
+				60EBDACADAAACBFFF77481DA /* AntennaReportsService.swift in Sources */,
 				715EF9F210C7031757AEAD25 /* AntennaSectorGeometry.swift in Sources */,
 				4062FC76DAFABCDD6E5C6901 /* AntennasService.swift in Sources */,
 				0B638C1A0778E2B060E4807A /* AppConfig.swift in Sources */,
@@ -1484,6 +1532,10 @@
 				97024B7E216A3779D06D6075 /* PrivacySettingsView.swift in Sources */,
 				938A4CDAB66991434228E103 /* ProfileView.swift in Sources */,
 				AFBEA35CA2303C2A10207310 /* PushNotificationService.swift in Sources */,
+				681DBC1F202BA2A5486B5F4E /* RadioLogImportModels.swift in Sources */,
+				D89CD7D071BFF52EB1D1B693 /* RadioLogImportParser.swift in Sources */,
+				606E7522E0DD527D31CF2E01 /* RadioLogImportService.swift in Sources */,
+				81468AFF5A5E22F90CD47B5A /* RadioLogImportView.swift in Sources */,
 				5F15D1940A0B15ACFD423499 /* ReactionPicker.swift in Sources */,
 				07937E7527A350188D085CA8 /* RemindersView.swift in Sources */,
 				D7A64FBC491AB29258026F4B /* RemoteImage.swift in Sources */,

@@ -76,6 +76,7 @@ struct AntennaDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewerPhoto: AntennaPhotoSummary?
     @State private var photoPickerItem: PhotosPickerItem?
+    @State private var showReportSheet = false
 
     init(site: AntennaSite, market: String = "FR", operatorName: String = "SFR", service: AntennasServicing) {
         self.site = site
@@ -104,6 +105,7 @@ struct AntennaDetailSheet: View {
                     } else {
                         ProgressView().tint(SQColor.brandRed).frame(maxWidth: .infinity)
                     }
+                    reportCard
                     if let address = site.address {
                         Label(address, systemImage: "mappin")
                             .font(SQType.callout)
@@ -134,6 +136,14 @@ struct AntennaDetailSheet: View {
         .presentationDragIndicator(.visible)
         .fullScreenCover(item: $viewerPhoto) { photo in
             AntennaPhotoViewer(photos: model.details?.photos ?? [photo], initialId: photo.id)
+        }
+        .sheet(isPresented: $showReportSheet) {
+            AntennaReportSheet(
+                siteId: site.siteId ?? site.id,
+                siteLabel: site.siteId ?? site.id,
+                availableSectors: reportSectors,
+                service: services.antennaReports
+            )
         }
         .onChangeCompat(of: photoPickerItem) { _, newValue in
             guard let newValue else { return }
@@ -182,6 +192,47 @@ struct AntennaDetailSheet: View {
         }
         .foregroundStyle(SQColor.label)
         .sqSheetCard()
+    }
+
+    /// Carte « Signaler un problème » : ouvre le formulaire de signalement d'antenne.
+    /// Style secondaire (surface) pour respecter la règle brique (le bouton photo
+    /// tient déjà l'unique grand aplat brique de la fiche).
+    private var reportCard: some View {
+        Button {
+            Haptics.light()
+            showReportSheet = true
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                Image(systemName: "exclamationmark.bubble")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(SQColor.brandRed)
+                    .frame(width: 40, height: 40)
+                    .background(SQColor.accentSoft, in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Signaler un problème")
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.label)
+                    Text("Une donnée incorrecte sur ce site ? Préviens la modération.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .sqSheetCard()
+    }
+
+    /// Azimuts connus (degrés arrondis) proposés comme « secteur concerné » dans
+    /// le formulaire de signalement.
+    private var reportSectors: [Int] {
+        let source = (model.details?.core?.azimuts ?? []).isEmpty ? site.azimuths : (model.details?.core?.azimuts ?? [])
+        return Array(Set(source.map { Int($0.rounded()) })).sorted()
     }
 
     /// Couleur de l'opérateur affiché (utilisée par l'éventail d'azimuts).

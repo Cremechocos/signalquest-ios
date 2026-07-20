@@ -266,6 +266,7 @@ struct SettingsView: View {
                 Toggle("Messages (in-app)", isOn: bind(\.notifyMessagesInApp))
                 Toggle("Mises à jour ANFR (push)", isOn: bind(\.notifyAnfrUpdatesPush))
                 Toggle("Likes & commentaires (push)", isOn: bind(\.notifyPhotoLikesPush))
+                Toggle("Réponses à mes signalements (e-mail)", isOn: bind(\.notifyAntennaReportsEmail))
             }
             .tint(SQColor.brandRed)
             .foregroundStyle(SQColor.label)

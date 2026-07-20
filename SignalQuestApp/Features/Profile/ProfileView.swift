@@ -1,5 +1,11 @@
 import SwiftUI
 
+/// Enveloppe `Identifiable` autour d'un identifiant de signalement, pour piloter
+/// une `.sheet(item:)` sur deep link (l'`id` `String` seul n'est pas `Identifiable`).
+struct AntennaReportDeepLink: Identifiable {
+    let id: String
+}
+
 /// Profil « Crème & Terre cuite » : en-tête centré (avatar 88 + ombre accent),
 /// carte stats 4 cellules, carte progression (niveau/points), menu en carte
 /// unique rayon 22 et déconnexion en capsule danger. Header custom scrollable
@@ -7,11 +13,15 @@ import SwiftUI
 struct ProfileView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
+    @EnvironmentObject private var router: AppRouter
     let user: AuthUser
     @State private var showEdit = false
     @State private var stats: UserStats?
     @State private var statsError: String?
     @State private var progression: GamificationProfile?
+    /// Fil de signalement à ouvrir en sheet (tap sur une notification
+    /// `antenna_report_reply`), résolu depuis `router.openAntennaReportId`.
+    @State private var deepLinkReport: AntennaReportDeepLink?
 
     var body: some View {
         ScrollView {
@@ -58,8 +68,29 @@ struct ProfileView: View {
         .sheet(isPresented: $showEdit) {
             EditProfileView(user: user)
         }
+        // Deep link « antenna_report_reply » : ouvre DIRECTEMENT le fil du bon
+        // signalement, en sheet (l'onglet Profil héberge « Mes signalements »).
+        .sheet(item: $deepLinkReport) { link in
+            NavigationStack {
+                AntennaReportThreadView(
+                    service: services.antennaReports,
+                    reportId: link.id,
+                    onClose: { deepLinkReport = nil }
+                )
+            }
+        }
+        .onAppear { consumeAntennaReportDeepLink() }
+        .onChangeCompat(of: router.openAntennaReportId) { _, _ in consumeAntennaReportDeepLink() }
         .task { await loadStats() }
         .refreshable { await loadStats() }
+    }
+
+    /// Consomme l'intention de deep link posée par le routeur (idempotent : on
+    /// remet la valeur à `nil` une fois lue, comme `openSiteFromRouterIfNeeded`).
+    private func consumeAntennaReportDeepLink() {
+        guard let id = router.openAntennaReportId else { return }
+        router.openAntennaReportId = nil
+        deepLinkReport = AntennaReportDeepLink(id: id)
     }
 
     // MARK: - En-tête
@@ -221,6 +252,18 @@ struct ProfileView: View {
                 MyIdentificationsView(service: services.identify)
             } label: {
                 menuRow(title: "Mes identifications", icon: "checkmark.seal")
+            }
+            menuSeparator
+            NavigationLink {
+                RadioLogImportView(service: services.radioLogImport)
+            } label: {
+                menuRow(title: "Importer des logs radio", icon: "square.and.arrow.down")
+            }
+            menuSeparator
+            NavigationLink {
+                AntennaReportsListView(service: services.antennaReports)
+            } label: {
+                menuRow(title: "Mes signalements d'antenne", icon: "exclamationmark.bubble")
             }
             menuSeparator
             NavigationLink {

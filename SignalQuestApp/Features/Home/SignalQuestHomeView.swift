@@ -368,7 +368,7 @@ struct SignalQuestHomeView: View {
             if let rsrp = pulse.avgRsrpDbm {
                 // Clé de lecture du dBm (négatif, contre-intuitif) directement sur la
                 // tuile grand public : plus proche de 0 = meilleur signal (INT-16).
-                pulseTileButton(value: "\(rsrp)", unit: "dBm · proche de 0 = mieux", metric: .signal)
+                pulseTileButton(value: "\(rsrp)", unit: "dBm", metric: .signal)
             }
             if let median = pulse.medianDownloadMbps {
                 pulseTileButton(value: "\(median)", unit: "Mbps médian", metric: .download)

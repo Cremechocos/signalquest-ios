@@ -163,7 +163,8 @@ struct NotificationsCenterView: View {
             conversationId: metaString(meta, "conversationId", "conversation_id"),
             postId: metaString(meta, "postId", "post_id"),
             userId: metaString(meta, "userId", "user_id", "actorId", "actor_id"),
-            siteId: metaString(meta, "siteId", "site_id")
+            siteId: metaString(meta, "siteId", "site_id"),
+            reportId: metaString(meta, "reportId", "report_id")
         )
     }
 
@@ -183,6 +184,9 @@ struct NotificationsCenterView: View {
     /// Crème : seule la forme distingue le type, la brique reste l'accent).
     private func icon(for kind: String?) -> String {
         let k = (kind ?? "").lowercased()
+        if k.contains("antenna_report") || k.contains("site_report") {
+            return "exclamationmark.bubble.fill"
+        }
         if k.contains("like") || k.contains("reaction") || k.contains("favorite") {
             return "heart.fill"
         }

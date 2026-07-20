@@ -26,9 +26,16 @@ struct SpeedtestView: View {
     // Défaut « Auto » : préflight hybride iPerf3 (OVH/Bouygues/Scaleway/MilkyWan)
     // + Cloudflare, le plus rapide gagne.
     @AppStorage("speedtest_download_target") private var downloadTargetRaw = SpeedtestDownloadTarget.hybridAuto.rawValue
-    @AppStorage("speedtest_duration_seconds") private var durationSeconds = 10
+    // Défaut 14 s (et non 10) : sur une ligne fibre/5G rapide la rampe TCP/BBR
+    // dure quelques secondes ; une fenêtre trop courte sous-évalue le débit
+    // (moyenne cumulée plombée par le démarrage). 14 s laisse la mesure se
+    // stabiliser sans allonger excessivement le test. Le drive test garde 10 s
+    // (résolution spatiale du trajet).
+    @AppStorage("speedtest_duration_seconds") private var durationSeconds = 14
     @AppStorage("speedtest_streams") private var streams = 16
     @AppStorage("speedtest_reliability_mode") private var reliabilityMode = true
+    /// Serveur LibreSpeed choisi manuellement (hostname). Vide = le plus proche.
+    @AppStorage("speedtest_librespeed_host") private var libreSpeedHost = ""
     /// Publication sur la carte communautaire publique. Opt-in explicite, mémorisé
     /// localement, et jamais publié sous VPN. La précision publique dépend ensuite
     /// du réglage global de confidentialité côté serveur.
@@ -605,7 +612,8 @@ struct SpeedtestView: View {
                             selection: Binding(
                                 get: { downloadTarget },
                                 set: { downloadTargetRaw = $0.rawValue }
-                            )
+                            ),
+                            libreSpeedHost: $libreSpeedHost
                         )
 
                         VStack(alignment: .leading, spacing: SQSpace.sm) {
@@ -771,7 +779,8 @@ struct SpeedtestView: View {
             downloadTarget: downloadTarget,
             durationSeconds: durationSeconds.clamped(to: 5...30),
             streams: streams.clamped(to: 1...16),
-            reliabilityMode: reliabilityMode
+            reliabilityMode: reliabilityMode,
+            libreSpeedHost: libreSpeedHost.isEmpty ? nil : libreSpeedHost
         )
     }
 
@@ -1890,17 +1899,21 @@ private extension SpeedtestPhase {
 /// simple (pas de `.move` qui décale le ScrollView parent).
 private struct SpeedtestServerPicker: View {
     @Binding var selection: SpeedtestDownloadTarget
+    /// Serveur LibreSpeed choisi manuellement (hostname) ; vide = le plus proche.
+    @Binding var libreSpeedHost: String
     /// `nil` = tout replié (sauf Auto toujours visible).
     @State private var expandedRegion: String?
 
     private var collapsibleGroups: [(region: String, targets: [SpeedtestDownloadTarget])] {
         SpeedtestDownloadTarget.pickerGroups
     }
+    private static let libreSpeedRegionKey = "LibreSpeed"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Auto + Cloudflare (moteurs, pas des POP) — toujours visibles.
-            ForEach(SpeedtestDownloadTarget.ungroupedCases) { target in
+            // Auto + Cloudflare (moteurs) — toujours visibles. LibreSpeed a sa
+            // propre section (data-driven + choix manuel du POP).
+            ForEach(SpeedtestDownloadTarget.ungroupedCases.filter { $0 != .libreSpeed }) { target in
                 serverRow(target)
             }
 
@@ -1964,6 +1977,8 @@ private struct SpeedtestServerPicker: View {
                     }
                 }
             }
+
+            libreSpeedSection
         }
         // Animation de hauteur/layout uniquement — fluide dans un ScrollView.
         .animation(.easeInOut(duration: 0.25), value: expandedRegion)
@@ -1977,6 +1992,7 @@ private struct SpeedtestServerPicker: View {
 
     /// Ouvre le groupe du serveur choisi (Auto / Cloudflare n'en ont pas).
     private func expandGroup(containing target: SpeedtestDownloadTarget) {
+        if target == .libreSpeed { expandedRegion = Self.libreSpeedRegionKey; return }
         let region = target.regionLabel
         guard collapsibleGroups.contains(where: { $0.region == region }) else { return }
         expandedRegion = region
@@ -2024,6 +2040,124 @@ private struct SpeedtestServerPicker: View {
         .accessibilityLabel(target.displayName)
         .accessibilityValue(selected ? "sélectionné" : "non sélectionné")
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    // MARK: LibreSpeed — section data-driven (Auto + choix manuel du POP mondial)
+
+    private var libreSpeedCurrentLabel: String {
+        if libreSpeedHost.isEmpty { return "Le plus proche" }
+        return libreSpeedServers.first { $0.hostname == libreSpeedHost }?.name ?? "Le plus proche"
+    }
+
+    @ViewBuilder private var libreSpeedSection: some View {
+        let isExpanded = expandedRegion == Self.libreSpeedRegionKey
+        let isEngineSelected = selection == .libreSpeed
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                Haptics.selection()
+                expandedRegion = isExpanded ? nil : Self.libreSpeedRegionKey
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(SQColor.labelTertiary)
+                        .frame(width: 12)
+                    Image(systemName: "speedometer")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(isEngineSelected ? SQColor.brandRed : SQColor.labelSecondary)
+                    Text("LibreSpeed")
+                        .font(SQFont.body(14, .semibold))
+                        .foregroundStyle(SQColor.label)
+                    Text("\(libreSpeedServers.count)")
+                        .font(SQFont.body(11, .semibold))
+                        .foregroundStyle(SQColor.labelTertiary)
+                        .padding(.horizontal, 7).padding(.vertical, 2)
+                        .background(SQColor.fill, in: Capsule(style: .continuous))
+                    Spacer(minLength: 6)
+                    if isEngineSelected, !isExpanded {
+                        Text(libreSpeedCurrentLabel)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(SQColor.brandRed)
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.horizontal, SQSpace.md).padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).fill(SQColor.surfaceMuted))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("LibreSpeed")
+            .accessibilityValue(isExpanded ? "ouvert" : "fermé")
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 6) {
+                    libreSpeedAutoRow
+                    ForEach(libreSpeedPickerGroups(), id: \.region) { group in
+                        Text(group.region)
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .padding(.top, 4).padding(.leading, 4)
+                        ForEach(group.servers, id: \.hostname) { server in
+                            libreSpeedServerRow(server)
+                        }
+                    }
+                }
+                .padding(.top, 6)
+            }
+        }
+    }
+
+    private var libreSpeedAutoRow: some View {
+        let selected = selection == .libreSpeed && libreSpeedHost.isEmpty
+        return Button {
+            selection = .libreSpeed
+            libreSpeedHost = ""
+            Haptics.selection()
+        } label: {
+            libreSpeedRowLabel(icon: "location.magnifyingglass", title: "Le plus proche (auto)",
+                               subtitle: "POP LibreSpeed le plus proche", selected: selected)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("LibreSpeed le plus proche")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func libreSpeedServerRow(_ server: LibreSpeedServer) -> some View {
+        let selected = selection == .libreSpeed && libreSpeedHost == server.hostname
+        return Button {
+            selection = .libreSpeed
+            libreSpeedHost = server.hostname
+            Haptics.selection()
+        } label: {
+            libreSpeedRowLabel(icon: "server.rack", title: server.name,
+                               subtitle: server.pickerSubtitle, selected: selected)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(server.name)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func libreSpeedRowLabel(icon: String, title: String, subtitle: String, selected: Bool) -> some View {
+        HStack(spacing: SQSpace.md) {
+            ZStack {
+                Circle().fill(selected ? SQColor.brandRed.opacity(0.16) : SQColor.fill).frame(width: 32, height: 32)
+                Image(systemName: icon).font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(selected ? SQColor.brandRed : SQColor.labelSecondary)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(SQFont.body(14, .semibold)).foregroundStyle(SQColor.label).lineLimit(1)
+                Text(subtitle).font(SQType.micro).foregroundStyle(SQColor.labelTertiary).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(selected ? SQColor.brandRed : SQColor.labelTertiary.opacity(0.5))
+        }
+        .padding(.horizontal, SQSpace.md).padding(.vertical, 9)
+        .background(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+            .fill(selected ? SQColor.brandRed.opacity(0.08) : SQColor.surfaceMuted))
+        .contentShape(Rectangle())
     }
 }
 

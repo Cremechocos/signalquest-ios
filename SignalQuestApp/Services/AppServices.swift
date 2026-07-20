@@ -12,6 +12,8 @@ final class AppServices: ObservableObject {
     let map: MapSnapshotServicing
     let markets: MarketRegistryServicing
     let antennas: AntennasServicing
+    /// Signalements d'antenne (émission, suivi, discussion avec la modération).
+    let antennaReports: AntennaReportsServicing
     let anfr: ANFRServicing
     let speedtest: SpeedtestService
     let networkOperator: NetworkOperatorServicing
@@ -23,6 +25,8 @@ final class AppServices: ObservableObject {
     let sessions: SessionsServicing
     let validations: ValidationsServicing
     let identify: IdentifyServicing
+    /// Import de logs radio (eNB Analytics CSV / NetMonster .ntm) → identification.
+    let radioLogImport: RadioLogImportServicing
     let e2ee: E2EEServicing
     let friends: FriendsServicing
     let gamification: GamificationServicing
@@ -65,6 +69,7 @@ final class AppServices: ObservableObject {
         let marketsService = MarketRegistryService(api: api)
         markets = marketsService
         antennas = AntennasService(api: api)
+        antennaReports = AntennaReportsService(api: api)
         anfr = ANFRService(api: api)
         let networkOperatorService = NetworkOperatorService(api: api)
         networkOperator = networkOperatorService
@@ -84,7 +89,9 @@ final class AppServices: ObservableObject {
         let speedtestService = speedtest
         Task { await speedtestService.retryPendingSaves() }
         validations = ValidationsService(api: api)
-        identify = IdentifyService(api: api)
+        let identifyService = IdentifyService(api: api)
+        identify = identifyService
+        radioLogImport = RadioLogImportService(api: api, identify: identifyService)
         friends = FriendsService(api: api)
         gamification = GamificationService(api: api)
         gamificationV2 = GamificationV2Service(api: api)

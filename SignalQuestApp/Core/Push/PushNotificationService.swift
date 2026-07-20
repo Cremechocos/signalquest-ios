@@ -174,8 +174,9 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         let postId = Self.string(info, "postId", "post_id")
         let userId = Self.string(info, "userId", "user_id", "actorId", "actor_id")
         let siteId = Self.string(info, "siteId", "site_id")
+        let reportId = Self.string(info, "reportId", "report_id")
         await MainActor.run {
-            self.router.handle(type: type, conversationId: conversationId, postId: postId, userId: userId, siteId: siteId)
+            self.router.handle(type: type, conversationId: conversationId, postId: postId, userId: userId, siteId: siteId, reportId: reportId)
             UNUserNotificationCenter.current().setBadgeCountCompat(0)
         }
     }

@@ -233,8 +233,25 @@ private enum SpeedtestEngineConfig {
     static let bytelIperfPortMax: UInt16 = 9_240
     static let onlineNetIperfPortMin: UInt16 = 5_200
     static let onlineNetIperfPortMax: UInt16 = 5_209
-    /// Warm-up discarded by the iPerf3 protocol itself (TCP slow-start).
-    static let iperf3OmitSeconds: Int = 1
+    /// POP iPerf3 publics FR/EU (vérifiés juil. 2026). Serveurs mono-slot →
+    /// enregistrer la plage complète pour laisser le fallback de port éviter les
+    /// collisions « BUSY ». Moji expose 41 ports (anti-collision), les autres 4-10.
+    static let mojiIperfPortMin: UInt16 = 5_200
+    static let mojiIperfPortMax: UInt16 = 5_240
+    static let clouviderIperfPortMin: UInt16 = 5_200
+    static let clouviderIperfPortMax: UInt16 = 5_209
+    static let leasewebIperfPortMin: UInt16 = 5_201
+    static let leasewebIperfPortMax: UInt16 = 5_210
+    static let init7IperfPortMin: UInt16 = 5_201
+    static let init7IperfPortMax: UInt16 = 5_204
+    /// Warm-up jeté par le protocole iPerf3 (`--omit`) : borne HAUTE de la durée
+    /// de rampe écartée. Doit couvrir slow-start TCP + BBR STARTUP + remplissage
+    /// du buffer, qui dure 2-3 s sur une ligne fibre/5G rapide (≈800 Mbps+) — un
+    /// omit de 1 s laissait la rampe plomber la moyenne cumulée des tests courts
+    /// (sous-estimation du débit). `--omit` N'AMPUTE PAS la fenêtre mesurée (les
+    /// deadlines valent omit + durationSeconds) : on écarte plus de rampe sans
+    /// raccourcir la mesure. La valeur effective est calquée sur la durée (2-3 s).
+    static let iperf3OmitSeconds: Int = 3
     /// Block size for iPerf3 data streams (matches stock iperf3 TCP default).
     static let iperf3BlockSize: Int = 131_072
     /// PingProbe: maximum 8 total attempts. We use one warmup when possible,
@@ -345,8 +362,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         progress: SpeedtestProgressHandler?
     ) async throws -> SpeedtestRunResult {
         let startedAt = Date()
-        let omitSeconds = SpeedtestEngineConfig.iperf3OmitSeconds
         let durationSeconds = max(5, min(settings.durationSeconds, 30))
+        // Omit adaptatif 2-3 s (jamais plus que `iperf3OmitSeconds`, jamais moins
+        // de 2 s) : écarte la rampe TCP/BBR sans raccourcir la fenêtre mesurée.
+        let omitSeconds = min(SpeedtestEngineConfig.iperf3OmitSeconds, max(2, durationSeconds / 4))
         // Multi-stream is required to saturate 5G / fibre : un seul flux TCP
         // plafonne souvent sous le débit réel du lien.
         let parallelStreams = min(max(settings.streams, 4), SpeedtestEngineConfig.hardMaxStreams)
@@ -365,6 +384,40 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 progress: progress,
                 notice: nil
             )
+        }
+
+        // Cible « LibreSpeed » : moteur HTTPS (garbage.php/empty.php) sur le POP
+        // LibreSpeed le plus proche — HTTPS pur (ATS OK), licence LGPL propre,
+        // aucune contrainte Ookla. Serveurs data-driven (`libreSpeedServers`).
+        if settings.downloadTarget == .libreSpeed {
+            do {
+                return try await runLibreSpeedTest(
+                    pathStatus: pathStatus,
+                    location: location,
+                    durationSeconds: durationSeconds,
+                    parallelStreams: parallelStreams,
+                    startedAt: startedAt,
+                    preferredHost: settings.libreSpeedHost,
+                    progress: progress
+                )
+            } catch is CancellationError {
+                throw CancellationError()   // annulation utilisateur : propager
+            } catch {
+                // Serveur LibreSpeed injoignable / TLS refusé par l'ATS / occupé →
+                // repli Cloudflare (HTTPS, résultat garanti), comme le chemin iPerf3.
+                // NE PAS gater sur `Task.checkCancellation()` : un échec (même long)
+                // ne doit pas empêcher le repli de produire un résultat.
+                sqDebugLog("SQ_LIBRESPEED repli Cloudflare : \(error.localizedDescription)")
+                return try await runCloudflareTest(
+                    pathStatus: pathStatus,
+                    location: location,
+                    durationSeconds: durationSeconds,
+                    parallelStreams: parallelStreams,
+                    startedAt: startedAt,
+                    progress: progress,
+                    notice: "Serveur LibreSpeed injoignable — test via Cloudflare"
+                )
+            }
         }
 
         var iperfServer = selectIPerfServer(for: settings.downloadTarget, location: location)
@@ -1303,6 +1356,286 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         return CloudflareTransferOutcome(bytes: counter.value, duration: max(0.001, elapsed))
     }
 
+    // MARK: - Moteur LibreSpeed (HTTPS, POP le plus proche)
+
+    /// Test complet via un backend LibreSpeed HTTPS (`garbage.php`/`empty.php`)
+    /// sur le POP le plus proche : ping (handshake TCP :443), download, upload,
+    /// pings chargés sur le même hôte. Même mécanique URLSession que Cloudflare.
+    private func runLibreSpeedTest(
+        pathStatus: NetworkPathStatus,
+        location: Coordinates?,
+        durationSeconds: Int,
+        parallelStreams: Int,
+        startedAt: Date,
+        preferredHost: String? = nil,
+        progress: SpeedtestProgressHandler?
+    ) async throws -> SpeedtestRunResult {
+        // Serveur choisi manuellement (par hostname) sinon le plus proche.
+        let server = (preferredHost.flatMap { host in libreSpeedServers.first { $0.hostname == host } })
+            ?? nearestLibreSpeedServer(to: location)
+        let serverName = server.name
+        let dlStreams = min(max(2, parallelStreams), LibreSpeedConfig.maxStreams)
+        let ulStreams = min(dlStreams, LibreSpeedConfig.maxUploadStreams)
+        let session = makeMeasurementSession(
+            maxConnectionsPerHost: dlStreams + 2,
+            requestTimeout: Double(durationSeconds) + 15
+        )
+        defer { session.finishTasksAndInvalidate() }
+
+        // 0. Pré-vol HTTPS (~6 s max) : le handshake TCP du ping ne teste PAS le
+        // TLS ; or certains serveurs LibreSpeed passent `curl` mais échouent le TLS
+        // de l'ATS iOS (« TLS error »), ou ont un backend mort. On le détecte vite
+        // ici — un `garbage.php?ckSize=1` réel doit renvoyer des octets — pour
+        // basculer promptement sur le repli Cloudflare (plutôt que 14 s à vide).
+        do {
+            var preflight = URLRequest(url: server.downloadURL(ckSizeMiB: 1))
+            preflight.timeoutInterval = 6
+            let (data, response) = try await session.data(for: preflight)
+            guard let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode), !data.isEmpty else {
+                throw SpeedtestEngineError.noServerReachable
+            }
+        } catch {
+            sqDebugLog("SQ_LIBRESPEED pré-vol échoué (\(server.hostname)) : \(error.localizedDescription)")
+            throw SpeedtestEngineError.noServerReachable
+        }
+
+        progress?(SpeedtestLiveProgress(
+            phase: .ping, fraction: 0,
+            pingSampleTarget: SpeedtestEngineConfig.pingAttemptBudget,
+            serverName: serverName
+        ))
+
+        // 1. Ping = handshake TCP pur sur :443 (comparable au ping iPerf3/Cloudflare).
+        let pingResult = await measureTcpPings(
+            host: server.hostname, port: LibreSpeedConfig.httpsPort,
+            serverName: serverName, progress: progress, minimumValidSamples: 2
+        )
+        guard !pingResult.values.isEmpty else { throw SpeedtestEngineError.pingFailed }
+        let pingValues = pingResult.values
+        let pingValue = SpeedMetricCalculator.average(pingValues)
+        let pingMedianValue = SpeedMetricCalculator.median(pingValues)
+        let jitterValue = SpeedMetricCalculator.jitter(pingValues)
+
+        // 2. Download.
+        progress?(SpeedtestLiveProgress(phase: .download, fraction: 0, serverName: serverName))
+        let usefulDuration = Double(durationSeconds)
+        let dlSamplesBox = SpeedtestSamplesBox()
+        let dlLiveSampler = SpeedtestLiveSampler()
+        let dlState = ProgressState()
+        let lsLoadedProbe = tcpProbe
+        let lsHost = server.hostname
+        let dlLoadedDeadline = Date().addingTimeInterval(usefulDuration + 1)
+        let dlLoadedTask = Task.detached(priority: .utility) {
+            await SpeedtestService.collectIPerfLoadedPings(
+                host: lsHost, port: LibreSpeedConfig.httpsPort,
+                deadline: dlLoadedDeadline, tcpProbe: lsLoadedProbe
+            )
+        }
+        defer { dlLoadedTask.cancel() }
+
+        let dlOutcome = await measureLibreSpeedTransfer(
+            server: server, direction: .download, session: session,
+            streams: dlStreams, duration: usefulDuration,
+            onProgress: { @Sendable bytes, elapsed in
+                let elapsedMs = elapsed * 1000.0
+                let needleMbps = dlLiveSampler.observe(totalBytes: bytes, elapsedMs: elapsedMs)
+                let averageMbps = (Double(bytes) * 8.0 / 1_000_000.0) / max(0.1, elapsed)
+                let deltaBytes = dlState.update(bytes: bytes, time: elapsedMs)
+                dlSamplesBox.append(start: max(0, elapsedMs - 150), end: elapsedMs, bytes: deltaBytes)
+                progress?(SpeedtestLiveProgress(
+                    phase: .download, currentMbps: needleMbps,
+                    fraction: min(1, elapsed / usefulDuration),
+                    downloadLiveMbps: needleMbps, downloadAverageMbps: averageMbps,
+                    serverName: serverName
+                ))
+            }
+        )
+        dlLoadedTask.cancel()
+        let downloadPings = await dlLoadedTask.value
+        let pingDlMs = downloadPings.isEmpty ? nil : SpeedMetricCalculator.average(downloadPings)
+        let jitterDlMs = downloadPings.isEmpty ? nil : SpeedMetricCalculator.jitter(downloadPings)
+
+        try Task.checkCancellation()
+        guard dlOutcome.bytes > 100_000, dlOutcome.duration >= 1.0 else {
+            sqDebugLog("SQ_LIBRESPEED DL insuffisant : \(dlOutcome.bytes) octets en \(String(format: "%.1f", dlOutcome.duration))s (\(server.hostname))")
+            throw SpeedtestEngineError.noServerReachable
+        }
+        let dlStats = dlSamplesBox.publicStats(
+            windowMs: SpeedtestEngineConfig.publicPeakWindowMs, graceMs: 0,
+            endMs: max(dlOutcome.duration, 0.001) * 1_000
+        )
+        let dlGraphSeries = dlSamplesBox.publicStats(
+            windowMs: SpeedtestEngineConfig.graphWindowMs, graceMs: 0,
+            endMs: max(dlOutcome.duration, 0.001) * 1_000
+        ).seriesMbps
+        let dlAverageMbps = dlOutcome.averageMbps
+        let dlPeakMbps = max(dlStats.peak, dlAverageMbps)
+
+        // 3. Upload — best effort.
+        progress?(SpeedtestLiveProgress(phase: .upload, fraction: 0, serverName: serverName))
+        let contextTask = resultContextTask(pathStatus: pathStatus, location: location)
+        let ulSamplesBox = SpeedtestSamplesBox()
+        let ulLiveSampler = SpeedtestLiveSampler()
+        let ulState = ProgressState()
+        var ulAverageMbps: Double?
+        var ulPeakMbps: Double?
+        var ulStats = SpeedtestSamplesBox.PublicStats(p90: nil, p95: nil, peak: 0, windowCount: 0, seriesMbps: [])
+        var pingUlMs: Double?
+        var jitterUlMs: Double?
+
+        let ulLoadedDeadline = Date().addingTimeInterval(usefulDuration + 1)
+        let ulLoadedTask = Task.detached(priority: .utility) {
+            await SpeedtestService.collectIPerfLoadedPings(
+                host: lsHost, port: LibreSpeedConfig.httpsPort,
+                deadline: ulLoadedDeadline, tcpProbe: lsLoadedProbe
+            )
+        }
+        defer { ulLoadedTask.cancel() }
+
+        let ulOutcome = await measureLibreSpeedTransfer(
+            server: server, direction: .upload, session: session,
+            streams: ulStreams, duration: usefulDuration,
+            onProgress: { @Sendable bytes, elapsed in
+                let elapsedMs = elapsed * 1000.0
+                let needleMbps = ulLiveSampler.observe(totalBytes: bytes, elapsedMs: elapsedMs)
+                let averageMbps = (Double(bytes) * 8.0 / 1_000_000.0) / max(0.1, elapsed)
+                let deltaBytes = ulState.update(bytes: bytes, time: elapsedMs)
+                ulSamplesBox.append(start: max(0, elapsedMs - 150), end: elapsedMs, bytes: deltaBytes)
+                progress?(SpeedtestLiveProgress(
+                    phase: .upload, currentMbps: needleMbps,
+                    fraction: min(1, elapsed / usefulDuration),
+                    uploadLiveMbps: needleMbps, uploadAverageMbps: averageMbps,
+                    serverName: serverName
+                ))
+            }
+        )
+        ulLoadedTask.cancel()
+        let uploadPings = await ulLoadedTask.value
+        if !uploadPings.isEmpty {
+            pingUlMs = SpeedMetricCalculator.average(uploadPings)
+            jitterUlMs = SpeedMetricCalculator.jitter(uploadPings)
+        }
+        try Task.checkCancellation()
+        var ulGraphSeries: [Double] = []
+        if ulOutcome.bytes > 100_000, ulOutcome.duration >= 1.0 {
+            ulStats = ulSamplesBox.publicStats(
+                windowMs: SpeedtestEngineConfig.publicPeakWindowMs, graceMs: 0,
+                endMs: max(ulOutcome.duration, 0.001) * 1_000
+            )
+            ulGraphSeries = ulSamplesBox.publicStats(
+                windowMs: SpeedtestEngineConfig.graphWindowMs, graceMs: 0,
+                endMs: max(ulOutcome.duration, 0.001) * 1_000
+            ).seriesMbps
+            ulAverageMbps = ulOutcome.averageMbps
+            ulPeakMbps = max(ulStats.peak, ulAverageMbps ?? 0)
+        }
+
+        let measurements = EngineMeasurements(
+            serverName: serverName,
+            downloadServerId: "librespeed_\(server.countryCode.lowercased())",
+            downloadServerCode: server.hostname,
+            pingProtocol: "TCP",
+            pingMs: pingValue,
+            pingMedianMs: pingMedianValue,
+            pingMinMs: pingValues.min(),
+            pingMaxMs: pingValues.max(),
+            jitterMs: jitterValue,
+            downloadAverageMbps: dlAverageMbps,
+            downloadMaxMbps: dlPeakMbps,
+            downloadP90Mbps: dlStats.p90,
+            downloadP95Mbps: dlStats.p95,
+            downloadSeriesMbps: dlGraphSeries.isEmpty ? dlStats.seriesMbps : dlGraphSeries,
+            uploadAverageMbps: ulAverageMbps,
+            uploadMaxMbps: ulPeakMbps,
+            uploadP90Mbps: ulStats.p90,
+            uploadP95Mbps: ulStats.p95,
+            uploadSeriesMbps: ulGraphSeries.isEmpty
+                ? (ulStats.seriesMbps.isEmpty ? nil : ulStats.seriesMbps)
+                : ulGraphSeries,
+            downloadGraceWindowCount: 0,
+            uploadGraceWindowCount: 0,
+            uploadMeasurementSource: "client-written",
+            pingDlMs: pingDlMs,
+            jitterDlMs: jitterDlMs,
+            pingUlMs: pingUlMs,
+            jitterUlMs: jitterUlMs
+        )
+        return await finalizeRun(
+            measurements, startedAt: startedAt, pathStatus: pathStatus,
+            location: location, context: contextTask, progress: progress
+        )
+    }
+
+    /// Transfert LibreSpeed borné par une deadline : N flux concurrents qui
+    /// enchaînent `garbage.php` (DL) ou des POST `empty.php` (UL, blocs de 4 Mo
+    /// car les gros POST sont refusés en 413). Octets comptés au fil de l'eau.
+    private func measureLibreSpeedTransfer(
+        server: LibreSpeedServer,
+        direction: CloudflareTransferDirection,
+        session: URLSession,
+        streams: Int,
+        duration: Double,
+        onProgress: @escaping @Sendable (_ bytes: Int, _ elapsedSeconds: Double) -> Void
+    ) async -> CloudflareTransferOutcome {
+        let counter = SafeCounter()
+        let start = Date()
+        let deadline = start.addingTimeInterval(duration)
+        let downURL = server.downloadURL(ckSizeMiB: LibreSpeedConfig.downloadCkSizeMiB)
+        let upURL = server.uploadURL
+        let uploadBody = direction == .upload ? Data(count: LibreSpeedConfig.uploadBytesPerRequest) : Data()
+
+        let ticker = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                let elapsed = Date().timeIntervalSince(start)
+                onProgress(counter.value, min(elapsed, duration))
+                if elapsed >= duration { break }
+            }
+        }
+        defer { ticker.cancel() }
+
+        let didLogFailure = AtomicBool(false)
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<max(1, streams) {
+                group.addTask { [counter, uploadBody, didLogFailure] in
+                    while Date() < deadline, !Task.isCancelled {
+                        do {
+                            switch direction {
+                            case .download:
+                                var request = URLRequest(url: downURL)
+                                request.timeoutInterval = duration + 10
+                                let delegate = SpeedtestDownloadDelegate(deadline: deadline, onBytes: { counter.add($0) })
+                                let task = session.dataTask(with: request)
+                                task.delegate = delegate
+                                try await delegate.run(task: task)
+                            case .upload:
+                                var request = URLRequest(url: upURL)
+                                request.httpMethod = "POST"
+                                request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+                                request.timeoutInterval = duration + 10
+                                let delegate = SpeedtestUploadDelegate(deadline: deadline, onBytesSent: { counter.add($0) })
+                                let task = session.uploadTask(with: request, from: uploadBody)
+                                task.delegate = delegate
+                                _ = try await delegate.run(task: task)
+                            }
+                        } catch {
+                            if Task.isCancelled || Date() >= deadline { break }
+                            if !didLogFailure.value {
+                                didLogFailure.value = true
+                                sqDebugLog("SQ_LIBRESPEED \(direction == .download ? "DL" : "UL") requête échouée : \(error.localizedDescription)")
+                            }
+                            try? await Task.sleep(nanoseconds: 250_000_000)
+                        }
+                    }
+                }
+            }
+        }
+        ticker.cancel()
+        let elapsed = min(Date().timeIntervalSince(start), duration)
+        return CloudflareTransferOutcome(bytes: counter.value, duration: max(0.001, elapsed))
+    }
+
     /// Lance iPerf3 en essayant la plage de ports du serveur si le port préféré
     /// est occupé (ACCESS_DENIED) ou refuse la connexion.
     ///
@@ -2033,6 +2366,10 @@ enum IPerfServerProvider: String, Sendable {
     case bouygues
     case scaleway
     case milkywan
+    case moji
+    case clouvider
+    case leaseweb
+    case init7
 }
 
 /// Catalogue des serveurs iPerf3 publics (OVH + Bouygues sains + Scaleway online.net).
@@ -2075,6 +2412,15 @@ let iperfPublicServers: [IPerfPublicServer] = {
         IPerfPublicServer(hostname: "ping6-90ms.online.net", name: "Paris Scaleway IPv6 +90 ms", latitude: parisLat, longitude: parisLon, code: "SCW690", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax),
         // MilkyWan AS2027 (ports 9200–9240 TCP, BBR, 40 Gbit/s) — vérifié en ligne 2026-07
         IPerfPublicServer(hostname: "speedtest.milkywan.fr", name: "Croissy-Beaubourg (MilkyWan)", latitude: 48.8412, longitude: 2.6724, code: "CBO", countryCode: "FR", provider: .milkywan, portMin: bytMin, portMax: bytMax),
+        // POP iPerf3 publics FR/EU — handshake iPerf3 réel vérifié (juil. 2026).
+        // Serveurs mono-slot : plage de ports complète pour le fallback anti-BUSY.
+        IPerfPublicServer(hostname: "iperf3.moji.fr", name: "Paris (Moji)", latitude: parisLat, longitude: parisLon, code: "MOJI", countryCode: "FR", provider: .moji, portMin: SpeedtestEngineConfig.mojiIperfPortMin, portMax: SpeedtestEngineConfig.mojiIperfPortMax),
+        IPerfPublicServer(hostname: "fra.speedtest.clouvider.net", name: "Francfort (Clouvider)", latitude: 50.1109, longitude: 8.6821, code: "FRA-CLV", countryCode: "DE", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax),
+        IPerfPublicServer(hostname: "ams.speedtest.clouvider.net", name: "Amsterdam (Clouvider)", latitude: 52.3676, longitude: 4.9041, code: "AMS-CLV", countryCode: "NL", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax),
+        IPerfPublicServer(hostname: "lon.speedtest.clouvider.net", name: "Londres (Clouvider)", latitude: 51.5074, longitude: -0.1278, code: "LON-CLV", countryCode: "GB", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax),
+        IPerfPublicServer(hostname: "man.speedtest.clouvider.net", name: "Manchester (Clouvider)", latitude: 53.4808, longitude: -2.2426, code: "MAN-CLV", countryCode: "GB", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax),
+        IPerfPublicServer(hostname: "speedtest.fra1.de.leaseweb.net", name: "Francfort (Leaseweb)", latitude: 50.1109, longitude: 8.6821, code: "FRA-LSW", countryCode: "DE", provider: .leaseweb, portMin: SpeedtestEngineConfig.leasewebIperfPortMin, portMax: SpeedtestEngineConfig.leasewebIperfPortMax),
+        IPerfPublicServer(hostname: "speedtest.init7.net", name: "Winterthour (Init7)", latitude: 47.4989, longitude: 8.7286, code: "INIT7", countryCode: "CH", provider: .init7, portMin: SpeedtestEngineConfig.init7IperfPortMin, portMax: SpeedtestEngineConfig.init7IperfPortMax),
     ]
 }()
 
@@ -2122,16 +2468,17 @@ func haversineDistanceKm(from c1: Coordinates, to c2: Coordinates) -> Double {
 
 func iperfServersSortedByDistance(from location: Coordinates?) -> [IPerfPublicServer] {
     guard let location else {
-        // Sans GPS : POP FR stables d'abord ; IPv6 / +90 ms en bas de liste.
+        // Sans GPS : POP FR non-OVH d'abord (OVH bride son egress, cf.
+        // `iperfProviderDistancePenaltyKm`) ; OVH ensuite ; IPv6 / +90 ms en bas.
         let preferred = [
             "paris.bbr.iperf.bytel.fr",
-            "ping.online.net",
             "speedtest.milkywan.fr",
+            "ping.online.net",
+            "lyo.bbr.iperf.bytel.fr",
+            "paris.cubic.iperf.bytel.fr",
             "gra.proof.ovh.net",
             "rbx.proof.ovh.net",
             "sbg.proof.ovh.net",
-            "lyo.bbr.iperf.bytel.fr",
-            "paris.cubic.iperf.bytel.fr",
             "ping6.online.net",
             "ping-90ms.online.net",
             "ping6-90ms.online.net",
@@ -2145,12 +2492,16 @@ func iperfServersSortedByDistance(from location: Coordinates?) -> [IPerfPublicSe
     }
     // Avec GPS : distance, mais déprioriser les hosts à latence artificielle (+90 ms)
     // et les IPv6-only pour éviter de les choisir en Auto sur un réseau IPv4.
+    // Une PÉNALITÉ DE DISTANCE (et non un tier dur) écarte OVH quand un POP
+    // non-OVH est raisonnablement proche : voir `iperfProviderDistancePenaltyKm`.
     return iperfPublicServers.sorted { s1, s2 in
         let p1 = iperfAutoPriorityBoost(s1)
         let p2 = iperfAutoPriorityBoost(s2)
         if p1 != p2 { return p1 < p2 }
         let d1 = haversineDistanceKm(from: location, to: Coordinates(latitude: s1.latitude, longitude: s1.longitude))
+            + iperfProviderDistancePenaltyKm(s1)
         let d2 = haversineDistanceKm(from: location, to: Coordinates(latitude: s2.latitude, longitude: s2.longitude))
+            + iperfProviderDistancePenaltyKm(s2)
         return d1 < d2
     }
 }
@@ -2162,6 +2513,17 @@ private func iperfAutoPriorityBoost(_ server: IPerfPublicServer) -> Int {
     case "ping6.online.net": return 1
     default: return 0
     }
+}
+
+/// Pénalité de distance (km) appliquée UNIQUEMENT au tri Auto : les serveurs
+/// OVH `proof` brident fortement leur egress (débit DL très sous-évalué,
+/// asymétrie DL/UL ×10 constatée en test), donc on ne les retient que si aucun
+/// POP non-OVH n'est raisonnablement proche — typiquement un voyage hors Europe
+/// où OVH (Beauharnois / Ashburn / Mumbai) est le seul iPerf3 du catalogue à
+/// portée. En France/Europe, un POP Bouygues/MilkyWan/Scaleway passe devant.
+/// N'affecte JAMAIS un choix MANUEL de serveur OVH (via `selectIPerfServer`).
+private func iperfProviderDistancePenaltyKm(_ server: IPerfPublicServer) -> Double {
+    server.provider == .ovh ? 1_500 : 0
 }
 
 func findClosestIPerfServer(to location: Coordinates?) -> IPerfPublicServer {
@@ -2195,9 +2557,16 @@ func selectIPerfServer(for target: SpeedtestDownloadTarget, location: Coordinate
     case .onlineNet90ms: host = "ping-90ms.online.net"
     case .onlineNet6_90ms: host = "ping6-90ms.online.net"
     case .milkywan: host = "speedtest.milkywan.fr"
+    case .mojiParis: host = "iperf3.moji.fr"
+    case .clouviderFra: host = "fra.speedtest.clouvider.net"
+    case .clouviderAms: host = "ams.speedtest.clouvider.net"
+    case .clouviderLon: host = "lon.speedtest.clouvider.net"
+    case .clouviderMan: host = "man.speedtest.clouvider.net"
+    case .leasewebFra: host = "speedtest.fra1.de.leaseweb.net"
+    case .init7: host = "speedtest.init7.net"
     // .cloudflare n'est pas un serveur iPerf3 : le moteur HTTPS est choisi en
     // amont dans run() ; ici on retombe sur le plus proche par sécurité.
-    case .hybridAuto, .cloudflare, .bytelPoiCubic, .cloudflareR2, .awsCloudFront, .vpsInternal:
+    case .hybridAuto, .cloudflare, .libreSpeed, .bytelPoiCubic, .cloudflareR2, .awsCloudFront, .vpsInternal:
         host = nil
     }
     if let host, let server = iperfPublicServers.first(where: { $0.hostname == host }) {
@@ -2606,6 +2975,146 @@ enum CloudflareSpeedtestConfig {
         components.queryItems = [URLQueryItem(name: "bytes", value: String(max(0, bytes)))]
         return components.url!
     }
+}
+
+// MARK: - LibreSpeed (moteur HTTPS open-source, alternative propre à Ookla)
+
+/// Schéma de chemin d'un backend LibreSpeed. Le préfixe varie selon le
+/// déploiement : PHP « standard » sous `/backend/`, PHP à la racine, ou backend
+/// Go (endpoints sans extension `.php`). Chaque serveur porte donc le sien.
+enum LibreSpeedPathScheme: String, Sendable {
+    case backendPHP   // /backend/garbage.php, /backend/empty.php
+    case rootPHP      // /garbage.php, /empty.php
+    case go           // /garbage, /empty  (backend Go, sans .php)
+}
+
+/// Un backend LibreSpeed public (HTTPS, cert valide → ATS-OK). Sélectionné par
+/// distance en mode `.libreSpeed`. Data-driven : ajouter un serveur = une entrée.
+struct LibreSpeedServer: Sendable {
+    let hostname: String
+    let name: String
+    let latitude: Double
+    let longitude: Double
+    let countryCode: String
+    let pathScheme: LibreSpeedPathScheme
+
+    private var prefix: String { pathScheme == .backendPHP ? "/backend" : "" }
+    private var ext: String { pathScheme == .go ? "" : ".php" }
+
+    /// Download : renvoie `ckSizeMiB` Mio de données incompressibles (chunké,
+    /// souvent sans Content-Length → compter les octets REÇUS).
+    func downloadURL(ckSizeMiB: Int) -> URL {
+        var c = URLComponents()
+        c.scheme = "https"; c.host = hostname
+        c.path = "\(prefix)/garbage\(ext)"
+        c.queryItems = [URLQueryItem(name: "ckSize", value: String(max(1, ckSizeMiB)))]
+        return c.url!
+    }
+
+    /// Upload : puits qui absorbe le corps POST (limité en taille côté serveur).
+    var uploadURL: URL {
+        URL(string: "https://\(hostname)\(prefix)/empty\(ext)")!
+    }
+}
+
+enum LibreSpeedConfig {
+    static let httpsPort: UInt16 = 443
+    /// Taille demandée par requête DL (le serveur plafonne ~1024 Mio ; assez gros
+    /// pour qu'un lien rapide n'enchaîne pas les requêtes, la deadline borne).
+    static let downloadCkSizeMiB = 200
+    /// Corps par requête UL. Les serveurs LibreSpeed plafonnent le POST via
+    /// `post_max_size` — très variable : Clouvider accepte ~5 Mo, mais HostKey
+    /// Paris **refuse dès 1,5 Mo** (413). Un bloc trop gros fait échouer TOUT
+    /// l'upload sur ces serveurs. On prend donc une taille universellement sûre
+    /// (1 Mo, sous la limite HostKey) et on sature par la concurrence (6 flux).
+    static let uploadBytesPerRequest = 1_000_000
+    static let maxStreams = 6
+    static let maxUploadStreams = 6
+}
+
+/// Catalogue LibreSpeed public — HTTPS cert valide vérifié (2026-07). Les POP
+/// Clouvider font iPerf3 ET LibreSpeed ; HostKey Paris est un hébergeur FR.
+/// Étendu au fil des découvertes (recherche mondiale). Sélection par distance.
+let libreSpeedServers: [LibreSpeedServer] = [
+    // Clouvider — Europe (proches FR d'abord)
+    LibreSpeedServer(hostname: "fra.speedtest.clouvider.net", name: "Francfort (Clouvider)", latitude: 50.1109, longitude: 8.6821, countryCode: "DE", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "ams.speedtest.clouvider.net", name: "Amsterdam (Clouvider)", latitude: 52.3676, longitude: 4.9041, countryCode: "NL", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "lon.speedtest.clouvider.net", name: "Londres (Clouvider)", latitude: 51.5074, longitude: -0.1278, countryCode: "GB", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "man.speedtest.clouvider.net", name: "Manchester (Clouvider)", latitude: 53.4808, longitude: -2.2426, countryCode: "GB", pathScheme: .backendPHP),
+    // NB : HostKey Paris (spd-frsrv.hostkey.com) RETIRÉ — son TLS passe `curl`
+    // mais est refusé par l'ATS iOS (« TLS error »), donc inutilisable par l'app.
+    // (Un utilisateur FR tombe sur Clouvider Londres/Amsterdam, les plus proches.)
+    // Clouvider — USA
+    LibreSpeedServer(hostname: "nyc.speedtest.clouvider.net", name: "New York (Clouvider)", latitude: 40.7128, longitude: -74.0060, countryCode: "US", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "atl.speedtest.clouvider.net", name: "Atlanta (Clouvider)", latitude: 33.7490, longitude: -84.3880, countryCode: "US", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "dal.speedtest.clouvider.net", name: "Dallas (Clouvider)", latitude: 32.7767, longitude: -96.7970, countryCode: "US", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "la.speedtest.clouvider.net", name: "Los Angeles (Clouvider)", latitude: 34.0522, longitude: -118.2437, countryCode: "US", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "phx.speedtest.clouvider.net", name: "Phoenix (Clouvider)", latitude: 33.4484, longitude: -112.0740, countryCode: "US", pathScheme: .backendPHP),
+    // Europe — communautaires vérifiés (HTTPS cert valide, ckSize honoré, juil. 2026)
+    LibreSpeedServer(hostname: "amsspeed.sharktech.net", name: "Amsterdam (Sharktech)", latitude: 52.3676, longitude: 4.9041, countryCode: "NL", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "de3.backend.librespeed.org", name: "Nuremberg (LibreSpeed)", latitude: 49.4521, longitude: 11.0767, countryCode: "DE", pathScheme: .rootPHP),
+    LibreSpeedServer(hostname: "de5.backend.librespeed.org", name: "Nuremberg (LibreSpeed)", latitude: 49.4521, longitude: 11.0767, countryCode: "DE", pathScheme: .rootPHP),
+    LibreSpeedServer(hostname: "speedtest.retzo.net", name: "Falkenstein (Retzo)", latitude: 50.4779, longitude: 12.3713, countryCode: "DE", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "librespeed.turris.cz", name: "Prague (Turris)", latitude: 50.0755, longitude: 14.4378, countryCode: "CZ", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "speedtest.cesnet.cz", name: "Prague (CESNET)", latitude: 50.0755, longitude: 14.4378, countryCode: "CZ", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "speedtest.kamilszczepanski.com", name: "Poznań", latitude: 52.4064, longitude: 16.9252, countryCode: "PL", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "www.librespeed.fi", name: "Helsinki (LibreSpeed.fi)", latitude: 60.1699, longitude: 24.9384, countryCode: "FI", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "argalasti.skoultsos.eu", name: "Argalasti", latitude: 39.2333, longitude: 23.2333, countryCode: "GR", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "st-be-rm2.infra.garr.it", name: "Rome (GARR)", latitude: 41.9028, longitude: 12.4964, countryCode: "IT", pathScheme: .rootPHP),
+    // Amérique du Nord — Sharktech / RackGenius (hors Clouvider)
+    LibreSpeedServer(hostname: "chispeed.sharktech.net", name: "Chicago (Sharktech)", latitude: 41.8781, longitude: -87.6298, countryCode: "US", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "mispeed.rackgenius.com", name: "Grand Rapids (RackGenius)", latitude: 42.9634, longitude: -85.6681, countryCode: "US", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "denspeed.sharktech.net", name: "Denver (Sharktech)", latitude: 39.7392, longitude: -104.9903, countryCode: "US", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "laxspeed.sharktech.net", name: "Los Angeles (Sharktech)", latitude: 34.0522, longitude: -118.2437, countryCode: "US", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "lasspeed.sharktech.net", name: "Las Vegas (Sharktech)", latitude: 36.1699, longitude: -115.1398, countryCode: "US", pathScheme: .backendPHP),
+    // Amérique du Sud (seules options publiques valides)
+    LibreSpeedServer(hostname: "speedtest.tdi.ind.br", name: "Brésil (TDI)", latitude: -23.5505, longitude: -46.6333, countryCode: "BR", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "blm.testepower.com.br", name: "Blumenau", latitude: -26.9194, longitude: -49.0661, countryCode: "BR", pathScheme: .backendPHP),
+    LibreSpeedServer(hostname: "speedtest.dpt.gba.gob.ar", name: "Buenos Aires", latitude: -34.6037, longitude: -58.3816, countryCode: "AR", pathScheme: .backendPHP),
+    // Asie (unique nœud public à cert valide ; filtre UA curl, OK avec l'UA iOS)
+    LibreSpeedServer(hostname: "librespeed.a573.net", name: "Tokyo", latitude: 35.6762, longitude: 139.6503, countryCode: "JP", pathScheme: .backendPHP),
+]
+
+/// POP LibreSpeed le plus proche (repli sur le 1er du catalogue sans GPS).
+func nearestLibreSpeedServer(to location: Coordinates?) -> LibreSpeedServer {
+    guard let location else { return libreSpeedServers[0] }
+    return libreSpeedServers.min { a, b in
+        haversineDistanceKm(from: location, to: Coordinates(latitude: a.latitude, longitude: a.longitude))
+            < haversineDistanceKm(from: location, to: Coordinates(latitude: b.latitude, longitude: b.longitude))
+    } ?? libreSpeedServers[0]
+}
+
+extension LibreSpeedServer {
+    /// Continent (pour le regroupement du sélecteur).
+    var continent: String {
+        switch countryCode {
+        case "FR", "DE", "NL", "GB", "CZ", "PL", "FI", "GR", "IT", "ES", "CH", "SE", "NO", "DK", "AT", "BE", "IE", "PT":
+            return "Europe"
+        case "US", "CA": return "Amérique du Nord"
+        case "BR", "AR", "CL", "CO", "PE", "UY": return "Amérique du Sud"
+        case "JP", "CN", "KR", "IN", "SG", "HK", "TW", "TH", "VN", "MY", "ID": return "Asie"
+        case "AU", "NZ": return "Océanie"
+        default: return "Autres"
+        }
+    }
+    var continentRank: Int {
+        ["Europe": 0, "Amérique du Nord": 1, "Amérique du Sud": 2, "Asie": 3, "Océanie": 4][continent] ?? 5
+    }
+    /// Sous-titre du sélecteur : « Pays · hostname ».
+    var pickerSubtitle: String { "\(countryCode) · \(hostname)" }
+}
+
+/// Serveurs LibreSpeed groupés par continent (ordre stable) pour le sélecteur.
+func libreSpeedPickerGroups() -> [(region: String, servers: [LibreSpeedServer])] {
+    let sorted = libreSpeedServers.sorted {
+        $0.continentRank != $1.continentRank ? $0.continentRank < $1.continentRank : $0.name < $1.name
+    }
+    var groups: [(region: String, servers: [LibreSpeedServer])] = []
+    for s in sorted {
+        if let i = groups.firstIndex(where: { $0.region == s.continent }) { groups[i].servers.append(s) }
+        else { groups.append((region: s.continent, servers: [s])) }
+    }
+    return groups
 }
 
 /// Parse le champ `colo=` (code IATA de l'edge) d'une réponse

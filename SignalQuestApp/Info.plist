@@ -2,6 +2,29 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Type importé pour les exports NetMonster (.ntm) : sans extension système,
+	     on le déclare conforme à public.plain-text pour qu'il soit proposé par le
+	     sélecteur de fichiers de l'import de logs radio. -->
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>fr.signalquest.ntm</string>
+			<key>UTTypeDescription</key>
+			<string>Export NetMonster</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.plain-text</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>ntm</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<!-- Épinglage TLS déclaratif (App Transport Security). On épingle la SPKI des

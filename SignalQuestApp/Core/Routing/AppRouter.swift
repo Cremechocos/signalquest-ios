@@ -19,6 +19,10 @@ final class AppRouter: ObservableObject {
     @Published var openUserProfileId: String?
     /// Set to request opening a site sheet on the Map tab (deep link carte).
     @Published var openSiteId: String?
+    /// Demande d'ouverture DIRECTE du fil de discussion d'un signalement d'antenne
+    /// (tap sur une notification `antenna_report_reply`). Consommé par ProfileView,
+    /// racine de l'onglet Profil qui héberge « Mes signalements d'antenne ».
+    @Published var openAntennaReportId: String?
     /// Coordonnée à cadrer sur la carte (posée depuis un test de l'historique,
     /// consommée par MapExplorerView une fois l'onglet carte actif).
     @Published var pendingMapFocus: Coordinates?
@@ -56,7 +60,7 @@ final class AppRouter: ObservableObject {
     /// off the (non-Sendable) `userInfo` dictionary so only `String?` values cross
     /// the actor boundary. The backend uses Firebase-style payloads, so callers
     /// look identifiers up under both camelCase and snake_case.
-    func handle(type rawType: String?, conversationId: String?, postId: String?, userId: String? = nil, siteId: String? = nil) {
+    func handle(type rawType: String?, conversationId: String?, postId: String?, userId: String? = nil, siteId: String? = nil, reportId: String? = nil) {
         switch rawType?.lowercased() {
         case "message", "conversation", "call", "dm":
             route(toConversation: conversationId)
@@ -64,10 +68,14 @@ final class AppRouter: ObservableObject {
             route(toPost: postId)
         case "follow", "friend", "friend_request", "profile":
             route(toUserProfile: userId)
+        case "antenna_report_reply", "antenna_report", "site_report":
+            route(toAntennaReport: reportId)
         case "site", "antenna", "validation":
             route(toSite: siteId)
         default:
-            if conversationId != nil {
+            if reportId != nil {
+                route(toAntennaReport: reportId)
+            } else if conversationId != nil {
                 route(toConversation: conversationId)
             } else if postId != nil {
                 route(toPost: postId)
@@ -98,5 +106,10 @@ final class AppRouter: ObservableObject {
     func route(toSite id: String?) {
         selectedTab = .map
         if let id { openSiteId = id }
+    }
+
+    func route(toAntennaReport id: String?) {
+        selectedTab = .profile
+        if let id { openAntennaReportId = id }
     }
 }

@@ -529,7 +529,8 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertTrue(
             closest.hostname == "paris.bbr.iperf.bytel.fr"
                 || closest.hostname == "paris.cubic.iperf.bytel.fr"
-                || closest.hostname == "ping.online.net",
+                || closest.hostname == "ping.online.net"
+                || closest.hostname == "iperf3.moji.fr",
             "Unexpected Paris POP: \(closest.hostname)"
         )
         XCTAssertFalse(closest.hostname.contains("90ms"))
@@ -555,6 +556,98 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(ynm.hostname, "bom.proof.ovh.net")
     }
 
+    func testAutoDeprioritizesThrottledOVHWhenNonOVHPOPReachable() {
+        // Roubaix : OVH RBX est à ~10 km, mais OVH bride son egress (débit DL
+        // fortement sous-évalué) → en mode Auto on préfère un POP non-OVH
+        // (Bouygues/MilkyWan/Scaleway) malgré la distance supérieure.
+        let roubaix = Coordinates(latitude: 50.6942, longitude: 3.1746)
+        let autoNearRBX = findClosestIPerfServer(to: roubaix)
+        XCTAssertNotEqual(
+            autoNearRBX.provider, .ovh,
+            "Auto ne doit pas retomber sur OVH (throttle egress) près de Roubaix : \(autoNearRBX.hostname)"
+        )
+        // Mais un choix MANUEL d'un serveur OVH reste honoré tel quel.
+        XCTAssertEqual(selectIPerfServer(for: .rbx, location: roubaix).hostname, "rbx.proof.ovh.net")
+        // Et hors zone de POP non-OVH (Montréal), OVH reste l'iPerf3 le plus proche.
+        let montreal = Coordinates(latitude: 45.5017, longitude: -73.5673)
+        XCTAssertEqual(findClosestIPerfServer(to: montreal).provider, .ovh)
+    }
+
+    func testPublicEuropeIPerf3ServersCatalogAndSelection() {
+        let paris = Coordinates(latitude: 48.8566, longitude: 2.3522)
+        // Sélection manuelle mappée sur le bon hôte.
+        XCTAssertEqual(selectIPerfServer(for: .mojiParis, location: paris).hostname, "iperf3.moji.fr")
+        XCTAssertEqual(selectIPerfServer(for: .clouviderFra, location: paris).hostname, "fra.speedtest.clouvider.net")
+        XCTAssertEqual(selectIPerfServer(for: .clouviderAms, location: paris).hostname, "ams.speedtest.clouvider.net")
+        XCTAssertEqual(selectIPerfServer(for: .leasewebFra, location: paris).hostname, "speedtest.fra1.de.leaseweb.net")
+        XCTAssertEqual(selectIPerfServer(for: .init7, location: paris).hostname, "speedtest.init7.net")
+        // Moji : gros pool de ports (mono-slot → anti-collision) + provider dédié.
+        let moji = iperfPublicServers.first { $0.hostname == "iperf3.moji.fr" }
+        XCTAssertEqual(moji?.portMin, 5_200)
+        XCTAssertEqual(moji?.portMax, 5_240)
+        XCTAssertEqual(moji?.provider, .moji)
+        // Tous les nouveaux POP présents au catalogue.
+        for host in [
+            "iperf3.moji.fr", "fra.speedtest.clouvider.net", "ams.speedtest.clouvider.net",
+            "speedtest.fra1.de.leaseweb.net", "speedtest.init7.net",
+        ] {
+            XCTAssertNotNil(iperfPublicServers.first { $0.hostname == host }, "catalogue: manque \(host)")
+        }
+        // Ces POP ne sont PAS pénalisés OVH → candidats Auto normaux par distance.
+        XCTAssertEqual(findClosestIPerfServer(to: paris).provider != .ovh, true)
+    }
+
+    func testLibreSpeedCatalogNearestAndURLs() {
+        XCTAssertFalse(libreSpeedServers.isEmpty)
+        // Sélection par distance : Paris → POP EU/FR ; NYC → POP US.
+        let paris = Coordinates(latitude: 48.8566, longitude: 2.3522)
+        XCTAssertTrue(["FR", "DE", "NL", "GB"].contains(nearestLibreSpeedServer(to: paris).countryCode),
+                      "POP LibreSpeed lointain pour Paris: \(nearestLibreSpeedServer(to: paris).hostname)")
+        let nyc = Coordinates(latitude: 40.7128, longitude: -74.0060)
+        XCTAssertEqual(nearestLibreSpeedServer(to: nyc).countryCode, "US")
+        // Sans GPS : repli déterministe sur le 1er du catalogue.
+        XCTAssertEqual(nearestLibreSpeedServer(to: nil).hostname, libreSpeedServers[0].hostname)
+        // Construction d'URL selon le schéma de chemin.
+        let backend = libreSpeedServers.first { $0.hostname == "fra.speedtest.clouvider.net" }
+        XCTAssertEqual(backend?.downloadURL(ckSizeMiB: 100).absoluteString,
+                       "https://fra.speedtest.clouvider.net/backend/garbage.php?ckSize=100")
+        XCTAssertEqual(backend?.uploadURL.absoluteString,
+                       "https://fra.speedtest.clouvider.net/backend/empty.php")
+        let go = LibreSpeedServer(hostname: "go.example", name: "Go", latitude: 0, longitude: 0, countryCode: "XX", pathScheme: .go)
+        XCTAssertEqual(go.downloadURL(ckSizeMiB: 5).absoluteString, "https://go.example/garbage?ckSize=5")
+        XCTAssertEqual(go.uploadURL.absoluteString, "https://go.example/empty")
+        let root = LibreSpeedServer(hostname: "root.example", name: "Root", latitude: 0, longitude: 0, countryCode: "XX", pathScheme: .rootPHP)
+        XCTAssertEqual(root.downloadURL(ckSizeMiB: 5).absoluteString, "https://root.example/garbage.php?ckSize=5")
+        // Schéma RACINE réel (de3 LibreSpeed officiel) → /garbage.php à la racine.
+        let de3 = libreSpeedServers.first { $0.hostname == "de3.backend.librespeed.org" }
+        XCTAssertEqual(de3?.pathScheme, .rootPHP)
+        XCTAssertEqual(de3?.downloadURL(ckSizeMiB: 200).absoluteString,
+                       "https://de3.backend.librespeed.org/garbage.php?ckSize=200")
+        // Couverture mondiale (recherche juil. 2026) : EU + US + Amérique du Sud + Asie.
+        // (Pas de serveur FR : HostKey retiré car TLS refusé par l'ATS — le plus
+        // proche d'un utilisateur FR est Clouvider Londres/Amsterdam.)
+        let countries = Set(libreSpeedServers.map(\.countryCode))
+        XCTAssertTrue(countries.isSuperset(of: ["GB", "DE", "US", "BR", "JP"]),
+                      "couverture LibreSpeed incomplète: \(countries.sorted())")
+        // Groupes du sélecteur : Europe en tête, tous les serveurs présents.
+        let groups = libreSpeedPickerGroups()
+        XCTAssertEqual(groups.first?.region, "Europe")
+        XCTAssertEqual(groups.flatMap { $0.servers }.count, libreSpeedServers.count)
+        // Choix manuel : le hostname persisté encode/décode (rétro-compat).
+        let manual = SpeedtestRunSettings(downloadTarget: .libreSpeed, durationSeconds: 14,
+                                          streams: 6, reliabilityMode: true,
+                                          libreSpeedHost: "fra.speedtest.clouvider.net")
+        let round = try! JSONDecoder().decode(SpeedtestRunSettings.self,
+                                              from: try! JSONEncoder().encode(manual))
+        XCTAssertEqual(round.libreSpeedHost, "fra.speedtest.clouvider.net")
+        // Anciens réglages persistés (sans le champ) décodent avec host nil.
+        let legacy = Data("{\"downloadTarget\":\"hybrid_auto\",\"durationSeconds\":10,\"streams\":16,\"reliabilityMode\":true}".utf8)
+        XCTAssertNil(try! JSONDecoder().decode(SpeedtestRunSettings.self, from: legacy).libreSpeedHost)
+        // LibreSpeed est une cible sélectionnable (ligne dédiée du picker).
+        XCTAssertTrue(SpeedtestDownloadTarget.ungroupedCases.contains(.libreSpeed))
+        XCTAssertEqual(SpeedtestDownloadTarget.libreSpeed.regionLabel, "Mondial")
+    }
+
     func testSelectOVHServerManualAndAuto() {
         let paris = Coordinates(latitude: 48.8566, longitude: 2.3522)
         XCTAssertEqual(selectIPerfServer(for: .sbg, location: paris).hostname, "sbg.proof.ovh.net")
@@ -565,7 +658,8 @@ final class SpeedtestTests: XCTestCase {
         // Auto / legacy → POP Paris proche (bytel ou Scaleway, pas 90 ms)
         let auto = selectIPerfServer(for: .hybridAuto, location: paris)
         XCTAssertTrue(
-            auto.hostname.contains("bytel.fr") || auto.hostname == "ping.online.net",
+            auto.hostname.contains("bytel.fr") || auto.hostname == "ping.online.net"
+                || auto.hostname == "iperf3.moji.fr",
             "Unexpected auto POP: \(auto.hostname)"
         )
         XCTAssertEqual(selectIPerfServer(for: .cloudflareR2, location: paris).hostname, auto.hostname)
@@ -592,14 +686,15 @@ final class SpeedtestTests: XCTestCase {
     func testDownloadTargetPickerMetadata() {
         XCTAssertEqual(SpeedtestDownloadTarget.hybridAuto.displayName, "Auto")
         XCTAssertFalse(SpeedtestDownloadTarget.rbx.subtitle.isEmpty)
-        // Auto + 6 OVH + 13 Bouygues sains + 2 Scaleway + 1 MilkyWan + 1 Cloudflare.
-        // Les 2 cibles Scaleway « +90 ms » (latence artificielle, debug) ne sont plus
-        // proposées à l'utilisateur (INT-02) : 24 entrées au lieu de 26.
-        XCTAssertEqual(SpeedtestDownloadTarget.selectableCases.count, 24)
+        // Auto + 6 OVH + 13 Bouygues sains + 2 Scaleway + 1 MilkyWan + 7 POP
+        // iPerf3 FR/EU publics + 1 Cloudflare + 1 LibreSpeed. Les 2 cibles Scaleway
+        // « +90 ms » (latence artificielle, debug) ne sont pas proposées : 32 entrées.
+        XCTAssertEqual(SpeedtestDownloadTarget.selectableCases.count, 32)
         XCTAssertEqual(SpeedtestDownloadTarget.ovhCases.count, 6)
         XCTAssertEqual(SpeedtestDownloadTarget.bouyguesCases.count, 13)
         XCTAssertEqual(SpeedtestDownloadTarget.scalewayCases.count, 2)
         XCTAssertEqual(SpeedtestDownloadTarget.milkywanCases.count, 1)
+        XCTAssertEqual(SpeedtestDownloadTarget.publicEuropeCases.count, 7)
         XCTAssertEqual(SpeedtestDownloadTarget.cloudflareCases.count, 1)
         XCTAssertFalse(SpeedtestDownloadTarget.bouyguesCases.contains(.bytelPoiCubic))
         XCTAssertEqual(SpeedtestDownloadTarget.bom.regionLabel, "OVH")
