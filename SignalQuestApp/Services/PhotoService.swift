@@ -1,7 +1,7 @@
 import Foundation
 
 protocol PhotoServicing: Sendable {
-    func listPhotos(filter: String, sortBy: String, limit: Int) async throws -> [Photo]
+    func listPhotos(filter: String, sortBy: String, page: Int, limit: Int) async throws -> PhotoListResponse
     func photo(id: String) async throws -> Photo
     func comments(photoId: String) async throws -> [PhotoComment]
     func addComment(photoId: String, content: String) async throws -> PhotoComment?
@@ -16,20 +16,20 @@ final class PhotoService: PhotoServicing {
         self.api = api
     }
 
-    func listPhotos(filter: String = "approved", sortBy: String = "recent", limit: Int = 20) async throws -> [Photo] {
-        let response: PhotoListResponse = try await api.request(
+    func listPhotos(filter: String = "approved", sortBy: String = "recent", page: Int = 1, limit: Int = 30) async throws -> PhotoListResponse {
+        try await api.request(
             APIEndpoint(
                 path: "/api/photos",
                 query: [
                     URLQueryItem(name: "filter", value: filter),
                     URLQueryItem(name: "sortBy", value: sortBy),
+                    URLQueryItem(name: "page", value: "\(page)"),
                     URLQueryItem(name: "limit", value: "\(limit)")
                 ],
                 authenticated: false
             ),
             as: PhotoListResponse.self
         )
-        return response.photos
     }
 
     func photo(id: String) async throws -> Photo {

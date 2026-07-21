@@ -190,9 +190,17 @@ struct LeaderboardsView: View {
             Text("Classements")
                 .font(SQFont.display(24, .bold))
                 .foregroundStyle(SQColor.label)
-            Spacer(minLength: 0)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .allowsTightening(true)
+                // Le titre garde la priorité de largeur : sinon le switcher « Vitesse |
+                // Points » (large) le comprime et « Classements » se tronque (iPhone SE /
+                // Dynamic Type élevé).
+                .layoutPriority(1)
+            Spacer(minLength: SQSpace.sm)
             // Segment Vitesse | Points compact, intégré au header (gagne une ligne).
             LeaderboardTabSwitcher(selection: $model.tab)
+                .layoutPriority(0)
         }
     }
 
@@ -323,6 +331,7 @@ struct LeaderboardsView: View {
                             if let city = entry.city { SQEditorialTag(text: city, color: SQColor.label) }
                             if let tech = entry.tech { SQEditorialTag(text: tech, color: SQBrand.techColor(tech)) }
                             if entry.isProbablyIOS { SQEditorialTag(text: "iOS", color: SQColor.brandRed) }
+                            Spacer(minLength: 0)
                         }
                     }
                     .sqFadeUp()
@@ -378,6 +387,7 @@ struct LeaderboardsView: View {
                                 statCount(icon: "camera.fill", count: stats.photos)
                                 statCount(icon: "speedometer", count: stats.speedtests)
                             }
+                            Spacer(minLength: 0)
                         }
                     }
                     .sqFadeUp()
@@ -813,6 +823,7 @@ private struct PodiumColumn: View {
                     .font(SQFont.body(isFirst ? 13.5 : 13, .semibold))
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 18)
@@ -873,7 +884,7 @@ private struct PodiumColumn: View {
                     .font(SQFont.body(isFirst ? 11.5 : 11))
                     .monospacedDigit()
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.7)
                     .padding(.horizontal, SQSpace.xs)
                     .foregroundStyle(isFirst ? SQColor.onAccent.opacity(0.85) : SQColor.labelSecondary)
             }
@@ -1004,6 +1015,7 @@ private struct LeaderboardRowView<Meta: View>: View {
                         .font(SQFont.body(15, .semibold))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                     if isMe {
                         SQEditorialTag(text: "Moi", color: SQColor.brandRed)
                     }
@@ -1016,7 +1028,9 @@ private struct LeaderboardRowView<Meta: View>: View {
                 .monospacedDigit()
                 .foregroundStyle(isMe ? SQColor.brandRed : SQColor.labelSecondary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                // La valeur classée ne doit jamais être tronquée (« 12 4… ») : elle garde
+                // sa largeur, c'est le nom (scale + lineLimit) qui cède.
+                .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.horizontal, SQSpace.lg)
         .padding(.vertical, SQSpace.md + 1)

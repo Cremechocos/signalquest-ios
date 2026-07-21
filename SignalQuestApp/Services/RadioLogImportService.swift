@@ -16,21 +16,60 @@ protocol RadioLogImportServicing: Sendable {
     func resolveStream(rows: [ParsedRadioLogRow]) -> AsyncStream<[ResolvedRadioLogRow]>
     /// Écrit les identifications pour les lignes rattachées à un site (`identify/direct`).
     func confirm(rows: [ResolvedRadioLogRow]) async -> RadioLogImportOutcome
+    /// Aperçu RICHE d'un site identifié (photo, commune, compteurs) — `GET /antenna/{id}`,
+    /// pour afficher une carte de site comme Android (au lieu d'un `siteId` brut).
+    func sitePreview(siteId: String, market: String?, operatorName: String?) async -> AntennaDetails?
+    /// Statuts d'identification cachés encore FRAIS (clé = identité cellule stable).
+    func cachedStatuses() -> [String: RadioLogImportCellStatus]
+    /// Persiste les statuts résolus (clé = identité cellule stable) pour la prochaine ouverture.
+    func persistStatuses(_ statuses: [String: RadioLogImportCellStatus])
 }
 
 final class RadioLogImportService: RadioLogImportServicing, @unchecked Sendable {
     private let api: APIClient
     private let identify: IdentifyServicing
+    private let antennas: AntennasServicing
     private let store: RadioLogImportStoring
+    private let statusStore: RadioLogImportStatusStoring
     /// Le batch serveur est borné à 150 items/requête.
     private let batchSize = 150
     /// Requêtes de résolution simultanées (accélère sans marteler le serveur).
     private let maxConcurrentResolves = 5
+    /// Fraîcheur du cache de statut (stale-while-revalidate, parité Android : 5 min).
+    private let statusTtlMs = 5 * 60 * 1000
 
-    init(api: APIClient, identify: IdentifyServicing, store: RadioLogImportStoring = RadioLogImportStore()) {
+    init(
+        api: APIClient,
+        identify: IdentifyServicing,
+        antennas: AntennasServicing,
+        store: RadioLogImportStoring = RadioLogImportStore(),
+        statusStore: RadioLogImportStatusStoring = RadioLogImportStatusStore()
+    ) {
         self.api = api
         self.identify = identify
+        self.antennas = antennas
         self.store = store
+        self.statusStore = statusStore
+    }
+
+    private func nowMs() -> Int { Int(Date().timeIntervalSince1970 * 1000) }
+
+    // MARK: - Aperçu site + cache de statut
+
+    func sitePreview(siteId: String, market: String?, operatorName: String?) async -> AntennaDetails? {
+        try? await antennas.details(
+            id: siteId,
+            market: market ?? "FR",
+            operatorName: operatorName ?? "ALL"
+        )
+    }
+
+    func cachedStatuses() -> [String: RadioLogImportCellStatus] {
+        statusStore.fresh(ttlMs: statusTtlMs, nowMs: nowMs())
+    }
+
+    func persistStatuses(_ statuses: [String: RadioLogImportCellStatus]) {
+        statusStore.merge(statuses, nowMs: nowMs())
     }
 
     // MARK: - Import & persistance

@@ -132,8 +132,9 @@ struct ResolvedRadioLogRow: Identifiable, Sendable {
 }
 
 /// Statut d'identification d'une cellule pour l'affichage (miroir simplifié des badges
-/// Android : Vérif. / Rattachable / Non identifié / Identifié).
-enum RadioLogImportCellStatus: Sendable, Equatable {
+/// Android : Vérif. / Rattachable / Non identifié / Identifié). `Codable` pour le cache
+/// disque (voir `RadioLogImportStatusStore`) — évite de tout re-résoudre à chaque ouverture.
+enum RadioLogImportCellStatus: Sendable, Equatable, Codable {
     case pending
     case identifiable(siteId: String, distanceMeters: Double?)
     case notFound
@@ -147,6 +148,52 @@ enum RadioLogImportCellStatus: Sendable, Equatable {
         case .identified: return "Identifié"
         }
     }
+
+    private enum Kind: String, Codable { case pending, identifiable, notFound, identified }
+    private enum CodingKeys: String, CodingKey { case kind, siteId, distanceMeters }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        switch try c.decode(Kind.self, forKey: .kind) {
+        case .pending: self = .pending
+        case .identifiable:
+            self = .identifiable(
+                siteId: (try? c.decode(String.self, forKey: .siteId)) ?? "",
+                distanceMeters: try? c.decodeIfPresent(Double.self, forKey: .distanceMeters)
+            )
+        case .notFound: self = .notFound
+        case .identified: self = .identified
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .pending: try c.encode(Kind.pending, forKey: .kind)
+        case let .identifiable(siteId, distance):
+            try c.encode(Kind.identifiable, forKey: .kind)
+            try c.encode(siteId, forKey: .siteId)
+            try c.encodeIfPresent(distance, forKey: .distanceMeters)
+        case .notFound: try c.encode(Kind.notFound, forKey: .kind)
+        case .identified: try c.encode(Kind.identified, forKey: .kind)
+        }
+    }
+}
+
+extension ParsedRadioLogRow {
+    /// Clé d'identité cellule STABLE (opérateur + nœud + cellule) — survit au ré-import,
+    /// contrairement à `id` (UUID régénéré). Sert de clé au cache de statut d'identification.
+    var stableIdentityKey: String {
+        [mcc ?? "", mnc ?? "", enb ?? "", gnb ?? "",
+         ci.map(String.init) ?? "", pci.map(String.init) ?? ""].joined(separator: "|")
+    }
+}
+
+/// Statut d'identification caché sur disque (clé = `stableIdentityKey`) + horodatage
+/// pour le TTL (revalidation périodique, façon stale-while-revalidate Android).
+struct CachedRadioLogStatus: Codable, Sendable {
+    let status: RadioLogImportCellStatus
+    let updatedAtMs: Int
 }
 
 /// Résultat de l'écriture (identify/direct par ligne rattachée).

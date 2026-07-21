@@ -50,10 +50,35 @@ final class CallHistoryViewModel: ObservableObject {
             // Silencieux : on conserve la liste déjà affichée.
         }
     }
+
+    /// Efface tout l'historique (masquage « pour moi » côté serveur + cache local vidé).
+    func clearHistory() async {
+        do {
+            try await service.clearHistory()
+            calls = []
+            page = 1
+            hasMore = false
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Supprime un appel de MON historique (optimiste, rollback si le serveur échoue).
+    func deleteEntry(_ call: CallSession) async {
+        let previous = calls
+        calls.removeAll { $0.id == call.id }
+        do {
+            try await service.deleteEntry(callId: call.id)
+        } catch {
+            calls = previous
+            errorMessage = error.localizedDescription
+        }
+    }
 }
 
 struct CallHistoryView: View {
     @StateObject private var model: CallHistoryViewModel
+    @State private var confirmingClear = false
     init(service: CallsServicing) {
         _model = StateObject(wrappedValue: CallHistoryViewModel(service: service))
     }
@@ -118,6 +143,13 @@ struct CallHistoryView: View {
                             Task { await model.loadMore() }
                         }
                     }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            Task { await model.deleteEntry(call) }
+                        } label: {
+                            Label("Supprimer", systemImage: "trash")
+                        }
+                    }
                 }
                 if model.isLoadingMore {
                     ProgressView()
@@ -137,6 +169,23 @@ struct CallHistoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
         .refreshable { await model.load() }
+        .toolbar {
+            if !model.calls.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(role: .destructive) { confirmingClear = true } label: {
+                        Image(systemName: "trash")
+                    }
+                    .tint(SQColor.brandRed)
+                    .accessibilityLabel("Effacer l'historique")
+                }
+            }
+        }
+        .confirmationDialog("Effacer tout l'historique d'appels ?", isPresented: $confirmingClear, titleVisibility: .visible) {
+            Button("Tout effacer", role: .destructive) { Task { await model.clearHistory() } }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Ton historique sera effacé pour toi. Tes correspondants gardent le leur.")
+        }
     }
 
     /// Icône + couleur selon l'ISSUE de l'appel (pas la direction : aucun champ

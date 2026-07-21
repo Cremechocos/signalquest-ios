@@ -119,12 +119,32 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
         (source ?? "").lowercased() == "ios"
     }
 
+    /// Durée en secondes : le champ `duration` stocké par le backend, ou à défaut
+    /// `endTime − startTime` (une session Drive Test non correctement clôturée n'a
+    /// pas de `duration` — sans ce repli, l'écran détail affichait « Durée — »).
+    var resolvedDurationSeconds: Double? {
+        if let d = durationSeconds, d > 0 { return d }
+        if let start = startTime, let end = endTime {
+            let delta = end.timeIntervalSince(start)
+            return delta > 0 ? delta : nil
+        }
+        return nil
+    }
+
     /// Libellé court de durée (« 12 min », « 1 h 04 ») si disponible.
     var durationLabel: String? {
-        guard let d = durationSeconds, d > 0 else { return nil }
+        guard let d = resolvedDurationSeconds, d > 0 else { return nil }
         let minutes = Int(d / 60)
         if minutes < 60 { return "\(max(1, minutes)) min" }
         return String(format: "%d h %02d", minutes / 60, minutes % 60)
+    }
+
+    /// Libellé RSRP moyen (dBm) avec le garde-fou canonique : `nil` ou un RSRP
+    /// > −44 dBm (sentinelle 0 « pas de mesure », ou au-delà du max 3GPP) → `nil`
+    /// (affiché « — »), jamais un faux « 0 dBm ». Aligné sur `SQNetworkColors.rsrpHex`.
+    var avgRsrpLabel: String? {
+        guard let v = avgSignalStrength, v <= -44 else { return nil }
+        return "\(Int(v)) dBm"
     }
 }
 

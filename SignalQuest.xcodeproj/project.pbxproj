@@ -137,6 +137,7 @@
 		7646C39F8B3F70170191AA50 /* SQTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86CF3B083A9BF65407412BBF /* SQTheme.swift */; };
 		76BB800EF2BE8540711AEF12 /* DriveSpeedtestDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47CD806E692BAA9C67319EE /* DriveSpeedtestDetailSheet.swift */; };
 		7834D63E27751200CFE2DCF1 /* MapPhotoViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3943DEC3A15CC630D29F54A /* MapPhotoViewer.swift */; };
+		7BD0F0D81265EB7E43D6B78E /* RadioLogImportStatusStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA6F453FFCEA21945FAE5FC /* RadioLogImportStatusStore.swift */; };
 		7C6A3C2708709AE1A38C1DE6 /* CommentsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4841F25C76693497780EE838 /* CommentsSheet.swift */; };
 		7D0BE4AFA8C517809583BFB1 /* IdentifyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C43EF0BBA838F55D6E4EF78 /* IdentifyService.swift */; };
 		7D587A943F3C2B6675722262 /* SignalQuestUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230A19DCE27F22F952273493 /* SignalQuestUITests.swift */; };
@@ -153,6 +154,7 @@
 		848B9C3DC83FC58801772208 /* NearbyOperatorStat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6570A8819FE179AAFE0B2546 /* NearbyOperatorStat.swift */; };
 		8A4136A5D87AAEDAB5407344 /* ANFRDemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C94749CE21617DB555FC5D6 /* ANFRDemoData.swift */; };
 		8A731C079D449D10B1E7ADD3 /* DockMinimizeQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E978EE2EBFDAD88C880B9C9 /* DockMinimizeQATests.swift */; };
+		8A9E4F0BAF7ACD8DDD8B61FA /* DromRegion.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB55790C931377A64C3D3477 /* DromRegion.swift */; };
 		8C7659AD0943ED428E44029F /* FriendsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D871487D03A7164E856392DE /* FriendsListView.swift */; };
 		8CC009E03CB57D8B8159BCAA /* SessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD5D954E6102D732D621D8E6 /* SessionModels.swift */; };
 		8D6A1FFFCEC4DF3C5D0246A9 /* SignalQuestWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2A5251F96893CB76BAAC1239 /* SignalQuestWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -485,6 +487,7 @@
 		C770C2B428D4F156C88972B0 /* SpeedtestDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestDetailSheet.swift; sourceTree = "<group>"; };
 		C82A89658CFF511C4133BD31 /* NetworkPulseHero.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPulseHero.swift; sourceTree = "<group>"; };
 		C8A8D289A6D4E7B0C9C621A4 /* PushNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationService.swift; sourceTree = "<group>"; };
+		CB55790C931377A64C3D3477 /* DromRegion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DromRegion.swift; sourceTree = "<group>"; };
 		CCFFAF3AD50336630849451C /* RadioLogImportParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogImportParser.swift; sourceTree = "<group>"; };
 		CD352558B0E98E08EE91AFF6 /* MessageShareModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageShareModels.swift; sourceTree = "<group>"; };
 		CD92F7CAEF5CE9D9F233D172 /* NearbyNetworkQualityDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbyNetworkQualityDetailSheet.swift; sourceTree = "<group>"; };
@@ -500,6 +503,7 @@
 		D89B6EA883CAE3151D38ABEB /* IdentificationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentificationModels.swift; sourceTree = "<group>"; };
 		DAB8735E7BA1CEC81DED95F9 /* NewPollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewPollView.swift; sourceTree = "<group>"; };
 		DB7D271F7EF3536DB6B7C1A1 /* SmokeTourQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTourQATests.swift; sourceTree = "<group>"; };
+		DDA6F453FFCEA21945FAE5FC /* RadioLogImportStatusStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogImportStatusStore.swift; sourceTree = "<group>"; };
 		DF1F41B3B9C7134D4B1810A3 /* ThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadView.swift; sourceTree = "<group>"; };
 		E03FBD9147DB71215729DD82 /* Figtree-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-Regular.ttf"; sourceTree = "<group>"; };
 		E04E544B4C215F036CD9B609 /* RadioLogImportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogImportModels.swift; sourceTree = "<group>"; };
@@ -1087,6 +1091,7 @@
 				9EC5960ABF8C24952322E392 /* PrivacyService.swift */,
 				CCFFAF3AD50336630849451C /* RadioLogImportParser.swift */,
 				8E28A9C023F0003B4E68771A /* RadioLogImportService.swift */,
+				DDA6F453FFCEA21945FAE5FC /* RadioLogImportStatusStore.swift */,
 				F9D26E553566F096D0740FCE /* RadioLogImportStore.swift */,
 				BF5C473D670B7B2938ABCB45 /* ReportsService.swift */,
 				413FB8DE8180198C52ED7167 /* SessionsService.swift */,
@@ -1154,6 +1159,7 @@
 			isa = PBXGroup;
 			children = (
 				1FF3CB12A75C5483284BC5C7 /* AntennaDetailSheet.swift */,
+				CB55790C931377A64C3D3477 /* DromRegion.swift */,
 				A7FCE24EAE6C3426959B07BC /* FriendLiveSheet.swift */,
 				A5C7F0DAC41E77828173A282 /* MapBackdrop.swift */,
 				ACB33739AFC84C313844322C /* MapExplorerView.swift */,
@@ -1464,6 +1470,7 @@
 				76BB800EF2BE8540711AEF12 /* DriveSpeedtestDetailSheet.swift in Sources */,
 				3544D1A314DE63A90BF89006 /* DriveTestMapView.swift in Sources */,
 				ECC09E7CA1AB0F9C9BE01F32 /* DriveTestView.swift in Sources */,
+				8A9E4F0BAF7ACD8DDD8B61FA /* DromRegion.swift in Sources */,
 				F5B1F063472CD474A7C9E2A1 /* E2EEBiometric.swift in Sources */,
 				2A75C227B62E74818271FE0A /* E2EEService.swift in Sources */,
 				505D859D72F614CC8E5C784C /* E2EEUnlockSheet.swift in Sources */,
@@ -1541,6 +1548,7 @@
 				681DBC1F202BA2A5486B5F4E /* RadioLogImportModels.swift in Sources */,
 				D89CD7D071BFF52EB1D1B693 /* RadioLogImportParser.swift in Sources */,
 				606E7522E0DD527D31CF2E01 /* RadioLogImportService.swift in Sources */,
+				7BD0F0D81265EB7E43D6B78E /* RadioLogImportStatusStore.swift in Sources */,
 				FE32E50F866E4FBC518B9120 /* RadioLogImportStore.swift in Sources */,
 				81468AFF5A5E22F90CD47B5A /* RadioLogImportView.swift in Sources */,
 				533BA2C52C7A4CAEE52B0251 /* RadioLogImportsViewModel.swift in Sources */,

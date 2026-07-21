@@ -91,7 +91,7 @@ final class AppServices: ObservableObject {
         validations = ValidationsService(api: api)
         let identifyService = IdentifyService(api: api)
         identify = identifyService
-        radioLogImport = RadioLogImportService(api: api, identify: identifyService)
+        radioLogImport = RadioLogImportService(api: api, identify: identifyService, antennas: antennas)
         friends = FriendsService(api: api)
         gamification = GamificationService(api: api)
         gamificationV2 = GamificationV2Service(api: api)

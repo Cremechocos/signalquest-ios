@@ -13,11 +13,15 @@ final class PhotosViewModel: ObservableObject {
     @Published var selectedPhoto: Photo?
     @Published var comments: [PhotoComment] = []
     @Published var isLoading = false
+    @Published var isLoadingMore = false
+    @Published var hasMore = false
     @Published var errorMessage: String?
     @Published var draft: String = ""
     @Published var isSending = false
 
     private let service: PhotoServicing
+    private var page = 1
+    private let pageSize = 30
 
     init(service: PhotoServicing) {
         self.service = service
@@ -26,13 +30,36 @@ final class PhotosViewModel: ObservableObject {
     func load() async {
         if AppEnvironment.usesDemoData {
             photos = Photo.demoList
+            hasMore = false
             errorMessage = nil
             return
         }
         isLoading = true
         defer { isLoading = false }
+        page = 1
         do {
-            photos = try await service.listPhotos(filter: "approved", sortBy: "recent", limit: 30)
+            let response = try await service.listPhotos(filter: "approved", sortBy: "recent", page: page, limit: pageSize)
+            photos = response.photos
+            hasMore = response.meta?.hasMore ?? (response.photos.count >= pageSize)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Charge la page suivante et l'ajoute (dédup par id). Déclenché quand la dernière
+    /// vignette apparaît. Sans ça, la galerie restait bloquée sur la 1re page (≈ 31
+    /// photos) même quand le serveur en avait davantage — `meta.hasMore` était décodé
+    /// mais jamais exploité (PHOTO-PAGINATION-01).
+    func loadMore() async {
+        guard hasMore, !isLoading, !isLoadingMore, !AppEnvironment.usesDemoData else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+        do {
+            let response = try await service.listPhotos(filter: "approved", sortBy: "recent", page: page + 1, limit: pageSize)
+            let known = Set(photos.map(\.id))
+            photos.append(contentsOf: response.photos.filter { !known.contains($0.id) })
+            page += 1
+            hasMore = response.meta?.hasMore ?? (response.photos.count >= pageSize)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -233,6 +260,7 @@ struct PhotosView: View {
             }
         }
         .signalQuestBackground()
+        .refreshable { await model.load() }
         .task { if model.photos.isEmpty { await model.load() } }
         .sheet(item: $model.selectedPhoto) { _ in
             if let selected = model.selectedPhoto {
@@ -309,8 +337,18 @@ struct PhotosView: View {
                         .accessibilityLabel("Photo \(photo.displayCaption)")
                         .accessibilityAction { Task { await model.open(photo) } }
                         .sqFadeUp()
+                        // Scroll infini : la dernière vignette visible tire la page suivante.
+                        .onAppear {
+                            if photo.id == model.photos.last?.id { Task { await model.loadMore() } }
+                        }
                 }
             }
+        }
+        if model.isLoadingMore {
+            ProgressView()
+                .tint(SQColor.brandRed)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, SQSpace.md)
         }
     }
 

@@ -65,6 +65,10 @@ struct MarketRegistryEntry: Codable, Equatable, Identifiable, Sendable {
     let marketCode: String
     let mccs: [Int]
     let sourceMode: String
+    /// Opérateurs RADIO (résolution SIM par MNC/PLMN), distincts des opérateurs
+    /// d'affichage `operators` (qui n'ont pas de MNC). Indispensable pour rattacher
+    /// une SIM DROM (MCC 340/647) à son opérateur exact.
+    let radioOperators: [MarketRadioOperator]
 
     var id: String { marketCode.isEmpty ? code : marketCode }
 
@@ -96,6 +100,16 @@ struct MarketRegistryEntry: Codable, Equatable, Identifiable, Sendable {
         return selectableOperators.first { $0.key.uppercased() == normalized }
     }
 
+    /// Clé opérateur (registre) pour une SIM MCC/MNC via le bloc `radioOperators` :
+    /// PLMN exact (mcc+mnc) d'abord, puis MNC seul si ce marché couvre le MCC. Renvoie
+    /// la clé UNIQUEMENT si elle correspond à un opérateur sélectionnable (affichable).
+    func radioOperatorKey(mcc: Int, mnc: Int) -> String? {
+        let match = radioOperators.first { $0.plmns.contains { $0.mcc == mcc && $0.mnc == mnc } }
+            ?? (mccs.contains(mcc) ? radioOperators.first { $0.mncs.contains(mnc) } : nil)
+        guard let key = match?.key, operatorEntry(forKey: key) != nil else { return nil }
+        return key
+    }
+
     /// Couleur registry de l'opérateur, avec repli sur la palette SQBrand.
     func operatorColor(forKey key: String?) -> Color {
         if let entry = operatorEntry(forKey: key), let color = Color(hexString: entry.color) {
@@ -107,7 +121,7 @@ struct MarketRegistryEntry: Codable, Equatable, Identifiable, Sendable {
     enum CodingKeys: String, CodingKey {
         case code, label, countryCode, publicSelectable, antennaCompatible
         case defaultLanguage, supportedLanguages, defaultMapCenter, defaultMapZoom
-        case capabilities, operators, marketCode, mccs, sourceMode
+        case capabilities, operators, marketCode, mccs, sourceMode, radioOperators
     }
 
     init(from decoder: Decoder) throws {
@@ -127,6 +141,38 @@ struct MarketRegistryEntry: Codable, Equatable, Identifiable, Sendable {
         marketCode = c.decodeFlexibleString(forKey: .marketCode) ?? decodedCode
         mccs = c.decodeLossyArray([Int].self, forKey: .mccs)
         sourceMode = c.decodeFlexibleString(forKey: .sourceMode) ?? "official"
+        radioOperators = c.decodeLossyArray([MarketRadioOperator].self, forKey: .radioOperators)
+    }
+}
+
+/// Opérateur RADIO (résolution SIM) — bloc `radioOperators` du registre, distinct
+/// des opérateurs d'AFFICHAGE (`operators`). Porte les MNC/PLMN pour rattacher une
+/// SIM à son opérateur, y compris en DROM (MCC 340/647 où le MNC seul est ambigu).
+struct MarketRadioOperator: Codable, Equatable, Sendable {
+    let key: String
+    let mncs: [Int]
+    let plmns: [MarketPlmn]
+
+    enum CodingKeys: String, CodingKey { case key, mncs, plmns }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        key = c.decodeFlexibleString(forKey: .key) ?? ""
+        mncs = c.decodeLossyArray([Int].self, forKey: .mncs)
+        plmns = c.decodeLossyArray([MarketPlmn].self, forKey: .plmns)
+    }
+}
+
+struct MarketPlmn: Codable, Equatable, Sendable {
+    let mcc: Int
+    let mnc: Int
+
+    enum CodingKeys: String, CodingKey { case mcc, mnc }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        mcc = (try? c.decode(Int.self, forKey: .mcc)) ?? -1
+        mnc = (try? c.decode(Int.self, forKey: .mnc)) ?? -1
     }
 }
 

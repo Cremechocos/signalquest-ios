@@ -62,6 +62,10 @@ final class MapExplorerViewModel: ObservableObject {
     // appliquée ensuite dans `resolveInitialSelection`.
     @Published var marketFilter = MapMarketStore.initialMarketCode()
     @Published var operatorFilter = MapMarketStore.initialOperatorKey()
+    /// Territoire DROM sous le viewport (Martinique, Réunion…) — restreint la liste
+    /// d'opérateurs à ceux du territoire (les opérateurs Outre-mer sont géographiquement
+    /// disjoints). `nil` hors DROM. Cf. `DromRegion`.
+    @Published var currentDromRegion: DromRegion?
     @Published var techFilters: Set<String> = []
     @Published var bandFilters: Set<Int> = []
     @Published var sharingFilters: Set<String> = []
@@ -175,6 +179,10 @@ final class MapExplorerViewModel: ObservableObject {
                let key = detected.operatorKey,
                entry.operatorEntry(forKey: key) != nil {
                 detectedOperator = key
+            } else if let mcc = status.operatorMcc, let mnc = status.operatorMnc,
+                      let key = entry.radioOperatorKey(mcc: mcc, mnc: mnc) {
+                // SIM DROM (MCC 340/647, MNC seul ambigu) → opérateur exact via radioOperators/PLMN.
+                detectedOperator = key
             } else if let mnc = status.operatorMnc,
                       let op = entry.selectableOperators.first(where: { $0.mncs.contains(mnc) }) {
                 detectedOperator = op.key
@@ -240,6 +248,9 @@ final class MapExplorerViewModel: ObservableObject {
         let validSharing = Set(MapFilterCatalog.sharing(forMarket: entry.marketCode).map(\.value))
         let prunedSharing = sharingFilters.intersection(validSharing)
         if prunedSharing != sharingFilters { sharingFilters = prunedSharing }
+        // DROM : caler le territoire courant (et purger un opérateur d'un autre DOM)
+        // dès le changement de marché, sans attendre le prochain arrêt caméra.
+        if let center = lastCenter { updateDromRegion(for: center) }
     }
 
     var supportsCommunityLayers: Bool {
@@ -265,6 +276,12 @@ final class MapExplorerViewModel: ObservableObject {
             return operatorFilter.uppercased() == "ALL" ? ["ALL"] : [operatorFilter, "ALL"]
         }
         var keys = entry.selectableOperators.map(\.key)
+        // DROM : restreindre aux opérateurs du TERRITOIRE courant (Martinique ≠ Réunion).
+        // Sans ça, la liste mélange les 9 opérateurs Outre-mer tous territoires confondus
+        // (« les DROM ne sont pas séparés »).
+        if entry.marketCode.uppercased() == "DROM", let region = currentDromRegion {
+            keys = keys.filter { region.allows(operatorKey: $0) }
+        }
         if !keys.contains(where: { $0.uppercased() == "ALL" }) {
             keys.append("ALL")
         }
@@ -360,6 +377,7 @@ final class MapExplorerViewModel: ObservableObject {
     /// résolution du marché sous le centre de la carte.
     func scheduleMarketDetection(center: CLLocationCoordinate2D) {
         lastCenter = center   // biais de proximité pour la recherche de lieux (MKLocalSearch)
+        updateDromRegion(for: center)
         MessageSyncLog.logger.debug("market detect schedule lat=\(center.latitude, privacy: .private) lng=\(center.longitude, privacy: .private)")
         marketDetectionTask?.cancel()
         marketDetectionTask = Task { [weak self] in
@@ -417,7 +435,28 @@ final class MapExplorerViewModel: ObservableObject {
         currentMarketEntry = entry
         operatorFilter = Self.defaultOperatorKey(for: entry)
         marketFilter = code
+        if let center = lastCenter { updateDromRegion(for: center) }
         showMarketNotice("Marché : \(entry.label)")
+    }
+
+    /// Met à jour le territoire DROM courant depuis le centre du viewport, et réaligne
+    /// l'opérateur (retour « Tous ») si le courant n'appartient pas au nouveau territoire
+    /// — sinon un opérateur d'un autre DOM resterait sélectionné (ex. SRR en Martinique).
+    /// Hors marché DROM : `nil`.
+    func updateDromRegion(for center: CLLocationCoordinate2D) {
+        guard marketFilter.uppercased() == "DROM" else {
+            if currentDromRegion != nil { currentDromRegion = nil }
+            return
+        }
+        let region = DromRegion.from(center)
+        guard region != currentDromRegion else { return }
+        currentDromRegion = region
+        if let region {
+            if !region.allows(operatorKey: operatorFilter) {
+                operatorFilter = "ALL"
+            }
+            showMarketNotice("Territoire : \(region.flag) \(region.shortName)")
+        }
     }
 
     private func showMarketNotice(_ text: String) {

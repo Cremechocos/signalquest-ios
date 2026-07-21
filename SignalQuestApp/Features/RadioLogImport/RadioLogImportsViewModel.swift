@@ -28,6 +28,8 @@ final class RadioLogImportsViewModel: ObservableObject {
     @Published private(set) var phase: Phase = .loading
     @Published private(set) var sections: [RadioLogImportOperatorSection] = []
     @Published private(set) var statusById: [UUID: RadioLogImportCellStatus] = [:]
+    /// Aperçus RICHES (photo, commune, compteurs) par siteId — carte de site façon Android.
+    @Published private(set) var previews: [String: AntennaDetails] = [:]
     @Published private(set) var resolving = false
     @Published private(set) var importing = false
     @Published var errorMessage: String?
@@ -35,6 +37,10 @@ final class RadioLogImportsViewModel: ObservableObject {
     private let service: RadioLogImportServicing
     private var allRows: [ParsedRadioLogRow] = []
     private var rowBatchId: [UUID: UUID] = [:]
+    /// siteId rattaché à chaque cellule — conservé même après passage en « Identifié »
+    /// (le statut `.identified` ne porte plus le siteId) pour garder l'aperçu affiché.
+    private var resolvedSiteId: [UUID: String] = [:]
+    private var previewLoads: Set<String> = []
     private var resolveTask: Task<Void, Never>?
 
     init(service: RadioLogImportServicing) {
@@ -52,10 +58,26 @@ final class RadioLogImportsViewModel: ObservableObject {
                 return batch.rows
             }
             rebuildSections()
+            hydrateStatusesFromCache()
             phase = allRows.isEmpty ? .empty : .ready
             startResolving()
         } catch {
             phase = .error(error.localizedDescription)
+        }
+    }
+
+    /// Réhydrate les statuts depuis le cache disque (clé cellule stable) → affichage
+    /// INSTANTANÉ à la réouverture, sans tout re-résoudre. Les entrées périmées (hors TTL)
+    /// restent absentes et seront re-résolues par `startResolving`.
+    private func hydrateStatusesFromCache() {
+        let cached = service.cachedStatuses()
+        guard !cached.isEmpty else { return }
+        for row in allRows {
+            guard let status = cached[row.stableIdentityKey] else { continue }
+            statusById[row.id] = status
+            if case let .identifiable(siteId, _) = status, !siteId.isEmpty {
+                resolvedSiteId[row.id] = siteId
+            }
         }
     }
 
@@ -101,12 +123,54 @@ final class RadioLogImportsViewModel: ObservableObject {
                 for resolved in batch {
                     // Ne pas écraser un « Identifié » déjà écrit par l'utilisateur.
                     if statusById[resolved.id] == .identified { continue }
-                    statusById[resolved.id] = resolved.matched
-                        ? .identifiable(siteId: resolved.siteId ?? "", distanceMeters: resolved.distanceMeters)
-                        : .notFound
+                    if resolved.matched, let siteId = resolved.siteId, !siteId.isEmpty {
+                        statusById[resolved.id] = .identifiable(siteId: siteId, distanceMeters: resolved.distanceMeters)
+                        resolvedSiteId[resolved.id] = siteId
+                    } else {
+                        statusById[resolved.id] = .notFound
+                    }
                 }
             }
             resolving = false
+            persistCurrentStatuses()
+        }
+    }
+
+    /// Persiste le statut courant de chaque cellule (clé stable) pour la prochaine ouverture.
+    private func persistCurrentStatuses() {
+        var byKey: [String: RadioLogImportCellStatus] = [:]
+        for row in allRows {
+            guard let status = statusById[row.id], status != .pending else { continue }
+            byKey[row.stableIdentityKey] = status
+        }
+        service.persistStatuses(byKey)
+    }
+
+    // MARK: - Aperçu site riche (photo + commune + compteurs)
+
+    /// siteId rattaché à un nœud (première cellule résolue), survit au passage « Identifié ».
+    func siteId(for node: RadioLogImportNodeGroup) -> String? {
+        for row in node.cells {
+            if let s = resolvedSiteId[row.id], !s.isEmpty { return s }
+            if case let .identifiable(s, _) = statusById[row.id], !s.isEmpty { return s }
+        }
+        return nil
+    }
+
+    func preview(for node: RadioLogImportNodeGroup) -> AntennaDetails? {
+        siteId(for: node).flatMap { previews[$0] }
+    }
+
+    /// Charge (une fois) l'aperçu riche du site rattaché à ce nœud — dédup in-flight.
+    func ensurePreview(for node: RadioLogImportNodeGroup) {
+        guard let siteId = siteId(for: node), previews[siteId] == nil, !previewLoads.contains(siteId) else { return }
+        previewLoads.insert(siteId)
+        let sample = node.cells.first
+        let market = RadioLogOperatorResolver.marketCode(forOperator: sample?.operatorName, mcc: sample?.mcc)
+        Task {
+            let preview = await service.sitePreview(siteId: siteId, market: market, operatorName: sample?.operatorName)
+            previewLoads.remove(siteId)
+            if let preview { previews[siteId] = preview }
         }
     }
 
@@ -158,7 +222,11 @@ final class RadioLogImportsViewModel: ObservableObject {
         Task {
             let outcome = await service.confirm(rows: rows)
             if outcome.submitted > 0 {
-                for r in rows where r.matched { statusById[r.id] = .identified }
+                for r in rows where r.matched {
+                    statusById[r.id] = .identified
+                    if let siteId = r.siteId, !siteId.isEmpty { resolvedSiteId[r.id] = siteId }
+                }
+                persistCurrentStatuses()
             }
             if outcome.failed > 0 {
                 errorMessage = "\(outcome.failed) identification(s) ont échoué."

@@ -177,6 +177,11 @@ protocol CallsServicing: Sendable {
     func history(page: Int, limit: Int) async throws -> [CallSession]
     /// Dernière page mémorisée (affichage instantané avant le rafraîchissement réseau).
     func cachedHistory() async -> [CallSession]
+    /// Efface (masque « pour moi ») TOUT l'historique d'appels côté serveur + vide le
+    /// cache disque local. L'autre participant conserve l'appel.
+    func clearHistory() async throws
+    /// Masque « pour moi » un appel précis (l'autre participant le garde).
+    func deleteEntry(callId: String) async throws
 }
 
 extension CallsServicing {
@@ -246,6 +251,18 @@ final class CallsService: CallsServicing {
     func cachedHistory() async -> [CallSession] {
         guard let cached = try? await cache.read([CachedCallSession].self, for: Self.historyCacheKey) else { return [] }
         return cached.map(\.session)
+    }
+
+    func clearHistory() async throws {
+        try await api.request(APIEndpoint(path: "/api/calls/history", method: .delete))
+        await cache.remove(Self.historyCacheKey)
+    }
+
+    func deleteEntry(callId: String) async throws {
+        try await api.request(APIEndpoint(path: "/api/calls/\(callId)", method: .delete))
+        // Le cache ne contient que la 1re page : on l'invalide pour éviter de réafficher
+        // l'appel supprimé avant le prochain fetch réseau.
+        await cache.remove(Self.historyCacheKey)
     }
 }
 

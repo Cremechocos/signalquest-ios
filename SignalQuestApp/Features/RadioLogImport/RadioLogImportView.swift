@@ -111,6 +111,9 @@ struct RadioLogImportView: View {
     @ViewBuilder
     private func nodeRow(_ node: RadioLogImportNodeGroup) -> some View {
         DisclosureGroup {
+            if let preview = model.preview(for: node) {
+                sitePreviewCard(preview)
+            }
             ForEach(node.cells) { cell in cellRow(cell) }
         } label: {
             VStack(alignment: .leading, spacing: 3) {
@@ -121,6 +124,9 @@ struct RadioLogImportView: View {
                 Text("\(node.pciCount) PCI · \(node.cellCount) \(node.cellIdLabel)")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            // Charge l'aperçu riche du site (photo + commune + compteurs) dès que le nœud
+            // apparaît — comme la carte d'antenne identifiée d'Android.
+            .onAppear { model.ensurePreview(for: node) }
         }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) { model.deleteNode(node) } label: { Label("Supprimer", systemImage: "trash") }
@@ -156,6 +162,44 @@ struct RadioLogImportView: View {
     private func isIdentifiable(_ cell: ParsedRadioLogRow) -> Bool {
         if case .identifiable = model.status(for: cell) { return true }
         return false
+    }
+
+    /// Carte du site identifié (photo + commune/adresse + compteurs) — remplace l'ancien
+    /// `siteId` brut par une vraie fiche, comme Android (`GET /antenna/{id}`).
+    @ViewBuilder
+    private func sitePreviewCard(_ preview: AntennaDetails) -> some View {
+        HStack(spacing: 12) {
+            if let url = preview.photos.first?.thumbnailUrl ?? preview.photos.first?.imageUrl {
+                RemoteImage(url: url, maxDimension: 160, contentMode: .fill) {
+                    Rectangle().fill(Color.secondary.opacity(0.12))
+                }
+                .frame(width: 54, height: 54)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            } else {
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 54, height: 54)
+                    .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(preview.core?.commune ?? preview.address ?? preview.siteId ?? "Site identifié")
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                if let address = preview.address, preview.core?.commune != nil {
+                    Text(address).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                }
+                HStack(spacing: 10) {
+                    if let v = preview.validationsCount, v > 0 { Label("\(v)", systemImage: "checkmark.seal.fill") }
+                    Label("\(preview.photosCount ?? preview.photos.count)", systemImage: "camera.fill")
+                    if let s = preview.speedtestsCount, s > 0 { Label("\(s)", systemImage: "speedometer") }
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
     }
 
     private func techChip(_ tech: String) -> some View {

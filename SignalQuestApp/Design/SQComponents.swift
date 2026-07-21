@@ -400,6 +400,7 @@ struct LeaderboardPodium: View {
                         .font(SQFont.body(13, .semibold))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                     UnevenRoundedRectangle(
                         topLeadingRadius: SQRadius.md,
                         bottomLeadingRadius: 0,

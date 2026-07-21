@@ -174,12 +174,16 @@ struct SessionDetailView: View {
     // MARK: Stats
 
     private var statsCard: some View {
-        let s = model.session
+        // Stats du DÉTAIL (recalculées par le backend sur les points VISIBLES filtrés
+        // qualité) plutôt que celles de la LISTE (comptage brut non filtré + valeurs
+        // stockées parfois périmées) → cohérence avec la carte et le breakdown de
+        // génération. Repli sur la liste tant que le détail n'est pas chargé.
+        let s = model.detail?.session ?? model.session
         return GlassCard {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: 2), spacing: SQSpace.sm) {
                 statTile("Points", s.totalPoints.map { "\($0)" } ?? "—", "mappin.and.ellipse")
                 statTile("Distance", s.distanceKm.map(Self.formatKm) ?? "—", "ruler")
-                statTile("RSRP moyen", s.avgSignalStrength.map { "\(Int($0)) dBm" } ?? "—", "antenna.radiowaves.left.and.right")
+                statTile("RSRP moyen", s.avgRsrpLabel ?? "—", "antenna.radiowaves.left.and.right")
                 statTile(s.isDriveTest ? "Durée" : "Date",
                          s.isDriveTest ? (s.durationLabel ?? "—")
                                        : (s.startTime.map { $0.formatted(.dateTime.day().month().year()) } ?? "—"),
