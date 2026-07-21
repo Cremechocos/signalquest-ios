@@ -282,3 +282,23 @@ struct WithdrawResult: Decodable, Equatable {
         withdrawnAt = (try? c.decodeIfPresent(Date.self, forKey: .withdrawnAt)) ?? nil
     }
 }
+
+/// Réponse de `POST /api/android/map/identify/delete` (suppression DÉFINITIVE).
+/// `deleted` = lignes solo hard-supprimées ; `softWithdrawn` = lignes partagées
+/// (confirmées par autrui) simplement retirées en soft — jamais effacées.
+struct DeleteResult: Decodable, Equatable {
+    let success: Bool
+    let siteId: String?
+    let deleted: Int
+    let softWithdrawn: Int
+
+    enum CodingKeys: String, CodingKey { case success, siteId, deleted, softWithdrawn }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = (try? c.decodeIfPresent(Bool.self, forKey: .success)) ?? false
+        siteId = c.decodeFlexibleString(forKey: .siteId)
+        deleted = (try? c.decodeIfPresent(Int.self, forKey: .deleted)) ?? 0
+        softWithdrawn = (try? c.decodeIfPresent(Int.self, forKey: .softWithdrawn)) ?? 0
+    }
+}

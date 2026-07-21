@@ -74,6 +74,36 @@ final class MyIdentificationsViewModel: ObservableObject {
             Haptics.error()
         }
     }
+
+    /// Suppression DÉFINITIVE (hard delete) des contributions solo de l'utilisateur.
+    /// Les lignes confirmées par autrui sont seulement retirées (soft) côté serveur —
+    /// on l'indique alors dans le toast pour ne pas laisser croire à un effacement total.
+    func delete(_ item: MyIdentification) async {
+        withdrawingId = item.id
+        defer { withdrawingId = nil }
+        do {
+            let result = try await service.delete(
+                siteId: item.siteId,
+                enb: item.enb, gnb: item.gnb,
+                pci: item.pciValue,
+                cellId: item.cellId, ci: item.ci,
+                tech: item.tech, reason: nil
+            )
+            if result.success {
+                await load()
+                toast = (result.deleted == 0 && result.softWithdrawn > 0)
+                    ? "Retirée (des cellules sont confirmées par d'autres)"
+                    : "Identification supprimée"
+                Haptics.success()
+            } else {
+                toast = "Suppression impossible"
+                Haptics.error()
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+            Haptics.error()
+        }
+    }
 }
 
 /// « Mes identifications » — les cellules→sites que l'utilisateur a identifiées
@@ -190,6 +220,12 @@ struct MyIdentificationsView: View {
                 onWithdraw: {
                     Task {
                         await model.withdraw(item)
+                        selected = nil
+                    }
+                },
+                onDelete: {
+                    Task {
+                        await model.delete(item)
                         selected = nil
                     }
                 },
@@ -321,11 +357,13 @@ private struct IdentificationDetailSheet: View {
     let item: MyIdentification
     let isWithdrawing: Bool
     let onWithdraw: () -> Void
+    var onDelete: () -> Void = {}
     var onChanged: () -> Void = {}
 
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
     @State private var confirmingWithdraw = false
+    @State private var confirmingDelete = false
     @State private var showRemap = false
     @State private var showSector = false
     @State private var adoptBusy = false
@@ -348,6 +386,7 @@ private struct IdentificationDetailSheet: View {
                     detailsCard
                     editSection
                     withdrawButton
+                    deleteButton
                 }
                 .padding()
             }
@@ -562,6 +601,35 @@ private struct IdentificationDetailSheet: View {
             Button("Annuler", role: .cancel) {}
         } message: {
             Text("« \(item.nodeLabel) » ne te sera plus attribuée. Réversible en ré-identifiant.")
+        }
+    }
+
+    /// Action secondaire (moins proéminente que le retrait) : hard delete owner-scoped.
+    /// Contrairement au retrait, c'est irréversible ; le serveur n'efface que les lignes
+    /// solo et retire en soft celles confirmées par d'autres.
+    private var deleteButton: some View {
+        Button {
+            confirmingDelete = true
+        } label: {
+            HStack(spacing: SQSpace.xs + 2) {
+                if isWithdrawing {
+                    ProgressView().tint(SQColor.danger)
+                } else {
+                    Image(systemName: "trash.slash")
+                }
+                Text("Supprimer définitivement").font(SQFont.body(14, .semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 44)
+            .foregroundStyle(SQColor.danger)
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .disabled(isWithdrawing)
+        .confirmationDialog("Supprimer définitivement ?", isPresented: $confirmingDelete) {
+            Button("Supprimer définitivement", role: .destructive, action: onDelete)
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("« \(item.nodeLabel) » sera effacée définitivement (irréversible). Les cellules confirmées par d'autres seront seulement retirées.")
         }
     }
 

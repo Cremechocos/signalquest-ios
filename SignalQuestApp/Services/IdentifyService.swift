@@ -33,6 +33,20 @@ protocol IdentifyServicing: Sendable {
         reason: String?
     ) async throws -> WithdrawResult
 
+    /// Suppression DÉFINITIVE (hard delete) des contributions SOLO de l'utilisateur pour un
+    /// nœud/cellule. Les lignes confirmées par autrui sont seulement retirées (soft) — jamais
+    /// effacées. Owner-scoped, irréversible pour les lignes solo. Idempotent.
+    func delete(
+        siteId: String,
+        enb: String?,
+        gnb: String?,
+        pci: String?,
+        cellId: String?,
+        ci: String?,
+        tech: String?,
+        reason: String?
+    ) async throws -> DeleteResult
+
     /// Ré-attribue un nœud eNB/gNB de l'utilisateur vers un AUTRE site (cascade
     /// toutes ses cellules). Owner-scoped, idempotent.
     func editSite(
@@ -129,6 +143,33 @@ final class IdentifyService: IdentifyServicing {
         }
         return try await api.requestJSON(
             "/api/android/map/identify/withdraw",
+            method: .post,
+            body: Body(siteId: siteId, enb: enb, gnb: gnb, pci: pci, cellId: cellId, ci: ci, tech: tech, reason: reason)
+        )
+    }
+
+    func delete(
+        siteId: String,
+        enb: String?,
+        gnb: String?,
+        pci: String?,
+        cellId: String?,
+        ci: String?,
+        tech: String?,
+        reason: String?
+    ) async throws -> DeleteResult {
+        struct Body: Encodable {
+            let siteId: String
+            let enb: String?
+            let gnb: String?
+            let pci: String?
+            let cellId: String?
+            let ci: String?
+            let tech: String?
+            let reason: String?
+        }
+        return try await api.requestJSON(
+            "/api/android/map/identify/delete",
             method: .post,
             body: Body(siteId: siteId, enb: enb, gnb: gnb, pci: pci, cellId: cellId, ci: ci, tech: tech, reason: reason)
         )
