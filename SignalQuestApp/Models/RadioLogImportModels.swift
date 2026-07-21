@@ -5,8 +5,8 @@ import Foundation
 /// Android, avec la MÊME logique d'identité cellule :
 ///  - LTE : `ci = eNB×256 + CID` (ECI, split 8 bits imposé par la 3GPP).
 ///  - NR  : `ci = NCI` (36 bits), `gnb = NCI >> 14` (convention identique au serveur).
-struct ParsedRadioLogRow: Identifiable, Sendable {
-    let id = UUID()
+struct ParsedRadioLogRow: Identifiable, Sendable, Codable {
+    var id = UUID()
     let lineNumber: Int
     /// "LTE" ou "NR" (nil si indéterminable).
     let technology: String?
@@ -128,18 +128,25 @@ struct ResolvedRadioLogRow: Identifiable, Sendable {
     let row: ParsedRadioLogRow
     let siteId: String?
     let matched: Bool
+    let distanceMeters: Double?
 }
 
-/// Aperçu agrégé présenté à l'utilisateur avant écriture.
-struct RadioLogImportPreview: Sendable {
-    let fileName: String
-    let totalLines: Int
-    let parsedRows: Int
-    let resolvedRows: [ResolvedRadioLogRow]
+/// Statut d'identification d'une cellule pour l'affichage (miroir simplifié des badges
+/// Android : Vérif. / Rattachable / Non identifié / Identifié).
+enum RadioLogImportCellStatus: Sendable, Equatable {
+    case pending
+    case identifiable(siteId: String, distanceMeters: Double?)
+    case notFound
+    case identified
 
-    var matchedCount: Int { resolvedRows.filter { $0.matched }.count }
-    var unmatchedCount: Int { resolvedRows.count - matchedCount }
-    var writableRows: [ResolvedRadioLogRow] { resolvedRows.filter { $0.matched && $0.siteId != nil } }
+    var label: String {
+        switch self {
+        case .pending: return "Vérif."
+        case .identifiable: return "Rattachable"
+        case .notFound: return "Non identifié"
+        case .identified: return "Identifié"
+        }
+    }
 }
 
 /// Résultat de l'écriture (identify/direct par ligne rattachée).

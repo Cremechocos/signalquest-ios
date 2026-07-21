@@ -38,18 +38,24 @@ enum RadioLogImportParser {
         let hasHeader = headers.contains { knownHeaders.contains($0) }
         guard hasHeader else { return Result(rows: [], totalLines: lines.count) }
 
+        // Index en-têtes précalculé UNE fois (première occurrence) : évite un
+        // headers.firstIndex(of:) O(n) par champ et par ligne — coûteux sur de gros
+        // exports (15k+ lignes × ~15 champs).
+        var headerIndex: [String: Int] = [:]
+        for (index, name) in headers.enumerated() where headerIndex[name] == nil {
+            headerIndex[name] = index
+        }
         let dataLines = Array(lines.dropFirst())
         let rows = dataLines.enumerated().compactMap { index, line in
-            parseHeaderRow(headers: headers, columns: splitLine(line, delimiter), lineNumber: index + 2)
+            parseHeaderRow(headerIndex: headerIndex, columns: splitLine(line, delimiter), lineNumber: index + 2)
         }
         return Result(rows: rows, totalLines: dataLines.count)
     }
 
-    private static func parseHeaderRow(headers: [String], columns: [String], lineNumber: Int) -> ParsedRadioLogRow? {
+    private static func parseHeaderRow(headerIndex: [String: Int], columns: [String], lineNumber: Int) -> ParsedRadioLogRow? {
         func value(_ aliases: String...) -> String? {
             for alias in aliases {
-                let normalized = normalizeHeader(alias)
-                if let index = headers.firstIndex(of: normalized), index < columns.count {
+                if let index = headerIndex[normalizeHeader(alias)], index < columns.count {
                     let trimmed = columns[index].trimmingCharacters(in: .whitespaces)
                     if !trimmed.isEmpty && trimmed != "null" { return trimmed }
                 }

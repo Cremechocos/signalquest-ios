@@ -1,61 +1,120 @@
 import Foundation
 
-/// Orchestration de l'import de logs radio : parse → **résout en lot** (lecture seule,
-/// `/api/android/map/identify/quick/batch`) → l'utilisateur valide → **écrit** les
-/// identifications rattachées via `identify/direct` (le serveur gère le nœud eNB/gNB).
+/// Orchestration de l'import de logs radio : parse (rapide) → **persistance locale** →
+/// affichage groupé (comme l'onglet Import d'Android) → **résolution progressive** du
+/// statut d'identification (`/identify/quick/batch`, lecture seule) → l'utilisateur
+/// identifie (`identify/direct`), voit les infos, ou supprime.
 protocol RadioLogImportServicing: Sendable {
-    /// Parse le contenu, dédoublonne les cellules et résout chacune contre les sites connus.
-    func resolve(fileName: String, content: String) async throws -> RadioLogImportPreview
-    /// Écrit les identifications pour les lignes rattachées à un site.
+    /// Parse le fichier, dédoublonne les cellules et persiste le lot. Rapide (aucun réseau).
+    func importFile(fileName: String, content: String) async throws -> StoredRadioLogImport
+    /// Lots persistés, plus récent d'abord.
+    func storedImports() throws -> [StoredRadioLogImport]
+    func deleteBatch(id: UUID) throws
+    func deleteRows(batchId: UUID, rowIds: Set<UUID>) throws
+    /// Résout le statut d'identification en parallèle borné ; émet chaque lot résolu au
+    /// fur et à mesure (affichage progressif, pas d'attente du fichier entier).
+    func resolveStream(rows: [ParsedRadioLogRow]) -> AsyncStream<[ResolvedRadioLogRow]>
+    /// Écrit les identifications pour les lignes rattachées à un site (`identify/direct`).
     func confirm(rows: [ResolvedRadioLogRow]) async -> RadioLogImportOutcome
 }
 
 final class RadioLogImportService: RadioLogImportServicing, @unchecked Sendable {
     private let api: APIClient
     private let identify: IdentifyServicing
+    private let store: RadioLogImportStoring
     /// Le batch serveur est borné à 150 items/requête.
     private let batchSize = 150
+    /// Requêtes de résolution simultanées (accélère sans marteler le serveur).
+    private let maxConcurrentResolves = 5
 
-    init(api: APIClient, identify: IdentifyServicing) {
+    init(api: APIClient, identify: IdentifyServicing, store: RadioLogImportStoring = RadioLogImportStore()) {
         self.api = api
         self.identify = identify
+        self.store = store
     }
 
-    func resolve(fileName: String, content: String) async throws -> RadioLogImportPreview {
+    // MARK: - Import & persistance
+
+    func importFile(fileName: String, content: String) async throws -> StoredRadioLogImport {
         let parsed = RadioLogImportParser.parse(fileName: fileName, content: content)
         let uniqueRows = deduplicate(parsed.rows.filter { $0.hasRadioIdentity })
+        let batch = StoredRadioLogImport(
+            id: UUID(),
+            fileName: fileName,
+            importedAtMs: Int(Date().timeIntervalSince1970 * 1000),
+            totalLines: parsed.totalLines,
+            rows: uniqueRows
+        )
+        try store.add(batch)
+        return batch
+    }
 
-        var resolved: [ResolvedRadioLogRow] = []
-        resolved.reserveCapacity(uniqueRows.count)
+    func storedImports() throws -> [StoredRadioLogImport] { try store.all() }
+    func deleteBatch(id: UUID) throws { try store.deleteBatch(id: id) }
+    func deleteRows(batchId: UUID, rowIds: Set<UUID>) throws { try store.deleteRows(batchId: batchId, rowIds: rowIds) }
 
-        for chunk in uniqueRows.chunked(into: batchSize) {
-            let items = chunk.map(batchItem(for:))
+    // MARK: - Résolution progressive (concurrente bornée)
+
+    func resolveStream(rows: [ParsedRadioLogRow]) -> AsyncStream<[ResolvedRadioLogRow]> {
+        AsyncStream { continuation in
+            let task = Task { [weak self] in
+                guard let self else { continuation.finish(); return }
+                let chunks = rows.chunked(into: self.batchSize)
+                await withTaskGroup(of: [ResolvedRadioLogRow].self) { group in
+                    var iterator = chunks.makeIterator()
+                    var inFlight = 0
+                    for _ in 0..<self.maxConcurrentResolves {
+                        guard let chunk = iterator.next() else { break }
+                        group.addTask { await self.resolveChunk(chunk) }
+                        inFlight += 1
+                    }
+                    while inFlight > 0, let result = await group.next() {
+                        inFlight -= 1
+                        if Task.isCancelled { break }
+                        continuation.yield(result)
+                        if let chunk = iterator.next() {
+                            group.addTask { await self.resolveChunk(chunk) }
+                            inFlight += 1
+                        }
+                    }
+                    group.cancelAll()
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    private func resolveChunk(_ chunk: [ParsedRadioLogRow]) async -> [ResolvedRadioLogRow] {
+        let items = chunk.map(batchItem(for:))
+        do {
             let response: QuickIdentifyBatchResponse = try await api.requestJSON(
                 "/api/android/map/identify/quick/batch",
                 method: .post,
                 body: QuickIdentifyBatchRequest(items: items)
             )
-            let bySiteId = Dictionary(
-                response.results.compactMap { result -> (String, QuickIdentifyBatchResult)? in
-                    guard let id = result.id else { return nil }
-                    return (id, result)
+            let byId = Dictionary(
+                response.results.compactMap { r -> (String, QuickIdentifyBatchResult)? in
+                    guard let id = r.id else { return nil }
+                    return (id, r)
                 },
                 uniquingKeysWith: { first, _ in first }
             )
-            for row in chunk {
-                let match = bySiteId[row.id.uuidString]?.result
+            return chunk.map { row in
+                let match = byId[row.id.uuidString]?.result
                 let siteId = (match?.found == true) ? match?.siteId : nil
-                resolved.append(ResolvedRadioLogRow(id: row.id, row: row, siteId: siteId, matched: siteId != nil))
+                return ResolvedRadioLogRow(
+                    id: row.id, row: row, siteId: siteId, matched: siteId != nil,
+                    distanceMeters: match?.distanceMeters
+                )
             }
+        } catch {
+            // Lecture seule best-effort : un lot en échec laisse ses cellules non résolues.
+            return chunk.map { ResolvedRadioLogRow(id: $0.id, row: $0, siteId: nil, matched: false, distanceMeters: nil) }
         }
-
-        return RadioLogImportPreview(
-            fileName: fileName,
-            totalLines: parsed.totalLines,
-            parsedRows: uniqueRows.count,
-            resolvedRows: resolved
-        )
     }
+
+    // MARK: - Écriture (identification)
 
     func confirm(rows: [ResolvedRadioLogRow]) async -> RadioLogImportOutcome {
         var outcome = RadioLogImportOutcome()
@@ -109,7 +168,7 @@ final class RadioLogImportService: RadioLogImportServicing, @unchecked Sendable 
     }
 
     /// Dédoublonne par identité cellule : un export contient beaucoup de lignes pour la
-    /// même cellule ; on ne résout/écrit qu'une fois par (opérateur, nœud, ci, pci).
+    /// même cellule ; on n'en garde qu'une par (opérateur, nœud, ci, pci).
     private func deduplicate(_ rows: [ParsedRadioLogRow]) -> [ParsedRadioLogRow] {
         var seen = Set<String>()
         return rows.filter { row in
