@@ -100,6 +100,17 @@ struct ValidationCardView: View {
         }
     }
 
+    /// Méthode d'identification lisible (Auto / Manuel / Import), nil si inconnue.
+    private var identifierMethodLabel: String? {
+        switch signal?.identifierSource?.lowercased() {
+        case "auto": return "Auto"
+        case "manual", "manuel": return "Manuel"
+        // Imports de logs externes (NetMonster, eNB Analytics…) : provenance honnête.
+        case .some(let s) where s.contains("sync") || s.contains("import"): return "Import"
+        default: return nil
+        }
+    }
+
     private var subtitle: String {
         [signal?.siteLabel, signal?.operator, signal?.frequency]
             .compactMap { $0 }
@@ -110,10 +121,8 @@ struct ValidationCardView: View {
         var parts: [String] = []
         // Ce qui a été identifié (eNB / gNB / PCI / cellule).
         if signal?.identifierType != nil { parts.append("Type \(identifierTileLabel)") }
-        // Méthode : auto-identifiée ou déclarée manuellement.
-        if let src = signal?.identifierSource?.lowercased() {
-            parts.append(src == "auto" ? "Auto" : "Manuel")
-        }
+        // Méthode : auto-identifiée, déclarée manuellement, ou importée.
+        if let method = identifierMethodLabel { parts.append(method) }
         if let sectors = signal?.sectors, !sectors.isEmpty {
             parts.append("Secteurs " + sectors.prefix(3).map(String.init).joined(separator: " / "))
         }
