@@ -207,6 +207,7 @@ struct SocialSignalSummary: Codable, Equatable {
     let siteLabel: String?
     let identifierType: String?
     let identifierValue: String?
+    let identifierSource: String?
     let validationCount: Int?
     let frequency: String?
     let earfcn: Int?
@@ -218,7 +219,7 @@ struct SocialSignalSummary: Codable, Equatable {
     let longitude: Double?
 
     enum CodingKeys: String, CodingKey {
-        case type, technology, rsrp, rsrq, sinr, band, cellId, pci, city, capturedAt, downloadMbps, uploadMbps, pingMs, jitterMs, maxDownloadMbps, distanceMeters, durationSeconds, detectedTechs, averageSignalDbm, minSignalDbm, maxSignalDbm, pointsCount, siteLabel, identifierType, identifierValue, validationCount, frequency, earfcn, arfcn, sectors, deviceModel, serverName, latitude, longitude
+        case type, technology, rsrp, rsrq, sinr, band, cellId, pci, city, capturedAt, downloadMbps, uploadMbps, pingMs, jitterMs, maxDownloadMbps, distanceMeters, durationSeconds, detectedTechs, averageSignalDbm, minSignalDbm, maxSignalDbm, pointsCount, siteLabel, identifierType, identifierValue, identifierSource, validationCount, frequency, earfcn, arfcn, sectors, deviceModel, serverName, latitude, longitude
         case `operator` = "operator"
     }
 
@@ -250,6 +251,7 @@ struct SocialSignalSummary: Codable, Equatable {
         siteLabel = try c.decodeIfPresent(String.self, forKey: .siteLabel)
         identifierType = try c.decodeIfPresent(String.self, forKey: .identifierType)
         identifierValue = c.decodeFlexibleString(forKey: .identifierValue)
+        identifierSource = try c.decodeIfPresent(String.self, forKey: .identifierSource)
         validationCount = try c.decodeIfPresent(Int.self, forKey: .validationCount)
         frequency = c.decodeFlexibleString(forKey: .frequency)
         earfcn = try c.decodeIfPresent(Int.self, forKey: .earfcn)

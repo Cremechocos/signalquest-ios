@@ -46,7 +46,7 @@ struct ValidationCardView: View {
                 // Tuile mise en avant en accent brique (DA), pas en couleur techno.
                 LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
                     CardMetricTile(
-                        label: "Ident.",
+                        label: identifierTileLabel,
                         value: signal?.identifierValue ?? signal?.cellId ?? "—",
                         highlight: true
                     )
@@ -89,6 +89,17 @@ struct ValidationCardView: View {
         Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: 4)
     }
 
+    /// Libellé de la tuile identifiant selon le type d'identification.
+    private var identifierTileLabel: String {
+        switch signal?.identifierType?.lowercased() {
+        case "enb": return "eNB"
+        case "gnb": return "gNB"
+        case "pci": return "PCI"
+        case "cellid", "ci": return "Cell"
+        default: return "Ident."
+        }
+    }
+
     private var subtitle: String {
         [signal?.siteLabel, signal?.operator, signal?.frequency]
             .compactMap { $0 }
@@ -97,7 +108,12 @@ struct ValidationCardView: View {
 
     private var footer: String? {
         var parts: [String] = []
-        if let type = signal?.identifierType { parts.append("Type \(type.uppercased())") }
+        // Ce qui a été identifié (eNB / gNB / PCI / cellule).
+        if signal?.identifierType != nil { parts.append("Type \(identifierTileLabel)") }
+        // Méthode : auto-identifiée ou déclarée manuellement.
+        if let src = signal?.identifierSource?.lowercased() {
+            parts.append(src == "auto" ? "Auto" : "Manuel")
+        }
         if let sectors = signal?.sectors, !sectors.isEmpty {
             parts.append("Secteurs " + sectors.prefix(3).map(String.init).joined(separator: " / "))
         }
