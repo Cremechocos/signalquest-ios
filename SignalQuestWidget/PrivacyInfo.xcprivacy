@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Manifeste propre à l'extension widget. Apple exige une déclaration par
+	  bundle : celui de l'app hôte ne couvre pas l'extension.
+
+	  Le widget ne collecte AUCUNE donnée : il se contente de lire les
+	  instantanés déposés par l'app dans l'App Group (WidgetSharedStore, compilé
+	  dans les deux cibles — cf. project.yml). Il n'a ni réseau, ni localisation,
+	  ni dépendance SDK.
+	-->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<!-- 1C8F.1 = UserDefaults partagés avec les autres membres de l'App
+		     Group. C'est le seul accès à API à raison requise du widget. -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>1C8F.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

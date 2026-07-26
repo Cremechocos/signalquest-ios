@@ -8,12 +8,31 @@
 	<array/>
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
+		<!-- CA92.1 = défauts propres à l'app (verrouillage, fond de carte,
+		     filtres carte…). 1C8F.1 = défauts partagés via l'App Group, lus et
+		     écrits par WidgetSharedStore pour alimenter le widget
+		     (WidgetSharedStore.swift:138). CA92.1 seul ne couvre PAS ce second
+		     cas et la déclaration était donc incomplète. -->
 		<dict>
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
 				<string>CA92.1</string>
+				<string>1C8F.1</string>
+			</array>
+		</dict>
+		<!-- DiskCache.evict() lit .contentModificationDateKey et .fileSizeKey
+		     pour l'éviction par âge et par taille, sur des fichiers du dossier
+		     Caches de l'app (DiskCache.swift:21,83). C617.1 = fichiers situés
+		     dans le conteneur de l'app. Ni DiskSpace ni SystemBootTime ne sont
+		     déclarés : aucune API correspondante dans le code (vérifié). -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
 			</array>
 		</dict>
 	</array>

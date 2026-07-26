@@ -55,6 +55,13 @@ targets:
         CODE_SIGN_ENTITLEMENTS: SignalQuestApp/SignalQuest.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_USER_SCRIPT_SANDBOXING: YES
+        # Info.plist référence $(MARKETING_VERSION) / $(CURRENT_PROJECT_VERSION) :
+        # sans ces réglages, toute archive porterait 1.0 (1) en dur et App Store
+        # Connect refuserait le 2e upload. DOIVENT rester alignés sur ceux de
+        # SignalQuestWidget — Apple rejette une extension dont la version diffère
+        # de l'app hôte.
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
       configs:
         Staging:
           PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.beta
@@ -62,6 +69,17 @@ targets:
       - name: Validate Build Environment
         path: ci_scripts/validate_build_environment.sh
         basedOnDependencyAnalysis: false
+    postBuildScripts:
+      # Sans upload des dSYM, les rapports Crashlytics arrivent non symbolisés
+      # (adresses mémoire au lieu de noms de fonctions) et sont inexploitables.
+      # Phase de FIN de build (et non postCompile) : les dSYM et l'Info.plist
+      # traité n'existent qu'à ce moment — les déclarer en entrée d'une phase
+      # antérieure crée un cycle de dépendances.
+      - name: Upload Crashlytics dSYM
+        path: ci_scripts/upload_crashlytics_dsym.sh
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(SRCROOT)/SignalQuestApp/GoogleService-Info.plist
     dependencies:
       - package: LiveKit
         product: LiveKit
@@ -84,6 +102,12 @@ targets:
     deploymentTarget: "16.0"
     sources:
       - path: SignalQuestWidget
+        excludes:
+          - PrivacyInfo.xcprivacy
+      # Manifeste de confidentialité PROPRE à l'extension : Apple en exige un par
+      # bundle, celui de l'app hôte ne couvre pas le widget.
+      - path: SignalQuestWidget/PrivacyInfo.xcprivacy
+        buildPhase: resources
       - path: SignalQuestApp/Core/Shared/WidgetSharedStore.swift
     configFiles:
       Debug: Config/Debug.xcconfig
@@ -93,6 +117,12 @@ targets:
       path: SignalQuestWidget/Info.plist
       properties:
         CFBundleDisplayName: SignalQuest
+        # XcodeGen écrit sinon les littéraux "1.0"/"1" dans le plist généré, et
+        # les MARKETING_VERSION/CURRENT_PROJECT_VERSION ci-dessous n'ont alors
+        # AUCUN effet : l'extension resterait en 1.0 (1) pendant que l'app hôte
+        # s'incrémente, ce qu'App Store Connect refuse.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

@@ -25,6 +25,7 @@
 		0F93CA162732A4E9F82EC1AF /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD246E248AC961551013A82C /* Haptics.swift */; };
 		14EAB8C4698346A19781589C /* Figtree-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 06CBBB2A485EB0E8C6DC23BB /* Figtree-Medium.ttf */; };
 		15606EDE03FC5483778DB980 /* ModelDecodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6FFA250C4BE27D4200678E2 /* ModelDecodeTests.swift */; };
+		1591CF282E326D5ACDBAFC78 /* RatingCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 315ABFF13D89760B78440BEC /* RatingCardView.swift */; };
 		15D675F950421D2AD863EED6 /* CommentsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26BF4AF46D1515F881E4DF50 /* CommentsService.swift */; };
 		1634EFD5E0F2C9E8D7DDC258 /* SectorNumberingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CC2679B071BC850638B4DB5 /* SectorNumberingTests.swift */; };
 		1642DC7B7E50D2260F79770D /* SQColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 522FEF871CE53739FE2CB92C /* SQColors.swift */; };
@@ -42,6 +43,7 @@
 		1EF63FFE668545D35C37E403 /* MyMeasurementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA556BEE2D1EA6BAA5FB0800 /* MyMeasurementsView.swift */; };
 		2178A64BBFDCF36192FACCD4 /* AppleDeviceDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F5CFE5CCBA408F62BDCC840 /* AppleDeviceDescriptor.swift */; };
 		223A9CEC6280B585F98FB578 /* AntennaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DA025CCAC0DF6A4A8AD5A6E /* AntennaModels.swift */; };
+		244EC68604DEEC5E82995E8E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 420C779CFB15C46F531F88B0 /* PrivacyInfo.xcprivacy */; };
 		2516E3C8A6050766B3839034 /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55CF1B9AC2B2537FE31D0FED /* SignupView.swift */; };
 		252D00D6A738321EA3312FBA /* MessagesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6C44B8774426189E2CBF50 /* MessagesService.swift */; };
 		254F77D0681DD6680DA80000 /* SignalQuestApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F46B89349A48401E7563977C /* SignalQuestApp.swift */; };
@@ -55,7 +57,6 @@
 		2A75C227B62E74818271FE0A /* E2EEService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */; };
 		2AE3D8AFA78A50D3114E392A /* PhotoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2F641884A080F0EC459B546 /* PhotoService.swift */; };
 		2B0A8A353E00456F4887BBEC /* ValidationCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B0A1DB2B40E7DCA6398C55 /* ValidationCardView.swift */; };
-		FEEDDA7180C0FFEE00000001 /* RatingCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDDA7180C0FFEE00000002 /* RatingCardView.swift */; };
 		2B4D7DDADD39133279E1C8E9 /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DBC54E804678243BC1BCC4C /* AuthModels.swift */; };
 		2EAA4923F615CB18816D9FD3 /* TwoFactorSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BA27C4F6CA354680172A364 /* TwoFactorSetupView.swift */; };
 		30311E763161242DA4BEC7EB /* MarketRegistryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57FDE918733D1625D560F628 /* MarketRegistryModels.swift */; };
@@ -95,6 +96,7 @@
 		52F6F1D7A3BCF1650C6BEEF5 /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 389490B290AB8281D5C364D0 /* AppServices.swift */; };
 		53124BA53C789E7595979D54 /* ReportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5886D2D8C4F18B7D0DE4C671 /* ReportSheet.swift */; };
 		533BA2C52C7A4CAEE52B0251 /* RadioLogImportsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EC0989C8E515CED280D87E0 /* RadioLogImportsViewModel.swift */; };
+		53C2F8D7E0BE624F1C800C35 /* CrashHardeningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 067D3AF65AE57675EBBE798B /* CrashHardeningTests.swift */; };
 		543116391555BF3BE77EDA7F /* LeaderboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 554B78FC0A0A68C411BAD689 /* LeaderboardModels.swift */; };
 		56EC777B107E81B428F7F1B5 /* ValidationsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 885DAE78D34639CBB592A710 /* ValidationsService.swift */; };
 		572D48910C58A33FE265B57B /* IdentificationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D89B6EA883CAE3151D38ABEB /* IdentificationModels.swift */; };
@@ -302,6 +304,7 @@
 		0412AAD8AE4FABC8AFE66ADE /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		0447B79F47CDC0258E0BEA27 /* SQFont.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQFont.swift; sourceTree = "<group>"; };
 		057F3D0D16C169E912292708 /* AppStoreSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreSyncTests.swift; sourceTree = "<group>"; };
+		067D3AF65AE57675EBBE798B /* CrashHardeningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashHardeningTests.swift; sourceTree = "<group>"; };
 		06CBBB2A485EB0E8C6DC23BB /* Figtree-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-Medium.ttf"; sourceTree = "<group>"; };
 		0B9B5640F38ED77C1C34D499 /* CoverageRenderPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageRenderPolicyTests.swift; sourceTree = "<group>"; };
 		0BBEF6D66A51142E104DBD6B /* SignalQuestUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SignalQuestUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -341,6 +344,7 @@
 		2FB22F5DE6B092A44B9F7A91 /* SQRadius.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQRadius.swift; sourceTree = "<group>"; };
 		30EFB586826CF2A6A011E18D /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
 		3132D23393CBFB7001BC1C1D /* SectorNumbering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectorNumbering.swift; sourceTree = "<group>"; };
+		315ABFF13D89760B78440BEC /* RatingCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingCardView.swift; sourceTree = "<group>"; };
 		3208FA15F4116CDD6FB4BF47 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3300B0156FFEE46C1CC81882 /* AppLockController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLockController.swift; sourceTree = "<group>"; };
 		342AD252F576AA2664A4C655 /* SQBrand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQBrand.swift; sourceTree = "<group>"; };
@@ -355,13 +359,13 @@
 		3CD01567054707A140E2FCA3 /* MapModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapModels.swift; sourceTree = "<group>"; };
 		3E2756E12B4DD8420E4E6FC4 /* GroupSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupSettingsView.swift; sourceTree = "<group>"; };
 		413FB8DE8180198C52ED7167 /* SessionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsService.swift; sourceTree = "<group>"; };
+		420C779CFB15C46F531F88B0 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		42D4BA9134FD958EE6A2E58F /* AntennaSectorGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaSectorGeometry.swift; sourceTree = "<group>"; };
 		448DCE616E7442994EA5AED7 /* SpeedtestCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestCardView.swift; sourceTree = "<group>"; };
 		469A66A89495AAE04EF039F3 /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
 		4710561B73DB096826FAEEDE /* PresenceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresenceModels.swift; sourceTree = "<group>"; };
 		4841F25C76693497780EE838 /* CommentsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsSheet.swift; sourceTree = "<group>"; };
 		48B0A1DB2B40E7DCA6398C55 /* ValidationCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationCardView.swift; sourceTree = "<group>"; };
-		FEEDDA7180C0FFEE00000002 /* RatingCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingCardView.swift; sourceTree = "<group>"; };
 		4A30FBE643735E6E375B3948 /* NewModelDecodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewModelDecodeTests.swift; sourceTree = "<group>"; };
 		4A392F27A37DB201C942F22D /* MessageSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageSyncEngine.swift; sourceTree = "<group>"; };
 		4C859D91AFCEFBFEE4E43C47 /* ANFRModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRModels.swift; sourceTree = "<group>"; };
@@ -1024,10 +1028,10 @@
 				1F4F7435470D7B186E080C8E /* FeedItemCard.swift */,
 				763622AD001158FA3157D839 /* PhotoCardView.swift */,
 				BA923675E56186A1BD8D5B7F /* PostCardView.swift */,
+				315ABFF13D89760B78440BEC /* RatingCardView.swift */,
 				F21195FC7BA83172FF32A3CC /* SignalFormatters.swift */,
 				448DCE616E7442994EA5AED7 /* SpeedtestCardView.swift */,
 				48B0A1DB2B40E7DCA6398C55 /* ValidationCardView.swift */,
-				FEEDDA7180C0FFEE00000002 /* RatingCardView.swift */,
 			);
 			path = Cards;
 			sourceTree = "<group>";
@@ -1117,6 +1121,7 @@
 				1B7D91FD53A512C0A154BCFB /* AutoRefreshTests.swift */,
 				B070C4F0FF01A239CDF93570 /* CallReliabilityTests.swift */,
 				0B9B5640F38ED77C1C34D499 /* CoverageRenderPolicyTests.swift */,
+				067D3AF65AE57675EBBE798B /* CrashHardeningTests.swift */,
 				1483D87FE8E1D946F88F7C05 /* E2EETests.swift */,
 				F23ED8BD3711812342EC5C19 /* EntitlementsTests.swift */,
 				74CF7E1DDA21B03198307ED6 /* Info.plist */,
@@ -1148,6 +1153,7 @@
 			children = (
 				6B56E287237E42CD44965DC6 /* Info.plist */,
 				8A4F1A6B2D39931723BEF026 /* NetworkWidget.swift */,
+				420C779CFB15C46F531F88B0 /* PrivacyInfo.xcprivacy */,
 				AD8048DF32A4922952CF4D9B /* SignalQuestWidget.entitlements */,
 				9E54BD3EC5237CAE037E9ABB /* SignalQuestWidgetBundle.swift */,
 				688909AB965601A75F6DC348 /* SpeedtestControl.swift */,
@@ -1274,6 +1280,7 @@
 				F02B3DC4F972A46E5907DC8D /* Resources */,
 				095C7997E533FDC4D69340AA /* Frameworks */,
 				7C68F404F72BA28EAD35527B /* Embed Foundation Extensions */,
+				5416E7D8A46C396DA18282B4 /* Upload Crashlytics dSYM */,
 			);
 			buildRules = (
 			);
@@ -1295,6 +1302,7 @@
 			buildConfigurationList = 13BA843E14C017BF108433A3 /* Build configuration list for PBXNativeTarget "SignalQuestWidget" */;
 			buildPhases = (
 				C31F0296FBF82F0099AD3F88 /* Sources */,
+				1F73117D53E5D98760DC53AD /* Resources */,
 			);
 			buildRules = (
 			);
@@ -1380,6 +1388,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		1F73117D53E5D98760DC53AD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				244EC68604DEEC5E82995E8E /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F02B3DC4F972A46E5907DC8D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1401,6 +1417,26 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		5416E7D8A46C396DA18282B4 /* Upload Crashlytics dSYM */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/SignalQuestApp/GoogleService-Info.plist",
+			);
+			name = "Upload Crashlytics dSYM";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "#!/bin/sh\n\n# Téléverse les symboles de debug (dSYM) vers Crashlytics après compilation.\n#\n# Sans cette étape, les rapports de crash arrivent NON SYMBOLISÉS : on obtient\n# des adresses mémoire au lieu de noms de fonctions, ce qui les rend\n# inexploitables. C'est l'oubli classique d'une intégration Crashlytics.\n#\n# Le script est volontairement tolérant : il sort en succès (avec un warning\n# visible dans le log de build) plutôt que de casser le build quand les\n# conditions ne sont pas réunies. Un contributeur sans `GoogleService-Info.plist`\n# — le fichier est gitignoré, cf. AppDelegate — doit pouvoir compiler.\n\nset -eu\n\nconfiguration=\"${CONFIGURATION:-}\"\n\nskip() {\n  echo \"warning: upload dSYM Crashlytics ignoré — $*\"\n  exit 0\n}\n\n# Debug produit `dwarf` sans bundle dSYM (cf. DEBUG_INFORMATION_FORMAT) : rien à\n# téléverser, et on évite un appel réseau à chaque compilation locale.\n[ \"$configuration\" != \"Debug\" ] || exit 0\n\nplist=\"${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist\"\n[ -f \"$plist\" ] || skip \"GoogleService-Info.plist absent\"\n\n# Le SDK est résolu par SwiftPM ; son emplacement dérive de BUILD_DIR.\nrun=\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\n[ -x \"$run\" ] || skip \"script Crashlytics introuvable ($run)\"\n\ndsym=\"${DWARF_DSYM_FOLDER_PATH:-}/${DWARF_DSYM_FILE_NAME:-}\"\n[ -d \"$dsym\" ] || skip \"bundle dSYM introuvable ($dsym)\"\n\n\"$run\" -gsp \"$plist\"\necho \"dSYM Crashlytics téléversés ($configuration).\"\n";
+		};
 		B222421102940D0D56C87D7C /* Validate Build Environment */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -1418,7 +1454,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "#!/bin/sh\n\n# Fail closed when a Beta points to production or when a distribution build\n# still contains placeholder staging services. Xcode invokes this as a build\n# phase; it can also be called directly with build-setting overrides.\n\nset -eu\n\nconfiguration=\"${CONFIGURATION:-}\"\nenvironment=\"${SQ_ENVIRONMENT:-}\"\nbundle_id=\"${PRODUCT_BUNDLE_IDENTIFIER:-}\"\n\nfail() {\n  echo \"error: SignalQuest environment validation failed: $*\" >&2\n  exit 1\n}\n\nurl_host() {\n  printf '%s' \"$1\" | sed -E 's#^[A-Za-z][A-Za-z0-9+.-]*://([^/:]+).*$#\\1#' | tr '[:upper:]' '[:lower:]'\n}\n\nis_production_host() {\n  case \"$1\" in\n    signalquest.fr|api.signalquest.fr) return 0 ;;\n    *) return 1 ;;\n  esac\n}\n\nvalidate_url() {\n  key=\"$1\"\n  value=\"$2\"\n  [ -n \"$value\" ] || fail \"$key is empty\"\n  host=\"$(url_host \"$value\")\"\n  [ -n \"$host\" ] || fail \"$key is not an absolute URL\"\n\n  if [ \"$environment\" = \"staging\" ]; then\n    is_production_host \"$host\" && fail \"$key points to production ($host)\"\n    case \"$host\" in\n      *.invalid) [ \"${SQ_ALLOW_PLACEHOLDER_STAGING:-NO}\" = \"YES\" ] || fail \"$key still uses placeholder host $host\" ;;\n    esac\n  fi\n}\n\ncase \"$configuration\" in\n  Staging)\n    [ \"$environment\" = \"staging\" ] || fail \"Staging configuration must set SQ_ENVIRONMENT=staging\"\n    [ \"$bundle_id\" = \"fr.signalquest.ios.beta\" ] || fail \"Staging bundle identifier must be fr.signalquest.ios.beta\"\n    ;;\n  Release)\n    [ \"$environment\" = \"production\" ] || fail \"Release configuration must set SQ_ENVIRONMENT=production\"\n    [ \"$bundle_id\" = \"fr.signalquest.ios\" ] || fail \"Release bundle identifier must be fr.signalquest.ios\"\n    ;;\n  Debug)\n    [ \"$environment\" = \"development\" ] || fail \"Debug configuration must set SQ_ENVIRONMENT=development\"\n    ;;\nesac\n\nvalidate_url SQ_APP_BASE_URL \"${SQ_APP_BASE_URL:-}\"\nvalidate_url SQ_API_BASE_URL \"${SQ_API_BASE_URL:-}\"\n\nif [ \"$environment\" = \"staging\" ] && [ -f \"${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist\" ]; then\n  firebase_bundle=\"$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' \"${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist\" 2>/dev/null || true)\"\n  [ \"$firebase_bundle\" = \"$bundle_id\" ] || fail \"Firebase BUNDLE_ID does not match the Beta bundle identifier\"\nfi\n\necho \"SignalQuest environment validation passed ($configuration/$environment).\"\n";
+			shellScript = "#!/bin/sh\n\n# Fail closed when a Beta points to production or when a distribution build\n# still contains placeholder staging services. Xcode invokes this as a build\n# phase; it can also be called directly with build-setting overrides.\n\nset -eu\n\nconfiguration=\"${CONFIGURATION:-}\"\nenvironment=\"${SQ_ENVIRONMENT:-}\"\nbundle_id=\"${PRODUCT_BUNDLE_IDENTIFIER:-}\"\n\nfail() {\n  echo \"error: SignalQuest environment validation failed: $*\" >&2\n  exit 1\n}\n\nurl_host() {\n  printf '%s' \"$1\" | sed -E 's#^[A-Za-z][A-Za-z0-9+.-]*://([^/:]+).*$#\\1#' | tr '[:upper:]' '[:lower:]'\n}\n\nis_production_host() {\n  case \"$1\" in\n    signalquest.fr|api.signalquest.fr) return 0 ;;\n    *) return 1 ;;\n  esac\n}\n\nvalidate_url() {\n  key=\"$1\"\n  value=\"$2\"\n  [ -n \"$value\" ] || fail \"$key is empty\"\n  host=\"$(url_host \"$value\")\"\n  [ -n \"$host\" ] || fail \"$key is not an absolute URL\"\n\n  if [ \"$environment\" = \"staging\" ]; then\n    is_production_host \"$host\" && fail \"$key points to production ($host)\"\n    case \"$host\" in\n      *.invalid) [ \"${SQ_ALLOW_PLACEHOLDER_STAGING:-NO}\" = \"YES\" ] || fail \"$key still uses placeholder host $host\" ;;\n    esac\n  fi\n}\n\ncase \"$configuration\" in\n  Staging)\n    [ \"$environment\" = \"staging\" ] || fail \"Staging configuration must set SQ_ENVIRONMENT=staging\"\n    [ \"$bundle_id\" = \"fr.signalquest.ios.beta\" ] || fail \"Staging bundle identifier must be fr.signalquest.ios.beta\"\n    ;;\n  Release)\n    [ \"$environment\" = \"production\" ] || fail \"Release configuration must set SQ_ENVIRONMENT=production\"\n    [ \"$bundle_id\" = \"fr.signalquest.ios\" ] || fail \"Release bundle identifier must be fr.signalquest.ios\"\n    ;;\n  Debug)\n    [ \"$environment\" = \"development\" ] || fail \"Debug configuration must set SQ_ENVIRONMENT=development\"\n    ;;\nesac\n\nvalidate_url SQ_APP_BASE_URL \"${SQ_APP_BASE_URL:-}\"\nvalidate_url SQ_API_BASE_URL \"${SQ_API_BASE_URL:-}\"\n\n# --- Garde-fou anti-récidive sur le code QA (SECURITY-04) -------------------\n# Un binaire de distribution ne doit contenir ni jeu de démonstration (URLs S3\n# et identifiants de photos de PRODUCTION, amis fictifs) ni lecture d'argument\n# de lancement hors des accesseurs gardés d'AppEnvironment. Deux invariants,\n# vérifiés sur les sources parce qu'ils sont structurels et donc stables :\n#   1. `ProcessInfo.processInfo.arguments` et le préfixe `--qa-` n'existent que\n#      dans AppEnvironment.swift, où ils sont derrière #if DEBUG ;\n#   2. aucune URL S3 hors d'une région #if DEBUG.\nif [ \"$configuration\" != \"Debug\" ]; then\n  sources=\"${SRCROOT:-.}/SignalQuestApp\"\n\n  # `code_hits` ignore les lignes de commentaire : documenter un drapeau dans un\n  # doc-comment est légitime, seul le code compilé compte.\n  code_hits() {\n    grep -rn \"$1\" \"$sources\" --include='*.swift' 2>/dev/null \\\n      | grep -v '^[^:]*/AppEnvironment\\.swift:' \\\n      | awk -F: '{ line=$0; sub(/^[^:]*:[0-9]+:[[:space:]]*/, \"\", line); if (line !~ /^(\\/\\/|\\*|\\/\\*)/) print $1 \":\" $2 }' \\\n      || true\n  }\n\n  strays=\"$(code_hits 'ProcessInfo\\.processInfo\\.arguments')\"\n  [ -z \"$strays\" ] || fail \"lecture d'arguments de lancement hors AppEnvironment : $(echo \"$strays\" | tr '\\n' ' ')\"\n\n  strays=\"$(code_hits '\"--qa-')\"\n  [ -z \"$strays\" ] || fail \"drapeau --qa- référencé dans du code hors AppEnvironment : $(echo \"$strays\" | tr '\\n' ' ')\"\n\n  # Suit l'imbrication des directives pour ne signaler que ce qui est réellement\n  # compilé en distribution (le corps d'un #else de #if DEBUG en fait partie).\n  leaks=\"$(find \"$sources\" -name '*.swift' -exec awk '\n    /^[[:space:]]*#if[[:space:]]+DEBUG/ { stack[++d]=\"D\"; next }\n    /^[[:space:]]*#if/                  { stack[++d]=\"O\"; next }\n    /^[[:space:]]*#else/                { if (d>0 && stack[d]==\"D\") stack[d]=\"E\"; next }\n    /^[[:space:]]*#endif/               { if (d>0) d--; next }\n    {\n      inDebug=0\n      for (i=1;i<=d;i++) if (stack[i]==\"D\") inDebug=1\n      if (!inDebug && $0 ~ /s3\\.signalquest\\.fr/) print FILENAME \":\" FNR\n    }' {} + 2>/dev/null || true)\"\n  [ -z \"$leaks\" ] || fail \"URL S3 de production hors #if DEBUG : $(echo \"$leaks\" | tr '\\n' ' ')\"\nfi\n\nif [ \"$environment\" = \"staging\" ] && [ -f \"${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist\" ]; then\n  firebase_bundle=\"$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' \"${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist\" 2>/dev/null || true)\"\n  [ \"$firebase_bundle\" = \"$bundle_id\" ] || fail \"Firebase BUNDLE_ID does not match the Beta bundle identifier\"\nfi\n\necho \"SignalQuest environment validation passed ($configuration/$environment).\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -1555,6 +1591,7 @@
 				FE32E50F866E4FBC518B9120 /* RadioLogImportStore.swift in Sources */,
 				81468AFF5A5E22F90CD47B5A /* RadioLogImportView.swift in Sources */,
 				533BA2C52C7A4CAEE52B0251 /* RadioLogImportsViewModel.swift in Sources */,
+				1591CF282E326D5ACDBAFC78 /* RatingCardView.swift in Sources */,
 				5F15D1940A0B15ACFD423499 /* ReactionPicker.swift in Sources */,
 				07937E7527A350188D085CA8 /* RemindersView.swift in Sources */,
 				D7A64FBC491AB29258026F4B /* RemoteImage.swift in Sources */,
@@ -1616,7 +1653,6 @@
 				8EDEC985C78861A0BFE4ED1A /* UserProfileView.swift in Sources */,
 				AFCD275D5C3626EAD024EB7B /* UserService.swift in Sources */,
 				2B0A8A353E00456F4887BBEC /* ValidationCardView.swift in Sources */,
-				FEEDDA7180C0FFEE00000001 /* RatingCardView.swift in Sources */,
 				523BC877CFAB8928A813BF37 /* ValidationModels.swift in Sources */,
 				56EC777B107E81B428F7F1B5 /* ValidationsService.swift in Sources */,
 				E4D3352BEA88542E42F96E7B /* ValidationsSheet.swift in Sources */,
@@ -1654,6 +1690,7 @@
 				5F7AF0A6DEEB9A788A1199E7 /* AutoRefreshTests.swift in Sources */,
 				989DD213B201095FFA84F05D /* CallReliabilityTests.swift in Sources */,
 				59319D5732AB2088D06F5F8D /* CoverageRenderPolicyTests.swift in Sources */,
+				53C2F8D7E0BE624F1C800C35 /* CrashHardeningTests.swift in Sources */,
 				A9AA093F88B7A4E23A7EE3A7 /* E2EETests.swift in Sources */,
 				4EA76BC1BEB2621F9B74C6ED /* EntitlementsTests.swift in Sources */,
 				5BB7F333FAEBC17CD67A33C2 /* MapFilterStoreTests.swift in Sources */,
@@ -1858,12 +1895,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestApp/SignalQuest.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios.beta;
 				PRODUCT_NAME = SignalQuest;
 				SDKROOT = iphoneos;
@@ -1977,12 +2016,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestApp/SignalQuest.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios;
 				PRODUCT_NAME = SignalQuest;
 				SDKROOT = iphoneos;
@@ -2033,12 +2074,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestApp/SignalQuest.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios;
 				PRODUCT_NAME = SignalQuest;
 				SDKROOT = iphoneos;

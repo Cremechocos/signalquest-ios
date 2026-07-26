@@ -1,5 +1,6 @@
 import UIKit
 import SwiftUI
+import os
 import FirebaseCore
 import FirebaseMessaging
 
@@ -14,9 +15,24 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     // le service vit le temps de l'app (détenu par AppServices), aucun cycle.
     static var sharedE2EE: E2EEServicing?
 
+    /// `GoogleService-Info.plist` est volontairement gitignoré (dépôt public ;
+    /// il est réinjecté par `ci_scripts/ci_post_clone.sh` sur Xcode Cloud). Sur
+    /// un clone frais, `FirebaseApp.configure()` lève une exception Objective-C
+    /// non rattrapable en Swift : l'app crashait au lancement avant même
+    /// d'afficher un écran. On dégrade donc proprement — push et Crashlytics
+    /// inopérants, tout le reste fonctionne.
+    private(set) static var isFirebaseConfigured = false
+
+    private static let logger = Logger(subsystem: "fr.signalquest.ios", category: "firebase")
+
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        guard Bundle.main.url(forResource: "GoogleService-Info", withExtension: "plist") != nil else {
+            Self.logger.error("GoogleService-Info.plist absent : Firebase désactivé (push et Crashlytics inopérants).")
+            return true
+        }
         FirebaseApp.configure()
+        Self.isFirebaseConfigured = true
         // FCM remonte le token de registration via MessagingDelegate ci-dessous.
         Messaging.messaging().delegate = self
         return true
@@ -46,6 +62,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // On transmet le token APNs à FCM, qui en dérive le token de registration
         // FCM (le seul que le backend sait utiliser via firebase-admin). Le token
         // FCM remonte ensuite via `messaging(_:didReceiveRegistrationToken:)`.
+        // `Messaging.messaging()` exige une app Firebase par défaut : sans plist,
+        // l'appel serait fatal (cf. `isFirebaseConfigured`).
+        guard Self.isFirebaseConfigured else { return }
         Messaging.messaging().apnsToken = deviceToken
     }
 
