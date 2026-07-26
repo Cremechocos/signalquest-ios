@@ -931,6 +931,9 @@ private struct LevelPill: View {
             .padding(.vertical, 3)
             .background(SQColor.accentSoft, in: Capsule(style: .continuous))
             .foregroundStyle(SQColor.brandRed)
+            // Ancre stable : la refonte est passée de « NIV. » à « Niv. » et le
+            // test UI matchait la casse d'origine.
+            .accessibilityIdentifier("leaderboard.levelPill")
     }
 }
 

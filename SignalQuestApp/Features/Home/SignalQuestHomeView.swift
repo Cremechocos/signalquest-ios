@@ -231,6 +231,7 @@ struct SignalQuestHomeView: View {
     private var actionsGrid: some View {
         LazyVGrid(columns: gridColumns, spacing: 14) {
             actionTile(
+                identifier: "speedtest",
                 title: "Tester",
                 subtitle: "Débit & latence en 30 s",
                 systemImage: "speedometer",
@@ -238,18 +239,21 @@ struct SignalQuestHomeView: View {
             ) { router.selectedTab = .speed }
 
             actionTile(
+                identifier: "map",
                 title: "Carte",
                 subtitle: "Antennes & couverture",
                 systemImage: "map"
             ) { router.selectedTab = .map }
 
             actionTile(
+                identifier: "community",
                 title: "Communauté",
                 subtitle: "Fil, stories, entraide",
                 systemImage: "person.2"
             ) { router.selectedTab = .community }
 
             actionTile(
+                identifier: "messages",
                 title: "Messages",
                 subtitle: messagesSubtitle,
                 systemImage: "bubble.left.and.bubble.right",
@@ -265,6 +269,7 @@ struct SignalQuestHomeView: View {
     }
 
     private func actionTile(
+        identifier: String,
         title: String,
         subtitle: String,
         systemImage: String,
@@ -317,6 +322,9 @@ struct SignalQuestHomeView: View {
         }
         .buttonStyle(SQPressButtonStyle())
         .accessibilityLabel("\(title). \(subtitle)")
+        // Ancre STABLE pour les tests UI et pour la localisation à venir : le
+        // libellé visible change avec la DA et la langue, pas l'identifiant.
+        .accessibilityIdentifier("home.action.\(identifier)")
     }
 
     // MARK: Autour de toi — données communautaires proches

@@ -201,6 +201,9 @@ struct SpeedtestView: View {
                 }
 
                 historySection
+                    // La refonte a supprimé le titre « Historique » : l'ancre
+                    // remplace ce libellé pour les tests UI.
+                    .accessibilityIdentifier("speedtest.history")
             }
             .padding(.horizontal, SQSpace.lg)
             .padding(.top, SQSpace.sm)

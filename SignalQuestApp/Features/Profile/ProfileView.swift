@@ -105,6 +105,7 @@ struct ProfileView: View {
                     .font(SQFont.display(26, .bold))
                     .foregroundStyle(SQColor.label)
                     .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("profile.displayName")
                 Text(user.handle.flatMap { $0.isEmpty ? nil : "@\($0)" } ?? "Ajoute un nom d’utilisateur")
                     .font(SQFont.body(14, .medium))
                     .foregroundStyle((user.handle?.isEmpty ?? true) ? SQColor.labelTertiary : SQColor.labelSecondary)

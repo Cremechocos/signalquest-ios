@@ -106,12 +106,12 @@ final class SignalQuestUITests: XCTestCase {
             )
         }
 
-        XCTAssertTrue(app.navigationBars["Accueil"].waitForExistence(timeout: 10))
+        // L'Accueil n'a plus de navigationTitle depuis la refonte (en-tête
+        // custom) : on ancre sur la tuile d'action, dont l'identifiant est
+        // stable quel que soit le libellé ou la langue.
         XCTAssertTrue(
-            app.descendants(matching: .any)
-                .matching(NSPredicate(format: "label CONTAINS %@", "Tester maintenant"))
-                .firstMatch
-                .waitForExistence(timeout: 10)
+            app.descendants(matching: .any)["home.action.speedtest"]
+                .firstMatch.waitForExistence(timeout: 10)
         )
 
         SignalQuestUITestSupport.tab(named: "Carte", in: app).tap()
@@ -119,21 +119,21 @@ final class SignalQuestUITests: XCTestCase {
 
         SignalQuestUITestSupport.tab(named: "Tester", in: app).tap()
         XCTAssertTrue(app.buttons["Lancer le test"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Historique"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["speedtest.history"].firstMatch.exists)
 
         SignalQuestUITestSupport.tab(named: "Communauté", in: app).tap()
-        XCTAssertTrue(app.navigationBars["Communauté"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["feed.header"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["Messages"].exists)
 
         SignalQuestUITestSupport.tab(named: "Profil", in: app).tap()
-        XCTAssertTrue(app.staticTexts["SignalQuest iOS"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["profile.displayName"].firstMatch.waitForExistence(timeout: 10))
     }
 
     func testCommunityRendersMockedPost() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])
         SignalQuestUITestSupport.tab(named: "Communauté", in: app).tap()
-        XCTAssertTrue(app.navigationBars["Communauté"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["feed.header"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Speedtest iOS partagé depuis Paris. Radio détaillée indisponible sur iOS, mais débit et latence contribuent à la carte."].waitForExistence(timeout: 5))
     }
 
@@ -149,7 +149,7 @@ final class SignalQuestUITests: XCTestCase {
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])
         SignalQuestUITestSupport.tab(named: "Tester", in: app).tap()
         XCTAssertTrue(app.buttons["Lancer le test"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Historique"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["speedtest.history"].firstMatch.exists)
     }
 
     func testGuestCanExploreMapWithoutAccount() {
@@ -203,7 +203,7 @@ final class SignalQuestUITests: XCTestCase {
             XCTAssertTrue(tab.waitForExistence(timeout: 10), "Navigation \(name) absente en paysage")
             tab.tap()
         }
-        XCTAssertTrue(app.staticTexts["SignalQuest iOS"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["profile.displayName"].firstMatch.waitForExistence(timeout: 10))
     }
 
     func testRealSpeedtestRunWithInjectedAuthToken() throws {
@@ -266,7 +266,7 @@ final class SignalQuestUITests: XCTestCase {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])
         SignalQuestUITestSupport.tab(named: "Profil", in: app).tap()
-        XCTAssertTrue(app.staticTexts["SignalQuest iOS"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["profile.displayName"].firstMatch.waitForExistence(timeout: 5))
 
         app.staticTexts["Photos"].tap()
         XCTAssertTrue(app.staticTexts["Photos"].waitForExistence(timeout: 5))
@@ -290,9 +290,7 @@ final class SignalQuestUITests: XCTestCase {
 
         // Onglet Points : pastilles de niveau dans les rangées du classement.
         app.buttons["Points"].tap()
-        let levelBadge = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label CONTAINS 'NIV.'"))
-            .firstMatch
+        let levelBadge = app.descendants(matching: .any)["leaderboard.levelPill"].firstMatch
         XCTAssertTrue(levelBadge.waitForExistence(timeout: 5))
         let pointsShot = XCTAttachment(screenshot: app.screenshot())
         pointsShot.name = "Leaderboards — onglet Points"

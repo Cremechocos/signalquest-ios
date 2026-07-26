@@ -57,7 +57,7 @@ final class FluidityQATests: XCTestCase {
         let community = SignalQuestUITestSupport.tab(named: "Communauté", in: app)
         XCTAssertTrue(community.waitForExistence(timeout: 25))
         community.tap()
-        XCTAssertTrue(app.navigationBars["Communauté"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["feed.header"].firstMatch.waitForExistence(timeout: 10))
         measure(metrics: [XCTOSSignpostMetric.scrollDecelerationMetric, XCTCPUMetric(), XCTMemoryMetric()], options: measureOptions()) {
             startMeasuring()
             for _ in 0..<6 { app.swipeUp(velocity: .fast) }

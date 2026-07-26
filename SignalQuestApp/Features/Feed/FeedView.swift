@@ -620,6 +620,7 @@ struct FeedView: View {
                 .font(SQFont.display(26, .bold))
                 .foregroundStyle(SQColor.label)
                 .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("feed.header")
             Spacer(minLength: SQSpace.sm)
             headerButton(systemImage: "bubble.left.and.bubble.right", label: "Messages") {
                 showMessages = true
