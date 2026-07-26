@@ -13,7 +13,7 @@ final class SpeedtestShareQATests: XCTestCase {
         let app = XCUIApplication()
         app.launchEnvironment["SQ_AUTH_TOKEN"] = token
         app.launchArguments = ["--qa-speedtest-run"]
-        app.launch()
+        app.sqLaunch()
 
         let shareButton = app.buttons["Partager le résultat"]
         XCTAssertTrue(shareButton.waitForExistence(timeout: 90), "Le test ne s'est pas terminé / bouton Partager absent")

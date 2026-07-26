@@ -23,7 +23,7 @@ final class MessagingE2EEQATests: XCTestCase {
 
         let app = XCUIApplication()
         app.launchEnvironment["SQ_AUTH_TOKEN"] = token
-        app.launch()
+        app.sqLaunch()
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
 
         SignalQuestUITestSupport.openMessages(in: app)

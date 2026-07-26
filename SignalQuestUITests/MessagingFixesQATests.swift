@@ -12,7 +12,7 @@ final class MessagingFixesQATests: XCTestCase {
 
         let app = XCUIApplication()
         app.launchEnvironment["SQ_AUTH_TOKEN"] = token
-        app.launch()
+        app.sqLaunch()
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
 
         SignalQuestUITestSupport.openMessages(in: app)

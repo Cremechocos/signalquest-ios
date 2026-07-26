@@ -9,6 +9,9 @@ IPAD_DESTINATION="${SQ_IPAD_DESTINATION:-platform=iOS Simulator,name=iPad (A16)}
 RESULT_ROOT="${SQ_RESULT_ROOT:-$ROOT/build/quality-gates}"
 RUN_ID="${SQ_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
 DERIVED_DATA="${SQ_DERIVED_DATA:-$RESULT_ROOT/$RUN_ID/DerivedData}"
+# 'all' est le gate avant merge : il doit tout exécuter. 'debug' reste rapide
+# pour les boucles de développement.
+UI_SCOPE="${SQ_UI_SCOPE:-$([[ "$MODE" == "all" ]] && echo full || echo fast)}"
 
 case "$MODE" in
   debug|staging|release|all) ;;
@@ -36,7 +39,29 @@ mkdir -p "$RESULT_ROOT/$RUN_ID"
 
 run_debug() {
   local result="$RESULT_ROOT/$RUN_ID/Debug-P0.xcresult"
-  echo "== Debug: unitaires + parcours UI P0 sur iPhone =="
+  local -a scope_args=()
+
+  # SQ_UI_SCOPE=fast (défaut) : unitaires + la seule classe UI déterministe.
+  # SQ_UI_SCOPE=full : toute la suite UI. Les 7 classes gardées par
+  # XCTSkipUnless (SQ_AUTH_TOKEN, SQ_E2EE_PASSWORD…) se signalent alors comme
+  # « skipped » au lieu d'être invisibles — c'est le but : ne jamais laisser
+  # croire qu'on a couvert 12 fichiers quand on n'en exécute qu'un.
+  case "$UI_SCOPE" in
+    fast)
+      scope_args=(-only-testing:SignalQuestTests -only-testing:SignalQuestUITests/SignalQuestUITests)
+      echo "== Debug: unitaires + parcours UI P0 sur iPhone (scope=fast) =="
+      echo "   NOTE: 11 classes UI sur 12 ne sont PAS exécutées. SQ_UI_SCOPE=full pour la suite complète."
+      ;;
+    full)
+      scope_args=()
+      echo "== Debug: unitaires + suite UI complète sur iPhone (scope=full) =="
+      ;;
+    *)
+      echo "error: SQ_UI_SCOPE doit valoir 'fast' ou 'full' (reçu: $UI_SCOPE)" >&2
+      exit 2
+      ;;
+  esac
+
   xcodebuild test \
     -project "$ROOT/SignalQuest.xcodeproj" \
     -scheme SignalQuest \
@@ -46,8 +71,7 @@ run_debug() {
     -resultBundlePath "$result" \
     -enableCodeCoverage YES \
     -parallel-testing-enabled NO \
-    -only-testing:SignalQuestTests \
-    -only-testing:SignalQuestUITests/SignalQuestUITests \
+    ${scope_args[@]+"${scope_args[@]}"} \
     CODE_SIGNING_ALLOWED=NO
 
   echo "== Debug: rotation et navigation iPad =="

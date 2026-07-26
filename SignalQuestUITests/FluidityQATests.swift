@@ -41,7 +41,7 @@ final class FluidityQATests: XCTestCase {
     func testLaunchPerformance() {
         let app = configuredApp()
         measure(metrics: [XCTApplicationLaunchMetric()]) {
-            app.launch()
+            app.sqLaunch()
             SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
             _ = SignalQuestUITestSupport.tab(named: "Accueil", in: app).waitForExistence(timeout: 25)
             app.terminate()
@@ -51,7 +51,7 @@ final class FluidityQATests: XCTestCase {
     /// Fluidité du scroll du Feed (écran d'accueil, anneaux de stories + cartes).
     func testFeedScrollHitches() {
         let app = configuredApp()
-        app.launch()
+        app.sqLaunch()
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
         dismissSystemAlert()
         let community = SignalQuestUITestSupport.tab(named: "Communauté", in: app)
@@ -71,7 +71,7 @@ final class FluidityQATests: XCTestCase {
     /// que MKMapView s'anime. Imprime TRACE_MAP_PANNING quand le pan démarre.
     func testMapDriveLong() {
         let app = configuredApp()
-        app.launch()
+        app.sqLaunch()
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
         dismissSystemAlert()
         let map = SignalQuestUITestSupport.tab(named: "Carte", in: app)
@@ -95,7 +95,7 @@ final class FluidityQATests: XCTestCase {
     /// Fluidité du pan/zoom de la Carte (écran le plus lourd : MapKit + overlays).
     func testMapPanHitches() {
         let app = configuredApp()
-        app.launch()
+        app.sqLaunch()
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
         dismissSystemAlert()
         let map = SignalQuestUITestSupport.tab(named: "Carte", in: app)

@@ -18,7 +18,7 @@ final class RedesignTourQATests: XCTestCase {
             app.launchEnvironment["SQ_AUTH_TOKEN"] = token
         }
         app.launchArguments += ["--reset-map"]
-        app.launch()
+        app.sqLaunch()
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
 
         // Ferme la demande système de notifications si présente (SpringBoard).

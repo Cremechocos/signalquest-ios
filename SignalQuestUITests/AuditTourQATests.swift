@@ -25,7 +25,7 @@ final class AuditTourQATests: XCTestCase {
             app.launchArguments += ["--reset-map"]
             app.launchEnvironment["SQ_QA_PAN_TO"] = "50.85,4.35,7"
         }
-        app.launch()
+        app.sqLaunch()
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
         XCTAssertTrue(SignalQuestUITestSupport.tab(named: "Accueil", in: app).waitForExistence(timeout: 20))
 

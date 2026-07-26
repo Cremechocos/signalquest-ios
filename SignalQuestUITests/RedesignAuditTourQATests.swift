@@ -14,7 +14,7 @@ final class RedesignAuditTourQATests: XCTestCase {
     func testLoggedOutTour() throws {
         let app = XCUIApplication()
         app.launchArguments += ["--reset-auth", "--reset-map"]
-        app.launch()
+        app.sqLaunch()
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
 
         XCTAssertTrue(app.buttons["Se connecter"].waitForExistence(timeout: 20), "écran de connexion absent")
@@ -69,7 +69,7 @@ final class RedesignAuditTourQATests: XCTestCase {
         if token.isEmpty { app.launchArguments += ["--mock-auth"] }
         else { app.launchEnvironment["SQ_AUTH_TOKEN"] = token }
         app.launchArguments += ["--reset-map"]
-        app.launch()
+        app.sqLaunch()
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
 
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
@@ -152,7 +152,7 @@ final class RedesignAuditTourQATests: XCTestCase {
         let token = ProcessInfo.processInfo.environment["SQ_AUTH_TOKEN"] ?? ""
         if token.isEmpty { app.launchArguments += ["--mock-auth"] }
         else { app.launchEnvironment["SQ_AUTH_TOKEN"] = token }
-        app.launch()
+        app.sqLaunch()
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
         XCTAssertTrue(SignalQuestUITestSupport.tab(named: "Profil", in: app).waitForExistence(timeout: 25))
         gotoTab("Profil", in: app)

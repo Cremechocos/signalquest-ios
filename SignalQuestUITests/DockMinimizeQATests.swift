@@ -20,7 +20,7 @@ final class DockMinimizeQATests: XCTestCase {
             app.launchEnvironment["SQ_AUTH_TOKEN"] = token
         }
         app.launchArguments += ["--qa-legacy-dock"]
-        app.launch()
+        app.sqLaunch()
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
 
         // Ferme les dialogues système résiduels (notifications, « Open in

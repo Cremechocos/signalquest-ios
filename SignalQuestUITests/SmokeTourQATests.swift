@@ -19,7 +19,7 @@ final class SmokeTourQATests: XCTestCase {
             app.launchEnvironment["SQ_AUTH_TOKEN"] = token
         }
         app.launchArguments += ["--reset-map"]
-        app.launch()
+        app.sqLaunch()
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
 
         // Ferme la demande système de notifications si présente (elle est sur SpringBoard).
@@ -78,7 +78,7 @@ final class SmokeTourQATests: XCTestCase {
         app.launchArguments += ["--start-map", "--qa-map-layers", "--reset-map"]
         let pan = ProcessInfo.processInfo.environment["SQ_QA_PAN_TO"] ?? "48.857,2.352,14"
         app.launchEnvironment["SQ_QA_PAN_TO"] = pan   // lat,lng,zoom (défaut Paris z14)
-        app.launch()
+        app.sqLaunch()
         let sb = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         for l in ["Refuser", "Ne pas autoriser", "Don't Allow", "Autoriser", "Allow"] {
             let b = sb.buttons[l]

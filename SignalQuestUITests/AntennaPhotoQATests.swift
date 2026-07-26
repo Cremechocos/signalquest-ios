@@ -13,7 +13,7 @@ final class AntennaPhotoQATests: XCTestCase {
         app.launchEnvironment["SQ_AUTH_TOKEN"] = token
         app.launchEnvironment["SQ_QA_PAN_TO"] = "48.857,2.352,14" // Paris, zoom 14
         app.launchArguments += ["--start-map", "--reset-map", "--qa-open-antenna"]
-        app.launch()
+        app.sqLaunch()
 
         // La fiche s'ouvre (kicker « Fiche site »).
         let fiche = app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] %@", "Fiche site")).firstMatch

@@ -1,5 +1,24 @@
 import XCTest
 
+extension XCUIApplication {
+    /// Lance l'app avec la locale figée en français.
+    ///
+    /// Toute la suite UI matche des libellés français en dur (`tabs`,
+    /// `"Passer"`, `"Les reçus sont chiffrés"`…). Sans ce verrou, les tests
+    /// dépendent de la langue du simulateur hôte et casseront le jour où
+    /// l'anglais sera ajouté au bundle. Passer par cette méthode plutôt que
+    /// `launch()` directement.
+    ///
+    /// `SQ_UI_TEST_LOCALE` permet de forcer une autre locale — prévu pour le
+    /// parcours smoke en anglais une fois la localisation livrée. Non défini =
+    /// français.
+    func sqLaunch() {
+        let locale = ProcessInfo.processInfo.environment["SQ_UI_TEST_LOCALE"] ?? "fr"
+        launchArguments += ["-AppleLanguages", "(\(locale))", "-AppleLocale", locale]
+        launch()
+    }
+}
+
 @MainActor
 enum SignalQuestUITestSupport {
     static let tabs = ["Accueil", "Carte", "Tester", "Communauté", "Profil"]
@@ -11,7 +30,7 @@ enum SignalQuestUITestSupport {
     ) {
         app.launchArguments = arguments
         environment.forEach { app.launchEnvironment[$0.key] = $0.value }
-        app.launch()
+        app.sqLaunch()
         completeOnboardingIfNeeded(in: app)
     }
 
@@ -193,7 +212,7 @@ final class SignalQuestUITests: XCTestCase {
 
         let app = XCUIApplication()
         app.launchEnvironment["SQ_AUTH_TOKEN"] = token
-        app.launch()
+        app.sqLaunch()
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
 
         let tester = SignalQuestUITestSupport.tab(named: "Tester", in: app)
