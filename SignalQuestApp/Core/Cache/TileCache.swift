@@ -61,7 +61,11 @@ actor TileCache {
             return fresh
         }
         inFlight[key] = task
-        defer { inFlight[key] = nil }
+        // Ne purger que si l'entrée est encore NOTRE tâche : le `defer`
+        // s'exécute aussi pour les appelants qui ont rejoint un téléchargement
+        // en cours, et purgerait sinon le slot d'une tâche installée entre-temps
+        // — le dédoublonnage sauterait et la même tuile serait retéléchargée.
+        defer { if inFlight[key] == task { inFlight[key] = nil } }
         let data = try await task.value
         store(data, for: key)
         return data

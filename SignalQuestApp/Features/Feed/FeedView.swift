@@ -286,7 +286,7 @@ struct FeedView: View {
         func hash(into hasher: inout Hasher) { hasher.combine(id) }
     }
 
-    init(service: SocialFeedServicing = SocialFeedService(api: APIClient()), location: LocationService? = nil) {
+    init(service: SocialFeedServicing, location: LocationService? = nil) {
         _model = StateObject(wrappedValue: FeedViewModel(service: service, location: location))
     }
 

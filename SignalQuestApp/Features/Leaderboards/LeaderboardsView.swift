@@ -140,7 +140,7 @@ struct LeaderboardsView: View {
     private let currentUser: AuthUser?
 
     init(
-        service: LeaderboardServicing = LeaderboardService(api: APIClient()),
+        service: LeaderboardServicing,
         gamification: GamificationServicing? = nil,
         user: AuthUser? = nil
     ) {

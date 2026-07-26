@@ -16,6 +16,14 @@ final class PhotoService: PhotoServicing {
         self.api = api
     }
 
+    // Ces trois lectures étaient marquées `authenticated: false` alors que le
+    // backend dérive `likedByCurrentUser` / `userReaction` du cookie de session.
+    // Elles ne fonctionnaient que par accident : `URLSession.shared` réémettait
+    // le cookie ambiant depuis `HTTPCookieStorage.shared`. Le rendre explicite
+    // est le préalable indispensable à la session dédiée d'`APIClient` — sans
+    // cette correction, neutraliser le cookie jar aurait cassé l'état « j'aime ».
+    // `authenticated: true` dégrade proprement en mode invité : sans token,
+    // aucun en-tête n'est posé.
     func listPhotos(filter: String = "approved", sortBy: String = "recent", page: Int = 1, limit: Int = 30) async throws -> PhotoListResponse {
         try await api.request(
             APIEndpoint(
@@ -26,18 +34,18 @@ final class PhotoService: PhotoServicing {
                     URLQueryItem(name: "page", value: "\(page)"),
                     URLQueryItem(name: "limit", value: "\(limit)")
                 ],
-                authenticated: false
+                authenticated: true
             ),
             as: PhotoListResponse.self
         )
     }
 
     func photo(id: String) async throws -> Photo {
-        try await api.request(APIEndpoint(path: "/api/photos/\(id)", authenticated: false), as: Photo.self)
+        try await api.request(APIEndpoint(path: "/api/photos/\(id)", authenticated: true), as: Photo.self)
     }
 
     func comments(photoId: String) async throws -> [PhotoComment] {
-        let response: PhotoCommentsResponse = try await api.request(APIEndpoint(path: "/api/photos/\(photoId)/comments", authenticated: false), as: PhotoCommentsResponse.self)
+        let response: PhotoCommentsResponse = try await api.request(APIEndpoint(path: "/api/photos/\(photoId)/comments", authenticated: true), as: PhotoCommentsResponse.self)
         return response.comments
     }
 

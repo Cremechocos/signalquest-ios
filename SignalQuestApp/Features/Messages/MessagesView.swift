@@ -87,7 +87,7 @@ struct MessagesView: View {
         EdgeInsets(top: 7, leading: SQSpace.xl, bottom: 7, trailing: SQSpace.xl)
     }
 
-    init(service: MessagesServicing = MessagesService(api: APIClient()), e2ee: E2EEServicing? = nil) {
+    init(service: MessagesServicing, e2ee: E2EEServicing? = nil) {
         self.service = service
         self.e2ee = e2ee
         _model = StateObject(wrappedValue: MessagesViewModel(service: service))

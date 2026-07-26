@@ -1410,9 +1410,9 @@ struct MapExplorerView: View {
     @State private var lastRegion: MKCoordinateRegion
     @State private var showFilterSheet = false
 
-    init(service: MapSnapshotServicing = MapSnapshotService(api: APIClient()),
-         antennas: AntennasServicing = AntennasService(api: APIClient()),
-         markets: MarketRegistryServicing = MarketRegistryService(api: APIClient())) {
+    init(service: MapSnapshotServicing,
+         antennas: AntennasServicing,
+         markets: MarketRegistryServicing) {
         _model = StateObject(wrappedValue: MapExplorerViewModel(map: service, antennas: antennas, markets: markets))
         // QA : `--reset-map` oublie région + marché/opérateur pour rejouer la détection.
         if AppEnvironment.resetsMapOnLaunch {

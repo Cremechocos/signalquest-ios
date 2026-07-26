@@ -215,7 +215,7 @@ struct PhotosView: View {
     @StateObject private var model: PhotosViewModel
     @State private var showingUpload = false
 
-    init(service: PhotoServicing = PhotoService(api: APIClient())) {
+    init(service: PhotoServicing) {
         _model = StateObject(wrappedValue: PhotosViewModel(service: service))
     }
 

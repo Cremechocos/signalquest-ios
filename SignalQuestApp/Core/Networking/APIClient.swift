@@ -35,13 +35,36 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     /// even if several requests 401 at the same time.
     private let refreshState = OSAllocatedUnfairLock<Task<Void, Error>?>(initialState: nil)
 
+    /// Session propriétaire du client.
+    ///
+    /// `URLSession.shared` partageait `HTTPCookieStorage.shared` avec tout le
+    /// processus : l'authentification dépendait alors d'un cookie ambiant plutôt
+    /// que de l'en-tête posé explicitement, ce qui rendait le comportement
+    /// difficile à raisonner (un appel marqué non authentifié partait quand même
+    /// avec le cookie) et laissait un cookie survivre à un `clearAll()`.
+    ///
+    /// `httpCookieStorage = nil` supprime structurellement ce risque. La
+    /// politique de cache reste `.useProtocolCachePolicy` : le backend renvoie
+    /// un `Cache-Control` utile sur les lectures publiques (photos, tuiles), le
+    /// désactiver globalement dégraderait la carte et la galerie.
+    static func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.default
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieStorage = nil
+        configuration.httpMaximumConnectionsPerHost = 6
+        configuration.waitsForConnectivity = true
+        configuration.timeoutIntervalForRequest = 30
+        return URLSession(configuration: configuration)
+    }
+
     init(
         config: AppConfig = .current,
         credentials: CredentialStore = CredentialStore(),
-        session: URLSession = .shared,
+        session: URLSession? = nil,
         decoder: JSONDecoder = .signalQuest,
         encoder: JSONEncoder = .signalQuest
     ) {
+        let session = session ?? Self.makeSession()
         self.config = config
         self.credentials = credentials
         self.cookieStore = AuthCookieStore(credentials: credentials)
@@ -54,7 +77,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     convenience init(
         config: AppConfig = .current,
         cookieStore: AuthCookieStore,
-        session: URLSession = .shared,
+        session: URLSession? = nil,
         decoder: JSONDecoder = .signalQuest,
         encoder: JSONEncoder = .signalQuest
     ) {
@@ -226,7 +249,11 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
         }
         if endpoint.authenticated, let token = credentials.accessToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            // Le backend n'authentifie QUE par le cookie `auth_token`
+            // (`extractAuthToken` dans packages/db/auth.ts) ; l'en-tête
+            // Authorization n'est lu que par `requireAdmin` et le secret
+            // interne. Envoyer le JWT utilisateur en Bearer n'apportait rien et
+            // doublait sa surface d'exposition (journaux de proxy, APM, traces).
             request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
         }
         return request
@@ -325,9 +352,16 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         }
         defer {
             refreshState.withLock { state in
-                // Clear the cached task once the in-flight refresh has resolved
-                // so the next 401 triggers a fresh attempt.
-                state = nil
+                // Ne purger QUE si le slot contient encore NOTRE tâche.
+                //
+                // Le `defer` s'exécute pour chaque appelant, y compris ceux qui
+                // ont simplement rejoint un refresh déjà en vol. Scénario de
+                // casse : A et B rejoignent T1 ; T1 se termine ; A purge ; C
+                // arrive et installe T2 ; B exécute alors SON defer et purge T2
+                // alors qu'elle est encore en vol ; D lance T3 → deux refresh
+                // concurrents. Sur un backend qui fait tourner la session, cela
+                // se solde par une déconnexion.
+                if state == task { state = nil }
             }
         }
         try await task.value

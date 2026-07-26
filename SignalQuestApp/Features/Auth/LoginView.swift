@@ -203,9 +203,18 @@ struct LoginView: View {
 /// Hérite de `services`/`router` de l'environnement (injectés sur RootView).
 private struct GuestMapPreview: View {
     @Environment(\.dismiss) private var dismiss
+    /// Le commentaire ci-dessus disait déjà que les services viennent de
+    /// l'environnement — mais `MapExplorerView()` s'appuyait sur ses valeurs par
+    /// défaut et construisait donc un SECOND graphe complet : autre `APIClient`,
+    /// autre `DiskCache` sur le même dossier, autre coalescing de refresh.
+    @EnvironmentObject private var services: AppServices
     var body: some View {
         NavigationStack {
-            MapExplorerView()
+            MapExplorerView(
+                service: services.map,
+                antennas: services.antennas,
+                markets: services.markets
+            )
                 // MapExplorerView masque volontairement sa navigation bar. Une
                 // safe-area dédiée garde donc les sorties invité visibles et
                 // accessibles, indépendamment de cette préférence interne.
