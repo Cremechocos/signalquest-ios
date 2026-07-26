@@ -37,7 +37,13 @@ final class MapSnapshotService: MapSnapshotServicing {
     private let cache: DiskCache
     private let tileCache: TileCache
 
-    init(api: APIClient, cache: DiskCache = DiskCache(), tileCache: TileCache = TileCache()) {
+    // Dossier DÉDIÉ. `MapSnapshotService` et `MarketRegistryService` prenaient
+    // tous deux le `DiskCache()` par défaut, donc le même dossier — deux acteurs
+    // distincts sur un même répertoire : le throttle d'éviction est par
+    // instance, le scan tournait deux fois plus souvent, et chacun pouvait
+    // supprimer les fichiers de l'autre en atteignant le plafond de 64 Mo. Leurs
+    // TTL n'ont rien à voir (snapshot 30 s, registre 24 h).
+    init(api: APIClient, cache: DiskCache = DiskCache(folderName: "SignalQuestMapCache"), tileCache: TileCache = TileCache()) {
         self.api = api
         self.cache = cache
         self.tileCache = tileCache

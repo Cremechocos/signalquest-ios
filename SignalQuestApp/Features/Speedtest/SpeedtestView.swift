@@ -479,7 +479,7 @@ struct SpeedtestView: View {
                     }
                 }
             } catch {
-                print("Failed to prerender share image: \(error)")
+                sqDebugLog("Failed to prerender share image: \(error)")
             }
         }
     }
@@ -1212,7 +1212,6 @@ struct SpeedtestView: View {
         didRunQASpeedtest = true
         try? await Task.sleep(nanoseconds: 1_000_000_000)
         currentNetworkStatus = services.networkPath.status
-        print("SQ_QA_SPEEDTEST_START network=\(currentNetworkStatus.displayName)")
         speedtestQALogger.notice("SQ_QA_SPEEDTEST_START network=\(currentNetworkStatus.displayName, privacy: .public)")
         start()
     }
@@ -1225,7 +1224,6 @@ struct SpeedtestView: View {
         let pingAverage = result.pingMs ?? 0
         let jitter = result.jitterMs ?? 0
         let line = "SQ_QA_SPEEDTEST_RESULT dl_avg=\(result.downloadAverageMbps) dl_max=\(result.downloadMaxMbps) ul_avg=\(uploadAverage) ul_max=\(uploadMax) ping_min=\(pingMin) ping_avg=\(pingAverage) jitter=\(jitter) network=\(result.networkDisplayName)"
-        print(line)
         speedtestQALogger.notice("\(line, privacy: .public)")
     }
 

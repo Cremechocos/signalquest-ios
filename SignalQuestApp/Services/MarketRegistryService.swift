@@ -42,7 +42,9 @@ final class MarketRegistryService: MarketRegistryServicing, @unchecked Sendable 
     /// qu'à cet intervalle pour ne pas marteler à chaque mouvement de carte.
     private static let retryInterval: TimeInterval = 120
 
-    init(api: APIClient, cache: DiskCache = DiskCache()) {
+    // Dossier dédié — cf. la note dans MapSnapshotService : les deux partageaient
+    // « SignalQuestCache » et s'évinçaient mutuellement.
+    init(api: APIClient, cache: DiskCache = DiskCache(folderName: "SignalQuestMarketCache")) {
         self.api = api
         self.cache = cache
     }

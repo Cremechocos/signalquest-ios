@@ -203,9 +203,13 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
             let snapshot = NetworkPathSnapshot(path: path)
             let satisfied = path.status == .satisfied
             Task { @MainActor in
-                self?.latestPathSnapshot = snapshot
-                self?.isOnline = satisfied
-                self?.refreshStatus()
+                guard let self else { return }
+                self.latestPathSnapshot = snapshot
+                // `@Published` émet à CHAQUE assignation, égalité ou non. Cet
+                // objet est injecté en `@EnvironmentObject` à la racine : une
+                // émission inutile réinvalide tout l'arbre de vues qui l'observe.
+                if self.isOnline != satisfied { self.isOnline = satisfied }
+                self.refreshStatus()
             }
         }
         monitor.start(queue: queue)
@@ -248,13 +252,20 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
         let cellularTechnology = latestPathSnapshot.usesCellular ? currentCellularTechnology() : nil
         let operatorName = latestPathSnapshot.usesCellular ? currentCarrierName() : nil
         let plmn: (mcc: Int?, mnc: Int?) = latestPathSnapshot.usesCellular ? currentCellularPLMN() : (mcc: nil, mnc: nil)
-        status = NetworkPathStatus.map(
+        let next = NetworkPathStatus.map(
             latestPathSnapshot,
             cellularTechnology: cellularTechnology,
             operatorName: operatorName,
             operatorMcc: plmn.mcc,
             operatorMnc: plmn.mnc
         )
+        // `refreshStatus()` est appelé à chaque notification radio
+        // (`CTServiceRadioAccessTechnologyDidChange`), très fréquente en
+        // mobilité — c'est-à-dire précisément pendant un drive test. Sans cette
+        // comparaison, chaque transition cellulaire réinvalidait tout l'arbre
+        // SwiftUI observant ce moniteur. `NetworkPathStatus` est `Equatable`,
+        // la comparaison est gratuite.
+        if next != status { status = next }
     }
 
     private func currentCellularTechnology() -> CellularRadioTechnology? {

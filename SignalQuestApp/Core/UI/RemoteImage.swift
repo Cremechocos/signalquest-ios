@@ -91,9 +91,19 @@ struct RemoteImage<Placeholder: View>: View {
         }
         .task(id: taskKey) {
             failed = false
-            image = nil
-            guard let url else { return }
+            guard let url else { image = nil; return }
             let maxPixel = max(1, maxDimension * displayScale)
+            // Lecture SYNCHRONE du cache mémoire avant toute remise à nil.
+            // Auparavant `image = nil` s'exécutait en premier et `image(for:)`
+            // est `async` même sur un hit `NSCache` : chaque recyclage de cellule
+            // (scroll d'une grille de photos, pan de carte) réaffichait donc au
+            // moins une frame de placeholder alors que l'image décodée était
+            // déjà en mémoire. L'accesseur existait et n'était appelé nulle part.
+            if let cached = ImagePipeline.shared.cachedImage(for: url, maxPixel: maxPixel) {
+                image = cached
+                return
+            }
+            image = nil
             do {
                 image = try await ImagePipeline.shared.image(for: url, maxPixel: maxPixel)
             } catch {
