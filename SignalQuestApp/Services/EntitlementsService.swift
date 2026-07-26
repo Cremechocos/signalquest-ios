@@ -243,9 +243,9 @@ enum PurchaseEligibility: Equatable, Sendable {
             return "Impossible de vérifier tes abonnements existants. Aucun achat n'est proposé pour éviter une double facturation."
         case .existingBackendEntitlement(let snapshot):
             if snapshot.status == .paymentFailed {
-                return "Un abonnement (snapshot.source.displayName) nécessite une action de paiement. Résous-le sur la plateforme d'origine avant de souscrire ailleurs."
+                return "Un abonnement \(snapshot.source.displayName) nécessite une action de paiement. Résous-le sur la plateforme d'origine avant de souscrire ailleurs."
             }
-            return "Ton abonnement (snapshot.tier.displayName) est déjà géré par (snapshot.source.displayName). Gère-le sur cette plateforme pour éviter un doublon."
+            return "Ton abonnement \(snapshot.tier.displayName) est déjà géré par \(snapshot.source.displayName). Gère-le sur cette plateforme pour éviter un doublon."
         case .existingLocalAppStoreEntitlement:
             return "Un achat App Store est détecté sur cet appareil, mais son activation serveur n'est pas encore confirmée."
         case .serverVerificationUnavailable:
@@ -456,7 +456,7 @@ final class EntitlementsStore: ObservableObject {
                 serverState = .available(snapshot)
                 await transaction.finish()
                 await refreshLocalEntitlements()
-                operation = .succeeded("Abonnement (snapshot.tier.displayName) activé sur ton compte.")
+                operation = .succeeded("Abonnement \(snapshot.tier.displayName) activé sur ton compte.")
             case .pending:
                 operation = .pending
             case .userCancelled:

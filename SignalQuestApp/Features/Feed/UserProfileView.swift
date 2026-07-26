@@ -306,9 +306,9 @@ struct UserProfileView: View {
             case .comments(let item):
                 CommentsSheet(service: services.comments, postId: item.backendPostId)
             case .report(let item):
-                ReportSheet(targetType: "post", targetId: item.backendPostId, service: services.reports)
+                ReportSheet(target: .post(item.backendPostId), service: services.reports)
             case .reportUser:
-                ReportSheet(targetType: "user", targetId: model.userId, service: services.reports)
+                ReportSheet(target: .profile(model.userId), service: services.reports)
             }
         }
     }

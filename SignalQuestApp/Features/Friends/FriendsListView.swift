@@ -3,7 +3,8 @@ import SwiftUI
 @MainActor
 final class FriendsViewModel: ObservableObject {
     @Published var friends: [Friend] = []
-    @Published var requests: [FriendRequest] = []
+    @Published var receivedRequests: [FriendRequest] = []
+    @Published var sentRequests: [FriendRequest] = []
     @Published var blocked: [BlockedUser] = []
     @Published var errorMessage: String?
     @Published var isLoading = false
@@ -11,31 +12,83 @@ final class FriendsViewModel: ObservableObject {
     private let service: FriendsServicing
     init(service: FriendsServicing) { self.service = service }
 
+    /// Les trois chargements sont INDÉPENDANTS.
+    ///
+    /// Le code précédent enchaînait trois `try await` dans un seul `do/catch` :
+    /// un échec sur `blocks()` — la liste la moins importante — faisait perdre
+    /// les amis et les demandes déjà récupérés avec succès, et l'écran
+    /// paraissait vide. On conserve désormais ce qui a réussi et on ne signale
+    /// que ce qui a échoué.
     func load() async {
         isLoading = true
         defer { isLoading = false }
-        do {
-            async let f = service.list()
-            async let r = service.requests()
-            async let b = service.blocks()
-            friends = try await f
-            requests = try await r
-            blocked = try await b
-        } catch {
-            errorMessage = error.localizedDescription
+
+        // `Result(catching:)` n'a pas de variante asynchrone : on encapsule.
+        let service = self.service
+        async let friendsResult = Self.attempt { try await service.list() }
+        async let requestsResult = Self.attempt { try await service.requests() }
+        async let blocksResult = Self.attempt { try await service.blocks() }
+
+        var failures: [Error] = []
+
+        switch await friendsResult {
+        case .success(let value): friends = value
+        case .failure(let error): failures.append(error)
         }
+        switch await requestsResult {
+        case .success(let value):
+            receivedRequests = value.received
+            sentRequests = value.sent
+        case .failure(let error): failures.append(error)
+        }
+        switch await blocksResult {
+        case .success(let value): blocked = value
+        case .failure(let error): failures.append(error)
+        }
+
+        // Une annulation (changement d'écran, rafraîchissement concurrent) n'est
+        // pas une erreur à montrer.
+        let reportable = failures.filter { !$0.isCancellation }
+        errorMessage = reportable.first.map { $0.localizedDescription }
     }
 
     func accept(_ request: FriendRequest) async {
-        do { try await service.accept(requestId: request.id); await load() } catch { errorMessage = error.localizedDescription }
+        await perform { try await self.service.accept(requestId: request.id) }
     }
 
     func decline(_ request: FriendRequest) async {
-        do { try await service.decline(requestId: request.id); await load() } catch { errorMessage = error.localizedDescription }
+        await perform { try await self.service.decline(requestId: request.id) }
+    }
+
+    /// Annule une demande que j'ai envoyée.
+    func cancel(_ request: FriendRequest) async {
+        await perform { try await self.service.cancelRequest(requestId: request.id) }
     }
 
     func remove(_ friend: Friend) async {
-        do { try await service.remove(userId: friend.userId); await load() } catch { errorMessage = error.localizedDescription }
+        await perform { try await self.service.remove(userId: friend.userId) }
+    }
+
+    /// Sans cette action, un blocage était définitif : aucun moyen de revenir en
+    /// arrière depuis l'app.
+    func unblock(_ user: BlockedUser) async {
+        await perform { try await self.service.unblock(userId: user.userId) }
+    }
+
+    private nonisolated static func attempt<T: Sendable>(
+        _ operation: @Sendable () async throws -> T
+    ) async -> Result<T, Error> {
+        do { return .success(try await operation()) } catch { return .failure(error) }
+    }
+
+    private func perform(_ action: @escaping () async throws -> Void) async {
+        do {
+            try await action()
+            await load()
+        } catch {
+            guard !error.isCancellation else { return }
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
@@ -45,17 +98,28 @@ struct FriendsListView: View {
     @State private var showAddFriend = false
     /// Ami dont on consulte le profil public (push UserProfileView).
     @State private var profileAuthor: SocialFeedAuthor?
+    /// Débloquer réintroduit quelqu'un dans le champ social de l'utilisateur :
+    /// confirmation explicite, comme pour bloquer.
+    @State private var unblockTarget: BlockedUser?
     init(service: FriendsServicing) {
         _model = StateObject(wrappedValue: FriendsViewModel(service: service))
     }
 
+    private var isUnblockConfirmationPresented: Binding<Bool> {
+        Binding(
+            get: { unblockTarget != nil },
+            set: { if !$0 { unblockTarget = nil } }
+        )
+    }
+
     private var isEverythingEmpty: Bool {
-        model.friends.isEmpty && model.requests.isEmpty && model.blocked.isEmpty
+        model.friends.isEmpty && model.receivedRequests.isEmpty
+            && model.sentRequests.isEmpty && model.blocked.isEmpty
     }
 
     var body: some View {
         List {
-            if model.isLoading && model.friends.isEmpty && model.requests.isEmpty {
+            if model.isLoading && model.friends.isEmpty && model.receivedRequests.isEmpty {
                 ProgressView().tint(SQColor.brandRed).frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -68,13 +132,22 @@ struct FriendsListView: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             }
-            if !model.requests.isEmpty {
+            if !model.receivedRequests.isEmpty {
                 Section {
-                    ForEach(model.requests) { request in
+                    ForEach(model.receivedRequests) { request in
                         cardRow { requestRow(request) }
                     }
                 } header: {
-                    sectionHeader("Demandes")
+                    sectionHeader("Demandes reçues")
+                }
+            }
+            if !model.sentRequests.isEmpty {
+                Section {
+                    ForEach(model.sentRequests) { request in
+                        cardRow { sentRequestRow(request) }
+                    }
+                } header: {
+                    sectionHeader("Demandes envoyées")
                 }
             }
             Section {
@@ -120,6 +193,14 @@ struct FriendsListView: View {
                                     .font(SQType.body)
                                     .foregroundStyle(SQColor.labelSecondary)
                                 Spacer()
+                                Button("Débloquer") {
+                                    Haptics.light()
+                                    unblockTarget = user
+                                }
+                                .font(SQType.button)
+                                .foregroundStyle(SQColor.brandRed)
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Débloquer \(user.displayName)")
                             }
                         }
                     }
@@ -167,8 +248,51 @@ struct FriendsListView: View {
             // bloqué : on resynchronise la liste.
             if newValue == nil { Task { await model.load() } }
         }
+        .confirmationDialog(
+            "Débloquer cette personne ?",
+            isPresented: isUnblockConfirmationPresented,
+            titleVisibility: .visible,
+            presenting: unblockTarget
+        ) { user in
+            Button("Débloquer") {
+                unblockTarget = nil
+                Task { await model.unblock(user) }
+            }
+            Button("Annuler", role: .cancel) { unblockTarget = nil }
+        } message: { user in
+            Text("\(user.displayName) pourra de nouveau voir ton profil et te contacter.")
+        }
         .task { await model.load() }
         .refreshable { await model.load() }
+    }
+
+    /// Demande que J'AI envoyée : on affiche le destinataire (et non
+    /// l'expéditeur, qui serait moi), avec l'annulation.
+    private func sentRequestRow(_ request: FriendRequest) -> some View {
+        let recipient = request.recipient
+        let name: String = recipient?.displayName ?? "Utilisateur"
+        let avatar: URL? = recipient?.avatarUrl
+        return HStack(spacing: SQSpace.md) {
+            SQAvatar(url: avatar, name: name)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.label)
+                Text("En attente de réponse")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            Spacer()
+            Button("Annuler") {
+                Haptics.light()
+                Task { await model.cancel(request) }
+            }
+            .font(SQType.button)
+            .foregroundStyle(SQColor.labelSecondary)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Annuler la demande envoyée à \(name)")
+        }
     }
 
     /// En-tête de section Figtree, casse normale (plus de MAJUSCULES système).

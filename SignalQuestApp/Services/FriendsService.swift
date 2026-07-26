@@ -39,6 +39,9 @@ struct FriendRequest: Codable, Identifiable, Equatable {
     let createdAt: Date?
     /// Personne à afficher pour une demande REÇUE = l'expéditeur.
     var user: FriendRequestUser? { sender ?? receiver }
+    /// Personne à afficher pour une demande ENVOYÉE = le destinataire. Utiliser
+    /// `user` pour une demande envoyée afficherait l'utilisateur courant.
+    var recipient: FriendRequestUser? { receiver ?? sender }
 }
 
 struct BlockedUser: Codable, Identifiable, Equatable {
@@ -53,13 +56,28 @@ struct BlockedUser: Codable, Identifiable, Equatable {
 
 protocol FriendsServicing: Sendable {
     func list() async throws -> [Friend]
-    func requests() async throws -> [FriendRequest]
+    func requests() async throws -> FriendRequests
     func sendRequest(toUserId: String) async throws
     func accept(requestId: String) async throws
     func decline(requestId: String) async throws
+    func cancelRequest(requestId: String) async throws
     func remove(userId: String) async throws
     func block(userId: String) async throws
+    func unblock(userId: String) async throws
     func blocks() async throws -> [BlockedUser]
+}
+
+/// Les deux sens d'une demande d'ami.
+///
+/// `sent` était auparavant décodé puis **jeté** (`return r.received ?? []`) :
+/// l'utilisateur ne voyait pas ses demandes en attente et ne pouvait pas les
+/// annuler, alors que le backend les renvoie et expose la route de suppression.
+struct FriendRequests: Equatable, Sendable {
+    let received: [FriendRequest]
+    let sent: [FriendRequest]
+
+    static let empty = FriendRequests(received: [], sent: [])
+    var isEmpty: Bool { received.isEmpty && sent.isEmpty }
 }
 
 final class FriendsService: FriendsServicing {
@@ -82,12 +100,22 @@ final class FriendsService: FriendsServicing {
         return r.friends ?? r.items ?? []
     }
 
-    func requests() async throws -> [FriendRequest] {
+    func requests() async throws -> FriendRequests {
         // Le backend renvoie { received, sent } (et NON { requests/items }).
-        // L'UI traite les demandes REÇUES (accepter/refuser).
-        struct Response: Codable { let received: [FriendRequest]?; let sent: [FriendRequest]? }
+        struct Response: Decodable {
+            let received: [FriendRequest]
+            let sent: [FriendRequest]
+            enum CodingKeys: String, CodingKey { case received, sent }
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                // Une demande à avatar malformé est ignorée au lieu de casser la
+                // liste entière (même politique que `list()`).
+                received = c.decodeLossyArray([FriendRequest].self, forKey: .received)
+                sent = c.decodeLossyArray([FriendRequest].self, forKey: .sent)
+            }
+        }
         let r: Response = try await api.request(APIEndpoint(path: "/api/friends/requests"), as: Response.self)
-        return r.received ?? []
+        return FriendRequests(received: r.received, sent: r.sent)
     }
 
     func sendRequest(toUserId: String) async throws {
@@ -108,6 +136,15 @@ final class FriendsService: FriendsServicing {
         )
     }
 
+    /// Annule une demande que J'AI envoyée (l'accepter/refuser concerne celles
+    /// que je reçois). L'identifiant est porté par le chemin.
+    func cancelRequest(requestId: String) async throws {
+        let _: SuccessResponse = try await api.request(
+            APIEndpoint(path: "/api/friends/requests/\(requestId)", method: .delete),
+            as: SuccessResponse.self
+        )
+    }
+
     func remove(userId: String) async throws {
         // Le backend attend ?userId=<id de l'AMI> (et NON ?id=<friendshipId>).
         let _: SuccessResponse = try await api.request(
@@ -119,6 +156,18 @@ final class FriendsService: FriendsServicing {
 
     func block(userId: String) async throws {
         let _: SuccessResponse = try await api.requestJSON("/api/users/blocks", body: ["userId": userId])
+    }
+
+    /// Sans cette route, un blocage était **irréversible depuis l'app** : un
+    /// cul-de-sac que la revue App Store regarde, et un défaut de contrôle de
+    /// l'utilisateur sur ses propres données. Le backend lit `userId` dans le
+    /// CORPS de la requête DELETE, pas en paramètre d'URL.
+    func unblock(userId: String) async throws {
+        let _: SuccessResponse = try await api.requestJSON(
+            "/api/users/blocks",
+            method: .delete,
+            body: ["userId": userId]
+        )
     }
 
     func blocks() async throws -> [BlockedUser] {

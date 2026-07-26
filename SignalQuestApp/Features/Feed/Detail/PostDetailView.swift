@@ -87,7 +87,7 @@ struct PostDetailView: View {
             )
         }
         .sheet(isPresented: $showReportSheet) {
-            ReportSheet(targetType: "post", targetId: localItem.backendPostId, service: reportsService)
+            ReportSheet(target: .post(localItem.backendPostId), service: reportsService)
         }
         .navigationDestinationItemCompat($profileAuthor) { author in
             UserProfileView(userId: author.id, prefill: author, service: feedService)

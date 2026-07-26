@@ -161,4 +161,51 @@ final class EntitlementsTests: XCTestCase {
     private func decodeResponse(_ json: String) throws -> BillingSubscriptionResponse {
         try JSONDecoder.signalQuest.decode(BillingSubscriptionResponse.self, from: Data(json.utf8))
     }
+
+    // MARK: - Interpolations
+
+    /// Régression : trois messages destinés à l'utilisateur avaient perdu leur
+    /// antislash d'interpolation et affichaient littéralement
+    /// « (snapshot.tier.displayName) ». Celui du chemin de succès d'achat
+    /// (`purchase()`) serait parti cassé en production le jour de l'ouverture
+    /// des achats — aucun test n'assertait sur le contenu de ces chaînes.
+    func testEligibilityMessagesInterpolateSnapshotValues() {
+        let snapshot = EntitlementSnapshot(
+            tier: .premium,
+            source: .googlePlay,
+            period: nil,
+            status: .active,
+            expiresAt: nil
+        )
+        let message = PurchaseEligibility.existingBackendEntitlement(snapshot).userMessage
+        XCTAssertTrue(message.contains(snapshot.tier.displayName), message)
+        XCTAssertTrue(message.contains(snapshot.source.displayName), message)
+        XCTAssertFalse(message.contains("snapshot."), "Interpolation non résolue : \(message)")
+
+        let failing = EntitlementSnapshot(
+            tier: .premium,
+            source: .googlePlay,
+            period: nil,
+            status: .paymentFailed,
+            expiresAt: nil
+        )
+        let failingMessage = PurchaseEligibility.existingBackendEntitlement(failing).userMessage
+        XCTAssertTrue(failingMessage.contains(failing.source.displayName), failingMessage)
+        XCTAssertFalse(failingMessage.contains("snapshot."), "Interpolation non résolue : \(failingMessage)")
+    }
+
+    /// Aucun message d'éligibilité ne doit contenir un nom de propriété Swift.
+    func testNoEligibilityMessageLeaksAPropertyPath() {
+        let snapshot = EntitlementSnapshot(
+            tier: .basic, source: .appStore, period: nil, status: .active, expiresAt: nil
+        )
+        let all: [PurchaseEligibility] = [
+            .allowed, .checkingServer, .backendUnavailable,
+            .existingBackendEntitlement(snapshot),
+            .existingLocalAppStoreEntitlement(.premium), .serverVerificationUnavailable
+        ]
+        for case let eligibility in all {
+            XCTAssertFalse(eligibility.userMessage.contains("snapshot."), "\(eligibility)")
+        }
+    }
 }

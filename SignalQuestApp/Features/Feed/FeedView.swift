@@ -456,7 +456,7 @@ struct FeedView: View {
                     }
                 )
             case .report(let item):
-                ReportSheet(targetType: "post", targetId: item.backendPostId, service: services.reports)
+                ReportSheet(target: .post(item.backendPostId), service: services.reports)
             case .share(let item):
                 PostShareSheet(
                     post: item,

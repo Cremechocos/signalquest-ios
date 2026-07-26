@@ -300,7 +300,7 @@ struct ConversationDetailView: View {
         }
         .sheet(isPresented: $showReportUser) {
             if let id = otherParticipantId {
-                ReportSheet(targetType: "user", targetId: id, service: services.reports)
+                ReportSheet(target: .profile(id), service: services.reports)
             }
         }
         .sheet(isPresented: $showGroupSettings) {

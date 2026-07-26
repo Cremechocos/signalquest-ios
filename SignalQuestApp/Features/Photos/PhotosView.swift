@@ -541,7 +541,7 @@ struct PhotoDetailView: View {
                 }
             }
             .sheet(isPresented: $showReport) {
-                ReportSheet(targetType: "photo", targetId: photo.id, service: services.reports)
+                ReportSheet(target: .photo(photo.id), service: services.reports)
             }
             .sheet(isPresented: $showShareSheet) {
                 PhotoShareSheet(photo: photo, messagesService: services.messages, onShare: onShareToConversation)

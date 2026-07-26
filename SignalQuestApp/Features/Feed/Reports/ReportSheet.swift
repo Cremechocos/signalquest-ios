@@ -1,8 +1,7 @@
 import SwiftUI
 
 struct ReportSheet: View {
-    let targetType: String
-    let targetId: String
+    let target: ReportTarget
     let service: ReportsServicing
     @Environment(\.dismiss) private var dismiss
     @State private var reason: ReportReason = .spam
@@ -65,8 +64,7 @@ struct ReportSheet: View {
         defer { isBusy = false }
         do {
             try await service.report(
-                targetType: targetType,
-                targetId: targetId,
+                target,
                 reason: reason,
                 comment: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note
             )
