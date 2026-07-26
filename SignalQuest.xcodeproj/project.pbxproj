@@ -55,6 +55,7 @@
 		2A75C227B62E74818271FE0A /* E2EEService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */; };
 		2AE3D8AFA78A50D3114E392A /* PhotoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2F641884A080F0EC459B546 /* PhotoService.swift */; };
 		2B0A8A353E00456F4887BBEC /* ValidationCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B0A1DB2B40E7DCA6398C55 /* ValidationCardView.swift */; };
+		FEEDDA7180C0FFEE00000001 /* RatingCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDDA7180C0FFEE00000002 /* RatingCardView.swift */; };
 		2B4D7DDADD39133279E1C8E9 /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DBC54E804678243BC1BCC4C /* AuthModels.swift */; };
 		2EAA4923F615CB18816D9FD3 /* TwoFactorSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BA27C4F6CA354680172A364 /* TwoFactorSetupView.swift */; };
 		30311E763161242DA4BEC7EB /* MarketRegistryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57FDE918733D1625D560F628 /* MarketRegistryModels.swift */; };
@@ -360,6 +361,7 @@
 		4710561B73DB096826FAEEDE /* PresenceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresenceModels.swift; sourceTree = "<group>"; };
 		4841F25C76693497780EE838 /* CommentsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsSheet.swift; sourceTree = "<group>"; };
 		48B0A1DB2B40E7DCA6398C55 /* ValidationCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationCardView.swift; sourceTree = "<group>"; };
+		FEEDDA7180C0FFEE00000002 /* RatingCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingCardView.swift; sourceTree = "<group>"; };
 		4A30FBE643735E6E375B3948 /* NewModelDecodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewModelDecodeTests.swift; sourceTree = "<group>"; };
 		4A392F27A37DB201C942F22D /* MessageSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageSyncEngine.swift; sourceTree = "<group>"; };
 		4C859D91AFCEFBFEE4E43C47 /* ANFRModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRModels.swift; sourceTree = "<group>"; };
@@ -1025,6 +1027,7 @@
 				F21195FC7BA83172FF32A3CC /* SignalFormatters.swift */,
 				448DCE616E7442994EA5AED7 /* SpeedtestCardView.swift */,
 				48B0A1DB2B40E7DCA6398C55 /* ValidationCardView.swift */,
+				FEEDDA7180C0FFEE00000002 /* RatingCardView.swift */,
 			);
 			path = Cards;
 			sourceTree = "<group>";
@@ -1613,6 +1616,7 @@
 				8EDEC985C78861A0BFE4ED1A /* UserProfileView.swift in Sources */,
 				AFCD275D5C3626EAD024EB7B /* UserService.swift in Sources */,
 				2B0A8A353E00456F4887BBEC /* ValidationCardView.swift in Sources */,
+				FEEDDA7180C0FFEE00000001 /* RatingCardView.swift in Sources */,
 				523BC877CFAB8928A813BF37 /* ValidationModels.swift in Sources */,
 				56EC777B107E81B428F7F1B5 /* ValidationsService.swift in Sources */,
 				E4D3352BEA88542E42F96E7B /* ValidationsSheet.swift in Sources */,
