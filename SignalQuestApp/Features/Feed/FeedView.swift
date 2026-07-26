@@ -49,7 +49,7 @@ final class FeedViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
-        if ProcessInfo.processInfo.arguments.contains("--qa-slow-load") {
+        if AppEnvironment.delaysLoadForQA {
             try? await Task.sleep(for: .seconds(4))
         }
         do {

@@ -139,16 +139,23 @@ private struct LossyElement<T: Decodable>: Decodable {
 }
 
 extension KeyedDecodingContainer {
+    /// Décode un tableau élément par élément, en IGNORANT les éléments invalides.
+    /// Clé absente ou valeur non-tableau → tableau vide (ROB-01/ROB-02/T1-9).
+    ///
+    /// L'implémentation précédente était `(try? decode(type, forKey:)) ?? []`,
+    /// c'est-à-dire du tout-ou-rien : **un seul** élément mal typé vidait le
+    /// tableau entier, en contradiction avec le nom. Concrètement, un opérateur
+    /// ajouté côté serveur avec une valeur inattendue faisait disparaître toute
+    /// la liste des opérateurs, des bandes ou des clusters d'une tuile de carte.
     func decodeLossyArray<T: Decodable>(_ type: [T].Type, forKey key: Key) -> [T] {
-        (try? decode(type, forKey: key)) ?? []
-    }
-
-    /// Décode un tableau élément par élément, en IGNORANT les éléments invalides
-    /// au lieu de vider tout le tableau (contrairement à `decodeLossyArray` qui est
-    /// tout-ou-rien). Clé absente → tableau vide (ROB-01/ROB-02/T1-9).
-    func decodeLossyElementArray<T: Decodable>(_ type: [T].Type, forKey key: Key) -> [T] {
         guard let wrapped = try? decode([LossyElement<T>].self, forKey: key) else { return [] }
         return wrapped.compactMap(\.value)
+    }
+
+    /// Alias historique de `decodeLossyArray`, conservé pour ne pas toucher aux
+    /// sites d'appel existants : les deux ont désormais la même sémantique.
+    func decodeLossyElementArray<T: Decodable>(_ type: [T].Type, forKey key: Key) -> [T] {
+        decodeLossyArray(type, forKey: key)
     }
 
     func decodeFlexibleString(forKey key: Key) -> String? {

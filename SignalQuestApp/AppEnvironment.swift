@@ -65,4 +65,43 @@ enum AppEnvironment {
     #else
     static var injectedAuthToken: String? { nil }
     #endif
+
+    // Drapeaux de mise en scène QA (carte, navigation, temporisations). Mêmes
+    // règles que ci-dessus : en Release ce sont des constantes `false`, donc le
+    // compilateur élimine les branches qui les consomment — et avec elles les
+    // jeux de données de démonstration (identifiants de photos réels, URLs S3,
+    // amis fictifs) qui n'ont rien à faire dans un binaire signé.
+    #if DEBUG
+    private static func hasArgument(_ flag: String) -> Bool {
+        ProcessInfo.processInfo.arguments.contains(flag)
+    }
+
+    static var usesDemoPhotos: Bool { hasArgument("--qa-demo-photos") }
+    static var usesDemoFriends: Bool { hasArgument("--qa-demo-friends") }
+    static var walksDemoFriends: Bool { hasArgument("--qa-friends-walk") }
+    static var opensMapLayers: Bool { hasArgument("--qa-map-layers") }
+    static var opensAntennaSheet: Bool { hasArgument("--qa-open-antenna") }
+    static var opensPhotoSheet: Bool { hasArgument("--qa-open-photo") }
+    static var opensFriendSheet: Bool { hasArgument("--qa-open-friend") }
+    static var opensMessagesTab: Bool { hasArgument("--qa-tab-messages") }
+    static var opensANFRMap: Bool { hasArgument("--qa-anfr-map") }
+    static var opensANFRStats: Bool { hasArgument("--qa-anfr-stats") }
+    static var usesLegacyDock: Bool { hasArgument("--qa-legacy-dock") }
+    static var delaysLoadForQA: Bool { hasArgument("--qa-slow-load") }
+    static var resetsMapOnLaunch: Bool { hasArgument("--reset-map") }
+    #else
+    static var usesDemoPhotos: Bool { false }
+    static var usesDemoFriends: Bool { false }
+    static var walksDemoFriends: Bool { false }
+    static var opensMapLayers: Bool { false }
+    static var opensAntennaSheet: Bool { false }
+    static var opensPhotoSheet: Bool { false }
+    static var opensFriendSheet: Bool { false }
+    static var opensMessagesTab: Bool { false }
+    static var opensANFRMap: Bool { false }
+    static var opensANFRStats: Bool { false }
+    static var usesLegacyDock: Bool { false }
+    static var delaysLoadForQA: Bool { false }
+    static var resetsMapOnLaunch: Bool { false }
+    #endif
 }

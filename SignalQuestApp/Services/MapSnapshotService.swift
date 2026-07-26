@@ -21,6 +21,15 @@ struct MapBounds: Equatable, Sendable {
     let south: Double
     let east: Double
     let west: Double
+
+    /// MapKit peut produire des `span` NaN après certaines transitions de caméra
+    /// (rotation, changement de scène, redimensionnement de fenêtre). Or les
+    /// conversions `Int(...)` qui construisent les clés de cache et les indices
+    /// de tuile **trappent** sur NaN ou infini — ce n'est pas un dépassement
+    /// rattrapable, c'est un crash. Même garde que `MarketRegistryService:91`.
+    var isFinite: Bool {
+        north.isFinite && south.isFinite && east.isFinite && west.isFinite
+    }
 }
 
 final class MapSnapshotService: MapSnapshotServicing {
@@ -35,6 +44,11 @@ final class MapSnapshotService: MapSnapshotServicing {
     }
 
     func snapshot(bounds: MapBounds, zoom: Double, lightweight: Bool = true) async throws -> SocialMapSnapshot {
+        // Les `Int(...)` de la clé de cache trappent sur NaN/infini. `.cancelled`
+        // plutôt qu'une vraie erreur : une région dégénérée n'est pas un échec à
+        // montrer à l'utilisateur, il n'y a simplement rien à charger — et
+        // `Error.isCancellation` fait déjà taire ce cas chez tous les appelants.
+        guard bounds.isFinite, zoom.isFinite else { throw APIError.cancelled }
         let key = "social-map-\(Int(bounds.north * 100))-\(Int(bounds.south * 100))-\(Int(bounds.east * 100))-\(Int(bounds.west * 100))-\(Int(zoom))-\(lightweight)"
         if let cached = try await cache.read(SocialMapSnapshot.self, for: key, maxAge: 30) {
             return cached
@@ -392,6 +406,11 @@ final class MapSnapshotService: MapSnapshotServicing {
     }
 
     private static func visibleTiles(bounds: MapBounds, zoom: Double, detailBoost: Int = 0, maxTiles: Int = 24) -> [AndroidMapTile] {
+        // `Int(zoom.rounded(.down))` trappe sur NaN/infini. Les `min`/`max` qui
+        // suivent neutralisent les NaN de lat/lon par accident (sémantique de
+        // Swift.min/max), mais pas celui du zoom. Point d'entrée des 4 couches
+        // de tuiles : la garde ici les couvre toutes.
+        guard bounds.isFinite, zoom.isFinite else { return [] }
         let z = min(16, max(4, Int(zoom.rounded(.down)) + detailBoost))
         let north = min(85.05112878, max(-85.05112878, bounds.north))
         let south = min(85.05112878, max(-85.05112878, bounds.south))

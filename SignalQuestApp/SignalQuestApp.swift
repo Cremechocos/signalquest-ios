@@ -313,7 +313,7 @@ struct MainTabView: View {
     /// vérifier le rendu et la rétraction pré-iOS 26 (DockMinimizeQATests).
     private static var forceLegacyDock: Bool {
 #if DEBUG
-        ProcessInfo.processInfo.arguments.contains("--qa-legacy-dock")
+        AppEnvironment.usesLegacyDock
 #else
         false
 #endif
@@ -347,10 +347,10 @@ struct MainTabView: View {
             NavigationStack {
                 ProfileView(user: user)
 #if DEBUG
-                    .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-map"))) {
+                    .navigationDestination(isPresented: .constant(AppEnvironment.opensANFRMap)) {
                         ANFRMapView(service: services.anfr)
                     }
-                    .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-stats"))) {
+                    .navigationDestination(isPresented: .constant(AppEnvironment.opensANFRStats)) {
                         ANFRStatsView(service: services.anfr)
                     }
 #endif
@@ -390,10 +390,10 @@ struct MainTabView: View {
                 ProfileView(user: user)
                     .toolbar(.hidden, for: .tabBar)
 #if DEBUG
-                    .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-map"))) {
+                    .navigationDestination(isPresented: .constant(AppEnvironment.opensANFRMap)) {
                         ANFRMapView(service: services.anfr)
                     }
-                    .navigationDestination(isPresented: .constant(ProcessInfo.processInfo.arguments.contains("--qa-anfr-stats"))) {
+                    .navigationDestination(isPresented: .constant(AppEnvironment.opensANFRStats)) {
                         ANFRStatsView(service: services.anfr)
                     }
 #endif

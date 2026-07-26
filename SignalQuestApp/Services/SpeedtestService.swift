@@ -1,6 +1,7 @@
 import Foundation
 import CoreLocation
 import Network
+import os
 import UIKit
 import WidgetKit
 import Security
@@ -3236,6 +3237,13 @@ actor IPerf3Runner {
         }
         let bag = IPerf3ConnectionBag()
         let isTestRunning = AtomicBool(false)
+        // Filet de sécurité : `onCancel` ne s'exécute QUE sur annulation. Si
+        // `runInternal` lève (timeout de lecture, erreur serveur iPerf3), le
+        // ticker de progression — qui boucle sur `while isTestRunning.value` —
+        // continuait d'émettre pendant que le repli Cloudflare pilotait déjà
+        // l'aiguille et la Live Activity : deux sources concurrentes sur le même
+        // cadran. Le `defer` couvre succès, échec et annulation.
+        defer { isTestRunning.value = false }
         return try await withTaskCancellationHandler {
             try await runInternal(portEndpoint: portEndpoint, bag: bag, isTestRunning: isTestRunning)
         } onCancel: {
@@ -3493,7 +3501,11 @@ actor IPerf3Runner {
 
     private func readJSON(_ connection: NWConnection) async throws -> [String: Any] {
         let lengthData = try await readExactNW(connection, count: 4, timeoutSeconds: 15)
-        let length = UInt32(bigEndian: lengthData.withUnsafeBytes { $0.load(as: UInt32.self) })
+        // `load(as:)` EXIGE un pointeur aligné sur 4 octets pour UInt32 et trappe
+        // sinon (« load from misaligned raw pointer »). `lengthData` est
+        // reconstruite depuis des buffers réseau : son adresse de base n'offre
+        // aucune garantie d'alignement. `loadUnaligned` (iOS 16+) est l'idiome sûr.
+        let length = UInt32(bigEndian: lengthData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) })
         guard length > 0, length < 16_000_000 else { throw IPerf3Error.invalidJSON }
         let jsonData = try await readExactNW(connection, count: Int(length), timeoutSeconds: 15)
         guard let json = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] else {
@@ -3923,19 +3935,30 @@ final class SpeedtestSamplesBox: @unchecked Sendable {
 /// l'ancienne version affichait la moyenne cumulée lissée, qui traînait
 /// systématiquement derrière le débit courant. La valeur FINALE affichée reste
 /// la moyenne cumulée post-grace, calculée en fin de phase (inchangée).
+/// `@unchecked Sendable` : la conformité est assurée par le verrou ci-dessous,
+/// pas par le compilateur. L'état était auparavant muté SANS synchronisation
+/// alors que `observe(...)` est appelé depuis les callbacks `NWConnection`
+/// (queues réseau) : deux `append`/`removeFirst` concurrents sur un `Array`
+/// Swift corrompent le buffer et font crasher le processus.
 final class SpeedtestLiveSampler: @unchecked Sendable {
     private struct Point {
         let elapsedMs: Double
         let totalBytes: Int
     }
 
+    private struct State {
+        var points: [Point] = []
+        var emaMbps: Double = 0
+        /// Dernier débit instantané NON lissé (fenêtre glissante brute) — sert
+        /// notamment à la décision de grace adaptative.
+        var lastInstantMbps: Double = 0
+    }
+
     private let windowMs: Double
     private let smoothing: Double
-    private var points: [Point] = []
-    private var emaMbps: Double = 0
-    /// Dernier débit instantané NON lissé (fenêtre glissante brute) — sert
-    /// notamment à la décision de grace adaptative.
-    private(set) var lastInstantMbps: Double = 0
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    var lastInstantMbps: Double { state.withLock { $0.lastInstantMbps } }
 
     init(windowMs: Double = 1_000, smoothing: Double = 0.35) {
         self.windowMs = max(1, windowMs)
@@ -3947,23 +3970,25 @@ final class SpeedtestLiveSampler: @unchecked Sendable {
     /// le warm-up l'aiguille montre déjà le débit réel, seule la moyenne
     /// l'exclut.
     func observe(totalBytes: Int, elapsedMs: Double) -> Double {
-        points.append(Point(elapsedMs: elapsedMs, totalBytes: totalBytes))
-        // Conserve un point au-delà de la fenêtre pour que le delta couvre
-        // toujours ~windowMs une fois la fenêtre remplie.
-        while points.count > 2, points[1].elapsedMs <= elapsedMs - windowMs {
-            points.removeFirst()
+        state.withLock { s in
+            s.points.append(Point(elapsedMs: elapsedMs, totalBytes: totalBytes))
+            // Conserve un point au-delà de la fenêtre pour que le delta couvre
+            // toujours ~windowMs une fois la fenêtre remplie.
+            while s.points.count > 2, s.points[1].elapsedMs <= elapsedMs - windowMs {
+                s.points.removeFirst()
+            }
+            guard s.points.count >= 2, let first = s.points.first else { return s.emaMbps }
+            let spanMs = elapsedMs - first.elapsedMs
+            guard spanMs > 0 else { return s.emaMbps }
+            let instant = boundedMbps(bytes: max(0, totalBytes - first.totalBytes), durationMs: spanMs)
+            s.lastInstantMbps = instant
+            if s.emaMbps == 0 {
+                s.emaMbps = instant
+            } else {
+                s.emaMbps = (smoothing * instant) + ((1 - smoothing) * s.emaMbps)
+            }
+            return s.emaMbps
         }
-        guard points.count >= 2, let first = points.first else { return emaMbps }
-        let spanMs = elapsedMs - first.elapsedMs
-        guard spanMs > 0 else { return emaMbps }
-        let instant = boundedMbps(bytes: max(0, totalBytes - first.totalBytes), durationMs: spanMs)
-        lastInstantMbps = instant
-        if emaMbps == 0 {
-            emaMbps = instant
-        } else {
-            emaMbps = (smoothing * instant) + ((1 - smoothing) * emaMbps)
-        }
-        return emaMbps
     }
 }
 

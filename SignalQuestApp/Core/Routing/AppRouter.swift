@@ -37,19 +37,21 @@ final class AppRouter: ObservableObject {
     @Published var isDockMinimized = false
 
     init() {
-        let args = ProcessInfo.processInfo.arguments
+        // Tous les drapeaux passent par AppEnvironment : en Release ce sont des
+        // constantes `false`, donc l'onglet initial est toujours `.home` et
+        // aucun argument de lancement ne peut détourner la navigation.
         if AppEnvironment.runsSpeedtestQA {
             selectedTab = .speed
         } else if AppEnvironment.startsOnMap
-                    || args.contains("--qa-demo-photos")
-                    || args.contains("--qa-demo-friends")
-                    || args.contains("--qa-map-layers")
-                    || args.contains("--qa-open-antenna") {
+                    || AppEnvironment.usesDemoPhotos
+                    || AppEnvironment.usesDemoFriends
+                    || AppEnvironment.opensMapLayers
+                    || AppEnvironment.opensAntennaSheet {
             selectedTab = .map
-        } else if args.contains("--qa-tab-messages") {
+        } else if AppEnvironment.opensMessagesTab {
             selectedTab = .community
-        } else if ProcessInfo.processInfo.arguments.contains("--qa-anfr-map") ||
-                    ProcessInfo.processInfo.arguments.contains("--qa-anfr-stats") {
+        } else if AppEnvironment.opensANFRMap ||
+                    AppEnvironment.opensANFRStats {
             selectedTab = .profile
         } else {
             selectedTab = .home

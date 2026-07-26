@@ -340,6 +340,13 @@ final class MapExplorerViewModel: ObservableObject {
         return nil
     }
 
+    // Les jeux de démonstration ci-dessous contiennent des identifiants de
+    // photos et des URLs S3 de PRODUCTION. `#if DEBUG` porte sur la déclaration
+    // elle-même, et pas seulement sur les appels : l'élimination de branche
+    // morte ne garantit pas que le compilateur retire les littéraux de la
+    // section `__cstring` du binaire. C'est le seul moyen sûr qu'ils ne soient
+    // pas lisibles dans une archive signée (SECURITY-04).
+    #if DEBUG
     /// QA : reconstruit le snapshot en y plaçant de vraies photos publiques
     /// (vignettes + détail/like/commentaires réels) réparties autour du centre.
     static func snapshotInjectingQAPhotos(into snapshot: SocialMapSnapshot, around bounds: MapBounds) -> SocialMapSnapshot {
@@ -370,6 +377,7 @@ final class MapExplorerViewModel: ObservableObject {
             logicalCoveragePointsCount: snapshot.logicalCoveragePointsCount
         )
     }
+    #endif
 
     // MARK: Changement automatique de marché (caméra idle)
 
@@ -482,17 +490,19 @@ final class MapExplorerViewModel: ObservableObject {
     func load(bounds: MapBounds, zoom: Double, filters: Set<MapDisplayItem.Kind>, lightweight: Bool = true) async {
         if AppEnvironment.usesDemoData {
             snapshot = .demo
+            #if DEBUG
             // QA (DEBUG) : injecte de vraies photos géolocalisées même en démo pour
             // visualiser/capturer le rendu de la couche Photos (publicPhotos).
-            if ProcessInfo.processInfo.arguments.contains("--qa-demo-photos") {
+            if AppEnvironment.usesDemoPhotos {
                 snapshot = Self.snapshotInjectingQAPhotos(into: snapshot, around: bounds)
                 publicPhotos = Self.demoPublicPhotos(around: bounds)
             }
-            if ProcessInfo.processInfo.arguments.contains("--qa-demo-friends") {
+            if AppEnvironment.usesDemoFriends {
                 liveFriends = Self.demoFriends(around: bounds)
                 publicPhotos = Self.demoPublicPhotos(around: bounds)
                 snapshot = Self.snapshotInjectingQAPhotos(into: snapshot, around: bounds)
             }
+            #endif
             errorMessage = nil
             dataVersion &+= 1
             return
@@ -642,11 +652,13 @@ final class MapExplorerViewModel: ObservableObject {
             // / amorçage amis déjà affichés) plutôt que de tout vider en « aucune donnée ».
             layerError = error
         }
+        #if DEBUG
         // QA (DEBUG) : injecte de vraies photos publiques géolocalisées pour
         // vérifier le rendu des vignettes + le viewer.
-        if ProcessInfo.processInfo.arguments.contains("--qa-demo-photos") {
+        if AppEnvironment.usesDemoPhotos {
             snapshot = Self.snapshotInjectingQAPhotos(into: snapshot, around: bounds)
         }
+        #endif
 
         if let tiles = antenna.tiles {
             antennaClusters = tiles.flatMap(\.clusters)
@@ -679,8 +691,10 @@ final class MapExplorerViewModel: ObservableObject {
         }
         // QA (DEBUG) : injecte des photos publiques de démo pour visualiser la
         // couche (le compte de test n'a pas forcément de photos géolocalisées).
-        if ProcessInfo.processInfo.arguments.contains("--qa-demo-photos") {
+        if AppEnvironment.usesDemoPhotos {
+            #if DEBUG
             publicPhotos = Self.demoPublicPhotos(around: bounds)
+            #endif
         } else if let value = photos.value {
             publicPhotos = value
         } else if let error = photos.error {
@@ -693,8 +707,10 @@ final class MapExplorerViewModel: ObservableObject {
             liveFriends = snapshot.friends
         }
         // QA (DEBUG) : amis de démo pour visualiser/capturer le rendu « Find My ».
-        if ProcessInfo.processInfo.arguments.contains("--qa-demo-friends") {
+        if AppEnvironment.usesDemoFriends {
+            #if DEBUG
             liveFriends = Self.demoFriends(around: bounds)
+            #endif
         }
         // ROB-08 : nil si tout a réussi (errorMessage déjà remis à nil en début de
         // `load`) ; sinon signale l'indisponibilité sans avoir écrasé les couches.
@@ -715,6 +731,9 @@ final class MapExplorerViewModel: ObservableObject {
         friendsVersion &+= 1
     }
 
+    // Idem : identifiants et URLs S3 de production, plus des amis fictifs
+    // nommés. Déclarations gardées, pas seulement les appels.
+    #if DEBUG
     /// Photos publiques de démonstration (QA) réparties autour du viewport.
     static func demoPublicPhotos(around bounds: MapBounds) -> [MapPublicPhoto] {
         let lat = (bounds.north + bounds.south) / 2
@@ -772,6 +791,7 @@ final class MapExplorerViewModel: ObservableObject {
             )
         }
     }
+    #endif
 
     /// Recherche à la frappe : anti-rebond ~300 ms + annulation de la précédente.
     /// Appelée depuis `.onChange(searchQuery)`.
@@ -1395,7 +1415,7 @@ struct MapExplorerView: View {
          markets: MarketRegistryServicing = MarketRegistryService(api: APIClient())) {
         _model = StateObject(wrappedValue: MapExplorerViewModel(map: service, antennas: antennas, markets: markets))
         // QA : `--reset-map` oublie région + marché/opérateur pour rejouer la détection.
-        if ProcessInfo.processInfo.arguments.contains("--reset-map") {
+        if AppEnvironment.resetsMapOnLaunch {
             MapRegionStore.reset()
             MapMarketStore.reset()
         }
@@ -1457,13 +1477,13 @@ struct MapExplorerView: View {
         }
         .task {
             // QA (DEBUG) : pré-active les couches pour capturer leurs couleurs.
-            if ProcessInfo.processInfo.arguments.contains("--qa-map-layers") {
+            if AppEnvironment.opensMapLayers {
                 filters = [.antenna, .speedtest, .coverage]
             }
-            if ProcessInfo.processInfo.arguments.contains("--qa-demo-photos") {
+            if AppEnvironment.usesDemoPhotos {
                 filters = [.photo]
             }
-            if ProcessInfo.processInfo.arguments.contains("--qa-demo-friends") {
+            if AppEnvironment.usesDemoFriends {
                 filters = [.friend, .photo, .antenna]
             }
             await model.loadRegistry()
@@ -1483,7 +1503,7 @@ struct MapExplorerView: View {
             }
             // QA (DEBUG) : cadre ville pour visualiser les marqueurs amis individuels
             // (avatars, cônes de cap, présence) plutôt qu'un cluster continental.
-            if ProcessInfo.processInfo.arguments.contains("--qa-demo-friends") {
+            if AppEnvironment.usesDemoFriends {
                 let region = MKCoordinateRegion(
                     center: CLLocationCoordinate2D(latitude: 45.188, longitude: 5.724),
                     latitudinalMeters: 2200, longitudinalMeters: 2200
@@ -1495,17 +1515,19 @@ struct MapExplorerView: View {
             await model.load(region: lastRegion, zoom: mapZoom, filters: filters)
             model.endInitialSelection()
             refreshMapRender()
+            #if DEBUG
             await runQAPanIfRequested()
+            #endif
             // QA (DEBUG) : ouvre la fiche de la première antenne (attend que le
             // niveau de zoom fasse apparaître des antennes individuelles).
-            if ProcessInfo.processInfo.arguments.contains("--qa-open-antenna") {
+            if AppEnvironment.opensAntennaSheet {
                 for _ in 0..<16 {
                     if let first = model.antennas.first { selectedAntenna = first; break }
                     try? await Task.sleep(for: .milliseconds(500))
                 }
             }
             // QA (DEBUG) : ouvre le viewer de la première photo injectée.
-            if ProcessInfo.processInfo.arguments.contains("--qa-open-photo") {
+            if AppEnvironment.opensPhotoSheet {
                 for _ in 0..<16 {
                     if let first = model.publicPhotos.first {
                         selectedPhoto = MapPhotoTarget(id: first.id, thumbnailURL: first.thumbnailUrl)
@@ -1515,7 +1537,7 @@ struct MapExplorerView: View {
                 }
             }
             // QA (DEBUG) : ouvre la fiche du premier ami vivant géolocalisé.
-            if ProcessInfo.processInfo.arguments.contains("--qa-open-friend") {
+            if AppEnvironment.opensFriendSheet {
                 for _ in 0..<16 {
                     if let first = model.liveFriends.first(where: { $0.location != nil }) {
                         selectedFriend = first
@@ -1526,7 +1548,8 @@ struct MapExplorerView: View {
             }
             // QA (DEBUG) : fait « marcher » les amis démo pour visualiser le
             // déplacement animé du marqueur (mise à jour périodique de la position).
-            if ProcessInfo.processInfo.arguments.contains("--qa-friends-walk") {
+            if AppEnvironment.walksDemoFriends {
+                #if DEBUG
                 Task { @MainActor [model] in
                     var friends = MapExplorerViewModel.demoFriends(around: MapBounds(north: 0, south: 0, east: 0, west: 0))
                     for _ in 0..<12 {
@@ -1545,6 +1568,7 @@ struct MapExplorerView: View {
                         model.applyLiveFriends(friends)
                     }
                 }
+                #endif
             }
             // Notification/deep link antenne reçu avant l'apparition de la carte.
             openSiteFromRouterIfNeeded()
@@ -1680,19 +1704,19 @@ struct MapExplorerView: View {
         .ignoresSafeArea()
     }
 
+    #if DEBUG
     /// Hook QA (DEBUG) : `SQ_QA_PAN_TO="lat,lng[,zoom]"` déplace la caméra
     /// après stabilisation, comme la fin d'un pan utilisateur — le delegate
     /// MapKit déclenche alors la chaîne réelle de détection de marché.
     private func runQAPanIfRequested() async {
-        #if DEBUG
         guard let raw = ProcessInfo.processInfo.environment["SQ_QA_PAN_TO"] else { return }
         let parts = raw.split(separator: ",").compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
         guard parts.count >= 2 else { return }
         try? await Task.sleep(for: .seconds(4))
         if parts.count >= 3 { mapZoom = parts[2] }
         mapCenter = CLLocationCoordinate2D(latitude: parts[0], longitude: parts[1])
-        #endif
     }
+    #endif
 
     /// Caméra par défaut d'un marché : centre/zoom du registre quand ils sont
     /// connus, sinon les valeurs statiques historiques.
@@ -1786,7 +1810,7 @@ struct MapExplorerView: View {
 
     private static var forcesLegacyDock: Bool {
         #if DEBUG
-        ProcessInfo.processInfo.arguments.contains("--qa-legacy-dock")
+        AppEnvironment.usesLegacyDock
         #else
         false
         #endif
@@ -3115,6 +3139,13 @@ struct MapExplorerView: View {
     }
 
     private func scheduleLoad(region: MKCoordinateRegion) {
+        // Garde à la source : MapKit livre parfois un centre ou un span NaN
+        // pendant une transition de caméra. Filtrer ici protège d'un coup les 7
+        // points d'entrée de MapSnapshotService, dont les conversions `Int(...)`
+        // trapperaient. On ne mémorise pas non plus une `lastRegion` corrompue,
+        // qui serait rejouée à chaque rechargement.
+        guard region.center.latitude.isFinite, region.center.longitude.isFinite,
+              region.span.latitudeDelta.isFinite, region.span.longitudeDelta.isFinite else { return }
         lastRegion = region
         let zoom = zoom(for: region)
         let bounds = MapBounds(
