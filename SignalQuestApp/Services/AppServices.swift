@@ -129,4 +129,33 @@ final class AppServices: ObservableObject {
             if lastMessageAt > lastReadAt { count += 1 }
         }
     }
+
+    // MARK: - Cycle de vie de la scène
+
+    /// Passage en arrière-plan : coupe les boucles réseau qui n'ont plus de
+    /// raison de tourner.
+    ///
+    /// Sans cela, la présence live continuait de publier toutes les 5 à 20 s,
+    /// écran verrouillé et sans limite de durée — `mapDidDisappear()` n'est
+    /// appelé que sur `.onDisappear` de la carte, qui ne se déclenche pas au
+    /// backgrounding. En drive test c'est aggravé : le background mode
+    /// `location` empêche iOS de suspendre le processus, donc la boucle tourne
+    /// réellement au lieu d'être gelée.
+    ///
+    /// La garde est délibérée : un drive test ou un appel en cours signifie que
+    /// l'utilisateur a explicitement demandé une activité de fond, et ses amis
+    /// s'attendent à le voir bouger. On ne coupe rien dans ces cas.
+    ///
+    /// La messagerie n'est pas concernée : `ConversationDetailView` arrête déjà
+    /// son flux SSE et son polling sur `scenePhase`.
+    func enterBackground() {
+        guard !location.wantsTracking, callManager.activeCall == nil else { return }
+        livePresence.setAppActive(false)
+    }
+
+    /// Retour au premier plan : la diffusion reprend si les réglages de partage
+    /// et le mode l'autorisent (`reevaluate()` tranche).
+    func enterForeground() {
+        livePresence.setAppActive(true)
+    }
 }

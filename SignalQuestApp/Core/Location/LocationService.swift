@@ -21,7 +21,11 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     private var locationRequestGeneration = 0
     /// Suivi continu demandé (drive test) : permet de (re)démarrer le tracking dès
     /// que l'autorisation est accordée, même si l'utilisateur valide le prompt après.
-    private var wantsTracking = false
+    /// Suivi continu demandé (rafale / drive test). Exposé en lecture parce que
+    /// c'est le signal qui autorise l'app à rester active écran verrouillé :
+    /// tant qu'il est vrai, couper les boucles réseau d'arrière-plan priverait
+    /// l'utilisateur de ce qu'il a explicitement lancé.
+    @Published private(set) var wantsTracking = false
     /// Callback optionnel appelé à chaque position pendant un suivi continu.
     /// Mis à nil par l'appelant en fin de session (drive test).
     var onLocationUpdate: (@MainActor (CLLocation) -> Void)?

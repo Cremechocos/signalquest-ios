@@ -119,8 +119,10 @@ struct SignalQuestApp: App {
                                 await services.callManager.reconcilePendingIncomingCall()
                             }
                         }
+                        services.enterForeground()
                     case .background:
                         appLock.didEnterBackground()
+                        services.enterBackground()
                     default:
                         break
                     }

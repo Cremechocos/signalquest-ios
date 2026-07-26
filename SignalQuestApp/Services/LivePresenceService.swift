@@ -111,9 +111,33 @@ final class LivePresenceService: ObservableObject {
 
     // MARK: - Boucle
 
-    /// Vrai quand on doit diffuser : partage actif ET (mode continu OU carte visible).
+    /// L'app est au premier plan. En arrière-plan, la diffusion s'arrête —
+    /// sauf si l'appelant décide explicitement de la maintenir (drive test ou
+    /// appel en cours, cf. `AppServices.enterBackground()`).
+    ///
+    /// Sans ce drapeau, `mode == .foregroundLive` suffisait à diffuser
+    /// indéfiniment : `mapDidDisappear()` n'est appelé que sur `.onDisappear`
+    /// de la carte, qui ne se déclenche PAS au passage en arrière-plan. Un
+    /// utilisateur en partage continu réveillait donc la radio toutes les
+    /// 5 à 20 secondes, écran verrouillé, sans limite de durée.
+    private var appIsActive = true
+
+    deinit {
+        // Filet : la boucle est normalement arrêtée par `stopLoop()`, mais une
+        // Task non structurée survit à son propriétaire.
+        loopTask?.cancel()
+    }
+
+    func setAppActive(_ active: Bool) {
+        guard appIsActive != active else { return }
+        appIsActive = active
+        reevaluate()
+    }
+
+    /// Vrai quand on doit diffuser : partage actif, app au premier plan, ET
+    /// (mode continu OU carte visible).
     private var shouldBroadcast: Bool {
-        shareLocation && (mode == .foregroundLive || mapVisible)
+        shareLocation && appIsActive && (mode == .foregroundLive || mapVisible)
     }
 
     private func reevaluate() {
@@ -129,9 +153,13 @@ final class LivePresenceService: ObservableObject {
         isBroadcasting = true
         loopTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.publishTick()
-                let interval = self?.publishInterval ?? 15
-                try? await Task.sleep(for: .seconds(interval))
+                // `guard let self` et non `self?` : si le service est désalloué
+                // sans passer par `stopLoop()`, la boucle tournait à vide
+                // indéfiniment, réveillant le processeur toutes les 15 s pour
+                // ne rien faire.
+                guard let self else { return }
+                await self.publishTick()
+                try? await Task.sleep(for: .seconds(self.publishInterval))
             }
         }
     }
