@@ -63,6 +63,11 @@ struct SignalQuestApp: App {
                 .environmentObject(services.router)
                 .environmentObject(services.callManager)
                 .environmentObject(services.networkPath)
+                // Injecté SÉPARÉMENT, comme networkPath et callManager : un
+                // ObservableObject imbriqué dans AppServices n'est pas observé
+                // de façon transitive, donc `RootView` ne se reconstruirait pas
+                // au changement d'état de la politique de version.
+                .environmentObject(services.versionPolicy)
                 .environmentObject(appLock)
                 .task {
                     services.networkPath.start()
@@ -75,6 +80,10 @@ struct SignalQuestApp: App {
                     // le report CallKit. Le token n'est associé au compte qu'après
                     // authentification par `registerPushIfAuthenticated`.
                     services.callManager.registerForVoIPPushes()
+                    // Best-effort et NON bloquant : lancé en parallèle du
+                    // bootstrap pour ne pas rallonger le démarrage. Un échec
+                    // laisse l'état à `.unknown`, donc l'app fonctionne.
+                    Task { await services.versionPolicy.refresh() }
                     await session.bootstrap()
                     await registerPushIfAuthenticated(session.state)
                     // Verrouillage biométrique à l'ouverture (si activé + authentifié).
@@ -147,18 +156,32 @@ struct RootView: View {
     @EnvironmentObject private var callManager: CallManager
     @EnvironmentObject private var networkPath: NetworkPathMonitor
     @EnvironmentObject private var appLock: AppLockController
+    @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var versionPolicy: VersionPolicyService
 
     var body: some View {
         Group {
-            switch session.state {
-            case .checking:
-                LaunchLoadingView()
-            case .loggedOut, .requires2FA:
-                LoginView()
-            case .offline:
-                OfflineRetryView()
-            case .authenticated(let user):
-                MainTabView(user: user)
+            // Version trop ancienne : on ne construit RIEN d'autre.
+            //
+            // Un simple `.overlay` ne suffit pas — le dock flottant restait
+            // atteignable en dessous (vérifié : les 5 onglets répondaient encore
+            // aux taps derrière l'écran de blocage). Court-circuiter la
+            // hiérarchie garantit qu'aucune requête d'une version obsolète
+            // n'atteigne un backend dont le contrat a été durci, ce qui est tout
+            // l'objet de ce kill-switch.
+            if case .updateRequired(let message, let storeURL) = versionPolicy.state {
+                ForcedUpdateView(message: message, storeURL: storeURL)
+            } else {
+                switch session.state {
+                case .checking:
+                    LaunchLoadingView()
+                case .loggedOut, .requires2FA:
+                    LoginView()
+                case .offline:
+                    OfflineRetryView()
+                case .authenticated(let user):
+                    MainTabView(user: user)
+                }
             }
         }
         .sqAnimation(SQMotion.smooth, value: session.state)
@@ -175,6 +198,7 @@ struct RootView: View {
                 AppLockScreen(lock: appLock).transition(.opacity)
             }
         }
+        .sqAnimation(SQMotion.smooth, value: versionPolicy.state)
         .sqAnimation(SQMotion.smooth, value: appLock.isLocked)
         // CALL-VOIP-07 : au retour du réseau (sortie de tunnel/mode avion), si le
         // dernier enregistrement du token VoIP avait échoué, on le rejoue — sinon

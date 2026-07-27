@@ -43,6 +43,9 @@ final class AppServices: ObservableObject {
     let networkPath = NetworkPathMonitor()
     /// Émetteur de la position/présence live pour la carte des amis.
     let livePresence: LivePresenceService
+    /// Kill-switch de version : permet de forcer une mise à jour sans revue
+    /// App Store, et conditionne tout durcissement de contrat côté backend.
+    let versionPolicy: VersionPolicyService
 
     /// Nombre de conversations non lues — alimente le badge de l'onglet Messages.
     @Published var unreadConversations = 0
@@ -64,6 +67,7 @@ final class AppServices: ObservableObject {
         let privacyService = PrivacyService(api: api)
         privacy = privacyService
         livePresence = LivePresenceService(api: api, location: location, networkPath: networkPath, privacy: privacyService)
+        versionPolicy = VersionPolicyService(api: api)
         let mapService = MapSnapshotService(api: api)
         map = mapService
         let marketsService = MarketRegistryService(api: api)
