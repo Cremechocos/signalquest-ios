@@ -28,6 +28,11 @@ protocol SocialFeedServicing: Sendable {
     /// Vote (ou retire son vote) sur le sondage d'une publication.
     /// `optionId == nil` retire tous les votes de l'utilisateur.
     func votePoll(postId: String, optionId: String?, removing: Bool) async throws -> FeedPoll?
+    /// Bilan hebdomadaire de l'utilisateur (mis en cache 5 min côté serveur).
+    func weeklyRecap() async throws -> WeeklyRecapStats?
+    /// Publie le bilan sous forme de story. Idempotent sur la semaine : le
+    /// serveur renvoie la story existante plutôt que d'en créer une seconde.
+    func publishWeeklyRecap() async throws -> WeeklyRecapPublishResponse
     /// Partage un post vers une conversation. Renvoie l'id du message créé (pour
     /// permettre l'annulation), ou nil si le backend ne l'a pas fourni.
     func share(postId: String, conversationId: String) async throws -> String?
@@ -209,6 +214,22 @@ final class SocialFeedService: SocialFeedServicing {
     func deletePost(postId: String) async throws {
         try await api.request(
             APIEndpoint(path: "/api/social/posts/\(normalizedPostId(postId))", method: .delete)
+        )
+    }
+
+    func weeklyRecap() async throws -> WeeklyRecapStats? {
+        struct Response: Decodable { let stats: WeeklyRecapStats? }
+        let response: Response = try await api.request(
+            APIEndpoint(path: "/api/social/recap"),
+            as: Response.self
+        )
+        return response.stats
+    }
+
+    func publishWeeklyRecap() async throws -> WeeklyRecapPublishResponse {
+        try await api.request(
+            APIEndpoint(path: "/api/social/recap", method: .post),
+            as: WeeklyRecapPublishResponse.self
         )
     }
 

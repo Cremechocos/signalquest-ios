@@ -253,3 +253,68 @@ final class FeedPollTests: XCTestCase {
         XCTAssertTrue(poll(totalVotes: 3).isOpen)
     }
 }
+
+/// Le bilan hebdo est le seul écran dont la sortie quitte l'app (image
+/// partagée). Ses défauts se voient donc par des inconnus, et pas dans l'app.
+final class WeeklyRecapTests: XCTestCase {
+
+    private func stats(
+        speedtests: Int = 0, topMbps: Double? = nil, points: Int = 0,
+        validations: Int = 0, photos: Int = 0, badges: Int = 0, moments: Int = 0
+    ) -> WeeklyRecapStats {
+        WeeklyRecapStats(
+            weekStart: Date(timeIntervalSince1970: 1_753_000_000),
+            weekEnd: Date(timeIntervalSince1970: 1_753_604_800),
+            speedtestCount: speedtests, topDownloadMbps: topMbps,
+            topDownloadTech: nil, topDownloadOperator: nil,
+            sessionPoints: points, sessionDistanceKm: nil,
+            validationCount: validations, photoCount: photos,
+            badgeCount: badges, signalMomentsShared: moments, topCity: nil
+        )
+    }
+
+    /// Une semaine vide ne doit rien proposer à partager : une carte creuse est
+    /// pire que pas de carte.
+    func testAnEmptyWeekHasNothingToShow() {
+        XCTAssertFalse(stats().hasSomethingToShow)
+        XCTAssertEqual(stats().headline, .none)
+    }
+
+    func testAnyContributionMakesTheWeekWorthSharing() {
+        XCTAssertTrue(stats(speedtests: 1).hasSomethingToShow)
+        XCTAssertTrue(stats(validations: 1).hasSomethingToShow)
+        XCTAssertTrue(stats(photos: 1).hasSomethingToShow)
+        XCTAssertTrue(stats(badges: 1).hasSomethingToShow)
+        XCTAssertTrue(stats(moments: 1).hasSomethingToShow)
+    }
+
+    /// Le débit domine le récit quand il existe ; sinon on met en avant ce qui a
+    /// réellement occupé la semaine, plutôt qu'un zéro.
+    func testHeadlinePrefersSpeedThenFallsBackInOrder() {
+        XCTAssertEqual(stats(speedtests: 3, topMbps: 240, points: 10).headline, .topSpeed(240))
+        XCTAssertEqual(stats(points: 10, validations: 2).headline, .coverage(10))
+        XCTAssertEqual(stats(validations: 2, photos: 5).headline, .validations(2))
+        XCTAssertEqual(stats(photos: 5).headline, .photos(5))
+    }
+
+    /// Un débit à zéro n'est pas un débit : il ne doit pas devenir le titre.
+    func testAZeroSpeedIsNotAHeadline() {
+        XCTAssertEqual(stats(speedtests: 2, topMbps: 0, points: 7).headline, .coverage(7))
+    }
+
+    func testStatsDecodeFromTheServerShape() throws {
+        let json = """
+        {"weekStart":"2026-07-20T00:00:00Z","weekEnd":"2026-07-27T00:00:00Z",
+         "speedtestCount":12,"topDownloadMbps":243.5,"topDownloadTech":"5G",
+         "topDownloadOperator":"Orange","sessionPoints":840,"sessionDistanceKm":31.2,
+         "validationCount":4,"photoCount":2,"badgeCount":1,"signalMomentsShared":3,
+         "topCity":"Lyon"}
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(WeeklyRecapStats.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.speedtestCount, 12)
+        XCTAssertEqual(decoded.headline, .topSpeed(243.5))
+        XCTAssertTrue(decoded.hasSomethingToShow)
+    }
+}

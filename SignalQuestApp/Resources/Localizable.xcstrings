@@ -14513,6 +14513,126 @@
           }
         }
       }
+    },
+    "Ma semaine": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "My week"
+          }
+        }
+      }
+    },
+    "Partager mon bilan": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share my recap"
+          }
+        }
+      }
+    },
+    "Publier en story": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Post as a story"
+          }
+        }
+      }
+    },
+    "Bilan indisponible": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recap unavailable"
+          }
+        }
+      }
+    },
+    "Pas encore de bilan": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No recap yet"
+          }
+        }
+      }
+    },
+    "Lance un speedtest, valide une antenne ou publie une photo : ton bilan de la semaine se remplira.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run a speedtest, confirm an antenna or publish a photo: your weekly recap will fill up."
+          }
+        }
+      }
+    },
+    "Ton bilan de la semaine est déjà en story.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your weekly recap is already a story."
+          }
+        }
+      }
+    },
+    "Bilan publié en story.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recap posted as a story."
+          }
+        }
+      }
+    },
+    "de couverture enregistrés": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "coverage points recorded"
+          }
+        }
+      }
+    },
+    "d'antennes confirmées": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "antennas confirmed"
+          }
+        }
+      }
+    },
+    "de sites partagées": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "site photos shared"
+          }
+        }
+      }
+    },
+    "en pic cette semaine": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "peak this week"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

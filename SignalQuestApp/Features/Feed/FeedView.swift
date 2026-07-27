@@ -338,6 +338,7 @@ struct FeedView: View {
     /// IRRÉVERSIBLE côté serveur : elle ne peut pas partir en deux taps depuis
     /// un menu contextuel.
     @State private var pendingDeletion: UnifiedSocialFeedItem?
+    @State private var showRecap = false
     @State private var presentedStoryStart: Int?
     @State private var showStoryComposer = false
     @State private var showComposer = false
@@ -502,6 +503,9 @@ struct FeedView: View {
         }
         .onChangeCompat(of: router.openMessagesInbox) { _, shouldOpen in
             if shouldOpen { presentMessagesIfNeeded() }
+        }
+        .sheet(isPresented: $showRecap) {
+            WeeklyRecapSheet(service: services.feed)
         }
         .confirmationDialog(
             "Supprimer cette publication ?",
@@ -724,6 +728,9 @@ struct FeedView: View {
             .accessibilityValue(services.unreadConversations == 0
                                 ? "Aucun message non lu"
                                 : "\(services.unreadConversations) conversations non lues")
+            headerButton(systemImage: "calendar", label: "Ma semaine") {
+                showRecap = true
+            }
             headerButton(systemImage: "magnifyingglass", label: "Explorer") {
                 showExplore = true
             }
