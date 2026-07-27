@@ -318,3 +318,53 @@ final class WeeklyRecapTests: XCTestCase {
         XCTAssertTrue(decoded.hasSomethingToShow)
     }
 }
+
+/// `GET /api/social/explore` renvoie trois listes en un appel. iOS n'appelait
+/// que la recherche d'utilisateurs : chercher un mot-clé ne trouvait JAMAIS la
+/// publication qui le contenait.
+final class SocialExploreTests: XCTestCase {
+
+    func testDecodesTheThreeLists() throws {
+        let json = """
+        {"posts":[{"id":"p1","kind":"post","author":{"id":"u1"},"text":"5G à Lyon",
+          "commentsCount":0,"repostsCount":0,"favoritesCount":0,
+          "likedByMe":false,"favoritedByMe":false,"repostedByMe":false}],
+         "people":[{"id":"u2","name":"Camille","handle":"cam"}],
+         "hashtags":[{"tag":"5g","postCount":12}]}
+        """
+        let result = try JSONDecoder().decode(SocialExploreResult.self, from: Data(json.utf8))
+        XCTAssertEqual(result.posts.count, 1)
+        XCTAssertEqual(result.people.count, 1)
+        // `postCount`, pas `count` : le premier fixture utilisait le mauvais nom
+        // et la liste se vidait SANS erreur, exactement le mode d'échec que le
+        // repli sur liste vide peut masquer. Vérifié contre la sélection Prisma
+        // du backend (`select: { tag: true, postCount: true }`).
+        XCTAssertEqual(result.hashtags.count, 1)
+        XCTAssertEqual(result.hashtags.first?.postCount, 12)
+        XCTAssertFalse(result.isEmpty)
+    }
+
+    /// Le serveur omet les listes vides selon la requête : un champ absent doit
+    /// valoir liste vide, pas un échec de décodage qui viderait tout l'écran.
+    func testMissingListsDecodeAsEmptyRatherThanFailing() throws {
+        let result = try JSONDecoder().decode(
+            SocialExploreResult.self,
+            from: Data(#"{"people":[{"id":"u2","name":"Camille"}]}"#.utf8)
+        )
+        XCTAssertTrue(result.posts.isEmpty)
+        XCTAssertTrue(result.hashtags.isEmpty)
+        XCTAssertEqual(result.people.count, 1)
+    }
+
+    /// La conversion vers le type de l'écran de recherche doit préserver
+    /// l'identité — sinon le tap ouvre le mauvais profil.
+    func testPeopleConversionKeepsIdentity() throws {
+        let result = try JSONDecoder().decode(
+            SocialExploreResult.self,
+            from: Data(#"{"people":[{"id":"u9","name":"Nora","handle":"nora"}]}"#.utf8)
+        )
+        let converted = result.peopleAsSearchResults
+        XCTAssertEqual(converted.first?.id, "u9")
+        XCTAssertEqual(converted.first?.handle, "nora")
+    }
+}

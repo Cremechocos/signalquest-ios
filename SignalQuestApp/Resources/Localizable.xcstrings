@@ -14633,6 +14633,26 @@
           }
         }
       }
+    },
+    "Publications": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Posts"
+          }
+        }
+      }
+    },
+    "Essaie un autre mot-clé, un nom ou un @handle.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try another keyword, name or @handle."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

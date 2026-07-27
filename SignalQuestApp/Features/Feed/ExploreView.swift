@@ -13,6 +13,9 @@ final class ExploreViewModel: ObservableObject {
     // Recherche d'utilisateurs
     @Published var searchText = ""
     @Published var searchResults: [SocialUserSearchResult] = []
+    /// Publications correspondant à la recherche — jusqu'ici jamais peuplées.
+    @Published var searchPosts: [UnifiedSocialFeedItem] = []
+    @Published var searchHashtags: [TrendingHashtag] = []
     @Published var isSearching = false
 
     // Flux filtré par hashtag
@@ -71,6 +74,8 @@ final class ExploreViewModel: ObservableObject {
 
     private func performSearch(query: String) async {
         if AppEnvironment.usesDemoData {
+            searchPosts = []
+            searchHashtags = []
             searchResults = Self.demoSearchResults.filter {
                 $0.displayName.localizedCaseInsensitiveContains(query) ||
                 ($0.handle?.localizedCaseInsensitiveContains(query) ?? false)
@@ -80,7 +85,13 @@ final class ExploreViewModel: ObservableObject {
         isSearching = true
         defer { isSearching = false }
         do {
-            searchResults = try await service.searchUsers(query: query, limit: 12)
+            // UN appel au lieu de deux, et surtout : la recherche renvoie enfin
+            // des PUBLICATIONS. `searchUsers` n'en rapportait aucune, si bien
+            // qu'un mot-clé ne trouvait jamais le post qui le contenait.
+            let result = try await service.explore(query: query)
+            searchResults = result.peopleAsSearchResults
+            searchPosts = result.posts
+            searchHashtags = result.hashtags
         } catch {
             if !(error is CancellationError) {
                 errorMessage = error.localizedDescription
@@ -265,11 +276,13 @@ struct ExploreView: View {
                     .tint(SQColor.brandRed)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, SQSpace.lg)
-            } else if model.searchResults.isEmpty {
+            } else if model.searchResults.isEmpty && model.searchPosts.isEmpty {
                 EmptyStateView(
                     title: "Aucun résultat",
-                    message: "Essaie un autre nom ou un @handle.",
-                    systemImage: "person.crop.circle.badge.questionmark"
+                    // Le message parlait de nom et de @handle alors que la
+                    // recherche couvre désormais aussi les publications.
+                    message: "Essaie un autre mot-clé, un nom ou un @handle.",
+                    systemImage: "magnifyingglass"
                 )
             } else {
                 LazyVStack(spacing: SQSpace.sm) {
@@ -314,7 +327,21 @@ struct ExploreView: View {
                         .accessibilityLabel("Voir le profil de \(result.displayName)")
                     }
                 }
-            }
+
+                }
+                if !model.searchPosts.isEmpty {
+                    // Les publications trouvées : c'est la moitié de la
+                    // recherche qui n'existait pas côté iOS.
+                    Text("Publications")
+                        .font(SQFont.archivo(13, .semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, SQSpace.md)
+                    ForEach(model.searchPosts) { item in
+                        // `detailItem` sert déjà à ouvrir une publication depuis cet écran :
+                        // en introduire un second dupliquerait la présentation.
+                        FeedItemCard(item: item, onTap: { detailItem = item })
+                    }            }
         }
     }
 

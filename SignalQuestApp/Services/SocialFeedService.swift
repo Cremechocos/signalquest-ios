@@ -28,6 +28,10 @@ protocol SocialFeedServicing: Sendable {
     /// Vote (ou retire son vote) sur le sondage d'une publication.
     /// `optionId == nil` retire tous les votes de l'utilisateur.
     func votePoll(postId: String, optionId: String?, removing: Bool) async throws -> FeedPoll?
+    /// Exploration unifiée : publications, personnes et hashtags en UN appel.
+    /// iOS n'interrogeait que les utilisateurs, et la recherche de publications
+    /// n'existait pas.
+    func explore(query: String?) async throws -> SocialExploreResult
     /// Bilan hebdomadaire de l'utilisateur (mis en cache 5 min côté serveur).
     func weeklyRecap() async throws -> WeeklyRecapStats?
     /// Publie le bilan sous forme de story. Idempotent sur la semaine : le
@@ -214,6 +218,17 @@ final class SocialFeedService: SocialFeedServicing {
     func deletePost(postId: String) async throws {
         try await api.request(
             APIEndpoint(path: "/api/social/posts/\(normalizedPostId(postId))", method: .delete)
+        )
+    }
+
+    func explore(query: String?) async throws -> SocialExploreResult {
+        var items: [URLQueryItem] = []
+        if let query, !query.trimmingCharacters(in: .whitespaces).isEmpty {
+            items.append(URLQueryItem(name: "q", value: query))
+        }
+        return try await api.request(
+            APIEndpoint(path: "/api/social/explore", query: items),
+            as: SocialExploreResult.self
         )
     }
 
