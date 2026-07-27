@@ -41,4 +41,8 @@ La voix est claire et directe, jamais technocratique. SignalQuest inspire la con
 
 ## Accessibility & Inclusion
 
-La cible minimale est WCAG 2.2 AA. Tous les écrans doivent prendre en charge Dynamic Type, VoiceOver, contraste suffisant (attention particulière : encre secondaire `#8D7C64` réservée aux textes ≥ 13 pt sur crème), Reduce Motion, différenciation des états autrement que par la couleur, zones tactiles d'au moins 44 points et navigation clavier sur iPad. Les textes essentiels sont disponibles en français et en anglais, sans troncature dans les tailles d'accessibilité.
+La cible minimale est WCAG 2.2 AA. Tous les écrans doivent prendre en charge Dynamic Type, VoiceOver, contraste suffisant, Reduce Motion, différenciation des états autrement que par la couleur, zones tactiles d'au moins 44 points et navigation clavier sur iPad.
+
+Sur le contraste, la règle est désormais tenue par un test (`DesignTokenContrastTests`) qui mesure chaque token **réellement résolu** par le système, dans les deux apparences : `label` et `labelSecondary` sont à ≥ 4,5:1 et portent le texte courant ; `labelTertiary` (`#8B7B63`) est à ≥ 3:1 et **réservé aux éléments graphiques** — icônes, traits, points inactifs. Sur une pastille teintée, utiliser `accentInk` / `dangerInk` plutôt que la couleur pleine.
+
+L'interface est en **français**. L'infrastructure de localisation est en place (String Catalogs, `SWIFT_EMIT_LOC_STRINGS`, catalogue `InfoPlist` pour les prompts de permission) et les chaînes sont extraites, mais aucune traduction n'est encore fournie : l'anglais reste à livrer.

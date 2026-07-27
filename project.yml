@@ -1,6 +1,10 @@
 name: SignalQuest
 options:
   developmentLanguage: fr
+  # Déclare les localisations du projet. Sans `knownRegions`, Xcode ne compile
+  # pas les String Catalogs et le réglage « Langue préférée » de l'app
+  # n'apparaît pas dans les Réglages système.
+  knownRegions: [fr, Base]
   bundleIdPrefix: fr.signalquest
   createIntermediateGroups: true
   deploymentTarget:
@@ -12,6 +16,11 @@ configs:
 settings:
   base:
     SWIFT_VERSION: "6.0"
+    # `Text("Bonjour")` en SwiftUI EST déjà un `LocalizedStringKey` : avec ce
+    # réglage, le compilateur émet les chaînes et Xcode les verse dans le String
+    # Catalog — sans modifier une ligne de code. C'est ce qui rend la migration
+    # de ~2 000 littéraux tenable.
+    SWIFT_EMIT_LOC_STRINGS: YES
     IPHONEOS_DEPLOYMENT_TARGET: "16.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     CODE_SIGN_STYLE: Automatic
@@ -42,6 +51,13 @@ targets:
       - path: SignalQuestApp/Resources/market_registry_fallback.json
         buildPhase: resources
       - path: SignalQuestApp/Resources/market_location_areas.json
+        buildPhase: resources
+      - path: SignalQuestApp/Resources/Localizable.xcstrings
+        buildPhase: resources
+      # Clés lues par le SYSTÈME (prompts de permission, nom de l'app). Une app
+      # déclarée multilingue dont les prompts restent français est un motif de
+      # rejet fréquent.
+      - path: SignalQuestApp/Resources/InfoPlist.xcstrings
         buildPhase: resources
     configFiles:
       Debug: Config/Debug.xcconfig
@@ -104,6 +120,10 @@ targets:
       - path: SignalQuestWidget
         excludes:
           - PrivacyInfo.xcprivacy
+          - Localizable.xcstrings
+      # Une extension a son propre bundle : catalogue séparé.
+      - path: SignalQuestWidget/Localizable.xcstrings
+        buildPhase: resources
       # Manifeste de confidentialité PROPRE à l'extension : Apple en exige un par
       # bundle, celui de l'app hôte ne couvre pas le widget.
       - path: SignalQuestWidget/PrivacyInfo.xcprivacy

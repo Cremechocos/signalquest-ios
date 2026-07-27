@@ -1,0 +1,104 @@
+{
+  "sourceLanguage" : "fr",
+  "strings" : {
+    "%lld" : {
+
+    },
+    "%lld %%" : {
+
+    },
+    "%lld Mbps ↓" : {
+
+    },
+    "%lld ms" : {
+
+    },
+    "%lld tests" : {
+
+    },
+    "%lld%%" : {
+
+    },
+    "Affiche ton dernier test de débit SignalQuest." : {
+
+    },
+    "Antenne à %@" : {
+
+    },
+    "Aucun test" : {
+
+    },
+    "Dernier Speedtest" : {
+
+    },
+    "Débit %@ mégabits par seconde, %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Débit %1$@ mégabits par seconde, %2$@"
+          }
+        }
+      }
+    },
+    "Lance un Drive Test" : {
+
+    },
+    "Lance un speedtest" : {
+
+    },
+    "Lancer un Speedtest SignalQuest" : {
+
+    },
+    "Mbps" : {
+
+    },
+    "Ouvre SignalQuest pour lancer un test de débit." : {
+
+    },
+    "Pas encore de tendance" : {
+
+    },
+    "Progression" : {
+
+    },
+    "Rafale %lld/%lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rafale %1$lld/%2$lld"
+          }
+        }
+      }
+    },
+    "Réseau autour de moi" : {
+
+    },
+    "SIGNALQUEST" : {
+
+    },
+    "Speedtest" : {
+
+    },
+    "Speedtest SignalQuest" : {
+
+    },
+    "TENDANCE DÉBIT" : {
+
+    },
+    "Tendance débit" : {
+
+    },
+    "Tes derniers tests de débit en un coup d'œil." : {
+
+    },
+    "Ton opérateur, l'antenne la plus proche et ton dernier débit." : {
+
+    },
+    "—" : {
+
+    }
+  },
+  "version" : "1.0"
+}

@@ -1,0 +1,2503 @@
+{
+  "sourceLanguage" : "fr",
+  "strings" : {
+    "" : {
+
+    },
+    "#%@" : {
+
+    },
+    "#%lld" : {
+
+    },
+    "%@ %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
+    "%@ / %@ pts" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ / %2$@ pts"
+          }
+        }
+      }
+    },
+    "%@ : %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ : %2$@"
+          }
+        }
+      }
+    },
+    "%@ ms" : {
+
+    },
+    "%@ pourra de nouveau voir ton profil et te contacter." : {
+
+    },
+    "%@ · %lld antenne%@ · %lld cellule%@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$lld antenne%3$@ · %4$lld cellule%5$@"
+          }
+        }
+      }
+    },
+    "%@ — %lld test%@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ — %2$lld test%3$@"
+          }
+        }
+      }
+    },
+    "%@%lld pts" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%2$lld pts"
+          }
+        }
+      }
+    },
+    "%@, %@, %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@, %3$@"
+          }
+        }
+      }
+    },
+    "%@. %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@. %2$@"
+          }
+        }
+      }
+    },
+    "%lld" : {
+
+    },
+    "%lld %%" : {
+
+    },
+    "%lld %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld %2$@"
+          }
+        }
+      }
+    },
+    "%lld / %lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld / %2$lld"
+          }
+        }
+      }
+    },
+    "%lld Mbps" : {
+
+    },
+    "%lld PCI · %lld %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld PCI · %2$lld %3$@"
+          }
+        }
+      }
+    },
+    "%lld conversations non lues" : {
+
+    },
+    "%lld dBm" : {
+
+    },
+    "%lld en conflit — un autre site est majoritaire sur cette antenne. Vérifie ou retire." : {
+
+    },
+    "%lld h" : {
+
+    },
+    "%lld j’aime" : {
+
+    },
+    "%lld messages épinglés" : {
+
+    },
+    "%lld mesure%@ au total · rayon %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld mesure%2$@ au total · rayon %3$@"
+          }
+        }
+      }
+    },
+    "%lld mesure%@ de la communauté · rayon %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld mesure%2$@ de la communauté · rayon %3$@"
+          }
+        }
+      }
+    },
+    "%lld mesures" : {
+
+    },
+    "%lld ms" : {
+
+    },
+    "%lld photos" : {
+
+    },
+    "%lld points de mesure sur %lld sessions" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld points de mesure sur %2$lld sessions"
+          }
+        }
+      }
+    },
+    "%lld points · %lld session%@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld points · %2$lld session%3$@"
+          }
+        }
+      }
+    },
+    "%lld pts" : {
+
+    },
+    "%lld réaction%@ %@%@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld réaction%2$@ %3$@%4$@"
+          }
+        }
+      }
+    },
+    "%lld réponse%@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld réponse%2$@"
+          }
+        }
+      }
+    },
+    "%lld secteur%@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld secteur%2$@"
+          }
+        }
+      }
+    },
+    "%lld sites visibles" : {
+
+    },
+    "%lld test%@ · moy. DL %lld Mbps · ping min %lld ms" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld test%2$@ · moy. DL %3$lld Mbps · ping min %4$lld ms"
+          }
+        }
+      }
+    },
+    "%lld validation%@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld validation%2$@"
+          }
+        }
+      }
+    },
+    "%lld vote%@, %lld %%%@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld vote%2$@, %3$lld %%%4$@"
+          }
+        }
+      }
+    },
+    "%lld%%" : {
+
+    },
+    "%lld. %@, %lld %@, %lld mesures." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld. %2$@, %3$lld %4$@, %5$lld mesures."
+          }
+        }
+      }
+    },
+    "%lld/%lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld/%2$lld"
+          }
+        }
+      }
+    },
+    "%lld/100" : {
+
+    },
+    "%llds" : {
+
+    },
+    "%lld°" : {
+
+    },
+    "+%lld" : {
+
+    },
+    "+%lld pts" : {
+
+    },
+    "0" : {
+
+    },
+    "1" : {
+
+    },
+    "2FA activée ✓" : {
+
+    },
+    "30 j" : {
+
+    },
+    "4G" : {
+
+    },
+    "5G" : {
+
+    },
+    "6 caractères minimum. Ce mot de passe ne quitte jamais ton appareil." : {
+
+    },
+    "7 j" : {
+
+    },
+    "90 j" : {
+
+    },
+    "@" : {
+
+    },
+    "@%@" : {
+
+    },
+    "Abonnement" : {
+
+    },
+    "Abonnements" : {
+
+    },
+    "Abonné" : {
+
+    },
+    "Accepte d’abord les conditions d’utilisation" : {
+
+    },
+    "Accueil" : {
+
+    },
+    "Actif sur la conversation" : {
+
+    },
+    "Activer la 2FA" : {
+
+    },
+    "Activer la caméra" : {
+
+    },
+    "Activer le haut-parleur" : {
+
+    },
+    "Activer le partage" : {
+
+    },
+    "Activer l’image dans l’image" : {
+
+    },
+    "Activité" : {
+
+    },
+    "Actuel" : {
+
+    },
+    "Admin" : {
+
+    },
+    "Adopter le site communautaire" : {
+
+    },
+    "Affichage" : {
+
+    },
+    "Affiche aussi les cellules captées, en plus des sites probables consolidés" : {
+
+    },
+    "Afficher la légende" : {
+
+    },
+    "Afficher la transcription" : {
+
+    },
+    "Afficher ma dernière activité" : {
+
+    },
+    "Afficher mes photos sur la carte Amis" : {
+
+    },
+    "Ajoute un commentaire" : {
+
+    },
+    "Ajoute un nom d’utilisateur" : {
+
+    },
+    "Ajouter aux favoris" : {
+
+    },
+    "Ajouter des photos" : {
+
+    },
+    "Ajouter en ami" : {
+
+    },
+    "Ajouter un ami" : {
+
+    },
+    "Ajouter un commentaire…" : {
+
+    },
+    "Ajouter un média" : {
+
+    },
+    "Ajouter une option" : {
+
+    },
+    "Ajouter une photo" : {
+
+    },
+    "Ajouter à ta story" : {
+
+    },
+    "Amis" : {
+
+    },
+    "Annuler" : {
+
+    },
+    "Annuler la demande envoyée à %@" : {
+
+    },
+    "Antennes desservantes" : {
+
+    },
+    "Aperçu" : {
+
+    },
+    "Aperçu de ta caméra" : {
+
+    },
+    "Aperçu photo" : {
+
+    },
+    "Appel audio" : {
+
+    },
+    "Appel terminé" : {
+
+    },
+    "Appel vidéo" : {
+
+    },
+    "Appeler" : {
+
+    },
+    "Appels" : {
+
+    },
+    "Apple te demandera de confirmer l’identité liée à ce compte." : {
+
+    },
+    "Appui long pour choisir une réaction" : {
+
+    },
+    "Après 1 h" : {
+
+    },
+    "Après 1 min" : {
+
+    },
+    "Après 15 min" : {
+
+    },
+    "Après 5 min" : {
+
+    },
+    "Après 8 h" : {
+
+    },
+    "Associe ton Apple ID pour te connecter en un geste, même avec « Masquer mon e-mail »." : {
+
+    },
+    "Au moins 8 caractères" : {
+
+    },
+    "Aucun essai gratuit et aucun partage familial. L’abonnement se renouvelle automatiquement et peut être résilié depuis les réglages App Store. Le prix affiché par Apple au moment de l’achat fait foi." : {
+
+    },
+    "Aucun identifiant de cellule (PCI/CI) associé à cette antenne." : {
+
+    },
+    "Aucun import" : {
+
+    },
+    "Aucun message non lu" : {
+
+    },
+    "Aucun point géolocalisé pour cette session." : {
+
+    },
+    "Aucun résultat" : {
+
+    },
+    "Aucun secteur sélectionné" : {
+
+    },
+    "Aucun site pour ces filtres" : {
+
+    },
+    "Aucune antenne au relevé courant." : {
+
+    },
+    "Aucune antenne desservante résolue pour cette session." : {
+
+    },
+    "Aucune clé de chiffrement de bout en bout n'existe encore pour ce compte. Choisis un mot de passe : il chiffre ta clé privée et lui seul peut la déverrouiller — ne le perds pas." : {
+
+    },
+    "Aucune conversation active" : {
+
+    },
+    "Aucune donnée" : {
+
+    },
+    "Aucune modification archivée pour ce support." : {
+
+    },
+    "Aucune méthode de réauthentification disponible." : {
+
+    },
+    "Aucune réponse pour l'instant." : {
+
+    },
+    "Aucune réponse pour l'instant. Lance le fil." : {
+
+    },
+    "Audience" : {
+
+    },
+    "Audio et vidéo transportés par LiveKit." : {
+
+    },
+    "Autour de toi" : {
+
+    },
+    "Avertissement. %@" : {
+
+    },
+    "Badges" : {
+
+    },
+    "Balayer vers le bas avec deux doigts pour fermer" : {
+
+    },
+    "Bio" : {
+
+    },
+    "Bloquer" : {
+
+    },
+    "Bloquer %@ ?" : {
+
+    },
+    "Bloquer l’expéditeur" : {
+
+    },
+    "Bonjour," : {
+
+    },
+    "CI %@" : {
+
+    },
+    "Calques & filtres" : {
+
+    },
+    "Calques et filtres" : {
+
+    },
+    "Carte" : {
+
+    },
+    "Carte ANFR" : {
+
+    },
+    "Carte des amis" : {
+
+    },
+    "Cartographie la 4G/5G en France avec une communauté de passionnés." : {
+
+    },
+    "Ce diagnostic s'appuie sur les mesures partagées par la communauté SignalQuest à moins de %@ de toi, pour le réseau %@." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ce diagnostic s'appuie sur les mesures partagées par la communauté SignalQuest à moins de %1$@ de toi, pour le réseau %2$@."
+          }
+        }
+      }
+    },
+    "Ce réglage contrôle les nouvelles demandes de conversation. Les conversations existantes restent accessibles." : {
+
+    },
+    "Cell ID" : {
+
+    },
+    "Cellule" : {
+
+    },
+    "Cellules observées" : {
+
+    },
+    "Cette antenne est indiquée comme %@. Confirme uniquement si tu l'as sélectionnée comme antenne réelle." : {
+
+    },
+    "Changer de caméra" : {
+
+    },
+    "Changer la photo de profil" : {
+
+    },
+    "Changer la photo du groupe" : {
+
+    },
+    "Chargement de SignalQuest" : {
+
+    },
+    "Chargement de l'historique…" : {
+
+    },
+    "Chargement de la carte" : {
+
+    },
+    "Chargement de la publication partagée" : {
+
+    },
+    "Chargement des sites ANFR…" : {
+
+    },
+    "Chargement des statistiques ANFR…" : {
+
+    },
+    "Chargement du classement" : {
+
+    },
+    "Chiffrement E2EE" : {
+
+    },
+    "Chiffrement à déverrouiller" : {
+
+    },
+    "Chiffrée · partage indisponible" : {
+
+    },
+    "Chiffrée — déverrouille pour lire" : {
+
+    },
+    "Choisir le bon site" : {
+
+    },
+    "Choisir un fichier (.csv, .ntm)" : {
+
+    },
+    "Choisir un nom d’utilisateur" : {
+
+    },
+    "Choisir un site" : {
+
+    },
+    "Choisir une date" : {
+
+    },
+    "Choisir une photo" : {
+
+    },
+    "Choisir une photo du site" : {
+
+    },
+    "Choisis ton niveau d’exploration" : {
+
+    },
+    "Choisis un opérateur pour afficher la couverture." : {
+
+    },
+    "Choisis une facturation mensuelle ou annuelle" : {
+
+    },
+    "Choisissez d'enregistrer la couverture, de lancer des speedtests, ou les deux" : {
+
+    },
+    "Choix multiples" : {
+
+    },
+    "Classements" : {
+
+    },
+    "Clos" : {
+
+    },
+    "Clé mise à jour — appuie pour resynchroniser" : {
+
+    },
+    "Clôture le" : {
+
+    },
+    "Clôturer le sondage" : {
+
+    },
+    "Code TOTP à 6 chiffres" : {
+
+    },
+    "Code de réinitialisation" : {
+
+    },
+    "Code envoyé à %@. Il expire dans 10 minutes et ne peut être utilisé qu’une fois." : {
+
+    },
+    "Code à 6 chiffres" : {
+
+    },
+    "Coloration couverture" : {
+
+    },
+    "Coloration de la carte : signal ou génération" : {
+
+    },
+    "Coloration de la couverture : signal ou génération" : {
+
+    },
+    "Comment on décide" : {
+
+    },
+    "Commentaires" : {
+
+    },
+    "Commenter" : {
+
+    },
+    "Communauté" : {
+
+    },
+    "Comprendre d'où vient ce verdict" : {
+
+    },
+    "Compte Apple" : {
+
+    },
+    "Conditions" : {
+
+    },
+    "Conditions d’utilisation" : {
+
+    },
+    "Confidentialité" : {
+
+    },
+    "Confirmer" : {
+
+    },
+    "Confirmer cette antenne ?" : {
+
+    },
+    "Confirmer le mot de passe" : {
+
+    },
+    "Confirmer ton identité" : {
+
+    },
+    "Confirmé par la communauté" : {
+
+    },
+    "Conflit : un autre site a plus de validations sur cette antenne." : {
+
+    },
+    "Connexion" : {
+
+    },
+    "Connexion indisponible" : {
+
+    },
+    "Connexion vidéo…" : {
+
+    },
+    "Connexion…" : {
+
+    },
+    "Continu · test %lld" : {
+
+    },
+    "Continuer avec Apple" : {
+
+    },
+    "Continuer sans" : {
+
+    },
+    "Conversation" : {
+
+    },
+    "Conversation chiffrée" : {
+
+    },
+    "Copier" : {
+
+    },
+    "Correction proposée (optionnel)" : {
+
+    },
+    "Corriger le secteur" : {
+
+    },
+    "Couper la caméra" : {
+
+    },
+    "Couper le micro" : {
+
+    },
+    "Couper les notifications" : {
+
+    },
+    "Couper notifs" : {
+
+    },
+    "Couverture" : {
+
+    },
+    "Couverture agrégée" : {
+
+    },
+    "Couverture enregistrée : %lld points" : {
+
+    },
+    "Couverture · %lld point%@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Couverture · %1$lld point%2$@"
+          }
+        }
+      }
+    },
+    "Creation..." : {
+
+    },
+    "Creer" : {
+
+    },
+    "Créer ta clé" : {
+
+    },
+    "Créer un compte" : {
+
+    },
+    "Créer un sondage" : {
+
+    },
+    "C’est ton identifiant unique (@pseudo) pour être mentionné dans le fil et la messagerie ; il s’affiche sur ton profil. Modifiable une fois tous les 30 jours." : {
+
+    },
+    "Date" : {
+
+    },
+    "Demande envoyée" : {
+
+    },
+    "Dernière mesure : %lld mégabits par seconde. Ouvre le Speedtest." : {
+
+    },
+    "Dernière mesure · %@" : {
+
+    },
+    "Discussion" : {
+
+    },
+    "Disponible pour tous" : {
+
+    },
+    "Dissocier" : {
+
+    },
+    "Dissocier le compte Apple ?" : {
+
+    },
+    "Double authentification" : {
+
+    },
+    "Download" : {
+
+    },
+    "Drive Test" : {
+
+    },
+    "Durée" : {
+
+    },
+    "Durée d'affichage %lld secondes" : {
+
+    },
+    "Durée de vie" : {
+
+    },
+    "Débit pendant le test" : {
+
+    },
+    "Débloquer" : {
+
+    },
+    "Débloquer %@" : {
+
+    },
+    "Débloquer cette personne ?" : {
+
+    },
+    "Décris ce qui ne va pas" : {
+
+    },
+    "Décris ce qui te pose problème" : {
+
+    },
+    "Déplace la carte pour charger" : {
+
+    },
+    "Déployer la navigation" : {
+
+    },
+    "Désactiver" : {
+
+    },
+    "Désactiver la 2FA ?" : {
+
+    },
+    "Désactiver le haut-parleur" : {
+
+    },
+    "Désactivé par défaut : les coordonnées visibles publiquement sont floutées. Si tu désactives ce réglage, le serveur floute aussi rétroactivement tes mesures déjà publiées." : {
+
+    },
+    "Désactivé par défaut et redemandé à chaque visite invitée. La mesure et l’opérateur deviennent publics." : {
+
+    },
+    "Désactivé par défaut. Si tu l’actives, ta mesure et ton opérateur deviennent publics ; la position reste floutée sauf consentement séparé dans Confidentialité." : {
+
+    },
+    "Désépingler" : {
+
+    },
+    "Détails du test" : {
+
+    },
+    "Détails techniques" : {
+
+    },
+    "Déverrouille avec %@ pour continuer." : {
+
+    },
+    "Déverrouiller" : {
+
+    },
+    "Déverrouiller avec %@" : {
+
+    },
+    "Effacer" : {
+
+    },
+    "Effacer l'historique" : {
+
+    },
+    "Effacer la recherche" : {
+
+    },
+    "Effacer tout l'historique d'appels ?" : {
+
+    },
+    "Email" : {
+
+    },
+    "En appel" : {
+
+    },
+    "En attente de la caméra distante" : {
+
+    },
+    "En attente de réponse" : {
+
+    },
+    "En ligne" : {
+
+    },
+    "En pause — WiFi détecté" : {
+
+    },
+    "En train d’écrire" : {
+
+    },
+    "Enchaîne plusieurs tests d'affilée. « ∞ » lance un mode continu (drive test) : tests illimités jusqu'à l'arrêt, position suivie en continu, poursuite écran verrouillé." : {
+
+    },
+    "Encore %@ pts avant le niveau %lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Encore %1$@ pts avant le niveau %2$lld"
+          }
+        }
+      }
+    },
+    "Enregistrer" : {
+
+    },
+    "Environ 2,50 € / mois, facturé annuellement." : {
+
+    },
+    "Environ 6,67 € / mois, facturé annuellement." : {
+
+    },
+    "Envoi en cours" : {
+
+    },
+    "Envoi…" : {
+
+    },
+    "Envoyer" : {
+
+    },
+    "Envoyer la réponse" : {
+
+    },
+    "Envoyer le" : {
+
+    },
+    "Envoyer le commentaire" : {
+
+    },
+    "Envoyer le message" : {
+
+    },
+    "Envoyer le signalement" : {
+
+    },
+    "Envoyer une demande à %@" : {
+
+    },
+    "Envoyé" : {
+
+    },
+    "Erreur" : {
+
+    },
+    "Erreur : %@" : {
+
+    },
+    "Exige %@ à l’ouverture après le délai d’inactivité choisi. La déconnexion automatique efface la session après une inactivité prolongée." : {
+
+    },
+    "Explorer" : {
+
+    },
+    "Explorer la carte sans compte" : {
+
+    },
+    "Facultatif et valable uniquement pour ce test. Sans ce choix, le serveur publie une position floutée." : {
+
+    },
+    "Fermer" : {
+
+    },
+    "Fil de discussion" : {
+
+    },
+    "Filtre %@" : {
+
+    },
+    "Fond de carte" : {
+
+    },
+    "Groupe" : {
+
+    },
+    "Génération" : {
+
+    },
+    "Génération du secret 2FA…" : {
+
+    },
+    "Gérer dans l’App Store" : {
+
+    },
+    "Gérer la relation avec %@" : {
+
+    },
+    "Hors ligne — certaines actions sont indisponibles" : {
+
+    },
+    "Ici, **couverture et débit** sont au même niveau." : {
+
+    },
+    "Ici, c'est la **couverture** qui tire le verdict vers le bas." : {
+
+    },
+    "Ici, c'est le **débit** qui tire le verdict vers le bas." : {
+
+    },
+    "Ici, seul le **débit** a assez de mesures : le verdict s'appuie dessus." : {
+
+    },
+    "Ici, seule la **couverture** a assez de mesures : le verdict s'appuie dessus." : {
+
+    },
+    "Identification" : {
+
+    },
+    "Identification antenne" : {
+
+    },
+    "Identifier" : {
+
+    },
+    "Identifier cette antenne" : {
+
+    },
+    "Identité" : {
+
+    },
+    "Immédiat" : {
+
+    },
+    "Importe un export « eNB Analytics » (CSV) ou NetMonster (.ntm) pour afficher, identifier et gérer les antennes détectées." : {
+
+    },
+    "Imports" : {
+
+    },
+    "Impossible de charger le détail de la suppression. Aucun compte ne sera supprimé tant que cette vérification échoue." : {
+
+    },
+    "Impossible de joindre SignalQuest. Vérifie ta connexion puis réessaie." : {
+
+    },
+    "Informations légales" : {
+
+    },
+    "J'ai déjà un compte" : {
+
+    },
+    "Jamais" : {
+
+    },
+    "Je n’aime plus" : {
+
+    },
+    "Joindre un speedtest" : {
+
+    },
+    "Joindre une photo" : {
+
+    },
+    "Journal" : {
+
+    },
+    "J’accepte les conditions d’utilisation et la politique de confidentialité." : {
+
+    },
+    "J’ai compris que cette action est irréversible et que mes contributions listées ci-dessus resteront anonymisées." : {
+
+    },
+    "J’aime" : {
+
+    },
+    "L'équipe de modération te répondra ici. Tu peux ajouter des précisions ou des photos." : {
+
+    },
+    "La localisation est désactivée pour SignalQuest. Active-la dans les Réglages pour situer tes mesures sur la carte. Le test fonctionne quand même sans." : {
+
+    },
+    "Lance un Drive Test pour enregistrer tes premières mesures." : {
+
+    },
+    "Lancer un Drive Test" : {
+
+    },
+    "Lancer un Speedtest" : {
+
+    },
+    "Lancer un speedtest sans compte" : {
+
+    },
+    "Le reçu sera effacé uniquement après confirmation du serveur." : {
+
+    },
+    "Le réseau mobile français" : {
+
+    },
+    "Les appels utilisent le transport LiveKit" : {
+
+    },
+    "Les données radio affichées ici viennent du backend SignalQuest, d’Android ou de sources publiques. iOS ne collecte pas ces métriques." : {
+
+    },
+    "Les notifications sont désactivées pour SignalQuest. Aucune alerte n’arrivera tant qu’elles ne sont pas réactivées dans les Réglages iOS." : {
+
+    },
+    "Les reçus sont chiffrés dans le trousseau de cet appareil. SignalQuest ne peut pas recréer un reçu perdu." : {
+
+    },
+    "LibreSpeed" : {
+
+    },
+    "LibreSpeed le plus proche" : {
+
+    },
+    "Liker" : {
+
+    },
+    "Likes & commentaires (push)" : {
+
+    },
+    "Localisation désactivée" : {
+
+    },
+    "Localisation non partagée" : {
+
+    },
+    "Localiser ta mesure" : {
+
+    },
+    "Lu" : {
+
+    },
+    "Légende" : {
+
+    },
+    "Légende génération" : {
+
+    },
+    "Légende qualité du signal" : {
+
+    },
+    "Ma progression" : {
+
+    },
+    "Ma progression : niveau %lld, %lld points, %lld jours consécutifs. Ouvre les récompenses." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ma progression : niveau %1$lld, %2$lld points, %3$lld jours consécutifs. Ouvre les récompenses."
+          }
+        }
+      }
+    },
+    "Maintenant" : {
+
+    },
+    "Masque ou affiche les antennes prévues selon leur avancement ANFR." : {
+
+    },
+    "Masquer la légende" : {
+
+    },
+    "Max" : {
+
+    },
+    "Max %@ %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Max %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Mbps" : {
+
+    },
+    "Me le rappeler" : {
+
+    },
+    "Me rappeler le" : {
+
+    },
+    "Membre depuis %@" : {
+
+    },
+    "Mes amis uniquement" : {
+
+    },
+    "Mes identifications" : {
+
+    },
+    "Mes reçus" : {
+
+    },
+    "Mes sessions" : {
+
+    },
+    "Mes signalements" : {
+
+    },
+    "Message" : {
+
+    },
+    "Message chiffré de bout en bout — programmé en toute sécurité." : {
+
+    },
+    "Message supprimé" : {
+
+    },
+    "Message à envoyer" : {
+
+    },
+    "Message éphémère" : {
+
+    },
+    "Message épinglé" : {
+
+    },
+    "Messagerie" : {
+
+    },
+    "Messagerie chiffrée" : {
+
+    },
+    "Messages" : {
+
+    },
+    "Messages (in-app)" : {
+
+    },
+    "Messages (push)" : {
+
+    },
+    "Messages enregistrés" : {
+
+    },
+    "Messages privés" : {
+
+    },
+    "Messages programmés" : {
+
+    },
+    "Messages éphémères (24 h)" : {
+
+    },
+    "Messages éphémères · disparaissent après 24 h" : {
+
+    },
+    "Message…" : {
+
+    },
+    "Mesure %@…" : {
+
+    },
+    "Mesure communautaire : %lld mégabits. %@. Ouvre la carte." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Mesure communautaire : %1$lld mégabits. %2$@. Ouvre la carte."
+          }
+        }
+      }
+    },
+    "Mesure de couverture" : {
+
+    },
+    "Mesure indisponible" : {
+
+    },
+    "Mesure, comprends et partage ton réseau" : {
+
+    },
+    "Mesures publiques" : {
+
+    },
+    "Mise à jour requise" : {
+
+    },
+    "Mises à jour ANFR (push)" : {
+
+    },
+    "Mode du Drive Test" : {
+
+    },
+    "Modifier" : {
+
+    },
+    "Mois" : {
+
+    },
+    "Mon rang" : {
+
+    },
+    "Mot de passe" : {
+
+    },
+    "Mot de passe (min. 8 caractères)" : {
+
+    },
+    "Mot de passe actuel" : {
+
+    },
+    "Mot de passe modifié" : {
+
+    },
+    "Mot de passe oublié ?" : {
+
+    },
+    "Motif" : {
+
+    },
+    "Motif (optionnel)" : {
+
+    },
+    "Mémoriser avec %@" : {
+
+    },
+    "Méthode" : {
+
+    },
+    "N" : {
+
+    },
+    "Navigation principale" : {
+
+    },
+    "Ne pas déranger" : {
+
+    },
+    "Niv. %lld" : {
+
+    },
+    "Niveau %lld" : {
+
+    },
+    "Nom" : {
+
+    },
+    "Nom affiché" : {
+
+    },
+    "Nom du groupe" : {
+
+    },
+    "Nom du groupe optionnel" : {
+
+    },
+    "Nom d’utilisateur" : {
+
+    },
+    "Nom, handle ou email" : {
+
+    },
+    "Non lu" : {
+
+    },
+    "Non lue" : {
+
+    },
+    "Non précisé" : {
+
+    },
+    "Note %lld sur 5" : {
+
+    },
+    "Notifications" : {
+
+    },
+    "Nouveau mot de passe" : {
+
+    },
+    "Nouveau mot de passe E2EE" : {
+
+    },
+    "Nouveau rappel" : {
+
+    },
+    "Nouveau sondage" : {
+
+    },
+    "Nouvelle conversation" : {
+
+    },
+    "Nouvelle photo" : {
+
+    },
+    "Nouvelle story" : {
+
+    },
+    "Nœud & opérateur" : {
+
+    },
+    "OK" : {
+
+    },
+    "Observatoire ANFR — Agence nationale des fréquences · relevé du %@" : {
+
+    },
+    "On t’envoie un lien avec un code à 8 caractères. Copie-le dans l’écran suivant." : {
+
+    },
+    "OpenStreetMap, Relief et Satellite utilisent des serveurs de tuiles tiers : la zone de carte consultée leur est transmise." : {
+
+    },
+    "Options" : {
+
+    },
+    "Options de %@" : {
+
+    },
+    "Opérateur affiché : %@" : {
+
+    },
+    "Opérateur du site" : {
+
+    },
+    "Opérateur détecté" : {
+
+    },
+    "Opérateurs autour de toi" : {
+
+    },
+    "Ouvre SignalQuest et démarre le mode Drive Test (mesure en continu)." : {
+
+    },
+    "Ouvre SignalQuest sur l'onglet Speed pour lancer un test de débit." : {
+
+    },
+    "Ouvre la carte des antennes et mesures." : {
+
+    },
+    "Ouvre la messagerie chiffrée SignalQuest." : {
+
+    },
+    "Ouvre le profil de %@" : {
+
+    },
+    "Ouvrir" : {
+
+    },
+    "Ouvrir dans Plans · %@" : {
+
+    },
+    "Ouvrir la carte SignalQuest" : {
+
+    },
+    "Ouvrir la messagerie SignalQuest" : {
+
+    },
+    "Ouvrir le partage" : {
+
+    },
+    "Ouvrir les Réglages" : {
+
+    },
+    "PCI" : {
+
+    },
+    "PCI %lld" : {
+
+    },
+    "Page %lld sur %lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Page %1$lld sur %2$lld"
+          }
+        }
+      }
+    },
+    "Partager" : {
+
+    },
+    "Partager ailleurs…" : {
+
+    },
+    "Partager la position exacte de mes mesures" : {
+
+    },
+    "Partager ma position" : {
+
+    },
+    "Partager ma position en direct" : {
+
+    },
+    "Partager ma position exacte pour ce test" : {
+
+    },
+    "Partager mes données radio" : {
+
+    },
+    "Partager mes sessions" : {
+
+    },
+    "Partager sur Signal Quest" : {
+
+    },
+    "Partager ta position en direct" : {
+
+    },
+    "Partager vers" : {
+
+    },
+    "Partagé vers %@" : {
+
+    },
+    "Participants" : {
+
+    },
+    "Pas assez de mesures" : {
+
+    },
+    "Passer" : {
+
+    },
+    "Personne" : {
+
+    },
+    "Photo" : {
+
+    },
+    "Photo %@" : {
+
+    },
+    "Photo du site, toucher pour agrandir" : {
+
+    },
+    "Photo en plein écran" : {
+
+    },
+    "Photo envoyée" : {
+
+    },
+    "Photo indisponible" : {
+
+    },
+    "Photo jointe, toucher pour agrandir" : {
+
+    },
+    "Photos" : {
+
+    },
+    "Pièce jointe %@, %@. Toucher pour ouvrir." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Pièce jointe %1$@, %2$@. Toucher pour ouvrir."
+          }
+        }
+      }
+    },
+    "Plus d'actions" : {
+
+    },
+    "Plus d'options" : {
+
+    },
+    "Plus d’options" : {
+
+    },
+    "Plus tard" : {
+
+    },
+    "Politique de confidentialité" : {
+
+    },
+    "Pose ta question" : {
+
+    },
+    "Position" : {
+
+    },
+    "Position : %@. Toucher pour ouvrir dans Plans." : {
+
+    },
+    "Post" : {
+
+    },
+    "Pouls réseau · autour de vous" : {
+
+    },
+    "Pour situer ton speedtest sur la carte communautaire, SignalQuest a besoin de ta position approximative (~100 m). Tu peux refuser : le test fonctionnera quand même, sans apparaître sur la carte." : {
+
+    },
+    "Pourquoi ce rappel ?" : {
+
+    },
+    "Profil" : {
+
+    },
+    "Programmer l'envoi" : {
+
+    },
+    "Progression vers le niveau suivant" : {
+
+    },
+    "Promouvoir admin" : {
+
+    },
+    "Précisions (optionnel)" : {
+
+    },
+    "Préférences enregistrées" : {
+
+    },
+    "Préparation…" : {
+
+    },
+    "Présence" : {
+
+    },
+    "Publication" : {
+
+    },
+    "Publication de %@" : {
+
+    },
+    "Publier" : {
+
+    },
+    "Publier sur la carte communautaire" : {
+
+    },
+    "QR code de configuration 2FA" : {
+
+    },
+    "Quand partager ma position" : {
+
+    },
+    "Que veux-tu signaler ?" : {
+
+    },
+    "Qui peut me contacter" : {
+
+    },
+    "Quitter" : {
+
+    },
+    "Quitter le groupe" : {
+
+    },
+    "Quitter le groupe ?" : {
+
+    },
+    "Quitter l’image dans l’image" : {
+
+    },
+    "Quoi de neuf sur le réseau ?" : {
+
+    },
+    "Quêtes" : {
+
+    },
+    "Quêtes, chargement en cours" : {
+
+    },
+    "RSRP indisponible" : {
+
+    },
+    "Raccrocher" : {
+
+    },
+    "Radio" : {
+
+    },
+    "Radio indisponible sur iOS" : {
+
+    },
+    "Rafale" : {
+
+    },
+    "Rafale · test %lld/%lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rafale · test %1$lld/%2$lld"
+          }
+        }
+      }
+    },
+    "Raison" : {
+
+    },
+    "Rappels" : {
+
+    },
+    "Recherche" : {
+
+    },
+    "Recherche en cours" : {
+
+    },
+    "Recherche indisponible" : {
+
+    },
+    "Rechercher" : {
+
+    },
+    "Rechercher une ville, une adresse, un site…" : {
+
+    },
+    "Rejoins SignalQuest" : {
+
+    },
+    "Relevé" : {
+
+    },
+    "Relevé ANFR" : {
+
+    },
+    "Repartager" : {
+
+    },
+    "Reprise automatique en cellulaire" : {
+
+    },
+    "Resynchronisation…" : {
+
+    },
+    "Retire cette identification si elle est erronée." : {
+
+    },
+    "Retirer" : {
+
+    },
+    "Retirer %@" : {
+
+    },
+    "Retirer %@ de tes amis ?" : {
+
+    },
+    "Retirer %@ du groupe ?" : {
+
+    },
+    "Retirer cette identification ?" : {
+
+    },
+    "Retirer des amis" : {
+
+    },
+    "Retirer des enregistrés" : {
+
+    },
+    "Retirer des favoris" : {
+
+    },
+    "Retirer du groupe" : {
+
+    },
+    "Retirer du groupe ?" : {
+
+    },
+    "Retirer la photo" : {
+
+    },
+    "Retirer le like" : {
+
+    },
+    "Retirer le speedtest" : {
+
+    },
+    "Retirer l’image" : {
+
+    },
+    "Retour" : {
+
+    },
+    "Retour à la connexion" : {
+
+    },
+    "Reçus invités" : {
+
+    },
+    "Réactiver le micro" : {
+
+    },
+    "Réactiver les notifications" : {
+
+    },
+    "Réactiver notifs" : {
+
+    },
+    "Réagir avec %@" : {
+
+    },
+    "Réclamation…" : {
+
+    },
+    "Réclamer" : {
+
+    },
+    "Réclamer la récompense de la quête %@" : {
+
+    },
+    "Récompenses" : {
+
+    },
+    "Rédiger" : {
+
+    },
+    "Réessayer" : {
+
+    },
+    "Réglages" : {
+
+    },
+    "Réglages du groupe" : {
+
+    },
+    "Réinitialiser" : {
+
+    },
+    "Réinitialiser le mot de passe" : {
+
+    },
+    "Répartition par génération" : {
+
+    },
+    "Répondre" : {
+
+    },
+    "Répondre dans le fil" : {
+
+    },
+    "Répondre dans un fil" : {
+
+    },
+    "Répondre…" : {
+
+    },
+    "Réponses à mes signalements (e-mail)" : {
+
+    },
+    "Réseau" : {
+
+    },
+    "Réseau %@" : {
+
+    },
+    "Réseau : %@" : {
+
+    },
+    "Réseau autour de toi" : {
+
+    },
+    "Réservé à Premium" : {
+
+    },
+    "Résolution des identifications…" : {
+
+    },
+    "Résultats" : {
+
+    },
+    "Résumé radio serveur" : {
+
+    },
+    "Rétrograder" : {
+
+    },
+    "S'ajuste aussi tout seul selon ta position / ta SIM." : {
+
+    },
+    "Saisis le code à 6 chiffres de ton application d’authentification (Google Authenticator, Authy…)." : {
+
+    },
+    "Saisis un code de ton application d'authentification pour confirmer la désactivation." : {
+
+    },
+    "Saisis un code généré" : {
+
+    },
+    "Scanne le QR avec Authy, Google Authenticator ou 1Password puis valide avec un code généré." : {
+
+    },
+    "Se connecter" : {
+
+    },
+    "Se déconnecter" : {
+
+    },
+    "Se désabonner de %@" : {
+
+    },
+    "Secret manuel" : {
+
+    },
+    "Secret sensible — copie effacée du presse-papier après 1 min." : {
+
+    },
+    "Secteur" : {
+
+    },
+    "Secteur %lld · azimut %lld°" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Secteur %1$lld · azimut %2$lld°"
+          }
+        }
+      }
+    },
+    "Secteur %lld, azimut %lld degrés" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Secteur %1$lld, azimut %2$lld degrés"
+          }
+        }
+      }
+    },
+    "Secteur %lld°" : {
+
+    },
+    "Secteur concerné (optionnel)" : {
+
+    },
+    "Secteurs %@" : {
+
+    },
+    "Semaine" : {
+
+    },
+    "Serveur de test" : {
+
+    },
+    "Services impactés" : {
+
+    },
+    "Session de couverture" : {
+
+    },
+    "Session en pause : WiFi détecté, reprise automatique en cellulaire" : {
+
+    },
+    "Sessions" : {
+
+    },
+    "Signal" : {
+
+    },
+    "Signal Quest" : {
+
+    },
+    "SignalQuest" : {
+
+    },
+    "SignalQuest est verrouillé" : {
+
+    },
+    "Signalements d'antenne" : {
+
+    },
+    "Signaler" : {
+
+    },
+    "Signaler ce profil" : {
+
+    },
+    "Signaler la photo" : {
+
+    },
+    "Signaler un problème" : {
+
+    },
+    "Site %@" : {
+
+    },
+    "Site %@. Ton signalement est envoyé à l'équipe de modération, qui pourra te répondre." : {
+
+    },
+    "Site ANFR" : {
+
+    },
+    "Site communautaire (consensus)" : {
+
+    },
+    "Soyez le premier à commenter" : {
+
+    },
+    "Speed Test" : {
+
+    },
+    "Speedtest" : {
+
+    },
+    "Speedtest joint" : {
+
+    },
+    "Speedtests" : {
+
+    },
+    "Statistiques ANFR" : {
+
+    },
+    "Statut" : {
+
+    },
+    "Story de %@" : {
+
+    },
+    "Story précédente" : {
+
+    },
+    "Story suivante" : {
+
+    },
+    "Succès : %@" : {
+
+    },
+    "Succès à débloquer" : {
+
+    },
+    "Suivre" : {
+
+    },
+    "Suivre %@" : {
+
+    },
+    "Support %@" : {
+
+    },
+    "Supports" : {
+
+    },
+    "Supports déployés" : {
+
+    },
+    "Suppression" : {
+
+    },
+    "Suppression…" : {
+
+    },
+    "Supprimer" : {
+
+    },
+    "Supprimer cette mesure" : {
+
+    },
+    "Supprimer cette story ?" : {
+
+    },
+    "Supprimer définitivement" : {
+
+    },
+    "Supprimer définitivement ?" : {
+
+    },
+    "Supprimer définitivement cette mesure ?" : {
+
+    },
+    "Supprimer l'option %@" : {
+
+    },
+    "Supprimer la mesure" : {
+
+    },
+    "Supprimer la story" : {
+
+    },
+    "Supprimer le brouillon" : {
+
+    },
+    "Supprimer mon compte" : {
+
+    },
+    "Supprimer pour moi" : {
+
+    },
+    "Supprimer pour tous" : {
+
+    },
+    "Supprimer ton compte" : {
+
+    },
+    "Supprimer tous les imports" : {
+
+    },
+    "Supprimer tous les imports ?" : {
+
+    },
+    "Sécurité" : {
+
+    },
+    "S’inscrire avec Apple" : {
+
+    },
+    "Ta mesure rejoindra la carte publique, à l'endroit du test." : {
+
+    },
+    "Ta story" : {
+
+    },
+    "Technologies prévues" : {
+
+    },
+    "Test invité" : {
+
+    },
+    "Tester" : {
+
+    },
+    "Ton historique sera effacé pour toi. Tes correspondants gardent le leur." : {
+
+    },
+    "Ton mot de passe déverrouille la clé de chiffrement en mémoire, le temps de la session." : {
+
+    },
+    "Ton offre : %@" : {
+
+    },
+    "Touche le bon site pour y ré-attribuer %@" : {
+
+    },
+    "Touche le secteur réellement desservi par %@." : {
+
+    },
+    "Toucher pour afficher en plein écran" : {
+
+    },
+    "Toucher pour ouvrir la publication" : {
+
+    },
+    "Toucher pour retirer ta réaction" : {
+
+    },
+    "Toucher pour réagir aussi" : {
+
+    },
+    "Toucher pour voter" : {
+
+    },
+    "Toujours" : {
+
+    },
+    "Tout" : {
+
+    },
+    "Tout effacer" : {
+
+    },
+    "Tout le monde" : {
+
+    },
+    "Tout marquer comme lu" : {
+
+    },
+    "Tout supprimer" : {
+
+    },
+    "Tu ne pourras plus te connecter via Apple. Si ton compte a été créé avec Apple, définis d'abord un mot de passe via « Mot de passe oublié » pour ne pas perdre l'accès." : {
+
+    },
+    "Tu ne verras plus ses publications ni ses messages, et il ne pourra plus te contacter." : {
+
+    },
+    "Tu peux te connecter avec Apple, même en masquant ton e-mail." : {
+
+    },
+    "Type de problème" : {
+
+    },
+    "Un code à usage unique sera envoyé à %@." : {
+
+    },
+    "Un réseau « au top » doit à la fois **bien capter** et **être rapide**. On retient donc le **moins bon** des deux critères." : {
+
+    },
+    "Une donnée incorrecte sur ce site ? Préviens la modération." : {
+
+    },
+    "Une légende ?" : {
+
+    },
+    "Upload" : {
+
+    },
+    "Valeur actuelle affichée" : {
+
+    },
+    "Valeur correcte selon toi" : {
+
+    },
+    "Validation 2FA" : {
+
+    },
+    "Validations" : {
+
+    },
+    "Valider" : {
+
+    },
+    "Valider cette antenne" : {
+
+    },
+    "Valider l'antenne %@" : {
+
+    },
+    "Verrouillage" : {
+
+    },
+    "Vidéo de %@" : {
+
+    },
+    "Visibilité" : {
+
+    },
+    "Voici ce que tes amis verront une fois ce partage activé." : {
+
+    },
+    "Voir l'antenne" : {
+
+    },
+    "Voir la publication" : {
+
+    },
+    "Voir le détail du test" : {
+
+    },
+    "Voir le profil de %@" : {
+
+    },
+    "Voir qui a vu la story" : {
+
+    },
+    "Vous ne partagerez plus vos positions ni vos mesures. Tu pourras renvoyer une demande plus tard." : {
+
+    },
+    "Vu par %@" : {
+
+    },
+    "Vu par %lld" : {
+
+    },
+    "Vu par…" : {
+
+    },
+    "Vérification des données concernées…" : {
+
+    },
+    "activé" : {
+
+    },
+    "arrêtée" : {
+
+    },
+    "conflit" : {
+
+    },
+    "dBm · RSRP" : {
+
+    },
+    "désactivé" : {
+
+    },
+    "en baisse de %lld cette semaine" : {
+
+    },
+    "en cours" : {
+
+    },
+    "en hausse de %lld cette semaine" : {
+
+    },
+    "en ligne" : {
+
+    },
+    "fermé" : {
+
+    },
+    "modifié" : {
+
+    },
+    "ms" : {
+
+    },
+    "non sélectionné" : {
+
+    },
+    "ou" : {
+
+    },
+    "ouvert" : {
+
+    },
+    "pseudo" : {
+
+    },
+    "pts" : {
+
+    },
+    "signalquest.fr" : {
+
+    },
+    "stable" : {
+
+    },
+    "stable cette semaine" : {
+
+    },
+    "sur %@" : {
+
+    },
+    "sélectionné" : {
+
+    },
+    "validée %lld×" : {
+
+    },
+    "« %@ » ne te sera plus attribuée. Les lignes liées sont rechargées depuis le serveur après retrait." : {
+
+    },
+    "« %@ » ne te sera plus attribuée. Réversible en ré-identifiant." : {
+
+    },
+    "« %@ » sera effacée définitivement (irréversible). Les cellules confirmées par d'autres seront seulement retirées." : {
+
+    },
+    "·" : {
+
+    },
+    "· %lld ms" : {
+
+    },
+    "· enregistré le %@" : {
+
+    },
+    "À mes amis" : {
+
+    },
+    "À personne" : {
+
+    },
+    "Échec de l'envoi. Appuyer pour réessayer." : {
+
+    },
+    "Échec de l’envoi · Renvoyer" : {
+
+    },
+    "Échéance" : {
+
+    },
+    "Échéance : %@" : {
+
+    },
+    "Écris une réponse" : {
+
+    },
+    "Éditer le profil" : {
+
+    },
+    "Épingler" : {
+
+    },
+    "Éventail des azimuts des secteurs" : {
+
+    },
+    "×%lld" : {
+
+    },
+    "—" : {
+
+    },
+    "• %@" : {
+
+    },
+    "↑ %@" : {
+
+    },
+    "↓ %@" : {
+
+    },
+    "↓ %@ Mbps" : {
+
+    },
+    "👑" : {
+
+    }
+  },
+  "version" : "1.0"
+}
