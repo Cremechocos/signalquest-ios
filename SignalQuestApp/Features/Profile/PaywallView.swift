@@ -8,9 +8,9 @@ enum PaywallEntryPoint: Equatable, Sendable {
     var introduction: String {
         switch self {
         case .profile:
-            return "Soutiens SignalQuest et débloque des outils avancés. Les mesures réseau essentielles restent gratuites."
+            return String(localized: "Soutiens SignalQuest et débloque des outils avancés. Les mesures réseau essentielles restent gratuites.")
         case .premiumFeature(let name):
-            return "« \(name) » fait partie de Premium. Compare les offres sans perdre ce que tu étais en train de faire."
+            return String(localized: "« \(name) » fait partie de Premium. Compare les offres sans perdre ce que tu étais en train de faire.")
         }
     }
 }
@@ -246,18 +246,18 @@ struct PaywallView: View {
     private var entitlementStatusMessage: String {
         switch store.serverState {
         case .idle, .loading:
-            return "Vérification des droits multiplateformes…"
+            return String(localized: "Vérification des droits multiplateformes…")
         case .unavailable:
-            return "Le serveur de droits est indisponible. Les nouveaux achats sont bloqués par sécurité."
+            return String(localized: "Le serveur de droits est indisponible. Les nouveaux achats sont bloqués par sécurité.")
         case .available(let snapshot):
             if snapshot.status == .paymentFailed {
-                return "Paiement à régulariser auprès de \(snapshot.source.displayName)."
+                return String(localized: "Paiement à régulariser auprès de \(snapshot.source.displayName).")
             }
             if snapshot.tier != .free {
-                return "Géré par \(snapshot.source.displayName)."
+                return String(localized: "Géré par \(snapshot.source.displayName).")
             }
             if store.localEntitlementTier != .free {
-                return "Achat Apple détecté localement, confirmation serveur en attente."
+                return String(localized: "Achat Apple détecté localement, confirmation serveur en attente.")
             }
             return "Aucun abonnement actif."
         }
@@ -327,9 +327,9 @@ struct PaywallView: View {
     }
 
     private func purchaseButtonTitle(tier: SupporterTier, isCurrentOrLower: Bool) -> String {
-        if isCurrentOrLower { return "Déjà inclus dans ton offre" }
-        if case .existingBackendEntitlement = store.eligibility { return "Déjà abonné ailleurs" }
-        if !store.eligibility.canPurchase { return "Bientôt disponible sur iOS" }
+        if isCurrentOrLower { return String(localized: "Déjà inclus dans ton offre") }
+        if case .existingBackendEntitlement = store.eligibility { return String(localized: "Déjà abonné ailleurs") }
+        if !store.eligibility.canPurchase { return String(localized: "Bientôt disponible sur iOS") }
         return "Choisir \(tier.displayName)"
     }
 

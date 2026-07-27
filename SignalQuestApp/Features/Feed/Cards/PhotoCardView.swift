@@ -110,8 +110,8 @@ struct PhotoCardView: View {
         let caption = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
         if !caption.isEmpty { return "Photo. \(caption)" }
         if let place = (item.signal?.city ?? item.placeLabel), !place.isEmpty {
-            return "Photo à \(place)"
+            return String(localized: "Photo à \(place)")
         }
-        return "Photo partagée"
+        return String(localized: "Photo partagée")
     }
 }

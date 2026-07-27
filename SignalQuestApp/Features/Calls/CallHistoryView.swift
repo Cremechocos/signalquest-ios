@@ -206,13 +206,13 @@ struct CallHistoryView: View {
     /// Libellé FR du statut d'appel (l'app est 100 % francophone — CALL-HIST-06).
     private func statusLabel(_ status: String?) -> String {
         switch status {
-        case "ended": return "Terminé"
-        case "missed": return "Manqué"
-        case "rejected": return "Refusé"
-        case "accepted", "answered": return "Accepté"
+        case "ended": return String(localized: "Terminé")
+        case "missed": return String(localized: "Manqué")
+        case "rejected": return String(localized: "Refusé")
+        case "accepted", "answered": return String(localized: "Accepté")
         case "ringing": return "Sonnerie"
         case "pending": return "En attente"
-        case "cancelled", "canceled": return "Annulé"
+        case "cancelled", "canceled": return String(localized: "Annulé")
         case .some(let other) where !other.isEmpty: return other.capitalized
         default: return "—"
         }

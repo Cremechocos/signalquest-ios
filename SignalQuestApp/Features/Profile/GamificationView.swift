@@ -442,8 +442,8 @@ enum QuestCadenceGroup: CaseIterable, Hashable {
         case .daily: return "Quotidiennes"
         case .weekly: return "Hebdo"
         case .seasonal: return "Saison"
-        case .event: return "Évènement"
-        case .other: return "Autres quêtes"
+        case .event: return String(localized: "Évènement")
+        case .other: return String(localized: "Autres quêtes")
         }
     }
 
@@ -480,11 +480,11 @@ enum QuestCadenceGroup: CaseIterable, Hashable {
     /// Description VoiceOver — « Quête quotidienne : … ».
     var voiceOverLabel: String {
         switch self {
-        case .daily: return "Quête quotidienne"
-        case .weekly: return "Quête hebdomadaire"
-        case .seasonal: return "Quête de saison"
-        case .event: return "Quête évènement"
-        case .other: return "Quête"
+        case .daily: return String(localized: "Quête quotidienne")
+        case .weekly: return String(localized: "Quête hebdomadaire")
+        case .seasonal: return String(localized: "Quête de saison")
+        case .event: return String(localized: "Quête évènement")
+        case .other: return String(localized: "Quête")
         }
     }
 }
@@ -611,9 +611,9 @@ private struct QuestCardView: View {
         var parts = ["\(quest.progressValue) sur \(quest.targetValue)"]
         if quest.rewardXp > 0 { parts.append("plus \(quest.rewardXp) points") }
         if quest.isClaimed {
-            parts.append("récompense réclamée")
+            parts.append(String(localized: "récompense réclamée"))
         } else if quest.isClaimable {
-            parts.append("récompense à réclamer")
+            parts.append(String(localized: "récompense à réclamer"))
         }
         return parts.joined(separator: ", ")
     }

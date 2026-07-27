@@ -17,8 +17,8 @@ enum NearbyOperatorMetric: Equatable, Sendable {
     /// Fragment inséré dans l'intro (« … la communauté a mesuré {…} … »).
     var introMetric: String {
         switch self {
-        case .download: return "le débit médian"
-        case .signal: return "le signal médian"
+        case .download: return String(localized: "le débit médian")
+        case .signal: return String(localized: "le signal médian")
         }
     }
 

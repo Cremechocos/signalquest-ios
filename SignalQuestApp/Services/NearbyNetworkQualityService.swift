@@ -307,12 +307,12 @@ extension CoverageQualityBand {
     /// Titre de la pastille d'accueil (« Réseau … ») pour un verdict de qualité.
     var homeNetworkTitle: String {
         switch self {
-        case .excellent: return "Réseau au top"
-        case .good: return "Bon réseau"
-        case .fair: return "Réseau correct"
-        case .weak: return "Réseau faible"
-        case .poor: return "Réseau très faible"
-        case .unknown: return "Réseau"
+        case .excellent: return String(localized: "Réseau au top")
+        case .good: return String(localized: "Bon réseau")
+        case .fair: return String(localized: "Réseau correct")
+        case .weak: return String(localized: "Réseau faible")
+        case .poor: return String(localized: "Réseau très faible")
+        case .unknown: return String(localized: "Réseau")
         }
     }
 }

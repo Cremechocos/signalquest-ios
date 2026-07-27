@@ -13,7 +13,7 @@ enum SpeedtestPublishError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unknownServerId:
-            return "Ce test ne peut pas être publié : il a été enregistré avant que l'app ne mémorise sa référence serveur."
+            return String(localized: "Ce test ne peut pas être publié : il a été enregistré avant que l'app ne mémorise sa référence serveur.")
         }
     }
 }
@@ -204,7 +204,7 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .gra: return "OVH · GRA · France"
         case .bom: return "OVH · YNM · Inde"
         case .bhs: return "OVH · BHS · Canada"
-        case .us: return "OVH · US-EAST · États-Unis"
+        case .us: return String(localized: "OVH · US-EAST · États-Unis")
         case .bytelParisBbr: return "Bouygues · paris.bbr · :9200–9240"
         case .bytelParisCubic: return "Bouygues · paris.cubic · :9200–9240"
         case .bytelMrsBbr: return "Bouygues · mrs.bbr · :9200–9240"
@@ -231,7 +231,7 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .clouviderMan: return "Clouvider · man.speedtest.clouvider.net · :5200–5209"
         case .leasewebFra: return "Leaseweb · speedtest.fra1.de.leaseweb.net · :5201–5210"
         case .init7: return "Init7 · speedtest.init7.net · :5201–5204"
-        case .cloudflare: return "Edge anycast mondial · HTTPS · DL/UL/ping même serveur"
+        case .cloudflare: return String(localized: "Edge anycast mondial · HTTPS · DL/UL/ping même serveur")
         case .libreSpeed: return "POP LibreSpeed le plus proche · HTTPS · DL/UL/ping"
         case .cloudflareR2: return "CDN Cloudflare"
         case .awsCloudFront: return "CDN AWS"
@@ -242,7 +242,7 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
     /// Groupe collapsible du sélecteur.
     var regionLabel: String {
         switch self {
-        case .hybridAuto: return "Recommandé"
+        case .hybridAuto: return String(localized: "Recommandé")
         case .rbx, .sbg, .gra, .bom, .bhs, .us: return "OVH"
         case .bytelParisBbr, .bytelParisCubic,
              .bytelMrsBbr, .bytelMrsCubic,

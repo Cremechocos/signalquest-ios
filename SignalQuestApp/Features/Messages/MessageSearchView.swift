@@ -115,9 +115,9 @@ struct MessageSearchView: View {
     }
 
     private func snippet(for message: MessageItem) -> String {
-        if message.deletedAt != nil { return "Message supprimé" }
+        if message.deletedAt != nil { return String(localized: "Message supprimé") }
         if !message.attachments.isEmpty && (message.content ?? "").isEmpty {
-            return "Pièce jointe"
+            return String(localized: "Pièce jointe")
         }
         if message.isEncrypted {
             return decrypted[message.id] ?? "🔒 Message chiffré"

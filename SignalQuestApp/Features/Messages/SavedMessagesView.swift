@@ -123,9 +123,9 @@ struct SavedMessagesView: View {
     }
 
     private func snippet(_ message: MessageItem) -> String {
-        if message.isEncrypted { return "🔒 Message chiffré" }
+        if message.isEncrypted { return String(localized: "🔒 Message chiffré") }
         if let card = ShareCardData.parse(fromMetadataJSON: message.metadata) { return card.title }
-        if MessageLocationData.parse(fromMetadataJSON: message.metadata) != nil { return "📍 Position partagée" }
+        if MessageLocationData.parse(fromMetadataJSON: message.metadata) != nil { return String(localized: "📍 Position partagée") }
         let content = message.content ?? ""
         if !content.isEmpty { return content }
         return message.attachments.isEmpty ? "Message" : "Pièce jointe"

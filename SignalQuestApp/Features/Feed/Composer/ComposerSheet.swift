@@ -11,7 +11,7 @@ enum SocialVisibility: String, CaseIterable, Identifiable {
         switch self {
         case .publicWorld: return "Public"
         case .friends: return "Amis"
-        case .privateOnly: return "Privé"
+        case .privateOnly: return String(localized: "Privé")
         }
     }
     var icon: String {

@@ -95,8 +95,8 @@ struct ScheduledMessagesView: View {
     private func statusLabel(_ status: String) -> String {
         switch status {
         case "dispatching": return "Envoi en cours…"
-        case "failed_membership", "failed_validation", "failed_dispatch": return "Échec d'envoi"
-        case "canceled": return "Annulé"
+        case "failed_membership", "failed_validation", "failed_dispatch": return String(localized: "Échec d'envoi")
+        case "canceled": return String(localized: "Annulé")
         default: return status
         }
     }

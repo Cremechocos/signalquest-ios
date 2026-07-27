@@ -519,7 +519,7 @@ struct ANFRStatsView: View {
         let scope = model.selectedFilter.label
         let opName = model.selectedOperator.label
         guard !points.isEmpty else {
-            return "Évolution des supports \(opName) en \(scope) : aucune donnée disponible sur la période."
+            return String(localized: "Évolution des supports \(opName) en \(scope) : aucune donnée disponible sur la période.")
         }
         let metric = model.showProjected ? "opérationnels et projetés" : "opérationnels"
         let segments = ANFRGeneration.allCases
@@ -528,9 +528,9 @@ struct ANFRStatsView: View {
                 let series = points.filter { $0.generation == gen }.sorted { $0.date < $1.date }
                 let start = (series.first?.value ?? 0).formatted(.number.grouping(.automatic))
                 let end = (series.last?.value ?? 0).formatted(.number.grouping(.automatic))
-                return "\(gen.label) de \(start) à \(end) supports"
+                return String(localized: "\(gen.label) de \(start) à \(end) supports")
             }
-        return "Évolution des supports \(opName) en \(scope), \(metric) : "
+        return String(localized: "Évolution des supports \(opName) en \(scope), \(metric) : ")
             + segments.joined(separator: " ; ") + " sur la période."
     }
 

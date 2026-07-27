@@ -29,13 +29,13 @@ enum AntennaReportType: String, CaseIterable, Identifiable, Codable {
         case .incorrectCellId: return "Cell ID incorrect"
         case .incorrectPci: return "PCI incorrect"
         case .incorrectSector: return "Secteur incorrect"
-        case .incorrectLeader: return "Opérateur porteur incorrect"
+        case .incorrectLeader: return String(localized: "Opérateur porteur incorrect")
         case .wrongLocation: return "Mauvais emplacement"
         case .duplicate: return "Doublon"
-        case .incorrectLocation: return "Coordonnées incorrectes"
-        case .incorrectOperator: return "Opérateur incorrect"
+        case .incorrectLocation: return String(localized: "Coordonnées incorrectes")
+        case .incorrectOperator: return String(localized: "Opérateur incorrect")
         case .incorrectTech: return "Technologie incorrecte"
-        case .other: return "Autre problème"
+        case .other: return String(localized: "Autre problème")
         }
     }
 
@@ -80,8 +80,8 @@ enum AntennaReportStatus: String, Codable {
     var label: String {
         switch self {
         case .pending: return "En attente"
-        case .resolved: return "Résolu"
-        case .dismissed: return "Rejeté"
+        case .resolved: return String(localized: "Résolu")
+        case .dismissed: return String(localized: "Rejeté")
         }
     }
 

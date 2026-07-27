@@ -223,11 +223,11 @@ struct DriveSpeedtestDetailSheet: View {
         switch mbps {
         case 1000...: return "Exceptionnel"
         case 600..<1000: return "Excellent"
-        case 300..<600: return "Très bon"
+        case 300..<600: return String(localized: "Très bon")
         case 100..<300: return "Bon"
         case 30..<100: return "Correct"
         case 10..<30: return "Lent"
-        default: return "Très lent"
+        default: return String(localized: "Très lent")
         }
     }
 

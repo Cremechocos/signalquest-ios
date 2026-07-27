@@ -240,8 +240,8 @@ struct SharedPostCardBubble: View {
     }
 
     private var sourceLine: String {
-        if let handle = card.author?.handleLine { return "\(handle) · Fil réseau" }
-        return "Fil réseau"
+        if let handle = card.author?.handleLine { return String(localized: "\(handle) · Fil réseau") }
+        return String(localized: "Fil réseau")
     }
 
     /// Vignette image en priorité ; sinon bandeau de mesure selon ce que porte la

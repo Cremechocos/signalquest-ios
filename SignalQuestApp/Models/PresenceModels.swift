@@ -15,7 +15,7 @@ enum SocialPresenceStatus: String, Codable, Sendable, CaseIterable {
         switch self {
         case .online: return "En ligne"
         case .away: return "Absent"
-        case .dnd: return "Ne pas déranger"
+        case .dnd: return String(localized: "Ne pas déranger")
         case .offline: return "Hors ligne"
         case .invisible: return "Invisible"
         }
@@ -48,9 +48,9 @@ enum LiveShareMode: String, Codable, Sendable, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .mapOpenOnly:
-            return "Ta position n'est partagée que lorsque tu consultes la carte des amis."
+            return String(localized: "Ta position n'est partagée que lorsque tu consultes la carte des amis.")
         case .foregroundLive:
-            return "Ta position reste partagée en continu tant que SignalQuest est ouverte, même sans consulter la carte des amis, ou pendant un Drive Test actif. Le partage se met en pause dès que l'app passe en arrière-plan."
+            return String(localized: "Ta position reste partagée en continu tant que SignalQuest est ouverte, même sans consulter la carte des amis, ou pendant un Drive Test actif. Le partage se met en pause dès que l'app passe en arrière-plan.")
         }
     }
 }

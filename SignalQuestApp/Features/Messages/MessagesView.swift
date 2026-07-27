@@ -275,7 +275,7 @@ struct MessagesView: View {
         guard let last = conversation.lastMessage else {
             return conversation.e2eeEnabled == true ? "Conversation chiffrée" : "Aucun message"
         }
-        if last.deletedAt != nil { return "Message supprimé" }
+        if last.deletedAt != nil { return String(localized: "Message supprimé") }
         let attachmentHint = last.attachments.isEmpty ? "" : "📎 "
         if last.isEncrypted {
             if let plain = model.decryptedPreviews[conversation.id], !plain.isEmpty {

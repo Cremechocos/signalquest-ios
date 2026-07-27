@@ -15,19 +15,19 @@ enum E2EEError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .locked:
-            return "Conversation chiffrée non encore supportée/déverrouillée sur iOS"
+            return String(localized: "Conversation chiffrée non encore supportée/déverrouillée sur iOS")
         case .unsupported(let value):
             return value
         case .invalidKey:
-            return "Clé E2EE invalide"
+            return String(localized: "Clé E2EE invalide")
         case .wrongPassword:
-            return "Mot de passe incorrect. Réessaie."
+            return String(localized: "Mot de passe incorrect. Réessaie.")
         case .decryptFailed:
-            return "Déchiffrement impossible"
+            return String(localized: "Déchiffrement impossible")
         case .keyGenerationFailed:
-            return "Génération de la clé E2EE impossible"
+            return String(localized: "Génération de la clé E2EE impossible")
         case .staleKey:
-            return "Clé de conversation obsolète — re-partage nécessaire"
+            return String(localized: "Clé de conversation obsolète — re-partage nécessaire")
         }
     }
 }

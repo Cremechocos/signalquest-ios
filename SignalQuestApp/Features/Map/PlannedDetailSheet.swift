@@ -151,8 +151,8 @@ struct PlannedDetailSheet: View {
         switch status {
         case .active: return "Site actif"
         case .upgradePending: return "Upgrade en attente"
-        case .declared: return "Station déclarée"
-        case .planned: return "Site prévu"
+        case .declared: return String(localized: "Station déclarée")
+        case .planned: return String(localized: "Site prévu")
         }
     }
 
@@ -173,15 +173,15 @@ struct PlannedDetailSheet: View {
         let pending = site.activation?.pendingTechnologies ?? []
         switch status {
         case .active:
-            return "Site en service — toutes les technologies prévues émettent."
+            return String(localized: "Site en service — toutes les technologies prévues émettent.")
         case .upgradePending:
             return pending.isEmpty
                 ? "Site en service, mise à niveau en cours."
                 : "Site en service ; reste à activer : \(pending.joined(separator: ", "))."
         case .declared:
-            return "Station enregistrée à l'ANFR, pas encore d'émetteur actif."
+            return String(localized: "Station enregistrée à l'ANFR, pas encore d'émetteur actif.")
         case .planned:
-            return "Site annoncé au prévisionnel, pas encore construit."
+            return String(localized: "Site annoncé au prévisionnel, pas encore construit.")
         }
     }
 

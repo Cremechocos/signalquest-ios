@@ -177,13 +177,13 @@ struct SignalQuestHomeView: View {
 
     private var networkTitle: String {
         guard isOnline else { return "Hors connexion" }
-        if networkStatus.isConstrained { return "Réseau limité" }
+        if networkStatus.isConstrained { return String(localized: "Réseau limité") }
         if let quality = networkQuality { return quality.level.homeNetworkTitle }
-        return "Connecté"
+        return String(localized: "Connecté")
     }
 
     private var networkSubtitle: String {
-        guard isOnline else { return "Vérifie ta connexion" }
+        guard isOnline else { return String(localized: "Vérifie ta connexion") }
         // Verdict dispo (hors mode données réduites) : opérateur SIM + le débit
         // médian communautaire. Le détail RSRP vit dans la sheet explicative
         // (peu lisible en un coup d'œil sur la pastille).
@@ -206,8 +206,8 @@ struct SignalQuestHomeView: View {
     }
 
     private var networkBadge: String {
-        guard isOnline else { return "Coupé" }
-        if networkStatus.isConstrained { return "Limité" }
+        guard isOnline else { return String(localized: "Coupé") }
+        if networkStatus.isConstrained { return String(localized: "Limité") }
         if let quality = networkQuality { return quality.level.title }
         return "En ligne"
     }
@@ -264,7 +264,7 @@ struct SignalQuestHomeView: View {
 
     private var messagesSubtitle: String {
         let unread = services.unreadConversations
-        if unread <= 0 { return "Conversations chiffrées" }
+        if unread <= 0 { return String(localized: "Conversations chiffrées") }
         return unread == 1 ? "1 non lu" : "\(unread) non lus"
     }
 
@@ -501,7 +501,7 @@ struct SignalQuestHomeView: View {
         }
         if let location = userLocation {
             let distance = location.distance(from: CLLocation(latitude: measure.lat, longitude: measure.lng))
-            parts.append("à \(SignalFormatters.meters(distance))")
+            parts.append(String(localized: "à \(SignalFormatters.meters(distance))"))
         }
         return parts.joined(separator: " · ")
     }

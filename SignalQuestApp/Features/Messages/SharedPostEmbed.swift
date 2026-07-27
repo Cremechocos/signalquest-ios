@@ -250,9 +250,9 @@ struct SharedPostEmbedBubble: View {
     private func sourceLine(_ item: UnifiedSocialFeedItem) -> String {
         if let handle = item.author.handle, !handle.isEmpty {
             let normalized = handle.hasPrefix("@") ? handle : "@\(handle)"
-            return "\(normalized) · Fil réseau"
+            return String(localized: "\(normalized) · Fil réseau")
         }
-        return "Fil réseau"
+        return String(localized: "Fil réseau")
     }
 
     /// Texte du post : version live en priorité, sinon aperçu du partage.

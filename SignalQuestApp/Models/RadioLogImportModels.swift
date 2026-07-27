@@ -142,10 +142,10 @@ enum RadioLogImportCellStatus: Sendable, Equatable, Codable {
 
     var label: String {
         switch self {
-        case .pending: return "Vérif."
+        case .pending: return String(localized: "Vérif.")
         case .identifiable: return "Rattachable"
-        case .notFound: return "Non identifié"
-        case .identified: return "Identifié"
+        case .notFound: return String(localized: "Non identifié")
+        case .identified: return String(localized: "Identifié")
         }
     }
 

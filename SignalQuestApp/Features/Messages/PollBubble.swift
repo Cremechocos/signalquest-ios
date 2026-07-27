@@ -71,10 +71,10 @@ struct PollBubble: View {
     private var metaLine: String {
         let mode = poll.multiSelect ? "Choix multiples" : "Choix unique"
         let count = "\(poll.totalVotes) vote\(poll.totalVotes > 1 ? "s" : "")"
-        if effectivelyClosed { return "Clôturé · \(count)" }
+        if effectivelyClosed { return String(localized: "Clôturé · \(count)") }
         if let endsAt = poll.endsAt {
             let when = endsAt.formatted(.dateTime.day().month(.abbreviated).hour().minute())
-            return "\(mode) · clôture le \(when) · \(count)"
+            return String(localized: "\(mode) · clôture le \(when) · \(count)")
         }
         return "\(mode) · \(count)"
     }

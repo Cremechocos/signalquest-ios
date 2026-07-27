@@ -79,8 +79,8 @@ struct NetworkPulseHero: View {
     private var accessibilitySummary: String {
         var parts: [String] = ["Pouls réseau autour de vous"]
         if let rsrp = pulse.avgRsrpDbm { parts.append("RSRP moyen \(rsrp) dBm") }
-        if let mbps = pulse.medianDownloadMbps { parts.append("débit médian \(mbps) mégabits par seconde") }
-        if hasOperator, let op = pulse.bestOperator { parts.append("meilleur opérateur \(op)") }
+        if let mbps = pulse.medianDownloadMbps { parts.append(String(localized: "débit médian \(mbps) mégabits par seconde")) }
+        if hasOperator, let op = pulse.bestOperator { parts.append(String(localized: "meilleur opérateur \(op)")) }
         else { parts.append("\(pulse.measurementsCount) mesures") }
         return parts.joined(separator: ", ")
     }

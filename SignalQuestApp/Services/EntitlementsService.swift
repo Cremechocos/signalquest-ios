@@ -238,18 +238,18 @@ enum PurchaseEligibility: Equatable, Sendable {
         case .allowed:
             return "Achat disponible."
         case .checkingServer:
-            return "Vérification de tes droits en cours…"
+            return String(localized: "Vérification de tes droits en cours…")
         case .backendUnavailable:
-            return "Impossible de vérifier tes abonnements existants. Aucun achat n'est proposé pour éviter une double facturation."
+            return String(localized: "Impossible de vérifier tes abonnements existants. Aucun achat n'est proposé pour éviter une double facturation.")
         case .existingBackendEntitlement(let snapshot):
             if snapshot.status == .paymentFailed {
-                return "Un abonnement \(snapshot.source.displayName) nécessite une action de paiement. Résous-le sur la plateforme d'origine avant de souscrire ailleurs."
+                return String(localized: "Un abonnement \(snapshot.source.displayName) nécessite une action de paiement. Résous-le sur la plateforme d'origine avant de souscrire ailleurs.")
             }
-            return "Ton abonnement \(snapshot.tier.displayName) est déjà géré par \(snapshot.source.displayName). Gère-le sur cette plateforme pour éviter un doublon."
+            return String(localized: "Ton abonnement \(snapshot.tier.displayName) est déjà géré par \(snapshot.source.displayName). Gère-le sur cette plateforme pour éviter un doublon.")
         case .existingLocalAppStoreEntitlement:
-            return "Un achat App Store est détecté sur cet appareil, mais son activation serveur n'est pas encore confirmée."
+            return String(localized: "Un achat App Store est détecté sur cet appareil, mais son activation serveur n'est pas encore confirmée.")
         case .serverVerificationUnavailable:
-            return "Les achats App Store seront ouverts après validation serveur en staging. Aucun débit ne peut être lancé pour le moment."
+            return String(localized: "Les achats App Store seront ouverts après validation serveur en staging. Aucun débit ne peut être lancé pour le moment.")
         }
     }
 }
@@ -325,11 +325,11 @@ enum EntitlementsError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .failedVerification:
-            return "La transaction App Store n'a pas pu être authentifiée."
+            return String(localized: "La transaction App Store n'a pas pu être authentifiée.")
         case .productUnavailable:
             return "Cette offre n'est pas disponible dans l'App Store."
         case .unexpectedProduct:
-            return "La transaction reçue ne correspond pas à l'offre choisie."
+            return String(localized: "La transaction reçue ne correspond pas à l'offre choisie.")
         case .transactionDeliveryUnavailable:
             return "La validation serveur App Store n'est pas encore disponible."
         }

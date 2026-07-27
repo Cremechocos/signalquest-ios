@@ -40,6 +40,16 @@
         }
       }
     },
+    "%@ de %@ à %@ supports" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ de %2$@ à %3$@ supports"
+          }
+        }
+      }
+    },
     "%@ ms" : {
 
     },
@@ -52,6 +62,19 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ · %2$lld antenne%3$@ · %4$lld cellule%5$@"
+          }
+        }
+      }
+    },
+    "%@ · Fil réseau" : {
+
+    },
+    "%@ · clôture le %@ · %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · clôture le %2$@ · %3$@"
           }
         }
       }
@@ -351,10 +374,19 @@
     "Accepte d’abord les conditions d’utilisation" : {
 
     },
+    "Accepté" : {
+
+    },
     "Accueil" : {
 
     },
+    "Achat Apple détecté localement, confirmation serveur en attente." : {
+
+    },
     "Actif sur la conversation" : {
+
+    },
+    "Action non autorisée." : {
 
     },
     "Activer la 2FA" : {
@@ -375,6 +407,9 @@
     "Activité" : {
 
     },
+    "Activée" : {
+
+    },
     "Actuel" : {
 
     },
@@ -382,6 +417,9 @@
 
     },
     "Adopter le site communautaire" : {
+
+    },
+    "Adresse invalide. Réessaie plus tard." : {
 
     },
     "Affichage" : {
@@ -438,11 +476,30 @@
     "Amis" : {
 
     },
+    "Amérique du Nord" : {
+
+    },
+    "Amérique du Sud" : {
+
+    },
     "Annuler" : {
 
     },
     "Annuler la demande envoyée à %@" : {
 
+    },
+    "Annulé" : {
+
+    },
+    "Antenne la plus proche · %@ · écart %lld°" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Antenne la plus proche · %1$@ · écart %2$lld°"
+          }
+        }
+      }
     },
     "Antennes desservantes" : {
 
@@ -493,6 +550,9 @@
 
     },
     "Associe ton Apple ID pour te connecter en un geste, même avec « Masquer mon e-mail »." : {
+
+    },
+    "Atteinte à la vie privée" : {
 
     },
     "Au moins 8 caractères" : {
@@ -555,7 +615,16 @@
     "Audio et vidéo transportés par LiveKit." : {
 
     },
+    "Authentification requise." : {
+
+    },
     "Autour de toi" : {
+
+    },
+    "Autre problème" : {
+
+    },
+    "Autres quêtes" : {
 
     },
     "Avertissement. %@" : {
@@ -565,6 +634,9 @@
 
     },
     "Balayer vers le bas avec deux doigts pour fermer" : {
+
+    },
+    "Bientôt disponible sur iOS" : {
 
     },
     "Bio" : {
@@ -577,6 +649,9 @@
 
     },
     "Bloquer l’expéditeur" : {
+
+    },
+    "Bon réseau" : {
 
     },
     "Bonjour," : {
@@ -597,7 +672,13 @@
     "Carte ANFR" : {
 
     },
+    "Carte Apple Plan native (par défaut)" : {
+
+    },
     "Carte des amis" : {
+
+    },
+    "Cartographie communautaire détaillée" : {
 
     },
     "Cartographie la 4G/5G en France avec une communauté de passionnés." : {
@@ -613,7 +694,13 @@
         }
       }
     },
+    "Ce nom est trop long." : {
+
+    },
     "Ce réglage contrôle les nouvelles demandes de conversation. Les conversations existantes restent accessibles." : {
+
+    },
+    "Ce test ne peut pas être publié : il a été enregistré avant que l'app ne mémorise sa référence serveur." : {
 
     },
     "Cell ID" : {
@@ -712,6 +799,12 @@
     "Clos" : {
 
     },
+    "Clé E2EE invalide" : {
+
+    },
+    "Clé de conversation obsolète — re-partage nécessaire" : {
+
+    },
     "Clé mise à jour — appuie pour resynchroniser" : {
 
     },
@@ -719,6 +812,9 @@
 
     },
     "Clôturer le sondage" : {
+
+    },
+    "Clôturé · %@" : {
 
     },
     "Code TOTP à 6 chiffres" : {
@@ -784,10 +880,32 @@
     "Confirmé par la communauté" : {
 
     },
+    "Conflit : l'élément a déjà été modifié ailleurs." : {
+
+    },
     "Conflit : un autre site a plus de validations sur cette antenne." : {
 
     },
+    "Connecté" : {
+
+    },
     "Connexion" : {
+
+    },
+    "Connexion iPerf3 annulée" : {
+
+    },
+    "Connexion iPerf3 fermée (%lld/%lld octets)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Connexion iPerf3 fermée (%1$lld/%2$lld octets)"
+          }
+        }
+      }
+    },
+    "Connexion impossible. Vérifie ta connexion puis réessaie." : {
 
     },
     "Connexion indisponible" : {
@@ -796,7 +914,13 @@
     "Connexion vidéo…" : {
 
     },
+    "Connexion à l'appel impossible : %@" : {
+
+    },
     "Connexion…" : {
+
+    },
+    "Contenu illégal" : {
 
     },
     "Continu · test %lld" : {
@@ -812,6 +936,15 @@
 
     },
     "Conversation chiffrée" : {
+
+    },
+    "Conversation chiffrée non encore supportée/déverrouillée sur iOS" : {
+
+    },
+    "Conversations chiffrées" : {
+
+    },
+    "Coordonnées incorrectes" : {
 
     },
     "Copier" : {
@@ -834,6 +967,19 @@
     },
     "Couper notifs" : {
 
+    },
+    "Coupé" : {
+
+    },
+    "Courbe de débit %@ : %@, %@." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Courbe de débit %1$@ : %2$@, %3$@."
+          }
+        }
+      }
     },
     "Couverture" : {
 
@@ -884,6 +1030,9 @@
     "Dernière mesure · %@" : {
 
     },
+    "Deuxième" : {
+
+    },
     "Discussion" : {
 
     },
@@ -926,10 +1075,40 @@
     "Débloquer cette personne ?" : {
 
     },
+    "Déchiffrement impossible" : {
+
+    },
+    "Déclaré" : {
+
+    },
     "Décris ce qui ne va pas" : {
 
     },
     "Décris ce qui te pose problème" : {
+
+    },
+    "Dégradé" : {
+
+    },
+    "Déjà abonné ailleurs" : {
+
+    },
+    "Déjà inclus dans ton offre" : {
+
+    },
+    "Délai dépassé sur le serveur iPerf3" : {
+
+    },
+    "Délai dépassé. Réessaie." : {
+
+    },
+    "Démarrer l'enregistrement couverture" : {
+
+    },
+    "Démarrer le drive test" : {
+
+    },
+    "Démarrer le speedtest continu" : {
 
     },
     "Déplace la carte pour charger" : {
@@ -956,6 +1135,9 @@
     "Désactivé par défaut. Si tu l’actives, ta mesure et ton opérateur deviennent publics ; la position reste floutée sauf consentement séparé dans Confidentialité." : {
 
     },
+    "Désinformation" : {
+
+    },
     "Désépingler" : {
 
     },
@@ -972,6 +1154,9 @@
 
     },
     "Déverrouiller avec %@" : {
+
+    },
+    "Edge anycast mondial · HTTPS · DL/UL/ping même serveur" : {
 
     },
     "Effacer" : {
@@ -1007,6 +1192,9 @@
     "En train d’écrire" : {
 
     },
+    "Enchaîne des speedtests en continu, sans enregistrer la couverture." : {
+
+    },
     "Enchaîne plusieurs tests d'affilée. « ∞ » lance un mode continu (drive test) : tests illimités jusqu'à l'arrêt, position suivie en continu, poursuite écran verrouillé." : {
 
     },
@@ -1019,6 +1207,9 @@
           }
         }
       }
+    },
+    "Enregistre la génération (5G/4G/…) le long du trajet, sans test de débit." : {
+
     },
     "Enregistrer" : {
 
@@ -1083,6 +1274,9 @@
     "Fil de discussion" : {
 
     },
+    "Fil réseau" : {
+
+    },
     "Filtre %@" : {
 
     },
@@ -1092,7 +1286,20 @@
     "Groupe" : {
 
     },
+    "Groupe de %lld éléments. %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Groupe de %1$lld éléments. %2$@"
+          }
+        }
+      }
+    },
     "Génération" : {
+
+    },
+    "Génération de la clé E2EE impossible" : {
 
     },
     "Génération du secret 2FA…" : {
@@ -1104,7 +1311,16 @@
     "Gérer la relation avec %@" : {
 
     },
+    "Géré par %@." : {
+
+    },
+    "Harcèlement" : {
+
+    },
     "Hors ligne — certaines actions sont indisponibles" : {
+
+    },
+    "Hypothèse" : {
 
     },
     "Ici, **couverture et débit** sont au même niveau." : {
@@ -1134,7 +1350,16 @@
     "Identifier cette antenne" : {
 
     },
+    "Identifié" : {
+
+    },
+    "Identifiée" : {
+
+    },
     "Identité" : {
+
+    },
+    "Imagerie aérienne Apple (native)" : {
 
     },
     "Immédiat" : {
@@ -1150,6 +1375,15 @@
 
     },
     "Impossible de joindre SignalQuest. Vérifie ta connexion puis réessaie." : {
+
+    },
+    "Impossible de mesurer une latence réseau fiable." : {
+
+    },
+    "Impossible de vérifier tes abonnements existants. Aucun achat n'est proposé pour éviter une double facturation." : {
+
+    },
+    "Indéterminée" : {
 
     },
     "Informations légales" : {
@@ -1182,10 +1416,22 @@
     "J’aime" : {
 
     },
+    "L'appel s'est terminé pendant la connexion." : {
+
+    },
     "L'équipe de modération te répondra ici. Tu peux ajouter des précisions ou des photos." : {
 
     },
+    "La Réunion" : {
+
+    },
     "La localisation est désactivée pour SignalQuest. Active-la dans les Réglages pour situer tes mesures sur la carte. Le test fonctionne quand même sans." : {
+
+    },
+    "La transaction App Store n'a pas pu être authentifiée." : {
+
+    },
+    "La transaction reçue ne correspond pas à l'offre choisie." : {
 
     },
     "Lance un Drive Test pour enregistrer tes premières mesures." : {
@@ -1200,10 +1446,28 @@
     "Lancer un speedtest sans compte" : {
 
     },
+    "Le fichier est trop volumineux." : {
+
+    },
+    "Le mot de passe doit faire au moins 8 caractères." : {
+
+    },
+    "Le nom ne peut pas être vide." : {
+
+    },
+    "Le partage d’écran n’est pas encore disponible sur iOS." : {
+
+    },
     "Le reçu sera effacé uniquement après confirmation du serveur." : {
 
     },
     "Le réseau mobile français" : {
+
+    },
+    "Le serveur de droits est indisponible. Les nouveaux achats sont bloqués par sécurité." : {
+
+    },
+    "Les achats App Store seront ouverts après validation serveur en staging. Aucun débit ne peut être lancé pour le moment." : {
 
     },
     "Les appels utilisent le transport LiveKit" : {
@@ -1218,6 +1482,9 @@
     "Les reçus sont chiffrés dans le trousseau de cet appareil. SignalQuest ne peut pas recréer un reçu perdu." : {
 
     },
+    "Les serveurs speedtest sont occupés ou injoignables depuis ce réseau. Réessaie dans un instant." : {
+
+    },
     "LibreSpeed" : {
 
     },
@@ -1228,6 +1495,9 @@
 
     },
     "Likes & commentaires (push)" : {
+
+    },
+    "Limité" : {
 
     },
     "Localisation désactivée" : {
@@ -1264,7 +1534,13 @@
         }
       }
     },
+    "Maintenance programmée" : {
+
+    },
     "Maintenant" : {
+
+    },
+    "Manqué" : {
 
     },
     "Masque ou affiche les antennes prévues selon leur avancement ANFR." : {
@@ -1401,6 +1677,9 @@
     "Modifier" : {
 
     },
+    "Modifiée" : {
+
+    },
     "Mois" : {
 
     },
@@ -1414,6 +1693,9 @@
 
     },
     "Mot de passe actuel" : {
+
+    },
+    "Mot de passe incorrect. Réessaie." : {
 
     },
     "Mot de passe modifié" : {
@@ -1467,6 +1749,9 @@
     "Nom, handle ou email" : {
 
     },
+    "Non identifié" : {
+
+    },
     "Non lu" : {
 
     },
@@ -1509,7 +1794,13 @@
     "OK" : {
 
     },
+    "OVH · US-EAST · États-Unis" : {
+
+    },
     "Observatoire ANFR — Agence nationale des fréquences · relevé du %@" : {
+
+    },
+    "Océanie" : {
 
     },
     "On t’envoie un lien avec un code à 8 caractères. Copie-le dans l’écran suivant." : {
@@ -1531,6 +1822,15 @@
 
     },
     "Opérateur détecté" : {
+
+    },
+    "Opérateur incorrect" : {
+
+    },
+    "Opérateur invalide." : {
+
+    },
+    "Opérateur porteur incorrect" : {
 
     },
     "Opérateurs autour de toi" : {
@@ -1584,6 +1884,9 @@
           }
         }
       }
+    },
+    "Paiement à régulariser auprès de %@." : {
+
     },
     "Partager" : {
 
@@ -1654,7 +1957,16 @@
     "Photo jointe, toucher pour agrandir" : {
 
     },
+    "Photo partagée" : {
+
+    },
+    "Photo à %@" : {
+
+    },
     "Photos" : {
+
+    },
+    "Pièce jointe" : {
 
     },
     "Pièce jointe %@, %@. Toucher pour ouvrir." : {
@@ -1703,6 +2015,9 @@
     "Pourquoi ce rappel ?" : {
 
     },
+    "Privé" : {
+
+    },
     "Profil" : {
 
     },
@@ -1715,6 +2030,9 @@
     "Promouvoir admin" : {
 
     },
+    "Proximité ANFR" : {
+
+    },
     "Précisions (optionnel)" : {
 
     },
@@ -1725,6 +2043,15 @@
 
     },
     "Présence" : {
+
+    },
+    "Prévu" : {
+
+    },
+    "Prêt" : {
+
+    },
+    "Prêt à mesurer" : {
 
     },
     "Publication" : {
@@ -1764,6 +2091,21 @@
 
     },
     "Quoi de neuf sur le réseau ?" : {
+
+    },
+    "Quête" : {
+
+    },
+    "Quête de saison" : {
+
+    },
+    "Quête hebdomadaire" : {
+
+    },
+    "Quête quotidienne" : {
+
+    },
+    "Quête évènement" : {
 
     },
     "Quêtes" : {
@@ -1818,6 +2160,15 @@
     "Rechercher une ville, une adresse, un site…" : {
 
     },
+    "Recommandé" : {
+
+    },
+    "Refusé" : {
+
+    },
+    "Rejeté" : {
+
+    },
     "Rejoins SignalQuest" : {
 
     },
@@ -1831,6 +2182,12 @@
 
     },
     "Reprise automatique en cellulaire" : {
+
+    },
+    "Requête annulée." : {
+
+    },
+    "Requête invalide." : {
 
     },
     "Resynchronisation…" : {
@@ -1902,6 +2259,9 @@
     "Réagir avec %@" : {
 
     },
+    "Réception" : {
+
+    },
     "Réclamation…" : {
 
     },
@@ -1947,6 +2307,12 @@
     "Répondre…" : {
 
     },
+    "Réponse iPerf3 JSON invalide" : {
+
+    },
+    "Réponse inattendue du serveur. Réessaie plus tard." : {
+
+    },
     "Réponses à mes signalements (e-mail)" : {
 
     },
@@ -1959,13 +2325,34 @@
     "Réseau : %@" : {
 
     },
+    "Réseau au top" : {
+
+    },
     "Réseau autour de toi" : {
+
+    },
+    "Réseau correct" : {
+
+    },
+    "Réseau faible" : {
+
+    },
+    "Réseau limité" : {
+
+    },
+    "Réseau très faible" : {
 
     },
     "Réservé à Premium" : {
 
     },
+    "Résolu" : {
+
+    },
     "Résolution des identifications…" : {
+
+    },
+    "Résultat" : {
 
     },
     "Résultats" : {
@@ -2045,6 +2432,15 @@
     "Serveur de test" : {
 
     },
+    "Serveur iPerf3 occupé (ACCESS_DENIED)" : {
+
+    },
+    "Service dégradé" : {
+
+    },
+    "Service momentanément indisponible. Réessaie plus tard." : {
+
+    },
     "Services impactés" : {
 
     },
@@ -2052,6 +2448,12 @@
 
     },
     "Session en pause : WiFi détecté, reprise automatique en cellulaire" : {
+
+    },
+    "Session expirée — reconnecte-toi pour enregistrer tes mesures." : {
+
+    },
+    "Session expirée. Reconnecte-toi." : {
 
     },
     "Sessions" : {
@@ -2093,7 +2495,19 @@
     "Site ANFR" : {
 
     },
+    "Site annoncé au prévisionnel, pas encore construit." : {
+
+    },
     "Site communautaire (consensus)" : {
+
+    },
+    "Site en service — toutes les technologies prévues émettent." : {
+
+    },
+    "Site prévu" : {
+
+    },
+    "Soutiens SignalQuest et débloque des outils avancés. Les mesures réseau essentielles restent gratuites." : {
 
     },
     "Soyez le premier à commenter" : {
@@ -2109,6 +2523,12 @@
 
     },
     "Speedtests" : {
+
+    },
+    "Station déclarée" : {
+
+    },
+    "Station enregistrée à l'ANFR, pas encore d'émetteur actif." : {
 
     },
     "Statistiques ANFR" : {
@@ -2201,6 +2621,9 @@
     "Supprimer tous les imports ?" : {
 
     },
+    "Supprimée" : {
+
+    },
     "Sécurité" : {
 
     },
@@ -2210,10 +2633,19 @@
     "Ta mesure rejoindra la carte publique, à l'endroit du test." : {
 
     },
+    "Ta position n'est partagée que lorsque tu consultes la carte des amis." : {
+
+    },
+    "Ta position reste partagée en continu tant que SignalQuest est ouverte, même sans consulter la carte des amis, ou pendant un Drive Test actif. Le partage se met en pause dès que l'app passe en arrière-plan." : {
+
+    },
     "Ta story" : {
 
     },
     "Technologies prévues" : {
+
+    },
+    "Terminé" : {
 
     },
     "Test invité" : {
@@ -2222,7 +2654,20 @@
     "Tester" : {
 
     },
+    "Ton abonnement %@ est déjà géré par %@. Gère-le sur cette plateforme pour éviter un doublon." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ton abonnement %1$@ est déjà géré par %2$@. Gère-le sur cette plateforme pour éviter un doublon."
+          }
+        }
+      }
+    },
     "Ton historique sera effacé pour toi. Tes correspondants gardent le leur." : {
+
+    },
+    "Ton identifiant ne peut pas encore être modifié." : {
 
     },
     "Ton mot de passe déverrouille la clé de chiffrement en mémoire, le temps de la session." : {
@@ -2270,6 +2715,21 @@
     "Tout supprimer" : {
 
     },
+    "Troisième" : {
+
+    },
+    "Trop de requêtes. Patiente un instant avant de réessayer." : {
+
+    },
+    "Très bon" : {
+
+    },
+    "Très faible" : {
+
+    },
+    "Très lent" : {
+
+    },
     "Tu ne pourras plus te connecter via Apple. Si ton compte a été créé avec Apple, définis d'abord un mot de passe via « Mot de passe oublié » pour ne pas perdre l'accès." : {
 
     },
@@ -2282,6 +2742,15 @@
     "Type de problème" : {
 
     },
+    "Téléchargement" : {
+
+    },
+    "Un abonnement %@ nécessite une action de paiement. Résous-le sur la plateforme d'origine avant de souscrire ailleurs." : {
+
+    },
+    "Un achat App Store est détecté sur cet appareil, mais son activation serveur n'est pas encore confirmée." : {
+
+    },
     "Un code à usage unique sera envoyé à %@." : {
 
     },
@@ -2289,6 +2758,9 @@
 
     },
     "Une donnée incorrecte sur ce site ? Préviens la modération." : {
+
+    },
+    "Une erreur est survenue. Réessaie." : {
 
     },
     "Une légende ?" : {
@@ -2357,7 +2829,19 @@
     "Vu par…" : {
 
     },
+    "Vérif." : {
+
+    },
+    "Vérification de tes droits en cours…" : {
+
+    },
     "Vérification des données concernées…" : {
+
+    },
+    "Vérification des droits multiplateformes…" : {
+
+    },
+    "Vérifie ta connexion" : {
 
     },
     "activé" : {
@@ -2370,6 +2854,9 @@
 
     },
     "dBm · RSRP" : {
+
+    },
+    "débit médian %lld mégabits par seconde" : {
 
     },
     "désactivé" : {
@@ -2388,6 +2875,18 @@
 
     },
     "fermé" : {
+
+    },
+    "la biométrie" : {
+
+    },
+    "le débit médian" : {
+
+    },
+    "le signal médian" : {
+
+    },
+    "meilleur opérateur %@" : {
 
     },
     "modifié" : {
@@ -2411,6 +2910,15 @@
     "pts" : {
 
     },
+    "publié sur la carte ✓" : {
+
+    },
+    "récompense réclamée" : {
+
+    },
+    "récompense à réclamer" : {
+
+    },
     "signalquest.fr" : {
 
     },
@@ -2426,7 +2934,13 @@
     "sélectionné" : {
 
     },
+    "test terminé ✓" : {
+
+    },
     "validée %lld×" : {
+
+    },
+    "« %@ » fait partie de Premium. Compare les offres sans perdre ce que tu étais en train de faire." : {
 
     },
     "« %@ » ne te sera plus attribuée. Les lignes liées sont rechargées depuis le serveur après retrait." : {
@@ -2453,6 +2967,22 @@
     "À personne" : {
 
     },
+    "Échec" : {
+
+    },
+    "Échec d'envoi" : {
+
+    },
+    "Échec d'envoi (%@) : %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Échec d'envoi (%1$@) : %2$@"
+          }
+        }
+      }
+    },
     "Échec de l'envoi. Appuyer pour réessayer." : {
 
     },
@@ -2471,13 +3001,54 @@
     "Éditer le profil" : {
 
     },
+    "Élément introuvable." : {
+
+    },
     "Épingler" : {
+
+    },
+    "État iPerf3 inattendu (%d)" : {
 
     },
     "Éventail des azimuts des secteurs" : {
 
     },
+    "Évolution des supports %@ en %@ : aucune donnée disponible sur la période." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Évolution des supports %1$@ en %2$@ : aucune donnée disponible sur la période."
+          }
+        }
+      }
+    },
+    "Évolution des supports %@ en %@, %@ : " : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Évolution des supports %1$@ en %2$@, %3$@ : "
+          }
+        }
+      }
+    },
+    "Évènement" : {
+
+    },
     "×%lld" : {
+
+    },
+    "à " : {
+
+    },
+    "à %@" : {
+
+    },
+    "à %lld m" : {
+
+    },
+    "à l'instant" : {
 
     },
     "—" : {
@@ -2496,6 +3067,12 @@
 
     },
     "👑" : {
+
+    },
+    "📍 Position partagée" : {
+
+    },
+    "🔒 Message chiffré" : {
 
     }
   },

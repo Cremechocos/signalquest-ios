@@ -78,9 +78,9 @@ enum ANFRModType: String, CaseIterable, Identifiable, Sendable, Hashable {
     var label: String {
         switch self {
         case .new: return "Nouveau support"
-        case .activated: return "Activée"
-        case .deleted: return "Supprimée"
-        case .added: return "Modifiée"
+        case .activated: return String(localized: "Activée")
+        case .deleted: return String(localized: "Supprimée")
+        case .added: return String(localized: "Modifiée")
         }
     }
 

@@ -253,10 +253,10 @@ enum ServingStatus: String, Equatable {
 
     var label: String {
         switch self {
-        case .identified: return "Identifiée"
-        case .hypothesis: return "Hypothèse"
-        case .proximity: return "Proximité ANFR"
-        case .unknown: return "Indéterminée"
+        case .identified: return String(localized: "Identifiée")
+        case .hypothesis: return String(localized: "Hypothèse")
+        case .proximity: return String(localized: "Proximité ANFR")
+        case .unknown: return String(localized: "Indéterminée")
         }
     }
 }

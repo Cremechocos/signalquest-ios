@@ -279,9 +279,9 @@ private enum SpeedtestEngineError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .pingFailed:
-            return "Impossible de mesurer une latence réseau fiable."
+            return String(localized: "Impossible de mesurer une latence réseau fiable.")
         case .noServerReachable:
-            return "Les serveurs speedtest sont occupés ou injoignables depuis ce réseau. Réessaie dans un instant."
+            return String(localized: "Les serveurs speedtest sont occupés ou injoignables depuis ce réseau. Réessaie dans un instant.")
         }
     }
 }
@@ -2880,17 +2880,17 @@ enum IPerf3Error: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .cancelled: return "Connexion iPerf3 annulée"
-        case .timeout: return "Délai dépassé sur le serveur iPerf3"
+        case .cancelled: return String(localized: "Connexion iPerf3 annulée")
+        case .timeout: return String(localized: "Délai dépassé sur le serveur iPerf3")
         case .emptyRead: return "Lecture iPerf3 vide"
         case .connectionClosed(let got, let expected):
-            return "Connexion iPerf3 fermée (\(got)/\(expected) octets)"
-        case .accessDenied: return "Serveur iPerf3 occupé (ACCESS_DENIED)"
+            return String(localized: "Connexion iPerf3 fermée (\(got)/\(expected) octets)")
+        case .accessDenied: return String(localized: "Serveur iPerf3 occupé (ACCESS_DENIED)")
         case .serverError: return "Erreur serveur iPerf3"
-        case .invalidJSON: return "Réponse iPerf3 JSON invalide"
+        case .invalidJSON: return String(localized: "Réponse iPerf3 JSON invalide")
         case .incomplete: return "Test iPerf3 incomplet"
         case .invalidPort: return "Port iPerf3 invalide"
-        case .unexpectedState(let s): return "État iPerf3 inattendu (\(s))"
+        case .unexpectedState(let s): return String(localized: "État iPerf3 inattendu (\(s))")
         }
     }
 }
@@ -3091,10 +3091,10 @@ extension LibreSpeedServer {
         switch countryCode {
         case "FR", "DE", "NL", "GB", "CZ", "PL", "FI", "GR", "IT", "ES", "CH", "SE", "NO", "DK", "AT", "BE", "IE", "PT":
             return "Europe"
-        case "US", "CA": return "Amérique du Nord"
-        case "BR", "AR", "CL", "CO", "PE", "UY": return "Amérique du Sud"
+        case "US", "CA": return String(localized: "Amérique du Nord")
+        case "BR", "AR", "CL", "CO", "PE", "UY": return String(localized: "Amérique du Sud")
         case "JP", "CN", "KR", "IN", "SG", "HK", "TW", "TH", "VN", "MY", "ID": return "Asie"
-        case "AU", "NZ": return "Océanie"
+        case "AU", "NZ": return String(localized: "Océanie")
         default: return "Autres"
         }
     }

@@ -537,9 +537,9 @@ final class DriveTestViewModel: ObservableObject {
     /// iOS ne vit que 7 j et n'est pas rafraîchi), donc on invite à se reconnecter.
     private static func uploadFailureMessage(_ error: Error, subject: String) -> String {
         if case APIError.http(let status, _, _, _, _) = error, status == 401 {
-            return "Session expirée — reconnecte-toi pour enregistrer tes mesures."
+            return String(localized: "Session expirée — reconnecte-toi pour enregistrer tes mesures.")
         }
-        return "Échec d'envoi (\(subject)) : \(error.localizedDescription)"
+        return String(localized: "Échec d'envoi (\(subject)) : \(error.localizedDescription)")
     }
 
     /// Met à jour l'instantané « réseau autour de moi » (F8) lu par le widget d'accueil.
@@ -854,13 +854,13 @@ final class DriveTestViewModel: ObservableObject {
 
     private static func phaseLabel(_ phase: SpeedtestPhase) -> String {
         switch phase {
-        case .idle: return "Prêt"
+        case .idle: return String(localized: "Prêt")
         case .ping: return "Ping"
-        case .download: return "Téléchargement"
+        case .download: return String(localized: "Téléchargement")
         case .upload: return "Envoi"
         case .saving: return "Enregistrement"
-        case .finished: return "Terminé"
-        case .failed: return "Échec"
+        case .finished: return String(localized: "Terminé")
+        case .failed: return String(localized: "Échec")
         }
     }
 
@@ -1111,8 +1111,8 @@ struct DriveTestView: View {
 
     private var driveTestModeHint: String {
         switch driveTestMode {
-        case .coverage: return "Enregistre la génération (5G/4G/…) le long du trajet, sans test de débit."
-        case .speedtest: return "Enchaîne des speedtests en continu, sans enregistrer la couverture."
+        case .coverage: return String(localized: "Enregistre la génération (5G/4G/…) le long du trajet, sans test de débit.")
+        case .speedtest: return String(localized: "Enchaîne des speedtests en continu, sans enregistrer la couverture.")
         case .both: return "Speedtests en continu + enregistrement de la couverture le long du trajet."
         }
     }
@@ -1302,9 +1302,9 @@ struct DriveTestView: View {
 
     private var startButtonTitle: String {
         switch driveTestMode {
-        case .coverage: return "Démarrer l'enregistrement couverture"
-        case .speedtest: return "Démarrer le speedtest continu"
-        case .both: return "Démarrer le drive test"
+        case .coverage: return String(localized: "Démarrer l'enregistrement couverture")
+        case .speedtest: return String(localized: "Démarrer le speedtest continu")
+        case .both: return String(localized: "Démarrer le drive test")
         }
     }
 
@@ -1335,7 +1335,7 @@ struct DriveTestView: View {
         guard let distance = model.nearestDistanceMeters else { return nil }
         let distanceText = distance >= 1000 ? String(format: "%.1f km", distance / 1000) : "\(Int(distance)) m"
         if let offset = model.sectorOffsetDegrees {
-            return "Antenne la plus proche · \(distanceText) · écart \(Int(offset.rounded()))°"
+            return String(localized: "Antenne la plus proche · \(distanceText) · écart \(Int(offset.rounded()))°")
         }
         return "Antenne la plus proche · \(distanceText)"
     }

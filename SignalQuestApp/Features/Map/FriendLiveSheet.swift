@@ -155,15 +155,15 @@ struct FriendLiveSheet: View {
         guard let userLocation, let location = friend.location else { return nil }
         let target = CLLocation(latitude: location.lat, longitude: location.lng)
         let meters = userLocation.distance(from: target)
-        if meters < 1000 { return "à \(Int(meters.rounded())) m" }
-        return "à " + String(format: "%.1f", meters / 1000).replacingOccurrences(of: ".", with: ",") + " km"
+        if meters < 1000 { return String(localized: "à \(Int(meters.rounded())) m") }
+        return String(localized: "à ") + String(format: "%.1f", meters / 1000).replacingOccurrences(of: ".", with: ",") + " km"
     }
 
     private var freshnessText: String? {
         guard let updatedAt = friend.location?.updatedAt else { return nil }
         // Position très fraîche (ou léger décalage d'horloge) : « à l'instant »
         // plutôt qu'un « dans 0 s » qui suggère à tort le futur.
-        if Date().timeIntervalSince(updatedAt) < 15 { return "à l'instant" }
+        if Date().timeIntervalSince(updatedAt) < 15 { return String(localized: "à l'instant") }
         let formatter = RelativeDateTimeFormatter()
         formatter.locale = Locale(identifier: "fr_FR")
         formatter.unitsStyle = .short

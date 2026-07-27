@@ -848,8 +848,8 @@ private struct PodiumColumn: View {
     private var rankLabel: String {
         switch entry.rank {
         case 1: return "Premier"
-        case 2: return "Deuxième"
-        case 3: return "Troisième"
+        case 2: return String(localized: "Deuxième")
+        case 3: return String(localized: "Troisième")
         default: return "\(entry.rank)e"
         }
     }

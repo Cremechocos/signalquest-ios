@@ -208,7 +208,7 @@ struct ThreadView: View {
     }
 
     private func displayedContent(for message: MessageItem) -> String {
-        if message.deletedAt != nil { return "Message supprimé" }
+        if message.deletedAt != nil { return String(localized: "Message supprimé") }
         if message.isEncrypted { return decrypted[message.id] ?? "🔒 Message chiffré" }
         return message.content ?? ""
     }

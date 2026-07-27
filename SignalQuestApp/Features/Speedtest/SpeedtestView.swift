@@ -768,9 +768,9 @@ struct SpeedtestView: View {
         // N'annoncer « publié sur la carte » que si le test a réellement une position
         // (un test sans coordonnée ne peut PAS être cartographié — TEL-04).
         if errorMessage == nil, mapPublicationEnabled, !isVPNActive, result?.coordinate != nil {
-            return "publié sur la carte ✓"
+            return String(localized: "publié sur la carte ✓")
         }
-        return "test terminé ✓"
+        return String(localized: "test terminé ✓")
     }
 
     private var downloadTarget: SpeedtestDownloadTarget {
@@ -1857,12 +1857,12 @@ private func ms(_ value: Double?) -> String {
 private extension SpeedtestPhase {
     var displayTitle: String {
         switch self {
-        case .idle: return "Prêt"
+        case .idle: return String(localized: "Prêt")
         case .ping: return "Ping"
-        case .download: return "Réception"
+        case .download: return String(localized: "Réception")
         case .upload: return "Envoi"
         case .saving: return "Sync"
-        case .finished: return "Résultat"
+        case .finished: return String(localized: "Résultat")
         case .failed: return "Erreur"
         }
     }
@@ -1871,12 +1871,12 @@ private extension SpeedtestPhase {
     /// `displayTitle` reste utilisé tel quel par la Live Activity.
     var dialTitle: String {
         switch self {
-        case .idle: return "Prêt à mesurer"
+        case .idle: return String(localized: "Prêt à mesurer")
         case .ping: return "Latence"
-        case .download: return "Téléchargement"
+        case .download: return String(localized: "Téléchargement")
         case .upload: return "Envoi"
         case .saving: return "Synchronisation"
-        case .finished: return "Téléchargement"
+        case .finished: return String(localized: "Téléchargement")
         case .failed: return "Erreur"
         }
     }

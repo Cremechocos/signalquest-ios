@@ -359,7 +359,7 @@ struct SpeedtestDetailContent: View {
         } else {
             maxText = "pic indisponible"
         }
-        return "Courbe de débit \(title) : \(avgText), \(maxText)."
+        return String(localized: "Courbe de débit \(title) : \(avgText), \(maxText).")
     }
 
     private static func decimal(_ value: Double, digits: Int) -> String {

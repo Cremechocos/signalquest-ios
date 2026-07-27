@@ -12,7 +12,7 @@ enum BiometricAuth {
             switch self {
             case .faceID: return "Face ID"
             case .touchID: return "Touch ID"
-            case .none: return "la biométrie"
+            case .none: return String(localized: "la biométrie")
             }
         }
 

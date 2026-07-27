@@ -23,7 +23,7 @@ final class LiveKitClient: ObservableObject {
         var errorDescription: String? {
             switch self {
             case .screenSharingDisabled:
-                return "Le partage d’écran n’est pas encore disponible sur iOS."
+                return String(localized: "Le partage d’écran n’est pas encore disponible sur iOS.")
             }
         }
     }

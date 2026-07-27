@@ -10,10 +10,10 @@ enum ReportReason: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .spam: return "Spam"
-        case .harassment: return "Harcèlement"
-        case .privacy: return "Atteinte à la vie privée"
-        case .illegal: return "Contenu illégal"
-        case .misleading: return "Désinformation"
+        case .harassment: return String(localized: "Harcèlement")
+        case .privacy: return String(localized: "Atteinte à la vie privée")
+        case .illegal: return String(localized: "Contenu illégal")
+        case .misleading: return String(localized: "Désinformation")
         case .other: return "Autre"
         }
     }

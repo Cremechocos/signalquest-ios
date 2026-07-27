@@ -16,17 +16,17 @@ enum APIError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Adresse invalide. Réessaie plus tard."
+            return String(localized: "Adresse invalide. Réessaie plus tard.")
         case .transport:
-            return "Connexion impossible. Vérifie ta connexion puis réessaie."
+            return String(localized: "Connexion impossible. Vérifie ta connexion puis réessaie.")
         case .http(let status, let code, let message, _, _):
             return APIError.userFacingMessage(status: status, code: code, serverMessage: message)
         case .decoding:
-            return "Réponse inattendue du serveur. Réessaie plus tard."
+            return String(localized: "Réponse inattendue du serveur. Réessaie plus tard.")
         case .missingAuthToken:
-            return "Authentification requise."
+            return String(localized: "Authentification requise.")
         case .cancelled:
-            return "Requête annulée."
+            return String(localized: "Requête annulée.")
         }
     }
 
@@ -79,16 +79,16 @@ enum APIError: Error, LocalizedError, Equatable {
     /// Repli localisé quand aucun message lisible n'est disponible.
     static func statusFallback(_ status: Int) -> String {
         switch status {
-        case 400: return "Requête invalide."
-        case 401: return "Session expirée. Reconnecte-toi."
-        case 403: return "Action non autorisée."
-        case 404: return "Élément introuvable."
-        case 408: return "Délai dépassé. Réessaie."
-        case 409: return "Conflit : l'élément a déjà été modifié ailleurs."
-        case 413: return "Le fichier est trop volumineux."
-        case 429: return "Trop de requêtes. Patiente un instant avant de réessayer."
-        case 500...599: return "Service momentanément indisponible. Réessaie plus tard."
-        default: return "Une erreur est survenue. Réessaie."
+        case 400: return String(localized: "Requête invalide.")
+        case 401: return String(localized: "Session expirée. Reconnecte-toi.")
+        case 403: return String(localized: "Action non autorisée.")
+        case 404: return String(localized: "Élément introuvable.")
+        case 408: return String(localized: "Délai dépassé. Réessaie.")
+        case 409: return String(localized: "Conflit : l'élément a déjà été modifié ailleurs.")
+        case 413: return String(localized: "Le fichier est trop volumineux.")
+        case 429: return String(localized: "Trop de requêtes. Patiente un instant avant de réessayer.")
+        case 500...599: return String(localized: "Service momentanément indisponible. Réessaie plus tard.")
+        default: return String(localized: "Une erreur est survenue. Réessaie.")
         }
     }
 
@@ -96,12 +96,12 @@ enum APIError: Error, LocalizedError, Equatable {
     /// (Le backend renvoie le plus souvent déjà un message FR ; cette table couvre
     /// les cas où il n'expose qu'un code.)
     private static let localizedMessages: [String: String] = [
-        "HANDLE_LOCKED": "Ton identifiant ne peut pas encore être modifié.",
-        "NAME_TOO_LONG": "Ce nom est trop long.",
-        "EMPTY_NAME": "Le nom ne peut pas être vide.",
-        "INVALID_OPERATOR": "Opérateur invalide.",
-        "RATE_LIMITED": "Trop de requêtes. Patiente un instant avant de réessayer.",
-        "UNAUTHORIZED": "Session expirée. Reconnecte-toi.",
+        "HANDLE_LOCKED": String(localized: "Ton identifiant ne peut pas encore être modifié."),
+        "NAME_TOO_LONG": String(localized: "Ce nom est trop long."),
+        "EMPTY_NAME": String(localized: "Le nom ne peut pas être vide."),
+        "INVALID_OPERATOR": String(localized: "Opérateur invalide."),
+        "RATE_LIMITED": String(localized: "Trop de requêtes. Patiente un instant avant de réessayer."),
+        "UNAUTHORIZED": String(localized: "Session expirée. Reconnecte-toi."),
     ]
 }
 

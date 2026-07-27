@@ -89,8 +89,8 @@ final class CallManager: NSObject, ObservableObject {
         var errorDescription: String? {
             switch self {
             case .missingCredentials: return "Identifiants d'appel manquants."
-            case .connectionFailed(let m): return "Connexion à l'appel impossible : \(m)"
-            case .connectionEnded: return "L'appel s'est terminé pendant la connexion."
+            case .connectionFailed(let m): return String(localized: "Connexion à l'appel impossible : \(m)")
+            case .connectionEnded: return String(localized: "L'appel s'est terminé pendant la connexion.")
             }
         }
     }

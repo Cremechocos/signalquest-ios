@@ -582,7 +582,7 @@ struct SessionDetailView: View {
         if a.status == .hypothesis, let conf = a.confidenceFR {
             parts.append("confiance \(conf)")
         }
-        if let d = a.distanceKm, d > 0 { parts.append("à \(formatKm(d))") }
+        if let d = a.distanceKm, d > 0 { parts.append(String(localized: "à \(formatKm(d))")) }
         return parts.joined(separator: " · ")
     }
 

@@ -964,7 +964,7 @@ private struct MapAnnotationPayload: Identifiable, Equatable {
     /// amis/photos sont des éléments anonymes non lisibles (A11Y-03/T1-6).
     var accessibilityLabel: String {
         if let count = clusterCount, count > 1 {
-            return "Groupe de \(count) éléments. \(title)"
+            return String(localized: "Groupe de \(count) éléments. \(title)")
         }
         var parts = [title]
         if !subtitle.isEmpty { parts.append(subtitle) }
@@ -1114,7 +1114,7 @@ enum CoverageQualityBand: String, CaseIterable, Identifiable {
         case .good: return "Bon"
         case .fair: return "Moyen"
         case .weak: return "Faible"
-        case .poor: return "Très faible"
+        case .poor: return String(localized: "Très faible")
         case .unknown: return "Inconnu"
         }
     }
@@ -2508,8 +2508,8 @@ struct MapExplorerView: View {
         switch status {
         case .active: return "Actif"
         case .upgradePending: return "Upgrade en attente"
-        case .declared: return "Déclaré"
-        case .planned: return "Prévu"
+        case .declared: return String(localized: "Déclaré")
+        case .planned: return String(localized: "Prévu")
         }
     }
 
@@ -4592,8 +4592,8 @@ struct OutageDetailSheet: View {
 
     private var issueLabel: String {
         switch issueKey {
-        case "maintenance": return "Maintenance programmée"
-        case "degraded": return "Service dégradé"
+        case "maintenance": return String(localized: "Maintenance programmée")
+        case "degraded": return String(localized: "Service dégradé")
         default: return "Panne / hors service"
         }
     }
@@ -4618,7 +4618,7 @@ struct OutageDetailSheet: View {
     private var reasonText: String {
         switch (site.reason ?? "").uppercased() {
         case "INT": return "Interruption de service"
-        case "MAINT": return "Maintenance programmée"
+        case "MAINT": return String(localized: "Maintenance programmée")
         case "": return site.detail ?? issueLabel
         default: return site.detail ?? (site.reason ?? issueLabel)
         }
@@ -4627,7 +4627,7 @@ struct OutageDetailSheet: View {
     private func serviceStatusLabel(_ status: String) -> String {
         switch status.uppercased() {
         case "HS": return "Hors service"
-        case "DE": return "Dégradé"
+        case "DE": return String(localized: "Dégradé")
         case "OK": return "OK"
         default: return status
         }
