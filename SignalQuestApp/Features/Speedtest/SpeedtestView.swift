@@ -571,7 +571,7 @@ struct SpeedtestView: View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack(alignment: .center) {
                 Label(
-                    "\(sessionIsContinuous ? "Session continue" : "Rafale") — \(s.count) test\(s.count > 1 ? "s" : "")",
+                    "\(sessionIsContinuous ? "Session continue" : "Rafale") — \(s.count) test",
                     systemImage: sessionIsContinuous ? "infinity" : "bolt.fill"
                 )
                     .font(SQType.heading)

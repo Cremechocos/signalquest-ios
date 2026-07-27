@@ -901,7 +901,7 @@ struct ConversationDetailView: View {
                     Image(systemName: "bubble.left.and.bubble.right.fill")
                         .font(.system(size: 11))
                         .accessibilityHidden(true)
-                    Text("\(count) réponse\(count > 1 ? "s" : "")")
+                    Text("\(count) réponse")
                         .font(SQType.micro)
                 }
                 .padding(.horizontal, SQSpace.sm)

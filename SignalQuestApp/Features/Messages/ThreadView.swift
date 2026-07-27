@@ -87,7 +87,7 @@ struct ThreadView: View {
                     .font(SQType.body)
                     .foregroundStyle(SQColor.label)
             }
-            Text("\(replies.count) réponse\(replies.count > 1 ? "s" : "")")
+            Text("\(replies.count) réponse")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .padding(.top, SQSpace.xs)

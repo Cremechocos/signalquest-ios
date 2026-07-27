@@ -171,7 +171,7 @@ struct NearbyNetworkQualityDetailSheet: View {
     private var footerNote: some View {
         HStack(spacing: SQSpace.sm) {
             Image(systemName: "person.3.fill").font(.caption).foregroundStyle(SQColor.labelTertiary)
-            Text("\(quality.sampleCount) mesure\(quality.sampleCount > 1 ? "s" : "") de la communauté · rayon \(radiusText)")
+            Text("\(quality.sampleCount) mesure de la communauté · rayon \(radiusText)")
                 .font(SQFont.body(12))
                 .foregroundStyle(SQColor.labelSecondary)
         }

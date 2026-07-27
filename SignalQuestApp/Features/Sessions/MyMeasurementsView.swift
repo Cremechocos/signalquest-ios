@@ -145,7 +145,7 @@ struct MyMeasurementsView: View {
     @ViewBuilder
     private var statsBar: some View {
         if !model.points.isEmpty {
-            Text("\(model.points.count) points · \(model.sessionCount) session\(model.sessionCount > 1 ? "s" : "")")
+            Text("\(model.points.count) points · \(model.sessionCount) session")
                 .font(SQFont.body(13, .semibold, relativeTo: .caption))
                 .foregroundStyle(SQColor.label)
                 .padding(.horizontal, SQSpace.lg - 2)

@@ -436,7 +436,7 @@ private struct IdentificationDetailSheet: View {
                         .font(SQFont.body(14, .semibold))
                         .foregroundStyle(SQColor.label)
                     if let v = item.conflictSiteValidations {
-                        Text("\(v) validation\(v > 1 ? "s" : "")")
+                        Text("\(v) validation")
                             .font(SQType.micro)
                             .foregroundStyle(SQColor.labelSecondary)
                     }

@@ -1123,7 +1123,7 @@ struct DriveTestView: View {
             Image(systemName: "point.3.connected.trianglepath.dotted")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(SQColor.brandRed)
-            Text("Couverture · \(model.coveragePointCount) point\(model.coveragePointCount > 1 ? "s" : "")")
+            Text("Couverture · \(model.coveragePointCount) point")
                 .font(SQFont.body(13, .semibold))
                 .foregroundStyle(SQColor.label)
                 .monospacedDigit()
@@ -1261,7 +1261,7 @@ struct DriveTestView: View {
             .padding(.vertical, SQSpace.sm)
             .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             if let summary = model.summary, summary.count > 0 {
-                Text("\(summary.count) test\(summary.count > 1 ? "s" : "") · moy. DL \(Int(summary.avgDownload.rounded())) Mbps · ping min \(Int(summary.minPing.rounded())) ms")
+                Text("\(summary.count) test · moy. DL \(Int(summary.avgDownload.rounded())) Mbps · ping min \(Int(summary.minPing.rounded())) ms")
                     .font(SQFont.body(11.5))
                     .foregroundStyle(SQColor.labelSecondary)
             }

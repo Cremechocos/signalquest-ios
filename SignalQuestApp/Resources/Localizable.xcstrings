@@ -148,22 +148,6 @@
         }
       }
     },
-    "%@ — %lld test%@": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$@ — %2$lld test%3$@"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ — %lld test%@"
-          }
-        }
-      }
-    },
     "%@%lld pts": {
       "localizations": {
         "fr": {
@@ -350,38 +334,6 @@
         }
       }
     },
-    "%lld mesure%@ au total · rayon %@": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$lld mesure%2$@ au total · rayon %3$@"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld measurement%@ in total · radius %@"
-          }
-        }
-      }
-    },
-    "%lld mesure%@ de la communauté · rayon %@": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$lld mesure%2$@ de la communauté · rayon %3$@"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld community measurement%@ · radius %@"
-          }
-        }
-      }
-    },
     "%lld mesures": {
       "localizations": {
         "en": {
@@ -428,22 +380,6 @@
         }
       }
     },
-    "%lld points · %lld session%@": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$lld points · %2$lld session%3$@"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld points · %lld session%@"
-          }
-        }
-      }
-    },
     "%lld pts": {
       "localizations": {
         "en": {
@@ -470,22 +406,6 @@
         }
       }
     },
-    "%lld réponse%@": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$lld réponse%2$@"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld repl%@"
-          }
-        }
-      }
-    },
     "%lld secteur%@": {
       "localizations": {
         "fr": {
@@ -508,38 +428,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld sites visible"
-          }
-        }
-      }
-    },
-    "%lld test%@ · moy. DL %lld Mbps · ping min %lld ms": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$lld test%2$@ · moy. DL %3$lld Mbps · ping min %4$lld ms"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld test%@ · avg DL %lld Mbps · min ping %lld ms"
-          }
-        }
-      }
-    },
-    "%lld validation%@": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$lld validation%2$@"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld validation%@"
           }
         }
       }
@@ -2802,22 +2690,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Coverage recorded: %lld points"
-          }
-        }
-      }
-    },
-    "Couverture · %lld point%@": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Couverture · %1$lld point%2$@"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Coverage · %lld point%@"
           }
         }
       }
@@ -11788,6 +11660,336 @@
           "stringUnit": {
             "state": "translated",
             "value": "iOS speedtest — radio metrics unavailable"
+          }
+        }
+      }
+    },
+    "%lld mesure de la communauté · rayon %@": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld mesure de la communauté · rayon %@"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld mesures de la communauté · rayon %@"
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld community measurement · radius %@"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld community measurements · radius %@"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld mesure au total · rayon %@": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld mesure au total · rayon %@"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld mesures au total · rayon %@"
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld measurement in total · radius %@"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld measurements in total · radius %@"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld réponse": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld réponse"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld réponses"
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld reply"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld replies"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld validation": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld validation"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld validations"
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld validation"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld validations"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld points · %lld session": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld points · %lld session"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld points · %lld sessions"
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld points · %lld session"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld points · %lld sessions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Couverture · %lld point": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Couverture · %lld point"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Couverture · %lld points"
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Coverage · %lld point"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Coverage · %lld points"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld test · moy. DL %lld Mbps · ping min %lld ms": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld test · moy. DL %lld Mbps · ping min %lld ms"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld tests · moy. DL %lld Mbps · ping min %lld ms"
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld test · avg DL %lld Mbps · min ping %lld ms"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld tests · avg DL %lld Mbps · min ping %lld ms"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%@ — %lld test": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%@ — %lld test"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%@ — %lld tests"
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%@ — %lld test"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%@ — %lld tests"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Session continue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuous session"
           }
         }
       }
