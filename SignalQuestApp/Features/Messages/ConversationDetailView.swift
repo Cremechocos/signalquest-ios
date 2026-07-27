@@ -546,7 +546,8 @@ struct ConversationDetailView: View {
                     showSchedulePicker = true
                 },
                 onShareLocation: { Task { await sendCurrentLocation() } },
-                onPickPhoto: { item, caption in Task { await sendAttachment(item: item, caption: caption) } }
+                onPickPhoto: { item, caption in Task { await sendAttachment(item: item, caption: caption) } },
+                onVoiceNote: { url, duration in Task { await sendVoiceNote(url: url, duration: duration) } }
             )
         }
         .background {
@@ -1828,6 +1829,57 @@ struct ConversationDetailView: View {
             attachments: [],
             reactions: []
         )
+    }
+
+    /// Envoie une note vocale.
+    ///
+    /// Même chemin que les autres pièces jointes : `uploadAttachment` accepte un
+    /// `mimeType` arbitraire, et le backend reconnaît `audio/*` pour déclencher
+    /// la transcription de son côté.
+    ///
+    /// Le fichier temporaire est supprimé dans TOUS les cas, y compris en échec :
+    /// une note ratée ne doit pas rester dans le cache de l'appareil.
+    private func sendVoiceNote(url: URL, duration: TimeInterval) async {
+        defer { try? FileManager.default.removeItem(at: url) }
+        isSending = true
+        defer { isSending = false }
+        do {
+            // Même limite que les images : le chiffrement des pièces jointes
+            // n'est pas encore disponible partout. Le dire plutôt que d'envoyer
+            // un audio en clair dans une conversation chiffrée.
+            guard !isE2EE else {
+                throw E2EEError.unsupported("Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils.")
+            }
+            guard let data = try? Data(contentsOf: url), !data.isEmpty else { return }
+            let uploaded = try await service.uploadAttachment(
+                conversationId: conversation.id,
+                data: data,
+                filename: url.lastPathComponent,
+                mimeType: "audio/m4a"
+            )
+            let attachment = UploadedAttachment(
+                kind: "AUDIO",
+                url: uploaded.url,
+                fileName: uploaded.fileName ?? url.lastPathComponent,
+                contentType: uploaded.contentType ?? "audio/m4a",
+                size: uploaded.size ?? data.count,
+                width: nil,
+                height: nil
+            )
+            let sent = try await service.sendAttachments(
+                [attachment],
+                caption: "",
+                in: conversation,
+                replyToId: replyTarget?.id,
+                e2ee: e2ee
+            )
+            messages = Self.normalized(messages + [sent])
+            replyTarget = nil
+            Haptics.success()
+        } catch {
+            errorMessage = error.localizedDescription
+            Haptics.error()
+        }
     }
 
     private func sendAttachment(item: PhotosPickerItem, caption rawCaption: String) async {

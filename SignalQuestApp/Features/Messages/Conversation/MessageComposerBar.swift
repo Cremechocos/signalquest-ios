@@ -20,11 +20,33 @@ struct MessageComposerBar: View {
     let onSchedule: (String) -> Void
     let onShareLocation: () -> Void
     let onPickPhoto: (PhotosPickerItem, String) -> Void
+    /// Note vocale enregistrée : fichier m4a et durée mesurée.
+    let onVoiceNote: (URL, TimeInterval) -> Void
 
     @State private var text = ""
     @State private var pickerItem: PhotosPickerItem?
+    @StateObject private var recorder = VoiceNoteRecorder()
 
     var body: some View {
+        // Pendant l'enregistrement, la barre est REMPLACÉE : garder le champ de
+        // saisie inviterait à taper alors que le micro tourne, et laisserait
+        // croire qu'on peut faire les deux.
+        if recorder.isRecording {
+            VoiceNoteRecordingBar(
+                recorder: recorder,
+                onCancel: { recorder.cancel() },
+                onSend: {
+                    let elapsed = recorder.duration
+                    if let url = recorder.stop() { onVoiceNote(url, elapsed) }
+                }
+            )
+            .transition(.opacity)
+        } else {
+            standardBar
+        }
+    }
+
+    private var standardBar: some View {
         HStack(spacing: SQSpace.sm + 2) {
             Menu {
                 Button { onPoll() } label: {
@@ -80,6 +102,23 @@ struct MessageComposerBar: View {
                 .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
                 .disabled(!canSend)
 
+            // Micro OU envoi, selon qu'il y a du texte : c'est la convention de
+            // toutes les messageries, et ça évite un bouton de plus dans une
+            // barre déjà dense.
+            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending {
+                Button {
+                    Haptics.selection()
+                    Task { await recorder.start() }
+                } label: {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .background(SQColor.surfaceMuted, in: Circle())
+                        .foregroundStyle(SQColor.brandRed)
+                }
+                .disabled(!canSend)
+                .accessibilityLabel("Enregistrer une note vocale")
+            } else {
             Button {
                 onSend(text)
             } label: {
@@ -92,6 +131,7 @@ struct MessageComposerBar: View {
             }
             .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending || !canSend)
             .accessibilityLabel(isSending ? "Envoi en cours" : "Envoyer le message")
+            }
         }
         .padding(.horizontal, SQSpace.md + 2)
         .padding(.vertical, SQSpace.sm + 2)

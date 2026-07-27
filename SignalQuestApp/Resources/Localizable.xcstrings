@@ -14913,6 +14913,96 @@
           }
         }
       }
+    },
+    "Enregistrer une note vocale": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record a voice note"
+          }
+        }
+      }
+    },
+    "Note vocale": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice note"
+          }
+        }
+      }
+    },
+    "Annuler l'enregistrement": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel recording"
+          }
+        }
+      }
+    },
+    "Envoyer la note vocale": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send voice note"
+          }
+        }
+      }
+    },
+    "Enregistrement en cours": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording"
+          }
+        }
+      }
+    },
+    "Toucher pour écouter": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap to listen"
+          }
+        }
+      }
+    },
+    "Toucher pour mettre en pause": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap to pause"
+          }
+        }
+      }
+    },
+    "Autorise le micro dans les Réglages pour enregistrer.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow the microphone in Settings to record."
+          }
+        }
+      }
+    },
+    "Impossible de démarrer l'enregistrement.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't start recording."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
