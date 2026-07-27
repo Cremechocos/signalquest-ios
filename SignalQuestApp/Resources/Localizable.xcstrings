@@ -12143,6 +12143,2206 @@
           }
         }
       }
+    },
+    ", dont la tienne": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ", including yours"
+          }
+        }
+      }
+    },
+    ", sélectionné": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ", selected"
+          }
+        }
+      }
+    },
+    "1 jour consécutif": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 day in a row"
+          }
+        }
+      }
+    },
+    "Accès anticipé à certains outils communautaires": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Early access to some community tools"
+          }
+        }
+      }
+    },
+    "Achats restaurés et droits vérifiés.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Purchases restored and entitlements verified."
+          }
+        }
+      }
+    },
+    "Activation 5G prévue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5G activation planned"
+          }
+        }
+      }
+    },
+    "Adoption non appliquée.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adoption not applied."
+          }
+        }
+      }
+    },
+    "Ajouter des membres": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add members"
+          }
+        }
+      }
+    },
+    "Ajouter le rappel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add reminder"
+          }
+        }
+      }
+    },
+    "Analyses détaillées du comparateur": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detailed comparator analytics"
+          }
+        }
+      }
+    },
+    "Antenne identifiée": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antenna identified"
+          }
+        }
+      }
+    },
+    "Antennes au relevé": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antennas in the reading"
+          }
+        }
+      }
+    },
+    "Arrêter": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        }
+      }
+    },
+    "Arrêter le drive test": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop the drive test"
+          }
+        }
+      }
+    },
+    "Arrêté": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped"
+          }
+        }
+      }
+    },
+    "Association Apple impossible. Réessaie.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't link Apple account. Try again."
+          }
+        }
+      }
+    },
+    "Aucun": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None"
+          }
+        }
+      }
+    },
+    "Aucun abonnement actif.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No active subscription."
+          }
+        }
+      }
+    },
+    "Aucun ami classé pour cette période.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No friend ranked for this period."
+          }
+        }
+      }
+    },
+    "Aucun autre participant n’est disponible pour cet appel.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No other participant is available for this call."
+          }
+        }
+      }
+    },
+    "Aucun message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No messages"
+          }
+        }
+      }
+    },
+    "Aucun speedtest enregistré pour le moment.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No speedtest recorded yet."
+          }
+        }
+      }
+    },
+    "Aucune donnée dans cette zone": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No data in this area"
+          }
+        }
+      }
+    },
+    "Aucune mesure géolocalisée pour l'instant.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No geolocated measurement yet."
+          }
+        }
+      }
+    },
+    "Aucune transcription disponible pour ce message.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No transcript available for this message."
+          }
+        }
+      }
+    },
+    "Autoriser la localisation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow location"
+          }
+        }
+      }
+    },
+    "Badge Basic argenté, masquable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silver Basic badge, can be hidden"
+          }
+        }
+      }
+    },
+    "Bloqués": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blocked"
+          }
+        }
+      }
+    },
+    "Bon angle, on voit bien les secteurs.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Good angle, the sectors are clearly visible."
+          }
+        }
+      }
+    },
+    "Bonus de série": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Streak bonus"
+          }
+        }
+      }
+    },
+    "Bug confirmé": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirmed bug"
+          }
+        }
+      }
+    },
+    "Cartographie le réseau, un speedtest à la fois.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mapping the network, one speedtest at a time."
+          }
+        }
+      }
+    },
+    "Catalogue App Store non configuré pour cette version.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Store catalog not configured for this version."
+          }
+        }
+      }
+    },
+    "Ce site n'expose pas d'azimuts de secteur.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This site doesn't expose sector azimuths."
+          }
+        }
+      }
+    },
+    "Ce site n'expose pas d'azimuts.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This site doesn't expose azimuths."
+          }
+        }
+      }
+    },
+    "Cellule observée": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observed cell"
+          }
+        }
+      }
+    },
+    "Cellule observée par la communauté": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cell observed by the community"
+          }
+        }
+      }
+    },
+    "Ces partages sont désactivés par défaut. Les désactiver retire aussi les données temps réel déjà publiées.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These shares are off by default. Turning them off also removes real-time data already published."
+          }
+        }
+      }
+    },
+    "Cette conversation est chiffrée de bout en bout : la recherche par mot-clé n’est pas disponible côté serveur.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This conversation is end-to-end encrypted: keyword search isn't available server-side."
+          }
+        }
+      }
+    },
+    "Cette offre n'est pas disponible dans l'App Store.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This plan isn't available in the App Store."
+          }
+        }
+      }
+    },
+    "Cette version de SignalQuest n'est plus prise en charge. Mets l'application à jour pour continuer.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This version of SignalQuest is no longer supported. Update the app to continue."
+          }
+        }
+      }
+    },
+    "Compte Apple associé": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple account linked"
+          }
+        }
+      }
+    },
+    "Connexion Apple impossible. Réessaie.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't sign in with Apple. Try again."
+          }
+        }
+      }
+    },
+    "Coordonnées": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coordinates"
+          }
+        }
+      }
+    },
+    "Couverture conservée en mémoire — stockage indisponible": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coverage kept in memory — storage unavailable"
+          }
+        }
+      }
+    },
+    "Couverture non envoyée — VPN actif": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coverage not sent — VPN active"
+          }
+        }
+      }
+    },
+    "Créer et activer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create and enable"
+          }
+        }
+      }
+    },
+    "Créer le sondage": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create poll"
+          }
+        }
+      }
+    },
+    "Créer mon compte": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create my account"
+          }
+        }
+      }
+    },
+    "Créée le": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Created on"
+          }
+        }
+      }
+    },
+    "Dans le secteur": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the sector"
+          }
+        }
+      }
+    },
+    "Demande d’accès et d’export de mes données (RGPD)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Request access to and export of my data (GDPR)"
+          }
+        }
+      }
+    },
+    "Demandes envoyées": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent requests"
+          }
+        }
+      }
+    },
+    "Demandes reçues": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Received requests"
+          }
+        }
+      }
+    },
+    "Dernière activité": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last activity"
+          }
+        }
+      }
+    },
+    "Dernière mesure": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last measurement"
+          }
+        }
+      }
+    },
+    "Dernière mise en service": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last commissioning"
+          }
+        }
+      }
+    },
+    "Dernière validation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last validation"
+          }
+        }
+      }
+    },
+    "Dissocier le compte Apple": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlink Apple account"
+          }
+        }
+      }
+    },
+    "Données Speedtest": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speedtest data"
+          }
+        }
+      }
+    },
+    "Durée longue réservée aux comptes Premium.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Long durations are Premium only."
+          }
+        }
+      }
+    },
+    "Durée personnalisée des stories": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom story duration"
+          }
+        }
+      }
+    },
+    "Débit speedtest (Mbps)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speedtest throughput (Mbps)"
+          }
+        }
+      }
+    },
+    "Débits": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Throughput"
+          }
+        }
+      }
+    },
+    "Début": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start"
+          }
+        }
+      }
+    },
+    "Déconnexion auto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto sign-out"
+          }
+        }
+      }
+    },
+    "Déjà pris par un autre membre.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Already taken by another member."
+          }
+        }
+      }
+    },
+    "Démarrage": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting"
+          }
+        }
+      }
+    },
+    "Démarrage…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting…"
+          }
+        }
+      }
+    },
+    "Département": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Department"
+          }
+        }
+      }
+    },
+    "Désactiver la 2FA": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disable 2FA"
+          }
+        }
+      }
+    },
+    "Détection en cours…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detecting…"
+          }
+        }
+      }
+    },
+    "Détecté automatiquement": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detected automatically"
+          }
+        }
+      }
+    },
+    "Déverrouille SignalQuest": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock SignalQuest"
+          }
+        }
+      }
+    },
+    "Déverrouille ta messagerie chiffrée": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock your encrypted messages"
+          }
+        }
+      }
+    },
+    "En France, le secteur est déterminé automatiquement à partir du PCI.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In France, the sector is determined automatically from the PCI."
+          }
+        }
+      }
+    },
+    "En France, le secteur est déterminé automatiquement à partir du PCI. La sélection ci-dessous est indicative.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In France, the sector is determined automatically from the PCI. The selection below is indicative."
+          }
+        }
+      }
+    },
+    "Enregistrer le secteur": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save sector"
+          }
+        }
+      }
+    },
+    "Environ toutes les 15 à 20 s, et plus souvent quand un ami regarde ta position.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About every 15 to 20 s, and more often when a friend is viewing your location."
+          }
+        }
+      }
+    },
+    "Envoyer le code": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send code"
+          }
+        }
+      }
+    },
+    "Envoyer le lien": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send link"
+          }
+        }
+      }
+    },
+    "Explore la couverture mobile autour de toi : antennes, opérateurs et qualité réelle mesurée par la communauté.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Explore mobile coverage around you: antennas, carriers and real quality measured by the community."
+          }
+        }
+      }
+    },
+    "Fréquences": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frequencies"
+          }
+        }
+      }
+    },
+    "Historique des modifications": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change history"
+          }
+        }
+      }
+    },
+    "Identification non confirmée": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identification not confirmed"
+          }
+        }
+      }
+    },
+    "Identification retirée": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identification removed"
+          }
+        }
+      }
+    },
+    "Identification supprimée": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identification deleted"
+          }
+        }
+      }
+    },
+    "Identité requise pour planifier un message chiffré": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identity required to schedule an encrypted message"
+          }
+        }
+      }
+    },
+    "Impossible de charger la discussion.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't load the conversation."
+          }
+        }
+      }
+    },
+    "Impossible de charger les commentaires.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't load the comments."
+          }
+        }
+      }
+    },
+    "Impossible de charger les secteurs de ce site.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't load this site's sectors."
+          }
+        }
+      }
+    },
+    "Impossible de créer le reçu de suppression local. Le speedtest invité n’a pas été envoyé. Réessaie.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't create the local deletion receipt. The guest speedtest wasn't sent. Try again."
+          }
+        }
+      }
+    },
+    "Impossible de finaliser le Drive Test sur l’appareil.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't finalize the Drive Test on the device."
+          }
+        }
+      }
+    },
+    "Impossible de sécuriser ce Drive Test sur l’appareil. Réessaie avant de partir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't secure this Drive Test on the device. Try again before you leave."
+          }
+        }
+      }
+    },
+    "Impossible de vérifier pour le moment.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't verify right now."
+          }
+        }
+      }
+    },
+    "Jeton Apple manquant. Réessaie.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple token missing. Try again."
+          }
+        }
+      }
+    },
+    "Journal synchronisé entre tes appareils": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log synced across your devices"
+          }
+        }
+      }
+    },
+    "La validation serveur App Store n'est pas encore disponible.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Store server validation isn't available yet."
+          }
+        }
+      }
+    },
+    "Le déplacement n'a pas abouti.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The move didn't go through."
+          }
+        }
+      }
+    },
+    "Le plus complet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Most complete"
+          }
+        }
+      }
+    },
+    "Le plus proche": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nearest"
+          }
+        }
+      }
+    },
+    "Le secteur n'a pas pu être enregistré.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The sector couldn't be saved."
+          }
+        }
+      }
+    },
+    "Les appels de groupe sont limités à 8 participants.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group calls are limited to 8 participants."
+          }
+        }
+      }
+    },
+    "Les deux": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Both"
+          }
+        }
+      }
+    },
+    "Les deux mots de passe ne correspondent pas.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The two passwords don't match."
+          }
+        }
+      }
+    },
+    "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Encrypted attachments aren't available on all your devices yet."
+          }
+        }
+      }
+    },
+    "Les publications récentes de ce profil apparaîtront ici.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This profile's recent posts will appear here."
+          }
+        }
+      }
+    },
+    "Lettres, chiffres, « . », « _ » et « - ». 2 à 32 caractères.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Letters, digits, “.”, “_” and “-”. 2 to 32 characters."
+          }
+        }
+      }
+    },
+    "Localisation désactivée. Active-la dans Réglages > SignalQuest pour te localiser sur la carte.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location turned off. Turn it on in Settings > SignalQuest to place yourself on the map."
+          }
+        }
+      }
+    },
+    "L’achat est en attente de validation par l’App Store.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The purchase is awaiting App Store validation."
+          }
+        }
+      }
+    },
+    "Marché": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Market"
+          }
+        }
+      }
+    },
+    "Mentions légales": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legal notice"
+          }
+        }
+      }
+    },
+    "Message chiffré": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Encrypted message"
+          }
+        }
+      }
+    },
+    "Mettre à jour": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update"
+          }
+        }
+      }
+    },
+    "Minimum 2 caractères.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minimum 2 characters."
+          }
+        }
+      }
+    },
+    "Mise à jour": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update"
+          }
+        }
+      }
+    },
+    "Mot de passe mis à jour. Connecte-toi avec le nouveau mot de passe.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Password updated. Sign in with the new password."
+          }
+        }
+      }
+    },
+    "Métrique du classement": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leaderboard metric"
+          }
+        }
+      }
+    },
+    "Niveau supérieur": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next level"
+          }
+        }
+      }
+    },
+    "Non communiqué": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not provided"
+          }
+        }
+      }
+    },
+    "Nouveau département": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New department"
+          }
+        }
+      }
+    },
+    "Nouveau site visité": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New site visited"
+          }
+        }
+      }
+    },
+    "Opérateur en cours de détection…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detecting carrier…"
+          }
+        }
+      }
+    },
+    "Opérateur inconnu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown carrier"
+          }
+        }
+      }
+    },
+    "Opérateurs inconnus": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown carriers"
+          }
+        }
+      }
+    },
+    "POP LibreSpeed le plus proche · HTTPS · DL/UL/ping": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nearest LibreSpeed PoP · HTTPS · DL/UL/ping"
+          }
+        }
+      }
+    },
+    "POP iPerf3 le plus proche": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nearest iPerf3 PoP"
+          }
+        }
+      }
+    },
+    "Par opérateur": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "By carrier"
+          }
+        }
+      }
+    },
+    "Partage communauté": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Community sharing"
+          }
+        }
+      }
+    },
+    "Partage ton premier speedtest ou post.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share your first speedtest or post."
+          }
+        }
+      }
+    },
+    "Partager le résultat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share the result"
+          }
+        }
+      }
+    },
+    "Photo claire, site facile à reconnaître.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear photo, site easy to recognize."
+          }
+        }
+      }
+    },
+    "Photo de la publication": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Post photo"
+          }
+        }
+      }
+    },
+    "Photo envoyée — merci ! Elle apparaîtra après validation.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo sent — thank you! It will appear after review."
+          }
+        }
+      }
+    },
+    "Photo publiée": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo published"
+          }
+        }
+      }
+    },
+    "Ping médian": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Median ping"
+          }
+        }
+      }
+    },
+    "Position indisponible — autorise la localisation dans les réglages.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location unavailable — allow location in settings."
+          }
+        }
+      }
+    },
+    "Position partagée": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location shared"
+          }
+        }
+      }
+    },
+    "Première activation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "First activation"
+          }
+        }
+      }
+    },
+    "Projet approuvé": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project approved"
+          }
+        }
+      }
+    },
+    "Propriétaire": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Owner"
+          }
+        }
+      }
+    },
+    "Prévisionnels": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planned"
+          }
+        }
+      }
+    },
+    "Prévue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planned"
+          }
+        }
+      }
+    },
+    "Publier sur la carte": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publish to the map"
+          }
+        }
+      }
+    },
+    "Période": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Period"
+          }
+        }
+      }
+    },
+    "Période du classement": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leaderboard period"
+          }
+        }
+      }
+    },
+    "Quête accomplie": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quest completed"
+          }
+        }
+      }
+    },
+    "Rafale terminée": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Burst finished"
+          }
+        }
+      }
+    },
+    "Recherche limitée": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limited search"
+          }
+        }
+      }
+    },
+    "Relancer le test": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run the test again"
+          }
+        }
+      }
+    },
+    "Retirer cette identification": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove this identification"
+          }
+        }
+      }
+    },
+    "Retirée (des cellules sont confirmées par d'autres)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed (some cells are confirmed by others)"
+          }
+        }
+      }
+    },
+    "Reviens après quelques mesures de la communauté.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Come back after a few community measurements."
+          }
+        }
+      }
+    },
+    "Ré-identifier ici": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Re-identify here"
+          }
+        }
+      }
+    },
+    "Réauthentification Apple impossible. Réessaie.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple re-authentication failed. Try again."
+          }
+        }
+      }
+    },
+    "Récompense bonus": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bonus reward"
+          }
+        }
+      }
+    },
+    "Réinitialiser les filtres": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset filters"
+          }
+        }
+      }
+    },
+    "Réponse App Store inconnue. Réessaie plus tard.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown App Store response. Try again later."
+          }
+        }
+      }
+    },
+    "Réponse Apple invalide": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid Apple response"
+          }
+        }
+      }
+    },
+    "Réponse auth invalide": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid auth response"
+          }
+        }
+      }
+    },
+    "Réponse de commentaire vide.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empty comment reply."
+          }
+        }
+      }
+    },
+    "Rétablissement prévu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restoration planned"
+          }
+        }
+      }
+    },
+    "Session terrain terminée": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Field session finished"
+          }
+        }
+      }
+    },
+    "Seuls tes amis y ont accès. Le partage suit le mode que tu choisis juste en dessous.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only your friends can see it. Sharing follows the mode you choose just below."
+          }
+        }
+      }
+    },
+    "Si l’adresse existe, un lien de réinitialisation t’a été envoyé.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If the address exists, a reset link has been sent to you."
+          }
+        }
+      }
+    },
+    "Signalement accepté": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Report accepted"
+          }
+        }
+      }
+    },
+    "Site actif — toutes les technos prévues sont en service": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active site — all planned technologies are in service"
+          }
+        }
+      }
+    },
+    "Site ajouté à la carte": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Site added to the map"
+          }
+        }
+      }
+    },
+    "Site en service, mise à niveau en cours.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Site in service, upgrade in progress."
+          }
+        }
+      }
+    },
+    "Site estimé par les observations communautaires": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Site estimated from community observations"
+          }
+        }
+      }
+    },
+    "Site identifié": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Site identified"
+          }
+        }
+      }
+    },
+    "Site identifié ✓": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Site identified ✓"
+          }
+        }
+      }
+    },
+    "Site prévisionnel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planned site"
+          }
+        }
+      }
+    },
+    "Site prévu (non encore construit)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planned site (not built yet)"
+          }
+        }
+      }
+    },
+    "Speedtests en continu + enregistrement de la couverture le long du trajet.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuous speedtests + coverage recording along the route."
+          }
+        }
+      }
+    },
+    "Station déclarée à l'ANFR (pas encore en service)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Station registered with ANFR (not in service yet)"
+          }
+        }
+      }
+    },
+    "Statut prévisionnel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planned status"
+          }
+        }
+      }
+    },
+    "Stockage local interrompu : garde l’app ouverte puis réessaie.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local storage interrupted: keep the app open and try again."
+          }
+        }
+      }
+    },
+    "Stories personnalisées de 1 à 72 heures": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom stories from 1 to 72 hours"
+          }
+        }
+      }
+    },
+    "Ta position disparaît automatiquement après environ 3 min sans mise à jour, et dès que tu coupes le partage.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your location disappears automatically after about 3 min without an update, and as soon as you turn sharing off."
+          }
+        }
+      }
+    },
+    "Ta session a expiré. Reconnecte-toi pour continuer.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your session has expired. Sign in again to continue."
+          }
+        }
+      }
+    },
+    "Techniquement opérationnel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Technically operational"
+          }
+        }
+      }
+    },
+    "Tendances et alertes avancées du journal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Advanced log trends and alerts"
+          }
+        }
+      }
+    },
+    "Tes amis voient ta position en direct et la direction dans laquelle tu te déplaces, sur la carte des amis.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your friends see your live location and the direction you're moving in, on the friends map."
+          }
+        }
+      }
+    },
+    "Tes contributions, et celles des autres, dessinent une carte vivante de la 4G/5G partout en France.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your contributions, and those of others, draw a living map of 4G/5G across France."
+          }
+        }
+      }
+    },
+    "Test publié sur la carte.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test published to the map."
+          }
+        }
+      }
+    },
+    "Tous les opérateurs": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All carriers"
+          }
+        }
+      }
+    },
+    "Tu avais déjà signalé ce problème pour ce site. Merci !": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You had already reported this problem for this site. Thank you!"
+          }
+        }
+      }
+    },
+    "Tu peux partager un post, une photo ou un speedtest vers cette conversation.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can share a post, a photo or a speedtest to this conversation."
+          }
+        }
+      }
+    },
+    "Télécharger mes données (RGPD)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download my data (GDPR)"
+          }
+        }
+      }
+    },
+    "VPN actif : ton opérateur ne peut pas être détecté, ce test ne sera pas publié sur la carte.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VPN active: your carrier can't be detected, this test won't be published to the map."
+          }
+        }
+      }
+    },
+    "Valide des antennes, publie des photos et lance des speedtests pour gagner des points.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm antennas, publish photos and run speedtests to earn points."
+          }
+        }
+      }
+    },
+    "Valider le code": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm code"
+          }
+        }
+      }
+    },
+    "Voir ce lieu sur la carte": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View this place on the map"
+          }
+        }
+      }
+    },
+    "Vous pourrez changer de nom d’utilisateur dans 1 jour.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You'll be able to change your username in 1 day."
+          }
+        }
+      }
+    },
+    "Vérification de la disponibilité…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking availability…"
+          }
+        }
+      }
+    },
+    "aucune cellule": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no cell"
+          }
+        }
+      }
+    },
+    "débit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "throughput"
+          }
+        }
+      }
+    },
+    "en cours de détection": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "detecting"
+          }
+        }
+      }
+    },
+    "la conversation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the conversation"
+          }
+        }
+      }
+    },
+    "opérateur": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "carrier"
+          }
+        }
+      }
+    },
+    "opérationnels": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "operational"
+          }
+        }
+      }
+    },
+    "opérationnels et projetés": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "operational and planned"
+          }
+        }
+      }
+    },
+    "réseau": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "network"
+          }
+        }
+      }
+    },
+    "réseau mobile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mobile network"
+          }
+        }
+      }
+    },
+    "stabilité": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "stability"
+          }
+        }
+      }
+    },
+    "une autre plateforme": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "another platform"
+          }
+        }
+      }
+    },
+    "À débloquer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To unlock"
+          }
+        }
+      }
+    },
+    "À la une": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Featured"
+          }
+        }
+      }
+    },
+    "Échec de l'envoi. Réessaie.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending failed. Try again."
+          }
+        }
+      }
+    },
+    "Échec de l’enregistrement.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saving failed."
+          }
+        }
+      }
+    },
+    "Équipe SignalQuest": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SignalQuest team"
+          }
+        }
+      }
+    },
+    "Évaluation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rating"
+          }
+        }
+      }
+    },
+    "Évolution": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change"
+          }
+        }
+      }
+    },
+    "Événement": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Event"
+          }
+        }
+      }
+    },
+    "📎 Pièce jointe": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "📎 Attachment"
+          }
+        }
+      }
+    },
+    "Code 2FA accepté mais utilisateur absent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2FA code accepted but user missing"
+          }
+        }
+      }
+    },
+    "Compte créé mais session non initialisée": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account created but session not initialized"
+          }
+        }
+      }
+    },
+    "(dégradé), ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(degraded), "
+          }
+        }
+      }
+    },
+    "(ignoré)+": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(ignored)+"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
