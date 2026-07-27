@@ -13,6 +13,8 @@ struct PostCardView: View {
     var onAuthorTap: (() -> Void)? = nil
     /// Réaction emoji (appui long sur ❤️). Repli sur onLike si absent.
     var onReact: ((String) -> Void)? = nil
+    /// Vote sur le sondage attaché, s'il y en a un.
+    var onPollVote: ((FeedPoll.Option) -> Void)? = nil
 
     var body: some View {
         Button(action: onTap) {
@@ -33,6 +35,13 @@ struct PostCardView: View {
                         .foregroundStyle(SQColor.label)
                         .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.leading)
+                }
+
+                // Le sondage se place APRÈS le texte et AVANT la pièce jointe :
+                // c'est l'ordre de lecture naturel, le texte posant la question
+                // que les options répondent.
+                if let poll = item.poll, let onPollVote {
+                    FeedPollView(poll: poll, onVote: onPollVote)
                 }
 
                 if let attachment = item.attachments.first,

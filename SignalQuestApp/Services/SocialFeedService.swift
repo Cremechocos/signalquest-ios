@@ -25,6 +25,9 @@ protocol SocialFeedServicing: Sendable {
     /// Épingle ou détache un post sur son profil. Le serveur ne garde qu'un seul
     /// post épinglé par auteur : épingler ailleurs détache automatiquement.
     func setPinned(postId: String, pinned: Bool) async throws
+    /// Vote (ou retire son vote) sur le sondage d'une publication.
+    /// `optionId == nil` retire tous les votes de l'utilisateur.
+    func votePoll(postId: String, optionId: String?, removing: Bool) async throws -> FeedPoll?
     /// Partage un post vers une conversation. Renvoie l'id du message créé (pour
     /// permettre l'annulation), ou nil si le backend ne l'a pas fourni.
     func share(postId: String, conversationId: String) async throws -> String?
@@ -207,6 +210,24 @@ final class SocialFeedService: SocialFeedServicing {
         try await api.request(
             APIEndpoint(path: "/api/social/posts/\(normalizedPostId(postId))", method: .delete)
         )
+    }
+
+    func votePoll(postId: String, optionId: String?, removing: Bool) async throws -> FeedPoll? {
+        struct Body: Encodable { let optionId: String? }
+        struct Response: Decodable { let poll: FeedPoll? }
+        // POST vote, DELETE retire — `optionId` est requis au vote, facultatif
+        // au retrait (absent = retirer tous ses votes).
+        let body = try JSONEncoder.signalQuest.encode(Body(optionId: optionId))
+        let response: Response = try await api.request(
+            APIEndpoint(
+                path: "/api/social/posts/\(normalizedPostId(postId))/poll/vote",
+                method: removing ? .delete : .post,
+                headers: ["Content-Type": "application/json"],
+                body: body
+            ),
+            as: Response.self
+        )
+        return response.poll
     }
 
     func setPinned(postId: String, pinned: Bool) async throws {

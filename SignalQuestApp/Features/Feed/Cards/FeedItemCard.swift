@@ -14,6 +14,8 @@ struct FeedItemCard: View {
     var onAuthorTap: (() -> Void)? = nil
     /// Réaction emoji (appui long sur ❤️), transmise à la barre d'actions.
     var onReact: ((String) -> Void)? = nil
+    /// Vote sur un sondage. Seules les publications ordinaires en portent.
+    var onPollVote: ((FeedPoll.Option) -> Void)? = nil
 
     var body: some View {
         switch normalizedKind {
@@ -57,7 +59,7 @@ struct FeedItemCard: View {
                 item: item,
                 onTap: onTap, onLike: onLike, onRepost: onRepost,
                 onComment: onComment, onFavorite: onFavorite, onShare: onShare,
-                onAuthorTap: onAuthorTap, onReact: onReact
+                onAuthorTap: onAuthorTap, onReact: onReact, onPollVote: onPollVote
             )
         }
     }

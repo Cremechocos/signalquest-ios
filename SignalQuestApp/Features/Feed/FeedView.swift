@@ -219,6 +219,32 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
+    /// Vote sur un sondage. Bascule si l'option était déjà choisie.
+    ///
+    /// Optimiste sur le seul état de sélection, PAS sur les décomptes : le
+    /// serveur applique ses propres règles (choix unique ou multiple, sondage
+    /// clos, vote déjà émis ailleurs). Recalculer les pourcentages localement
+    /// afficherait un résultat qui saute dès la réponse.
+    func votePoll(_ item: UnifiedSocialFeedItem, option: FeedPoll.Option) {
+        guard let poll = item.poll, poll.isOpen else { return }
+        let removing = option.votedByMe
+        Task {
+            do {
+                let updated = try await service.votePoll(
+                    postId: item.id,
+                    optionId: option.id,
+                    removing: removing
+                )
+                guard let updated else { return }
+                await applyLocalToggle(itemId: item.id) { current in
+                    var copy = current; copy.poll = updated; return copy
+                }
+            } catch {
+                if !error.isCancellation { errorMessage = error.localizedDescription }
+            }
+        }
+    }
+
     func muteNotifications(_ item: UnifiedSocialFeedItem) {
         Task {
             do {
@@ -410,66 +436,7 @@ struct FeedView: View {
                         .padding(.top, SQSpace.xxl)
                     }
                     ForEach(model.page?.items ?? []) { item in
-                        FeedItemCard(
-                            item: item,
-                            onTap: { presentedSheet = .detail(item) },
-                            // Chaque action nourrit aussi le classement : ce
-                            // sont les signaux les plus discriminants, bien plus
-                            // qu'une simple vue.
-                            onLike: {
-                                model.react(item)
-                                Task { await services.feedSignals.record(postId: item.id, type: "like") }
-                            },
-                            onRepost: {
-                                model.repost(item)
-                                Task { await services.feedSignals.record(postId: item.id, type: "repost") }
-                            },
-                            onComment: {
-                                presentedSheet = .comments(item)
-                                Task { await services.feedSignals.record(postId: item.id, type: "comment") }
-                            },
-                            onFavorite: {
-                                model.favorite(item)
-                                Task { await services.feedSignals.record(postId: item.id, type: "favorite") }
-                            },
-                            onShare: {
-                                presentedSheet = .share(item)
-                                Task { await services.feedSignals.record(postId: item.id, type: "share") }
-                            },
-                            onAuthorTap: { profileAuthor = item.author },
-                            onReact: { emoji in model.react(item, emoji: emoji) }
-                        )
-                        .contextMenu {
-                            // Réservé à l'auteur. Le serveur revérifie et répond
-                            // 403 : ce masquage évite d'offrir une action vouée
-                            // à échouer, il ne fait pas autorité.
-                            if item.canManage {
-                                Button { model.togglePin(item) } label: {
-                                    Label(item.isPinned ? "Désépingler" : "Épingler",
-                                          systemImage: item.isPinned ? "pin.slash" : "pin")
-                                }
-                                Button(role: .destructive) { pendingDeletion = item } label: {
-                                    Label("Supprimer", systemImage: "trash")
-                                }
-                            }
-                            Button { model.muteNotifications(item) } label: {
-                                Label(item.notificationsMutedByMe == true ? "Réactiver notifs" : "Couper notifs",
-                                      systemImage: item.notificationsMutedByMe == true ? "bell" : "bell.slash")
-                            }
-                            Button(role: .destructive) { presentedSheet = .report(item) } label: {
-                                Label("Signaler", systemImage: "flag")
-                            }
-                        }
-                        .sqFadeUp()
-                        .onAppear {
-                            // Une vue par post et par session : le collecteur
-                            // déduplique, l'appeler à chaque réapparition de
-                            // cellule est donc sans effet de bord.
-                            Task { await services.feedSignals.onVisibleItems([item.id]) }
-                            if item.id == model.page?.items.last?.id {
-                                Task { await model.loadMore() }
-                            }
-                        }
+                        feedCard(for: item)
                     }
                     if model.isLoadingMore {
                         HStack { Spacer(); ProgressView().tint(SQColor.brandRed); Spacer() }
@@ -800,6 +767,84 @@ struct FeedView: View {
     }
 
     // MARK: Hashtags — capsules pleines/douces
+
+
+    /// Carte du fil, extraite en fonction.
+    ///
+    /// Ce n'est pas cosmétique : construite en ligne dans le `LazyVStack`, avec
+    /// ses six fermetures d'action, son menu contextuel et son `onAppear`,
+    /// l'expression faisait saturer le vérificateur de types de Swift
+    /// (« unable to type-check in reasonable time »). L'isoler lui redonne un
+    /// contexte borné.
+    @ViewBuilder
+    private func feedCard(for item: UnifiedSocialFeedItem) -> some View {
+        FeedItemCard(
+            item: item,
+            onTap: { presentedSheet = .detail(item) },
+            // Chaque action nourrit aussi le classement : ce
+            // sont les signaux les plus discriminants, bien plus
+            // qu'une simple vue.
+            onLike: {
+                model.react(item)
+                Task { await services.feedSignals.record(postId: item.id, type: "like") }
+            },
+            onRepost: {
+                model.repost(item)
+                Task { await services.feedSignals.record(postId: item.id, type: "repost") }
+            },
+            onComment: {
+                presentedSheet = .comments(item)
+                Task { await services.feedSignals.record(postId: item.id, type: "comment") }
+            },
+            onFavorite: {
+                model.favorite(item)
+                Task { await services.feedSignals.record(postId: item.id, type: "favorite") }
+            },
+            onShare: {
+                presentedSheet = .share(item)
+                Task { await services.feedSignals.record(postId: item.id, type: "share") }
+            },
+            onAuthorTap: { profileAuthor = item.author },
+            onReact: { emoji in model.react(item, emoji: emoji) },
+            onPollVote: { option in model.votePoll(item, option: option) }
+        )
+        .contextMenu {
+            // Réservé à l'auteur. Le serveur revérifie et répond
+            // 403 : ce masquage évite d'offrir une action vouée
+            // à échouer, il ne fait pas autorité.
+            if item.canManage {
+                Button { model.togglePin(item) } label: {
+                    Label(item.isPinned ? "Désépingler" : "Épingler",
+                          systemImage: item.isPinned ? "pin.slash" : "pin")
+                }
+                Button(role: .destructive) { pendingDeletion = item } label: {
+                    Label("Supprimer", systemImage: "trash")
+                }
+            }
+            Button { model.muteNotifications(item) } label: {
+                // Ternaires sortis en variables : imbriqués dans
+                // le `Label`, ils faisaient saturer le
+                // vérificateur de types de ce bloc devenu long.
+                let muted = item.notificationsMutedByMe == true
+                let title: LocalizedStringKey = muted ? "Réactiver notifs" : "Couper notifs"
+                let icon = muted ? "bell" : "bell.slash"
+                Label(title, systemImage: icon)
+            }
+            Button(role: .destructive) { presentedSheet = .report(item) } label: {
+                Label("Signaler", systemImage: "flag")
+            }
+        }
+        .sqFadeUp()
+        .onAppear {
+            // Une vue par post et par session : le collecteur
+            // déduplique, l'appeler à chaque réapparition de
+            // cellule est donc sans effet de bord.
+            Task { await services.feedSignals.onVisibleItems([item.id]) }
+            if item.id == model.page?.items.last?.id {
+                Task { await model.loadMore() }
+            }
+        }
+    }
 
     /// Barre d'onglets du fil.
     ///

@@ -301,6 +301,8 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
     /// lui appartenait, ni afficher son état d'épinglage.
     let isMine: Bool?
     var pinnedAt: Date?
+    /// Sondage attaché, servi par le backend et jusqu'ici ignoré.
+    var poll: FeedPoll?
 
     /// Vrai si l'utilisateur peut éditer, supprimer ou épingler ce post.
     /// L'autorité reste le SERVEUR (403 sinon) : ceci ne fait que masquer des
@@ -309,7 +311,7 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
     var isPinned: Bool { pinnedAt != nil }
 
     enum CodingKeys: String, CodingKey {
-        case id, kind, sourceType, sourceId, createdAt, score, author, text, visibility, status, targetType, targetId, placeLabel, latitude, longitude, metadata, attachments, signal, hashtags, reactions, commentsCount, repostsCount, favoritesCount, likedByMe, favoritedByMe, repostedByMe, notificationsMutedByMe, isMine, pinnedAt
+        case id, kind, sourceType, sourceId, createdAt, score, author, text, visibility, status, targetType, targetId, placeLabel, latitude, longitude, metadata, attachments, signal, hashtags, reactions, commentsCount, repostsCount, favoritesCount, likedByMe, favoritedByMe, repostedByMe, notificationsMutedByMe, isMine, pinnedAt, poll
     }
 
     init(from decoder: Decoder) throws {
@@ -343,6 +345,7 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
         notificationsMutedByMe = try c.decodeIfPresent(Bool.self, forKey: .notificationsMutedByMe)
         isMine = try c.decodeIfPresent(Bool.self, forKey: .isMine)
         pinnedAt = try c.decodeIfPresent(Date.self, forKey: .pinnedAt)
+        poll = try c.decodeIfPresent(FeedPoll.self, forKey: .poll)
     }
 }
 

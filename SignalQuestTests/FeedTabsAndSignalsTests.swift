@@ -192,3 +192,64 @@ final class FeedItemOwnershipTests: XCTestCase {
         XCTAssertFalse(item.isPinned)
     }
 }
+
+/// Le sondage du fil a une forme DIFFÉRENTE de celui de la messagerie
+/// (`label`/`votesCount`/`votedByMe` contre `text`/`count`/`votesByMe`).
+/// Confondre les deux donnerait un décodage silencieusement vide.
+final class FeedPollTests: XCTestCase {
+
+    private func poll(totalVotes: Int, expired: Bool = false, votedIndex: Int? = nil) -> FeedPoll {
+        FeedPoll(
+            id: "poll1", question: "Ton opérateur ?", expiresAt: nil,
+            allowMultiple: false, totalVotes: totalVotes, hasExpired: expired,
+            options: (0..<3).map { i in
+                FeedPoll.Option(
+                    id: "o\(i)", label: "Choix \(i)", position: 2 - i,
+                    votesCount: i, votedByMe: votedIndex == i
+                )
+            }
+        )
+    }
+
+    func testDecodesTheFeedShapeNotTheMessagingOne() throws {
+        let json = """
+        {"id":"poll1","question":"Ton opérateur ?","expiresAt":null,"allowMultiple":false,
+         "totalVotes":5,"hasExpired":false,
+         "options":[{"id":"o1","label":"Orange","position":0,"votesCount":3,"votedByMe":true}]}
+        """
+        let decoded = try JSONDecoder().decode(FeedPoll.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.options.first?.label, "Orange")
+        XCTAssertEqual(decoded.options.first?.votesCount, 3)
+        XCTAssertTrue(decoded.hasVoted)
+    }
+
+    /// Le piège classique : diviser par zéro quand personne n'a voté. Le
+    /// résultat remonterait jusqu'à un `frame` SwiftUI et planterait le rendu.
+    func testShareIsZeroRatherThanNaNWithoutVotes() {
+        let empty = poll(totalVotes: 0)
+        for option in empty.options {
+            let share = empty.share(of: option)
+            XCTAssertFalse(share.isNaN, "NaN sur un sondage sans vote")
+            XCTAssertEqual(share, 0)
+        }
+    }
+
+    func testShareIsAProportionOfTheTotal() {
+        let p = poll(totalVotes: 3)   // votes 0, 1, 2
+        XCTAssertEqual(p.share(of: p.options[2]), 2.0 / 3.0, accuracy: 0.0001)
+    }
+
+    /// Le backend renvoie `position`, mais s'y fier sans trier laisserait
+    /// l'ordre à la merci de la sérialisation JSON.
+    func testOptionsAreOrderedByPosition() {
+        let ordered = poll(totalVotes: 3).orderedOptions
+        XCTAssertEqual(ordered.map(\.position), [0, 1, 2])
+    }
+
+    /// Un sondage clos n'accepte plus de vote : proposer l'action donnerait une
+    /// erreur serveur à l'utilisateur.
+    func testAnExpiredPollIsClosedToVoting() {
+        XCTAssertFalse(poll(totalVotes: 3, expired: true).isOpen)
+        XCTAssertTrue(poll(totalVotes: 3).isOpen)
+    }
+}

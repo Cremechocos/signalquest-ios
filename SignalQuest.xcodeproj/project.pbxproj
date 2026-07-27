@@ -141,6 +141,7 @@
 		62E1E8A453959C316BFF3444 /* BackgroundTaskScope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A136AAB9556457EEA80A8F /* BackgroundTaskScope.swift */; };
 		633DC6F9C6F272906A7E7363 /* LeaderboardService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC02787ABEAE06188ADF7D1F /* LeaderboardService.swift */; };
 		6355B681F28A5EB94BEBF576 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3208FA15F4116CDD6FB4BF47 /* PrivacyInfo.xcprivacy */; };
+		63A197C5516EA15B55DF8942 /* FeedPoll.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4B43802B3725DE1A21B9D53 /* FeedPoll.swift */; };
 		6651F3A94F7A12751A676CC2 /* SpeedtestShareImageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 879A6D651EB7605DE38CD230 /* SpeedtestShareImageTests.swift */; };
 		681DBC1F202BA2A5486B5F4E /* RadioLogImportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E04E544B4C215F036CD9B609 /* RadioLogImportModels.swift */; };
 		696D8CC9612CF18EA3CEFE62 /* EntitlementsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 510C718208A0F0CD33A6405E /* EntitlementsService.swift */; };
@@ -176,6 +177,7 @@
 		819A23CD1C96508D7129E5F0 /* BricolageGrotesque-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F2B897546130656652D9717D /* BricolageGrotesque-SemiBold.ttf */; };
 		81FED606BC8524E427FBB708 /* GamificationV2Service.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94A824085331B8DDD8FD3AEC /* GamificationV2Service.swift */; };
 		820491F93E8015B6ECDD7D2D /* CallSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8366DB9AD97C6EFE27467176 /* CallSessionView.swift */; };
+		82C7D06B8D1D2960E61EF1C7 /* FeedPollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A497779B95276F8B69AB2B7D /* FeedPollView.swift */; };
 		82D213CFFAD0F862FFF86CE8 /* MessageImageViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37A33F778EF242CBA6881750 /* MessageImageViewer.swift */; };
 		836D76211D8B12F2E56901A8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AD04EAFD67FBCB63533321A0 /* Assets.xcassets */; };
 		848B9C3DC83FC58801772208 /* NearbyOperatorStat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6570A8819FE179AAFE0B2546 /* NearbyOperatorStat.swift */; };
@@ -541,6 +543,7 @@
 		A220418E768D630538FCBDB6 /* UntranslatedSweepQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UntranslatedSweepQATests.swift; sourceTree = "<group>"; };
 		A3943DEC3A15CC630D29F54A /* MapPhotoViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapPhotoViewer.swift; sourceTree = "<group>"; };
 		A41B467FC7CE900FFE562268 /* SQAccessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQAccessibility.swift; sourceTree = "<group>"; };
+		A497779B95276F8B69AB2B7D /* FeedPollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedPollView.swift; sourceTree = "<group>"; };
 		A4F5346C853F95E32F253D7B /* AuditTourQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditTourQATests.swift; sourceTree = "<group>"; };
 		A4F8B268ACB58F2F9B93795E /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		A5C7F0DAC41E77828173A282 /* MapBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapBackdrop.swift; sourceTree = "<group>"; };
@@ -597,6 +600,7 @@
 		D29224A48769AB74981281AE /* MessagingFixesQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagingFixesQATests.swift; sourceTree = "<group>"; };
 		D2F641884A080F0EC459B546 /* PhotoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoService.swift; sourceTree = "<group>"; };
 		D39C1D3B6CAAB2272A0E6B6C /* MapAccessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAccessibility.swift; sourceTree = "<group>"; };
+		D4B43802B3725DE1A21B9D53 /* FeedPoll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedPoll.swift; sourceTree = "<group>"; };
 		D6A0DBB96F9423CDD0C043B6 /* SpeedtestShareQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestShareQATests.swift; sourceTree = "<group>"; };
 		D6FFA250C4BE27D4200678E2 /* ModelDecodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDecodeTests.swift; sourceTree = "<group>"; };
 		D7454A1BEDAD17CEBB961A3D /* SignalQuestTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SignalQuestTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -718,6 +722,7 @@
 				8DA025CCAC0DF6A4A8AD5A6E /* AntennaModels.swift */,
 				969394914FD409108A452239 /* AntennaReportModels.swift */,
 				4DBC54E804678243BC1BCC4C /* AuthModels.swift */,
+				D4B43802B3725DE1A21B9D53 /* FeedPoll.swift */,
 				D89B6EA883CAE3151D38ABEB /* IdentificationModels.swift */,
 				7AE018DD5313EE91ADC34F09 /* JSONValue.swift */,
 				554B78FC0A0A68C411BAD689 /* LeaderboardModels.swift */,
@@ -1195,6 +1200,7 @@
 			children = (
 				91DE6C62E4954951C0A2419C /* CoverageCardView.swift */,
 				1F4F7435470D7B186E080C8E /* FeedItemCard.swift */,
+				A497779B95276F8B69AB2B7D /* FeedPollView.swift */,
 				763622AD001158FA3157D839 /* PhotoCardView.swift */,
 				BA923675E56186A1BD8D5B7F /* PostCardView.swift */,
 				315ABFF13D89760B78440BEC /* RatingCardView.swift */,
@@ -1713,6 +1719,8 @@
 				696D8CC9612CF18EA3CEFE62 /* EntitlementsService.swift in Sources */,
 				25E51616DFCEE545AE04E5EF /* ExploreView.swift in Sources */,
 				457C2A59F2A7938C086C2669 /* FeedItemCard.swift in Sources */,
+				63A197C5516EA15B55DF8942 /* FeedPoll.swift in Sources */,
+				82C7D06B8D1D2960E61EF1C7 /* FeedPollView.swift in Sources */,
 				623A16DE37C1CE236F74BD81 /* FeedSignalsCollector.swift in Sources */,
 				CFBA45A0F84A42EAA877DE8A /* FeedTab.swift in Sources */,
 				E156E1B5171E02B1878DA63A /* FeedView.swift in Sources */,
