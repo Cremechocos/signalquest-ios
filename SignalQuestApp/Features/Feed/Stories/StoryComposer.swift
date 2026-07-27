@@ -32,6 +32,10 @@ final class StoryComposerViewModel: ObservableObject {
     @Published var audience: StoryAudience = .friends
     @Published var ttlHours: Int = 24
     @Published var hiddenUserIds: Set<String> = []
+    /// Joint le relevé radio courant : c'est ce qui fait une story « signal ».
+    /// Le serveur accepte alors une story SANS texte ni image — exactement le
+    /// cas d'usage, partager sa couverture.
+    @Published var attachRadio = false
     @Published var closeFriendIds: Set<String> = []
     @Published var friends: [Friend] = []
     @Published var showHideEditor = false
@@ -97,7 +101,9 @@ final class StoryComposerViewModel: ObservableObject {
                 visibility: audience.rawValue,
                 ttlHours: ttlHours,
                 hiddenUserIds: Array(hiddenUserIds),
-                background: nil
+                background: nil,
+                attachRadio: attachRadio,
+                metadata: nil
             )
             didPublish = true
             Haptics.success()
@@ -168,6 +174,7 @@ struct StoryComposer: View {
 
                     audienceSection
                     hideSection
+                    signalSection
                     ttlSection
                     durationRow
 
@@ -217,6 +224,24 @@ struct StoryComposer: View {
                 .presentationDetents([.large])
             }
         }
+    }
+
+    /// Story typée « signal ».
+    private var signalSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            Toggle(isOn: $model.attachRadio) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Joindre mon relevé réseau")
+                        .font(SQFont.body(15, .medium))
+                    Text("Techno, opérateur et qualité au moment du partage.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .tint(SQColor.brandRed)
+        }
+        .padding(SQSpace.md)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
     }
 
     private var audienceSection: some View {

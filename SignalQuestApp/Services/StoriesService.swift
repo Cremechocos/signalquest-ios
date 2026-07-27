@@ -14,7 +14,9 @@ protocol StoriesServicing: Sendable {
         visibility: String,
         ttlHours: Int,
         hiddenUserIds: [String],
-        background: String?
+        background: String?,
+        attachRadio: Bool,
+        metadata: [String: JSONValue]?
     ) async throws -> SocialStory?
     /// Téléverse une image de story et renvoie ses URLs (média + miniature).
     func uploadMedia(data: Data) async throws -> StoryUpload
@@ -66,6 +68,14 @@ struct CreateStoryRequest: Codable {
     let ttlHours: Int
     let hiddenUserIds: [String]?
     let background: String?
+    /// Joint le relevé radio courant. Le serveur considère une story avec
+    /// `attachRadio` comme NON vide, même sans texte ni média — c'est ce qui
+    /// rend une story « signal » possible.
+    let attachRadio: Bool?
+    /// Charge typée : `signal`, `session` ou `speedtest`. Le serveur inspecte
+    /// ces clés (`technology`, `rsrp`, `operator`…) pour valider la story et
+    /// pour la rendre.
+    let metadata: [String: JSONValue]?
 }
 
 struct CreateStoryResponse: Codable {
@@ -138,7 +148,9 @@ final class StoriesService: StoriesServicing {
         visibility: String = "friends",
         ttlHours: Int = 24,
         hiddenUserIds: [String] = [],
-        background: String? = nil
+        background: String? = nil,
+        attachRadio: Bool = false,
+        metadata: [String: JSONValue]? = nil
     ) async throws -> SocialStory? {
         let duration = Self.allowedDisplayDurations.contains(displayDurationSeconds) ? displayDurationSeconds : 10
         let body = CreateStoryRequest(
@@ -150,7 +162,12 @@ final class StoriesService: StoriesServicing {
             visibility: visibility,
             ttlHours: min(72, max(1, ttlHours)),
             hiddenUserIds: hiddenUserIds.isEmpty ? nil : hiddenUserIds,
-            background: background
+            background: background,
+            // `false` n'est pas envoyé : le serveur teste la PRÉSENCE de la clé
+            // pour décider si la story est vide, et un `false` explicite le
+            // ferait basculer du mauvais côté sur une story sans texte.
+            attachRadio: attachRadio ? true : nil,
+            metadata: metadata
         )
         let response: CreateStoryResponse = try await api.requestJSON("/api/social/stories", body: body)
         return response.story

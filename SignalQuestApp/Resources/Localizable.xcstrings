@@ -14843,6 +14843,26 @@
           }
         }
       }
+    },
+    "Joindre mon relevé réseau": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attach my network reading"
+          }
+        }
+      }
+    },
+    "Techno, opérateur et qualité au moment du partage.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Technology, carrier and quality at the time of sharing."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
