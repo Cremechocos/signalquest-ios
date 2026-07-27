@@ -2,7 +2,7 @@ import Foundation
 
 protocol AuthServicing: Sendable {
     func login(email: String, password: String) async throws -> LoginResponse
-    func signup(email: String, password: String, name: String) async throws -> LoginResponse
+    func signup(email: String, password: String, name: String, acceptedTerms: Bool) async throws -> LoginResponse
     func verify2FA(tempToken: String, code: String) async throws -> LoginResponse
     /// Sign in with Apple : envoie le jeton d'identité Apple (JWT) + le nom
     /// (1re autorisation) ; le backend vérifie le jeton et crée/connecte l'utilisateur.
@@ -74,10 +74,10 @@ final class AuthService: AuthServicing {
         )
     }
 
-    func signup(email: String, password: String, name: String) async throws -> LoginResponse {
+    func signup(email: String, password: String, name: String, acceptedTerms: Bool) async throws -> LoginResponse {
         try await api.requestJSON(
             "/api/auth/signup",
-            body: SignupRequest(email: email, password: password, name: name),
+            body: SignupRequest(email: email, password: password, name: name, acceptedTerms: acceptedTerms),
             authenticated: false
         )
     }
@@ -422,12 +422,14 @@ final class AuthSessionViewModel: ObservableObject {
         }
     }
 
-    func signup(email: String, password: String, name: String) async {
+    func signup(email: String, password: String, name: String, acceptedTerms: Bool) async {
         isBusy = true
         errorMessage = nil
         defer { isBusy = false }
         do {
-            let response = try await service.signup(email: email, password: password, name: name)
+            let response = try await service.signup(
+                email: email, password: password, name: name, acceptedTerms: acceptedTerms
+            )
             if let user = response.user {
                 await setAuthenticated(user)
             } else if response.requires2FA == true, let tempToken = response.tempToken {

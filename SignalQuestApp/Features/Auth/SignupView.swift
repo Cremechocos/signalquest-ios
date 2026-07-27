@@ -68,7 +68,16 @@ struct SignupView: View {
                     }
 
                     GradientButton("Créer mon compte", systemImage: "person.crop.circle.badge.plus", isBusy: session.isBusy) {
-                        Task { await session.signup(email: trimmedEmail, password: password, name: trimmedName) }
+                        // `canSubmit` exige déjà `acceptedTerms` : on transmet
+                        // la valeur réelle plutôt qu'un `true` littéral, pour
+                        // qu'un futur contournement de la validation n'aboutisse
+                        // pas à enregistrer un consentement qui n'a pas eu lieu.
+                        Task {
+                            await session.signup(
+                                email: trimmedEmail, password: password,
+                                name: trimmedName, acceptedTerms: acceptedTerms
+                            )
+                        }
                     }
                     .disabled(!canSubmit)
                     .opacity(canSubmit ? 1 : 0.5)

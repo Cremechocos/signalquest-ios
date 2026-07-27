@@ -34,7 +34,7 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
 
     // Non exercées.
     func login(email: String, password: String) async throws -> LoginResponse { throw Unused.notImplemented }
-    func signup(email: String, password: String, name: String) async throws -> LoginResponse { throw Unused.notImplemented }
+    func signup(email: String, password: String, name: String, acceptedTerms: Bool) async throws -> LoginResponse { throw Unused.notImplemented }
     func verify2FA(tempToken: String, code: String) async throws -> LoginResponse { throw Unused.notImplemented }
     func signInWithApple(identityToken: String, fullName: String?) async throws -> LoginResponse { throw Unused.notImplemented }
     func linkApple(identityToken: String) async throws { throw Unused.notImplemented }

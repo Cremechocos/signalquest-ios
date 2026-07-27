@@ -37,6 +37,14 @@ struct SignupRequest: Codable {
     let email: String
     let password: String
     let name: String
+    /// Consentement clickwrap aux CGU et à la politique de confidentialité.
+    ///
+    /// Le backend n'écrit `acceptedTermsVersion` / `acceptedTermsAt` QUE si ce
+    /// champ est présent. Il ne l'était pas : aucun compte créé depuis iOS ne
+    /// portait de trace de consentement, alors que la case était bien affichée
+    /// et bloquait le bouton. Exigence RGPD, et attendu par la revue App Store
+    /// sur la guideline EULA.
+    let acceptedTerms: Bool
 }
 
 struct AppleLinkResponse: Decodable {
