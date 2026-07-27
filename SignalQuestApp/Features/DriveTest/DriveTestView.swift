@@ -977,7 +977,7 @@ struct DriveTestView: View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             legendSection("Génération", items: [
                 ("5G", Color(hex: 0x8B5CF6)), ("4G", Color(hex: 0x3B82F6)),
-                ("3G", Color(hex: 0x14B8A6)), ("2G", Color(hex: 0xF59E0B)),
+                ("3G", Color(hex: 0x14B8A6)), ("2G", Color(hex: 0x64748B)),
                 ("Aucun", Color(hex: 0x94A3B8))
             ], mark: .circle)
             legendSection("Parcours", items: [

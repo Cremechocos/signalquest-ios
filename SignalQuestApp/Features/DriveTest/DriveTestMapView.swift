@@ -192,7 +192,7 @@ struct DriveTestMapView: UIViewRepresentable {
             case "5g": hex = 0x8B5CF6
             case "4g": hex = 0x3B82F6
             case "3g": hex = 0x14B8A6
-            case "2g": hex = 0xF59E0B
+            case "2g": hex = 0x64748B
             default: hex = 0x94A3B8
             }
             return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)

@@ -67,7 +67,7 @@ enum SQNetworkColors {
 
     // MARK: Génération (technologie) → couleur
 
-    /// 5G violet · 4G bleu · 3G teal · 2G ambre · inconnu gris.
+    /// 5G violet · 4G bleu · 3G sarcelle · 2G ardoise · inconnu gris.
     static func generationColor(_ tech: String?) -> Color { Color(hex: generationHex(tech)) }
     static func generationUIColor(_ tech: String?) -> UIColor { uiColor(generationHex(tech)) }
 
@@ -76,7 +76,7 @@ enum SQNetworkColors {
         if t.contains("5G") || t.contains("NR") { return 0x8B5CF6 }
         if t.contains("4G") || t.contains("LTE") { return 0x3B82F6 }
         if t.contains("3G") || t.contains("UMTS") || t.contains("HSPA") || t.contains("WCDMA") { return 0x14B8A6 }
-        if t.contains("2G") || t.contains("GSM") || t.contains("EDGE") || t.contains("GPRS") { return 0xF59E0B }
+        if t.contains("2G") || t.contains("GSM") || t.contains("EDGE") || t.contains("GPRS") { return 0x64748B }
         return unknownHex
     }
 

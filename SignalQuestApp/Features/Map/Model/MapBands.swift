@@ -106,7 +106,7 @@ enum CoverageQualityBand: String, CaseIterable, Identifiable {
 
 /// Bandes de GÉNÉRATION pour la couche couverture (mode « génération », distinct du
 /// RSRP). Couleurs alignées sur la carte « Mes mesures » (SessionGenerationColor) :
-/// 5G violet · 4G bleu · 3G teal · 2G ambre · gris (aucun/inconnu).
+/// 5G violet · 4G bleu · 3G sarcelle · 2G ardoise · gris (aucun/inconnu).
 enum CoverageGenerationBand: String, CaseIterable, Identifiable {
     case g5, g4, g3, g2, none
 
@@ -152,7 +152,7 @@ enum CoverageGenerationBand: String, CaseIterable, Identifiable {
         case .g5: return 0x8B5CF6
         case .g4: return 0x3B82F6
         case .g3: return 0x14B8A6
-        case .g2: return 0xF59E0B
+        case .g2: return 0x64748B
         case .none: return 0x94A3B8
         }
     }
