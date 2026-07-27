@@ -214,6 +214,12 @@ struct ProfileView: View {
             }
             menuSeparator
             NavigationLink {
+                TerritoriesView(service: services.gamification)
+            } label: {
+                menuRow(title: "Territoires", icon: "square.grid.3x3.fill")
+            }
+            menuSeparator
+            NavigationLink {
                 PaywallView(store: services.entitlements, entryPoint: .profile)
             } label: {
                 menuRow(title: "Abonnements", icon: "checkmark.seal.fill")

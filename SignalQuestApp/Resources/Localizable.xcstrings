@@ -14653,6 +14653,86 @@
           }
         }
       }
+    },
+    "Territoires": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Territories"
+          }
+        }
+      }
+    },
+    "Zone blanche": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "White zone"
+          }
+        }
+      }
+    },
+    "Observée": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observed"
+          }
+        }
+      }
+    },
+    "Fiable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reliable"
+          }
+        }
+      }
+    },
+    "Complète": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Complete"
+          }
+        }
+      }
+    },
+    "À rafraîchir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs refresh"
+          }
+        }
+      }
+    },
+    "Zoome pour voir les territoires": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zoom in to see territories"
+          }
+        }
+      }
+    },
+    "Zone trop large : certains territoires ne sont pas affichés": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Area too wide: some territories aren't shown"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
