@@ -34,11 +34,7 @@ extension View {
     /// `.presentationBackground(_:)` est iOS 16.4+ ; sur 16.0–16.3, fond de sheet par défaut.
     @ViewBuilder
     func presentationBackgroundCompat<S: ShapeStyle>(_ style: S) -> some View {
-        if #available(iOS 16.4, *) {
-            self.presentationBackground(style)
-        } else {
-            self
-        }
+        modifier(SQPresentationBackground(style: style))
     }
 
     /// `.toolbarTitleDisplayMode(.inline)` (iOS 17+) → repli `navigationBarTitleDisplayMode`.
@@ -119,6 +115,31 @@ private struct SQReadableWidthModifier: ViewModifier {
             content
                 .frame(maxWidth: maxWidth)
                 .frame(maxWidth: .infinity)
+        } else {
+            content
+        }
+    }
+}
+
+
+/// Fond de feuille, sensible à « Réduire la transparence ».
+///
+/// Le réglage système impose une surface opaque : les matériaux translucides
+/// sont donc remplacés par `SQColor.surface`. Passer par cette primitive
+/// (comme `sqDockChrome` pour le dock) fait que le réglage est honoré partout
+/// où l'app présente une feuille, sans avoir à le rappeler sur chaque site.
+private struct SQPresentationBackground<S: ShapeStyle>: ViewModifier {
+    let style: S
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 16.4, *) {
+            if reduceTransparency {
+                content.presentationBackground(SQColor.surface)
+            } else {
+                content.presentationBackground(style)
+            }
         } else {
             content
         }

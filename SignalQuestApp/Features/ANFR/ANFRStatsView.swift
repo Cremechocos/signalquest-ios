@@ -581,7 +581,7 @@ struct ANFRStatsView: View {
                     HStack(spacing: SQSpace.sm) {
                         Text("\(index + 1)")
                             .font(SQFont.body(12, .semibold))
-                            .foregroundStyle(SQColor.labelTertiary)
+                            .foregroundStyle(SQColor.labelSecondary)
                             .frame(width: 18)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(region.label)

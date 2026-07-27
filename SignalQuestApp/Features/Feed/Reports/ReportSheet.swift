@@ -40,7 +40,7 @@ struct ReportSheet: View {
                             }
                         }
                         .frame(maxWidth: .infinity)
-                        .foregroundStyle(SQColor.danger)
+                        .foregroundStyle(SQColor.dangerInk)
                     }
                     .disabled(isBusy)
                     .listRowBackground(SQColor.dangerSoft)

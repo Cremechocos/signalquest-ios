@@ -410,7 +410,7 @@ private struct StoryViewersSheet: View {
                                 if let viewedAt = entry.viewedAt {
                                     Text(viewedAt, format: .relative(presentation: .named, unitsStyle: .abbreviated))
                                         .font(SQType.caption)
-                                        .foregroundStyle(SQColor.labelTertiary)
+                                        .foregroundStyle(SQColor.labelSecondary)
                                 }
                             }
                         }

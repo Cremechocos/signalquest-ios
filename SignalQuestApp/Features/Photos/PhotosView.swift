@@ -1104,7 +1104,7 @@ struct PhotoShareSheet: View {
                     Section {
                         Text(errorMessage)
                             .font(SQType.caption)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                             .listRowBackground(SQColor.dangerSoft)
                     }
                 }
@@ -1206,7 +1206,7 @@ struct AntennaSitePickerSheet: View {
                     if let errorMessage {
                         Text(errorMessage)
                             .font(SQType.caption)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                             .padding(.horizontal, SQSpace.md)
                             .padding(.vertical, SQSpace.xs + 2)
                             .background(SQColor.dangerSoft, in: Capsule(style: .continuous))

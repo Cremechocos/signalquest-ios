@@ -580,7 +580,7 @@ struct PostPreviewCard: View {
                         Text("Maintenant")
                     }
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelTertiary)
+                    .foregroundStyle(SQColor.labelSecondary)
                 }
                 Spacer()
                 SQEditorialTag(
@@ -596,7 +596,7 @@ struct PostPreviewCard: View {
 
             Text(displayText)
                 .font(SQType.body)
-                .foregroundStyle(bodyTrimmed.isEmpty && image == nil && speedtest == nil ? SQColor.labelTertiary : SQColor.label)
+                .foregroundStyle(bodyTrimmed.isEmpty && image == nil && speedtest == nil ? SQColor.labelSecondary : SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.leading)
 
@@ -643,7 +643,7 @@ struct PostPreviewCard: View {
                         Text(op)
                             .font(SQType.caption)
                     }
-                    .foregroundStyle(SQColor.labelTertiary)
+                    .foregroundStyle(SQColor.labelSecondary)
                     .padding(.top, -2)
                 }
             }

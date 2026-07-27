@@ -235,7 +235,7 @@ struct AntennaReportThreadView: View {
                 .foregroundStyle(SQColor.labelSecondary)
             Text("L'équipe de modération te répondra ici. Tu peux ajouter des précisions ou des photos.")
                 .font(SQType.caption)
-                .foregroundStyle(SQColor.labelTertiary)
+                .foregroundStyle(SQColor.labelSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -277,7 +277,7 @@ struct AntennaReportThreadView: View {
                 if let date = comment.createdAt {
                     Text(date, format: .relative(presentation: .named, unitsStyle: .abbreviated))
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelTertiary)
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
             }
             if isTeam { Spacer(minLength: SQSpace.xxl) }

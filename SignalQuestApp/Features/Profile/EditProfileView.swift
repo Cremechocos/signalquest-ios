@@ -50,7 +50,7 @@ struct EditProfileView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Nom d’utilisateur")
                                         .font(SQType.micro)
-                                        .foregroundStyle(SQColor.labelTertiary)
+                                        .foregroundStyle(SQColor.labelSecondary)
                                     Text(currentHandle.isEmpty ? "Choisir un nom d’utilisateur" : "@\(currentHandle)")
                                         .font(SQType.body)
                                         .foregroundStyle(SQColor.label)
@@ -78,7 +78,7 @@ struct EditProfileView: View {
                             }
                         Text("\(bio.count)/\(Self.bioCharacterLimit)")
                             .font(SQType.micro)
-                            .foregroundStyle(SQColor.labelTertiary)
+                            .foregroundStyle(SQColor.labelSecondary)
                             .frame(maxWidth: .infinity, alignment: .trailing)
                     }
                     .sqFadeUp()
@@ -86,7 +86,7 @@ struct EditProfileView: View {
                     if let error {
                         Text(error)
                             .font(SQType.caption)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(SQSpace.md)
                             .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))

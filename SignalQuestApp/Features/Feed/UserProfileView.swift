@@ -429,7 +429,7 @@ struct UserProfileView: View {
                     if let createdAt = profile?.createdAt {
                         Text("Membre depuis \(createdAt, format: .dateTime.month(.wide).year())")
                             .font(SQType.micro)
-                            .foregroundStyle(SQColor.labelTertiary)
+                            .foregroundStyle(SQColor.labelSecondary)
                     }
                 }
                 Spacer()

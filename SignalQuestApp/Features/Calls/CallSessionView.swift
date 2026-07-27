@@ -39,7 +39,7 @@ struct CallScreen: View {
                 controls
                 Text("Audio et vidéo transportés par LiveKit.")
                     .font(SQType.micro)
-                    .foregroundStyle(SQColor.labelTertiary)
+                    .foregroundStyle(SQColor.labelSecondary)
                     .accessibilityLabel("Les appels utilisent le transport LiveKit")
             }
             .padding(.horizontal, SQSpace.lg)

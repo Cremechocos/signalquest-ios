@@ -253,7 +253,7 @@ private struct ANFRTimelineRow: View {
                     if entry.isCurrentSnapshot {
                         Text("Actuel")
                             .font(SQType.micro)
-                            .foregroundStyle(SQColor.brandRed)
+                            .foregroundStyle(SQColor.accentInk)
                             .padding(.horizontal, SQSpace.sm)
                             .padding(.vertical, 2)
                             .background(SQColor.accentSoft, in: Capsule(style: .continuous))

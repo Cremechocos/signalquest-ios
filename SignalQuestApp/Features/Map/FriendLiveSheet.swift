@@ -82,7 +82,7 @@ struct FriendLiveSheet: View {
                     VStack(alignment: .leading, spacing: SQSpace.xxs) {
                         Text(tile.label)
                             .font(SQFont.archivo(11, .semibold))
-                            .foregroundStyle(SQColor.labelTertiary)
+                            .foregroundStyle(SQColor.labelSecondary)
                         Text(tile.value)
                             .font(SQFont.display(17, .bold))
                             .foregroundStyle(SQColor.label)

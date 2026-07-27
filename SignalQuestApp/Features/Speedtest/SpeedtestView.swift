@@ -557,7 +557,7 @@ struct SpeedtestView: View {
                 if let trailing {
                     Text(trailing)
                         .font(SQType.micro)
-                        .foregroundStyle(SQColor.labelTertiary)
+                        .foregroundStyle(SQColor.labelSecondary)
                         .lineLimit(1)
                 }
             }
@@ -1548,7 +1548,7 @@ private struct SignatureSpeedDial: View {
                     let position = point(fraction: tick.fraction, radius: labelRadius)
                     Text(label)
                         .font(SQFont.body(10, .semibold))
-                        .foregroundStyle(reached ? SQColor.labelSecondary : SQColor.labelTertiary)
+                        .foregroundStyle(reached ? SQColor.labelSecondary : SQColor.labelSecondary)
                         .monospacedDigit()
                         .offset(x: position.x, y: position.y)
                 }
@@ -1941,7 +1941,7 @@ private struct SpeedtestServerPicker: View {
 
                             Text("\(group.targets.count)")
                                 .font(SQFont.body(11, .semibold))
-                                .foregroundStyle(SQColor.labelTertiary)
+                                .foregroundStyle(SQColor.labelSecondary)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 2)
                                 .background(SQColor.fill, in: Capsule(style: .continuous))
@@ -2071,7 +2071,7 @@ private struct SpeedtestServerPicker: View {
                         .foregroundStyle(SQColor.label)
                     Text("\(libreSpeedServers.count)")
                         .font(SQFont.body(11, .semibold))
-                        .foregroundStyle(SQColor.labelTertiary)
+                        .foregroundStyle(SQColor.labelSecondary)
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(SQColor.fill, in: Capsule(style: .continuous))
                     Spacer(minLength: 6)
@@ -2148,7 +2148,7 @@ private struct SpeedtestServerPicker: View {
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(title).font(SQFont.body(14, .semibold)).foregroundStyle(SQColor.label).lineLimit(1)
-                Text(subtitle).font(SQType.micro).foregroundStyle(SQColor.labelTertiary).lineLimit(1)
+                Text(subtitle).font(SQType.micro).foregroundStyle(SQColor.labelSecondary).lineLimit(1)
             }
             Spacer(minLength: 8)
             Image(systemName: selected ? "checkmark.circle.fill" : "circle")

@@ -293,7 +293,7 @@ struct SignalQuestHomeView: View {
                         )
                     if badgeCount > 0 {
                         Text("\(min(badgeCount, 99))")
-                            .font(SQFont.bodyFixed(11, .bold))
+                            .font(SQFont.body(11, .bold))
                             .foregroundStyle(SQColor.onAccent)
                             .frame(minWidth: 18, minHeight: 18)
                             .background(SQColor.brandRed, in: Circle())
@@ -441,7 +441,7 @@ struct SignalQuestHomeView: View {
                     Circle().fill(TechAccent.color(for: measure.tech))
                     if let label = Self.techShortLabel(measure.tech) {
                         Text(label)
-                            .font(SQFont.bodyFixed(12, .bold))
+                            .font(SQFont.body(12, .bold))
                             .foregroundStyle(SQColor.onAccent)
                     } else {
                         // Techno inconnue (ex. « CELLULAR » brut) : icône antenne.

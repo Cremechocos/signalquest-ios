@@ -356,13 +356,13 @@ struct SettingsView: View {
                 Button(role: .destructive) { showDeleteConfirm = true } label: {
                     Label("Supprimer mon compte", systemImage: "trash")
                         .font(SQType.heading)
-                        .foregroundStyle(SQColor.danger)
+                        .foregroundStyle(SQColor.dangerInk)
                         .frame(maxWidth: .infinity)
                 }
             }
             .listRowBackground(SQColor.dangerSoft)
             if let error = model.errorMessage {
-                Section { Text(error).foregroundStyle(SQColor.danger) }
+                Section { Text(error).foregroundStyle(SQColor.dangerInk) }
                     .listRowBackground(SQColor.dangerSoft)
             }
         }
@@ -505,7 +505,7 @@ struct ChangePasswordView: View {
             }
             .listRowBackground(SQColor.surface)
             if let error {
-                Section { Text(error).foregroundStyle(SQColor.danger) }
+                Section { Text(error).foregroundStyle(SQColor.dangerInk) }
                     .listRowBackground(SQColor.dangerSoft)
             }
             if success {

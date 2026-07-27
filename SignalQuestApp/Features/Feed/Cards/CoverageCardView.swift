@@ -80,7 +80,7 @@ struct CoverageCardView: View {
                 if let footer = footer {
                     Text(footer)
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelTertiary)
+                        .foregroundStyle(SQColor.labelSecondary)
                         .lineLimit(2)
                 }
 

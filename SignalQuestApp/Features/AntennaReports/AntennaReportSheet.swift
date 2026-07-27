@@ -85,7 +85,7 @@ struct AntennaReportSheet: View {
                 }
 
                 if let error {
-                    Section { Text(error).foregroundStyle(SQColor.danger) }
+                    Section { Text(error).foregroundStyle(SQColor.dangerInk) }
                         .listRowBackground(SQColor.dangerSoft)
                 }
 
@@ -102,7 +102,7 @@ struct AntennaReportSheet: View {
                             }
                         }
                         .frame(maxWidth: .infinity)
-                        .foregroundStyle(SQColor.brandRed)
+                        .foregroundStyle(SQColor.accentInk)
                     }
                     .disabled(isBusy)
                     .listRowBackground(SQColor.accentSoft)

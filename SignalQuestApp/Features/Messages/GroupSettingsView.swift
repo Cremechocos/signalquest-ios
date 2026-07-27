@@ -152,13 +152,13 @@ struct GroupSettingsView: View {
                     } label: {
                         Label("Quitter le groupe", systemImage: "rectangle.portrait.and.arrow.right")
                             .font(SQType.body.weight(.medium))
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                     }
                 }
                 .listRowBackground(SQColor.dangerSoft)
 
                 if let errorMessage {
-                    Section { Text(errorMessage).font(SQType.caption).foregroundStyle(SQColor.danger) }
+                    Section { Text(errorMessage).font(SQType.caption).foregroundStyle(SQColor.dangerInk) }
                         .listRowBackground(SQColor.dangerSoft)
                 }
             }

@@ -89,7 +89,7 @@ struct NearbyOperatorComparisonSheet: View {
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
             HStack(spacing: SQSpace.sm) {
                 Text("\(rank)")
-                    .font(SQFont.bodyFixed(13, .bold))
+                    .font(SQFont.body(13, .bold))
                     .foregroundStyle(isLeader ? SQColor.onAccent : SQColor.labelSecondary)
                     .frame(width: 24, height: 24)
                     .background(isLeader ? color : SQColor.surfaceMuted, in: Circle())
@@ -122,7 +122,7 @@ struct NearbyOperatorComparisonSheet: View {
             .frame(height: 8)
             Text(detailText(stat))
                 .font(SQFont.body(11.5))
-                .foregroundStyle(SQColor.labelTertiary)
+                .foregroundStyle(SQColor.labelSecondary)
         }
         .padding(SQSpace.md)
         .background(
@@ -142,7 +142,7 @@ struct NearbyOperatorComparisonSheet: View {
             Image(systemName: "person.3.fill").font(.caption).foregroundStyle(SQColor.labelTertiary)
             Text("\(totalSamples) mesure\(totalSamples > 1 ? "s" : "") au total · rayon \(radiusText)")
                 .font(SQFont.body(12))
-                .foregroundStyle(SQColor.labelTertiary)
+                .foregroundStyle(SQColor.labelSecondary)
         }
         .frame(maxWidth: .infinity)
     }

@@ -163,7 +163,7 @@ struct PrivacySettingsView: View {
             .listRowBackground(SQColor.surface)
 
             if let error = model.errorMessage {
-                Section { Text(error).foregroundStyle(SQColor.danger) }
+                Section { Text(error).foregroundStyle(SQColor.dangerInk) }
                     .listRowBackground(SQColor.dangerSoft)
             }
             if model.savedConfirmation {

@@ -108,7 +108,7 @@ struct ProfileView: View {
                     .accessibilityIdentifier("profile.displayName")
                 Text(user.handle.flatMap { $0.isEmpty ? nil : "@\($0)" } ?? "Ajoute un nom d’utilisateur")
                     .font(SQFont.body(14, .medium))
-                    .foregroundStyle((user.handle?.isEmpty ?? true) ? SQColor.labelTertiary : SQColor.labelSecondary)
+                    .foregroundStyle((user.handle?.isEmpty ?? true) ? SQColor.labelSecondary : SQColor.labelSecondary)
             }
             if user.twoFactorEnabled == true {
                 Text("2FA activée ✓")

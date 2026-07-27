@@ -124,7 +124,7 @@ struct CallHistoryView: View {
                                 Text(duration)
                                     .font(SQType.micro)
                                     .monospacedDigit()
-                                    .foregroundStyle(SQColor.labelTertiary)
+                                    .foregroundStyle(SQColor.labelSecondary)
                             }
                         }
                         Image(systemName: call.mode == "video" ? "video.fill" : "phone.fill")

@@ -104,7 +104,7 @@ struct AntennaReportsListView: View {
                     if let date = report.createdAt {
                         Text(date, format: .relative(presentation: .named))
                             .font(SQFont.body(11.5, relativeTo: .caption2))
-                            .foregroundStyle(SQColor.labelTertiary)
+                            .foregroundStyle(SQColor.labelSecondary)
                     }
                 }
                 Spacer(minLength: 0)

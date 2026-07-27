@@ -47,7 +47,7 @@ struct ShareCardBubble: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(badge)
                         .font(SQType.micro)
-                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.75) : SQColor.labelTertiary)
+                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.75) : SQColor.labelSecondary)
                     Text(card.title)
                         .font(SQFont.body(14, .semibold))
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
@@ -232,7 +232,7 @@ struct SharedPostCardBubble: View {
                     .lineLimit(1)
                 Text(sourceLine)
                     .font(SQType.micro)
-                    .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary)
+                    .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
@@ -297,7 +297,7 @@ struct SharedPostCardBubble: View {
                     .foregroundStyle(mine ? SQColor.onAccent : tint)
                 Text(unit)
                     .font(SQType.micro)
-                    .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary)
+                    .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
             }
             if !visibleChips.isEmpty {
                 Text(visibleChips.joined(separator: " · "))
@@ -385,7 +385,7 @@ struct LocationBubble: View {
                             .lineLimit(1)
                         Text("Ouvrir dans Plans · \(coordinateText)")
                             .font(SQType.micro)
-                            .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary)
+                            .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 0)

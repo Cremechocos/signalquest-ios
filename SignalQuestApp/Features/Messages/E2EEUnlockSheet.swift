@@ -59,7 +59,10 @@ struct E2EEUnlockSheet: View {
                         if needsCreation {
                             Label("6 caractères minimum. Ce mot de passe ne quitte jamais ton appareil.", systemImage: "info.circle")
                                 .font(SQFont.body(11.5))
-                                .foregroundStyle(SQColor.labelTertiary)
+                                // `Label` porte du texte : `labelTertiary` est
+                                // désormais réservé aux éléments graphiques (3:1),
+                                // pas au texte courant (4,5:1).
+                                .foregroundStyle(SQColor.labelSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
 

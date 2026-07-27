@@ -451,7 +451,7 @@ struct AntennaDetailSheet: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("PCI")
                                     .font(SQType.micro)
-                                    .foregroundStyle(SQColor.labelTertiary)
+                                    .foregroundStyle(SQColor.labelSecondary)
                                 ForEach(core.cellIdentifiers.pci.prefix(8)) { pci in
                                     detailRow(
                                         pci.value,
@@ -464,7 +464,7 @@ struct AntennaDetailSheet: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Cell ID")
                                     .font(SQType.micro)
-                                    .foregroundStyle(SQColor.labelTertiary)
+                                    .foregroundStyle(SQColor.labelSecondary)
                                 ForEach(core.cellIdentifiers.cellId.prefix(8)) { cell in
                                     detailRow(
                                         cell.value,
@@ -488,7 +488,7 @@ struct AntennaDetailSheet: View {
                                     Spacer()
                                     Text(carrier.source ?? "Officiel")
                                         .font(SQType.micro)
-                                        .foregroundStyle(SQColor.labelTertiary)
+                                        .foregroundStyle(SQColor.labelSecondary)
                                 }
                                 detailRow("Fréquences", [carrier.txFrequencyMhz.map { "\($0) MHz TX" }, carrier.rxFrequencyMhz.map { "\($0) MHz RX" }].compactMap { $0 }.joined(separator: " · "))
                                 detailRow("Bande passante", carrier.bandwidthMhz.map { "\($0) MHz" })

@@ -166,7 +166,7 @@ struct MyMeasurementsView: View {
             )
             Text("Lance un Drive Test pour enregistrer tes premières mesures.")
                 .font(SQType.caption)
-                .foregroundStyle(SQColor.labelTertiary)
+                .foregroundStyle(SQColor.labelSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, SQSpace.xl)
         }

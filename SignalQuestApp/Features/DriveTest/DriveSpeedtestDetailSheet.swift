@@ -113,7 +113,7 @@ struct DriveSpeedtestDetailSheet: View {
                 Text(value).font(SQFont.display(24, .bold)).monospacedDigit().foregroundStyle(SQColor.label)
                 Text(unit).font(SQFont.body(11)).foregroundStyle(SQColor.labelSecondary)
             }
-            Text(detail).font(SQFont.body(11)).foregroundStyle(SQColor.labelTertiary).lineLimit(1)
+            Text(detail).font(SQFont.body(11)).foregroundStyle(SQColor.labelSecondary).lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SQSpace.md)

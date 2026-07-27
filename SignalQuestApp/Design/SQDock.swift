@@ -71,7 +71,9 @@ struct SQDock: View {
                         .frame(height: 22)
                     if badge > 0 {
                         Text(verbatim: badge > 99 ? "99+" : "\(badge)")
-                            .font(SQFont.bodyFixed(9, .bold))
+                            // `bodyFixed` ne suit PAS Dynamic Type. Sur un
+                            // badge de 9 pt, c'est illisible en basse vision.
+                            .font(SQFont.body(9, .bold))
                             .foregroundStyle(SQColor.onAccent)
                             .padding(.horizontal, 4)
                             .frame(minWidth: 15, minHeight: 15)
@@ -80,12 +82,16 @@ struct SQDock: View {
                     }
                 }
                 Text(item.label)
-                    .font(SQFont.bodyFixed(9.5, .semibold))
+                    // Idem : les libellés du dock — navigation PRINCIPALE de
+                    // l'app — étaient figés à 9,5 pt quelle que soit la taille
+                    // de texte choisie par l'utilisateur.
+                    .font(SQFont.body(9.5, .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
             .padding(.vertical, 7)
             .frame(maxWidth: .infinity)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
             .foregroundStyle(isActive ? SQColor.brandRed : SQColor.dockInactive)
             .background {
                 if isActive {
@@ -140,17 +146,7 @@ private extension View {
     /// rendrait laiteux.
     @ViewBuilder
     func sqDockChrome() -> some View {
-        if #available(iOS 26.0, *) {
-            self.background { SQGlassCapsuleBackground() }
-        } else {
-            self
-                .background {
-                    Capsule(style: .continuous)
-                        .fill(SQColor.dockBackground)
-                        .background(.ultraThinMaterial, in: Capsule(style: .continuous))
-                }
-                .sqShadowDock()
-        }
+        modifier(SQDockChrome())
     }
 }
 
@@ -266,5 +262,35 @@ extension View {
     /// Rétraction du dock au scroll (voir `SQDockAutoMinimize`).
     func sqDockAutoMinimize() -> some View {
         modifier(SQDockAutoMinimize())
+    }
+}
+
+
+/// Habillage du dock, sensible à « Réduire la transparence ».
+///
+/// Le réglage système n'était honoré nulle part : le dock restait translucide
+/// quel que soit le choix de l'utilisateur, alors que ce réglage existe
+/// précisément pour les personnes que la superposition gêne.
+private struct SQDockChrome: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    func body(content: Content) -> some View {
+        if reduceTransparency {
+            content
+                .background {
+                    Capsule(style: .continuous).fill(SQColor.surface)
+                }
+                .sqShadowDock()
+        } else if #available(iOS 26.0, *) {
+            content.background { SQGlassCapsuleBackground() }
+        } else {
+            content
+                .background {
+                    Capsule(style: .continuous)
+                        .fill(SQColor.dockBackground)
+                        .background(.ultraThinMaterial, in: Capsule(style: .continuous))
+                }
+                .sqShadowDock()
+        }
     }
 }

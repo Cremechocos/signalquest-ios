@@ -163,7 +163,7 @@ struct CommentsSheet: View {
                         if let created = comment.createdAt {
                             Text(created, format: .relative(presentation: .named, unitsStyle: .abbreviated))
                                 .font(SQType.caption)
-                                .foregroundStyle(SQColor.labelTertiary)
+                                .foregroundStyle(SQColor.labelSecondary)
                         }
                     }
                     Text(comment.text)

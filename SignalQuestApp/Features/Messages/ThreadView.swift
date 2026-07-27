@@ -34,7 +34,7 @@ struct ThreadView: View {
                         } else if replies.isEmpty {
                             Text("Aucune réponse pour l'instant. Lance le fil.")
                                 .font(SQType.caption)
-                                .foregroundStyle(SQColor.labelTertiary)
+                                .foregroundStyle(SQColor.labelSecondary)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, SQSpace.lg)
                         } else {
@@ -77,7 +77,7 @@ struct ThreadView: View {
                     if let date = source.createdAt {
                         Text(date.formatted(date: .abbreviated, time: .shortened))
                             .font(SQType.micro)
-                            .foregroundStyle(SQColor.labelTertiary)
+                            .foregroundStyle(SQColor.labelSecondary)
                     }
                 }
             }

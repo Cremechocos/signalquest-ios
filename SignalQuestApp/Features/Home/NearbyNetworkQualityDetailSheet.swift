@@ -118,7 +118,7 @@ struct NearbyNetworkQualityDetailSheet: View {
                 if band == .unknown {
                     Text("Pas assez de mesures")
                         .font(SQFont.body(11.5, .semibold))
-                        .foregroundStyle(SQColor.labelTertiary)
+                        .foregroundStyle(SQColor.labelSecondary)
                 } else {
                     Text(band.title)
                         .font(SQFont.body(11.5, .bold))
@@ -173,7 +173,7 @@ struct NearbyNetworkQualityDetailSheet: View {
             Image(systemName: "person.3.fill").font(.caption).foregroundStyle(SQColor.labelTertiary)
             Text("\(quality.sampleCount) mesure\(quality.sampleCount > 1 ? "s" : "") de la communauté · rayon \(radiusText)")
                 .font(SQFont.body(12))
-                .foregroundStyle(SQColor.labelTertiary)
+                .foregroundStyle(SQColor.labelSecondary)
         }
         .frame(maxWidth: .infinity)
     }

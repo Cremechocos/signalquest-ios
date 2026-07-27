@@ -212,7 +212,7 @@ struct FriendsListView: View {
                 Section {
                     Text(error)
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.danger)
+                        .foregroundStyle(SQColor.dangerInk)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(SQSpace.md + 2)
                         .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))

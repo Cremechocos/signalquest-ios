@@ -97,7 +97,7 @@ struct MessageSearchView: View {
                         if let date = message.createdAt {
                             Text(date.formatted(date: .abbreviated, time: .shortened))
                                 .font(SQType.micro)
-                                .foregroundStyle(SQColor.labelTertiary)
+                                .foregroundStyle(SQColor.labelSecondary)
                         }
                     }
                     Text(snippet(for: message))

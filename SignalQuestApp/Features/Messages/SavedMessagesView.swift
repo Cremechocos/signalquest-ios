@@ -70,7 +70,7 @@ struct SavedMessagesView: View {
                         .accessibilityHidden(true)
                     Text(conversationLabel(entry))
                         .font(SQType.micro)
-                        .foregroundStyle(SQColor.labelTertiary)
+                        .foregroundStyle(SQColor.labelSecondary)
                         .lineLimit(1)
                 }
                 Text(snippet(message))
@@ -87,7 +87,7 @@ struct SavedMessagesView: View {
                     if let savedAt = entry.savedAt {
                         Text("· enregistré le \(savedAt.formatted(.dateTime.day().month(.abbreviated).hour().minute()))")
                             .font(SQType.micro)
-                            .foregroundStyle(SQColor.labelTertiary)
+                            .foregroundStyle(SQColor.labelSecondary)
                     }
                 }
             }

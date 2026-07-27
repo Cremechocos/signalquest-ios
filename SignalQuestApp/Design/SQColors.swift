@@ -37,8 +37,16 @@ enum SQColor {
 
     // MARK: Texte sur aplats
 
-    /// Texte posé sur une surface accent (brique) : crème dans les deux modes.
-    static let onAccent = Color(red: 0xFB / 255, green: 0xF7 / 255, blue: 0xEF / 255)
+    /// Texte posé sur une surface accent (brique).
+    ///
+    /// Était crème dans LES DEUX modes. Or `brandRed` s'éclaircit en sombre
+    /// (`#D97A66`) : du crème dessus tombait à **2,84:1**, très en dessous du
+    /// seuil AA — et c'est le bouton principal de l'app (`GradientButton`
+    /// `.accent`). L'encre nuit y remonte à 6,03:1. Même bascule que `onInk`,
+    /// qui traite déjà ce cas symétrique.
+    static let onAccent = dynamicTint(
+        light: (0xFB, 0xF7, 0xEF, 1.0), dark: (0x19, 0x14, 0x10, 1.0)
+    )
     /// Texte posé sur le bouton encre (`label`) : crème en clair, nuit en sombre.
     static let onInk = dynamicTint(
         light: (0xFB, 0xF7, 0xEF, 1.0), dark: (0x19, 0x14, 0x10, 1.0)
@@ -62,6 +70,27 @@ enum SQColor {
     /// Ambre à 14 % (18 % en sombre) : avertissements teintés.
     static let warningSoft = dynamicTint(
         light: (0xC0, 0x8A, 0x3E, 0.14), dark: (0xDC, 0xA9, 0x5E, 0.18)
+    )
+
+    // MARK: Encres pour texte posé SUR une pastille teintée
+    //
+    // Poser `brandRed` sur `accentSoft` donne 4,28:1, et `danger` sur
+    // `dangerSoft` 4,33:1 — juste sous le seuil AA de 4,5:1 pour du texte
+    // courant. Ces deux encres, légèrement plus contrastées, sont à utiliser
+    // À LA PLACE de la couleur pleine quand le texte est sur sa propre pastille.
+    // `success` et `warning` n'en ont pas besoin : ils passent déjà AA (4,62 et
+    // 4,68) depuis que leurs valeurs ont été assombries.
+    //
+    // Règle : `.foregroundStyle(SQColor.accentInk)` dès qu'on est sur
+    // `SQColor.accentSoft` ; `SQColor.brandRed` sur un fond de surface normal.
+
+    /// Brique lisible sur `accentSoft` (4,76:1 en clair, 4,72:1 en sombre).
+    static let accentInk = dynamicTint(
+        light: (0xA6, 0x44, 0x37, 1.0), dark: (0xE0, 0x8A, 0x78, 1.0)
+    )
+    /// Danger lisible sur `dangerSoft` (4,90:1 en clair, 5,08:1 en sombre).
+    static let dangerInk = dynamicTint(
+        light: (0xB3, 0x36, 0x28, 1.0), dark: (0xE8, 0x8D, 0x7C, 1.0)
     )
 
     // MARK: Surfaces spéciales

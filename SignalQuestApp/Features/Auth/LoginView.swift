@@ -135,7 +135,7 @@ struct LoginView: View {
     private var legalFooter: some View {
         HStack(spacing: SQSpace.xs) {
             Link("Conditions d’utilisation", destination: AppConfig.current.termsURL)
-            Text("·").foregroundStyle(SQColor.labelTertiary)
+            Text("·").foregroundStyle(SQColor.labelSecondary)
             Link("Confidentialité", destination: AppConfig.current.privacyURL)
         }
         .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))

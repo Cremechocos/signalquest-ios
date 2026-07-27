@@ -207,7 +207,7 @@ struct ConversationDetailView: View {
                                 if let stamp {
                                     Text(stamp)
                                         .font(SQType.caption)
-                                        .foregroundStyle(SQColor.labelTertiary)
+                                        .foregroundStyle(SQColor.labelSecondary)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, SQSpace.sm)
                                 }
@@ -683,7 +683,7 @@ struct ConversationDetailView: View {
                 if message.editedAt != nil { Text("modifié") }
             }
             .font(SQFont.body(10.5))
-            .foregroundStyle(SQColor.labelTertiary)
+            .foregroundStyle(SQColor.labelSecondary)
         }
     }
 
@@ -730,7 +730,7 @@ struct ConversationDetailView: View {
                 if message.deletedAt != nil {
                     Text("Message supprimé")
                         .font(SQType.caption.italic())
-                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary)
+                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
                 } else if let shareCard = card {
                     // Partage envoyé par Android (publication / signal / speedtest / session…).
                     // La publication (`social_post`) est testée EN PREMIER car elle peut
@@ -877,7 +877,7 @@ struct ConversationDetailView: View {
                 Text("Échec de l’envoi · Renvoyer")
                     .font(SQType.micro.weight(.semibold))
             }
-            .foregroundStyle(SQColor.danger)
+            .foregroundStyle(SQColor.dangerInk)
             .padding(.horizontal, SQSpace.sm + 2)
             .padding(.vertical, 5)
             .background(SQColor.dangerSoft, in: Capsule(style: .continuous))
@@ -1169,7 +1169,7 @@ struct ConversationDetailView: View {
                         .truncationMode(.middle)
                     Text(fileMetaLine(attachment))
                         .font(SQType.micro)
-                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary)
+                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: SQSpace.sm)
@@ -1260,7 +1260,7 @@ struct ConversationDetailView: View {
             if !seenBy.isEmpty {
                 Text("Vu par \(seenBy.compactMap { $0.name }.joined(separator: ", "))")
                     .font(SQType.micro)
-                    .foregroundStyle(SQColor.labelTertiary)
+                    .foregroundStyle(SQColor.labelSecondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .padding(.top, SQSpace.xs)
             }

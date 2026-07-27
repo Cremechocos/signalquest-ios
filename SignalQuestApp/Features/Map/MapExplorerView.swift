@@ -1969,7 +1969,7 @@ struct MapExplorerView: View {
                     .background { mapGlassBackground(Circle()) }
                 if activeFilterCount > 0 {
                     Text("\(activeFilterCount)")
-                        .font(SQFont.bodyFixed(10, .bold))
+                        .font(SQFont.body(10, .bold))
                         .frame(minWidth: 17, minHeight: 17)
                         .background(SQColor.brandRed, in: Circle())
                         .foregroundStyle(SQColor.onAccent)

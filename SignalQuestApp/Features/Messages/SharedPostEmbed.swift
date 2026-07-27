@@ -240,7 +240,7 @@ struct SharedPostEmbedBubble: View {
                     .lineLimit(1)
                 Text(sourceLine(item))
                     .font(SQType.micro)
-                    .foregroundStyle(SQColor.labelTertiary)
+                    .foregroundStyle(SQColor.labelSecondary)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
@@ -417,7 +417,7 @@ struct SharedPostEmbedBubble: View {
                     .foregroundStyle(measure.tint)
                 Text(measure.unit)
                     .font(SQType.micro)
-                    .foregroundStyle(SQColor.labelTertiary)
+                    .foregroundStyle(SQColor.labelSecondary)
             }
             if !measure.chips.isEmpty {
                 Text(measure.chips.prefix(3).joined(separator: " · "))

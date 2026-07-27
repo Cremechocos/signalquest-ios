@@ -32,7 +32,7 @@ struct PollBubble: View {
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                     Text(metaLine)
                         .font(SQType.micro)
-                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary)
+                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
                 }
                 Spacer(minLength: 0)
                 if effectivelyClosed {

@@ -214,7 +214,7 @@ struct MapPhotoViewer: View {
                 if let date = comment.createdAt {
                     Text(date.formatted(.relative(presentation: .numeric)))
                         .font(SQFont.body(11, .regular))
-                        .foregroundStyle(SQColor.labelTertiary)
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
             }
             Text(comment.content ?? "")

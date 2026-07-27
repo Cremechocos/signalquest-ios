@@ -51,7 +51,7 @@ struct SignupView: View {
 
                     HStack(spacing: SQSpace.md) {
                         Link("Conditions d’utilisation", destination: Self.termsURL)
-                        Text("·").foregroundStyle(SQColor.labelTertiary)
+                        Text("·").foregroundStyle(SQColor.labelSecondary)
                         Link("Politique de confidentialité", destination: Self.privacyURL)
                     }
                     .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
