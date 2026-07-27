@@ -14343,6 +14343,106 @@
           }
         }
       }
+    },
+    "Pour toi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For you"
+          }
+        }
+      }
+    },
+    "Récent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latest"
+          }
+        }
+      }
+    },
+    "Enregistrés": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved"
+          }
+        }
+      }
+    },
+    "Filtres du fil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feed filters"
+          }
+        }
+      }
+    },
+    "Lance quelques speedtests et suis des membres : les recommandations arrivent vite.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run a few speedtests and follow members: recommendations arrive quickly."
+          }
+        }
+      }
+    },
+    "Aucune publication récente pour l'instant.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No recent posts yet."
+          }
+        }
+      }
+    },
+    "Tu ne suis encore personne. Explore les profils pour remplir cet onglet.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You don't follow anyone yet. Explore profiles to fill this tab."
+          }
+        }
+      }
+    },
+    "Aucune publication de tes amis pour l'instant.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No posts from your friends yet."
+          }
+        }
+      }
+    },
+    "Aucune mesure ni identification partagée récemment.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No measurement or identification shared recently."
+          }
+        }
+      }
+    },
+    "Touche le marque-page d'une publication pour la retrouver ici.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap a post's bookmark to find it here."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -110,7 +110,7 @@ final class ExploreViewModel: ObservableObject {
         isLoadingHashtag = true
         defer { isLoadingHashtag = false }
         do {
-            let page = try await service.loadFeed(cursor: nil, hashtag: tag)
+            let page = try await service.loadFeed(cursor: nil, hashtag: tag, tab: nil)
             guard selectedHashtag == tag else { return }
             hashtagItems = page.items
             hashtagCursor = page.nextCursor
@@ -127,7 +127,7 @@ final class ExploreViewModel: ObservableObject {
         isLoadingMoreHashtag = true
         defer { isLoadingMoreHashtag = false }
         do {
-            let page = try await service.loadFeed(cursor: cursor, hashtag: tag)
+            let page = try await service.loadFeed(cursor: cursor, hashtag: tag, tab: nil)
             guard selectedHashtag == tag else { return }
             let known = Set(hashtagItems.map(\.id))
             hashtagItems.append(contentsOf: page.items.filter { !known.contains($0.id) })

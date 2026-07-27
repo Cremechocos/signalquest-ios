@@ -1,7 +1,7 @@
 import Foundation
 
 protocol SocialFeedServicing: Sendable {
-    func loadFeed(cursor: String?, hashtag: String?) async throws -> SocialFeedPage
+    func loadFeed(cursor: String?, hashtag: String?, tab: FeedTab?) async throws -> SocialFeedPage
     /// Récupère un post unique (deep-link / notification) par son identifiant.
     func post(id: String) async throws -> UnifiedSocialFeedItem?
     func createPost(
@@ -89,11 +89,18 @@ final class SocialFeedService: SocialFeedServicing {
         raw.hasPrefix("post-") ? String(raw.dropFirst("post-".count)) : raw
     }
 
-    func loadFeed(cursor: String? = nil, hashtag: String? = nil) async throws -> SocialFeedPage {
+    /// `tab` porte le couple filtre/classement. Les valeurs par défaut
+    /// reproduisent exactement l'ancien comportement (`all` + `smart`), pour que
+    /// les appelants non migrés soient inchangés.
+    func loadFeed(
+        cursor: String? = nil,
+        hashtag: String? = nil,
+        tab: FeedTab? = nil
+    ) async throws -> SocialFeedPage {
         var query = [
             URLQueryItem(name: "limit", value: "20"),
-            URLQueryItem(name: "filter", value: "all"),
-            URLQueryItem(name: "ranking", value: "smart"),
+            URLQueryItem(name: "filter", value: tab?.filter ?? "all"),
+            URLQueryItem(name: "ranking", value: tab?.ranking ?? "smart"),
             URLQueryItem(name: "include", value: "items,stories,trends,suggestions")
         ]
         if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }

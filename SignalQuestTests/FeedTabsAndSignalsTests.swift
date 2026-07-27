@@ -1,0 +1,148 @@
+import XCTest
+@testable import SignalQuest
+
+/// Le fil envoyait `filter=all` + `ranking=smart` en dur alors que le serveur
+/// accepte 11 filtres et 3 classements. Ces tests figent la correspondance : une
+/// valeur inventée côté client ne produit pas d'erreur visible, juste un fil qui
+/// ignore silencieusement l'onglet choisi.
+final class FeedTabsTests: XCTestCase {
+
+    /// Valeurs acceptées par `/api/social/feed` (schéma zod du backend).
+    private let validFilters: Set<String> = [
+        "all", "posts", "telecom", "media", "following", "friends",
+        "mine", "liked", "reposted", "saved", "followed-hashtags"
+    ]
+    private let validRankings: Set<String> = ["smart", "latest", "foryou"]
+
+    func testEveryTabMapsToParametersTheServerAccepts() {
+        for tab in FeedTab.allCases {
+            XCTAssertTrue(validFilters.contains(tab.filter), "\(tab): filtre « \(tab.filter) » inconnu du serveur")
+            XCTAssertTrue(validRankings.contains(tab.ranking), "\(tab): classement « \(tab.ranking) » inconnu du serveur")
+        }
+    }
+
+    /// « Pour toi » est le seul à demander le classement personnalisé — c'est ce
+    /// qui justifie de collecter les signaux d'engagement.
+    func testOnlyForYouRequestsThePersonalisedRanking() {
+        let personalised = FeedTab.allCases.filter { $0.ranking == "foryou" }
+        XCTAssertEqual(personalised, [.forYou])
+    }
+
+    /// « Récent » doit être strictement chronologique : `smart` réordonnerait.
+    func testLatestIsChronological() {
+        XCTAssertEqual(FeedTab.latest.ranking, "latest")
+    }
+
+    /// Deux onglets qui enverraient le MÊME couple afficheraient la même liste —
+    /// l'utilisateur croirait à un bug.
+    func testNoTwoTabsProduceTheSameRequest() {
+        let pairs = FeedTab.allCases.map { "\($0.filter)|\($0.ranking)" }
+        XCTAssertEqual(Set(pairs).count, pairs.count, "Onglets indiscernables : \(pairs)")
+    }
+
+    /// Un état vide générique (« Ton fil est encore vide ») est faux sur
+    /// « Amis » quand on n'a pas d'amis : chaque onglet explique SA vacuité.
+    func testEachTabExplainsItsOwnEmptiness() {
+        let messages = FeedTab.allCases.map(\.emptyMessage)
+        XCTAssertEqual(Set(messages).count, messages.count)
+        for message in messages { XCTAssertGreaterThan(message.count, 20) }
+    }
+}
+
+/// Le collecteur alimente le classement « Pour toi ». Ses défauts sont
+/// silencieux : trop de signaux fausse le modèle, trop peu le prive de données,
+/// et rien ne le signale à l'écran.
+final class FeedSignalsCollectorTests: XCTestCase {
+
+    /// Boîte ACTEUR pour les corps capturés : `NSLock` est interdit en contexte
+    /// asynchrone sous Swift 6, et le collecteur envoie depuis une `Task`.
+    private actor Recorder {
+        private(set) var bodies: [Data] = []
+        func append(_ data: Data) { bodies.append(data) }
+    }
+
+    /// Client factice : capture les corps envoyés sans réseau.
+    private final class SpyAPI: APIClientProtocol, @unchecked Sendable {
+        let recorder = Recorder()
+
+        func request<T: Decodable>(_ endpoint: APIEndpoint, as type: T.Type) async throws -> T {
+            throw APIError.http(status: 500, code: nil, message: "", requestId: nil, retryAfter: nil)
+        }
+        func request(_ endpoint: APIEndpoint) async throws {
+            await recorder.append(endpoint.body ?? Data())
+        }
+        func uploadMultipart<T: Decodable>(
+            path: String, fields: [String: String], fileField: String,
+            fileName: String, mimeType: String, data: Data, as type: T.Type
+        ) async throws -> T {
+            throw APIError.http(status: 500, code: nil, message: "", requestId: nil, retryAfter: nil)
+        }
+    }
+
+    private struct Batch: Decodable {
+        struct Signal: Decodable { let postId: String; let signalType: String }
+        let signals: [Signal]
+    }
+
+    private func decode(_ api: SpyAPI) async -> [Batch.Signal] {
+        await api.recorder.bodies
+            .compactMap { try? JSONDecoder().decode(Batch.self, from: $0) }
+            .flatMap(\.signals)
+    }
+
+    /// Le défaut le plus coûteux : une cellule qui réapparaît au défilement
+    /// enverrait une vue de plus à chaque passage, et gonflerait le score du
+    /// post proportionnellement au nombre d'allers-retours.
+    func testAViewIsSentOnlyOncePerPost() async {
+        let api = SpyAPI()
+        let collector = FeedSignalsCollector(api: api)
+        for _ in 0..<5 { await collector.onVisibleItems(["p1"]) }
+        await collector.flushNow()
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        let views = await decode(api).filter { $0.signalType == "view" }
+        XCTAssertEqual(views.count, 1, "\(views.count) vues envoyées pour un seul post")
+    }
+
+    /// Un post à peine croisé au défilement rapide ne doit pas compter comme lu.
+    func testDwellIsNotReportedBelowTheThreshold() async {
+        let api = SpyAPI()
+        let collector = FeedSignalsCollector(api: api)
+        await collector.onVisibleItems(["p1"])
+        await collector.onVisibleItems([])          // sort immédiatement du viewport
+        await collector.flushNow()
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        let signals = await decode(api)
+        XCTAssertTrue(signals.allSatisfy { $0.signalType != "dwell" })
+    }
+
+    func testExplicitActionsAreRecorded() async {
+        let api = SpyAPI()
+        let collector = FeedSignalsCollector(api: api)
+        await collector.record(postId: "p1", type: "like")
+        await collector.record(postId: "p1", type: "share")
+        await collector.flushNow()
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        let types = Set(await decode(api).map(\.signalType))
+        XCTAssertEqual(types, ["like", "share"])
+    }
+
+    /// Un vidage à vide ne doit pas produire de requête : le fil est consulté
+    /// souvent, et une requête inutile par passage en arrière-plan se paierait
+    /// en batterie.
+    func testFlushingAnEmptyBufferSendsNothing() async {
+        let api = SpyAPI()
+        let collector = FeedSignalsCollector(api: api)
+        await collector.flushNow()
+        try? await Task.sleep(nanoseconds: 150_000_000)
+        let bodies = await api.recorder.bodies
+        XCTAssertTrue(bodies.isEmpty)
+    }
+
+    /// Les constantes doivent rester alignées sur Android : deux clients qui
+    /// pondèrent différemment apprendraient deux modèles.
+    func testConstantsMatchTheAndroidCollector() {
+        XCTAssertEqual(FeedSignalsCollector.dwellThreshold, 1.8)
+        XCTAssertEqual(FeedSignalsCollector.flushInterval, 30)
+        XCTAssertEqual(FeedSignalsCollector.maxBuffer, 80)
+    }
+}

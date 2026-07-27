@@ -40,6 +40,20 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
+    /// Onglet actif. Changer d'onglet change le couple filtre/classement envoyé
+    /// au serveur — c'est le seul état qui pilote `loadFeed`.
+    @Published var tab: FeedTab = .forYou
+
+    /// Bascule d'onglet : recharge depuis zéro. Pas de fusion avec la page
+    /// précédente — deux classements différents produisent deux ordres, les
+    /// mélanger donnerait une liste incohérente.
+    func select(_ newTab: FeedTab) async {
+        guard newTab != tab else { return }
+        tab = newTab
+        page = nil
+        await load()
+    }
+
     func load() async {
         if AppEnvironment.usesDemoData {
             page = .demo
@@ -53,7 +67,7 @@ final class FeedViewModel: ObservableObject {
             try? await Task.sleep(for: .seconds(4))
         }
         do {
-            page = try await service.loadFeed(cursor: nil, hashtag: selectedHashtag)
+            page = try await service.loadFeed(cursor: nil, hashtag: selectedHashtag, tab: tab)
         } catch {
             if !error.isCancellation { errorMessage = error.localizedDescription }
         }
@@ -70,7 +84,7 @@ final class FeedViewModel: ObservableObject {
         isLoadingMore = true
         defer { isLoadingMore = false }
         do {
-            let next = try await service.loadFeed(cursor: cursor, hashtag: selectedHashtag)
+            let next = try await service.loadFeed(cursor: cursor, hashtag: selectedHashtag, tab: tab)
             var seen = Set(current.items.map { $0.id })
             let appended = next.items.filter { seen.insert($0.id).inserted }
             page = SocialFeedPage(
@@ -294,6 +308,7 @@ struct FeedView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: SQSpace.lg) {
                 header
+                feedTabs
 
                 if model.isLoading && model.page == nil {
                     LoadingSkeleton()
@@ -340,11 +355,29 @@ struct FeedView: View {
                         FeedItemCard(
                             item: item,
                             onTap: { presentedSheet = .detail(item) },
-                            onLike: { model.react(item) },
-                            onRepost: { model.repost(item) },
-                            onComment: { presentedSheet = .comments(item) },
-                            onFavorite: { model.favorite(item) },
-                            onShare: { presentedSheet = .share(item) },
+                            // Chaque action nourrit aussi le classement : ce
+                            // sont les signaux les plus discriminants, bien plus
+                            // qu'une simple vue.
+                            onLike: {
+                                model.react(item)
+                                Task { await services.feedSignals.record(postId: item.id, type: "like") }
+                            },
+                            onRepost: {
+                                model.repost(item)
+                                Task { await services.feedSignals.record(postId: item.id, type: "repost") }
+                            },
+                            onComment: {
+                                presentedSheet = .comments(item)
+                                Task { await services.feedSignals.record(postId: item.id, type: "comment") }
+                            },
+                            onFavorite: {
+                                model.favorite(item)
+                                Task { await services.feedSignals.record(postId: item.id, type: "favorite") }
+                            },
+                            onShare: {
+                                presentedSheet = .share(item)
+                                Task { await services.feedSignals.record(postId: item.id, type: "share") }
+                            },
                             onAuthorTap: { profileAuthor = item.author },
                             onReact: { emoji in model.react(item, emoji: emoji) }
                         )
@@ -359,6 +392,10 @@ struct FeedView: View {
                         }
                         .sqFadeUp()
                         .onAppear {
+                            // Une vue par post et par session : le collecteur
+                            // déduplique, l'appeler à chaque réapparition de
+                            // cellule est donc sans effet de bord.
+                            Task { await services.feedSignals.onVisibleItems([item.id]) }
                             if item.id == model.page?.items.last?.id {
                                 Task { await model.loadMore() }
                             }
@@ -680,6 +717,50 @@ struct FeedView: View {
     }
 
     // MARK: Hashtags — capsules pleines/douces
+
+    /// Barre d'onglets du fil.
+    ///
+    /// Défilante horizontalement : à Dynamic Type élevé, six capsules ne tiennent
+    /// pas sur une largeur d'iPhone, et une barre segmentée les tronquerait.
+    private var feedTabs: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: SQSpace.sm) {
+                ForEach(FeedTab.allCases) { tab in
+                    let selected = model.tab == tab
+                    Button {
+                        Haptics.selection()
+                        Task { await model.select(tab) }
+                    } label: {
+                        HStack(spacing: SQSpace.xs + 1) {
+                            Image(systemName: tab.systemImage)
+                                .font(.system(size: 11, weight: .semibold))
+                                .accessibilityHidden(true)
+                            Text(LocalizedStringKey(tab.title))
+                                .font(SQFont.body(13, .semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .padding(.horizontal, SQSpace.md)
+                        .padding(.vertical, SQSpace.sm)
+                        .foregroundStyle(selected ? SQColor.onAccent : SQColor.labelSecondary)
+                        .background(
+                            selected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
+                            in: Capsule(style: .continuous)
+                        )
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                    // `.isSelected` plutôt qu'un libellé « sélectionné » ajouté au
+                    // texte : VoiceOver l'annonce déjà, et le rotor s'en sert.
+                    .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+                }
+            }
+            .padding(.horizontal, SQSpace.xl)
+        }
+        // Le rail déborde volontairement des marges de l'écran, comme celui des
+        // stories : la première capsule reste alignée à 20 pt.
+        .padding(.horizontal, -SQSpace.xl)
+        .accessibilityLabel("Filtres du fil")
+    }
 
     private var hashtags: some View {
         ScrollView(.horizontal, showsIndicators: false) {

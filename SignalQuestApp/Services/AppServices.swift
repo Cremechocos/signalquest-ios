@@ -5,6 +5,7 @@ final class AppServices: ObservableObject {
     let api: APIClient
     let auth: AuthServicing
     let feed: SocialFeedServicing
+    let feedSignals: FeedSignalsCollector
     let comments: CommentsServicing
     let stories: StoriesServicing
     let reports: ReportsServicing
@@ -61,6 +62,9 @@ final class AppServices: ObservableObject {
         sse = SSEClient(api: api)
         auth = AuthService(api: api, e2ee: e2eeService)
         feed = SocialFeedService(api: api)
+        // Nourrit le classement « Pour toi ». Livrer l'onglet sans émettre ces
+        // signaux donnerait un classement aveugle : les deux vont ensemble.
+        feedSignals = FeedSignalsCollector(api: api)
         comments = CommentsService(api: api)
         stories = StoriesService(api: api)
         reports = ReportsService(api: api)
@@ -153,6 +157,10 @@ final class AppServices: ObservableObject {
     /// La messagerie n'est pas concernée : `ConversationDetailView` arrête déjà
     /// son flux SSE et son polling sur `scenePhase`.
     func enterBackground() {
+        // Vidage AVANT le garde-fou : les signaux d'engagement doivent partir
+        // même pendant un drive test ou un appel, sinon le dernier lot meurt
+        // avec l'app. C'est un seul POST, sans incidence sur la batterie.
+        Task { [feedSignals] in await feedSignals.flushNow() }
         guard !location.wantsTracking, callManager.activeCall == nil else { return }
         livePresence.setAppActive(false)
     }
