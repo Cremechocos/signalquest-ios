@@ -6,11 +6,9 @@ import FirebaseCore
 @main
 struct SignalQuestApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var services: AppServices
     @StateObject private var session: AuthSessionViewModel
     @StateObject private var appLock = AppLockController()
-    @AppStorage("sq.hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     init() {
         let services = AppServices()
@@ -34,6 +32,60 @@ struct SignalQuestApp: App {
         UINavigationBar.appearance().compactAppearance = appearance
     }
 
+    var body: some Scene {
+        // Lus ICI, dans `body` : `StateObject.wrappedValue` est `@MainActor`, donc
+        // illisible depuis la fermeture `@Sendable` ci-dessous. Les trois sont des
+        // classes `@MainActor`, donc `Sendable` — la capture est légale.
+        let services = self.services
+        let session = self.session
+        let appLock = self.appLock
+        // `@Sendable` n'est PAS décoratif et ne doit pas être retiré : sans lui,
+        // cette fermeture hérite de l'isolation `@MainActor` d'`App.body` et le
+        // mode langage Swift 6 lui greffe une vérification d'exécuteur qui piège
+        // (EXC_BREAKPOINT) quand SwiftUI l'évalue depuis son renderer asynchrone.
+        // Une fermeture `@Sendable` n'hérite d'aucune isolation, donc plus de
+        // vérification. Voir la note d'en-tête d'`AppRootView`.
+        return WindowGroup { @Sendable in
+            AppRootView(services: services, session: session, appLock: appLock)
+        }
+    }
+}
+
+/// Contenu de la scène principale.
+///
+/// Tout ce qui compose la racine vit ici plutôt que directement dans la
+/// fermeture `WindowGroup { … }`, et ce n'est pas cosmétique.
+///
+/// SwiftUI enveloppe le contenu du `WindowGroup` dans un `LazyView` et le
+/// ré-évalue depuis son thread de rendu asynchrone
+/// (`com.apple.SwiftUI.AsyncRenderer`), pas depuis le thread principal. Or une
+/// fermeture non-`@Sendable` hérite *inconditionnellement* — quel que soit son
+/// contenu — de l'isolation `@MainActor` d'`App.body` ; en mode langage Swift 6,
+/// la convertir vers le type non isolé attendu par `WindowGroup.init(content:)`
+/// y greffe une vérification d'exécuteur (`swift_task_isCurrentExecutor`) qui
+/// piège en EXC_BREAKPOINT/SIGTRAP hors du thread principal. D'où le crash
+/// intermittent, y compris au lancement.
+///
+/// La fermeture est donc marquée `@Sendable` (elle n'hérite alors d'aucune
+/// isolation, et la vérification disparaît — constaté au désassemblage), ce qui
+/// lui interdit du même coup tout accès `@MainActor`. Ce code doit bien vivre
+/// quelque part : c'est cette vue. Le `body` d'une `View` n'est, lui, pas
+/// instrumenté ainsi — SwiftUI l'appelle depuis son renderer sans franchir de
+/// frontière d'isolation vérifiée.
+///
+/// Conséquence pratique : ce qu'on ajoute à la racine se met ICI. Le compilateur
+/// refusera de toute façon de le mettre dans la fermeture.
+struct AppRootView: View {
+    // `@ObservedObject` et non `let` : `.onChangeCompat(of: session.state)` et le
+    // badge `services.unreadConversations` n'ont d'effet que si cette vue est
+    // bien invalidée — c'est ce que faisaient les `@StateObject` de l'`App`
+    // quand cette hiérarchie était construite dans la fermeture.
+    @ObservedObject var services: AppServices
+    @ObservedObject var session: AuthSessionViewModel
+    @ObservedObject var appLock: AppLockController
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("sq.hasCompletedOnboarding") private var hasCompletedOnboarding = false
+
     /// Enregistre les notifications APNs + le token VoIP dès que la session
     /// devient authentifiée. Idempotent : `requestAuthorizationAndRegister` ne
     /// re-sollicite pas l'autorisation déjà déterminée et `registerForVoIPPushes`
@@ -55,99 +107,97 @@ struct SignalQuestApp: App {
         await services.callManager.reconcilePendingIncomingCall()
     }
 
-    var body: some Scene {
-        WindowGroup {
-            RootView()
-                .environmentObject(services)
-                .environmentObject(session)
-                .environmentObject(services.router)
-                .environmentObject(services.callManager)
-                .environmentObject(services.networkPath)
-                // Injecté SÉPARÉMENT, comme networkPath et callManager : un
-                // ObservableObject imbriqué dans AppServices n'est pas observé
-                // de façon transitive, donc `RootView` ne se reconstruirait pas
-                // au changement d'état de la politique de version.
-                .environmentObject(services.versionPolicy)
-                .environmentObject(appLock)
-                .task {
-                    services.networkPath.start()
-                    AppDelegate.sharedPush = services.push
-                    AppDelegate.sharedCallManager = services.callManager
-                    AppDelegate.sharedE2EE = services.e2ee
-                    // PushKit doit être prêt avant tout `await` de bootstrap : au
-                    // lancement à froid provoqué par une push VoIP, retarder la
-                    // création du registre peut faire expirer le watchdog avant
-                    // le report CallKit. Le token n'est associé au compte qu'après
-                    // authentification par `registerPushIfAuthenticated`.
-                    services.callManager.registerForVoIPPushes()
-                    // Best-effort et NON bloquant : lancé en parallèle du
-                    // bootstrap pour ne pas rallonger le démarrage. Un échec
-                    // laisse l'état à `.unknown`, donc l'app fonctionne.
-                    Task { await services.versionPolicy.refresh() }
-                    await session.bootstrap()
-                    await registerPushIfAuthenticated(session.state)
-                    // Verrouillage biométrique à l'ouverture (si activé + authentifié).
-                    if case .authenticated = session.state { appLock.lockOnActivationIfNeeded() }
-                    // Mode « continu » : amorce la diffusion de présence dès le
-                    // lancement (le mode « carte ouverte » démarre, lui, à l'ouverture
-                    // de la couche Amis — inutile de payer un appel réseau ici).
-                    if case .authenticated = session.state, LiveShareModeStore.load() == .foregroundLive {
-                        await services.livePresence.refreshSharingSettings()
+    var body: some View {
+        RootView()
+            .environmentObject(services)
+            .environmentObject(session)
+            .environmentObject(services.router)
+            .environmentObject(services.callManager)
+            .environmentObject(services.networkPath)
+            // Injecté SÉPARÉMENT, comme networkPath et callManager : un
+            // ObservableObject imbriqué dans AppServices n'est pas observé
+            // de façon transitive, donc `RootView` ne se reconstruirait pas
+            // au changement d'état de la politique de version.
+            .environmentObject(services.versionPolicy)
+            .environmentObject(appLock)
+            .task {
+                services.networkPath.start()
+                AppDelegate.sharedPush = services.push
+                AppDelegate.sharedCallManager = services.callManager
+                AppDelegate.sharedE2EE = services.e2ee
+                // PushKit doit être prêt avant tout `await` de bootstrap : au
+                // lancement à froid provoqué par une push VoIP, retarder la
+                // création du registre peut faire expirer le watchdog avant
+                // le report CallKit. Le token n'est associé au compte qu'après
+                // authentification par `registerPushIfAuthenticated`.
+                services.callManager.registerForVoIPPushes()
+                // Best-effort et NON bloquant : lancé en parallèle du
+                // bootstrap pour ne pas rallonger le démarrage. Un échec
+                // laisse l'état à `.unknown`, donc l'app fonctionne.
+                Task { await services.versionPolicy.refresh() }
+                await session.bootstrap()
+                await registerPushIfAuthenticated(session.state)
+                // Verrouillage biométrique à l'ouverture (si activé + authentifié).
+                if case .authenticated = session.state { appLock.lockOnActivationIfNeeded() }
+                // Mode « continu » : amorce la diffusion de présence dès le
+                // lancement (le mode « carte ouverte » démarre, lui, à l'ouverture
+                // de la couche Amis — inutile de payer un appel réseau ici).
+                if case .authenticated = session.state, LiveShareModeStore.load() == .foregroundLive {
+                    await services.livePresence.refreshSharingSettings()
+                }
+            }
+            .onChangeCompat(of: session.state) { _, newState in
+                // Un login effectué dans une session déjà lancée (cas nominal
+                // installation → premier login, ou après logout/login) doit lui
+                // aussi déclencher l'enregistrement push/VoIP — sinon l'utilisateur
+                // ne reçoit ni notifications ni appels tant qu'il ne relance pas
+                // l'app à froid. Les deux appels sont idempotents.
+                Task { await registerPushIfAuthenticated(newState) }
+                if case .authenticated = newState {
+                    appLock.lockOnActivationIfNeeded()
+                } else {
+                    appLock.reset()   // jamais verrouillé par-dessus l'écran de login
+                }
+            }
+            .onChangeCompat(of: hasCompletedOnboarding) { _, completed in
+                guard completed else { return }
+                Task { await registerPushIfAuthenticated(session.state) }
+            }
+            .onChangeCompat(of: scenePhase) { _, phase in
+                switch phase {
+                case .active:
+                    UNUserNotificationCenter.current().setBadgeCountCompat(0)
+                    // Verrouillage / déconnexion par inactivité au retour au 1er plan.
+                    if case .authenticated = session.state, appLock.willEnterForeground() {
+                        Task { await session.logout() }
                     }
-                }
-                .onChangeCompat(of: session.state) { _, newState in
-                    // Un login effectué dans une session déjà lancée (cas nominal
-                    // installation → premier login, ou après logout/login) doit lui
-                    // aussi déclencher l'enregistrement push/VoIP — sinon l'utilisateur
-                    // ne reçoit ni notifications ni appels tant qu'il ne relance pas
-                    // l'app à froid. Les deux appels sont idempotents.
-                    Task { await registerPushIfAuthenticated(newState) }
-                    if case .authenticated = newState {
-                        appLock.lockOnActivationIfNeeded()
-                    } else {
-                        appLock.reset()   // jamais verrouillé par-dessus l'écran de login
-                    }
-                }
-                .onChangeCompat(of: hasCompletedOnboarding) { _, completed in
-                    guard completed else { return }
-                    Task { await registerPushIfAuthenticated(session.state) }
-                }
-                .onChangeCompat(of: scenePhase) { _, phase in
-                    switch phase {
-                    case .active:
-                        UNUserNotificationCenter.current().setBadgeCountCompat(0)
-                        // Verrouillage / déconnexion par inactivité au retour au 1er plan.
-                        if case .authenticated = session.state, appLock.willEnterForeground() {
-                            Task { await session.logout() }
+                    // CALL-INCOMING-03 / CALL-VOIP-04 : ré-enregistrer le token VoIP
+                    // et rattraper un appel entrant que le push VoIP aurait manqué.
+                    if case .authenticated = session.state {
+                        Task {
+                            await services.callManager.retryVoIPTokenRegistrationIfNeeded()
+                            await services.callManager.reconcilePendingIncomingCall()
                         }
-                        // CALL-INCOMING-03 / CALL-VOIP-04 : ré-enregistrer le token VoIP
-                        // et rattraper un appel entrant que le push VoIP aurait manqué.
-                        if case .authenticated = session.state {
-                            Task {
-                                await services.callManager.retryVoIPTokenRegistrationIfNeeded()
-                                await services.callManager.reconcilePendingIncomingCall()
-                            }
-                        }
-                        services.enterForeground()
-                    case .background:
-                        appLock.didEnterBackground()
-                        services.enterBackground()
-                    default:
-                        break
                     }
+                    services.enterForeground()
+                case .background:
+                    appLock.didEnterBackground()
+                    services.enterBackground()
+                default:
+                    break
                 }
-                .fullScreenCover(isPresented: Binding(
-                    get: { !hasCompletedOnboarding },
-                    // Ne PAS marquer l'onboarding « vu » sur une simple fermeture du
-                    // cover : une dismissal système ou un cover concurrent (appel
-                    // entrant au 1er lancement) le complétait sans que l'utilisateur
-                    // l'ait parcouru (UXP-06). Seul `onFinish` valide la complétion ;
-                    // sinon le cover se re-présente.
-                    set: { _ in }
-                )) {
-                    OnboardingView { hasCompletedOnboarding = true }
-                }
-        }
+            }
+            .fullScreenCover(isPresented: Binding(
+                get: { !hasCompletedOnboarding },
+                // Ne PAS marquer l'onboarding « vu » sur une simple fermeture du
+                // cover : une dismissal système ou un cover concurrent (appel
+                // entrant au 1er lancement) le complétait sans que l'utilisateur
+                // l'ait parcouru (UXP-06). Seul `onFinish` valide la complétion ;
+                // sinon le cover se re-présente.
+                set: { _ in }
+            )) {
+                OnboardingView { hasCompletedOnboarding = true }
+            }
     }
 }
 
