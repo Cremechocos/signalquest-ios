@@ -28,6 +28,16 @@ protocol SocialFeedServicing: Sendable {
     /// Vote (ou retire son vote) sur le sondage d'une publication.
     /// `optionId == nil` retire tous les votes de l'utilisateur.
     func votePoll(postId: String, optionId: String?, removing: Bool) async throws -> FeedPoll?
+    /// Hashtags suivis par l'utilisateur.
+    func followedHashtags() async throws -> [FollowedHashtag]
+    /// Suit ou arrête de suivre un hashtag.
+    func setHashtagFollowed(_ tag: String, following: Bool) async throws
+    /// Inventaire des masquages (hashtags + mots) en un appel.
+    func mutes() async throws -> SocialMutes
+    /// Masque ou démasque un hashtag.
+    func setHashtagMuted(_ tag: String, muted: Bool) async throws
+    /// Masque ou démasque un mot-clé.
+    func setWordMuted(_ pattern: String, muted: Bool) async throws
     /// Exploration unifiée : publications, personnes et hashtags en UN appel.
     /// iOS n'interrogeait que les utilisateurs, et la recherche de publications
     /// n'existait pas.
@@ -218,6 +228,56 @@ final class SocialFeedService: SocialFeedServicing {
     func deletePost(postId: String) async throws {
         try await api.request(
             APIEndpoint(path: "/api/social/posts/\(normalizedPostId(postId))", method: .delete)
+        )
+    }
+
+    func followedHashtags() async throws -> [FollowedHashtag] {
+        struct Response: Decodable { let follows: [FollowedHashtag]? }
+        let response: Response = try await api.request(
+            APIEndpoint(path: "/api/social/hashtags/follows"),
+            as: Response.self
+        )
+        return response.follows ?? []
+    }
+
+    func setHashtagFollowed(_ tag: String, following: Bool) async throws {
+        let normalized = tag.normalizedHashtag
+        guard !normalized.isEmpty else { return }
+        try await api.request(
+            APIEndpoint(
+                path: "/api/social/hashtags/\(normalized)/follow",
+                method: following ? .post : .delete
+            )
+        )
+    }
+
+    func mutes() async throws -> SocialMutes {
+        try await api.request(APIEndpoint(path: "/api/social/mutes"), as: SocialMutes.self)
+    }
+
+    func setHashtagMuted(_ tag: String, muted: Bool) async throws {
+        let normalized = tag.normalizedHashtag
+        guard !normalized.isEmpty else { return }
+        try await api.request(
+            APIEndpoint(
+                path: "/api/social/mutes/hashtag/\(normalized)",
+                method: muted ? .post : .delete
+            )
+        )
+    }
+
+    func setWordMuted(_ pattern: String, muted: Bool) async throws {
+        // Le motif voyage dans le CHEMIN : sans encodage, un mot accentué ou
+        // espacé produirait une URL invalide.
+        let trimmed = pattern.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+        else { return }
+        try await api.request(
+            APIEndpoint(
+                path: "/api/social/mutes/word/\(encoded)",
+                method: muted ? .post : .delete
+            )
         )
     }
 

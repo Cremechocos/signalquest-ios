@@ -220,6 +220,12 @@ struct ProfileView: View {
             }
             menuSeparator
             NavigationLink {
+                FeedPreferencesView(service: services.feed)
+            } label: {
+                menuRow(title: "Préférences du fil", icon: "slider.horizontal.3")
+            }
+            menuSeparator
+            NavigationLink {
                 PaywallView(store: services.entitlements, entryPoint: .profile)
             } label: {
                 menuRow(title: "Abonnements", icon: "checkmark.seal.fill")

@@ -14733,6 +14733,106 @@
           }
         }
       }
+    },
+    "Préférences du fil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feed preferences"
+          }
+        }
+      }
+    },
+    "Hashtags suivis": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Followed hashtags"
+          }
+        }
+      }
+    },
+    "Hashtags masqués": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muted hashtags"
+          }
+        }
+      }
+    },
+    "Mots masqués": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muted words"
+          }
+        }
+      }
+    },
+    "Ne plus suivre": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unfollow"
+          }
+        }
+      }
+    },
+    "Ajouter": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add"
+          }
+        }
+      }
+    },
+    "Ajouter un hashtag": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a hashtag"
+          }
+        }
+      }
+    },
+    "Ajouter un mot": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a word"
+          }
+        }
+      }
+    },
+    "Suis un hashtag depuis l'explorateur pour le retrouver ici.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow a hashtag from Explore to find it here."
+          }
+        }
+      }
+    },
+    "Les publications contenant ces mots n'apparaîtront plus dans ton fil.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Posts containing these words will no longer appear in your feed."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
