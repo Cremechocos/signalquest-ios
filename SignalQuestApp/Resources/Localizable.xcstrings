@@ -14863,6 +14863,56 @@
           }
         }
       }
+    },
+    "%lld nouveauté": {
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld nouveauté"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld nouveautés"
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld new post"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld new posts"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Affiche les publications reçues": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows the posts received"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

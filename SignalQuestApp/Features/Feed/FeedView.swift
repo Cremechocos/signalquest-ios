@@ -43,6 +43,14 @@ final class FeedViewModel: ObservableObject {
     /// Onglet actif. Changer d'onglet change le couple filtre/classement envoyé
     /// au serveur — c'est le seul état qui pilote `loadFeed`.
     @Published var tab: FeedTab = .forYou
+    /// Publications reçues en direct et NON encore insérées.
+    ///
+    /// Le plan est explicite : jamais d'insertion directe. Faire remonter la
+    /// liste pendant que l'utilisateur lit déplace ce qu'il regarde — on
+    /// annonce, il décide. C'est aussi ce que font toutes les apps de fil.
+    @Published private(set) var pendingCount = 0
+    private var streamTask: Task<Void, Never>?
+    private var knownIds: Set<String> = []
 
     /// Bascule d'onglet : recharge depuis zéro. Pas de fusion avec la page
     /// précédente — deux classements différents produisent deux ordres, les
@@ -51,6 +59,51 @@ final class FeedViewModel: ObservableObject {
         guard newTab != tab else { return }
         tab = newTab
         page = nil
+        await load()
+    }
+
+    /// S'abonne au flux temps réel. Idempotent : rappeler ne crée pas un second
+    /// abonnement.
+    func startStream(_ sse: SSEClient) {
+        guard streamTask == nil else { return }
+        streamTask = Task { [weak self] in
+            for await message in sse.dataStream(
+                path: "/api/social/feed/stream", keep: ["snapshot"]
+            ) {
+                guard !Task.isCancelled else { return }
+                await self?.handleSnapshot(message.data)
+            }
+        }
+    }
+
+    func stopStream() {
+        streamTask?.cancel()
+        streamTask = nil
+    }
+
+    /// Compte les publications réellement NOUVELLES.
+    ///
+    /// Le serveur renvoie les 5 dernières à chaque événement : sans
+    /// déduplication contre ce qui est déjà affiché ET contre ce qui a déjà été
+    /// annoncé, la pastille grimperait à chaque battement pour les mêmes posts.
+    private func handleSnapshot(_ raw: String) {
+        struct Snapshot: Decodable { let items: [UnifiedSocialFeedItem] }
+        guard let data = raw.data(using: .utf8),
+              let snapshot = try? JSONDecoder.signalQuest.decode(Snapshot.self, from: data)
+        else { return }
+        let displayed = Set(page?.items.map(\.id) ?? [])
+        let fresh = snapshot.items.filter { !displayed.contains($0.id) && !knownIds.contains($0.id) }
+        guard !fresh.isEmpty else { return }
+        fresh.forEach { knownIds.insert($0.id) }
+        pendingCount += fresh.count
+    }
+
+    /// L'utilisateur accepte les nouveautés : rechargement complet depuis le
+    /// haut. Insérer les seuls éléments reçus laisserait des trous si d'autres
+    /// ont été publiés entre-temps.
+    func applyPending() async {
+        pendingCount = 0
+        knownIds.removeAll()
         await load()
     }
 
@@ -394,6 +447,7 @@ struct FeedView: View {
             LazyVStack(alignment: .leading, spacing: SQSpace.lg) {
                 header
                 feedTabs
+                if model.pendingCount > 0 { newPostsPill }
 
                 if model.isLoading && model.page == nil {
                     LoadingSkeleton()
@@ -851,6 +905,33 @@ struct FeedView: View {
                 Task { await model.loadMore() }
             }
         }
+    }
+
+    /// Pilule « N nouveautés ».
+    ///
+    /// Annoncer plutôt qu'insérer : faire remonter la liste pendant que
+    /// l'utilisateur lit déplacerait ce qu'il regarde. Il décide du moment.
+    private var newPostsPill: some View {
+        Button {
+            Haptics.selection()
+            Task { await model.applyPending() }
+        } label: {
+            HStack(spacing: SQSpace.xs + 1) {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 11, weight: .bold))
+                    .accessibilityHidden(true)
+                Text("\(model.pendingCount) nouveauté")
+                    .font(SQFont.body(13, .semibold))
+            }
+            .foregroundStyle(SQColor.onAccent)
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm)
+            .background(SQColor.brandRed, in: Capsule(style: .continuous))
+            .sqShadowSoft()
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .frame(maxWidth: .infinity)
+        .accessibilityHint("Affiche les publications reçues")
     }
 
     /// Barre d'onglets du fil.
