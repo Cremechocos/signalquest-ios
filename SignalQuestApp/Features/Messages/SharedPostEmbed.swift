@@ -342,7 +342,7 @@ struct SharedPostEmbedBubble: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(label)
+        .accessibilityLabel(LocalizedStringKey(label))
         .accessibilityValue(count > 0 ? "\(count)" : "")
         .accessibilityAddTraits(selected ? .isSelected : [])
     }

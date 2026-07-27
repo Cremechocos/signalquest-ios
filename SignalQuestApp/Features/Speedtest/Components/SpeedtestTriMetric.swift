@@ -133,6 +133,11 @@ struct SpeedtestTriMetric: View {
         .sqShadowSoft()
         .sqAnimation(.snappy(duration: 0.25), value: state)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title) : \(value == "—" ? "non mesuré" : value)")
+        // `title` est un littéral d'interface, `value` une mesure : seul le
+        // premier — et le repli « non mesuré » — passent par le catalogue.
+        .accessibilityLabel(
+            Text(LocalizedStringKey(title)) + Text(" : ")
+                + (value == "—" ? Text("non mesuré") : Text(value))
+        )
     }
 }

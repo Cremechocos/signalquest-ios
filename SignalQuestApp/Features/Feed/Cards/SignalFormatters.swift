@@ -104,7 +104,7 @@ struct CardMetricTile: View {
         .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         // VoiceOver : « libellé : valeur » d'un bloc (Down 240 Mbps), pas 2 textes.
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(label)
+        .accessibilityLabel(LocalizedStringKey(label))
         .accessibilityValue(value)
     }
 }
@@ -285,7 +285,7 @@ struct CardActionsBar: View {
             .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
-        .accessibilityLabel(label)
+        .accessibilityLabel(LocalizedStringKey(label))
         .accessibilityValue(count > 0 ? "\(count)" : "")
     }
 }

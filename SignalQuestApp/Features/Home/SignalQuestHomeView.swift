@@ -325,7 +325,12 @@ struct SignalQuestHomeView: View {
             .contentShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel("\(title). \(subtitle)")
+        // Les DEUX morceaux passent par le catalogue : composer les `String`
+        // bruts produisait « Communauté. Fil, stories, entraide » à VoiceOver
+        // dans une app par ailleurs anglaise.
+        .accessibilityLabel(
+            Text(LocalizedStringKey(title)) + Text(". ") + Text(LocalizedStringKey(subtitle))
+        )
         // Ancre STABLE pour les tests UI et pour la localisation à venir : le
         // libellé visible change avec la DA et la langue, pas l'identifiant.
         .accessibilityIdentifier("home.action.\(identifier)")

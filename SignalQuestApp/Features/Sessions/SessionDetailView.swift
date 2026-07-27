@@ -213,7 +213,7 @@ struct SessionDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(label)
+        .accessibilityLabel(LocalizedStringKey(label))
         .accessibilityValue(value)
     }
 

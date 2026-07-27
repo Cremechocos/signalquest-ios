@@ -10,6 +10,7 @@
 		00F5008A3845ECDCF0D226DD /* SQCompat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CE1FA9C0AE5C296806B4C08 /* SQCompat.swift */; };
 		00F65D8517A5F39DBC8F3627 /* SQMapKitDotsOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650653A7B6FF5FCF914EA06D /* SQMapKitDotsOverlay.swift */; };
 		03F9AFEEE08F4A89518363D5 /* ContinuousSessionAccumulator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F81FC163DBCA9F8D2907783C /* ContinuousSessionAccumulator.swift */; };
+		03FAF13136B9E540F08B5A98 /* UntranslatedSweepQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A220418E768D630538FCBDB6 /* UntranslatedSweepQATests.swift */; };
 		044254633FC07356DEE15A05 /* MapSnapshotService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C51010FA360E6C3806F7179 /* MapSnapshotService.swift */; };
 		0498F131894BFA67F39B4BB3 /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 469A66A89495AAE04EF039F3 /* MessagesView.swift */; };
 		05B7E7D7DB5CC95AFF2328E5 /* BackgroundLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 389D21260C9885B53E70B525 /* BackgroundLifecycleTests.swift */; };
@@ -532,6 +533,7 @@
 		9F7996D06DFF212012F7841D /* MapAccessibilityQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAccessibilityQATests.swift; sourceTree = "<group>"; };
 		A01462ACA13AD33221D20FAF /* ShareCardBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardBubble.swift; sourceTree = "<group>"; };
 		A073CAEDF99975C220519FB1 /* SQSpace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQSpace.swift; sourceTree = "<group>"; };
+		A220418E768D630538FCBDB6 /* UntranslatedSweepQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UntranslatedSweepQATests.swift; sourceTree = "<group>"; };
 		A3943DEC3A15CC630D29F54A /* MapPhotoViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapPhotoViewer.swift; sourceTree = "<group>"; };
 		A41B467FC7CE900FFE562268 /* SQAccessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQAccessibility.swift; sourceTree = "<group>"; };
 		A4F5346C853F95E32F253D7B /* AuditTourQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditTourQATests.swift; sourceTree = "<group>"; };
@@ -1053,6 +1055,7 @@
 				230A19DCE27F22F952273493 /* SignalQuestUITests.swift */,
 				DB7D271F7EF3536DB6B7C1A1 /* SmokeTourQATests.swift */,
 				D6A0DBB96F9423CDD0C043B6 /* SpeedtestShareQATests.swift */,
+				A220418E768D630538FCBDB6 /* UntranslatedSweepQATests.swift */,
 			);
 			path = SignalQuestUITests;
 			sourceTree = "<group>";
@@ -1890,6 +1893,7 @@
 				7D587A943F3C2B6675722262 /* SignalQuestUITests.swift in Sources */,
 				410070C7BCF48B0D6C417526 /* SmokeTourQATests.swift in Sources */,
 				0674D477E2E2124A28ECDA78 /* SpeedtestShareQATests.swift in Sources */,
+				03FAF13136B9E540F08B5A98 /* UntranslatedSweepQATests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

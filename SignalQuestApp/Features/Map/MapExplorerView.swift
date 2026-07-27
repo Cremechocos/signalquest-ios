@@ -1568,7 +1568,7 @@ struct MapExplorerView: View {
                 .sqShadowCard()
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel(label)
+        .accessibilityLabel(LocalizedStringKey(label))
     }
 
     // MARK: Chrome « Crème & Terre cuite » (verre crème + ombres douces, zéro bordure)

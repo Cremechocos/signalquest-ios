@@ -41,7 +41,7 @@ struct MetricPill: View {
         .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         // VoiceOver : lire « titre : valeur » d'un bloc plutôt que l'icône + 2 textes.
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(title)
+        .accessibilityLabel(LocalizedStringKey(title))
         .accessibilityValue(value)
     }
 }
@@ -171,7 +171,7 @@ struct MapFilterBar: View {
                             .sqShadowSoft()
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(title)
+                    .accessibilityLabel(LocalizedStringKey(title))
                     .accessibilityAddTraits(isOn ? .isSelected : [])
                 }
             }
@@ -483,7 +483,14 @@ struct EmptyStateView: View {
         // Un état vide se lit d'un bloc : titre puis explication. Le laisser en
         // trois éléments distincts obligerait à balayer trois fois pour une
         // information unique. Traiter ce composant couvre ses ~28 sites d'usage.
-        .sqCard(label: title, value: message)
+        // `sqCard` prend des `String` : sans recherche explicite, VoiceOver
+        // énonçait le titre FRANÇAIS dans une app anglaise, alors même que le
+        // texte affiché, lui, était traduit. `NSLocalizedString` accepte une clé
+        // d'exécution — ce que `String(localized:)` ne fait pas.
+        .sqCard(
+            label: NSLocalizedString(title, comment: ""),
+            value: NSLocalizedString(message, comment: "")
+        )
     }
 }
 

@@ -35,7 +35,11 @@ enum SignalQuestUITestSupport {
     }
 
     static func completeOnboardingIfNeeded(in app: XCUIApplication) {
-        let skip = app.buttons["Passer"]
+        // Le bouton est cherché dans LES DEUX langues : l'app est désormais
+        // bilingue, et un test lancé en anglais restait bloqué sur l'onboarding
+        // en cherchant « Passer ». Un identifiant stable serait mieux — c'est le
+        // seul écran qui n'en a pas encore.
+        let skip = app.buttons["Passer"].exists ? app.buttons["Passer"] : app.buttons["Skip"]
         for attempt in 0..<3 {
             let exists = attempt == 0 ? skip.waitForExistence(timeout: 2) : skip.exists
             guard exists else { return }

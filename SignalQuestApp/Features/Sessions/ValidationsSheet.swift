@@ -142,6 +142,6 @@ struct ValidationsSheet: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel(label)
+        .accessibilityLabel(LocalizedStringKey(label))
     }
 }

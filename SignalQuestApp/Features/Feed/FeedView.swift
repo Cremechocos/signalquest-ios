@@ -676,7 +676,7 @@ struct FeedView: View {
                 .overlay(alignment: .topTrailing) { decoration() }
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel(label)
+        .accessibilityLabel(LocalizedStringKey(label))
     }
 
     // MARK: Hashtags — capsules pleines/douces

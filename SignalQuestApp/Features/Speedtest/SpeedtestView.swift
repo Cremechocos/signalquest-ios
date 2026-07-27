@@ -347,7 +347,7 @@ struct SpeedtestView: View {
                 .sqShadowSoft()
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel(label)
+        .accessibilityLabel(LocalizedStringKey(label))
     }
 
     // MARK: - Primary action

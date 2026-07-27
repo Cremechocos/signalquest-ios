@@ -755,7 +755,7 @@ private struct LeaderboardFilterChip: View {
                 .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel(label)
+        .accessibilityLabel(LocalizedStringKey(label))
         .accessibilityAddTraits(isOn ? [.isSelected] : [])
     }
 }

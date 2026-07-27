@@ -81,11 +81,15 @@ struct NetworkPulseHero: View {
     private var operatorLabel: String { hasOperator ? "meilleur op." : "mesures" }
 
     private var accessibilitySummary: String {
-        var parts: [String] = ["Pouls réseau autour de vous"]
-        if let rsrp = pulse.avgRsrpDbm { parts.append("RSRP moyen \(rsrp) dBm") }
+        // TOUS les morceaux passent par le catalogue. Deux d'entre eux ne le
+        // faisaient pas, et VoiceOver énonçait un libellé mi-français
+        // mi-anglais — le genre de défaut qu'aucune relecture de code ne
+        // rattrape, seulement l'écoute ou un relevé des textes rendus.
+        var parts: [String] = [String(localized: "Pouls réseau autour de vous")]
+        if let rsrp = pulse.avgRsrpDbm { parts.append(String(localized: "RSRP moyen \(rsrp) dBm")) }
         if let mbps = pulse.medianDownloadMbps { parts.append(String(localized: "débit médian \(mbps) mégabits par seconde")) }
         if hasOperator, let op = pulse.bestOperator { parts.append(String(localized: "meilleur opérateur \(op)")) }
-        else { parts.append("\(pulse.measurementsCount) mesures") }
+        else { parts.append(String(localized: "\(pulse.measurementsCount) mesure")) }
         return parts.joined(separator: ", ")
     }
 }
