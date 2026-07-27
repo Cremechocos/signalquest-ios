@@ -33,8 +33,13 @@ final class ComposerViewModel: ObservableObject {
     @Published var text: String = "" {
         didSet {
             saveDraft()
+            refreshMentionToken()
         }
     }
+    /// Jeton `@…` en cours de frappe et suggestions associées.
+    @Published private(set) var mentionToken: MentionAutocomplete.Token?
+    @Published private(set) var mentionSuggestions: [SocialUserSearchResult] = []
+    private var suggestionTask: Task<Void, Never>?
     @Published var visibility: SocialVisibility = .friends {
         didSet {
             saveDraft()
@@ -63,6 +68,44 @@ final class ComposerViewModel: ObservableObject {
         self.service = service
         self.userService = userService
         loadDraft()
+    }
+
+    /// Recalcule le jeton actif et relance les suggestions.
+    ///
+    /// Le curseur d'un `TextField` SwiftUI n'est pas exposé : on suppose la
+    /// frappe en fin de texte, ce qui couvre le cas courant. Éditer au milieu
+    /// ne propose simplement rien, plutôt que de proposer à tort.
+    private func refreshMentionToken() {
+        mentionToken = MentionAutocomplete.activeToken(in: text, cursor: text.endIndex)
+        scheduleMentionSuggestions()
+    }
+
+    /// Débounce 250 ms. Sans lui, « @nora » produirait cinq requêtes dont
+    /// quatre inutiles. Seules les MENTIONS interrogent le serveur : les
+    /// hashtags viendront des tendances déjà chargées.
+    private func scheduleMentionSuggestions() {
+        suggestionTask?.cancel()
+        guard let token = mentionToken, token.kind == .mention,
+              token.query.count >= MentionAutocomplete.minimumQueryLength else {
+            mentionSuggestions = []
+            return
+        }
+        suggestionTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled, let self else { return }
+            let found = (try? await self.service.searchUsers(query: token.query, limit: 6)) ?? []
+            guard !Task.isCancelled else { return }
+            self.mentionSuggestions = found
+        }
+    }
+
+    /// Applique une suggestion. Le jeton est remplacé ENTIER, préfixe compris —
+    /// sinon on obtient « @@nora ».
+    func applyMention(_ handle: String) {
+        guard let token = mentionToken else { return }
+        text = MentionAutocomplete.apply(handle, to: text, token: token).text
+        mentionToken = nil
+        mentionSuggestions = []
     }
 
     func loadUserProfile() async {
@@ -237,6 +280,35 @@ struct ComposerSheet: View {
         _model = StateObject(wrappedValue: ComposerViewModel(service: service, userService: userService))
     }
 
+    /// Suggestions de mention. Liste courte et scrollable horizontalement : sous
+    /// le champ de saisie, une liste verticale repousserait le clavier et
+    /// masquerait ce qu'on est en train d'écrire.
+    private var mentionSuggestions: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: SQSpace.sm) {
+                ForEach(model.mentionSuggestions) { user in
+                    Button {
+                        Haptics.selection()
+                        model.applyMention(user.handle ?? user.displayName)
+                    } label: {
+                        HStack(spacing: SQSpace.xs + 1) {
+                            SQAvatar(url: user.avatarUrl, name: user.displayName, size: 22)
+                            Text(user.handle.map { "@\($0)" } ?? user.displayName)
+                                .font(SQFont.body(13, .medium))
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, SQSpace.sm + 2)
+                        .padding(.vertical, SQSpace.xs + 2)
+                        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("Mentionner ") + Text(user.displayName))
+                }
+            }
+        }
+        .frame(maxHeight: 44)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -248,6 +320,10 @@ struct ComposerSheet: View {
                                 .font(SQType.body)
                                 .textFieldStyle(.plain)
                                 .focused($isInputFocused)
+
+                            if !model.mentionSuggestions.isEmpty {
+                                mentionSuggestions
+                            }
                             
                             if let image = model.previewImage {
                                 Image(uiImage: image)

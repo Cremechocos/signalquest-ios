@@ -47,6 +47,7 @@
 		1C8AA28EE4CFA6F012C5B69F /* DiskCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F8487B690EEC1DAED017BE3 /* DiskCache.swift */; };
 		1D28698E2B20210A26DF1D9A /* AppStoreTransactionSynchronizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 754787A246D3FF9F9B99202D /* AppStoreTransactionSynchronizer.swift */; };
 		1E08C8632734607458C0A7DF /* WiFiSSIDProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E223D37F2AA33DF68928E05 /* WiFiSSIDProvider.swift */; };
+		1E85BE17631EC5FEDBB2967B /* MentionAutocompleteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43A01E23F145B917FF35CD53 /* MentionAutocompleteTests.swift */; };
 		1EA7A254FB02AACF6723DF96 /* TerritoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29545835569FD2D703C23E6A /* TerritoriesView.swift */; };
 		1EC17F2A5E383435467A6EB1 /* SQBrand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 342AD252F576AA2664A4C655 /* SQBrand.swift */; };
 		1EF63FFE668545D35C37E403 /* MyMeasurementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA556BEE2D1EA6BAA5FB0800 /* MyMeasurementsView.swift */; };
@@ -181,6 +182,7 @@
 		81468AFF5A5E22F90CD47B5A /* RadioLogImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E68316AF4C10942F8D8F691 /* RadioLogImportView.swift */; };
 		81672BA3E386570C6398A008 /* CoverageCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91DE6C62E4954951C0A2419C /* CoverageCardView.swift */; };
 		819A23CD1C96508D7129E5F0 /* BricolageGrotesque-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F2B897546130656652D9717D /* BricolageGrotesque-SemiBold.ttf */; };
+		81DFFE9AA337FF36E5549415 /* MentionAutocomplete.swift in Sources */ = {isa = PBXBuildFile; fileRef = 743199D868E04642B691ED1A /* MentionAutocomplete.swift */; };
 		81FED606BC8524E427FBB708 /* GamificationV2Service.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94A824085331B8DDD8FD3AEC /* GamificationV2Service.swift */; };
 		820491F93E8015B6ECDD7D2D /* CallSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8366DB9AD97C6EFE27467176 /* CallSessionView.swift */; };
 		82C7D06B8D1D2960E61EF1C7 /* FeedPollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A497779B95276F8B69AB2B7D /* FeedPollView.swift */; };
@@ -441,6 +443,7 @@
 		413FB8DE8180198C52ED7167 /* SessionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsService.swift; sourceTree = "<group>"; };
 		420C779CFB15C46F531F88B0 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		42D4BA9134FD958EE6A2E58F /* AntennaSectorGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaSectorGeometry.swift; sourceTree = "<group>"; };
+		43A01E23F145B917FF35CD53 /* MentionAutocompleteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionAutocompleteTests.swift; sourceTree = "<group>"; };
 		448DCE616E7442994EA5AED7 /* SpeedtestCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestCardView.swift; sourceTree = "<group>"; };
 		469A66A89495AAE04EF039F3 /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
 		4710561B73DB096826FAEEDE /* PresenceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresenceModels.swift; sourceTree = "<group>"; };
@@ -498,6 +501,7 @@
 		70E4B6F01B0F4B916A069D31 /* SpeedtestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestTests.swift; sourceTree = "<group>"; };
 		71F03A270597876371BF433F /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		729C9DEBA4E8FC4DD397E20E /* SpeedtestTriMetric.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestTriMetric.swift; sourceTree = "<group>"; };
+		743199D868E04642B691ED1A /* MentionAutocomplete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionAutocomplete.swift; sourceTree = "<group>"; };
 		74CF7E1DDA21B03198307ED6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		75277B9215C74B786F3456E4 /* FeedSignalsCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedSignalsCollector.swift; sourceTree = "<group>"; };
 		752CA575743D913E207E4A67 /* ChooseHandleSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChooseHandleSheet.swift; sourceTree = "<group>"; };
@@ -1030,6 +1034,7 @@
 			isa = PBXGroup;
 			children = (
 				6C7FDA09EB9502659D0A0D15 /* ComposerSheet.swift */,
+				743199D868E04642B691ED1A /* MentionAutocomplete.swift */,
 			);
 			path = Composer;
 			sourceTree = "<group>";
@@ -1352,6 +1357,7 @@
 				C6D04C87CE6B4E179FE38964 /* MapAccessibilityTests.swift */,
 				B1F4DC14B58C08DADF46E158 /* MapFilterStoreTests.swift */,
 				AB3FB8DEBAD180B509683C8D /* MapSearchTests.swift */,
+				43A01E23F145B917FF35CD53 /* MentionAutocompleteTests.swift */,
 				A9594367DF3047FDF3B240AB /* MockURLProtocol.swift */,
 				D6FFA250C4BE27D4200678E2 /* ModelDecodeTests.swift */,
 				83991EBA39D411D1F2DE6744 /* NetworkPathDedupTests.swift */,
@@ -1809,6 +1815,7 @@
 				B8A85AD81CA49026682265E0 /* MapStores.swift in Sources */,
 				30311E763161242DA4BEC7EB /* MarketRegistryModels.swift in Sources */,
 				EE47E722A4FE5F89F50C9523 /* MarketRegistryService.swift in Sources */,
+				81DFFE9AA337FF36E5549415 /* MentionAutocomplete.swift in Sources */,
 				D1212A2119E013814872AB77 /* MessageComposerBar.swift in Sources */,
 				82D213CFFAD0F862FFF86CE8 /* MessageImageViewer.swift in Sources */,
 				9D8F7A82FABDCB187B9D4B98 /* MessageModels.swift in Sources */,
@@ -1991,6 +1998,7 @@
 				5B9F06F814F19495F2842E1C /* MapAccessibilityTests.swift in Sources */,
 				5BB7F333FAEBC17CD67A33C2 /* MapFilterStoreTests.swift in Sources */,
 				E9D5E1E145866A01C6966810 /* MapSearchTests.swift in Sources */,
+				1E85BE17631EC5FEDBB2967B /* MentionAutocompleteTests.swift in Sources */,
 				FA8A1167522105F2D6EBEFB7 /* MockURLProtocol.swift in Sources */,
 				15606EDE03FC5483778DB980 /* ModelDecodeTests.swift in Sources */,
 				D6CEFBA50FB780C0C6B045ED /* NetworkPathDedupTests.swift in Sources */,
