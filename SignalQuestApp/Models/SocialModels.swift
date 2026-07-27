@@ -349,6 +349,37 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
     }
 }
 
+/// Sondage à créer avec une publication.
+struct CreatePostPoll: Codable, Equatable {
+    let question: String?
+    let options: [String]
+    let allowMultiple: Bool
+
+    /// Bornes du serveur, appliquées AVANT l'envoi : un 400 sur un sondage
+    /// coûte tout le post, pièce jointe comprise.
+    static let minimumOptions = 2
+    static let maximumOptions = 4
+
+    /// Normalise et valide. `nil` si le sondage n'est pas envoyable — les
+    /// options vides sont retirées, pas rejetées : une ligne laissée en blanc
+    /// dans le formulaire est une omission, pas une erreur.
+    static func make(question: String, options: [String], allowMultiple: Bool) -> CreatePostPoll? {
+        let cleaned = options
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .map { String($0.prefix(80)) }
+        guard cleaned.count >= minimumOptions, cleaned.count <= maximumOptions else { return nil }
+        // Deux options identiques rendraient le résultat ininterprétable.
+        guard Set(cleaned.map { $0.lowercased() }).count == cleaned.count else { return nil }
+        let trimmedQuestion = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        return CreatePostPoll(
+            question: trimmedQuestion.isEmpty ? nil : String(trimmedQuestion.prefix(160)),
+            options: cleaned,
+            allowMultiple: allowMultiple
+        )
+    }
+}
+
 struct CreatePostRequest: Codable {
     let text: String
     let visibility: String
@@ -360,6 +391,9 @@ struct CreatePostRequest: Codable {
     let metadata: [String: JSONValue]?
     let attachments: [CreatePostAttachment]?
     let attachRadio: Bool?
+    /// Sondage attaché. Le serveur impose 2 à 4 options, chacune 1 à 80
+    /// caractères, et une question facultative de 160 au plus.
+    let poll: CreatePostPoll?
 }
 
 struct CreatePostResponse: Codable {

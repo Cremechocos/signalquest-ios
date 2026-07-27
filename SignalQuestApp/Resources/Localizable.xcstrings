@@ -15003,6 +15003,46 @@
           }
         }
       }
+    },
+    "Sondage": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Poll"
+          }
+        }
+      }
+    },
+    "Ta question (optionnel)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your question (optional)"
+          }
+        }
+      }
+    },
+    "Choix %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choice %lld"
+          }
+        }
+      }
+    },
+    "Supprimer l'option %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete option %lld"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

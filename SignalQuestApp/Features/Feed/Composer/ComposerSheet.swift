@@ -36,6 +36,29 @@ final class ComposerViewModel: ObservableObject {
             refreshMentionToken()
         }
     }
+    /// Sondage en cours de composition. Vide = pas de sondage.
+    @Published var pollQuestion = ""
+    @Published var pollOptions: [String] = ["", ""]
+    @Published var pollAllowMultiple = false
+    @Published var pollEnabled = false
+
+    /// Sondage prêt à l'envoi, ou `nil`. La validation est faite AVANT l'appel :
+    /// un 400 sur le sondage coûterait tout le post, pièce jointe comprise.
+    var preparedPoll: CreatePostPoll? {
+        guard pollEnabled else { return nil }
+        return CreatePostPoll.make(
+            question: pollQuestion, options: pollOptions, allowMultiple: pollAllowMultiple
+        )
+    }
+
+    /// Post en cours d'édition. `nil` = création.
+    ///
+    /// Le composer sert les deux cas plutôt qu'un second écran : la saisie, la
+    /// visibilité, les mentions et la limite de longueur sont identiques, et
+    /// deux écrans divergeraient dès la première évolution.
+    private(set) var editingPost: UnifiedSocialFeedItem?
+    var isEditing: Bool { editingPost != nil }
+
     /// Jeton `@…` en cours de frappe et suggestions associées.
     @Published private(set) var mentionToken: MentionAutocomplete.Token?
     @Published private(set) var mentionSuggestions: [SocialUserSearchResult] = []
@@ -237,9 +260,79 @@ final class ComposerViewModel: ObservableObject {
         }.value
     }
 
+    /// Prépare le composer pour une ÉDITION.
+
+    ///
+
+    /// Le brouillon n'est volontairement pas touché : éditer un post existant ne
+
+    /// doit pas écraser ce que l'utilisateur avait commencé à rédiger ailleurs.
+
+    func beginEditing(_ post: UnifiedSocialFeedItem) {
+
+        editingPost = post
+
+        text = post.text
+
+        if let raw = post.visibility, let parsed = SocialVisibility(rawValue: raw) {
+
+            visibility = parsed
+
+        }
+
+    }
+
+
+    /// Enregistre les modifications.
+
+    ///
+
+    /// Le serveur valide la propriété et répond 403 : on ne s'appuie pas sur le
+
+    /// seul masquage de l'UI. Le schéma est `.strict()`, donc on n'envoie que
+
+    /// texte et visibilité — une clé inconnue ferait échouer tout le patch.
+
+    func saveEdit() async {
+
+        guard let post = editingPost else { return }
+
+        let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !body.isEmpty, !isTextTooLong else { return }
+
+        isBusy = true
+
+        defer { isBusy = false }
+
+        do {
+
+            _ = try await service.editPost(
+
+                postId: post.id, text: body, visibility: visibility.rawValue
+
+            )
+
+            didPublish = true
+
+            Haptics.success()
+
+        } catch {
+
+            errorMessage = error.localizedDescription
+
+            Haptics.error()
+
+        }
+
+    }
+
+
     func publish() async {
         let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !body.isEmpty || previewImage != nil || attachedSpeedtest != nil else { return }
+        // Un sondage seul suffit : la question porte le message, exiger un
+        // texte en plus obligerait à se répéter.
+        guard !body.isEmpty || previewImage != nil || attachedSpeedtest != nil || preparedPoll != nil else { return }
         guard !isTextTooLong else { return }
         isBusy = true
         defer { isBusy = false }
@@ -258,7 +351,8 @@ final class ComposerViewModel: ObservableObject {
                 attachments: attachments,
                 targetType: attachedSpeedtest != nil ? "speedtest" : nil,
                 targetId: attachedSpeedtest?.id,
-                extraMetadata: attachedSpeedtest.map { ["speedtestId": .string($0.id)] }
+                extraMetadata: attachedSpeedtest.map { ["speedtestId": .string($0.id)] },
+                poll: preparedPoll
             )
             didPublish = true
             clearDraft()
@@ -276,8 +370,59 @@ struct ComposerSheet: View {
     @State private var selectedMode: ComposerMode = .edit
     @FocusState private var isInputFocused: Bool
 
-    init(service: SocialFeedServicing, userService: UserServicing? = nil) {
-        _model = StateObject(wrappedValue: ComposerViewModel(service: service, userService: userService))
+    /// `editing` bascule le composer en édition et précharge le post.
+    init(
+        service: SocialFeedServicing,
+        userService: UserServicing? = nil,
+        editing: UnifiedSocialFeedItem? = nil
+    ) {
+        let model = ComposerViewModel(service: service, userService: userService)
+        if let editing { model.beginEditing(editing) }
+        _model = StateObject(wrappedValue: model)
+    }
+
+    /// Saisie du sondage.
+    private var pollEditor: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            TextField("Ta question (optionnel)", text: $model.pollQuestion)
+                .font(SQFont.body(15, .medium))
+                .submitLabel(.next)
+
+            ForEach(model.pollOptions.indices, id: \.self) { index in
+                HStack(spacing: SQSpace.sm) {
+                    TextField("Choix \(index + 1)", text: $model.pollOptions[index])
+                        .font(SQType.body)
+                    // Le retrait n'est offert qu'au-dessus du minimum : le
+                    // proposer puis refuser l'action serait pire que l'absence.
+                    if model.pollOptions.count > CreatePostPoll.minimumOptions {
+                        Button {
+                            model.pollOptions.remove(at: index)
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .foregroundStyle(SQColor.labelTertiary)
+                        }
+                        .accessibilityLabel(Text("Supprimer l'option \(index + 1)"))
+                    }
+                }
+                .padding(.vertical, SQSpace.xs)
+            }
+
+            if model.pollOptions.count < CreatePostPoll.maximumOptions {
+                Button {
+                    model.pollOptions.append("")
+                } label: {
+                    Label("Ajouter une option", systemImage: "plus.circle")
+                        .font(SQFont.body(13, .semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                }
+            }
+
+            Toggle("Choix multiples", isOn: $model.pollAllowMultiple)
+                .font(SQFont.body(13))
+                .tint(SQColor.brandRed)
+        }
+        .padding(SQSpace.md)
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
     /// Suggestions de mention. Liste courte et scrollable horizontalement : sous
@@ -324,6 +469,8 @@ struct ComposerSheet: View {
                             if !model.mentionSuggestions.isEmpty {
                                 mentionSuggestions
                             }
+
+                            if model.pollEnabled { pollEditor }
                             
                             if let image = model.previewImage {
                                 Image(uiImage: image)
@@ -406,7 +553,9 @@ struct ComposerSheet: View {
                     Button {
                         isInputFocused = false
                         Task {
-                            await model.publish()
+                            // Même bouton pour les deux modes : l'action change,
+                            // pas la place ni le geste.
+                            if model.isEditing { await model.saveEdit() } else { await model.publish() }
                             if model.didPublish { dismiss() }
                         }
                     } label: {
@@ -414,7 +563,7 @@ struct ComposerSheet: View {
                             if model.isBusy {
                                 ProgressView().controlSize(.mini).tint(SQColor.onAccent)
                             } else {
-                                Text("Publier")
+                                Text(model.isEditing ? "Enregistrer" : "Publier")
                                     .font(SQFont.body(14, .semibold))
                             }
                         }
@@ -444,6 +593,21 @@ struct ComposerSheet: View {
 
     private var bottomToolbar: some View {
         HStack(spacing: SQSpace.md) {
+            // Bascule sondage : même gabarit que les autres actions de la barre.
+            Button {
+                Haptics.selection()
+                model.pollEnabled.toggle()
+            } label: {
+                Image(systemName: "chart.bar.xaxis")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(model.pollEnabled ? SQColor.onAccent : SQColor.brandRed)
+                    .frame(width: 40, height: 40)
+                    .background(model.pollEnabled ? SQColor.brandRed : SQColor.surface, in: Circle())
+                    .sqShadowSoft()
+            }
+            .accessibilityLabel("Sondage")
+            .accessibilityAddTraits(model.pollEnabled ? [.isButton, .isSelected] : .isButton)
+
             // Photos Picker — bouton circulaire 40, surface + ombre repos.
             PhotosPicker(selection: $model.selectedItem, matching: .images) {
                 Image(systemName: "photo.on.rectangle.angled")

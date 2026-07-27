@@ -392,6 +392,8 @@ struct FeedView: View {
     /// un menu contextuel.
     @State private var pendingDeletion: UnifiedSocialFeedItem?
     @State private var showRecap = false
+    /// Post en cours d'édition — ouvre le composer en mode édition.
+    @State private var editingPost: UnifiedSocialFeedItem?
     @State private var presentedStoryStart: Int?
     @State private var showStoryComposer = false
     @State private var showComposer = false
@@ -557,6 +559,12 @@ struct FeedView: View {
         }
         .onChangeCompat(of: router.openMessagesInbox) { _, shouldOpen in
             if shouldOpen { presentMessagesIfNeeded() }
+        }
+        .sheet(item: $editingPost) { post in
+            // Même composer qu'à la création : deux écrans divergeraient
+            // dès la première évolution de la saisie.
+            ComposerSheet(service: services.feed, editing: post)
+                .onDisappear { Task { await model.load() } }
         }
         .sheet(isPresented: $showRecap) {
             WeeklyRecapSheet(service: services.feed)
@@ -874,6 +882,9 @@ struct FeedView: View {
             // 403 : ce masquage évite d'offrir une action vouée
             // à échouer, il ne fait pas autorité.
             if item.canManage {
+                Button { editingPost = item } label: {
+                    Label("Modifier", systemImage: "pencil")
+                }
                 Button { model.togglePin(item) } label: {
                     Label(item.isPinned ? "Désépingler" : "Épingler",
                           systemImage: item.isPinned ? "pin.slash" : "pin")

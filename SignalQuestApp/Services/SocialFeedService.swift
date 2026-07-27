@@ -10,7 +10,8 @@ protocol SocialFeedServicing: Sendable {
         attachments: [CreatePostAttachment],
         targetType: String?,
         targetId: String?,
-        extraMetadata: [String: JSONValue]?
+        extraMetadata: [String: JSONValue]?,
+        poll: CreatePostPoll?
     ) async throws -> UnifiedSocialFeedItem?
     func uploadImage(data: Data, mimeType: String) async throws -> CreatePostAttachment
     func react(postId: String, emoji: String) async throws -> ReactionResponse
@@ -86,7 +87,8 @@ extension SocialFeedServicing {
             attachments: attachments,
             targetType: nil,
             targetId: nil,
-            extraMetadata: nil
+            extraMetadata: nil,
+            poll: nil
         )
     }
 }
@@ -153,7 +155,8 @@ final class SocialFeedService: SocialFeedServicing {
         attachments: [CreatePostAttachment],
         targetType: String?,
         targetId: String?,
-        extraMetadata: [String: JSONValue]?
+        extraMetadata: [String: JSONValue]?,
+        poll: CreatePostPoll? = nil
     ) async throws -> UnifiedSocialFeedItem? {
         var metadata: [String: JSONValue] = ["platform": .string("ios")]
         if let extraMetadata {
@@ -169,7 +172,8 @@ final class SocialFeedService: SocialFeedServicing {
             longitude: nil,
             metadata: metadata,
             attachments: attachments.isEmpty ? nil : attachments,
-            attachRadio: false
+            attachRadio: false,
+            poll: poll
         )
         let response: CreatePostResponse = try await api.requestJSON("/api/social/v2/posts", body: request)
         return response.post
