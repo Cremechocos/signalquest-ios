@@ -473,6 +473,9 @@
     "Ajouter à ta story" : {
 
     },
+    "Ami" : {
+
+    },
     "Amis" : {
 
     },
@@ -489,6 +492,9 @@
 
     },
     "Annulé" : {
+
+    },
+    "Antenne" : {
 
     },
     "Antenne la plus proche · %@ · écart %lld°" : {
@@ -1286,6 +1292,16 @@
     "Groupe" : {
 
     },
+    "Groupe de %lld %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Groupe de %1$lld %2$@"
+          }
+        }
+      }
+    },
     "Groupe de %lld éléments. %@" : {
       "localizations" : {
         "fr" : {
@@ -1381,6 +1397,9 @@
 
     },
     "Impossible de vérifier tes abonnements existants. Aucun achat n'est proposé pour éviter une double facturation." : {
+
+    },
+    "Incident" : {
 
     },
     "Indéterminée" : {
@@ -1656,6 +1675,9 @@
     "Mesure de couverture" : {
 
     },
+    "Mesure de débit" : {
+
+    },
     "Mesure indisponible" : {
 
     },
@@ -1845,7 +1867,22 @@
     "Ouvre la carte des antennes et mesures." : {
 
     },
+    "Ouvre la fiche de l'ami" : {
+
+    },
+    "Ouvre la fiche de l'antenne" : {
+
+    },
     "Ouvre la messagerie chiffrée SignalQuest." : {
+
+    },
+    "Ouvre la photo en plein écran" : {
+
+    },
+    "Ouvre le détail de l'incident" : {
+
+    },
+    "Ouvre le détail du site prévu" : {
 
     },
     "Ouvre le profil de %@" : {
@@ -1989,6 +2026,9 @@
 
     },
     "Plus tard" : {
+
+    },
+    "Point de couverture" : {
 
     },
     "Politique de confidentialité" : {
@@ -2444,6 +2484,9 @@
     "Services impactés" : {
 
     },
+    "Session" : {
+
+    },
     "Session de couverture" : {
 
     },
@@ -2496,6 +2539,9 @@
 
     },
     "Site annoncé au prévisionnel, pas encore construit." : {
+
+    },
+    "Site communautaire" : {
 
     },
     "Site communautaire (consensus)" : {
@@ -2775,6 +2821,9 @@
     "Valeur correcte selon toi" : {
 
     },
+    "Validation" : {
+
+    },
     "Validation 2FA" : {
 
     },
@@ -2844,7 +2893,16 @@
     "Vérifie ta connexion" : {
 
     },
+    "Zoome pour séparer les éléments" : {
+
+    },
     "activé" : {
+
+    },
+    "amis" : {
+
+    },
+    "antennes" : {
 
     },
     "arrêtée" : {
@@ -2877,6 +2935,9 @@
     "fermé" : {
 
     },
+    "incidents" : {
+
+    },
     "la biométrie" : {
 
     },
@@ -2887,6 +2948,9 @@
 
     },
     "meilleur opérateur %@" : {
+
+    },
+    "mesures de débit" : {
 
     },
     "modifié" : {
@@ -2904,6 +2968,12 @@
     "ouvert" : {
 
     },
+    "photos" : {
+
+    },
+    "points de couverture" : {
+
+    },
     "pseudo" : {
 
     },
@@ -2919,7 +2989,19 @@
     "récompense à réclamer" : {
 
     },
+    "sans nom" : {
+
+    },
+    "sessions" : {
+
+    },
     "signalquest.fr" : {
+
+    },
+    "sites communautaires" : {
+
+    },
+    "sites prévus" : {
 
     },
     "stable" : {
@@ -2935,6 +3017,9 @@
 
     },
     "test terminé ✓" : {
+
+    },
+    "validations" : {
 
     },
     "validée %lld×" : {

@@ -7,7 +7,7 @@ import UIKit
 /// déranger, gris = hors ligne), cône de cap (heading — qu'Android ne rend pas) et
 /// badge technologie. Position périmée → marqueur estompé. Style « Crème & Terre
 /// cuite » : bord crème épais + ombre chaude.
-final class SQFriendMarkerView: MKAnnotationView {
+final class SQFriendMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     static let reuseID = "sq-friend-marker"
     let coneLayer = CAShapeLayer()
     let halo = UIView()
@@ -90,6 +90,11 @@ final class SQFriendMarkerView: MKAnnotationView {
     }
 
     func apply(_ info: FriendAnnotationInfo, displayScale: CGFloat) {
+        // Le payload vit sur l'annotation : la signature de `apply` diffère
+        // d'une vue à l'autre, pas la source de vérité.
+        if let payload = (annotation as? SQMapKitAnnotation)?.payload {
+            applyAccessibility(for: payload)
+        }
         let presence = Self.presenceColor(info.presence)
         halo.backgroundColor = presence
 

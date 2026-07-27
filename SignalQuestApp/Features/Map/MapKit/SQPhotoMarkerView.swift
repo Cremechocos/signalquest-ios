@@ -6,7 +6,7 @@ import UIKit
 /// sur la carte dans un cadre crème arrondi (marge basse épaissie façon polaroïd)
 /// plutôt qu'en pastille appareil-photo. Chargement async + downsampling via
 /// `ImagePipeline`. Les CLUSTERS de photos gardent la pastille numérotée.
-final class SQPhotoMarkerView: MKAnnotationView {
+final class SQPhotoMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     static let reuseID = "sq-photo-marker"
     let card = UIView()
     let photo = UIImageView()
@@ -63,6 +63,9 @@ final class SQPhotoMarkerView: MKAnnotationView {
     }
 
     func apply(url: URL?, displayScale: CGFloat) {
+        if let payload = (annotation as? SQMapKitAnnotation)?.payload {
+            applyAccessibility(for: payload)
+        }
         guard url != currentURL else { return }
         currentURL = url
         photo.image = nil

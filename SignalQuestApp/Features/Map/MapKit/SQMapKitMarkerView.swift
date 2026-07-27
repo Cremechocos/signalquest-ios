@@ -4,7 +4,7 @@ import UIKit
 
 /// Vue d'annotation native : pastille colorée (opérateur) ou pastille de cluster
 /// numérotée. (Vignettes photos / cônes : phases ultérieures.)
-final class SQMapKitMarkerView: MKAnnotationView {
+final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     static let reuseID = "sq-mapkit-marker"
     let dot = UIView()
     let countLabel = UILabel()
@@ -33,6 +33,7 @@ final class SQMapKitMarkerView: MKAnnotationView {
     required init?(coder: NSCoder) { nil }
 
     func apply(_ payload: MapAnnotationPayload) {
+        applyAccessibility(for: payload)
         let color = UIColor(payload.markerColor)
         if let count = payload.clusterCount {
             let size: CGFloat = count >= 100 ? 44 : 38
