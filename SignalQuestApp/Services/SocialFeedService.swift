@@ -17,6 +17,14 @@ protocol SocialFeedServicing: Sendable {
     func favorite(postId: String) async throws -> ReactionResponse
     func repost(postId: String) async throws -> ReactionResponse
     func muteNotifications(postId: String) async throws -> SuccessResponse
+    /// Édite un post dont on est l'auteur. Le serveur vérifie la propriété et
+    /// répond 403 sinon — on ne s'appuie donc pas sur le seul masquage de l'UI.
+    func editPost(postId: String, text: String, visibility: String?) async throws -> UnifiedSocialFeedItem?
+    /// Suppression définitive. Irréversible côté serveur.
+    func deletePost(postId: String) async throws
+    /// Épingle ou détache un post sur son profil. Le serveur ne garde qu'un seul
+    /// post épinglé par auteur : épingler ailleurs détache automatiquement.
+    func setPinned(postId: String, pinned: Bool) async throws
     /// Partage un post vers une conversation. Renvoie l'id du message créé (pour
     /// permettre l'annulation), ou nil si le backend ne l'a pas fourni.
     func share(postId: String, conversationId: String) async throws -> String?
@@ -172,6 +180,43 @@ final class SocialFeedService: SocialFeedServicing {
 
     func muteNotifications(postId: String) async throws -> SuccessResponse {
         try await api.request(APIEndpoint(path: "/api/social/posts/\(normalizedPostId(postId))/notifications", method: .post), as: SuccessResponse.self)
+    }
+
+    func editPost(postId: String, text: String, visibility: String?) async throws -> UnifiedSocialFeedItem? {
+        // Le schéma backend est `.strict()` : n'envoyer QUE les champs modifiés.
+        // Une clé inconnue ferait échouer tout le patch en 400.
+        struct Patch: Encodable {
+            let text: String
+            let visibility: String?
+        }
+        struct Response: Decodable { let item: UnifiedSocialFeedItem? }
+        let body = try JSONEncoder.signalQuest.encode(Patch(text: text, visibility: visibility))
+        let response: Response = try await api.request(
+            APIEndpoint(
+                path: "/api/social/posts/\(normalizedPostId(postId))",
+                method: .patch,
+                headers: ["Content-Type": "application/json"],
+                body: body
+            ),
+            as: Response.self
+        )
+        return response.item
+    }
+
+    func deletePost(postId: String) async throws {
+        try await api.request(
+            APIEndpoint(path: "/api/social/posts/\(normalizedPostId(postId))", method: .delete)
+        )
+    }
+
+    func setPinned(postId: String, pinned: Bool) async throws {
+        // POST épingle, DELETE détache — deux verbes sur la même route, sans corps.
+        try await api.request(
+            APIEndpoint(
+                path: "/api/social/posts/\(normalizedPostId(postId))/pin",
+                method: pinned ? .post : .delete
+            )
+        )
     }
 
     func share(postId: String, conversationId: String) async throws -> String? {

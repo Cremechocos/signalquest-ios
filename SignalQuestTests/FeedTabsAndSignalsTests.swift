@@ -146,3 +146,49 @@ final class FeedSignalsCollectorTests: XCTestCase {
         XCTAssertEqual(FeedSignalsCollector.maxBuffer, 80)
     }
 }
+
+/// `isMine` et `pinnedAt` étaient envoyés par le backend et ignorés par le
+/// modèle : iOS ne pouvait ni savoir qu'un post lui appartenait, ni afficher son
+/// état d'épinglage. Un champ ignoré ne produit aucune erreur — d'où ces tests.
+final class FeedItemOwnershipTests: XCTestCase {
+
+    private func decode(_ json: String) throws -> UnifiedSocialFeedItem {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(UnifiedSocialFeedItem.self, from: Data(json.utf8))
+    }
+
+    private func payload(isMine: String, pinnedAt: String) -> String {
+        """
+        {"id":"p1","kind":"post","author":{"id":"u1"},"text":"bonjour",
+         "commentsCount":0,"repostsCount":0,"favoritesCount":0,
+         "likedByMe":false,"favoritedByMe":false,"repostedByMe":false,
+         "isMine":\(isMine),"pinnedAt":\(pinnedAt)}
+        """
+    }
+
+    func testOwnershipAndPinAreDecoded() throws {
+        let item = try decode(payload(isMine: "true", pinnedAt: "\"2026-07-27T10:00:00Z\""))
+        XCTAssertTrue(item.canManage)
+        XCTAssertTrue(item.isPinned)
+    }
+
+    func testAPostFromSomeoneElseCannotBeManaged() throws {
+        let item = try decode(payload(isMine: "false", pinnedAt: "null"))
+        XCTAssertFalse(item.canManage)
+        XCTAssertFalse(item.isPinned)
+    }
+
+    /// Champs absents : le décodage ne doit pas échouer, et l'app doit se
+    /// comporter comme si le post n'était PAS gérable — masquer une action est
+    /// bénin, l'offrir à tort renvoie un 403 à l'utilisateur.
+    func testMissingFieldsFallBackToNotManageable() throws {
+        let item = try decode("""
+        {"id":"p1","kind":"post","author":{"id":"u1"},"text":"bonjour",
+         "commentsCount":0,"repostsCount":0,"favoritesCount":0,
+         "likedByMe":false,"favoritedByMe":false,"repostedByMe":false}
+        """)
+        XCTAssertFalse(item.canManage)
+        XCTAssertFalse(item.isPinned)
+    }
+}

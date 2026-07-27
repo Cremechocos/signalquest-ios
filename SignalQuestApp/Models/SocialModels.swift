@@ -296,9 +296,20 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
     var favoritedByMe: Bool
     var repostedByMe: Bool
     var notificationsMutedByMe: Bool?
+    /// Le backend renvoie ces deux champs depuis toujours ; le modèle les
+    /// ignorait silencieusement, si bien qu'iOS ne pouvait ni savoir qu'un post
+    /// lui appartenait, ni afficher son état d'épinglage.
+    let isMine: Bool?
+    var pinnedAt: Date?
+
+    /// Vrai si l'utilisateur peut éditer, supprimer ou épingler ce post.
+    /// L'autorité reste le SERVEUR (403 sinon) : ceci ne fait que masquer des
+    /// actions vouées à échouer.
+    var canManage: Bool { isMine == true }
+    var isPinned: Bool { pinnedAt != nil }
 
     enum CodingKeys: String, CodingKey {
-        case id, kind, sourceType, sourceId, createdAt, score, author, text, visibility, status, targetType, targetId, placeLabel, latitude, longitude, metadata, attachments, signal, hashtags, reactions, commentsCount, repostsCount, favoritesCount, likedByMe, favoritedByMe, repostedByMe, notificationsMutedByMe
+        case id, kind, sourceType, sourceId, createdAt, score, author, text, visibility, status, targetType, targetId, placeLabel, latitude, longitude, metadata, attachments, signal, hashtags, reactions, commentsCount, repostsCount, favoritesCount, likedByMe, favoritedByMe, repostedByMe, notificationsMutedByMe, isMine, pinnedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -330,6 +341,8 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
         favoritedByMe = (try? c.decode(Bool.self, forKey: .favoritedByMe)) ?? false
         repostedByMe = (try? c.decode(Bool.self, forKey: .repostedByMe)) ?? false
         notificationsMutedByMe = try c.decodeIfPresent(Bool.self, forKey: .notificationsMutedByMe)
+        isMine = try c.decodeIfPresent(Bool.self, forKey: .isMine)
+        pinnedAt = try c.decodeIfPresent(Date.self, forKey: .pinnedAt)
     }
 }
 

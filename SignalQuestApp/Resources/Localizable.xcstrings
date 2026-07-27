@@ -14443,6 +14443,26 @@
           }
         }
       }
+    },
+    "Supprimer cette publication ?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this post?"
+          }
+        }
+      }
+    },
+    "Cette action est irréversible.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This action is irreversible."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

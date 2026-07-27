@@ -165,6 +165,60 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
+    /// Épingle ou détache. Optimiste comme les autres bascules, avec une
+    /// nuance : le serveur ne garde QU'UN post épinglé par auteur, donc épingler
+    /// ici détache l'autre. On reflète cette exclusivité localement, sinon deux
+    /// posts apparaîtraient épinglés jusqu'au prochain chargement.
+    func togglePin(_ item: UnifiedSocialFeedItem) {
+        let previous = item
+        let willPin = !item.isPinned
+        Task {
+            await applyLocalToggle(itemId: item.id) { current in
+                var copy = current
+                copy.pinnedAt = willPin ? Date() : nil
+                return copy
+            }
+            if willPin, let page {
+                let others = page.items.filter { $0.id != item.id && $0.isPinned }
+                for other in others {
+                    await applyLocalToggle(itemId: other.id) { current in
+                        var copy = current; copy.pinnedAt = nil; return copy
+                    }
+                }
+            }
+        }
+        Task {
+            do { try await service.setPinned(postId: item.id, pinned: willPin) }
+            catch {
+                await restore(previous)
+                if !error.isCancellation { errorMessage = error.localizedDescription }
+            }
+        }
+    }
+
+    /// Suppression définitive. Retrait optimiste puis remise en place en cas
+    /// d'échec — un post qui disparaît sans confirmation serveur ferait croire
+    /// à une suppression réussie.
+    func deletePost(_ item: UnifiedSocialFeedItem) {
+        guard let page else { return }
+        let snapshot = page
+        self.page = SocialFeedPage(
+            items: page.items.filter { $0.id != item.id },
+            nextCursor: page.nextCursor,
+            stories: page.stories,
+            trendingHashtags: page.trendingHashtags,
+            suggestedUsers: page.suggestedUsers,
+            requestId: page.requestId
+        )
+        Task {
+            do { try await service.deletePost(postId: item.id) }
+            catch {
+                self.page = snapshot
+                if !error.isCancellation { errorMessage = error.localizedDescription }
+            }
+        }
+    }
+
     func muteNotifications(_ item: UnifiedSocialFeedItem) {
         Task {
             do {
@@ -254,6 +308,10 @@ struct FeedView: View {
     @EnvironmentObject private var router: AppRouter
 
     @State private var presentedSheet: FeedSheet?
+    /// Post en attente de confirmation de suppression. La suppression est
+    /// IRRÉVERSIBLE côté serveur : elle ne peut pas partir en deux taps depuis
+    /// un menu contextuel.
+    @State private var pendingDeletion: UnifiedSocialFeedItem?
     @State private var presentedStoryStart: Int?
     @State private var showStoryComposer = false
     @State private var showComposer = false
@@ -382,6 +440,18 @@ struct FeedView: View {
                             onReact: { emoji in model.react(item, emoji: emoji) }
                         )
                         .contextMenu {
+                            // Réservé à l'auteur. Le serveur revérifie et répond
+                            // 403 : ce masquage évite d'offrir une action vouée
+                            // à échouer, il ne fait pas autorité.
+                            if item.canManage {
+                                Button { model.togglePin(item) } label: {
+                                    Label(item.isPinned ? "Désépingler" : "Épingler",
+                                          systemImage: item.isPinned ? "pin.slash" : "pin")
+                                }
+                                Button(role: .destructive) { pendingDeletion = item } label: {
+                                    Label("Supprimer", systemImage: "trash")
+                                }
+                            }
                             Button { model.muteNotifications(item) } label: {
                                 Label(item.notificationsMutedByMe == true ? "Réactiver notifs" : "Couper notifs",
                                       systemImage: item.notificationsMutedByMe == true ? "bell" : "bell.slash")
@@ -465,6 +535,19 @@ struct FeedView: View {
         }
         .onChangeCompat(of: router.openMessagesInbox) { _, shouldOpen in
             if shouldOpen { presentMessagesIfNeeded() }
+        }
+        .confirmationDialog(
+            "Supprimer cette publication ?",
+            isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Supprimer", role: .destructive) {
+                if let item = pendingDeletion { model.deletePost(item) }
+                pendingDeletion = nil
+            }
+            Button("Annuler", role: .cancel) { pendingDeletion = nil }
+        } message: {
+            Text("Cette action est irréversible.")
         }
         .sheet(item: $presentedSheet) { sheet in
             switch sheet {
