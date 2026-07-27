@@ -185,7 +185,7 @@ struct AntennaDetailSheet: View {
             }
             .disabled(model.isUploadingPhoto)
             if let message = model.photoUploadMessage {
-                Text(message)
+                Text(LocalizedStringKey(message))
                     .font(SQType.caption)
                     .foregroundStyle(message.contains("merci") ? SQColor.success : SQColor.danger)
             }
@@ -584,7 +584,7 @@ struct AntennaDetailSheet: View {
     private func detailRow(_ label: String, _ value: String?) -> some View {
         let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines)
         return HStack(alignment: .firstTextBaseline) {
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(SQFont.body(12))
                 .foregroundStyle(SQColor.labelSecondary)
             Spacer(minLength: SQSpace.md)

@@ -156,7 +156,15 @@ struct FriendLiveSheet: View {
         let target = CLLocation(latitude: location.lat, longitude: location.lng)
         let meters = userLocation.distance(from: target)
         if meters < 1000 { return String(localized: "à \(Int(meters.rounded())) m") }
-        return String(localized: "à ") + String(format: "%.1f", meters / 1000).replacingOccurrences(of: ".", with: ",") + " km"
+        // Une seule chaîne localisable, et non un préfixe concaténé : en français
+        // la distance se PRÉFIXE (« à 1,5 km »), en anglais elle se SUFFIXE
+        // (« 1.5 km away »). Un « à » traduit séparément ne peut pas rendre les
+        // deux. Le séparateur décimal suit aussi la locale, au lieu d'être
+        // forcé à la virgule.
+        let kilometers = Measurement(value: meters, unit: UnitLength.meters)
+            .converted(to: .kilometers).value
+        let formatted = kilometers.formatted(.number.precision(.fractionLength(1)))
+        return String(localized: "à \(formatted) km")
     }
 
     private var freshnessText: String? {
@@ -165,7 +173,7 @@ struct FriendLiveSheet: View {
         // plutôt qu'un « dans 0 s » qui suggère à tort le futur.
         if Date().timeIntervalSince(updatedAt) < 15 { return String(localized: "à l'instant") }
         let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.locale = Locale.autoupdatingCurrent
         formatter.unitsStyle = .short
         return formatter.localizedString(for: updatedAt, relativeTo: Date())
     }
@@ -195,7 +203,7 @@ struct FriendLiveSheet: View {
         HStack(spacing: SQSpace.sm) {
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .semibold))
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(SQFont.archivo(16, .semibold))
         }
         .foregroundStyle(filled ? SQColor.onAccent : SQColor.label)

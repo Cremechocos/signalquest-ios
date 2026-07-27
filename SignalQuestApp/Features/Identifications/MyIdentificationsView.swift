@@ -524,7 +524,7 @@ private struct IdentificationDetailSheet: View {
                     .frame(width: 36, height: 36)
                     .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title).font(SQFont.body(15.5, .medium)).foregroundStyle(SQColor.label)
+                    Text(LocalizedStringKey(title)).font(SQFont.body(15.5, .medium)).foregroundStyle(SQColor.label)
                     Text(subtitle).font(SQType.micro).foregroundStyle(SQColor.labelSecondary)
                 }
                 Spacer()
@@ -636,7 +636,7 @@ private struct IdentificationDetailSheet: View {
     private func infoRow(_ label: String, _ value: String, mono: Bool = false) -> some View {
         VStack(spacing: 0) {
             HStack {
-                Text(label).font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
+                Text(LocalizedStringKey(label)).font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
                 Spacer()
                 Text(value)
                     .font(mono ? .subheadline.monospaced() : SQFont.body(14, .semibold))

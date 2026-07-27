@@ -252,7 +252,7 @@ struct SpeedtestServerPicker: View {
                     .foregroundStyle(selected ? SQColor.brandRed : SQColor.labelSecondary)
             }
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(SQFont.body(14, .semibold)).foregroundStyle(SQColor.label).lineLimit(1)
+                Text(LocalizedStringKey(title)).font(SQFont.body(14, .semibold)).foregroundStyle(SQColor.label).lineLimit(1)
                 Text(subtitle).font(SQType.micro).foregroundStyle(SQColor.labelSecondary).lineLimit(1)
             }
             Spacer(minLength: 8)

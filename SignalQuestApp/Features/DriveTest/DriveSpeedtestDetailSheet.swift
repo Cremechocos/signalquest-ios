@@ -107,7 +107,7 @@ struct DriveSpeedtestDetailSheet: View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
             HStack(spacing: 6) {
                 Image(systemName: icon).font(.caption.weight(.semibold)).foregroundStyle(color)
-                Text(title).font(SQFont.body(11.5, .semibold)).foregroundStyle(SQColor.labelSecondary)
+                Text(LocalizedStringKey(title)).font(SQFont.body(11.5, .semibold)).foregroundStyle(SQColor.labelSecondary)
             }
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value).font(SQFont.display(24, .bold)).monospacedDigit().foregroundStyle(SQColor.label)
@@ -169,7 +169,7 @@ struct DriveSpeedtestDetailSheet: View {
                 .foregroundStyle(SQColor.brandRed)
                 .frame(width: 36, height: 36)
                 .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            Text(label).font(SQFont.body(14.5, .medium)).foregroundStyle(SQColor.labelSecondary)
+            Text(LocalizedStringKey(label)).font(SQFont.body(14.5, .medium)).foregroundStyle(SQColor.labelSecondary)
             Spacer()
             Text(value).font(SQFont.body(14.5, .semibold)).foregroundStyle(SQColor.label)
                 .multilineTextAlignment(.trailing).lineLimit(2)

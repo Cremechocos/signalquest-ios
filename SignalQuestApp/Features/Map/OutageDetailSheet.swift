@@ -88,7 +88,7 @@ struct OutageDetailSheet: View {
     func infoRow(_ label: String, _ value: String?) -> some View {
         if let value, !value.isEmpty {
             HStack(alignment: .top) {
-                Text(label)
+                Text(LocalizedStringKey(label))
                     .font(SQType.subhead)
                     .foregroundStyle(SQColor.labelSecondary)
                 Spacer()
@@ -183,7 +183,7 @@ struct OutageDetailSheet: View {
         }
         guard let date else { return raw }
         let out = DateFormatter()
-        out.locale = Locale(identifier: "fr_FR")
+        out.locale = Locale.autoupdatingCurrent
         out.dateStyle = .medium
         out.timeStyle = raw.contains("T") ? .short : .none
         return out.string(from: date)

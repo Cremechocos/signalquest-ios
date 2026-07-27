@@ -117,7 +117,10 @@ final class SpeedtestDetailSheetTests: XCTestCase {
     /// l'erreur doit l'expliquer, pas échouer en silence.
     func testUnknownServerIdIsExplained() {
         let message = SpeedtestPublishError.unknownServerId.errorDescription ?? ""
+        // Indépendant de la langue : on vérifie qu'une EXPLICATION est fournie —
+        // une vraie phrase, pas le nom de cas brut — et non sa formulation.
         XCTAssertFalse(message.isEmpty)
-        XCTAssertTrue(message.lowercased().contains("publié") || message.lowercased().contains("référence"))
+        XCTAssertGreaterThan(message.count, 20, "Un motif d'échec doit être explicité, pas nommé")
+        XCTAssertFalse(message.contains("unknownServerId"))
     }
 }

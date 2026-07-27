@@ -146,7 +146,7 @@ struct SpeedtestDetailContent: View {
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
             HStack(spacing: SQSpace.sm) {
                 Circle().fill(accent).frame(width: 8, height: 8)
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(SQFont.body(14, .semibold))
                     .foregroundStyle(accent)
                 Spacer(minLength: 0)
@@ -276,7 +276,7 @@ struct SpeedtestDetailContent: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(SQColor.labelSecondary)
                 .frame(width: 20)
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.labelSecondary)
             Spacer(minLength: SQSpace.sm)
@@ -322,14 +322,14 @@ struct SpeedtestDetailContent: View {
 
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.locale = Locale.autoupdatingCurrent
         formatter.dateFormat = "d MMM yyyy · HH:mm"
         return formatter
     }()
 
     private static let frFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.locale = Locale.autoupdatingCurrent
         formatter.numberStyle = .decimal
         return formatter
     }()

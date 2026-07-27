@@ -26,7 +26,7 @@ struct MetricPill: View {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(SQColor.brandRed)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(SQFont.body(11))
                     .foregroundStyle(SQColor.labelSecondary)
                 Text(value)
@@ -162,7 +162,7 @@ struct MapFilterBar: View {
                     } label: {
                         // Chips carte : capsules casse normale sans icônes ;
                         // actif = brique pleine, inactif = surface glass + ombre repos.
-                        Text(title)
+                        Text(LocalizedStringKey(title))
                             .font(SQFont.body(12, .semibold))
                             .padding(.horizontal, SQSpace.md + 1)
                             .padding(.vertical, SQSpace.sm)
@@ -450,6 +450,13 @@ private struct PodiumColumnShadow: ViewModifier {
     }
 }
 
+    // `Text(String)` NE LOCALISE PAS — seule la surcharge `LocalizedStringKey`
+    // le fait. Un libellé qui transite par un paramètre `String` contourne donc
+    // le catalogue, ce qui laissait ces états en français une fois l'app passée
+    // en anglais. `LocalizedStringKey(_:)` rétablit la recherche pour les
+    // littéraux, et rend le texte inchangé quand la clé est absente — ce qui est
+    // exactement le comportement voulu pour les quelques appels qui passent un
+    // message venu du serveur.
 struct EmptyStateView: View {
     let title: String
     let message: String
@@ -463,10 +470,10 @@ struct EmptyStateView: View {
                 .frame(width: 64, height: 64)
                 .background(SQColor.accentSoft, in: Circle())
                 .sqDecorative()
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
-            Text(message)
+            Text(LocalizedStringKey(message))
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .multilineTextAlignment(.center)
@@ -492,10 +499,10 @@ struct ErrorStateView: View {
                     .font(.title)
                     .foregroundStyle(SQColor.warning)
                     .sqDecorative()
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
-                Text(message)
+                Text(LocalizedStringKey(message))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)
@@ -530,7 +537,7 @@ struct VPNWarningBanner: View {
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(SQColor.warning)
                 .accessibilityHidden(true)
-            Text(message)
+            Text(LocalizedStringKey(message))
                 .font(.caption.weight(.medium))
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
@@ -726,7 +733,7 @@ struct SQChipMetric: View {
                     .foregroundStyle(SQColor.label)
             }
             if let label {
-                Text(label)
+                Text(LocalizedStringKey(label))
                     .font(SQType.micro)
                     .foregroundStyle(SQColor.labelSecondary)
             }
@@ -747,7 +754,7 @@ struct SQSectionHeader<Trailing: View>: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(SQType.title)
                 .foregroundStyle(SQColor.label)
             Spacer()

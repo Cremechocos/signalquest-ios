@@ -1,104 +1,298 @@
 {
-  "sourceLanguage" : "fr",
-  "strings" : {
-    "%lld" : {
-
-    },
-    "%lld %%" : {
-
-    },
-    "%lld Mbps ↓" : {
-
-    },
-    "%lld ms" : {
-
-    },
-    "%lld tests" : {
-
-    },
-    "%lld%%" : {
-
-    },
-    "Affiche ton dernier test de débit SignalQuest." : {
-
-    },
-    "Antenne à %@" : {
-
-    },
-    "Aucun test" : {
-
-    },
-    "Dernier Speedtest" : {
-
-    },
-    "Débit %@ mégabits par seconde, %@" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Débit %1$@ mégabits par seconde, %2$@"
+  "sourceLanguage": "fr",
+  "strings": {
+    "%lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld"
           }
         }
       }
     },
-    "Lance un Drive Test" : {
-
-    },
-    "Lance un speedtest" : {
-
-    },
-    "Lancer un Speedtest SignalQuest" : {
-
-    },
-    "Mbps" : {
-
-    },
-    "Ouvre SignalQuest pour lancer un test de débit." : {
-
-    },
-    "Pas encore de tendance" : {
-
-    },
-    "Progression" : {
-
-    },
-    "Rafale %lld/%lld" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Rafale %1$lld/%2$lld"
+    "%lld %%": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld %%"
           }
         }
       }
     },
-    "Réseau autour de moi" : {
-
+    "%lld Mbps ↓": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Mbps ↓"
+          }
+        }
+      }
     },
-    "SIGNALQUEST" : {
-
+    "%lld ms": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld ms"
+          }
+        }
+      }
     },
-    "Speedtest" : {
-
+    "%lld tests": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld tests"
+          }
+        }
+      }
     },
-    "Speedtest SignalQuest" : {
-
+    "%lld%%": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%%"
+          }
+        }
+      }
     },
-    "TENDANCE DÉBIT" : {
-
+    "Affiche ton dernier test de débit SignalQuest.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows your latest SignalQuest speedtest."
+          }
+        }
+      }
     },
-    "Tendance débit" : {
-
+    "Antenne à %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antenna %@ away"
+          }
+        }
+      }
     },
-    "Tes derniers tests de débit en un coup d'œil." : {
-
+    "Aucun test": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No test"
+          }
+        }
+      }
     },
-    "Ton opérateur, l'antenne la plus proche et ton dernier débit." : {
-
+    "Dernier Speedtest": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latest Speedtest"
+          }
+        }
+      }
     },
-    "—" : {
-
+    "Débit %@ mégabits par seconde, %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Débit %1$@ mégabits par seconde, %2$@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Throughput %@ megabits per second, %@"
+          }
+        }
+      }
+    },
+    "Lance un Drive Test": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run a Drive Test"
+          }
+        }
+      }
+    },
+    "Lance un speedtest": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run a speedtest"
+          }
+        }
+      }
+    },
+    "Lancer un Speedtest SignalQuest": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run a SignalQuest Speedtest"
+          }
+        }
+      }
+    },
+    "Mbps": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mbps"
+          }
+        }
+      }
+    },
+    "Ouvre SignalQuest pour lancer un test de débit.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens SignalQuest to run a speedtest."
+          }
+        }
+      }
+    },
+    "Pas encore de tendance": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No trend yet"
+          }
+        }
+      }
+    },
+    "Progression": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Progress"
+          }
+        }
+      }
+    },
+    "Rafale %lld/%lld": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Rafale %1$lld/%2$lld"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Burst %lld/%lld"
+          }
+        }
+      }
+    },
+    "Réseau autour de moi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Network around me"
+          }
+        }
+      }
+    },
+    "SIGNALQUEST": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SIGNALQUEST"
+          }
+        }
+      }
+    },
+    "Speedtest": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speedtest"
+          }
+        }
+      }
+    },
+    "Speedtest SignalQuest": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SignalQuest Speedtest"
+          }
+        }
+      }
+    },
+    "TENDANCE DÉBIT": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "THROUGHPUT TREND"
+          }
+        }
+      }
+    },
+    "Tendance débit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Throughput trend"
+          }
+        }
+      }
+    },
+    "Tes derniers tests de débit en un coup d'œil.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your latest speedtests at a glance."
+          }
+        }
+      }
+    },
+    "Ton opérateur, l'antenne la plus proche et ton dernier débit.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your carrier, the nearest antenna and your latest throughput."
+          }
+        }
+      }
+    },
+    "—": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "—"
+          }
+        }
+      }
     }
   },
-  "version" : "1.0"
+  "version": "1.0"
 }

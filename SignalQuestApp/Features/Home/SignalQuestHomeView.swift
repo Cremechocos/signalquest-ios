@@ -140,16 +140,16 @@ struct SignalQuestHomeView: View {
                 .frame(width: 46, height: 46)
                 .background(networkTintSoft, in: Circle())
             VStack(alignment: .leading, spacing: 1) {
-                Text(networkTitle)
+                Text(LocalizedStringKey(networkTitle))
                     .font(SQFont.body(16, .semibold))
                     .foregroundStyle(SQColor.label)
-                Text(networkSubtitle)
+                Text(LocalizedStringKey(networkSubtitle))
                     .font(SQFont.body(13.5))
                     .foregroundStyle(SQColor.labelSecondary)
                     .lineLimit(1)
             }
             Spacer(minLength: SQSpace.sm)
-            Text(networkBadge)
+            Text(LocalizedStringKey(networkBadge))
                 .font(SQFont.body(12, .semibold))
                 .padding(.horizontal, 11)
                 .padding(.vertical, 6)
@@ -301,10 +301,10 @@ struct SignalQuestHomeView: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
+                    Text(LocalizedStringKey(title))
                         .font(SQFont.display(16.5, .semibold))
                         .foregroundStyle(accented ? SQColor.onAccent : SQColor.label)
-                    Text(subtitle)
+                    Text(LocalizedStringKey(subtitle))
                         .font(SQFont.body(12.5))
                         // Pas d'alpha sur brique : à 12,5 pt il faut 4,5:1, que
                         // `onAccent` n'atteint qu'à α ≈ 0,92 — indiscernable du
@@ -425,7 +425,7 @@ struct SignalQuestHomeView: View {
                 .foregroundStyle(SQColor.brandRed)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-            Text(unit)
+            Text(LocalizedStringKey(unit))
                 .font(SQFont.body(11))
                 .foregroundStyle(SQColor.labelSecondary)
                 // Trois tuiles se partagent la largeur : à Dynamic Type élevé,
@@ -451,7 +451,7 @@ struct SignalQuestHomeView: View {
                 ZStack {
                     Circle().fill(TechAccent.color(for: measure.tech))
                     if let label = Self.techShortLabel(measure.tech) {
-                        Text(label)
+                        Text(LocalizedStringKey(label))
                             .font(SQFont.body(12, .bold))
                             .foregroundStyle(SQColor.onAccent)
                     } else {

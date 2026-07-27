@@ -200,7 +200,7 @@ struct ANFRSiteDetailSheet: View {
                 .frame(width: 32, height: 32)
                 .background(SQColor.accentSoft, in: Circle())
                 .accessibilityHidden(true)
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
         }

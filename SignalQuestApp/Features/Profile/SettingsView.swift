@@ -415,7 +415,7 @@ struct SettingsView: View {
     /// (icône brique) + libellé Figtree Medium 15,5. Aucune bordure.
     private func settingsLabel(_ title: String, systemImage: String) -> some View {
         Label {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(SQFont.body(15.5, .medium))
                 .foregroundStyle(SQColor.label)
         } icon: {

@@ -204,7 +204,7 @@ struct GroupSettingsView: View {
 
     /// En-tête de section : Figtree casse normale (pas de majuscules trackées).
     private func sectionHeader(_ title: String) -> some View {
-        Text(title)
+        Text(LocalizedStringKey(title))
             .font(SQType.subhead)
             .foregroundStyle(SQColor.labelSecondary)
             .textCase(nil)

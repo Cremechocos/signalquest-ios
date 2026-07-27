@@ -704,7 +704,7 @@ private struct LeaderboardMenuPill<Items: View>: View {
                 Image(systemName: icon)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(SQColor.brandRed)
-                Text(label)
+                Text(LocalizedStringKey(label))
                     .font(SQFont.body(13, .semibold))
                     .foregroundStyle(SQColor.label)
                 Image(systemName: "chevron.up.chevron.down")
@@ -741,7 +741,7 @@ private struct LeaderboardFilterChip: View {
                     Image(systemName: icon)
                         .font(.system(size: 11, weight: .semibold))
                 }
-                Text(label)
+                Text(LocalizedStringKey(label))
                     .font(SQFont.body(13, .semibold))
             }
                 .padding(.horizontal, SQSpace.md + 2)

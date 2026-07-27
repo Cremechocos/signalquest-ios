@@ -111,7 +111,7 @@ struct NearbyNetworkQualityDetailSheet: View {
                 .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(title).font(SQFont.body(15, .semibold)).foregroundStyle(SQColor.label)
+                    Text(LocalizedStringKey(title)).font(SQFont.body(15, .semibold)).foregroundStyle(SQColor.label)
                     Spacer()
                     Text(valueText).font(SQFont.body(15, .semibold)).monospacedDigit().foregroundStyle(SQColor.label)
                 }
@@ -126,7 +126,7 @@ struct NearbyNetworkQualityDetailSheet: View {
                         .padding(.horizontal, 8).padding(.vertical, 2)
                         .background(band.swiftUIColor.opacity(0.14), in: Capsule(style: .continuous))
                 }
-                Text(caption)
+                Text(LocalizedStringKey(caption))
                     .font(SQFont.body(12))
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)

@@ -297,7 +297,7 @@ struct FriendsListView: View {
 
     /// En-tête de section Figtree, casse normale (plus de MAJUSCULES système).
     private func sectionHeader(_ title: String) -> some View {
-        Text(title)
+        Text(LocalizedStringKey(title))
             .font(SQType.subhead)
             .foregroundStyle(SQColor.labelSecondary)
             .textCase(nil)
@@ -345,7 +345,7 @@ struct FriendsListView: View {
             Haptics.medium()
             action()
         } label: {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(SQFont.body(13, .semibold, relativeTo: .footnote))
                 .padding(.horizontal, SQSpace.md)
                 .padding(.vertical, SQSpace.sm)

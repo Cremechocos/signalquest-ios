@@ -51,7 +51,7 @@ struct NetworkPulseHero: View {
                 .foregroundStyle(SQColor.onAccent)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(SQFont.body(11, .medium))
                 .foregroundStyle(SQColor.onAccent)
                 // Même correctif que `pulseTile` : `lineLimit(1)` sans repli

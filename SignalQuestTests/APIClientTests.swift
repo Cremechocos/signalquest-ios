@@ -67,15 +67,19 @@ final class APIClientTests: XCTestCase {
             APIError.userFacingMessage(status: 500, code: nil, serverMessage: "Invalid `prisma.$queryRaw()` invocation: ..."),
             APIError.statusFallback(500)
         )
+        // Comparé au REPLI, pas à sa traduction : figer la copie française ferait
+        // tomber ce test le jour de l'ajout d'une langue, sans qu'aucune fuite
+        // n'ait eu lieu — ce qui s'est produit.
         XCTAssertEqual(
             APIError.http(status: 500, code: nil, message: "Invalid `prisma.$queryRaw()` invocation: ...", requestId: "r1", retryAfter: nil).errorDescription,
-            "Service momentanément indisponible. Réessaie plus tard."
+            APIError.statusFallback(500)
         )
-        // Un code connu reste prioritaire, même en 5xx.
-        XCTAssertEqual(
-            APIError.userFacingMessage(status: 503, code: "RATE_LIMITED", serverMessage: "peu importe"),
-            "Trop de requêtes. Patiente un instant avant de réessayer."
-        )
+        // Un code connu reste prioritaire, même en 5xx. Ce qui compte est que la
+        // prose du serveur ne ressorte pas, pas le libellé exact du remplacement.
+        let rateLimited = APIError.userFacingMessage(status: 503, code: "RATE_LIMITED", serverMessage: "peu importe")
+        XCTAssertFalse(rateLimited.contains("peu importe"))
+        XCTAssertFalse(rateLimited.isEmpty)
+        XCTAssertNotEqual(rateLimited, APIError.statusFallback(503))
         // Un 4xx avec message FR lisible passe toujours (comportement inchangé).
         XCTAssertEqual(
             APIError.userFacingMessage(status: 400, code: nil, serverMessage: "Le nom est déjà pris."),

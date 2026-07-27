@@ -563,7 +563,7 @@ struct ConversationDetailView: View {
                 .fill(SQColor.brandRed)
                 .frame(width: 3, height: 32)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(SQType.micro)
                     .foregroundStyle(SQColor.brandRed)
                 Text(text)

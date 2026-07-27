@@ -112,7 +112,7 @@ struct SpeedtestTriMetric: View {
     @ViewBuilder
     func cell(title: String, value: String, state: CellState, quality: Color?) -> some View {
         VStack(spacing: 3) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(SQFont.body(12))
                 .foregroundStyle(SQColor.labelSecondary)
             Text(value)

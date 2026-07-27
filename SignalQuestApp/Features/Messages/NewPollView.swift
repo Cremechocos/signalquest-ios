@@ -133,7 +133,7 @@ struct NewPollView: View {
 
     private func section<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.labelSecondary)
             content()

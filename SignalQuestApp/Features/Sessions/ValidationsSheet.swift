@@ -86,7 +86,7 @@ struct ValidationsSheet: View {
     private func group(_ title: String, _ type: String, _ entries: [ValidationEntry]) -> some View {
         if !entries.isEmpty {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
                     .padding(.bottom, SQSpace.xs)

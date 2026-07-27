@@ -98,7 +98,7 @@ struct MyMeasurementsView: View {
             Haptics.selection()
             coloring = value
         } label: {
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(SQFont.body(13, .semibold))
                 .padding(.horizontal, SQSpace.lg - 2)
                 .padding(.vertical, SQSpace.sm)
@@ -136,7 +136,7 @@ struct MyMeasurementsView: View {
     private func legendRow(_ color: Color, _ label: String) -> some View {
         HStack(spacing: 6) {
             Circle().fill(color).frame(width: 10, height: 10)
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(SQFont.body(11.5, relativeTo: .caption2))
                 .foregroundStyle(SQColor.label)
         }

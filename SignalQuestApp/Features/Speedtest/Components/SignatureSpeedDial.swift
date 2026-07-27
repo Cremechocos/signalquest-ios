@@ -170,7 +170,7 @@ struct SignatureSpeedDial: View {
 
                 if let label = tick.label {
                     let position = point(fraction: tick.fraction, radius: labelRadius)
-                    Text(label)
+                    Text(LocalizedStringKey(label))
                         .font(SQFont.body(10, .semibold))
                         .foregroundStyle(reached ? SQColor.labelSecondary : SQColor.labelSecondary)
                         .monospacedDigit()

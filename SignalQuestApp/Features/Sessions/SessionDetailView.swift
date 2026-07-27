@@ -200,7 +200,7 @@ struct SessionDetailView: View {
                 .frame(width: 24)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
-                Text(label).font(SQFont.body(11, relativeTo: .caption2)).foregroundStyle(SQColor.labelSecondary)
+                Text(LocalizedStringKey(label)).font(SQFont.body(11, relativeTo: .caption2)).foregroundStyle(SQColor.labelSecondary)
                 Text(value)
                     .font(SQFont.display(15, .bold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
@@ -310,7 +310,7 @@ struct SessionDetailView: View {
     private func legendDot(_ color: UIColor, _ label: String) -> some View {
         HStack(spacing: 3) {
             Circle().fill(Color(uiColor: color)).frame(width: 7, height: 7)
-            Text(label)
+            Text(LocalizedStringKey(label))
         }
     }
 
@@ -409,7 +409,7 @@ struct SessionDetailView: View {
 
     private func speedStat(_ label: String, _ value: Double?, _ unit: String, _ color: Color) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(SQFont.body(10.5, relativeTo: .caption2))
                 .foregroundStyle(SQColor.labelSecondary)
             HStack(alignment: .firstTextBaseline, spacing: 2) {

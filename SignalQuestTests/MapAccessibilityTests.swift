@@ -25,10 +25,20 @@ final class MapAccessibilityTests: XCTestCase {
     /// Le label doit nommer la NATURE de l'élément : « Orange 4G » seul ne dit
     /// pas à un lecteur d'écran s'il s'agit d'une antenne ou d'une mesure.
     func testLabelNamesTheKind() {
-        XCTAssertTrue(MapAccessibility.describe(payload(kind: .antenna)).label.hasPrefix("Antenne"))
-        XCTAssertTrue(MapAccessibility.describe(payload(kind: .photo)).label.hasPrefix("Photo"))
-        XCTAssertTrue(MapAccessibility.describe(payload(kind: .friend)).label.hasPrefix("Ami"))
-        XCTAssertTrue(MapAccessibility.describe(payload(kind: .outage)).label.hasPrefix("Incident"))
+        // Indépendant de la langue : ce qui doit tenir est que chaque nature
+        // produise un préfixe DISTINCT et non vide, pas qu'il s'écrive
+        // « Antenne ». Figer le mot français faisait tomber ce test à l'ajout
+        // de l'anglais alors que le comportement était intact.
+        let kinds: [MapDisplayItem.Kind] = [.antenna, .photo, .friend, .outage]
+        var prefixes: Set<String> = []
+        for kind in kinds {
+            let label = MapAccessibility.describe(payload(kind: kind)).label
+            let prefix = label.components(separatedBy: " ").first ?? ""
+            XCTAssertFalse(prefix.isEmpty, "\(kind) : label sans préfixe de nature")
+            XCTAssertTrue(label.hasSuffix("Orange 4G"), "\(kind) : le titre doit suivre la nature")
+            prefixes.insert(prefix)
+        }
+        XCTAssertEqual(prefixes.count, kinds.count, "Deux natures partagent le même préfixe : \(prefixes)")
     }
 
     func testLabelIncludesTheTitle() {
@@ -38,9 +48,11 @@ final class MapAccessibilityTests: XCTestCase {
     /// Un titre vide ne doit pas produire un label tronqué du type « Antenne ».
     func testEmptyTitleFallsBackGracefully() {
         let description = MapAccessibility.describe(payload(kind: .antenna, title: ""))
-        XCTAssertTrue(description.label.contains("Antenne"))
+        let named = MapAccessibility.describe(payload(kind: .antenna, title: "Orange 4G"))
+        let noun = named.label.components(separatedBy: " ").first ?? ""
+        XCTAssertTrue(description.label.hasPrefix(noun), "La nature doit rester annoncée")
         XCTAssertFalse(description.label.hasSuffix(" "), "Label mal formé : \(description.label)")
-        XCTAssertGreaterThan(description.label.count, "Antenne".count)
+        XCTAssertGreaterThan(description.label.count, noun.count, "Un repli lisible doit suivre la nature")
     }
 
     /// L'information utile va en `value` : VoiceOver l'énonce après le label et
@@ -62,8 +74,9 @@ final class MapAccessibilityTests: XCTestCase {
     /// dire comment le développer.
     func testClusterAnnouncesItsCount() {
         let description = MapAccessibility.describe(payload(kind: .antenna, clusterCount: 42))
+        let single = MapAccessibility.describe(payload(kind: .antenna))
         XCTAssertTrue(description.label.contains("42"), description.label)
-        XCTAssertTrue(description.label.contains("antennes"), description.label)
+        XCTAssertNotEqual(description.label, single.label, "Un groupe ne s'annonce pas comme un élément seul")
         XCTAssertNotNil(description.hint, "Un cluster doit indiquer qu'il faut zoomer")
     }
 
@@ -71,7 +84,8 @@ final class MapAccessibilityTests: XCTestCase {
     /// comme un groupe.
     func testSingleElementClusterIsNotAnnouncedAsGroup() {
         let description = MapAccessibility.describe(payload(kind: .antenna, clusterCount: 1))
-        XCTAssertFalse(description.label.contains("Groupe"), description.label)
+        XCTAssertEqual(description.label, MapAccessibility.describe(payload(kind: .antenna)).label,
+                       "Un « groupe » de 1 doit s'annoncer comme un élément simple")
     }
 
     /// L'indice dit ce que le tap PRODUIT — non déductible sans voir l'écran —

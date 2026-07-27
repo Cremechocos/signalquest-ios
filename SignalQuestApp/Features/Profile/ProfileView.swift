@@ -149,7 +149,7 @@ struct ProfileView: View {
                 .monospacedDigit()
                 .foregroundStyle(accent ? SQColor.brandRed : SQColor.label)
                 .contentTransition(.numericText())
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(SQFont.body(11.5))
                 .foregroundStyle(SQColor.labelSecondary)
         }
@@ -322,7 +322,7 @@ struct ProfileView: View {
                 .frame(width: 36, height: 36)
                 .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .accessibilityHidden(true)
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(SQFont.body(15.5, .medium))
                 .foregroundStyle(SQColor.label)
             Spacer()

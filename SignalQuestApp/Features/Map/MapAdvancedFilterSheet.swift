@@ -287,7 +287,7 @@ struct MapAdvancedFilterSheet: View {
                 Image(systemName: icon)
                     .font(.system(size: 12, weight: .semibold))
                     .frame(width: 16)
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(SQFont.body(12.5, .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -364,7 +364,7 @@ struct MapAdvancedFilterSheet: View {
 
     func periodPicker(_ title: String, selection: Binding<Int>) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(SQFont.body(12.5, .semibold))
                 .foregroundStyle(SQColor.labelSecondary)
             Picker(title, selection: selection) {

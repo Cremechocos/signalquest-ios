@@ -398,7 +398,7 @@ struct ANFRMapFilterSheet: View {
 
     private func section<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
             content()
@@ -412,7 +412,7 @@ struct ANFRMapFilterSheet: View {
         } label: {
             HStack(spacing: SQSpace.xs + 2) {
                 Circle().fill(on ? SQColor.onAccent : color).frame(width: 8, height: 8)
-                Text(label).font(SQFont.body(13, .semibold))
+                Text(LocalizedStringKey(label)).font(SQFont.body(13, .semibold))
             }
             .padding(.horizontal, SQSpace.md)
             .frame(height: 38)
@@ -469,7 +469,7 @@ struct ANFRDatePickerSheet: View {
                     .font(.body.weight(.semibold))
                     .foregroundStyle(isSelected ? SQColor.brandRed : SQColor.labelTertiary)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(label)
+                    Text(LocalizedStringKey(label))
                         .font(SQFont.body(15, .semibold))
                         .foregroundStyle(SQColor.label)
                     if let value, let pretty = ANFRDateParser.date(from: value)?.formatted(.dateTime.day().month(.wide).year()) {

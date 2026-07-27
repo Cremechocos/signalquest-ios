@@ -312,7 +312,7 @@ private struct LiveLocationDisclosureSheet: View {
                     in: RoundedRectangle(cornerRadius: 9, style: .continuous)
                 )
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(SQType.subhead)
                     .foregroundStyle(SQColor.label)
                 Text(detail)

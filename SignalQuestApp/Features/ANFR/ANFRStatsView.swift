@@ -275,7 +275,7 @@ struct ANFRStatsView: View {
             Haptics.selection()
             action()
         } label: {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(SQFont.body(13, .semibold))
                 .foregroundStyle(active ? SQColor.onAccent : SQColor.label)
                 .frame(maxWidth: .infinity)
@@ -506,7 +506,7 @@ struct ANFRStatsView: View {
     private func legendDot(color: Color, label: String) -> some View {
         HStack(spacing: SQSpace.xs + 2) {
             Circle().fill(color).frame(width: 9, height: 9)
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(SQType.micro)
                 .foregroundStyle(SQColor.labelSecondary)
         }
@@ -631,7 +631,7 @@ struct ANFRStatsView: View {
                 .frame(width: 32, height: 32)
                 .background(SQColor.accentSoft, in: Circle())
                 .accessibilityHidden(true)
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
         }

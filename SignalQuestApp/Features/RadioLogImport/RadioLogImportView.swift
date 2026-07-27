@@ -64,7 +64,7 @@ struct RadioLogImportView: View {
         case .error(let message):
             VStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle").font(.largeTitle).foregroundStyle(.orange)
-                Text(message).multilineTextAlignment(.center).foregroundStyle(.secondary)
+                Text(LocalizedStringKey(message)).multilineTextAlignment(.center).foregroundStyle(.secondary)
                 importButton
             }.padding()
         case .ready:
@@ -281,7 +281,7 @@ private struct RadioLogCellDetailView: View {
 
     private func infoRow(_ label: String, _ value: String) -> some View {
         HStack {
-            Text(label).foregroundStyle(.secondary)
+            Text(LocalizedStringKey(label)).foregroundStyle(.secondary)
             Spacer()
             Text(value).multilineTextAlignment(.trailing)
         }.font(.subheadline)

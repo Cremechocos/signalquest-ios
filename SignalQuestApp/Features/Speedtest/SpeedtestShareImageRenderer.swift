@@ -250,7 +250,7 @@ private struct SpeedtestShareCard: View {
 
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.locale = Locale.autoupdatingCurrent
         formatter.dateFormat = "d MMM yyyy · HH:mm"
         return formatter
     }()
@@ -258,7 +258,7 @@ private struct SpeedtestShareCard: View {
     /// Formats français (virgule décimale) — l'app est monolangue FR.
     private static let frNumberFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.locale = Locale.autoupdatingCurrent
         formatter.numberStyle = .decimal
         return formatter
     }()
@@ -372,7 +372,7 @@ private struct SpeedtestShareCard: View {
                 Circle()
                     .fill(accentColor)
                     .frame(width: 8, height: 8)
-                Text(label)
+                Text(LocalizedStringKey(label))
                     .font(SQFont.bodyFixed(15, .semibold))
                     .foregroundStyle(accentColor)
                 Spacer(minLength: 0)

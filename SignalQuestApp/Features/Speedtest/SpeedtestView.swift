@@ -544,7 +544,7 @@ struct SpeedtestView: View {
 
     private func detailItem(label: String, value: String, trailing: String? = nil, highlight: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(SQType.micro)
                 .foregroundStyle(SQColor.labelSecondary)
             HStack(alignment: .firstTextBaseline, spacing: 4) {

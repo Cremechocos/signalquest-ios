@@ -4,7 +4,10 @@ options:
   # Déclare les localisations du projet. Sans `knownRegions`, Xcode ne compile
   # pas les String Catalogs et le réglage « Langue préférée » de l'app
   # n'apparaît pas dans les Réglages système.
-  knownRegions: [fr, Base]
+  # `en` ajouté avec la traduction anglaise : sans lui, les String Catalogs
+  # compilent la variante anglaise mais l'app ne la propose jamais, et le
+  # sélecteur de langue des Réglages système reste absent.
+  knownRegions: [fr, en, Base]
   bundleIdPrefix: fr.signalquest
   createIntermediateGroups: true
   deploymentTarget:
@@ -203,6 +206,13 @@ schemes:
         - SignalQuestTests
         - SignalQuestUITests
       gatherCoverageData: true
+      # Langue VERROUILLÉE sur le français. Plusieurs tests assertent le texte
+      # exact rendu à l'utilisateur (message d'erreur serveur non divulgué,
+      # descriptions d'accessibilité de la carte). Sans ce verrou, ils suivent
+      # la langue du simulateur : ils passaient tant que le français était la
+      # seule localisation, et 8 sont tombés le jour où l'anglais est arrivé.
+      language: fr
+      region: FR
     run:
       config: Debug
       storeKitConfiguration: SignalQuest.storekit
@@ -218,6 +228,8 @@ schemes:
         - SignalQuestTests
         - SignalQuestUITests
       gatherCoverageData: true
+      language: fr
+      region: FR
     run:
       config: Staging
     archive:

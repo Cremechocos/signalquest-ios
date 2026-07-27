@@ -92,7 +92,7 @@ struct PlannedDetailSheet: View {
     private func legendDot(_ color: Color, _ label: String) -> some View {
         HStack(spacing: 4) {
             Circle().fill(color).frame(width: 7, height: 7)
-            Text(label)
+            Text(LocalizedStringKey(label))
         }
     }
 
@@ -116,7 +116,7 @@ struct PlannedDetailSheet: View {
     private func infoRow(_ label: String, _ value: String?) -> some View {
         if let value, !value.isEmpty {
             HStack(alignment: .top) {
-                Text(label)
+                Text(LocalizedStringKey(label))
                     .font(SQType.subhead)
                     .foregroundStyle(SQColor.labelSecondary)
                 Spacer()
@@ -188,7 +188,7 @@ struct PlannedDetailSheet: View {
     private func formattedDate(_ date: Date?) -> String? {
         guard let date else { return nil }
         let out = DateFormatter()
-        out.locale = Locale(identifier: "fr_FR")
+        out.locale = Locale.autoupdatingCurrent
         out.dateStyle = .medium
         out.timeStyle = .none
         return out.string(from: date)

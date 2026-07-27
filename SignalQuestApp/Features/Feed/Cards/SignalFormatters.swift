@@ -85,7 +85,7 @@ struct CardMetricTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(SQFont.body(11))
                 .foregroundStyle(SQColor.labelSecondary)
                 // Sans repli, « Tech » et « Down » se tronquaient à Dynamic Type

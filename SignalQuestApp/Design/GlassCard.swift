@@ -79,7 +79,7 @@ struct GradientButton: View {
                     Image(systemName: systemImage)
                         .font(.system(size: 16, weight: .semibold))
                 }
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(SQType.button)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)

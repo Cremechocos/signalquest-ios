@@ -27,7 +27,7 @@ struct SpeedtestServerBar: View {
                 .fill(SQColor.success)
                 .frame(width: 7, height: 7)
                 .accessibilityHidden(true)
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(SQFont.body(13, .medium))
                 .foregroundStyle(SQColor.labelSecondary)
                 .lineLimit(1)

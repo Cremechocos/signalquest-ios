@@ -1005,11 +1005,11 @@ struct DriveTestView: View {
 
     private func legendSection(_ title: String, items: [(String, Color)], mark: LegendMark) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(SQFont.body(11, .semibold)).foregroundStyle(SQColor.labelSecondary)
+            Text(LocalizedStringKey(title)).font(SQFont.body(11, .semibold)).foregroundStyle(SQColor.labelSecondary)
             ForEach(items, id: \.0) { label, color in
                 HStack(spacing: 6) {
                     legendMark(mark, color: color).frame(width: 14, alignment: .center)
-                    Text(label).font(SQFont.body(11.5)).foregroundStyle(SQColor.label)
+                    Text(LocalizedStringKey(label)).font(SQFont.body(11.5)).foregroundStyle(SQColor.label)
                 }
             }
         }
@@ -1285,7 +1285,7 @@ struct DriveTestView: View {
                     .foregroundStyle(SQColor.label)
                 if let unit { Text(unit).font(SQFont.body(11)).foregroundStyle(SQColor.labelSecondary) }
             }
-            Text(label).font(SQFont.body(11)).foregroundStyle(SQColor.labelSecondary)
+            Text(LocalizedStringKey(label)).font(SQFont.body(11)).foregroundStyle(SQColor.labelSecondary)
         }
         .frame(maxWidth: .infinity)
     }
