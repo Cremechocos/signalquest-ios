@@ -47,7 +47,7 @@ struct ShareCardBubble: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(badge)
                         .font(SQType.micro)
-                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.75) : SQColor.labelSecondary)
+                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                     Text(card.title)
                         .font(SQFont.body(14, .semibold))
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
@@ -58,7 +58,7 @@ struct ShareCardBubble: View {
             if let subtitle = card.subtitle, !subtitle.isEmpty {
                 Text(subtitle)
                     .font(SQType.micro)
-                    .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
+                    .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                     .lineLimit(2)
             }
             if !card.rows.isEmpty {
@@ -67,7 +67,7 @@ struct ShareCardBubble: View {
                         HStack {
                             Text(row.label)
                                 .font(SQType.micro)
-                                .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
+                                .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                             Spacer(minLength: SQSpace.sm)
                             Text(row.value)
                                 .font(SQType.caption.weight(.medium))
@@ -119,7 +119,7 @@ struct SignalCardBubble: View {
                     if let sub = signal.subtitleLine ?? card.subtitle {
                         Text(sub)
                             .font(SQType.micro)
-                            .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
+                            .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                             .lineLimit(1)
                     }
                 }
@@ -138,7 +138,7 @@ struct SignalCardBubble: View {
                 } else {
                     Text("RSRP indisponible")
                         .font(SQType.caption)
-                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.8) : SQColor.labelSecondary)
+                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                 }
                 Spacer(minLength: 0)
                 if let score = signal.resolvedScore {
@@ -232,7 +232,7 @@ struct SharedPostCardBubble: View {
                     .lineLimit(1)
                 Text(sourceLine)
                     .font(SQType.micro)
-                    .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
+                    .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
@@ -302,7 +302,7 @@ struct SharedPostCardBubble: View {
             if !visibleChips.isEmpty {
                 Text(visibleChips.joined(separator: " · "))
                     .font(SQType.micro)
-                    .foregroundStyle(mine ? SQColor.onAccent.opacity(0.75) : SQColor.labelSecondary)
+                    .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                     .lineLimit(1)
             }
         }
@@ -385,7 +385,7 @@ struct LocationBubble: View {
                             .lineLimit(1)
                         Text("Ouvrir dans Plans · \(coordinateText)")
                             .font(SQType.micro)
-                            .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
+                            .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 0)

@@ -88,6 +88,10 @@ struct CardMetricTile: View {
             Text(label)
                 .font(SQFont.body(11))
                 .foregroundStyle(SQColor.labelSecondary)
+                // Sans repli, « Tech » et « Down » se tronquaient à Dynamic Type
+                // élevé alors que la valeur, elle, savait se réduire.
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
             Text(value)
                 .font(SQFont.display(15, .bold))
                 .foregroundStyle(highlight ? accent : SQColor.label)

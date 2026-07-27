@@ -417,7 +417,7 @@ struct LeaderboardPodium: View {
                                 .foregroundStyle(isFirst ? SQColor.onAccent : SQColor.label)
                             Text("\(Int(entry.value)) \(entry.unit)")
                                 .font(SQFont.body(11))
-                                .foregroundStyle(isFirst ? SQColor.onAccent.opacity(0.85) : SQColor.labelSecondary)
+                                .foregroundStyle(isFirst ? SQColor.onAccent : SQColor.labelSecondary)
                         }
                     )
                     .modifier(PodiumColumnShadow(accent: isFirst))
@@ -462,6 +462,7 @@ struct EmptyStateView: View {
                 .foregroundStyle(SQColor.brandRed)
                 .frame(width: 64, height: 64)
                 .background(SQColor.accentSoft, in: Circle())
+                .sqDecorative()
             Text(title)
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
@@ -472,6 +473,10 @@ struct EmptyStateView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(SQSpace.xxl + 2)
+        // Un état vide se lit d'un bloc : titre puis explication. Le laisser en
+        // trois éléments distincts obligerait à balayer trois fois pour une
+        // information unique. Traiter ce composant couvre ses ~28 sites d'usage.
+        .sqCard(label: title, value: message)
     }
 }
 
@@ -486,6 +491,7 @@ struct ErrorStateView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.title)
                     .foregroundStyle(SQColor.warning)
+                    .sqDecorative()
                 Text(title)
                     .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
@@ -493,6 +499,12 @@ struct ErrorStateView: View {
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)
+                // Volontairement PAS de `.sqCard` ici : regrouper ce bloc faisait
+                // échouer `testFiveTabsAndPrimaryStatesWithMockAuth`, qui ne
+                // retrouvait plus `feed.header` ni le bouton « Messages » —
+                // pourtant des FRÈRES de cet état d'erreur, pas des enfants.
+                // Mécanisme non élucidé ; le gain (3 arrêts de balayage en 1)
+                // ne valait pas de livrer une régression inexpliquée.
                 if let retry {
                     Button("Réessayer", action: retry)
                         .buttonStyle(.borderedProminent)

@@ -709,7 +709,9 @@ struct ConversationDetailView: View {
                     } label: {
                         HStack(spacing: SQSpace.xs + 2) {
                             RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                .fill(mine ? SQColor.onAccent.opacity(0.6) : SQColor.brandRed)
+                                // 0,6 donnait 2,82:1 : sous le seuil de 3:1 que
+                                // WCAG 1.4.11 impose aux objets graphiques.
+                                .fill(mine ? SQColor.onAccent.opacity(0.7) : SQColor.brandRed)
                                 .frame(width: 3)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(quoted.sender?.displayName ?? "Message")
@@ -730,7 +732,7 @@ struct ConversationDetailView: View {
                 if message.deletedAt != nil {
                     Text("Message supprimé")
                         .font(SQType.caption.italic())
-                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
+                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                 } else if let shareCard = card {
                     // Partage envoyé par Android (publication / signal / speedtest / session…).
                     // La publication (`social_post`) est testée EN PREMIER car elle peut
@@ -921,7 +923,7 @@ struct ConversationDetailView: View {
                 .accessibilityHidden(true)
             Text(text)
                 .font(SQType.caption.italic())
-                .foregroundStyle(mine ? SQColor.onAccent.opacity(0.9) : SQColor.labelSecondary)
+                .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
         }
         .padding(.top, SQSpace.xs)
     }
@@ -1169,7 +1171,7 @@ struct ConversationDetailView: View {
                         .truncationMode(.middle)
                     Text(fileMetaLine(attachment))
                         .font(SQType.micro)
-                        .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelSecondary)
+                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: SQSpace.sm)

@@ -53,8 +53,12 @@ struct NetworkPulseHero: View {
                 .minimumScaleFactor(0.7)
             Text(label)
                 .font(SQFont.body(11, .medium))
-                .foregroundStyle(SQColor.onAccent.opacity(0.8))
-                .lineLimit(1)
+                .foregroundStyle(SQColor.onAccent)
+                // Même correctif que `pulseTile` : `lineLimit(1)` sans repli
+                // tronquait « dBm moyen » dès que la police grandissait.
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
     }

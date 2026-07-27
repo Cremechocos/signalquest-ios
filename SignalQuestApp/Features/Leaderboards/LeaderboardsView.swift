@@ -886,7 +886,7 @@ private struct PodiumColumn: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .padding(.horizontal, SQSpace.xs)
-                    .foregroundStyle(isFirst ? SQColor.onAccent.opacity(0.85) : SQColor.labelSecondary)
+                    .foregroundStyle(isFirst ? SQColor.onAccent : SQColor.labelSecondary)
             }
         )
         .modifier(SQSoftShadowIf(active: !isFirst, accentOtherwise: true))

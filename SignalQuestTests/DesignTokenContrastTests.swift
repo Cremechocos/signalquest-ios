@@ -150,4 +150,96 @@ final class DesignTokenContrastTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(r, 4.5, "onAccent sur brandRed : \(String(format: "%.2f", r)):1")
         }
     }
+
+    /// Le trou que ce fichier avait laissé passer.
+    ///
+    /// Tous les tests ci-dessus mesurent les tokens à **alpha plein**, alors que
+    /// l'app rend `onAccent` à 0,7-0,92 sur les bulles brique et les tuiles
+    /// accentuées — de l'encre translucide qui se rapproche de son propre fond.
+    /// `performAccessibilityAudit` a signalé ces textes ; le test unitaire, non.
+    ///
+    /// Le seuil retenu est **3:1** et non 4,5 : ces usages sont tous du texte
+    /// ≥ 18 pt ou semi-gras (sous-titres de tuile, méta de bulle), catégorie
+    /// « large text » de WCAG 1.4.3. Les alphas qui n'y arrivent pas doivent
+    /// être remontés, pas dispensés.
+    func testTranslucentOnAccentStaysReadable() {
+        // Les alphas restants sont tous portés par des OBJETS GRAPHIQUES (traits,
+        // icônes décoratives, `ProgressView`) ou du grand texte : seuil 3:1.
+        // Les 13 petits textes qui les utilisaient sont repassés en alpha plein,
+        // parce qu'aucune valeur < 1,0 n'atteint 4,5:1 en mode clair.
+        // 0,6 a disparu du code : il donnait 2,82:1 sur la barre de citation.
+        let alphas: [CGFloat] = [0.7, 0.75, 0.8, 0.85, 0.9, 0.92]
+        var failures: [String] = []
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            let mode = style == .light ? "clair" : "sombre"
+            for alpha in alphas {
+                let ink = UIColor(SQColor.onAccent).withAlphaComponent(alpha)
+                let composited = composite(ink, over: UIColor(SQColor.brandRed), style)
+                let r = ratio(composited, on: UIColor(SQColor.brandRed), style)
+                let line = "  α=\(alpha) \(mode) : \(String(format: "%.2f", r)):1"
+                print("SQ_ALPHA\(line)")
+                if r < 3.0 { failures.append(line) }
+            }
+        }
+        XCTAssertTrue(
+            failures.isEmpty,
+            "Encre translucide illisible sur brandRed :\n" + failures.joined(separator: "\n")
+        )
+    }
+
+    /// Garde-fou de SOURCE : aucun `Text` ne doit reprendre un `onAccent`
+    /// translucide.
+    ///
+    /// Le test de ratios ci-dessus ne peut pas l'attraper — il mesure des
+    /// couleurs, pas des sites d'appel. Or c'est exactement l'erreur qui s'était
+    /// glissée treize fois : une hiérarchie de texte obtenue par l'alpha, qui
+    /// n'atteint jamais 4,5:1 sur brique en mode clair (5,05:1 à alpha plein,
+    /// 4,39:1 dès 0,9).
+    ///
+    /// Les objets graphiques gardent leur alpha : WCAG 1.4.11 ne leur demande
+    /// que 3:1. La distinction se fait sur la vue qui PRÉCÈDE le modificateur.
+    func testNoSmallTextUsesTranslucentOnAccent() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("SignalQuestApp")
+        let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?
+            .compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" } ?? []
+
+        // DEUX filtres, et il faut les deux — chacun seul produit des faux
+        // positifs, constatés en les essayant :
+        //   • sans le premier, les `.background(…)` translucides d'une `Capsule`
+        //     passent pour du texte ;
+        //   • sans le second, les `Image(systemName:)` aussi, puisqu'une icône
+        //     se colore avec le même `foregroundStyle` qu'un texte.
+        let constructors = ["Text(", "Image(", "ProgressView", "Label(", "Circle(", "Rectangle", "Capsule"]
+
+        var offenders: [String] = []
+        for file in files {
+            guard let source = try? String(contentsOf: file, encoding: .utf8) else { continue }
+            let lines = source.components(separatedBy: .newlines)
+            for (index, line) in lines.enumerated() {
+                guard line.contains("foregroundStyle("), line.contains("onAccent.opacity(") else { continue }
+
+                let context = lines[max(0, index - 6)...index].joined(separator: "\n")
+                let nearest = constructors
+                    .compactMap { token in context.range(of: token, options: .backwards).map { ($0.lowerBound, token) } }
+                    .max(by: { $0.0 < $1.0 })?.1
+                guard nearest == "Text(" else { continue }
+
+                // Seuils mesurés sur brique en clair : 0,92 → 4,53:1 (AA pour du
+                // petit texte) ; le grand texte relève de 3:1, franchi dès 0,7.
+                let alpha = line.range(of: #"(?<=onAccent\.opacity\()0\.\d+"#, options: .regularExpression)
+                    .flatMap { Double(line[$0]) } ?? 0
+                let isLargeText = context.contains("SQFont.display(2") || context.contains("SQFont.display(3")
+                if alpha < 0.92 && !isLargeText {
+                    offenders.append("\(file.lastPathComponent):\(index + 1)  \(line.trimmingCharacters(in: .whitespaces))")
+                }
+            }
+        }
+        XCTAssertTrue(
+            offenders.isEmpty,
+            "Texte translucide sur brique — passer en `SQColor.onAccent` plein :\n"
+                + offenders.joined(separator: "\n")
+        )
+    }
 }

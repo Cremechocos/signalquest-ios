@@ -306,7 +306,11 @@ struct SignalQuestHomeView: View {
                         .foregroundStyle(accented ? SQColor.onAccent : SQColor.label)
                     Text(subtitle)
                         .font(SQFont.body(12.5))
-                        .foregroundStyle(accented ? SQColor.onAccent.opacity(0.75) : SQColor.labelSecondary)
+                        // Pas d'alpha sur brique : à 12,5 pt il faut 4,5:1, que
+                        // `onAccent` n'atteint qu'à α ≈ 0,92 — indiscernable du
+                        // plein. La hiérarchie tient déjà par la taille (16,5
+                        // semi-gras contre 12,5 normal).
+                        .foregroundStyle(accented ? SQColor.onAccent : SQColor.labelSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
                 }
@@ -424,6 +428,13 @@ struct SignalQuestHomeView: View {
             Text(unit)
                 .font(SQFont.body(11))
                 .foregroundStyle(SQColor.labelSecondary)
+                // Trois tuiles se partagent la largeur : à Dynamic Type élevé,
+                // « Mbps médian » ne tient plus et se tronquait silencieusement
+                // (relevé par `performAccessibilityAudit`). La valeur avait déjà
+                // son repli, pas le libellé.
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, SQSpace.sm + 2)

@@ -44,6 +44,16 @@ enum SQColor {
     /// seuil AA — et c'est le bouton principal de l'app (`GradientButton`
     /// `.accent`). L'encre nuit y remonte à 6,03:1. Même bascule que `onInk`,
     /// qui traite déjà ce cas symétrique.
+    ///
+    /// **Ne pas l'atténuer par `.opacity()` sur du texte.** Mesuré sur
+    /// `brandRed` en mode clair : α 0,7 → 3,30:1, α 0,85 → 4,11:1, et le seuil
+    /// AA du petit texte (4,5:1) n'est franchi qu'à α ≈ 0,92, visuellement
+    /// indiscernable du plein. Autrement dit, une hiérarchie de texte par
+    /// l'alpha est impossible sur brique : la faire porter par la taille et la
+    /// graisse. L'alpha reste légitime sur les objets graphiques (traits,
+    /// icônes décoratives, `ProgressView`), au-dessus de **0,7** — seuil de
+    /// WCAG 1.4.11. `DesignTokenContrastTests.testTranslucentOnAccentStaysReadable`
+    /// verrouille ce plancher.
     static let onAccent = dynamicTint(
         light: (0xFB, 0xF7, 0xEF, 1.0), dark: (0x19, 0x14, 0x10, 1.0)
     )
