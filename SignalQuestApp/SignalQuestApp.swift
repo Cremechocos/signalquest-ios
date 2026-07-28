@@ -9,6 +9,11 @@ struct SignalQuestApp: App {
     @StateObject private var services: AppServices
     @StateObject private var session: AuthSessionViewModel
     @StateObject private var appLock = AppLockController()
+    /// Observé À LA RACINE, et nulle part ailleurs : les jetons de surface lisent
+    /// ce réglage au moment du rendu, mais rien ne les ferait ré-évaluer si
+    /// personne ne l'observait. Sans cette ligne, activer le mode OLED ne
+    /// changerait l'apparence qu'au redémarrage de l'app.
+    @AppStorage(SQOledPalette.storageKey) private var pureBlack = false
 
     init() {
         let services = AppServices()

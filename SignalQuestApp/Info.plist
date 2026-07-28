@@ -110,6 +110,13 @@
 		<string>Figtree-Bold.ttf</string>
 		<string>BricolageGrotesque-SemiBold.ttf</string>
 		<string>BricolageGrotesque-Bold.ttf</string>
+		<!-- Polices de la CARTE DE PARTAGE uniquement, jamais de l'interface :
+		     elles existent pour que l'image produite soit identique à celle
+		     d'Android, qui compose en Sora et JetBrains Mono. Ce sont des polices
+		     VARIABLES (axe wght 100-800) : la graisse se pilote par variation, pas
+		     en choisissant un fichier — voir SQShareFonts. -->
+		<string>Sora-Variable.ttf</string>
+		<string>JetBrainsMono-Variable.ttf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

@@ -114,6 +114,7 @@ struct SettingsView: View {
     @AppStorage(MapBackdrop.storageKey) private var mapBackdropRaw = MapBackdrop.applePlan.rawValue
     @AppStorage(AppLockSettings.enabledKey) private var appLockEnabled = false
     @AppStorage(AppLockSettings.lockGraceKey) private var lockGraceSeconds = 0.0
+    @AppStorage(SQOledPalette.storageKey) private var pureBlack = false
     @AppStorage(AppLockSettings.autoLogoutKey) private var autoLogoutSeconds = 0.0
     @AppStorage(E2EEBiometric.enabledKey) private var e2eeBiometricEnabled = false
     @Environment(\.colorScheme) private var colorScheme
@@ -160,6 +161,18 @@ struct SettingsView: View {
                 } label: { settingsLabel("Changer le mot de passe", systemImage: "key.fill") }
             } header: {
                 Text("Sécurité")
+            }
+            .listRowBackground(SQColor.surface)
+            Section {
+                Toggle(isOn: $pureBlack) {
+                    settingsLabel("Noir intense (OLED)", systemImage: "circle.lefthalf.filled")
+                }
+                .tint(SQColor.brandRed)
+                Text("En thème sombre, les fonds passent au noir pur. Sur un écran OLED, un pixel noir est éteint : l'affichage consomme moins. Sans effet en thème clair.")
+                    .font(SQFont.body(12))
+                    .foregroundStyle(SQColor.labelSecondary)
+            } header: {
+                Text("Apparence")
             }
             .listRowBackground(SQColor.surface)
             if BiometricAuth.isAvailable {
@@ -231,7 +244,7 @@ struct SettingsView: View {
                     SignInWithAppleButton(.continue) { request in
                         request.requestedScopes = [.fullName, .email]
                     } onCompletion: { result in handleAppleLink(result) }
-                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                    .signInWithAppleButtonStyle(SQOledPalette.appleButtonStyle(colorScheme))
                     .frame(height: 44)
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                 }
@@ -743,7 +756,7 @@ private struct DeleteAccountSheet: View {
             } onCompletion: { result in
                 handleAppleReauthentication(result)
             }
-            .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+            .signInWithAppleButtonStyle(SQOledPalette.appleButtonStyle(colorScheme))
             .frame(height: 50)
             .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
             .disabled(!hasAcknowledged || isBusy)

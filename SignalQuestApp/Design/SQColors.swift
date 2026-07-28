@@ -15,9 +15,17 @@ enum SQColor {
     static let brandGreen = Color("BrandGreen")
 
     // MARK: Surfaces
-    static let bg = Color("BackgroundPrimary")
-    static let surface = Color("SurfaceElevated")
-    static let surfaceMuted = Color("SurfaceMuted")
+    /// Surfaces — DYNAMIQUES depuis l'ajout du mode « Noir intense (OLED) ».
+    ///
+    /// Le catalogue d'assets sait exprimer clair et sombre, pas un troisième mode :
+    /// ces jetons ne peuvent donc plus être de simples `Color("…")`. Ils résolvent
+    /// la couleur au moment du rendu, en croisant l'apparence système et le réglage
+    /// OLED. Seules les SURFACES changent — les textes et les couleurs de marque
+    /// gardent leurs valeurs, exactement comme la transformation `withOledSurfaces`
+    /// d'Android, sinon le contraste dériverait.
+    static var bg: Color { SQOledPalette.surface(asset: "BackgroundPrimary", oled: .background) }
+    static var surface: Color { SQOledPalette.surface(asset: "SurfaceElevated", oled: .container) }
+    static var surfaceMuted: Color { SQOledPalette.surface(asset: "SurfaceMuted", oled: .variant) }
 
     // MARK: Labels
     static let label = Color("LabelPrimary")
@@ -25,8 +33,8 @@ enum SQColor {
     static let labelTertiary = Color("LabelTertiary")
 
     // MARK: Lines / fills
-    static let separator = Color("Separator")
-    static let fill = Color("Fill")
+    static var separator: Color { SQOledPalette.surface(asset: "Separator", oled: .outline) }
+    static var fill: Color { SQOledPalette.surface(asset: "Fill", oled: .highest) }
 
     // MARK: Semantic
     static let like = Color("Like")
@@ -54,6 +62,15 @@ enum SQColor {
     /// icônes décoratives, `ProgressView`), au-dessus de **0,7** — seuil de
     /// WCAG 1.4.11. `DesignTokenContrastTests.testTranslucentOnAccentStaysReadable`
     /// verrouille ce plancher.
+    /// Texte posé sur une surface accent : crème en clair, NUIT en sombre — parce
+    /// qu'en sombre l'accent est un saumon clair.
+    ///
+    /// ⚠️ Ne pas assombrir `brandRed` en sombre sans traiter ce jeton : les deux
+    /// forment un système. Un accent profond (carmin) exigerait un texte clair,
+    /// or `brandRed` sert AUSSI de couleur de premier plan sur les surfaces, où il
+    /// doit rester clair pour atteindre 3:1. Recherche exhaustive faite : aucune
+    /// teinte ne satisfait les deux rôles à la fois. Changer d'accent en sombre
+    /// suppose donc de SÉPARER les deux usages en deux jetons distincts.
     static let onAccent = dynamicTint(
         light: (0xFB, 0xF7, 0xEF, 1.0), dark: (0x19, 0x14, 0x10, 1.0)
     )
@@ -108,11 +125,13 @@ enum SQColor {
     /// Surface « verre » : SurfaceElevated à 92 % — à combiner avec un blur
     /// (barres de conversation, recherche carte, FABs).
     static let surfaceGlass = dynamicTint(
-        light: (0xFB, 0xF7, 0xEF, 0.92), dark: (0x26, 0x20, 0x19, 0.92)
+        light: (0xFB, 0xF7, 0xEF, 0.92), dark: (0x26, 0x20, 0x19, 0.92),
+        oled: (0x0A, 0x0A, 0x0A, 0.92)
     )
     /// Fond du dock flottant : SurfaceElevated à 95 % (94 % en sombre).
     static let dockBackground = dynamicTint(
-        light: (0xFB, 0xF7, 0xEF, 0.95), dark: (0x26, 0x20, 0x19, 0.94)
+        light: (0xFB, 0xF7, 0xEF, 0.95), dark: (0x26, 0x20, 0x19, 0.94),
+        oled: (0x0A, 0x0A, 0x0A, 0.94)
     )
     /// Items inactifs du dock : bruns discrets. Clair assombri à #8D7E68 (3,7:1 sur
     /// le fond du dock) pour rester lisible en basse vision / plein soleil (A11Y-10).
@@ -124,28 +143,41 @@ enum SQColor {
 
     /// Ombre repos (chips, petites tuiles) : 5 % encre / 30 % noir.
     static let shadowSoft = dynamicTint(
-        light: (0x33, 0x28, 0x18, 0.05), dark: (0x00, 0x00, 0x00, 0.30)
+        light: (0x33, 0x28, 0x18, 0.05), dark: (0x00, 0x00, 0x00, 0.30),
+        oled: (0x00, 0x00, 0x00, 0)
     )
     /// Ombre carte : 6 % encre / 35 % noir.
     static let shadowCard = dynamicTint(
-        light: (0x33, 0x28, 0x18, 0.06), dark: (0x00, 0x00, 0x00, 0.35)
+        light: (0x33, 0x28, 0x18, 0.06), dark: (0x00, 0x00, 0x00, 0.35),
+        oled: (0x00, 0x00, 0x00, 0)
     )
     /// Ombre accent (28 %) : uniquement sous les surfaces brique.
+    /// ⚠️ En OLED, cette ombre est ANNULÉE : un saumon à 28 % posé sur du noir pur
+    /// ne se lit pas comme une ombre mais comme un halo lumineux autour des
+    /// surfaces brique — le défaut le plus voyant du mode sur appareil réel.
     static let shadowAccent = dynamicTint(
-        light: (0xB0, 0x4A, 0x3C, 0.28), dark: (0xD9, 0x7A, 0x66, 0.28)
+        light: (0xB0, 0x4A, 0x3C, 0.28), dark: (0xD9, 0x7A, 0x66, 0.28),
+        oled: (0x00, 0x00, 0x00, 0)
     )
     /// Ombre du dock flottant : 14 % encre / 50 % noir.
     static let shadowDock = dynamicTint(
-        light: (0x33, 0x28, 0x18, 0.14), dark: (0x00, 0x00, 0x00, 0.50)
+        light: (0x33, 0x28, 0x18, 0.14), dark: (0x00, 0x00, 0x00, 0.50),
+        oled: (0x00, 0x00, 0x00, 0)
     )
 
     /// Couleur dynamique clair/sombre avec alpha, hors asset catalog.
+    /// `oled` : teinte substituée en sombre quand le mode « Noir intense » est
+    /// actif. Sans elle, les surfaces calculées — dock et verre en tête — gardaient
+    /// leur brun chaud au milieu d'une app passée au noir. Le dock étant visible
+    /// sur CHAQUE écran, c'était le défaut le plus voyant du mode.
     private static func dynamicTint(
         light: (UInt8, UInt8, UInt8, CGFloat),
-        dark: (UInt8, UInt8, UInt8, CGFloat)
+        dark: (UInt8, UInt8, UInt8, CGFloat),
+        oled: (UInt8, UInt8, UInt8, CGFloat)? = nil
     ) -> Color {
         Color(UIColor { traits in
-            let c = traits.userInterfaceStyle == .dark ? dark : light
+            let isDark = traits.userInterfaceStyle == .dark
+            let c = isDark ? ((oled != nil && SQOledPalette.isEnabled) ? oled! : dark) : light
             return UIColor(
                 red: CGFloat(c.0) / 255,
                 green: CGFloat(c.1) / 255,

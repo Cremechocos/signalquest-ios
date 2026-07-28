@@ -598,6 +598,12 @@ struct LoadingSkeleton: View {
         }
         .padding(SQSpace.lg)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        // Liseré visible UNIQUEMENT en mode OLED, où la carte et le fond sont tous
+        // deux noirs : sans lui, les tuiles fusionneraient en un seul aplat.
+        .overlay {
+            RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
+                .strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
+        }
         .sqShadowCard()
     }
 }
