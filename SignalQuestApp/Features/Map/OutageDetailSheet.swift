@@ -29,7 +29,7 @@ struct OutageDetailSheet: View {
                 .frame(width: 46, height: 46)
                 .background(issueColor, in: Circle())
             VStack(alignment: .leading, spacing: 3) {
-                Text(site.commune?.capitalized ?? site.siteId ?? "Site en panne")
+                Text(site.commune?.capitalized ?? site.siteId ?? String(localized: "Site en panne"))
                     .font(SQFont.display(20, .bold, relativeTo: .title3))
                     .foregroundStyle(SQColor.label)
                 Text(issueLabel)
@@ -134,7 +134,7 @@ struct OutageDetailSheet: View {
     /// Code opérateur brut → libellé lisible (au lieu d'« INT » / « MAINT »).
     var reasonText: String {
         switch (site.reason ?? "").uppercased() {
-        case "INT": return "Interruption de service"
+        case "INT": return String(localized: "Interruption de service")
         case "MAINT": return String(localized: "Maintenance programmée")
         case "": return site.detail ?? issueLabel
         default: return site.detail ?? (site.reason ?? issueLabel)

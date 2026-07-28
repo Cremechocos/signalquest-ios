@@ -40,8 +40,8 @@ enum LiveShareMode: String, Codable, Sendable, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .mapOpenOnly: return "Carte ouverte seulement"
-        case .foregroundLive: return "Continu (app ouverte)"
+        case .mapOpenOnly: return String(localized: "Carte ouverte seulement")
+        case .foregroundLive: return String(localized: "Continu (app ouverte)")
         }
     }
 

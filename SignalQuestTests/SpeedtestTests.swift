@@ -382,9 +382,17 @@ final class SpeedtestTests: XCTestCase {
         )
 
         XCTAssertFalse(blurred.shareExactLocation)
-        XCTAssertEqual(blurred.coordinates?.latitude ?? 0, 48.857, accuracy: 0.00001)
         XCTAssertTrue(exact.shareExactLocation)
+        // Ce qui compte est le CONTRASTE entre les deux, pas la valeur arrondie :
+        // la grille de publication a changé une fois (111 m → ~50 m) et figer un
+        // nombre ici ne testait plus que la constante du jour.
         XCTAssertEqual(exact.coordinates?.latitude ?? 0, 48.8566, accuracy: 0.000001)
+        XCTAssertNotEqual(blurred.coordinates?.latitude ?? 0, exact.coordinates?.latitude ?? 0)
+        XCTAssertLessThanOrEqual(
+            abs((blurred.coordinates?.latitude ?? 0) - 48.8566),
+            CoordinateGrid.publicationStep,
+            "La position floutée s'écarte de plus d'un pas de grille de la position réelle"
+        )
     }
 
     func testGuestSpeedtestPayloadCarriesClientOwnedDeletionReceipt() throws {
@@ -434,17 +442,26 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertTrue(firstStore.all().isEmpty)
     }
 
-    func testSpeedtestPayloadMinimizesCoordinates() {
+    /// Le payload par défaut ne doit JAMAIS porter la position exacte : c'est la
+    /// garantie de minimisation. On vérifie l'appartenance à la grille plutôt
+    /// qu'une valeur figée, pour que le test survive à un changement de pas.
+    func testSpeedtestPayloadMinimizesCoordinates() throws {
         let payload = SpeedtestSubmission.iosPayload(from: makeResultForPrivacy(), streams: 4, deviceModel: "iPhone")
-        let coords = try? XCTUnwrap(payload.coordinates)
-        XCTAssertEqual(coords?.latitude ?? 0, 48.857, accuracy: 0.00001)
-        XCTAssertEqual(coords?.longitude ?? 0, 2.352, accuracy: 0.00001)
+        let coords = try XCTUnwrap(payload.coordinates)
+        XCTAssertEqual(coords.latitude, CoordinateGrid.snap(coords.latitude), accuracy: 1e-9)
+        XCTAssertEqual(coords.longitude, CoordinateGrid.snap(coords.longitude), accuracy: 1e-9)
+        XCTAssertNotEqual(coords.latitude, 48.8566, "La position exacte a fuité dans le payload")
     }
 
-    func testMinimizedCoordinatesRoundsToThreeDecimals() {
-        let m = SpeedtestSubmission.minimizedCoordinates(Coordinates(latitude: 45.76061634812504, longitude: 4.834277))
-        XCTAssertEqual(m?.latitude ?? 0, 45.761, accuracy: 0.00001)
-        XCTAssertEqual(m?.longitude ?? 0, 4.834, accuracy: 0.00001)
+    func testMinimizedCoordinatesSnapToThePublicationGrid() throws {
+        let raw = Coordinates(latitude: 45.76061634812504, longitude: 4.834277)
+        let m = try XCTUnwrap(SpeedtestSubmission.minimizedCoordinates(raw))
+        // Sur la grille…
+        XCTAssertEqual(m.latitude, CoordinateGrid.snap(m.latitude), accuracy: 1e-9)
+        XCTAssertEqual(m.longitude, CoordinateGrid.snap(m.longitude), accuracy: 1e-9)
+        // …et à moins d'un demi-pas de la position réelle.
+        XCTAssertLessThanOrEqual(abs(m.latitude - raw.latitude), CoordinateGrid.publicationStep / 2 + 1e-9)
+        XCTAssertLessThanOrEqual(abs(m.longitude - raw.longitude), CoordinateGrid.publicationStep / 2 + 1e-9)
         XCTAssertNil(SpeedtestSubmission.minimizedCoordinates(nil))
     }
 

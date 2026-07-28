@@ -661,14 +661,15 @@ struct SpeedtestSubmission: Encodable, Equatable {
     }
 
     /// Réduit la précision des coordonnées avant tout envoi au backend, pour
-    /// respecter la minimisation (RGPD art. 5.1.c). 3 décimales ≈ 111 m, cohérent
-    /// avec `kCLLocationAccuracyHundredMeters` utilisé par LocationService.
+    /// respecter la minimisation (RGPD art. 5.1.c). Même grille que la couverture
+    /// (`CoveragePointUpload.minimizedCoordinates`) : les deux DOIVENT rester
+    /// alignées, sinon un speedtest et le point de couverture pris au même endroit
+    /// atterrissent sur deux positions différentes de la carte.
     static func minimizedCoordinates(_ coordinate: Coordinates?) -> Coordinates? {
         guard let coordinate else { return nil }
-        func round3(_ value: Double) -> Double { (value * 1000).rounded() / 1000 }
         return Coordinates(
-            latitude: round3(coordinate.latitude),
-            longitude: round3(coordinate.longitude)
+            latitude: CoordinateGrid.snap(coordinate.latitude),
+            longitude: CoordinateGrid.snap(coordinate.longitude)
         )
     }
 

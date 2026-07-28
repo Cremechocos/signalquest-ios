@@ -292,7 +292,7 @@ final class MapExplorerViewModel: ObservableObject {
         if let entry = currentMarketEntry?.operatorEntry(forKey: key) {
             return entry.shortLabel
         }
-        return key.uppercased() == "ALL" ? "Tous" : key
+        return key.uppercased() == "ALL" ? String(localized: "Tous") : key
     }
 
     func operatorLabel(_ key: String) -> String {
@@ -1923,11 +1923,13 @@ struct MapExplorerView: View {
             let pending = site.activation?.pendingTechnologies ?? []
             let statusNote: String
             switch status {
-            case .active: statusNote = "Site actif — toutes les technos prévues sont en service"
+            case .active: statusNote = String(localized: "Site actif — toutes les technos prévues sont en service")
             case .upgradePending:
-                statusNote = pending.isEmpty ? "Upgrade en cours" : "Upgrade en attente : \(pending.joined(separator: ", "))"
-            case .declared: statusNote = "Station déclarée à l'ANFR (pas encore en service)"
-            case .planned: statusNote = "Site prévu (non encore construit)"
+                statusNote = pending.isEmpty
+                    ? String(localized: "Upgrade en cours")
+                    : String(localized: "Upgrade en attente : \(pending.joined(separator: ", "))")
+            case .declared: statusNote = String(localized: "Station déclarée à l'ANFR (pas encore en service)")
+            case .planned: statusNote = String(localized: "Site prévu (non encore construit)")
             }
             return MapAnnotationPayload(
                 id: "planned-\(site.id)",
@@ -1965,7 +1967,7 @@ struct MapExplorerView: View {
             return MapAnnotationPayload(
                 id: "outage-\(site.id)",
                 kind: .outage,
-                title: site.siteId ?? "Site en panne",
+                title: site.siteId ?? String(localized: "Site en panne"),
                 subtitle: [site.operator, site.commune].compactMap { $0 }.joined(separator: " · "),
                 coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
                 metric: site.status,
@@ -2030,8 +2032,8 @@ struct MapExplorerView: View {
     /// Libellé court du statut, pour les fiches et l'accessibilité.
     static func plannedStatusLabel(_ status: PlannedActivationStatus) -> String {
         switch status {
-        case .active: return "Actif"
-        case .upgradePending: return "Upgrade en attente"
+        case .active: return String(localized: "Actif")
+        case .upgradePending: return String(localized: "Upgrade en attente")
         case .declared: return String(localized: "Déclaré")
         case .planned: return String(localized: "Prévu")
         }

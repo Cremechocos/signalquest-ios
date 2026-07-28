@@ -348,7 +348,7 @@ struct PaywallView: View {
                 "Analyses détaillées du comparateur",
                 "Tendances et alertes avancées du journal",
                 "Stories personnalisées de 1 à 72 heures",
-                "Badge Premium or et rouge, masquable",
+                String(localized: "Badge Premium or et rouge, masquable"),
             ]
         }
     }

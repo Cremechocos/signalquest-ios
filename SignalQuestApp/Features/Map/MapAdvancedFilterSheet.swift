@@ -51,16 +51,16 @@ struct MapAdvancedFilterSheet: View {
     var layerOptions: [(MapDisplayItem.Kind, String, String)] {
         if selectedEntry?.isCommunityOnly == true {
             return [
-                (.communitySite, "Sites communautaires", "dot.radiowaves.up.forward"),
-                (.speedtest, "Speedtests", "speedometer")
+                (.communitySite, String(localized: "Sites communautaires"), "dot.radiowaves.up.forward"),
+                (.speedtest, String(localized: "Speedtests"), "speedometer")
             ]
         }
         var options: [(MapDisplayItem.Kind, String, String)] = [
-            (.antenna, "Antennes", "antenna.radiowaves.left.and.right"),
-            (.speedtest, "Speedtests", "speedometer"),
-            (.photo, "Photos", "photo"),
-            (.friend, "Amis", "person.2"),
-            (.coverage, "Couverture communautaire", "dot.radiowaves.left.and.right")
+            (.antenna, String(localized: "Antennes"), "antenna.radiowaves.left.and.right"),
+            (.speedtest, String(localized: "Speedtests"), "speedometer"),
+            (.photo, String(localized: "Photos"), "photo"),
+            (.friend, String(localized: "Amis"), "person.2"),
+            (.coverage, String(localized: "Couverture communautaire"), "dot.radiowaves.left.and.right")
         ]
         // Pannes & Prévisionnels : données ANFR FR/DROM uniquement (le backend ne
         // répond que pour ces marchés ; ailleurs `load()` ne les charge jamais).

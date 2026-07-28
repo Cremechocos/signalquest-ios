@@ -388,10 +388,10 @@ struct SignalQuestHomeView: View {
                 pulseTileButton(value: "\(rsrp)", unit: "dBm", metric: .signal)
             }
             if let median = pulse.medianDownloadMbps {
-                pulseTileButton(value: "\(median)", unit: "Mbps médian", metric: .download)
+                pulseTileButton(value: "\(median)", unit: String(localized: "Mbps médian"), metric: .download)
             }
             if let best = pulse.bestOperator, !best.isEmpty {
-                pulseTileButton(value: best, unit: "meilleur op.", metric: .download)
+                pulseTileButton(value: best, unit: String(localized: "meilleur op."), metric: .download)
             }
         }
         .accessibilityElement(children: .contain)

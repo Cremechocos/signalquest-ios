@@ -78,7 +78,9 @@ struct NetworkPulseHero: View {
         if let op = pulse.bestOperator, !op.isEmpty { return op }
         return "\(pulse.measurementsCount)"
     }
-    private var operatorLabel: String { hasOperator ? "meilleur op." : "mesures" }
+    private var operatorLabel: String {
+        hasOperator ? String(localized: "meilleur op.") : String(localized: "mesures")
+    }
 
     private var accessibilitySummary: String {
         // TOUS les morceaux passent par le catalogue. Deux d'entre eux ne le

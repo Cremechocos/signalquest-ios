@@ -1,91 +1,118 @@
 {
-  "sourceLanguage": "fr",
-  "strings": {
-    "NSCameraUsageDescription": {
-      "extractionState": "manual",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "SignalQuest utilise la caméra uniquement pendant les appels vidéo que tu démarres ou acceptes."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "SignalQuest uses the camera only during video calls that you start or accept."
+  "sourceLanguage" : "fr",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "comment" : "Bundle display name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "SignalQuest"
           }
         }
       }
     },
-    "NSFaceIDUsageDescription": {
-      "extractionState": "manual",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "SignalQuest utilise Face ID pour verrouiller l'app et déverrouiller ta messagerie chiffrée."
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "SignalQuest uses Face ID to lock the app and to unlock your encrypted messages."
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "SignalQuest"
           }
         }
       }
     },
-    "NSLocationWhenInUseUsageDescription": {
-      "extractionState": "manual",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "SignalQuest utilise ta position, si tu l'autorises, pour placer tes speedtests et contributions sur la carte, suivre un Drive Test (y compris écran verrouillé) et, si tu l'actives, partager ta position en direct avec tes amis."
+    "Export NetMonster" : {
+
+    },
+    "NSCameraUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest uses the camera only during video calls that you start or accept."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "SignalQuest uses your location, if you allow it, to place your speedtests and contributions on the map, to track a Drive Test (including with the screen locked) and, if you turn it on, to share your live location with your friends."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest utilise la caméra uniquement pendant les appels vidéo que tu démarres ou acceptes."
           }
         }
       }
     },
-    "NSMicrophoneUsageDescription": {
-      "extractionState": "manual",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "SignalQuest utilise le micro uniquement pendant les appels audio ou vidéo que tu démarres ou acceptes."
+    "NSFaceIDUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest uses Face ID to lock the app and to unlock your encrypted messages."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "SignalQuest uses the microphone only during audio or video calls that you start or accept."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest utilise Face ID pour verrouiller l'app et déverrouiller ta messagerie chiffrée."
           }
         }
       }
     },
-    "NSPhotoLibraryUsageDescription": {
-      "extractionState": "manual",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "SignalQuest peut importer une photo choisie pour contribuer aux sites antennes."
+    "NSLocationWhenInUseUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest uses your location, if you allow it, to place your speedtests and contributions on the map, to track a Drive Test (including with the screen locked) and, if you turn it on, to share your live location with your friends."
           }
         },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "SignalQuest can import a photo you choose, to contribute to antenna sites."
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest utilise ta position, si tu l'autorises, pour placer tes speedtests et contributions sur la carte, suivre un Drive Test (y compris écran verrouillé) et, si tu l'actives, partager ta position en direct avec tes amis."
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest uses the microphone only during audio or video calls that you start or accept."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest utilise le micro uniquement pendant les appels audio ou vidéo que tu démarres ou acceptes."
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest can import a photo you choose, to contribute to antenna sites."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest peut importer une photo choisie pour contribuer aux sites antennes."
           }
         }
       }
     }
   },
-  "version": "1.0"
+  "version" : "1.0"
 }

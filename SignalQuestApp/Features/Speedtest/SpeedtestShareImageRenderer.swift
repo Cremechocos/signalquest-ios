@@ -453,7 +453,7 @@ private struct SpeedtestShareCard: View {
                 label: "Jitter",
                 tint: textSecondary,
                 value: jitterText(result.jitterMs),
-                subline: "au repos"
+                subline: String(localized: "au repos")
             )
             gridDivider
             latencyCell(

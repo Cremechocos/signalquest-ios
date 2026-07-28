@@ -1,12 +1,11 @@
 name: SignalQuest
 options:
   developmentLanguage: fr
-  # Déclare les localisations du projet. Sans `knownRegions`, Xcode ne compile
-  # pas les String Catalogs et le réglage « Langue préférée » de l'app
-  # n'apparaît pas dans les Réglages système.
-  # `en` ajouté avec la traduction anglaise : sans lui, les String Catalogs
-  # compilent la variante anglaise mais l'app ne la propose jamais, et le
-  # sélecteur de langue des Réglages système reste absent.
+  # ⚠️ VÉRIFIÉ : XcodeGen 2.45.4 IGNORE silencieusement cette clé — le
+  # `.pbxproj` généré garde `knownRegions = (Base, fr)`. Ce n'est pas bloquant :
+  # Xcode compile de toute façon `en.lproj` à partir du String Catalog, qui
+  # porte lui-même la langue. La clé est conservée pour le jour où XcodeGen la
+  # supportera ; ne pas s'y fier pour la compilation.
   knownRegions: [fr, en, Base]
   bundleIdPrefix: fr.signalquest
   createIntermediateGroups: true
