@@ -96,7 +96,7 @@ final class AntennaReportThreadViewModel: ObservableObject {
         attachmentError = nil
         for item in items {
             guard pendingImages.count < Self.maxImages else {
-                attachmentError = "3 images maximum par message."
+                attachmentError = String(localized: "3 images maximum par message.")
                 break
             }
             guard let prepared = await prepare(item) else {

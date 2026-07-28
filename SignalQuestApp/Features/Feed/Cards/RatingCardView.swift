@@ -102,9 +102,9 @@ struct RatingCardView: View {
 
     private var trendTag: (label: String, color: Color)? {
         switch signal?.ratingTrend?.lowercased() {
-        case "improved": return ("En hausse", SQColor.success)
-        case "degraded": return ("En baisse", SQColor.danger)
-        case "same": return ("Stable", SQColor.labelSecondary)
+        case "improved": return (String(localized: "En hausse"), SQColor.success)
+        case "degraded": return (String(localized: "En baisse"), SQColor.danger)
+        case "same": return (String(localized: "Stable"), SQColor.labelSecondary)
         default: return nil
         }
     }

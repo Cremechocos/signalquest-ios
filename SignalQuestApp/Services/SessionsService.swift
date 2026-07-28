@@ -43,15 +43,14 @@ struct CoveragePointUpload: Codable, Equatable, Sendable {
 
 extension CoveragePointUpload {
     /// Réduit la précision des coordonnées avant persistance/envoi au backend, pour
-    /// respecter la minimisation (RGPD art. 5.1.c). 3 décimales ≈ 111 m, aligné sur
-    /// la troncature des speedtests (`SpeedtestPayload.minimizedCoordinates`). La
-    /// trace locale du Drive Test (`coverageTrail`) conserve, elle, la précision.
+    /// respecter la minimisation (RGPD art. 5.1.c). Grille commune à toute l'app —
+    /// voir `CoordinateGrid` pour le choix du pas. La trace locale du Drive Test
+    /// (`coverageTrail`) conserve, elle, la précision réelle.
     func minimizedCoordinates() -> CoveragePointUpload {
-        func round3(_ value: Double) -> Double { (value * 1000).rounded() / 1000 }
-        return CoveragePointUpload(
+        CoveragePointUpload(
             localId: localId,
-            latitude: round3(latitude),
-            longitude: round3(longitude),
+            latitude: CoordinateGrid.snap(latitude),
+            longitude: CoordinateGrid.snap(longitude),
             timestamp: timestamp,
             technology: technology,
             downloadMbps: downloadMbps,

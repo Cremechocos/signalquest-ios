@@ -12,9 +12,19 @@ extension XCUIApplication {
     /// `SQ_UI_TEST_LOCALE` permet de forcer une autre locale — prévu pour le
     /// parcours smoke en anglais une fois la localisation livrée. Non défini =
     /// français.
-    func sqLaunch() {
-        let locale = ProcessInfo.processInfo.environment["SQ_UI_TEST_LOCALE"] ?? "fr"
-        launchArguments += ["-AppleLanguages", "(\(locale))", "-AppleLocale", locale]
+    /// Lance l'app dans une langue FORCÉE.
+    ///
+    /// `TEST_RUNNER_SQ_UI_TEST_LOCALE=…` passé à `xcodebuild` n'atteint PAS ce
+    /// processus (vérifié : le parcours « anglais » démarrait en français), d'où
+    /// le paramètre explicite. La variable d'environnement reste acceptée en
+    /// second recours pour les lancements depuis Xcode.
+    ///
+    /// ⚠️ Ne jamais ajouter `-AppleLanguages` aux `launchArguments` de l'appelant :
+    /// un doublon casse l'analyse du domaine d'arguments et l'app démarre dans la
+    /// langue système.
+    func sqLaunch(locale: String? = nil) {
+        let resolved = locale ?? ProcessInfo.processInfo.environment["SQ_UI_TEST_LOCALE"] ?? "fr"
+        launchArguments += ["-AppleLanguages", "(\(resolved))", "-AppleLocale", resolved]
         launch()
     }
 }
@@ -26,11 +36,12 @@ enum SignalQuestUITestSupport {
     static func launch(
         _ app: XCUIApplication,
         arguments: [String],
-        environment: [String: String] = [:]
+        environment: [String: String] = [:],
+        locale: String? = nil
     ) {
         app.launchArguments = arguments
         environment.forEach { app.launchEnvironment[$0.key] = $0.value }
-        app.sqLaunch()
+        app.sqLaunch(locale: locale)
         completeOnboardingIfNeeded(in: app)
     }
 

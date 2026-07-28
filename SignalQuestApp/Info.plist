@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Région de développement. SANS cette clé, Foundation retombe sur `en` :
+	     `fr.lproj` ne contient pas de `Localizable.strings` (le français EST la
+	     clé, Xcode omet la table identité), donc une demande de français
+	     traversait jusqu'à `en.lproj` et l'app s'affichait EN ANGLAIS pour un
+	     utilisateur français. Doit rester aligné sur `developmentLanguage`
+	     de `project.yml`. -->
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<!-- Type importé pour les exports NetMonster (.ntm) : sans extension système,
 	     on le déclare conforme à public.plain-text pour qu'il soit proposé par le
 	     sélecteur de fichiers de l'import de logs radio. -->

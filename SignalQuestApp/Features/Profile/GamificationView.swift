@@ -633,7 +633,7 @@ private struct GamificationEventDisplay {
     init(kind: String?) {
         switch kind?.lowercased() {
         case "validation", "site_validation", "direct_map_validation", "offline_validation":
-            title = "Validation de site"
+            title = String(localized: "Validation de site")
             icon = "checkmark.seal.fill"
             tint = SQColor.success; tintSoft = SQColor.successSoft
         case "speedtest", "speed_test":

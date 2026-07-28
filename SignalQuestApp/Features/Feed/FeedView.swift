@@ -772,6 +772,14 @@ struct FeedView: View {
             Text("Communauté")
                 .font(SQFont.display(26, .bold))
                 .foregroundStyle(SQColor.label)
+                // Quatre boutons d'action à droite ne laissent plus la largeur
+                // d'un titre display de 26 pt : sans ces trois modificateurs,
+                // « Communauté » se coupait en « Communau / té ». Réduction
+                // plutôt que troncature — un titre d'écran ne doit pas finir
+                // en « … ».
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .allowsTightening(true)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("feed.header")
             Spacer(minLength: SQSpace.sm)

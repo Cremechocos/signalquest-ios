@@ -181,7 +181,15 @@ struct TerritoryMapView: UIViewRepresentable {
         let map = MKMapView()
         map.delegate = context.coordinator
         map.showsUserLocation = true
-        map.pointOfInterestFilter = .excludingAll
+        // Même configuration que la carte principale (`MapKitMapView.applyBackdrop`) :
+        // relief à plat, POI masqués. VÉRIFIÉ par capture : cela ne change PAS la
+        // palette d'Apple Plan (les deux cartes rendent le même vert/bleu vif) —
+        // c'est un alignement de comportement, pas un correctif visuel. Le filtre
+        // de POI passe par la configuration plutôt que par la propriété dépréciée
+        // `MKMapView.pointOfInterestFilter`.
+        let configuration = MKStandardMapConfiguration(elevationStyle: .flat)
+        configuration.pointOfInterestFilter = .excludingAll
+        map.preferredConfiguration = configuration
         return map
     }
 

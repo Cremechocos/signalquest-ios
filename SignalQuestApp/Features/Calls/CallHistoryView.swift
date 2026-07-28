@@ -210,8 +210,8 @@ struct CallHistoryView: View {
         case "missed": return String(localized: "Manqué")
         case "rejected": return String(localized: "Refusé")
         case "accepted", "answered": return String(localized: "Accepté")
-        case "ringing": return "Sonnerie"
-        case "pending": return "En attente"
+        case "ringing": return String(localized: "Sonnerie")
+        case "pending": return String(localized: "En attente")
         case "cancelled", "canceled": return String(localized: "Annulé")
         case .some(let other) where !other.isEmpty: return other.capitalized
         default: return "—"

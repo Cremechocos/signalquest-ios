@@ -155,6 +155,15 @@ protocol SpeedtestTCPProbing: Sendable {
 }
 
 struct NetworkSpeedtestTCPProbe: SpeedtestTCPProbing {
+    /// File PARTAGÉE. Une file par sonde faisait payer à chaque échantillon la
+    /// création d'une queue et l'ordonnancement d'un fil — du bruit pur ajouté à une
+    /// mesure de latence.
+    private static let probeQueue = DispatchQueue(label: "fr.signalquest.speedtest.tcp")
+
+    /// ⚠️ `host` doit être une ADRESSE IP déjà résolue, pas un nom.
+    /// `NWEndpoint.Host(name)` déclenche une résolution DNS à l'intérieur de la fenêtre
+    /// chronométrée : c'est l'une des causes du ping surévalué. Les appelants résolvent
+    /// une fois par série (`ICMPPinger.resolve`) et passent l'adresse.
     func connectLatencyMs(host: String, port: UInt16, timeoutSeconds: TimeInterval) async throws -> Double {
         final class ResumeGate: @unchecked Sendable {
             private let lock = NSLock()
@@ -174,13 +183,17 @@ struct NetworkSpeedtestTCPProbe: SpeedtestTCPProbing {
 
         return try await withCheckedThrowingContinuation { continuation in
             let gate = ResumeGate()
-            let queue = DispatchQueue(label: "fr.signalquest.speedtest.tcp")
-            let start = Date()
+            let queue = Self.probeQueue
             let connection = NWConnection(
                 host: NWEndpoint.Host(host),
                 port: NWEndpoint.Port(rawValue: port) ?? .https,
                 using: .tcp
             )
+            // Le chronomètre démarre au plus près de `start()`. Il englobait auparavant
+            // la construction de `NWConnection` ET la création d'une `DispatchQueue`
+            // neuve à chaque sonde — quelques millisecondes ajoutées à CHAQUE
+            // échantillon, sur une grandeur qui en vaut vingt.
+            let start = Date()
             connection.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
@@ -219,12 +232,28 @@ private enum SpeedtestEngineConfig {
     static let publicPeakWindowMs: Double = 1_000
     /// Hard cap on parallel streams (download reverse).
     static let hardMaxStreams: Int = 16
-    /// Upload : plafonner plus bas que le DL. 16 flux × 12 blocs en vol
-    /// provoquent souvent des RST sur les POP publics (Scaleway / Bouygues)
-    /// et sur la montée cellulaire — le test UL plantait en silence.
-    static let hardMaxUploadStreams: Int = 8
-    /// Second essai UL si le premier échoue (RST / busy).
+    /// Upload : aligné sur le descendant et sur Android, qui monte à 16 depuis
+    /// toujours — l'écart rendait les débits montants des deux apps incomparables.
+    static let hardMaxUploadStreams: Int = 16
+    /// Palier INTERMÉDIAIRE, et non un simple second essai.
+    ///
+    /// 16 flux × 12 blocs en vol provoquent des RST sur certains POP publics
+    /// (Scaleway, Bouygues) et sur la montée cellulaire : c'est ce qui avait fait
+    /// plafonner iOS à 8. Le repli doit donc repasser par 8 — valeur éprouvée en
+    /// production — avant de descendre à 4. Sans ce palier, un POP qui refuse 16 flux
+    /// tomberait droit à 4 et SOUS-mesurerait, soit l'inverse de l'effet recherché.
+    static let uploadFallbackStreams: Int = 8
+    /// Dernier essai UL quand même 8 flux échouent.
     static let uploadRetryStreams: Int = 4
+
+    static func uploadStreamLadder(requested: Int) -> [Int] {
+        speedtestUploadStreamLadder(
+            requested: requested,
+            hardMax: hardMaxUploadStreams,
+            fallback: uploadFallbackStreams,
+            last: uploadRetryStreams
+        )
+    }
     /// Petite pause entre DL et UL pour laisser le démon iPerf libérer le port.
     static let interPhaseDelayMs: Double = 300
     /// OVH proof : 5201–5210. Bouygues : 9200–9240. Scaleway online.net : 5200–5209.
@@ -363,6 +392,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         progress: SpeedtestProgressHandler?
     ) async throws -> SpeedtestRunResult {
         let startedAt = Date()
+        // Vide la mémoire des sondages de ports si le réseau n'est plus le même :
+        // un serveur injoignable en 4G peut répondre en WiFi, et inversement.
+        await IPerfEndpointCache.shared.invalidateIfNetworkChanged(
+            "\(pathStatus.connection.rawValue)|\(pathStatus.operatorName ?? "?")|\(pathStatus.operatorMcc ?? 0)"
+        )
         let durationSeconds = max(5, min(settings.durationSeconds, 30))
         // Omit adaptatif 2-3 s (jamais plus que `iperf3OmitSeconds`, jamais moins
         // de 2 s) : écarte la rampe TCP/BBR sans raccourcir la fenêtre mesurée.
@@ -706,10 +740,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 min: iperfServer.portMin,
                 max: iperfServer.portMax
             )
-        let ulStreamAttempts = [
-            min(parallelStreams, SpeedtestEngineConfig.hardMaxUploadStreams),
-            SpeedtestEngineConfig.uploadRetryStreams
-        ]
+        let ulStreamAttempts = SpeedtestEngineConfig.uploadStreamLadder(requested: parallelStreams)
         // Loaded pings sur un 3e port si possible, jamais le port d'upload actif.
         let ulLoadedHost = iperfServer.hostname
         let ulLoadedPort = endpoint.openPorts.first(where: { $0 != port && $0 != ulPreferredPort })
@@ -2113,8 +2144,17 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         serverName: String,
         progress: SpeedtestProgressHandler?
     ) async throws -> PingOutcome {
+        // ICMP d'abord : c'est le seul vrai RTT. Le connect TCP reste en repli parce
+        // que beaucoup d'opérateurs mobiles et de POP publics filtrent l'ICMP — mais
+        // il ne doit plus être le chemin nominal, il surestime structurellement.
+        if let icmp = await measureIcmpPings(host: host, serverName: serverName, progress: progress) {
+            return icmp
+        }
+
+        // Repli : hôte résolu UNE fois, la sonde reçoit une adresse et non un nom.
+        let address = (try? ICMPPinger.resolve(host: host))?.addressText ?? host
         let result = await measureTcpPings(
-            host: host,
+            host: address,
             port: port,
             serverName: serverName,
             progress: progress,
@@ -2122,6 +2162,40 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         )
         guard !result.values.isEmpty else { throw SpeedtestEngineError.pingFailed }
         return PingOutcome(values: result.values, protocolName: "TCP")
+    }
+
+    /// Série ICMP. `nil` — et non une erreur — quand l'ICMP n'aboutit pas : c'est le
+    /// signal que le repli TCP doit prendre la main, pas que le test a échoué.
+    ///
+    /// Le seuil de 2 échantillons est le même que pour le TCP : une valeur unique ne
+    /// permet ni médiane ni gigue honnêtes.
+    private func measureIcmpPings(
+        host: String,
+        serverName: String,
+        progress: SpeedtestProgressHandler?
+    ) async -> PingOutcome? {
+        let target = speedtestPingMeasuredSampleTarget(
+            attemptBudget: SpeedtestEngineConfig.pingAttemptBudget,
+            warmupCount: SpeedtestEngineConfig.pingWarmupCount
+        )
+        let pinger = ICMPPinger(host: host, timeout: SpeedtestEngineConfig.pingTimeoutSeconds)
+        // Un échantillon d'échauffement en plus, écarté ensuite : le premier écho paie
+        // souvent la mise en route du chemin radio.
+        guard let samples = try? await pinger.ping(
+            count: target + 1,
+            intervalMs: SpeedtestEngineConfig.pingIntervalMs
+        ) else { return nil }
+
+        let values = samples.dropFirst().map(\.rttMs).filter { $0 > 0 }
+        guard values.count >= 2 else { return nil }
+        emitPingProgress(
+            values: Array(values),
+            protocolName: "ICMP",
+            target: target,
+            serverName: serverName,
+            progress: progress
+        )
+        return PingOutcome(values: Array(values), protocolName: "ICMP")
     }
 
     /// RTT TCP sous charge (pendant DL/UL iPerf) : connect latency uniquement,
@@ -2588,10 +2662,69 @@ struct IPerfEndpoint: Sendable {
     }
 }
 
-/// Probe TCP parallèle de la plage de ports du serveur.
+/// Mémoire courte des sondages de ports, positive ET négative.
+///
+/// Sans elle, chaque `run()` re-sondait tout : ~13 ports par serveur, et le dernier
+/// filet essaie CHAQUE serveur du catalogue trié par distance. Dans un pays où les
+/// iPerf3 sont injoignables — le cas nominal hors d'Europe — cela faisait jusqu'à
+/// ~30 s de scan et plusieurs centaines de connexions TCP **par test**, répété à
+/// chaque itération de la boucle Drive Test. Vu du réseau de l'opérateur, cela
+/// ressemble d'ailleurs à du scan de ports.
+///
+/// L'échec est mis en cache plus longtemps que le succès : un serveur injoignable
+/// le reste, alors qu'un port ouvert peut se remplir.
+actor IPerfEndpointCache {
+    static let shared = IPerfEndpointCache()
+
+    private struct Entry {
+        let endpoint: IPerfEndpoint?
+        let expiry: Date
+    }
+
+    private var entries: [String: Entry] = [:]
+    private var networkSignature: String?
+    private static let successTTL: TimeInterval = 600   // 10 min
+    private static let failureTTL: TimeInterval = 900   // 15 min
+
+    /// Le réseau a changé (cellulaire ↔ WiFi, changement d'opérateur, itinérance) :
+    /// ce qui était injoignable peut très bien répondre maintenant. Appelé une fois
+    /// au début de chaque test plutôt que dispersé dans les appelants.
+    func invalidateIfNetworkChanged(_ signature: String) {
+        guard networkSignature != signature else { return }
+        networkSignature = signature
+        entries.removeAll()
+    }
+
+    func cached(_ hostname: String) -> IPerfEndpoint?? {
+        guard let entry = entries[hostname] else { return nil }
+        guard entry.expiry > Date() else { entries[hostname] = nil; return nil }
+        return .some(entry.endpoint)
+    }
+
+    func store(_ endpoint: IPerfEndpoint?, for hostname: String) {
+        let ttl = endpoint == nil ? Self.failureTTL : Self.successTTL
+        entries[hostname] = Entry(endpoint: endpoint, expiry: Date().addingTimeInterval(ttl))
+    }
+
+    func invalidateAll() {
+        entries.removeAll()
+        networkSignature = nil
+    }
+}
+
+/// Probe TCP parallèle de la plage de ports du serveur, mémoïsé par hôte.
 /// Les ports « busy » (ACCESS_DENIED) sont gérés ensuite par
 /// `runIPerf3WithPortFallback` au moment du vrai test.
 func resolveIPerfEndpoint(for server: IPerfPublicServer) async -> IPerfEndpoint? {
+    if let hit = await IPerfEndpointCache.shared.cached(server.hostname) {
+        return hit
+    }
+    let resolved = await resolveIPerfEndpointUncached(for: server)
+    await IPerfEndpointCache.shared.store(resolved, for: server.hostname)
+    return resolved
+}
+
+private func resolveIPerfEndpointUncached(for server: IPerfPublicServer) async -> IPerfEndpoint? {
     let lo = server.portMin
     let hi = server.portMax
     let allPorts = Array(lo...hi)
@@ -3589,6 +3722,23 @@ private func boundedMbps(bytes: Int, durationMs: Double) -> Double {
     return mbps.isFinite && mbps >= 0 ? mbps : 0
 }
 
+/// Échelle de repli de l'upload, du plus ambitieux au plus prudent.
+///
+/// Fonction libre pour rester testable : la configuration du moteur est `private`, et
+/// c'est exactement le genre de logique qui casse en silence — une échelle qui remonte,
+/// ou qui rejoue deux fois le même palier, ne se voit dans aucune capture.
+///
+/// Strictement décroissante et dédoublonnée : demander 4 flux doit donner `[4]`, pas
+/// `[4, 8, 4]` — qui essaierait plus haut que la demande puis répéterait un échec.
+func speedtestUploadStreamLadder(requested: Int, hardMax: Int, fallback: Int, last: Int) -> [Int] {
+    let top = min(max(requested, 1), max(hardMax, 1))
+    var ladder: [Int] = []
+    for rung in [top, fallback, last] where rung >= 1 && rung <= top && !ladder.contains(rung) {
+        ladder.append(rung)
+    }
+    return ladder
+}
+
 func speedtestPingMeasuredSampleTarget(attemptBudget: Int, warmupCount: Int) -> Int {
     let budget = max(0, attemptBudget)
     guard budget > 0 else { return 0 }
@@ -3940,6 +4090,31 @@ final class SpeedtestSamplesBox: @unchecked Sendable {
 /// alors que `observe(...)` est appelé depuis les callbacks `NWConnection`
 /// (queues réseau) : deux `append`/`removeFirst` concurrents sur un `Array`
 /// Swift corrompent le buffer et font crasher le processus.
+/// Volume de données consommé par les speedtests, tous moteurs confondus.
+///
+/// Un Drive Test enchaîne les tests, et un test vaut débit × durée : ~375 Mo à
+/// 300 Mb/s sur 10 s. Sans compteur, une session pouvait engloutir plusieurs
+/// dizaines de gigaoctets du forfait de l'utilisateur sans que rien ne l'indique.
+///
+/// Le comptage se fait ICI, dans l'échantillonneur, et non dans chacun des trois
+/// moteurs : ils lui passent tous des totaux cumulés monotones, donc la somme des
+/// deltas par instance vaut exactement le volume transféré — rampe comprise.
+final class SpeedtestDataMeter: @unchecked Sendable {
+    static let shared = SpeedtestDataMeter()
+
+    private let total = OSAllocatedUnfairLock(initialState: 0)
+
+    /// Octets consommés depuis le dernier `reset()`.
+    var bytes: Int { total.withLock { $0 } }
+
+    func add(_ delta: Int) {
+        guard delta > 0 else { return }
+        total.withLock { $0 += delta }
+    }
+
+    func reset() { total.withLock { $0 = 0 } }
+}
+
 final class SpeedtestLiveSampler: @unchecked Sendable {
     private struct Point {
         let elapsedMs: Double
@@ -3952,6 +4127,9 @@ final class SpeedtestLiveSampler: @unchecked Sendable {
         /// Dernier débit instantané NON lissé (fenêtre glissante brute) — sert
         /// notamment à la décision de grace adaptative.
         var lastInstantMbps: Double = 0
+        /// Dernier total cumulé vu, pour n'ajouter au compteur global que le
+        /// delta — un total ne s'additionne pas, il se dérive.
+        var lastCountedTotal: Int = 0
     }
 
     private let windowMs: Double
@@ -3971,6 +4149,11 @@ final class SpeedtestLiveSampler: @unchecked Sendable {
     /// l'exclut.
     func observe(totalBytes: Int, elapsedMs: Double) -> Double {
         state.withLock { s in
+            // Comptabilise le volume AVANT toute sortie anticipée : les premiers
+            // ticks repartent par `guard s.points.count >= 2` et leurs octets
+            // seraient sinon perdus du compteur.
+            SpeedtestDataMeter.shared.add(totalBytes - s.lastCountedTotal)
+            s.lastCountedTotal = max(s.lastCountedTotal, totalBytes)
             s.points.append(Point(elapsedMs: elapsedMs, totalBytes: totalBytes))
             // Conserve un point au-delà de la fenêtre pour que le delta couvre
             // toujours ~windowMs une fois la fenêtre remplie.

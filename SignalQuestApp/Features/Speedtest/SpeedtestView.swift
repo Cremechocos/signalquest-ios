@@ -47,6 +47,14 @@ struct SpeedtestView: View {
     @State private var guestShareExactLocation = false
     /// Nombre de tests enchaînés en rafale (1 = test simple).
     @AppStorage("speedtest_burst_count") private var burstCount = 1
+    /// Distance à parcourir entre deux speedtests d'un Drive Test. Espacer par la
+    /// distance plutôt que par le temps répartit les mesures le long du trajet
+    /// au lieu de les entasser là où l'on roule lentement.
+    @AppStorage("speedtest_drive_interval_meters") private var driveIntervalMeters = 500
+    /// Plafond de données d'une session Drive Test, en Mo (0 = illimité).
+    /// Un test vaut débit × durée : à 300 Mb/s sur 10 s, c'est ~375 Mo. Sans
+    /// plafond une session pouvait engloutir des dizaines de gigaoctets.
+    @AppStorage("speedtest_drive_data_cap_mb") private var driveDataCapMB = 5_120
     @State private var phase: SpeedtestPhase = .idle
     @State private var result: SpeedtestRunResult?
     @State private var liveProgress = SpeedtestLiveProgress(phase: .idle)
@@ -368,7 +376,7 @@ struct SpeedtestView: View {
 
     private var primaryButtonTitle: String {
         if burstCount == Self.continuousBurst {
-            return "Lancer en continu"
+            return String(localized: "Lancer en continu")
         }
         if burstCount > 1 {
             return result == nil ? "Lancer la rafale ×\(burstCount)" : "Relancer la rafale ×\(burstCount)"
@@ -600,6 +608,72 @@ struct SpeedtestView: View {
         .sqShadowCard()
     }
 
+    // MARK: - Réglages Drive Test (cadence + budget de données)
+
+    /// Deux réglages qui n'existaient pas et dont l'absence coûtait cher : la
+    /// boucle enchaînait les tests avec 800 ms de pause, sans aucun plafond.
+    private var driveTestBudgetSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            Text("Drive Test")
+                .font(SQFont.archivo(15, .bold))
+                .foregroundStyle(SQColor.label)
+
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                chipRow(
+                    title: "Un test tous les",
+                    options: [(250, "250 m"), (500, "500 m"), (1_000, "1 km"), (2_000, "2 km")],
+                    selection: $driveIntervalMeters
+                )
+                Text("Les tests s'espacent selon la DISTANCE parcourue, pas le temps : les mesures se répartissent le long du trajet au lieu de s'entasser dans les bouchons. À l'arrêt, « Tester maintenant » force une mesure.")
+                    .font(.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                chipRow(
+                    title: "Plafond de données",
+                    options: [(500, "500 Mo"), (2_000, "2 Go"), (5_120, "5 Go"), (0, "∞")],
+                    selection: $driveDataCapMB
+                )
+                Text("Un speedtest consomme son débit × sa durée : environ 375 Mo à 300 Mb/s sur 10 s. La session s'arrête proprement au plafond et te le dit.")
+                    .font(.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// Rangée de puces à sélection unique — même grammaire visuelle que « Rafale ».
+    private func chipRow(
+        title: LocalizedStringKey,
+        options: [(value: Int, label: String)],
+        selection: Binding<Int>
+    ) -> some View {
+        HStack {
+            Text(title).foregroundStyle(SQColor.label)
+            Spacer()
+            ForEach(options, id: \.value) { option in
+                Button {
+                    selection.wrappedValue = option.value
+                    Haptics.selection()
+                } label: {
+                    Text(option.label)
+                        .font(.caption.weight(.bold))
+                        .frame(minWidth: 44)
+                        .padding(.vertical, SQSpace.xs + 3)
+                        .background(
+                            selection.wrappedValue == option.value ? SQColor.brandRed : SQColor.fill,
+                            in: Capsule(style: .continuous)
+                        )
+                        .foregroundStyle(selection.wrappedValue == option.value ? SQColor.onAccent : SQColor.label)
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selection.wrappedValue == option.value ? [.isSelected] : [])
+            }
+        }
+    }
+
     // MARK: - Settings sheet (unchanged behaviour)
 
     private var settingsSheet: some View {
@@ -684,6 +758,10 @@ struct SpeedtestView: View {
 
                         Divider().overlay(SQColor.separator)
 
+                        driveTestBudgetSection
+
+                        Divider().overlay(SQColor.separator)
+
                         VStack(alignment: .leading, spacing: SQSpace.xs) {
                             Toggle(isOn: mapPublicationBinding) {
                                 Text("Publier sur la carte communautaire")
@@ -691,9 +769,12 @@ struct SpeedtestView: View {
                                     .foregroundStyle(SQColor.label)
                             }
                             .tint(SQColor.brandRed)
+                            // Précision indispensable depuis que le Drive Test
+                            // publie systématiquement : sans elle, ce réglage
+                            // laisserait croire qu'il couvre AUSSI les trajets.
                             Text(guestMode
-                                 ? "Désactivé par défaut et redemandé à chaque visite invitée. La mesure et l’opérateur deviennent publics."
-                                 : "Désactivé par défaut. Si tu l’actives, ta mesure et ton opérateur deviennent publics ; la position reste floutée sauf consentement séparé dans Confidentialité.")
+                                 ? "Désactivé par défaut et redemandé à chaque visite invitée. La mesure et l’opérateur deviennent publics. Ne concerne pas le Drive Test, qui publie toujours."
+                                 : "Désactivé par défaut, et ne concerne que les tests lancés depuis cet écran : un Drive Test publie toujours, c'est sa raison d'être. Si tu l’actives, ta mesure et ton opérateur deviennent publics ; la position reste floutée sauf consentement séparé dans Confidentialité.")
                                 .font(.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
                                 .fixedSize(horizontal: false, vertical: true)

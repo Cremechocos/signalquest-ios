@@ -138,13 +138,13 @@ struct MapFilterBar: View {
     @Binding var filters: Set<MapDisplayItem.Kind>
 
     private let values: [(MapDisplayItem.Kind, String, String)] = [
-        (.antenna, "Antennes", "antenna.radiowaves.left.and.right"),
-        (.speedtest, "Speedtests", "speedometer"),
-        (.photo, "Photos", "photo"),
-        (.friend, "Amis", "person.2"),
-        (.coverage, "Couverture", "dot.radiowaves.left.and.right"),
-        (.outage, "Pannes", "exclamationmark.triangle"),
-        (.planned, "Prev.", "calendar.badge.clock")
+        (.antenna, String(localized: "Antennes"), "antenna.radiowaves.left.and.right"),
+        (.speedtest, String(localized: "Speedtests"), "speedometer"),
+        (.photo, String(localized: "Photos"), "photo"),
+        (.friend, String(localized: "Amis"), "person.2"),
+        (.coverage, String(localized: "Couverture"), "dot.radiowaves.left.and.right"),
+        (.outage, String(localized: "Pannes"), "exclamationmark.triangle"),
+        (.planned, String(localized: "Prev."), "calendar.badge.clock")
     ]
 
     var body: some View {

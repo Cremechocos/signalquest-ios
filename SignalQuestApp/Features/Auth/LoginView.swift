@@ -93,13 +93,13 @@ struct LoginView: View {
                         .sqAuthAppear(appeared, delay: 0.10)
                     }
 
-                    GradientButton("Explorer sans compte", systemImage: "map", style: .secondary) {
+                    GradientButton(String(localized: "Explorer sans compte"), systemImage: "map", style: .secondary) {
                         showGuestMap = true
                     }
                     .accessibilityLabel("Explorer la carte sans compte")
                     .sqAuthAppear(appeared, delay: 0.11)
 
-                    GradientButton("Tester sans compte", systemImage: "speedometer", style: .secondary) {
+                    GradientButton(String(localized: "Tester sans compte"), systemImage: "speedometer", style: .secondary) {
                         showGuestSpeedtest = true
                     }
                     .accessibilityLabel("Lancer un speedtest sans compte")

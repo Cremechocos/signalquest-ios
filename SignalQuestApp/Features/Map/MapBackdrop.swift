@@ -32,10 +32,10 @@ enum MapBackdrop: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
-        case .carto: return "Tuiles Carto Positron (raster, clair)"
+        case .carto: return String(localized: "Tuiles Carto Positron (raster, clair)")
         case .applePlan: return String(localized: "Carte Apple Plan native (par défaut)")
         case .osm: return String(localized: "Cartographie communautaire détaillée")
-        case .topo: return "Courbes de niveau et relief"
+        case .topo: return String(localized: "Courbes de niveau et relief")
         case .satellite: return String(localized: "Imagerie aérienne Apple (native)")
         }
     }

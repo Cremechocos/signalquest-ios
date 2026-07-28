@@ -236,7 +236,7 @@ struct SignatureSpeedDial: View {
     var accessibilityText: String {
         var parts = ["\(phaseTitle) \(formattedValue) \(unit)"]
         if isRunning {
-            parts.append("mesure en cours")
+            parts.append(String(localized: "mesure en cours"))
         } else if let completionLabel {
             parts.append(completionLabel)
         }

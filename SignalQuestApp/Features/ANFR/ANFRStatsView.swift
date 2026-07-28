@@ -531,7 +531,7 @@ struct ANFRStatsView: View {
                 return String(localized: "\(gen.label) de \(start) à \(end) supports")
             }
         return String(localized: "Évolution des supports \(opName) en \(scope), \(metric) : ")
-            + segments.joined(separator: " ; ") + " sur la période."
+            + segments.joined(separator: " ; ") + String(localized: " sur la période.")
     }
 
     // MARK: Bandes (opérateur sélectionné)

@@ -80,9 +80,9 @@ struct PlannedDetailSheet: View {
                 }
             }
             HStack(spacing: SQSpace.md) {
-                legendDot(SQColor.success, "En service")
-                legendDot(SQColor.warning, "En attente")
-                legendDot(SQColor.labelSecondary, "Prévue")
+                legendDot(SQColor.success, String(localized: "En service"))
+                legendDot(SQColor.warning, String(localized: "En attente"))
+                legendDot(SQColor.labelSecondary, String(localized: "Prévue"))
             }
             .font(SQType.micro)
             .foregroundStyle(SQColor.labelSecondary)
@@ -105,7 +105,7 @@ struct PlannedDetailSheet: View {
             infoRow("Département", site.departement)
             infoRow("Activation 5G prévue", formattedDate(site.date5g))
             infoRow("Distance antenne", site.activation?.distanceM.map { "\(Int($0)) m" })
-            infoRow("Mise en service", formattedDate(site.activation?.lastInServiceDate))
+            infoRow(String(localized: "Mise en service"), formattedDate(site.activation?.lastInServiceDate))
         }
         .padding(.vertical, SQSpace.xs)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
@@ -149,8 +149,8 @@ struct PlannedDetailSheet: View {
 
     private var statusLabel: String {
         switch status {
-        case .active: return "Site actif"
-        case .upgradePending: return "Upgrade en attente"
+        case .active: return String(localized: "Site actif")
+        case .upgradePending: return String(localized: "Upgrade en attente")
         case .declared: return String(localized: "Station déclarée")
         case .planned: return String(localized: "Site prévu")
         }

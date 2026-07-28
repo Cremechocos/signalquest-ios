@@ -79,7 +79,7 @@ enum AntennaReportStatus: String, Codable {
 
     var label: String {
         switch self {
-        case .pending: return "En attente"
+        case .pending: return String(localized: "En attente")
         case .resolved: return String(localized: "Résolu")
         case .dismissed: return String(localized: "Rejeté")
         }

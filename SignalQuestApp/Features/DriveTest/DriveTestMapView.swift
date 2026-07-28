@@ -187,15 +187,7 @@ struct DriveTestMapView: UIViewRepresentable {
             return "none"
         }
         private static func generationColor(_ key: String) -> UIColor {
-            let hex: UInt32
-            switch key {
-            case "5g": hex = 0x8B5CF6
-            case "4g": hex = 0x3B82F6
-            case "3g": hex = 0x14B8A6
-            case "2g": hex = 0x64748B
-            default: hex = 0x94A3B8
-            }
-            return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+            SQSignalScale.Generation.from(key).uiColor
         }
 
         // MARK: Speedtests (annotations tappables colorées par débit)
@@ -207,17 +199,7 @@ struct DriveTestMapView: UIViewRepresentable {
             if !speedtestAnnotations.isEmpty { map.addAnnotations(speedtestAnnotations) }
         }
         private static func speedColor(_ mbps: Double) -> UIColor {
-            let hex: UInt32
-            switch mbps {
-            case 1000...: hex = 0x3B82F6
-            case 600..<1000: hex = 0x06B6D4
-            case 300..<600: hex = 0x22C55E
-            case 100..<300: hex = 0x84CC16
-            case 30..<100: hex = 0xEAB308
-            case 10..<30: hex = 0xF97316
-            default: hex = 0xEF4444
-            }
-            return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+            SQSignalScale.Throughput.from(mbps).uiColor
         }
 
         // MARK: Délégué
