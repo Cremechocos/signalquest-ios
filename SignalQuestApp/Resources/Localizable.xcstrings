@@ -241,6 +241,16 @@
         }
       }
     },
+    "%@ · %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
     "%@ · %lld antenne%@ · %lld cellule%@" : {
       "localizations" : {
         "en" : {
@@ -334,6 +344,16 @@
     "%@ de données" : {
 
     },
+    "%@ est identifié sur le site %@." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ est identifié sur le site %2$@."
+          }
+        }
+      }
+    },
     "%@ ms" : {
       "localizations" : {
         "en" : {
@@ -372,6 +392,19 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ will be able to see your profile and contact you again."
+          }
+        }
+      }
+    },
+    "%@ sites" : {
+
+    },
+    "%@ sites · %@ relevés" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ sites · %2$@ relevés"
           }
         }
       }
@@ -476,6 +509,9 @@
         }
       }
     },
+    "%lld %% vérifié" : {
+
+    },
     "%lld conversations non lues" : {
       "localizations" : {
         "en" : {
@@ -515,6 +551,12 @@
           }
         }
       }
+    },
+    "%lld identifié" : {
+
+    },
+    "%lld identifiés" : {
+
     },
     "%lld j’aime" : {
       "localizations" : {
@@ -916,6 +958,12 @@
         }
       }
     },
+    "%lld relevé" : {
+
+    },
+    "%lld relevés" : {
+
+    },
     "%lld réponse" : {
       "localizations" : {
         "en" : {
@@ -972,12 +1020,28 @@
         }
       }
     },
+    "%lld site" : {
+
+    },
+    "%lld sites" : {
+
+    },
     "%lld sites visibles" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld sites visible"
+          }
+        }
+      }
+    },
+    "%lld sur %lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld sur %2$lld"
           }
         }
       }
@@ -1674,6 +1738,9 @@
         }
       }
     },
+    "Accès refusé : clé d'API requise." : {
+
+    },
     "Accueil" : {
       "localizations" : {
         "en" : {
@@ -2289,6 +2356,9 @@
         }
       }
     },
+    "Antenne %@" : {
+
+    },
     "Antenne en toiture" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2483,6 +2553,9 @@
           }
         }
       }
+    },
+    "Application non vérifiée. Mets-la à jour puis réessaie." : {
+
     },
     "Appui long pour choisir une réaction" : {
       "localizations" : {
@@ -2737,6 +2810,12 @@
         }
       }
     },
+    "Aucun de ces relevés ne porte de position : impossible de proposer une antenne." : {
+
+    },
+    "Aucun de ces relevés ne porte de position." : {
+
+    },
     "Aucun essai gratuit et aucun partage familial. L’abonnement se renouvelle automatiquement et peut être résilié depuis les réglages App Store. Le prix affiché par Apple au moment de l’achat fait foi." : {
       "localizations" : {
         "en" : {
@@ -2905,6 +2984,9 @@
         }
       }
     },
+    "Aucun site sélectionné." : {
+
+    },
     "Aucun speedtest enregistré pour le moment." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2936,6 +3018,18 @@
           }
         }
       }
+    },
+    "Aucune antenne connue à moins de 3 km de ces relevés." : {
+
+    },
+    "Aucune antenne connue à proximité." : {
+
+    },
+    "Aucune antenne connue dans cette zone." : {
+
+    },
+    "Aucune antenne dans cette zone. Déplace la carte." : {
+
     },
     "Aucune antenne desservante résolue pour cette session." : {
       "localizations" : {
@@ -3437,6 +3531,9 @@
         }
       }
     },
+    "Balayage désactivé en données mobiles." : {
+
+    },
     "Balayer vers le bas avec deux doigts pour fermer" : {
       "localizations" : {
         "en" : {
@@ -3750,6 +3847,9 @@
         }
       }
     },
+    "Catalogue vérifié à %lld pour cent" : {
+
+    },
     "Ce diagnostic s'appuie sur les mesures partagées par la communauté SignalQuest à moins de %@ de toi, pour le réseau %@." : {
       "localizations" : {
         "en" : {
@@ -3796,6 +3896,15 @@
           }
         }
       }
+    },
+    "Ce relevé et cette antenne ne sont pas dans le même pays." : {
+
+    },
+    "Ce relevé et cette antenne ne sont pas du même opérateur." : {
+
+    },
+    "Ce relevé ne porte aucun identifiant radio (eNB, gNB ou PCI)." : {
+
     },
     "Ce site n'expose pas d'azimuts de secteur." : {
       "extractionState" : "stale",
@@ -3903,6 +4012,9 @@
         }
       }
     },
+    "Cellules relevées" : {
+
+    },
     "Ces partages sont désactivés par défaut. Les désactiver retire aussi les données temps réel déjà publiées." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -3944,6 +4056,9 @@
           }
         }
       }
+    },
+    "Cette identification est publique et attribuée à ton compte. Tu peux la retirer depuis « Mes identifications »." : {
+
     },
     "Cette offre n'est pas disponible dans l'App Store." : {
       "extractionState" : "stale",
@@ -4118,6 +4233,9 @@
         }
       }
     },
+    "Choisir l'antenne" : {
+
+    },
     "Choisir le bon site" : {
       "localizations" : {
         "en" : {
@@ -4169,6 +4287,9 @@
         }
       }
     },
+    "Choisir une autre antenne sur la carte" : {
+
+    },
     "Choisir une date" : {
       "localizations" : {
         "en" : {
@@ -4218,6 +4339,9 @@
           }
         }
       }
+    },
+    "Choisis une antenne avant de valider." : {
+
     },
     "Choisis une facturation mensuelle ou annuelle" : {
       "localizations" : {
@@ -4716,6 +4840,9 @@
           }
         }
       }
+    },
+    "Connexion au journal…" : {
+
     },
     "Connexion impossible. Vérifie ta connexion puis réessaie." : {
       "localizations" : {
@@ -6180,6 +6307,9 @@
         }
       }
     },
+    "Données ANFR" : {
+
+    },
     "Données Speedtest" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6673,6 +6803,9 @@
           }
         }
       }
+    },
+    "eNB croissant" : {
+
     },
     "Enchaîne des speedtests en continu, sans enregistrer la couverture." : {
       "localizations" : {
@@ -7315,6 +7448,9 @@
         }
       }
     },
+    "Filtrer les antennes" : {
+
+    },
     "Filtres du fil" : {
       "localizations" : {
         "en" : {
@@ -7593,7 +7729,6 @@
       }
     },
     "Identifiant" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7644,6 +7779,9 @@
           }
         }
       }
+    },
+    "Identification non confirmée par le serveur." : {
+
     },
     "Identification retirée" : {
       "extractionState" : "stale",
@@ -7708,6 +7846,15 @@
         }
       }
     },
+    "Identifier %lld sites à la suite" : {
+
+    },
+    "Identifier ce site" : {
+
+    },
+    "Identifier ce site ?" : {
+
+    },
     "Identifier cette antenne" : {
       "localizations" : {
         "en" : {
@@ -7717,6 +7864,9 @@
           }
         }
       }
+    },
+    "Identifiés" : {
+
     },
     "Identité" : {
       "localizations" : {
@@ -8189,6 +8339,9 @@
         }
       }
     },
+    "Journal radio supprimé." : {
+
+    },
     "Journal synchronisé entre tes appareils" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -8230,6 +8383,9 @@
           }
         }
       }
+    },
+    "L'identifiant radio ne correspond pas au site choisi." : {
+
     },
     "la biométrie" : {
       "localizations" : {
@@ -8293,6 +8449,9 @@
           }
         }
       }
+    },
+    "La sauvegarde du journal radio est réservée aux membres Premium." : {
+
     },
     "La transaction App Store n'a pas pu être authentifiée." : {
       "localizations" : {
@@ -8588,6 +8747,9 @@
         }
       }
     },
+    "Le serveur renvoie toujours les mêmes relevés : synchronisation incomplète." : {
+
+    },
     "le signal médian" : {
       "localizations" : {
         "en" : {
@@ -8638,6 +8800,9 @@
           }
         }
       }
+    },
+    "Les %lld relevés synchronisés seront effacés du serveur et de cet appareil. Les identifications que tu as faites, elles, sont conservées." : {
+
     },
     "Les achats App Store seront ouverts après validation serveur en staging. Aucun débit ne peut être lancé pour le moment." : {
       "localizations" : {
@@ -8733,6 +8898,9 @@
           }
         }
       }
+    },
+    "les plus relevés d'abord" : {
+
     },
     "Les publications contenant ces mots n'apparaîtront plus dans ton fil." : {
       "localizations" : {
@@ -8898,6 +9066,9 @@
           }
         }
       }
+    },
+    "Logs antennes" : {
+
     },
     "Lu" : {
       "localizations" : {
@@ -10078,6 +10249,9 @@
         }
       }
     },
+    "Non identifiés" : {
+
+    },
     "Non lu" : {
       "localizations" : {
         "en" : {
@@ -10364,6 +10538,12 @@
         }
       }
     },
+    "Opérateur du relevé inconnu : impossible de rattacher cette identification." : {
+
+    },
+    "Opérateur du relevé inconnu : le serveur ne peut pas rattacher cette identification." : {
+
+    },
     "Opérateur du site" : {
       "localizations" : {
         "en" : {
@@ -10385,7 +10565,6 @@
       }
     },
     "Opérateur inconnu" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11082,6 +11261,9 @@
         }
       }
     },
+    "Pertinence" : {
+
+    },
     "Photo" : {
       "localizations" : {
         "en" : {
@@ -11438,6 +11620,9 @@
         }
       }
     },
+    "Plus" : {
+
+    },
     "Plus d'actions" : {
       "localizations" : {
         "en" : {
@@ -11593,6 +11778,9 @@
         }
       }
     },
+    "Position des relevés" : {
+
+    },
     "Position indisponible — autorise la localisation dans les réglages." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -11603,6 +11791,9 @@
           }
         }
       }
+    },
+    "Position médiane des %lld relevés de ce site — ce n'est pas la position de l'antenne." : {
+
     },
     "Position partagée" : {
       "extractionState" : "stale",
@@ -11915,6 +12106,9 @@
         }
       }
     },
+    "Proposé" : {
+
+    },
     "Propriétaire" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -12066,6 +12260,9 @@
           }
         }
       }
+    },
+    "Quelle antenne as-tu relevée ?" : {
+
     },
     "Question" : {
       "extractionState" : "stale",
@@ -12368,6 +12565,9 @@
         }
       }
     },
+    "Récence" : {
+
+    },
     "Récent" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -12432,6 +12632,9 @@
         }
       }
     },
+    "Recherche des antennes voisines…" : {
+
+    },
     "Recherche en cours" : {
       "localizations" : {
         "en" : {
@@ -12483,6 +12686,9 @@
           }
         }
       }
+    },
+    "Rechercher un site" : {
+
     },
     "Rechercher un utilisateur" : {
       "extractionState" : "stale",
@@ -12585,6 +12791,9 @@
           }
         }
       }
+    },
+    "Récupération du journal" : {
+
     },
     "Reçus invités" : {
       "localizations" : {
@@ -12872,6 +13081,9 @@
           }
         }
       }
+    },
+    "Reprendre" : {
+
     },
     "Reprise automatique en cellulaire" : {
       "localizations" : {
@@ -14171,7 +14383,6 @@
       }
     },
     "Site identifié" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14191,6 +14402,12 @@
           }
         }
       }
+    },
+    "Site identifié." : {
+
+    },
+    "Site introuvable : aucune antenne connue pour cet identifiant." : {
+
     },
     "Site prévisionnel" : {
       "extractionState" : "stale",
@@ -14885,6 +15102,12 @@
         }
       }
     },
+    "Supprimer le journal" : {
+
+    },
+    "Supprimer le journal radio ?" : {
+
+    },
     "Supprimer mon compte" : {
       "localizations" : {
         "en" : {
@@ -14954,6 +15177,9 @@
           }
         }
       }
+    },
+    "Suspendre" : {
+
     },
     "Ta mesure rejoindra la carte publique, à l'endroit du test." : {
       "localizations" : {
@@ -15343,6 +15569,9 @@
         }
       }
     },
+    "Ton compte ne peut pas identifier de site chez cet opérateur." : {
+
+    },
     "Ton fil est encore vide" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -15436,6 +15665,9 @@
         }
       }
     },
+    "Touche une antenne sur la carte pour la choisir." : {
+
+    },
     "Toucher pour afficher en plein écran" : {
       "localizations" : {
         "en" : {
@@ -15528,7 +15760,6 @@
       }
     },
     "Tous les opérateurs" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15577,6 +15808,9 @@
           }
         }
       }
+    },
+    "Tout revérifier" : {
+
     },
     "Tout supprimer" : {
       "localizations" : {
@@ -15662,6 +15896,9 @@
         }
       }
     },
+    "Trier et filtrer" : {
+
+    },
     "Troisième" : {
       "localizations" : {
         "en" : {
@@ -15671,6 +15908,9 @@
           }
         }
       }
+    },
+    "Trop d'éléments envoyés d'un coup. Réessaie." : {
+
     },
     "Trop de requêtes. Patiente un instant avant de réessayer." : {
       "localizations" : {
@@ -15860,6 +16100,9 @@
           }
         }
       }
+    },
+    "un site après l'autre, sortie à tout moment" : {
+
     },
     "Un speedtest consomme son débit × sa durée : environ 375 Mo à 300 Mb/s sur 10 s. La session s'arrête proprement au plafond et te le dit." : {
       "extractionState" : "manual",
@@ -16195,6 +16438,12 @@
         }
       }
     },
+    "Vérification du catalogue" : {
+
+    },
+    "Vérification…" : {
+
+    },
     "Vérifie ta connexion" : {
       "localizations" : {
         "en" : {
@@ -16412,6 +16661,9 @@
         }
       }
     },
+    "vus en dernier" : {
+
+    },
     "Zone blanche" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -16433,6 +16685,9 @@
           }
         }
       }
+    },
+    "Zoome pour afficher les antennes." : {
+
     },
     "Zoome pour séparer les éléments" : {
       "localizations" : {

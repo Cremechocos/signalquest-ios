@@ -78,8 +78,21 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
     /// Fenêtres de balayage en vol. Trois : chacune coûte cher au serveur, qui y
     /// rejoue la résolution item par item.
     private let scanWindowsInFlight = 3
-    /// Fraîcheur du cache de statut (stale-while-revalidate, parité Android).
-    private let statusTtlMs = 30 * 60 * 1000
+    /// Fraîcheur du cache de statut — DISSYMÉTRIQUE, parce que les deux verdicts
+    /// ne vieillissent pas pareil.
+    ///
+    /// Un site IDENTIFIÉ ne redevient pas inconnu : sa validation reste en base.
+    /// Le revérifier n'apprend rien, et sur un catalogue de 5 700 sites c'est une
+    /// quarantaine de requêtes pour confirmer ce qu'on savait. Sept jours.
+    ///
+    /// Un site NON identifié, lui, peut devenir identifié à tout moment —
+    /// quelqu'un d'autre le fait, ou soi-même depuis un autre appareil. Vingt-
+    /// quatre heures, pour que l'information arrive sans marteler le serveur.
+    ///
+    /// Avant : trente minutes pour les deux, donc un balayage COMPLET à chaque
+    /// ouverture passé ce délai. C'est ce que l'utilisateur ressentait.
+    private let identifiedTtlMs = 7 * 24 * 60 * 60 * 1000
+    private let unidentifiedTtlMs = 24 * 60 * 60 * 1000
 
     /// Recul appliqué au curseur STOCKÉ avant de reprendre un rattrapage. Il
     /// s'ajoute à celui du serveur : un rattrapage repris des jours plus tard ne
@@ -282,7 +295,11 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
     // MARK: - Balayage du catalogue
 
     func cachedSiteStates() -> [String: RadioLogSiteState] {
-        statusStore.fresh(ttlMs: statusTtlMs, nowMs: nowMs())
+        statusStore.fresh(
+            identifiedTtlMs: identifiedTtlMs,
+            unidentifiedTtlMs: unidentifiedTtlMs,
+            nowMs: nowMs()
+        )
     }
 
     /// Balaie les sites par fenêtres concurrentes bornées.

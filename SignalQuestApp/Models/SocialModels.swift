@@ -49,12 +49,17 @@ struct SocialFeedAuthor: Codable, Identifiable, Equatable {
     let isFriend: Bool?
     let isFollowing: Bool?
     let liveRadio: SocialAuthorLiveRadio?
+    /// Badges affichés à côté du nom. Deux origines côté serveur, indiscernables
+    /// ici et c'est voulu : ceux accordés par l'équipe (officiel, vérifié…) et
+    /// celui dérivé de l'abonnement actif, que le serveur recalcule à chaque
+    /// lecture plutôt que de le stocker.
+    let badges: [SocialUserBadge]
 
     var displayName: String {
         name ?? handle.map { "@\($0)" } ?? "Utilisateur"
     }
 
-    enum CodingKeys: String, CodingKey { case id, name, handle, avatarUrl, isFriend, isFollowing, liveRadio }
+    enum CodingKeys: String, CodingKey { case id, name, handle, avatarUrl, isFriend, isFollowing, liveRadio, badges }
 
     init(
         id: String,
@@ -63,7 +68,8 @@ struct SocialFeedAuthor: Codable, Identifiable, Equatable {
         avatarUrl: URL?,
         isFriend: Bool?,
         isFollowing: Bool?,
-        liveRadio: SocialAuthorLiveRadio?
+        liveRadio: SocialAuthorLiveRadio?,
+        badges: [SocialUserBadge] = []
     ) {
         self.id = id
         self.name = name
@@ -72,6 +78,7 @@ struct SocialFeedAuthor: Codable, Identifiable, Equatable {
         self.isFriend = isFriend
         self.isFollowing = isFollowing
         self.liveRadio = liveRadio
+        self.badges = badges
     }
 
     init(from decoder: Decoder) throws {
@@ -83,11 +90,31 @@ struct SocialFeedAuthor: Codable, Identifiable, Equatable {
         isFriend = try c.decodeIfPresent(Bool.self, forKey: .isFriend)
         isFollowing = try c.decodeIfPresent(Bool.self, forKey: .isFollowing)
         liveRadio = try c.decodeIfPresent(SocialAuthorLiveRadio.self, forKey: .liveRadio)
+        badges = c.decodeLossyArray([SocialUserBadge].self, forKey: .badges)
     }
 }
 
 /// Hashable pour pouvoir pousser un profil via `navigationDestination(item:)`.
 extension SocialFeedAuthor: Hashable {}
+
+/// Un badge d'auteur. Le catalogue fait autorité côté serveur
+/// (`packages/core/social/badges.ts`) ; iOS n'en connaît que les genres qu'il
+/// sait rendre, et ignore les autres — ajouter un badge au catalogue ne doit
+/// pas exiger une mise à jour de l'app.
+struct SocialUserBadge: Codable, Identifiable, Equatable, Hashable {
+    let kind: String
+    let note: String?
+
+    var id: String { kind }
+
+    enum CodingKeys: String, CodingKey { case kind, note }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = c.decodeFlexibleString(forKey: .kind) ?? ""
+        note = c.decodeFlexibleString(forKey: .note)
+    }
+}
 
 struct SocialPostAttachment: Codable, Identifiable, Equatable {
     let id: String

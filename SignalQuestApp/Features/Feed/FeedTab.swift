@@ -17,6 +17,7 @@ enum FeedTab: String, CaseIterable, Identifiable, Sendable {
     case following
     case friends
     case telecom
+    case photos
     case saved
 
     var id: String { rawValue }
@@ -28,6 +29,9 @@ enum FeedTab: String, CaseIterable, Identifiable, Sendable {
         case .following: return "following"
         case .friends: return "friends"
         case .telecom: return "telecom"
+        // `media` : le backend l'accepte depuis le début, iOS ne l'exposait pas.
+        // Il ne rend que les publications porteuses d'une image ou d'une vidéo.
+        case .photos: return "media"
         case .saved: return "saved"
         }
     }
@@ -53,6 +57,7 @@ enum FeedTab: String, CaseIterable, Identifiable, Sendable {
         case .following: return "Abonnements"
         case .friends: return "Amis"
         case .telecom: return "Réseau"
+        case .photos: return "Photos"
         case .saved: return "Enregistrés"
         }
     }
@@ -64,9 +69,17 @@ enum FeedTab: String, CaseIterable, Identifiable, Sendable {
         case .following: return "person.badge.plus"
         case .friends: return "person.2"
         case .telecom: return "antenna.radiowaves.left.and.right"
+        case .photos: return "photo.on.rectangle.angled"
         case .saved: return "bookmark"
         }
     }
+
+    /// Cet onglet se rend en GRILLE et non en cartes.
+    ///
+    /// Une galerie se parcourt à l'œil : trois vignettes par ligne montrent en un
+    /// écran ce que six cartes pleine largeur mettraient six écrans à révéler. Le
+    /// reste du fil garde ses cartes, où le texte et les métriques comptent.
+    var rendersAsGallery: Bool { self == .photos }
 
     /// Message d'état vide propre à l'onglet — « Ton fil est encore vide » est
     /// faux et décourageant sur « Amis » quand on n'a simplement pas d'amis.
@@ -77,6 +90,7 @@ enum FeedTab: String, CaseIterable, Identifiable, Sendable {
         case .following: return "Tu ne suis encore personne. Explore les profils pour remplir cet onglet."
         case .friends: return "Aucune publication de tes amis pour l'instant."
         case .telecom: return "Aucune mesure ni identification partagée récemment."
+        case .photos: return "Aucune photo partagée pour l'instant. Ajoute-en une depuis une antenne ou une publication."
         case .saved: return "Touche le marque-page d'une publication pour la retrouver ici."
         }
     }

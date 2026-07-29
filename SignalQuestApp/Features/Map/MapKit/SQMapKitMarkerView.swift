@@ -55,8 +55,16 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             dot.alpha = payload.communityObserved ? 0.6 : 1
             countLabel.isHidden = true
             glyph.frame = dot.bounds.insetBy(dx: 8, dy: 8)
-            glyph.image = UIImage(systemName: Self.glyphName(for: payload))?
-                .withConfiguration(UIImage.SymbolConfiguration(pointSize: 13, weight: .bold))
+            if payload.kind == .antenna, payload.glyphOverride == nil {
+                // Pylône dessiné plutôt que `antenna.radiowaves.left.and.right`,
+                // qui ne montre pas une antenne mais un point qui émet — la même
+                // image que le Wi-Fi. Sur une carte d'antennes, il ne distinguait
+                // rien.
+                glyph.image = SQAntennaGlyph.image(size: glyph.bounds.width, color: .white)
+            } else {
+                glyph.image = UIImage(systemName: Self.glyphName(for: payload))?
+                    .withConfiguration(UIImage.SymbolConfiguration(pointSize: 13, weight: .bold))
+            }
             glyph.isHidden = false
         }
     }

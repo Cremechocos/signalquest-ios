@@ -473,13 +473,22 @@ struct ServingAntennaHypothesis: Decodable {
 struct SessionsListResponse: Decodable {
     let sessions: [CoverageSession]
     let pagination: SessionsPagination?
+    /// Nuage de points allégé, présent uniquement sur `?mapPoints=1`.
+    ///
+    /// Il remplace, pour « Mes mesures », l'appel au DÉTAIL de chaque session :
+    /// le détail pèse ~5,5 Mo pièce (759 octets par point, `cellMeasurements`
+    /// imbriqué compris) alors que la carte n'a besoin que de la position, de la
+    /// techno et du niveau. Le serveur charge déjà ces colonnes pour ses
+    /// agrégats — les renvoyer ne lui coûte pas une requête de plus.
+    let mapPoints: [CoverageSessionPoint]
 
-    enum CodingKeys: String, CodingKey { case sessions, pagination }
+    enum CodingKeys: String, CodingKey { case sessions, pagination, mapPoints }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         sessions = c.decodeLossyArray([CoverageSession].self, forKey: .sessions)
         pagination = try? c.decodeIfPresent(SessionsPagination.self, forKey: .pagination) ?? nil
+        mapPoints = c.decodeLossyArray([CoverageSessionPoint].self, forKey: .mapPoints)
     }
 }
 

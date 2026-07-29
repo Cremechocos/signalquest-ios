@@ -6,7 +6,7 @@ final class MyIdentificationsViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var withdrawingId: String?
-    @Published var filter: Filter = .all
+    @Published var filter: Filter = .all { didSet { rebuild() } }
     @Published var toast: String?
 
     enum Filter: String, CaseIterable, Identifiable {
@@ -32,11 +32,20 @@ final class MyIdentificationsViewModel: ObservableObject {
         }
     }
 
-    var filteredGroups: [IdentifiedNodeGroup] {
-        IdentifiedNodeGroup.group(filtered)
-    }
+    /// Regroupement en nœuds, CALCULÉ UNE FOIS par changement d'entrée.
+    ///
+    /// En propriété calculée, `IdentifiedNodeGroup.group` — qui construit un
+    /// dictionnaire, agrège les cellules et trie deux fois — repartait à chaque
+    /// évaluation du `body`, donc à chaque frappe, chaque retrait, chaque
+    /// bascule de filtre, et plusieurs fois par passe (la liste ET son état vide
+    /// le lisent).
+    @Published private(set) var filteredGroups: [IdentifiedNodeGroup] = []
+    @Published private(set) var conflictCount = 0
 
-    var conflictCount: Int { items.filter(\.conflict).count }
+    private func rebuild() {
+        filteredGroups = IdentifiedNodeGroup.group(filtered)
+        conflictCount = items.filter(\.conflict).count
+    }
 
     func load() async {
         isLoading = true
@@ -45,6 +54,7 @@ final class MyIdentificationsViewModel: ObservableObject {
         do {
             let result = try await service.mine(includeRelated: true)
             items = result.sorted { ($0.lastValidated ?? $0.createdAt ?? .distantPast) > ($1.lastValidated ?? $1.createdAt ?? .distantPast) }
+            rebuild()
         } catch {
             if !error.isCancellation { errorMessage = error.localizedDescription }
         }

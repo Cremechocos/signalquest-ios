@@ -439,6 +439,13 @@ struct FeedView: View {
 
     /// Enveloppe `Hashable` d'un post pour `navigationDestination(item:)`
     /// (deep-link), identifiée par l'id du post.
+    /// Une vignette de la galerie : la publication, et l'image qui la représente.
+    private struct GalleryTile: Identifiable {
+        let item: UnifiedSocialFeedItem
+        let url: URL
+        var id: String { item.id }
+    }
+
     private struct RoutedPost: Identifiable, Hashable {
         let item: UnifiedSocialFeedItem
         var id: String { item.id }
@@ -498,8 +505,12 @@ struct FeedView: View {
                         )
                         .padding(.top, SQSpace.xxl)
                     }
-                    ForEach(model.page?.items ?? []) { item in
-                        feedCard(for: item)
+                    if model.tab.rendersAsGallery {
+                        photoGallery(model.page?.items ?? [])
+                    } else {
+                        ForEach(model.page?.items ?? []) { item in
+                            feedCard(for: item)
+                        }
                     }
                     if model.isLoadingMore {
                         HStack { Spacer(); ProgressView().tint(SQColor.brandRed); Spacer() }
@@ -833,6 +844,49 @@ struct FeedView: View {
             communityMenu
         }
         .accessibilityElement(children: .contain)
+    }
+
+    /// L'onglet « Photos », en galerie.
+    ///
+    /// Trois colonnes, vignettes carrées, sans chrome : ce qu'on regarde ici,
+    /// c'est l'image. Les cartes du fil portent l'auteur, le texte, les
+    /// métriques et six actions — nécessaires pour un speedtest, du bruit pour
+    /// une photo. Un appui ouvre la publication complète, où tout cela revient.
+    @ViewBuilder
+    private func photoGallery(_ items: [UnifiedSocialFeedItem]) -> some View {
+        let tiles: [GalleryTile] = items.compactMap { item in
+            guard let url = item.attachments.lazy
+                .compactMap({ $0.thumbnailUrl ?? $0.url })
+                .first
+            else { return nil }
+            return GalleryTile(item: item, url: url)
+        }
+        LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.xs), count: 3),
+            spacing: SQSpace.xs
+        ) {
+            ForEach(tiles) { tile in
+                Button {
+                    routedPostItem = RoutedPost(item: tile.item)
+                    Haptics.light()
+                } label: {
+                    // 320 pt de côté max : une vignette de grille ne dépasse
+                    // jamais le tiers de la largeur, décoder du 1500 px pour
+                    // l'afficher à 120 remplirait le cache pour rien.
+                    RemoteImage(url: tile.url, maxDimension: 320, contentMode: .fill) {
+                        RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                            .fill(SQColor.surfaceMuted)
+                    }
+                    .aspectRatio(1, contentMode: .fill)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("Photo de \(tile.item.author.displayName)"))
+            }
+        }
     }
 
     /// `⋯` — les destinations de la communauté qui ne méritent pas un bouton

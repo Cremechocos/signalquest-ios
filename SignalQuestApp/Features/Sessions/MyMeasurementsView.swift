@@ -18,21 +18,18 @@ final class MyMeasurementsViewModel: ObservableObject {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            let list = try await service.sessions(offset: 0, limit: 40)
+            // UNE requête, et un nuage déjà réduit aux champs que la carte
+            // dessine.
+            //
+            // Avant : la liste, puis le DÉTAIL des quinze sessions les plus
+            // récentes en parallèle. Mesuré sur un compte réel, un seul détail
+            // pèse 5,5 Mo pour 7 340 points — 759 octets par point, dont un
+            // `cellMeasurements` imbriqué dont on ne fait rien ici. Seize
+            // allers-retours et ~80 Mo à décoder sur le téléphone, pour poser
+            // des pastilles sur une carte.
+            let list = try await service.sessions(offset: 0, limit: 40, mapPoints: true)
             sessionCount = list.sessions.count
-            // Récupère les points des sessions les plus récentes EN PARALLÈLE (borné),
-            // puis les agrège en un seul nuage.
-            let recent = Array(list.sessions.prefix(15))
-            let service = self.service
-            let collected = await withTaskGroup(of: [CoverageSessionPoint].self) { group -> [CoverageSessionPoint] in
-                for session in recent {
-                    group.addTask { (try? await service.sessionDetail(id: session.id))?.points ?? [] }
-                }
-                var all: [CoverageSessionPoint] = []
-                for await pts in group { all.append(contentsOf: pts) }
-                return all
-            }
-            points = collected.filter(\.hasValidCoordinate)
+            points = list.mapPoints.filter(\.hasValidCoordinate)
         } catch {
             errorMessage = error.localizedDescription
         }

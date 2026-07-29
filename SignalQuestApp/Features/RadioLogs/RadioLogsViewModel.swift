@@ -231,9 +231,25 @@ final class RadioLogsViewModel: ObservableObject {
 
     // MARK: Chargement
 
-    /// Ouverture : le cache d'abord (affichage immédiat), le réseau ensuite.
+    /// Délai en deçà duquel rouvrir la page ne relance PAS de rattrapage.
+    ///
+    /// Le journal est alimenté par des trajets, pas par la seconde : revenir sur
+    /// l'écran deux minutes après n'a aucune chance d'y trouver du neuf, et
+    /// chaque passage payait pourtant un aller-retour puis une reconstruction
+    /// complète de la liste. Tirer pour rafraîchir contourne toujours ce délai —
+    /// c'est le geste par lequel on demande explicitement du frais.
+    private let syncCooldown: TimeInterval = 10 * 60
+
+    /// Ouverture : le cache d'abord (affichage immédiat), le réseau seulement
+    /// s'il a des chances d'apporter quelque chose.
     func onAppear() async {
         loadFromCache()
+        if let lastSyncedAt, Date().timeIntervalSince(lastSyncedAt) < syncCooldown {
+            // Rien à retélécharger, mais le balayage peut avoir des sites dont
+            // le statut a expiré depuis la dernière fois.
+            await startScanIfNeeded()
+            return
+        }
         await sync()
     }
 

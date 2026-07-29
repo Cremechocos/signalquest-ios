@@ -22,7 +22,15 @@ final class SessionsListViewModel: ObservableObject {
 
     let service: SessionsServicing
     private var offset = 0
-    private let pageSize = 30
+    /// Quinze, pas trente.
+    ///
+    /// Le serveur charge TOUS les points de TOUTES les sessions de la page pour
+    /// en dériver ses agrégats (distance sans réseau, opérateurs, comptes
+    /// logiques) : le coût de la page est proportionnel au nombre de sessions,
+    /// pas à leur nombre de lignes. Mesuré : 1,0 s à vingt sessions, 1,8 s à
+    /// quarante. Quinze remplit déjà plus d'un écran, et le défilement infini
+    /// charge la suite pendant qu'on lit.
+    private let pageSize = 15
 
     init(service: SessionsServicing) { self.service = service }
 

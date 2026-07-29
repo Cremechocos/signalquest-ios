@@ -1,44 +1,12 @@
 import Foundation
 
-/// Une ligne de log radio parsée depuis un export « eNB Analytics » (CSV `ExportV5`)
-/// ou un fichier `.ntm` (format NetMonster). Miroir Swift du `NormalizedRadioLogSample`
-/// Android, avec la MÊME logique d'identité cellule :
-///  - LTE : `ci = eNB×256 + CID` (ECI, split 8 bits imposé par la 3GPP).
-///  - NR  : `ci = NCI` (36 bits), `gnb = NCI >> 14` (convention identique au serveur).
-struct ParsedRadioLogRow: Identifiable, Sendable, Codable {
-    var id = UUID()
-    let lineNumber: Int
-    /// "LTE" ou "NR" (nil si indéterminable).
-    let technology: String?
-    /// Nom d'opérateur brut ("Orange", "SFR", "ZB"…) quand la source le fournit.
-    let operatorName: String?
-    let mcc: String?
-    let mnc: String?
-    let enb: String?
-    let gnb: String?
-    /// Identité cellule complète (ECI en LTE, NCI en NR).
-    let ci: Int64?
-    /// Cellule locale (bits bas), telle qu'affichée par la source.
-    let cellId: String?
-    let pci: Int?
-    let tac: Int?
-    let earfcn: Int?
-    let band: Int?
-    let rsrp: Int?
-    let latitude: Double?
-    let longitude: Double?
-
-    var hasLocation: Bool { latitude != nil && longitude != nil }
-
-    var hasRadioIdentity: Bool {
-        !(enb ?? "").isEmpty || !(gnb ?? "").isEmpty || !(cellId ?? "").isEmpty || ci != nil || pci != nil
-    }
-
-    /// Est-ce une cellule 5G ? (utilisé pour router techno/nœud.)
-    var isNr: Bool {
-        (technology ?? "").uppercased().contains("NR") || (technology ?? "").uppercased().contains("5G") || gnb != nil
-    }
-}
+/// Résolution d'opérateur et contrat `identify/quick` — le socle partagé de
+/// l'identification.
+///
+/// Ces types vivaient dans `RadioLogImportModels.swift`, aux côtés de l'import
+/// de fichiers de logs. Cet écran a été retiré ; ce qui reste ici n'a jamais
+/// été propre à l'import, c'est la page « Logs antennes » qui s'en sert
+/// aujourd'hui pour balayer le catalogue et proposer des sites.
 
 // MARK: - Résolution opérateur → MCC/MNC + marché (miroir de OperatorNetworkFallback.kt)
 
@@ -230,86 +198,4 @@ struct QuickIdentifyHypothesis: Decodable, Sendable {
         confidenceScore = try? c.decodeIfPresent(Int.self, forKey: .confidenceScore)
         confidence = c.decodeFlexibleString(forKey: .confidence)
     }
-}
-
-// MARK: - État d'import (aperçu + résultat d'écriture)
-
-/// Une ligne parsée + son verdict de résolution serveur (site rattachable ou non).
-struct ResolvedRadioLogRow: Identifiable, Sendable {
-    let id: UUID
-    let row: ParsedRadioLogRow
-    let siteId: String?
-    let matched: Bool
-    let distanceMeters: Double?
-}
-
-/// Statut d'identification d'une cellule pour l'affichage (miroir simplifié des badges
-/// Android : Vérif. / Rattachable / Non identifié / Identifié). `Codable` pour le cache
-/// disque (voir `RadioLogImportStatusStore`) — évite de tout re-résoudre à chaque ouverture.
-enum RadioLogImportCellStatus: Sendable, Equatable, Codable {
-    case pending
-    case identifiable(siteId: String, distanceMeters: Double?)
-    case notFound
-    case identified
-
-    var label: String {
-        switch self {
-        case .pending: return String(localized: "Vérif.")
-        case .identifiable: return "Rattachable"
-        case .notFound: return String(localized: "Non identifié")
-        case .identified: return String(localized: "Identifié")
-        }
-    }
-
-    private enum Kind: String, Codable { case pending, identifiable, notFound, identified }
-    private enum CodingKeys: String, CodingKey { case kind, siteId, distanceMeters }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        switch try c.decode(Kind.self, forKey: .kind) {
-        case .pending: self = .pending
-        case .identifiable:
-            self = .identifiable(
-                siteId: (try? c.decode(String.self, forKey: .siteId)) ?? "",
-                distanceMeters: try? c.decodeIfPresent(Double.self, forKey: .distanceMeters)
-            )
-        case .notFound: self = .notFound
-        case .identified: self = .identified
-        }
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-        case .pending: try c.encode(Kind.pending, forKey: .kind)
-        case let .identifiable(siteId, distance):
-            try c.encode(Kind.identifiable, forKey: .kind)
-            try c.encode(siteId, forKey: .siteId)
-            try c.encodeIfPresent(distance, forKey: .distanceMeters)
-        case .notFound: try c.encode(Kind.notFound, forKey: .kind)
-        case .identified: try c.encode(Kind.identified, forKey: .kind)
-        }
-    }
-}
-
-extension ParsedRadioLogRow {
-    /// Clé d'identité cellule STABLE (opérateur + nœud + cellule) — survit au ré-import,
-    /// contrairement à `id` (UUID régénéré). Sert de clé au cache de statut d'identification.
-    var stableIdentityKey: String {
-        [mcc ?? "", mnc ?? "", enb ?? "", gnb ?? "",
-         ci.map(String.init) ?? "", pci.map(String.init) ?? ""].joined(separator: "|")
-    }
-}
-
-/// Statut d'identification caché sur disque (clé = `stableIdentityKey`) + horodatage
-/// pour le TTL (revalidation périodique, façon stale-while-revalidate Android).
-struct CachedRadioLogStatus: Codable, Sendable {
-    let status: RadioLogImportCellStatus
-    let updatedAtMs: Int
-}
-
-/// Résultat de l'écriture (identify/direct par ligne rattachée).
-struct RadioLogImportOutcome: Sendable {
-    var submitted: Int = 0
-    var failed: Int = 0
 }

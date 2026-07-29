@@ -231,7 +231,10 @@ final class CoverageSessionQueue: CoverageSessionStoring, @unchecked Sendable {
 /// Accès aux sessions/logs de mesure de l'utilisateur (synchronisées côté
 /// serveur, donc visibles ici même si enregistrées sur Android).
 protocol SessionsServicing: Sendable {
-    func sessions(offset: Int, limit: Int) async throws -> SessionsListResponse
+    /// `mapPoints` demande en plus le nuage de points allégé du compte : il
+    /// remplace, pour les écrans cartographiques, l'appel au détail de chaque
+    /// session (~5,5 Mo pièce, contre quatre champs utiles).
+    func sessions(offset: Int, limit: Int, mapPoints: Bool) async throws -> SessionsListResponse
     func sessionDetail(id: String) async throws -> CoverageSessionDetail
     /// Écrit/remplace le brouillon atomique avant toute tentative réseau.
     func persistCoverageDraft(_ session: CoverageSessionUpload) throws
@@ -244,6 +247,14 @@ protocol SessionsServicing: Sendable {
     /// Reprend les brouillons interrompus et rejoue la file. Ne remonte pas l'erreur
     /// à l'appelant de cycle de vie : les éléments restent sur disque.
     func retryPendingCoverageSessions() async
+}
+
+/// Valeurs par défaut : une exigence de protocole ne peut pas en porter, et la
+/// grande majorité des appelants ne veulent pas du nuage cartographique.
+extension SessionsServicing {
+    func sessions(offset: Int = 0, limit: Int = 30) async throws -> SessionsListResponse {
+        try await sessions(offset: offset, limit: limit, mapPoints: false)
+    }
 }
 
 final class SessionsService: SessionsServicing, @unchecked Sendable {
@@ -301,15 +312,17 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
         }
     }
 
-    func sessions(offset: Int = 0, limit: Int = 30) async throws -> SessionsListResponse {
-        try await api.request(
-            APIEndpoint(
-                path: "/api/coverage/sessions",
-                query: [
-                    URLQueryItem(name: "offset", value: String(offset)),
-                    URLQueryItem(name: "limit", value: String(limit))
-                ]
-            ),
+    func sessions(offset: Int = 0, limit: Int = 30, mapPoints: Bool = false) async throws -> SessionsListResponse {
+        var query = [
+            URLQueryItem(name: "offset", value: String(offset)),
+            URLQueryItem(name: "limit", value: String(limit))
+        ]
+        // Nuage de points allégé, pour les écrans qui dessinent une carte. Il
+        // évite d'aller chercher le DÉTAIL de chaque session — 5,5 Mo pièce là
+        // où la carte a besoin de quatre champs.
+        if mapPoints { query.append(URLQueryItem(name: "mapPoints", value: "1")) }
+        return try await api.request(
+            APIEndpoint(path: "/api/coverage/sessions", query: query),
             as: SessionsListResponse.self
         )
     }

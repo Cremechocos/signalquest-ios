@@ -14,7 +14,7 @@ struct RadioLogSnapshot: Codable, Sendable {
 
 /// Persistance locale du journal radio synchronisé.
 ///
-/// iOS n'a pas de Room : comme `RadioLogImportStore`, on garde un fichier JSON
+/// iOS n'a pas de Room : on garde un fichier JSON
 /// durable en Application Support. Le journal du compte de test pèse ~15 500
 /// lignes, soit ~2 Mo une fois réduit aux champs affichés — l'écriture est donc
 /// FAITE UNE FOIS par synchronisation, pas par page : trente et une réécritures de
@@ -29,7 +29,7 @@ protocol RadioLogStoring: Sendable {
 }
 
 /// Fichier durable, mutations sous verrou et écriture atomique. Même patron que
-/// `RadioLogImportStore`.
+/// `CoverageSessionQueue`.
 final class RadioLogStore: RadioLogStoring, @unchecked Sendable {
     private let fileURL: URL
     private let fileManager: FileManager
@@ -112,11 +112,12 @@ final class RadioLogStore: RadioLogStoring, @unchecked Sendable {
 // MARK: - Cache du statut d'identification par SITE
 
 /// Cache disque du statut d'identification des SITES (clé = `RadioLogSite.id`).
-/// Jumeau de `RadioLogImportStatusStore`, dont la clé est une identité de CELLULE.
 /// Il permet de rouvrir la page avec ses pastilles déjà posées au lieu de relancer
 /// un balayage complet de 4 800 sites à chaque fois.
 protocol RadioLogSiteStatusStoring: Sendable {
-    func fresh(ttlMs: Int, nowMs: Int) -> [String: RadioLogSiteState]
+    /// Statuts encore frais. La durée de vie dépend du VERDICT, pas de l'entrée :
+    /// voir `RadioLogsService` pour le raisonnement.
+    func fresh(identifiedTtlMs: Int, unidentifiedTtlMs: Int, nowMs: Int) -> [String: RadioLogSiteState]
     func merge(_ states: [String: RadioLogSiteState], nowMs: Int)
     func clear()
 }
@@ -147,12 +148,13 @@ final class RadioLogSiteStatusStore: RadioLogSiteStatusStoring, @unchecked Senda
         }
     }
 
-    func fresh(ttlMs: Int, nowMs: Int) -> [String: RadioLogSiteState] {
+    func fresh(identifiedTtlMs: Int, unidentifiedTtlMs: Int, nowMs: Int) -> [String: RadioLogSiteState] {
         lock.lock(); defer { lock.unlock() }
         let file = (try? readUnlocked()) ?? RadioLogSiteStatusFile()
         var out: [String: RadioLogSiteState] = [:]
-        for (key, cached) in file.states where nowMs - cached.updatedAtMs <= ttlMs {
-            out[key] = cached.state
+        for (key, cached) in file.states {
+            let ttl = cached.state.isIdentified ? identifiedTtlMs : unidentifiedTtlMs
+            if nowMs - cached.updatedAtMs <= ttl { out[key] = cached.state }
         }
         return out
     }

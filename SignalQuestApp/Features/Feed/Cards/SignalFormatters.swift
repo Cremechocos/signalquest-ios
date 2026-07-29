@@ -142,9 +142,14 @@ struct CardHeader: View {
         HStack(spacing: SQSpace.md) {
             SQAvatar(url: author.avatarUrl, name: author.displayName)
             VStack(alignment: .leading, spacing: 2) {
-                Text(author.displayName)
-                    .font(SQFont.body(16, .semibold))
-                    .foregroundStyle(SQColor.label)
+                HStack(spacing: 5) {
+                    Text(author.displayName)
+                        .font(SQFont.body(16, .semibold))
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(1)
+                    // Badges accolés au nom, comme sur le web et Android.
+                    SQUserBadges(badges: author.badges)
+                }
                 HStack(spacing: 6) {
                     if let place {
                         Image(systemName: "location.fill")

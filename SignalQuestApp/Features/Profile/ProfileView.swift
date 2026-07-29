@@ -225,7 +225,7 @@ struct ProfileView: View {
                 NavigationLink {
                     SessionsListView(service: services.sessions)
                 } label: {
-                    menuRow(title: "Mes sessions / Logs", icon: "point.topleft.down.curvedto.point.bottomright.up")
+                    menuRow(title: "Mes enregistrements de trajet", icon: "point.topleft.down.curvedto.point.bottomright.up")
                 }
                 menuSeparator
                 NavigationLink {
@@ -242,12 +242,6 @@ struct ProfileView: View {
                     )
                 } label: {
                     menuRow(title: "Logs antennes", icon: "antenna.radiowaves.left.and.right")
-                }
-                menuSeparator
-                NavigationLink {
-                    RadioLogImportView(service: services.radioLogImport)
-                } label: {
-                    menuRow(title: "Importer des logs radio", icon: "square.and.arrow.down")
                 }
                 menuSeparator
                 NavigationLink {

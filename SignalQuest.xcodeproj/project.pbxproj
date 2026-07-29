@@ -30,6 +30,7 @@
 		0D300C2A9A425CA8A494389A /* Figtree-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E03FBD9147DB71215729DD82 /* Figtree-Regular.ttf */; };
 		0E23C8236637F2291A28E8E2 /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 837392435FEEACE677A0F0FF /* ShareSheet.swift */; };
 		0E91F86BD082D7967A904E1B /* GamificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DE13CA2784C45B1F0EDF3B2 /* GamificationService.swift */; };
+		0ECBE473F9CE2213A93E7583 /* SQUserBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC5255F7439DB3A81B3C67F6 /* SQUserBadge.swift */; };
 		0F93CA162732A4E9F82EC1AF /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD246E248AC961551013A82C /* Haptics.swift */; };
 		0FC1E05534800C8F2C87ABD4 /* SQFriendMarkerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E75516A87ED197A5BB4AB1 /* SQFriendMarkerView.swift */; };
 		10DD4DD2B9C039C5DDDFA23C /* TerritoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF1CBBB47AF9B0D1E7B04560 /* TerritoryTests.swift */; };
@@ -128,7 +129,6 @@
 		523C31F38FEC5EFE05662838 /* SSEClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E64A098BE39CEC609740776 /* SSEClient.swift */; };
 		52F6F1D7A3BCF1650C6BEEF5 /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 389490B290AB8281D5C364D0 /* AppServices.swift */; };
 		53124BA53C789E7595979D54 /* ReportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5886D2D8C4F18B7D0DE4C671 /* ReportSheet.swift */; };
-		533BA2C52C7A4CAEE52B0251 /* RadioLogImportsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EC0989C8E515CED280D87E0 /* RadioLogImportsViewModel.swift */; };
 		53C2F8D7E0BE624F1C800C35 /* CrashHardeningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 067D3AF65AE57675EBBE798B /* CrashHardeningTests.swift */; };
 		543116391555BF3BE77EDA7F /* LeaderboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 554B78FC0A0A68C411BAD689 /* LeaderboardModels.swift */; };
 		56EC777B107E81B428F7F1B5 /* ValidationsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 885DAE78D34639CBB592A710 /* ValidationsService.swift */; };
@@ -149,7 +149,6 @@
 		5F15D1940A0B15ACFD423499 /* ReactionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 366127FDD01986AEE70AE565 /* ReactionPicker.swift */; };
 		5F7AF0A6DEEB9A788A1199E7 /* AutoRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B7D91FD53A512C0A154BCFB /* AutoRefreshTests.swift */; };
 		5FC825F33AD5AE53302210C6 /* AuthSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 670C9CDB66FCC050C0142C58 /* AuthSessionTests.swift */; };
-		606E7522E0DD527D31CF2E01 /* RadioLogImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E28A9C023F0003B4E68771A /* RadioLogImportService.swift */; };
 		60D23DEF3BF11E5D8C85EFA4 /* MapBands.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4D38E0CB180E8E0F533A27D /* MapBands.swift */; };
 		60EBDACADAAACBFFF77481DA /* AntennaReportsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01B521A888A6F354C88F21D1 /* AntennaReportsService.swift */; };
 		6132F896B54ED9F1ED730465 /* SQFont.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0447B79F47CDC0258E0BEA27 /* SQFont.swift */; };
@@ -162,7 +161,6 @@
 		63A197C5516EA15B55DF8942 /* FeedPoll.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4B43802B3725DE1A21B9D53 /* FeedPoll.swift */; };
 		6651F3A94F7A12751A676CC2 /* SpeedtestShareImageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 879A6D651EB7605DE38CD230 /* SpeedtestShareImageTests.swift */; };
 		67B241EC2769C4066723D656 /* SpeedtestUploadStreamLadderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BB896FE06E7411B91CC373D /* SpeedtestUploadStreamLadderTests.swift */; };
-		681DBC1F202BA2A5486B5F4E /* RadioLogImportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E04E544B4C215F036CD9B609 /* RadioLogImportModels.swift */; };
 		696D8CC9612CF18EA3CEFE62 /* EntitlementsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 510C718208A0F0CD33A6405E /* EntitlementsService.swift */; };
 		69C6356C453ED3AA2B0CFFEC /* SpeedtestModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39509D5164E7F02622A4D040 /* SpeedtestModels.swift */; };
 		69CCCECACF194424E6D74D3E /* MapBounds+Geometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA954636DB0A4A82D56EFD1 /* MapBounds+Geometry.swift */; };
@@ -187,7 +185,6 @@
 		77296AC47C010924CDD13008 /* SQShareCardRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDD13E6A80233AA4C49D1F1 /* SQShareCardRenderTests.swift */; };
 		7827FB3BCE2C62729FA1C132 /* ProfileReorgQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9370C0177B2346BC4EBEC5 /* ProfileReorgQATests.swift */; };
 		7834D63E27751200CFE2DCF1 /* MapPhotoViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3943DEC3A15CC630D29F54A /* MapPhotoViewer.swift */; };
-		7BD0F0D81265EB7E43D6B78E /* RadioLogImportStatusStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA6F453FFCEA21945FAE5FC /* RadioLogImportStatusStore.swift */; };
 		7C6A3C2708709AE1A38C1DE6 /* CommentsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4841F25C76693497780EE838 /* CommentsSheet.swift */; };
 		7CA5E6F0A4A14654924684BB /* SQShareFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C83749A7788F75706BA83C05 /* SQShareFonts.swift */; };
 		7D0BE4AFA8C517809583BFB1 /* IdentifyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C43EF0BBA838F55D6E4EF78 /* IdentifyService.swift */; };
@@ -196,7 +193,6 @@
 		7E8B1CCCA9F6BE070514C050 /* SpeedtestIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6A9E12FB0C1755E79A6216 /* SpeedtestIntents.swift */; };
 		8027C2DE7425912942340D4B /* NewModelDecodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A30FBE643735E6E375B3948 /* NewModelDecodeTests.swift */; };
 		80E825877A511351EBDCAE08 /* LiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = BB84BCC804AE4D6D0E2FF2FF /* LiveKit */; };
-		81468AFF5A5E22F90CD47B5A /* RadioLogImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E68316AF4C10942F8D8F691 /* RadioLogImportView.swift */; };
 		81672BA3E386570C6398A008 /* CoverageCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91DE6C62E4954951C0A2419C /* CoverageCardView.swift */; };
 		819A23CD1C96508D7129E5F0 /* BricolageGrotesque-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F2B897546130656652D9717D /* BricolageGrotesque-SemiBold.ttf */; };
 		81DFFE9AA337FF36E5549415 /* MentionAutocomplete.swift in Sources */ = {isa = PBXBuildFile; fileRef = 743199D868E04642B691ED1A /* MentionAutocomplete.swift */; };
@@ -229,9 +225,11 @@
 		957BBD951DB3EBBDCA090720 /* DriveTestSessionLifecycleQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E98AB3B3DAB26FF843400EAD /* DriveTestSessionLifecycleQATests.swift */; };
 		963DE4BE9799715D9F0BE77D /* ANFRStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 805212969955D9E456D8238A /* ANFRStatsView.swift */; };
 		96679653422A929EBA6F3A26 /* RadioLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3B3876EB852F87013AA160D /* RadioLogsView.swift */; };
+		969B467EEDF33B1C78B4CC82 /* SQAntennaGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0012B13A7B2878BF00E6CEB /* SQAntennaGlyph.swift */; };
 		96A50CD6F0BD28180FC1530B /* RedesignTourQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5668B2D20BD77FACF98E80BB /* RedesignTourQATests.swift */; };
 		97024B7E216A3779D06D6075 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FC8EF017841F78C280399C /* PrivacySettingsView.swift */; };
 		989DD213B201095FFA84F05D /* CallReliabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B070C4F0FF01A239CDF93570 /* CallReliabilityTests.swift */; };
+		9919D198453EFF9D37F58197 /* QuickIdentifyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C57A60CEC0CC1678EB3A77 /* QuickIdentifyModels.swift */; };
 		997C6C270FA23C242ED9CE63 /* BiometricAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1907E549B13F0B983DD9CCC8 /* BiometricAuth.swift */; };
 		9AE53698DBD1BBD4EC68EFBA /* StoryTypedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10228EB5F8E1022D2A64E804 /* StoryTypedTests.swift */; };
 		9B23A9464CD35CCB2BED5DD8 /* SessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E8601B1C76C24BA49EBF1C /* SessionDetailView.swift */; };
@@ -307,7 +305,6 @@
 		D57FB42D1064CB2A6172E6A2 /* RadioLogSiteMapPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0990B1A078A21371068E114 /* RadioLogSiteMapPicker.swift */; };
 		D6CEFBA50FB780C0C6B045ED /* NetworkPathDedupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83991EBA39D411D1F2DE6744 /* NetworkPathDedupTests.swift */; };
 		D7A64FBC491AB29258026F4B /* RemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B47BDB4D6F4BC76820FA3D2 /* RemoteImage.swift */; };
-		D89CD7D071BFF52EB1D1B693 /* RadioLogImportParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCFFAF3AD50336630849451C /* RadioLogImportParser.swift */; };
 		D8B502074515888EFFA296B9 /* GroupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E2756E12B4DD8420E4E6FC4 /* GroupSettingsView.swift */; };
 		D8D71CD3AB926175688AD739 /* ScheduledMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA71E3F29A86476A36C8900F /* ScheduledMessagesView.swift */; };
 		D9270EE5F2BA3509FBF72312 /* SavedMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD7AF3FD3C9A5C4D2280D2B5 /* SavedMessagesView.swift */; };
@@ -361,7 +358,6 @@
 		FCA0F934683B2BC6C982C8B8 /* DriveTestDataBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AE9139473E16EE1FB4FFE7 /* DriveTestDataBudgetTests.swift */; };
 		FD8C8A4E55F6F7F937636C0E /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C14BE7BE1D4056FB4421D16 /* APIClientTests.swift */; };
 		FE06618978AF041B7C59E003 /* TypingDotsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D3298EDB2E0523439799250 /* TypingDotsView.swift */; };
-		FE32E50F866E4FBC518B9120 /* RadioLogImportStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9D26E553566F096D0740FCE /* RadioLogImportStore.swift */; };
 		FF540CAB6E6C3889FAE0ED6C /* MapFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F08F6ECE4166CBD8CCC080 /* MapFeatures.swift */; };
 /* End PBXBuildFile section */
 
@@ -460,7 +456,6 @@
 		2DD37884E4B468579B8A6FA7 /* VersionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionPolicyTests.swift; sourceTree = "<group>"; };
 		2E03EF30DC08FEA39216CD0B /* UserService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserService.swift; sourceTree = "<group>"; };
 		2E77FAF7EF72C921A19826A6 /* PostDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDetailView.swift; sourceTree = "<group>"; };
-		2EC0989C8E515CED280D87E0 /* RadioLogImportsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogImportsViewModel.swift; sourceTree = "<group>"; };
 		2F1F197A1DD02322E21D022C /* RadioLogSiteModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogSiteModels.swift; sourceTree = "<group>"; };
 		2FB22F5DE6B092A44B9F7A91 /* SQRadius.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQRadius.swift; sourceTree = "<group>"; };
 		30EFB586826CF2A6A011E18D /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
@@ -495,6 +490,7 @@
 		43A01E23F145B917FF35CD53 /* MentionAutocompleteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionAutocompleteTests.swift; sourceTree = "<group>"; };
 		43F86F356FE7B0E322F9B79A /* RadioLogIdentifyPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogIdentifyPicker.swift; sourceTree = "<group>"; };
 		448DCE616E7442994EA5AED7 /* SpeedtestCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestCardView.swift; sourceTree = "<group>"; };
+		44C57A60CEC0CC1678EB3A77 /* QuickIdentifyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickIdentifyModels.swift; sourceTree = "<group>"; };
 		4667EE4B0BF1383A8D24C87E /* ICMPPinger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICMPPinger.swift; sourceTree = "<group>"; };
 		469A66A89495AAE04EF039F3 /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
 		4710561B73DB096826FAEEDE /* PresenceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresenceModels.swift; sourceTree = "<group>"; };
@@ -523,7 +519,6 @@
 		5E03418AAFBEEEBDF356739B /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
 		5E552A9B78EBBE744667DDC4 /* market_location_areas.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = market_location_areas.json; sourceTree = "<group>"; };
 		5E5547A4163714BB45440475 /* WidgetSharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSharedStore.swift; sourceTree = "<group>"; };
-		5E68316AF4C10942F8D8F691 /* RadioLogImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogImportView.swift; sourceTree = "<group>"; };
 		5EF26DB7319D9F10927854D0 /* SocialModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialModels.swift; sourceTree = "<group>"; };
 		5F24B90CDD67FFE038702151 /* SocialPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialPreferences.swift; sourceTree = "<group>"; };
 		610EE8D2CB67E2741D6E1701 /* PlannedDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannedDetailSheet.swift; sourceTree = "<group>"; };
@@ -606,7 +601,6 @@
 		8D2BA4BE9B82CEBAF420AC06 /* RadioLogsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogsService.swift; sourceTree = "<group>"; };
 		8DA025CCAC0DF6A4A8AD5A6E /* AntennaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaModels.swift; sourceTree = "<group>"; };
 		8DE0378DBCDC3C95B69153DE /* RadioLogsSiteCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogsSiteCard.swift; sourceTree = "<group>"; };
-		8E28A9C023F0003B4E68771A /* RadioLogImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogImportService.swift; sourceTree = "<group>"; };
 		90B0A00F01799457A250D3FE /* MapAnnotationPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAnnotationPayload.swift; sourceTree = "<group>"; };
 		91551435A0AA4D676F97FDCB /* StoryViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryViewer.swift; sourceTree = "<group>"; };
 		91DE6C62E4954951C0A2419C /* CoverageCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageCardView.swift; sourceTree = "<group>"; };
@@ -626,6 +620,7 @@
 		9EC5960ABF8C24952322E392 /* PrivacyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyService.swift; sourceTree = "<group>"; };
 		9F5CFE5CCBA408F62BDCC840 /* AppleDeviceDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleDeviceDescriptor.swift; sourceTree = "<group>"; };
 		9F7996D06DFF212012F7841D /* MapAccessibilityQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAccessibilityQATests.swift; sourceTree = "<group>"; };
+		A0012B13A7B2878BF00E6CEB /* SQAntennaGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQAntennaGlyph.swift; sourceTree = "<group>"; };
 		A003CFB7415DD224E468A2D5 /* Territory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Territory.swift; sourceTree = "<group>"; };
 		A01462ACA13AD33221D20FAF /* ShareCardBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardBubble.swift; sourceTree = "<group>"; };
 		A073CAEDF99975C220519FB1 /* SQSpace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQSpace.swift; sourceTree = "<group>"; };
@@ -691,7 +686,6 @@
 		CA388892729A99B8736A88C1 /* SQMapKitMarkerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQMapKitMarkerView.swift; sourceTree = "<group>"; };
 		CA9370C0177B2346BC4EBEC5 /* ProfileReorgQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileReorgQATests.swift; sourceTree = "<group>"; };
 		CB55790C931377A64C3D3477 /* DromRegion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DromRegion.swift; sourceTree = "<group>"; };
-		CCFFAF3AD50336630849451C /* RadioLogImportParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogImportParser.swift; sourceTree = "<group>"; };
 		CD352558B0E98E08EE91AFF6 /* MessageShareModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageShareModels.swift; sourceTree = "<group>"; };
 		CD92F7CAEF5CE9D9F233D172 /* NearbyNetworkQualityDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbyNetworkQualityDetailSheet.swift; sourceTree = "<group>"; };
 		CE9C7190AEB0D08E27839A20 /* CallsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsService.swift; sourceTree = "<group>"; };
@@ -712,10 +706,8 @@
 		DB7D271F7EF3536DB6B7C1A1 /* SmokeTourQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTourQATests.swift; sourceTree = "<group>"; };
 		DCCEF2D66932C76B827ED058 /* SQShareCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQShareCard.swift; sourceTree = "<group>"; };
 		DCDE3C255B3CDE0E30DC180A /* RadioLogIdentifySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogIdentifySheet.swift; sourceTree = "<group>"; };
-		DDA6F453FFCEA21945FAE5FC /* RadioLogImportStatusStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogImportStatusStore.swift; sourceTree = "<group>"; };
 		DF1F41B3B9C7134D4B1810A3 /* ThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreadView.swift; sourceTree = "<group>"; };
 		E03FBD9147DB71215729DD82 /* Figtree-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-Regular.ttf"; sourceTree = "<group>"; };
-		E04E544B4C215F036CD9B609 /* RadioLogImportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogImportModels.swift; sourceTree = "<group>"; };
 		E1D216600CE3DCF8B267BD70 /* PhotoUploadPreparation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoUploadPreparation.swift; sourceTree = "<group>"; };
 		E31D4A2FC853B46DC0196738 /* SessionTraceMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTraceMapView.swift; sourceTree = "<group>"; };
 		E39D8D7ADDF4C4A7FF55C92C /* PhotoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoModels.swift; sourceTree = "<group>"; };
@@ -729,6 +721,7 @@
 		E91AD5F784D0FCE84CBC6FC8 /* LiveKitClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitClient.swift; sourceTree = "<group>"; };
 		E98AB3B3DAB26FF843400EAD /* DriveTestSessionLifecycleQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveTestSessionLifecycleQATests.swift; sourceTree = "<group>"; };
 		EA556BEE2D1EA6BAA5FB0800 /* MyMeasurementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyMeasurementsView.swift; sourceTree = "<group>"; };
+		EC5255F7439DB3A81B3C67F6 /* SQUserBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQUserBadge.swift; sourceTree = "<group>"; };
 		EC90EEA12944FF6F69C6632B /* ICMPPingerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICMPPingerTests.swift; sourceTree = "<group>"; };
 		ED23939334EC481F2A096590 /* ReportsRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsRoutingTests.swift; sourceTree = "<group>"; };
 		EF1CBBB47AF9B0D1E7B04560 /* TerritoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerritoryTests.swift; sourceTree = "<group>"; };
@@ -751,7 +744,6 @@
 		F7FC8EF017841F78C280399C /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
 		F81FC163DBCA9F8D2907783C /* ContinuousSessionAccumulator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuousSessionAccumulator.swift; sourceTree = "<group>"; };
 		F95EB05B86F26CEFD0F46621 /* SiteRemapSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteRemapSheet.swift; sourceTree = "<group>"; };
-		F9D26E553566F096D0740FCE /* RadioLogImportStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogImportStore.swift; sourceTree = "<group>"; };
 		FA71E3F29A86476A36C8900F /* ScheduledMessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledMessagesView.swift; sourceTree = "<group>"; };
 		FA8ECC4FB30FDE6210DF221A /* MessageSchedulingSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageSchedulingSheets.swift; sourceTree = "<group>"; };
 		FAB5FA7CA8B461402BA0DF2A /* RedesignAuditTourQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedesignAuditTourQATests.swift; sourceTree = "<group>"; };
@@ -856,7 +848,7 @@
 				CD352558B0E98E08EE91AFF6 /* MessageShareModels.swift */,
 				E39D8D7ADDF4C4A7FF55C92C /* PhotoModels.swift */,
 				4710561B73DB096826FAEEDE /* PresenceModels.swift */,
-				E04E544B4C215F036CD9B609 /* RadioLogImportModels.swift */,
+				44C57A60CEC0CC1678EB3A77 /* QuickIdentifyModels.swift */,
 				C263B41C968A1E89912CAEA9 /* RadioLogModels.swift */,
 				2F1F197A1DD02322E21D022C /* RadioLogSiteModels.swift */,
 				FD5D954E6102D732D621D8E6 /* SessionModels.swift */,
@@ -970,7 +962,6 @@
 				E75734A43E4CB4B262E74719 /* Onboarding */,
 				2A10CEC1AE5133DC2359EA2B /* Photos */,
 				3C6C0845A097E28771A42C47 /* Profile */,
-				3CC07B050C55A8241E5FDD9F /* RadioLogImport */,
 				1467E7550F3281C1D812D1AB /* RadioLogs */,
 				B367C49F9620A202AB659ACA /* Sessions */,
 				BB98C3F61016E4C3E6F242E0 /* Speedtest */,
@@ -1062,15 +1053,6 @@
 				F3B11B2DAF5DED109A1CA2CE /* SettingsView.swift */,
 			);
 			path = Profile;
-			sourceTree = "<group>";
-		};
-		3CC07B050C55A8241E5FDD9F /* RadioLogImport */ = {
-			isa = PBXGroup;
-			children = (
-				2EC0989C8E515CED280D87E0 /* RadioLogImportsViewModel.swift */,
-				5E68316AF4C10942F8D8F691 /* RadioLogImportView.swift */,
-			);
-			path = RadioLogImport;
 			sourceTree = "<group>";
 		};
 		3E56653C936C5B86173CE9F8 /* MapKit */ = {
@@ -1449,10 +1431,6 @@
 				BEAB0F4B51977FF72375533F /* NotificationsService.swift */,
 				D2F641884A080F0EC459B546 /* PhotoService.swift */,
 				9EC5960ABF8C24952322E392 /* PrivacyService.swift */,
-				CCFFAF3AD50336630849451C /* RadioLogImportParser.swift */,
-				8E28A9C023F0003B4E68771A /* RadioLogImportService.swift */,
-				DDA6F453FFCEA21945FAE5FC /* RadioLogImportStatusStore.swift */,
-				F9D26E553566F096D0740FCE /* RadioLogImportStore.swift */,
 				8D2BA4BE9B82CEBAF420AC06 /* RadioLogsService.swift */,
 				C9D767888C889FD28F3AA8DF /* RadioLogStore.swift */,
 				BF5C473D670B7B2938ABCB45 /* ReportsService.swift */,
@@ -1589,6 +1567,7 @@
 				FF71EBDA3DD738BAEF9242E3 /* GlassCard.swift */,
 				FD246E248AC961551013A82C /* Haptics.swift */,
 				A41B467FC7CE900FFE562268 /* SQAccessibility.swift */,
+				A0012B13A7B2878BF00E6CEB /* SQAntennaGlyph.swift */,
 				342AD252F576AA2664A4C655 /* SQBrand.swift */,
 				522FEF871CE53739FE2CB92C /* SQColors.swift */,
 				0CE1FA9C0AE5C296806B4C08 /* SQCompat.swift */,
@@ -1605,6 +1584,7 @@
 				6823DC6FC630CA393FA509E2 /* SQSignalScale.swift */,
 				A073CAEDF99975C220519FB1 /* SQSpace.swift */,
 				86CF3B083A9BF65407412BBF /* SQTheme.swift */,
+				EC5255F7439DB3A81B3C67F6 /* SQUserBadge.swift */,
 			);
 			path = Design;
 			sourceTree = "<group>";
@@ -2003,16 +1983,10 @@
 				97024B7E216A3779D06D6075 /* PrivacySettingsView.swift in Sources */,
 				938A4CDAB66991434228E103 /* ProfileView.swift in Sources */,
 				AFBEA35CA2303C2A10207310 /* PushNotificationService.swift in Sources */,
+				9919D198453EFF9D37F58197 /* QuickIdentifyModels.swift in Sources */,
 				B6F59F55BF8CFE41FFBD30E1 /* RadioLogIdentifyChainView.swift in Sources */,
 				0172A2931556007F32F840D0 /* RadioLogIdentifyPicker.swift in Sources */,
 				3817114389C995BBD5971D41 /* RadioLogIdentifySheet.swift in Sources */,
-				681DBC1F202BA2A5486B5F4E /* RadioLogImportModels.swift in Sources */,
-				D89CD7D071BFF52EB1D1B693 /* RadioLogImportParser.swift in Sources */,
-				606E7522E0DD527D31CF2E01 /* RadioLogImportService.swift in Sources */,
-				7BD0F0D81265EB7E43D6B78E /* RadioLogImportStatusStore.swift in Sources */,
-				FE32E50F866E4FBC518B9120 /* RadioLogImportStore.swift in Sources */,
-				81468AFF5A5E22F90CD47B5A /* RadioLogImportView.swift in Sources */,
-				533BA2C52C7A4CAEE52B0251 /* RadioLogImportsViewModel.swift in Sources */,
 				4AFB0DC62CF13CCEA58DEC77 /* RadioLogModels.swift in Sources */,
 				D57FB42D1064CB2A6172E6A2 /* RadioLogSiteMapPicker.swift in Sources */,
 				4B210BA00F5D6D35E73E36AA /* RadioLogSiteModels.swift in Sources */,
@@ -2030,6 +2004,7 @@
 				53124BA53C789E7595979D54 /* ReportSheet.swift in Sources */,
 				EB9551322B0DE0869A0B7E2C /* ReportsService.swift in Sources */,
 				C12138B326842FEB27D2C5BF /* SQAccessibility.swift in Sources */,
+				969B467EEDF33B1C78B4CC82 /* SQAntennaGlyph.swift in Sources */,
 				1EC17F2A5E383435467A6EB1 /* SQBrand.swift in Sources */,
 				1642DC7B7E50D2260F79770D /* SQColors.swift in Sources */,
 				00F5008A3845ECDCF0D226DD /* SQCompat.swift in Sources */,
@@ -2054,6 +2029,7 @@
 				F65CE0D7B751228A5B147A0A /* SQSpace.swift in Sources */,
 				75C095DBB43F66C37DF4A51F /* SQSpotlight.swift in Sources */,
 				7646C39F8B3F70170191AA50 /* SQTheme.swift in Sources */,
+				0ECBE473F9CE2213A93E7583 /* SQUserBadge.swift in Sources */,
 				523C31F38FEC5EFE05662838 /* SSEClient.swift in Sources */,
 				D9270EE5F2BA3509FBF72312 /* SavedMessagesView.swift in Sources */,
 				D8D71CD3AB926175688AD739 /* ScheduledMessagesView.swift in Sources */,

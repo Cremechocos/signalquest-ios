@@ -26,7 +26,6 @@ struct RadioLogSiteMapPicker: View {
     /// Clé de la zone déjà chargée, arrondie : évite de recharger à chaque
     /// micro-déplacement de la carte.
     @State private var loadedKey: String?
-    @State private var showsAllOperators = false
     @State private var showsConfirmation = false
     /// Renseigné une fois l'écriture acceptée par le serveur.
     let onIdentified: (String) -> Void
@@ -66,19 +65,16 @@ struct RadioLogSiteMapPicker: View {
                     Button("Annuler") { dismiss() }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Toggle("Tous les opérateurs", isOn: $showsAllOperators)
-                    } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                    }
-                    .accessibilityLabel("Filtrer les antennes")
+                    Text(operatorLabel)
+                        .font(SQFont.body(12.5, .semibold))
+                        .foregroundStyle(P.accentInk)
+                        .padding(.horizontal, SQSpace.md)
+                        .padding(.vertical, SQSpace.xs + 1)
+                        .background(P.accentSoft, in: Capsule(style: .continuous))
+                        .accessibilityLabel("Antennes affichées : \(operatorLabel)")
                 }
             }
             .task(id: regionKey) { await loadIfNeeded() }
-            .onChange(of: showsAllOperators) { _ in
-                loadedKey = nil
-                Task { await loadIfNeeded() }
-            }
             .alert("Identifier ce site ?", isPresented: $showsConfirmation) {
                 Button("Annuler", role: .cancel) {}
                 Button("Identifier") { Task { await confirm() } }
@@ -98,15 +94,20 @@ struct RadioLogSiteMapPicker: View {
                     selected = pin.antenna
                     Haptics.selection()
                 } label: {
-                    Image(systemName: pin.isOrigin ? "dot.scope" : "antenna.radiowaves.left.and.right")
-                        .font(.system(size: pin.isOrigin ? 18 : 14, weight: .bold))
-                        .foregroundStyle(pin.isSelected ? P.onAccent : (pin.isOrigin ? P.ink : P.accentInk))
-                        .padding(pin.isSelected ? 9 : 6)
-                        .background(
-                            pin.isSelected ? AnyShapeStyle(P.accent) : AnyShapeStyle(P.card),
-                            in: Circle()
+                    if pin.isOrigin {
+                        Image(systemName: "dot.scope")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(P.ink)
+                            .padding(6)
+                            .background(P.card, in: Circle())
+                            .sqShadowSoft()
+                    } else {
+                        SQAntennaMarker(
+                            azimuths: pin.azimuths,
+                            isSelected: pin.isSelected,
+                            diameter: pin.isSelected ? 38 : 32
                         )
-                        .sqShadowSoft()
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(pin.isOrigin ? "Position des relevés" : "Antenne \(pin.antenna?.siteId ?? "")")
@@ -121,6 +122,9 @@ struct RadioLogSiteMapPicker: View {
         let isOrigin: Bool
         let isSelected: Bool
         let antenna: AntennaSite?
+        /// Orientation des secteurs, pour lire d'un coup d'œil vers où l'antenne
+        /// émet — l'information qu'on va justement chercher sur le terrain.
+        let azimuths: [Double]
     }
 
     private var pins: [PickerPin] {
@@ -132,7 +136,8 @@ struct RadioLogSiteMapPicker: View {
                     coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
                     isOrigin: true,
                     isSelected: false,
-                    antenna: nil
+                    antenna: nil,
+                    azimuths: []
                 )
             )
         }
@@ -144,7 +149,8 @@ struct RadioLogSiteMapPicker: View {
                     coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
                     isOrigin: false,
                     isSelected: selected?.id == antenna.id,
-                    antenna: antenna
+                    antenna: antenna,
+                    azimuths: antenna.azimuths
                 )
             )
         }
@@ -252,7 +258,7 @@ struct RadioLogSiteMapPicker: View {
             region.center.latitude,
             region.center.longitude,
             region.span.latitudeDelta,
-            showsAllOperators ? "all" : "op"
+            operatorKey
         )
     }
 
@@ -288,7 +294,7 @@ struct RadioLogSiteMapPicker: View {
             // mutualisés et où l'utilisateur a son propre filtre opérateur ; ici ça
             // masquerait silencieusement la moitié du référentiel, sur un journal
             // qui est à 40 % Orange.
-            for operatorKey in queriedOperatorKeys(market: market) {
+            for operatorKey in queriedOperatorKeys {
                 let batch = try await antennas.list(
                     bbox: bbox, market: market, operatorName: operatorKey, technologies: []
                 )
@@ -306,18 +312,37 @@ struct RadioLogSiteMapPicker: View {
         }
     }
 
-    /// Opérateurs à interroger : celui du relevé, ou les quatre nationaux quand
-    /// l'utilisateur ouvre le choix. Hors France, on s'en remet au marché.
-    private func queriedOperatorKeys(market: String) -> [String] {
-        guard showsAllOperators else {
-            return [RadioLogOperatorResolver.operatorKey(forOperator: site.operatorName) ?? "ALL"]
+    /// Opérateur des antennes affichées — celui du LOG, et lui seul.
+    ///
+    /// Montrer les autres serait contre-productif : le serveur refuse un
+    /// rattachement inter-opérateur (`IDENTIFY_OPERATOR_MISMATCH`), donc chaque
+    /// antenne d'un autre réseau est un choix qui échouera.
+    ///
+    /// ⚠️ CAS « ZB » (zone blanche). Ce n'est pas un opérateur mais un
+    /// dispositif : un site mutualisé du New Deal, exploité par plusieurs
+    /// réseaux. Un log capté sur un site ZB porte le MNC de l'opérateur qui le
+    /// dessert, alors que l'antenne est référencée « ZB » côté ANFR. Filtrer sur
+    /// le seul opérateur du log masquerait donc précisément l'antenne cherchée :
+    /// on interroge les deux.
+    private var queriedOperatorKeys: [String] {
+        let key = RadioLogOperatorResolver.operatorKey(forOperator: site.operatorName)
+        switch key {
+        case "ZB": return ["ZB"]
+        case let resolved?: return [resolved, "ZB"]
+        case nil: return ["ALL"]
         }
-        return market.uppercased() == "FR"
-            ? ["ORANGE", "SFR", "BOUYGUES", "FREE"]
-            : ["ALL"]
     }
 
-    @MainActor
+    /// Clé stable de la sélection d'opérateur, pour le cache de zone.
+    private var operatorKey: String { queriedOperatorKeys.joined(separator: "+") }
+
+    private var operatorLabel: String {
+        let keys = queriedOperatorKeys
+        if keys == ["ALL"] { return String(localized: "Toutes") }
+        if keys.first == "ZB" { return "Zone blanche" }
+        return (site.operatorName ?? keys.first ?? "").capitalized
+    }
+
     private func confirm() async {
         guard let selected else { return }
         picker.addManualChoice(selected, origin: site)
