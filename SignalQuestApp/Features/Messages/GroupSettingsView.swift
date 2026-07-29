@@ -74,9 +74,17 @@ struct GroupSettingsView: View {
                             SQAvatar(url: participant.user.avatarUrl, name: participant.user.displayName, size: 34)
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading) {
-                                Text(participant.user.displayName)
-                                    .font(SQType.body)
-                                    .foregroundStyle(SQColor.label)
+                                HStack(spacing: 5) {
+                                    Text(participant.user.displayName)
+                                        .font(SQType.body)
+                                        .foregroundStyle(SQColor.label)
+                                        .lineLimit(1)
+                                    // Dans un GROUPE, c'est ici que le badge a un
+                                    // sens : à côté du membre qu'il qualifie. Le
+                                    // poser à côté du nom du groupe ne dirait rien
+                                    // de personne.
+                                    SQUserBadges(badges: participant.user.badges, size: 12)
+                                }
                                 if participant.role == "admin" {
                                     Text("Admin")
                                         .font(SQType.micro)
