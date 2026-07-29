@@ -475,6 +475,9 @@ struct SocialUserProfile: Codable, Equatable {
     /// succès de GAMIFICATION — deux systèmes, un même mot. Les confondre
     /// casserait le web et Android, qui lisent déjà le premier.
     let accountBadges: [SocialUserBadge]
+    /// Pays et réseaux mesurés. Voir `SocialProfileNetworks` : ce n'est pas un
+    /// opérateur déclaré.
+    let networks: SocialProfileNetworks?
     let isSelf: Bool
     let isFriend: Bool
     var isFollowing: Bool
@@ -490,7 +493,7 @@ struct SocialUserProfile: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, name, handle, bio, avatarUrl, createdAt, isSelf, isFriend
         case isFollowing, followersCount, followingCount, canMessage, stats
-        case accountBadges
+        case accountBadges, networks
     }
 
     init(
@@ -507,7 +510,8 @@ struct SocialUserProfile: Codable, Equatable {
         followingCount: Int,
         canMessage: Bool?,
         stats: SocialUserProfileStats?,
-        accountBadges: [SocialUserBadge] = []
+        accountBadges: [SocialUserBadge] = [],
+        networks: SocialProfileNetworks? = nil
     ) {
         self.id = id
         self.name = name
@@ -523,6 +527,7 @@ struct SocialUserProfile: Codable, Equatable {
         self.canMessage = canMessage
         self.stats = stats
         self.accountBadges = accountBadges
+        self.networks = networks
     }
 
     init(from decoder: Decoder) throws {
@@ -541,7 +546,79 @@ struct SocialUserProfile: Codable, Equatable {
         canMessage = try? c.decodeIfPresent(Bool.self, forKey: .canMessage)
         stats = try? c.decodeIfPresent(SocialUserProfileStats.self, forKey: .stats)
         accountBadges = c.decodeLossyArray([SocialUserBadge].self, forKey: .accountBadges)
+        networks = try? c.decodeIfPresent(SocialProfileNetworks.self, forKey: .networks)
     }
+}
+
+
+/// Pays et réseaux réellement MESURÉS par un membre (`profile.networks`).
+///
+/// ⚠️ Ce n'est PAS son opérateur, et l'UI ne doit pas le présenter comme tel.
+/// Mesuré sur un compte réel : 52 % Orange, 48 % SFR — deux SIM, ou quelqu'un
+/// qui teste plusieurs réseaux. En déduire un abonnement serait inventer une
+/// identité ; en revanche, dire ce qu'il couvre est vrai par construction.
+struct SocialProfileNetworks: Codable, Equatable {
+    /// Code marché ISO (« FR », « CA », « DROM »…).
+    let countryCode: String?
+    /// Vrai quand le pays est DÉCLARÉ, faux quand il est déduit des mesures.
+    let countryIsDeclared: Bool
+    let operators: [SocialProfileOperatorShare]
+    let sampleSize: Int
+
+    enum CodingKeys: String, CodingKey { case countryCode, countryIsDeclared, operators, sampleSize }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        countryCode = c.decodeFlexibleString(forKey: .countryCode)
+        countryIsDeclared = (try? c.decodeIfPresent(Bool.self, forKey: .countryIsDeclared)) ?? false
+        operators = c.decodeLossyArray([SocialProfileOperatorShare].self, forKey: .operators)
+        sampleSize = (try? c.decodeIfPresent(Int.self, forKey: .sampleSize)) ?? 0
+    }
+
+    /// Drapeau du pays, dérivé du code à deux lettres. Les marchés qui ne sont
+    /// pas un pays (« DROM ») retombent sur celui de leur métropole.
+    var flag: String? {
+        guard let code = countryCode?.uppercased() else { return nil }
+        let iso = code == "DROM" ? "FR" : code
+        guard iso.count == 2, iso.allSatisfy({ $0.isLetter }) else { return nil }
+        let base: UInt32 = 127_397
+        var flag = ""
+        for scalar in iso.unicodeScalars {
+            guard let value = UnicodeScalar(base + scalar.value) else { return nil }
+            flag.unicodeScalars.append(value)
+        }
+        return flag
+    }
+
+    var countryLabel: String? {
+        guard let code = countryCode?.uppercased() else { return nil }
+        if code == "DROM" { return String(localized: "France (outre-mer)") }
+        // Le système connaît les noms de pays dans la langue de l'utilisateur :
+        // pas de table à maintenir, et « CA » devient « Canada » ou « Kanada »
+        // selon la locale.
+        return Locale.current.localizedString(forRegionCode: code) ?? code
+    }
+}
+
+struct SocialProfileOperatorShare: Codable, Equatable, Identifiable {
+    let key: String
+    let count: Int
+    /// Part entre 0 et 1.
+    let share: Double
+
+    var id: String { key }
+
+    enum CodingKeys: String, CodingKey { case key, count, share }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        key = c.decodeFlexibleString(forKey: .key) ?? ""
+        count = (try? c.decodeIfPresent(Int.self, forKey: .count)) ?? 0
+        share = (try? c.decodeIfPresent(Double.self, forKey: .share)) ?? 0
+    }
+
+    var label: String { key.capitalized }
+    var percentLabel: String { "\(Int((share * 100).rounded())) %" }
 }
 
 struct SocialUserProfileResponse: Codable {

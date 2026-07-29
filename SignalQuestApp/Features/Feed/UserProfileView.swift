@@ -426,11 +426,18 @@ struct UserProfileView: View {
                         // de gamification affichés plus bas dans la page.
                         SQUserBadges(badges: profile?.accountBadges ?? [], size: 15)
                     }
-                    if let handle = profile?.handle ?? model.prefill?.handle {
-                        Text("@\(handle)")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
+                    HStack(spacing: 6) {
+                        if let handle = profile?.handle ?? model.prefill?.handle {
+                            Text("@\(handle)")
+                        }
+                        if let networks = profile?.networks,
+                           let country = networks.countryLabel {
+                            if profile?.handle != nil { Text("·") }
+                            Text([networks.flag, country].compactMap { $0 }.joined(separator: " "))
+                        }
                     }
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
                     if let createdAt = profile?.createdAt {
                         Text("Membre depuis \(createdAt, format: .dateTime.month(.wide).year())")
                             .font(SQType.micro)
@@ -445,9 +452,21 @@ struct UserProfileView: View {
 
             if let bio = profile?.bio, !bio.isEmpty {
                 Text(bio)
-                    .font(SQType.subhead)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .font(SQFont.body(14.5))
+                    .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, SQSpace.md)
+                    .overlay(alignment: .leading) {
+                        // Filet d'accent plutôt que des guillemets : la bio est
+                        // une parole, pas une métadonnée de plus dans la liste.
+                        Capsule()
+                            .fill(SQColor.brandRed.opacity(0.35))
+                            .frame(width: 3)
+                    }
+            }
+
+            if let networks = profile?.networks, !networks.operators.isEmpty {
+                measuredNetworks(networks)
             }
 
             statsRow
@@ -458,6 +477,49 @@ struct UserProfileView: View {
         }
         .padding(SQSpace.lg)
         .sqEditorialCard()
+    }
+
+    /// Réseaux réellement mesurés par la personne.
+    ///
+    /// ⚠️ Le libellé ne dit PAS « opérateur ». Sur un compte réel la répartition
+    /// est 52 % Orange / 48 % SFR : en déduire un abonnement serait inventer une
+    /// identité. Ce que la donnée établit, c'est la couverture des mesures — et
+    /// sur une app de mesure réseau, c'est l'information intéressante.
+    @ViewBuilder
+    private func measuredNetworks(_ networks: SocialProfileNetworks) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Réseaux mesurés")
+                .font(SQFont.body(12.5, .semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+            ForEach(networks.operators) { entry in
+                HStack(spacing: SQSpace.sm) {
+                    Text(entry.label)
+                        .font(SQFont.body(13, .medium))
+                        .foregroundStyle(SQColor.label)
+                        .frame(width: 74, alignment: .leading)
+                        .lineLimit(1)
+                    GeometryReader { proxy in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(SQColor.fill)
+                            Capsule()
+                                .fill(SQBrand.operatorColor(entry.key))
+                                .frame(width: max(4, proxy.size.width * entry.share))
+                        }
+                    }
+                    .frame(height: 7)
+                    Text(entry.percentLabel)
+                        .font(SQFont.body(12))
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .frame(width: 42, alignment: .trailing)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(entry.label) : \(entry.percentLabel) des mesures")
+            }
+            Text("Sur ses \(networks.sampleSize) derniers tests de débit.")
+                .font(SQType.micro)
+                .foregroundStyle(SQColor.labelTertiary)
+        }
     }
 
     private var avatar: some View {
