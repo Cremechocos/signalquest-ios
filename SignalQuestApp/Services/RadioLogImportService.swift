@@ -163,18 +163,32 @@ final class RadioLogImportService: RadioLogImportServicing, @unchecked Sendable 
                 continue
             }
             let row = resolved.row
+            // Le PLMN est indispensable : sans lui le serveur renvoie
+            // `MISSING_PLMN` plutôt que d'attribuer l'écriture à un opérateur
+            // arbitraire. Quand la source ne porte qu'un NOM d'opérateur, la table
+            // de repli le convertit (`RadioLogOperatorResolver`).
+            let plmn = (row.mcc, row.mnc) as (String?, String?)
+            let resolvedPlmn = plmn.0 != nil && plmn.1 != nil
+                ? plmn
+                : (RadioLogOperatorResolver.mccMnc(forOperator: row.operatorName).map { ($0.mcc, $0.mnc) } ?? plmn)
             do {
                 _ = try await identify.identify(
-                    siteId: siteId,
-                    enb: row.enb,
-                    gnb: row.gnb,
-                    pci: row.pci.map(String.init),
-                    cellId: row.cellId,
-                    operatorName: row.operatorName,
-                    mcc: row.mcc,
-                    mnc: row.mnc,
-                    lat: lat,
-                    lng: lon
+                    IdentifyDirectRequest(
+                        siteId: siteId,
+                        enb: row.enb,
+                        gnb: row.gnb,
+                        pci: row.pci,
+                        cellId: row.cellId,
+                        ci: row.ci.map(String.init),
+                        tech: row.isNr ? "5G" : "4G",
+                        band: row.band,
+                        earfcn: row.earfcn,
+                        operatorName: row.operatorName,
+                        mcc: resolvedPlmn.0,
+                        mnc: resolvedPlmn.1,
+                        latitude: lat,
+                        longitude: lon
+                    )
                 )
                 outcome.submitted += 1
             } catch {

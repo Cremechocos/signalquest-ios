@@ -78,15 +78,31 @@ final class SessionDetailViewModel: ObservableObject {
             (antenna.enb != nil && p.enb == antenna.enb) || (antenna.gnb != nil && p.gnb == antenna.gnb)
         } ?? detail?.points.first { $0.enb != nil || $0.gnb != nil || $0.pci != nil }
         let coord = await location.currentLocation(timeoutSeconds: 5)?.coordinate ?? antenna.coordinate
+        guard let siteId = antenna.siteId, !siteId.isEmpty else {
+            identifyResult = "Site inconnu : rien à identifier."
+            Haptics.error()
+            return
+        }
+        // Les points de session ne portent pas de PLMN : on le dérive du nom
+        // d'opérateur. Sans lui, le serveur renvoie `MISSING_PLMN` — il refuse
+        // (à raison) d'attribuer une identification à un opérateur arbitraire.
+        let plmn = RadioLogOperatorResolver.mccMnc(forOperator: antenna.operatorName)
+        let isNr = (sample?.gnb ?? antenna.gnb) != nil
         do {
             let result = try await service.identify(
-                siteId: antenna.siteId,
-                enb: sample?.enb ?? antenna.enb,
-                gnb: sample?.gnb ?? antenna.gnb,
-                pci: sample?.pci ?? antenna.pci,
-                cellId: sample?.cellId ?? antenna.cellId,
-                operatorName: antenna.operatorName, mcc: nil, mnc: nil,
-                lat: coord.latitude, lng: coord.longitude
+                IdentifyDirectRequest(
+                    siteId: siteId,
+                    enb: sample?.enb ?? antenna.enb,
+                    gnb: sample?.gnb ?? antenna.gnb,
+                    pci: (sample?.pci ?? antenna.pci).flatMap(Int.init),
+                    cellId: sample?.cellId ?? antenna.cellId,
+                    tech: isNr ? "5G" : "4G",
+                    operatorName: antenna.operatorName,
+                    mcc: plmn?.mcc,
+                    mnc: plmn?.mnc,
+                    latitude: coord.latitude,
+                    longitude: coord.longitude
+                )
             )
             identifyResult = result.success ? "Site identifié ✓" : (result.message ?? "Identification non confirmée")
             Haptics.success()

@@ -28,6 +28,9 @@ final class AppServices: ObservableObject {
     let identify: IdentifyServicing
     /// Import de logs radio (eNB Analytics CSV / NetMonster .ntm) → identification.
     let radioLogImport: RadioLogImportServicing
+    /// Journal radio SYNCHRONISÉ du compte (capté sur Android, relu ici en
+    /// lecture seule) — alimente la page « Logs antennes ».
+    let radioLogs: RadioLogsServicing
     let e2ee: E2EEServicing
     let friends: FriendsServicing
     let gamification: GamificationServicing
@@ -100,6 +103,7 @@ final class AppServices: ObservableObject {
         let identifyService = IdentifyService(api: api)
         identify = identifyService
         radioLogImport = RadioLogImportService(api: api, identify: identifyService, antennas: antennas)
+        radioLogs = RadioLogsService(api: api)
         friends = FriendsService(api: api)
         gamification = GamificationService(api: api)
         gamificationV2 = GamificationV2Service(api: api)

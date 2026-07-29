@@ -1,21 +1,82 @@
 import Foundation
 
+/// Charge d'une identification directe (`POST /api/android/map/identify/direct`).
+///
+/// ⚠️ Le PLMN voyage sous les noms `mobileCountryCode` / `mobileNetworkCode`, PAS
+/// `mcc` / `mnc`. Le contrat serveur (`DirectIdentifyBody`) ne déclare que les
+/// premiers, et seuls ceux-là sont lus — `mcc`/`mnc` n'apparaissent nulle part
+/// dans la route. Envoyer les seconds revient donc à n'envoyer AUCUN PLMN, et le
+/// serveur ne peut plus rattacher l'identification au bon opérateur : selon les
+/// droits du compte, il refuse (`MISSING_PLMN`, `OPERATOR_NOT_ALLOWED`) ou se
+/// rabat sur le champ hérité `operator`. C'était le cas de tous les appels iOS
+/// jusqu'ici.
+struct IdentifyDirectRequest: Sendable {
+    /// Site cible. Obligatoire côté serveur (`MISSING_SITE_ID` sinon).
+    var siteId: String
+    var enb: String?
+    var gnb: String?
+    /// Au moins un de `enb`, `gnb`, `pci` doit être présent
+    /// (`MISSING_CELL_IDENTIFIERS` sinon).
+    var pci: Int?
+    var cellId: String?
+    /// Identité cellule complète (ECI/NCI). En CHAÎNE : le serveur la relit en
+    /// `BigInt`, et un NCI 5G dépasse la précision d'un `Double` JSON.
+    var ci: String?
+    /// `4G` / `5G`. Le serveur en dérive la canonicalisation NR et le secteur.
+    var tech: String?
+    var band: Int?
+    var earfcn: Int?
+    /// Secteur imposé. Laissé nil, le serveur le dérive lui-même (règle PCI/PSS),
+    /// ce qui est préférable : sa règle fait autorité sur le calcul client.
+    var sectorIndex: Int?
+    var operatorName: String?
+    /// MCC/MNC tels qu'ils apparaissent dans le log — convertis en entiers à
+    /// l'envoi, le serveur les passe par `parseNumber`.
+    var mcc: String?
+    var mnc: String?
+    var latitude: Double?
+    var longitude: Double?
+
+    init(
+        siteId: String,
+        enb: String? = nil,
+        gnb: String? = nil,
+        pci: Int? = nil,
+        cellId: String? = nil,
+        ci: String? = nil,
+        tech: String? = nil,
+        band: Int? = nil,
+        earfcn: Int? = nil,
+        sectorIndex: Int? = nil,
+        operatorName: String? = nil,
+        mcc: String? = nil,
+        mnc: String? = nil,
+        latitude: Double? = nil,
+        longitude: Double? = nil
+    ) {
+        self.siteId = siteId
+        self.enb = enb
+        self.gnb = gnb
+        self.pci = pci
+        self.cellId = cellId
+        self.ci = ci
+        self.tech = tech
+        self.band = band
+        self.earfcn = earfcn
+        self.sectorIndex = sectorIndex
+        self.operatorName = operatorName
+        self.mcc = mcc
+        self.mnc = mnc
+        self.latitude = latitude
+        self.longitude = longitude
+    }
+}
+
 /// Identification d'une cellule observée → site ANFR/ISED
 /// (`POST /api/android/map/identify/direct`). Le serveur croise les
 /// identifiants radio + position et confirme l'antenne.
 protocol IdentifyServicing: Sendable {
-    func identify(
-        siteId: String?,
-        enb: String?,
-        gnb: String?,
-        pci: String?,
-        cellId: String?,
-        operatorName: String?,
-        mcc: String?,
-        mnc: String?,
-        lat: Double,
-        lng: Double
-    ) async throws -> IdentifyResult
+    func identify(_ request: IdentifyDirectRequest) async throws -> IdentifyResult
 
     /// Liste des identifications de l'utilisateur (compte partagé Android/iOS).
     /// `includeRelated` ajoute les lignes PCI/Cell ID en plus des nœuds eNB/gNB.
@@ -77,36 +138,43 @@ final class IdentifyService: IdentifyServicing {
     private let api: APIClient
     init(api: APIClient) { self.api = api }
 
-    func identify(
-        siteId: String?,
-        enb: String?,
-        gnb: String?,
-        pci: String?,
-        cellId: String?,
-        operatorName: String?,
-        mcc: String?,
-        mnc: String?,
-        lat: Double,
-        lng: Double
-    ) async throws -> IdentifyResult {
+    func identify(_ request: IdentifyDirectRequest) async throws -> IdentifyResult {
         struct Body: Encodable {
-            let siteId: String?
+            let siteId: String
             let enb: String?
             let gnb: String?
-            let pci: String?
+            let pci: Int?
             let cellId: String?
+            let ci: String?
+            let tech: String?
+            let band: Int?
+            let earfcn: Int?
+            let sectorIndex: Int?
             let `operator`: String?
-            let mcc: String?
-            let mnc: String?
-            let userLat: Double
-            let userLng: Double
+            let mobileCountryCode: Int?
+            let mobileNetworkCode: Int?
+            let userLat: Double?
+            let userLng: Double?
         }
         return try await api.requestJSON(
             "/api/android/map/identify/direct",
             method: .post,
             body: Body(
-                siteId: siteId, enb: enb, gnb: gnb, pci: pci, cellId: cellId,
-                operator: operatorName, mcc: mcc, mnc: mnc, userLat: lat, userLng: lng
+                siteId: request.siteId,
+                enb: request.enb,
+                gnb: request.gnb,
+                pci: request.pci,
+                cellId: request.cellId,
+                ci: request.ci,
+                tech: request.tech,
+                band: request.band,
+                earfcn: request.earfcn,
+                sectorIndex: request.sectorIndex,
+                operator: request.operatorName,
+                mobileCountryCode: request.mcc.flatMap(Int.init),
+                mobileNetworkCode: request.mnc.flatMap(Int.init),
+                userLat: request.latitude,
+                userLng: request.longitude
             )
         )
     }

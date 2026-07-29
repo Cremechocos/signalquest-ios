@@ -102,6 +102,28 @@ enum APIError: Error, LocalizedError, Equatable {
         "INVALID_OPERATOR": String(localized: "Opérateur invalide."),
         "RATE_LIMITED": String(localized: "Trop de requêtes. Patiente un instant avant de réessayer."),
         "UNAUTHORIZED": String(localized: "Session expirée. Reconnecte-toi."),
+
+        // Identification d'un site (`/api/android/map/identify/direct`). Le serveur
+        // renvoie déjà un message FR pour la plupart ; ceux-ci n'en portent qu'un
+        // code, ou un libellé trop technique pour être montré tel quel.
+        "MISSING_PLMN": String(localized: "Opérateur du relevé inconnu : impossible de rattacher cette identification."),
+        "MISSING_SITE_ID": String(localized: "Aucun site sélectionné."),
+        "MISSING_CELL_IDENTIFIERS": String(localized: "Ce relevé ne porte aucun identifiant radio (eNB, gNB ou PCI)."),
+        "OPERATOR_NOT_ALLOWED": String(localized: "Ton compte ne peut pas identifier de site chez cet opérateur."),
+        "IDENTIFY_SITE_NOT_FOUND": String(localized: "Site introuvable : aucune antenne connue pour cet identifiant."),
+        "IDENTIFY_MARKET_MISMATCH": String(localized: "Ce relevé et cette antenne ne sont pas dans le même pays."),
+        "IDENTIFY_OPERATOR_MISMATCH": String(localized: "Ce relevé et cette antenne ne sont pas du même opérateur."),
+        "VALIDATION_NODE_SITE_MISMATCH": String(localized: "L'identifiant radio ne correspond pas au site choisi."),
+        // Ces deux-là ne peuvent pas tomber sur les routes en politique `session`
+        // (le cookie suffit) : ils sont mappés pour les routes qui, elles, exigent
+        // une clé ou une attestation.
+        "API_KEY_REQUIRED": String(localized: "Accès refusé : clé d'API requise."),
+        "ATTESTATION_FAILED": String(localized: "Application non vérifiée. Mets-la à jour puis réessaie."),
+        "FIRST_PARTY_TOKEN_REQUIRED": String(localized: "Application non vérifiée. Mets-la à jour puis réessaie."),
+
+        // Journal radio synchronisé.
+        "PREMIUM_REQUIRED": String(localized: "La sauvegarde du journal radio est réservée aux membres Premium."),
+        "TOO_MANY_ITEMS": String(localized: "Trop d'éléments envoyés d'un coup. Réessaie."),
     ]
 }
 

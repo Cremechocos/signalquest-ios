@@ -268,6 +268,16 @@ struct ProfileView: View {
             }
             menuSeparator
             NavigationLink {
+                RadioLogsView(
+                    service: services.radioLogs,
+                    antennas: services.antennas,
+                    networkPath: services.networkPath
+                )
+            } label: {
+                menuRow(title: "Logs antennes", icon: "antenna.radiowaves.left.and.right")
+            }
+            menuSeparator
+            NavigationLink {
                 RadioLogImportView(service: services.radioLogImport)
             } label: {
                 menuRow(title: "Importer des logs radio", icon: "square.and.arrow.down")
