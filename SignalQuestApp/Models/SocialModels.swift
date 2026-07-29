@@ -109,6 +109,11 @@ struct SocialUserBadge: Codable, Identifiable, Equatable, Hashable {
 
     enum CodingKeys: String, CodingKey { case kind, note }
 
+    init(kind: String, note: String? = nil) {
+        self.kind = kind
+        self.note = note
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         kind = c.decodeFlexibleString(forKey: .kind) ?? ""
@@ -567,6 +572,13 @@ struct SocialProfileNetworks: Codable, Equatable {
 
     enum CodingKeys: String, CodingKey { case countryCode, countryIsDeclared, operators, sampleSize }
 
+    init(countryCode: String?, countryIsDeclared: Bool, operators: [SocialProfileOperatorShare], sampleSize: Int) {
+        self.countryCode = countryCode
+        self.countryIsDeclared = countryIsDeclared
+        self.operators = operators
+        self.sampleSize = sampleSize
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         countryCode = c.decodeFlexibleString(forKey: .countryCode)
@@ -605,16 +617,30 @@ struct SocialProfileOperatorShare: Codable, Equatable, Identifiable {
     let count: Int
     /// Part entre 0 et 1.
     let share: Double
+    /// Marques MVNO rencontrées sur ce réseau (« Lebara » sur Bouygues).
+    ///
+    /// ⚠️ `key` reste le réseau HÔTE : un MVNO n'a pas de cellules, donc la
+    /// couverture et les identifications sont rattachées à l'hôte. Ces marques
+    /// servent uniquement à nommer ce que la personne lit sur son téléphone.
+    let brands: [String]
 
     var id: String { key }
 
-    enum CodingKeys: String, CodingKey { case key, count, share }
+    enum CodingKeys: String, CodingKey { case key, count, share, brands }
+
+    init(key: String, count: Int, share: Double, brands: [String] = []) {
+        self.key = key
+        self.count = count
+        self.share = share
+        self.brands = brands
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         key = c.decodeFlexibleString(forKey: .key) ?? ""
         count = (try? c.decodeIfPresent(Int.self, forKey: .count)) ?? 0
         share = (try? c.decodeIfPresent(Double.self, forKey: .share)) ?? 0
+        brands = c.decodeLossyArray([String].self, forKey: .brands)
     }
 
     var label: String { key.capitalized }

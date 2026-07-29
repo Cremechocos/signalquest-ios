@@ -207,7 +207,19 @@ final class UserProfileViewModel: ObservableObject {
             followersCount: 128,
             followingCount: 87,
             canMessage: !isSelf,
-            stats: SocialUserProfileStats(points: 4210, gamificationPoints: 4210, level: 12, validations: 36, photos: 14, speedtests: 220)
+            stats: SocialUserProfileStats(points: 4210, gamificationPoints: 4210, level: 12, validations: 36, photos: 14, speedtests: 220),
+            accountBadges: [SocialUserBadge(kind: "premium")],
+            // Deux réseaux qui ne totalisent pas 100 % : la démo doit exercer la
+            // piste résiduelle de la barre empilée, pas seulement le cas plein.
+            networks: SocialProfileNetworks(
+                countryCode: "FR",
+                countryIsDeclared: false,
+                operators: [
+                    SocialProfileOperatorShare(key: "orange", count: 104, share: 0.52),
+                    SocialProfileOperatorShare(key: "sfr", count: 76, share: 0.38)
+                ],
+                sampleSize: 200
+            )
         )
         items = SocialFeedPage.demo.items
         nextCursor = nil
@@ -218,7 +230,15 @@ final class UserProfileViewModel: ObservableObject {
 struct UserProfileView: View {
     @StateObject private var model: UserProfileViewModel
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var router: AppRouter
     @Environment(\.dismiss) private var dismiss
+
+    /// Ouverture de la conversation en cours : évite qu'un double appui crée
+    /// deux requêtes concurrentes.
+    @State private var isOpeningConversation = false
+    /// Échec d'ouverture de la conversation, distinct de l'erreur de chargement
+    /// du profil.
+    @State private var conversationError: String?
 
     /// Anneau de story actif (info connue du feed appelant).
     private let hasActiveStory: Bool
@@ -262,6 +282,7 @@ struct UserProfileView: View {
                     profileSkeleton
                 } else {
                     header
+                    secondaryStats
                     if let error = model.errorMessage {
                         ErrorStateView(title: "Profil indisponible", message: error) {
                             Task { await model.load() }
@@ -289,6 +310,17 @@ struct UserProfileView: View {
             Button("Bloquer", role: .destructive) { Task { await blockUser() } }
         } message: {
             Text("Tu ne verras plus ses publications ni ses messages, et il ne pourra plus te contacter.")
+        }
+        .alert(
+            "Conversation indisponible",
+            isPresented: Binding(
+                get: { conversationError != nil },
+                set: { if !$0 { conversationError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { conversationError = nil }
+        } message: {
+            Text(conversationError ?? "")
         }
         .sheet(item: $presentedSheet) { sheet in
             switch sheet {
@@ -410,51 +442,39 @@ struct UserProfileView: View {
 
     // MARK: Header
 
+    /// En-tête « carte de visite » : l'essentiel tient sans défiler.
+    ///
+    /// L'identité est centrée, la bio reste alignée à gauche (une parole se lit
+    /// en drapeau, pas centrée), et les réseaux passent en UNE barre empilée —
+    /// à quatre opérateurs, des barres séparées mangeaient quatre lignes.
     @ViewBuilder
     private var header: some View {
         let profile = model.profile
-        VStack(alignment: .leading, spacing: SQSpace.lg) {
-            HStack(alignment: .center, spacing: SQSpace.lg) {
+        VStack(spacing: SQSpace.lg) {
+            VStack(spacing: SQSpace.sm) {
                 avatar
-                VStack(alignment: .leading, spacing: SQSpace.xs) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(profile?.displayName ?? model.prefill?.displayName ?? "Utilisateur")
-                            .font(SQType.title)
-                            .foregroundStyle(SQColor.label)
-                            .lineLimit(2)
-                        // Badges sociaux (`accountBadges`), distincts des succès
-                        // de gamification affichés plus bas dans la page.
-                        SQUserBadges(badges: profile?.accountBadges ?? [], size: 15)
-                    }
-                    HStack(spacing: 6) {
-                        if let handle = profile?.handle ?? model.prefill?.handle {
-                            Text("@\(handle)")
-                        }
-                        if let networks = profile?.networks,
-                           let country = networks.countryLabel {
-                            if profile?.handle != nil { Text("·") }
-                            Text([networks.flag, country].compactMap { $0 }.joined(separator: " "))
-                        }
-                    }
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    if let createdAt = profile?.createdAt {
-                        Text("Membre depuis \(createdAt, format: .dateTime.month(.wide).year())")
-                            .font(SQType.micro)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(profile?.displayName ?? model.prefill?.displayName ?? "Utilisateur")
+                        .font(SQType.title)
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                    // Badges sociaux (`accountBadges`), distincts des succès
+                    // de gamification affichés plus bas dans la page.
+                    SQUserBadges(badges: profile?.accountBadges ?? [], size: 15)
                 }
-                Spacer()
-                if let profile, !profile.isSelf {
-                    manageMenu(profile)
-                }
+                identityLine(profile)
             }
+            // Réserve la gouttière du menu « ⋯ » pour que le bloc reste centré
+            // sur la carte, et non sur l'espace qui lui reste à gauche du menu.
+            .padding(.horizontal, SQSpace.xxl)
 
             if let bio = profile?.bio, !bio.isEmpty {
                 Text(bio)
                     .font(SQFont.body(14.5))
                     .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, SQSpace.md)
                     .overlay(alignment: .leading) {
                         // Filet d'accent plutôt que des guillemets : la bio est
@@ -472,11 +492,48 @@ struct UserProfileView: View {
             statsRow
 
             if let profile, !profile.isSelf {
-                followButton(profile)
+                actionRow(profile)
             }
         }
         .padding(SQSpace.lg)
         .sqEditorialCard()
+        .overlay(alignment: .topTrailing) {
+            // Le menu quitte le flux : l'en-tête est centré, un « ⋯ » inline
+            // décalerait l'identité.
+            if let profile, !profile.isSelf {
+                manageMenu(profile).padding(SQSpace.sm)
+            }
+        }
+    }
+
+    /// `@pseudo · 🇫🇷 France`, puis l'ancienneté. Le pays vient des mesures, pas
+    /// d'une déclaration : voir `SocialProfileNetworks`.
+    @ViewBuilder
+    private func identityLine(_ profile: SocialUserProfile?) -> some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 6) {
+                if let handle = profile?.handle ?? model.prefill?.handle {
+                    Text("@\(handle)")
+                }
+                if let networks = profile?.networks, let country = networks.countryLabel {
+                    if (profile?.handle ?? model.prefill?.handle) != nil {
+                        Text("·").foregroundStyle(SQColor.labelTertiary)
+                    }
+                    // Pas de drapeau : le pays est DÉDUIT des mesures dans le cas
+                    // général, et un drapeau donne à cette déduction l'autorité
+                    // d'une nationalité déclarée.
+                    Text(country)
+                }
+            }
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            if let createdAt = profile?.createdAt {
+                Text("Membre depuis \(createdAt, format: .dateTime.month(.wide).year())")
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelTertiary)
+            }
+        }
+        .multilineTextAlignment(.center)
     }
 
     /// Réseaux réellement mesurés par la personne.
@@ -485,48 +542,99 @@ struct UserProfileView: View {
     /// est 52 % Orange / 48 % SFR : en déduire un abonnement serait inventer une
     /// identité. Ce que la donnée établit, c'est la couverture des mesures — et
     /// sur une app de mesure réseau, c'est l'information intéressante.
+    ///
+    /// La barre peut ne pas être pleine : le serveur écarte les parts sous 5 %
+    /// et n'en garde que quatre. Le reste de piste visible est cette part
+    /// résiduelle — la combler serait mentir sur le total.
     @ViewBuilder
     private func measuredNetworks(_ networks: SocialProfileNetworks) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text("Réseaux mesurés")
                 .font(SQFont.body(12.5, .semibold))
                 .foregroundStyle(SQColor.labelSecondary)
-            ForEach(networks.operators) { entry in
-                HStack(spacing: SQSpace.sm) {
-                    Text(entry.label)
-                        .font(SQFont.body(13, .medium))
-                        .foregroundStyle(SQColor.label)
-                        .frame(width: 74, alignment: .leading)
-                        .lineLimit(1)
-                    GeometryReader { proxy in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(SQColor.fill)
-                            Capsule()
-                                .fill(SQBrand.operatorColor(entry.key))
-                                .frame(width: max(4, proxy.size.width * entry.share))
-                        }
+            GeometryReader { proxy in
+                HStack(spacing: 0) {
+                    ForEach(networks.operators) { entry in
+                        Rectangle()
+                            .fill(Self.tint(for: entry.key))
+                            .frame(width: max(2, proxy.size.width * entry.share))
                     }
-                    .frame(height: 7)
-                    Text(entry.percentLabel)
-                        .font(SQFont.body(12))
-                        .monospacedDigit()
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .frame(width: 42, alignment: .trailing)
+                    Spacer(minLength: 0)
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(entry.label) : \(entry.percentLabel) des mesures")
             }
-            Text("Sur ses \(networks.sampleSize) derniers tests de débit.")
+            .frame(height: 12)
+            .background(SQColor.fill)
+            .clipShape(Capsule())
+            .accessibilityHidden(true)
+
+            // La légende porte le détail chiffré : la barre seule ne dit pas
+            // quel segment est quel opérateur.
+            FlowLayoutCompat(spacing: SQSpace.md) {
+                ForEach(networks.operators) { entry in
+                    let name = Self.operatorLabel(for: entry)
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(Self.tint(for: entry.key))
+                            .frame(width: 9, height: 9)
+                        Text("\(name) \(entry.percentLabel)")
+                            .font(SQFont.body(12))
+                            .monospacedDigit()
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(name) : \(entry.percentLabel) des mesures")
+                }
+            }
+
+            // Ne PAS écrire « ses N derniers tests » : `sampleSize` n'est pas une
+            // fenêtre de récence, c'est le nombre de tests portant un opérateur.
+            // Un compte à 229 tests dont 8 sans réseau détecté affichait
+            // « ses 221 derniers », ce qui laissait croire à une troncature.
+            Text("Sur \(networks.sampleSize) tests où un réseau a été détecté.")
                 .font(SQType.micro)
                 .foregroundStyle(SQColor.labelTertiary)
         }
+    }
+
+    /// Clés qui ne désignent PAS un opérateur mais l'échec à en résoudre un.
+    /// Le serveur les écrit dans `operatorKey` quand le couple MCC/MNC relevé
+    /// n'existe pas dans le registre du marché — itinérance à l'étranger, MVNO
+    /// absent du registre, ou territoire DROM non mappé finement.
+    private static let unresolvedOperatorKeys: Set<String> = ["UNMAPPED_MNO", "DROM_OTHER"]
+
+    /// Libellé d'une part de réseau.
+    ///
+    /// « Réseau observé » reprend le mot du registre côté serveur
+    /// (`radio-market-registry`), pour que web, Android et iOS nomment la même
+    /// chose pareil.
+    private static func operatorLabel(for entry: SocialProfileOperatorShare) -> String {
+        if unresolvedOperatorKeys.contains(entry.key.uppercased()) {
+            return String(localized: "Réseau observé")
+        }
+        // Les noms d'opérateurs sont des sigles : `entry.label` (`capitalized`)
+        // donnait « Sfr ». Le registre de marque rend « SFR » ou « TELUS ».
+        let network = SQBrand.operatorName(entry.key) ?? entry.label
+        guard !entry.brands.isEmpty else { return network }
+        // « Bouygues (via Lebara) » : le réseau d'abord, la marque entre
+        // parenthèses. L'inverse laisserait croire que Lebara EST un réseau,
+        // alors que ses mesures comptent dans la couverture de Bouygues.
+        return "\(network) (via \(entry.brands.joined(separator: ", ")))"
+    }
+
+    /// Teinte d'une part de réseau. Une clé non résolue reçoit un gris neutre :
+    /// `SQBrand.operatorColor` retombe sur le rouge SFR, ce qui ferait passer
+    /// un réseau inconnu pour SFR dans la barre comme dans la légende.
+    private static func tint(for key: String) -> Color {
+        unresolvedOperatorKeys.contains(key.uppercased())
+            ? SQColor.labelTertiary
+            : SQBrand.operatorColor(key)
     }
 
     private var avatar: some View {
         SQAvatar(
             url: model.profile?.avatarUrl ?? model.prefill?.avatarUrl,
             name: model.profile?.displayName ?? model.prefill?.displayName ?? "?",
-            size: 84
+            size: 92
         )
         .padding(4)
         .overlay {
@@ -536,24 +644,117 @@ struct UserProfileView: View {
         }
     }
 
+    /// Trois mesures de CONTRIBUTION — ce que l'app sait faire de singulier.
+    /// Abonnés et abonnements n'ont pas disparu : ils passent en pastilles sous
+    /// la carte, où ils restent lisibles sans occuper la ligne forte.
     private var statsRow: some View {
+        let stats = model.profile?.stats
+        return HStack(spacing: 0) {
+            SQChipMetric(value: SignalFormatters.count(stats?.points), label: "Points")
+            statDivider
+            SQChipMetric(value: SignalFormatters.count(stats?.speedtests), label: "Tests")
+            statDivider
+            SQChipMetric(value: SignalFormatters.count(stats?.validations), label: "Validations")
+        }
+    }
+
+    private var statDivider: some View {
+        Rectangle()
+            .fill(SQColor.separator)
+            .frame(width: 1)
+            .padding(.vertical, SQSpace.xs)
+    }
+
+    /// Suivre + Message côte à côte : les deux actions qu'on vient chercher sur
+    /// un profil. « Message » n'apparaît que si le serveur l'autorise
+    /// (`canMessage`) — le masquer vaut mieux qu'un bouton qui échoue.
+    @ViewBuilder
+    private func actionRow(_ profile: SocialUserProfile) -> some View {
         HStack(spacing: SQSpace.sm) {
-            SQChipMetric(
-                value: SignalFormatters.count(model.profile?.stats?.speedtests),
-                label: "Speedtests",
-                systemImage: "speedometer"
+            followButton(profile)
+            if profile.canMessage == true {
+                GradientButton(
+                    "Message",
+                    systemImage: "bubble.left",
+                    isBusy: isOpeningConversation,
+                    style: .secondary
+                ) {
+                    Task { await openConversation() }
+                }
+                .accessibilityLabel("Envoyer un message à \(profile.displayName)")
+            }
+        }
+    }
+
+    /// Ouvre la conversation directe. Le serveur DÉDUPLIQUE : pour deux
+    /// participants sans titre, il renvoie la conversation existante
+    /// (`reused: true`) au lieu d'en créer une seconde.
+    private func openConversation() async {
+        guard !isOpeningConversation else { return }
+        isOpeningConversation = true
+        defer { isOpeningConversation = false }
+        if AppEnvironment.usesDemoData {
+            router.route(toConversation: nil)
+            return
+        }
+        do {
+            let created = try await services.messages.createConversation(
+                participantIds: [model.userId],
+                title: nil,
+                e2ee: true
             )
-            SQChipMetric(
-                value: SignalFormatters.count(model.profile?.followersCount),
-                label: "Abonnés",
+            router.route(toConversation: created.conversationId)
+        } catch {
+            // Erreur PROPRE à l'ouverture : passer par `model.errorMessage`
+            // afficherait « Profil indisponible » avec un bouton qui recharge
+            // le profil — un contresens, le profil s'est bien chargé.
+            conversationError = error.localizedDescription
+            Haptics.error()
+        }
+    }
+
+    /// Pastilles secondaires : le lien social et le niveau.
+    ///
+    /// Le niveau s'affiche SANS barre de progression : le profil public renvoie
+    /// `level`, pas les seuils de la tranche. Dessiner une progression
+    /// demanderait d'inventer le denominateur.
+    @ViewBuilder
+    private var secondaryStats: some View {
+        let profile = model.profile
+        let stats = profile?.stats
+        FlowLayoutCompat(spacing: SQSpace.sm) {
+            if let level = stats?.level {
+                secondaryChip("Niveau \(level)", systemImage: "chevron.up.circle", accented: true)
+            }
+            secondaryChip(
+                "\(SignalFormatters.count(profile?.followersCount)) abonnés",
                 systemImage: "person.2"
             )
-            SQChipMetric(
-                value: SignalFormatters.count(model.profile?.followingCount),
-                label: "Abonnements",
+            secondaryChip(
+                "\(SignalFormatters.count(profile?.followingCount)) abonnements",
                 systemImage: "person.crop.circle.badge.checkmark"
             )
+            if let photos = stats?.photos, photos > 0 {
+                secondaryChip("\(SignalFormatters.count(photos)) photos", systemImage: "photo")
+            }
         }
+    }
+
+    private func secondaryChip(_ title: String, systemImage: String, accented: Bool = false) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: systemImage)
+                .font(.system(size: 11, weight: .semibold))
+            Text(title)
+                .font(SQFont.body(12, .medium))
+                .monospacedDigit()
+        }
+        .foregroundStyle(accented ? SQColor.accentInk : SQColor.labelSecondary)
+        .padding(.horizontal, SQSpace.sm + 2)
+        .padding(.vertical, 6)
+        .background(
+            accented ? SQColor.brandRed.opacity(0.12) : SQColor.fill,
+            in: Capsule()
+        )
     }
 
     private func followButton(_ profile: SocialUserProfile) -> some View {

@@ -73,6 +73,23 @@ enum SQBrand {
     static func operatorColor(_ rawName: String?) -> Color {
         operatorColors(rawName).solid
     }
+
+    /// Nom d'affichage de l'opérateur, ou `nil` quand la clé n'est pas reconnue.
+    ///
+    /// ⚠️ À utiliser plutôt que `operatorColors(_:).name` pour du TEXTE :
+    /// `operatorColors` retombe volontairement sur SFR (couleur par défaut),
+    /// donc lire son `name` étiquetterait « SFR » un opérateur inconnu. Une
+    /// couleur approximative est acceptable ; un faux nom ne l'est pas.
+    static func operatorName(_ rawName: String?) -> String? {
+        guard let rawName, !rawName.isEmpty else { return nil }
+        let resolved = operatorColors(rawName)
+        guard resolved.name != defaultOperator.name else {
+            // Le repli EST SFR : on ne le retient que si la clé le dit vraiment.
+            let n = rawName.lowercased()
+            return (n.contains("sfr") && !n.contains("srr")) ? resolved.name : nil
+        }
+        return resolved.name
+    }
 }
 
 extension Color {
