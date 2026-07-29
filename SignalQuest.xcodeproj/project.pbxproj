@@ -190,6 +190,7 @@
 		7CA5E6F0A4A14654924684BB /* SQShareFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C83749A7788F75706BA83C05 /* SQShareFonts.swift */; };
 		7D0BE4AFA8C517809583BFB1 /* IdentifyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C43EF0BBA838F55D6E4EF78 /* IdentifyService.swift */; };
 		7D587A943F3C2B6675722262 /* SignalQuestUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230A19DCE27F22F952273493 /* SignalQuestUITests.swift */; };
+		7DC00F26E17E3572AD6AC560 /* OnboardingAnimationQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E85A770CF60ED550C4CCFE /* OnboardingAnimationQATests.swift */; };
 		7DE9EBCF7A592DBA4BB5EE35 /* VoiceNoteViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E569663F0441B4DA32B4BF6 /* VoiceNoteViews.swift */; };
 		7E8B1CCCA9F6BE070514C050 /* SpeedtestIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6A9E12FB0C1755E79A6216 /* SpeedtestIntents.swift */; };
 		8027C2DE7425912942340D4B /* NewModelDecodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A30FBE643735E6E375B3948 /* NewModelDecodeTests.swift */; };
@@ -446,6 +447,7 @@
 		1FF3CB12A75C5483284BC5C7 /* AntennaDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaDetailSheet.swift; sourceTree = "<group>"; };
 		21471D2C10A3FFD059193B78 /* AccountSettingsQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSettingsQATests.swift; sourceTree = "<group>"; };
 		230A19DCE27F22F952273493 /* SignalQuestUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalQuestUITests.swift; sourceTree = "<group>"; };
+		23E85A770CF60ED550C4CCFE /* OnboardingAnimationQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingAnimationQATests.swift; sourceTree = "<group>"; };
 		24B43573690B59F5B6ECA05C /* SessionsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsListView.swift; sourceTree = "<group>"; };
 		262F4840634C90DB85AD2353 /* NewScreensTourQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewScreensTourQATests.swift; sourceTree = "<group>"; };
 		26BF4AF46D1515F881E4DF50 /* CommentsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsService.swift; sourceTree = "<group>"; };
@@ -1204,6 +1206,7 @@
 				D29224A48769AB74981281AE /* MessagingFixesQATests.swift */,
 				262F4840634C90DB85AD2353 /* NewScreensTourQATests.swift */,
 				FBEB88B2CA9EC99EE88C5146 /* OledTourQATests.swift */,
+				23E85A770CF60ED550C4CCFE /* OnboardingAnimationQATests.swift */,
 				4886511AB14489C9F2B2CD6B /* ProfileCardQATests.swift */,
 				CA9370C0177B2346BC4EBEC5 /* ProfileReorgQATests.swift */,
 				280EA62012D2306B46FFCDD4 /* RadioLogsTourQATests.swift */,
@@ -2130,6 +2133,7 @@
 				5DCECE2C39F5BB5B5F65D5A0 /* MessagingFixesQATests.swift in Sources */,
 				1ED81414650F7C221C124090 /* NewScreensTourQATests.swift in Sources */,
 				6EC78D1C71A760B6A239524F /* OledTourQATests.swift in Sources */,
+				7DC00F26E17E3572AD6AC560 /* OnboardingAnimationQATests.swift in Sources */,
 				34BA73B5085E3FEA3207B12F /* ProfileCardQATests.swift in Sources */,
 				7827FB3BCE2C62729FA1C132 /* ProfileReorgQATests.swift in Sources */,
 				44EC8D0BEE05F50F4E616A77 /* RadioLogsTourQATests.swift in Sources */,

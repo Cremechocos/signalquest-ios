@@ -117,7 +117,13 @@ struct AppRootView: View {
     }
 
     var body: some View {
-        RootView()
+        // L'onboarding vit DANS la hiérarchie (ZStack d'`OnboardingHost`) et non
+        // plus dans un `fullScreenCover` : son drapeau « complété » n'est écrit
+        // que par un geste utilisateur, jamais par le démontage de la
+        // présentation. C'est ce qui remplace le garde `set: { _ in }` de
+        // l'ancien cover (UXP-06), et ce qui permet à la transition de sortie
+        // d'être animée au lieu d'être coupée par la fermeture du cover.
+        OnboardingHost { RootView() }
             .environmentObject(services)
             .environmentObject(session)
             .environmentObject(services.router)
@@ -196,17 +202,6 @@ struct AppRootView: View {
                 default:
                     break
                 }
-            }
-            .fullScreenCover(isPresented: Binding(
-                get: { !hasCompletedOnboarding },
-                // Ne PAS marquer l'onboarding « vu » sur une simple fermeture du
-                // cover : une dismissal système ou un cover concurrent (appel
-                // entrant au 1er lancement) le complétait sans que l'utilisateur
-                // l'ait parcouru (UXP-06). Seul `onFinish` valide la complétion ;
-                // sinon le cover se re-présente.
-                set: { _ in }
-            )) {
-                OnboardingView { hasCompletedOnboarding = true }
             }
     }
 }
