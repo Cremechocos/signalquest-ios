@@ -417,10 +417,15 @@ struct UserProfileView: View {
             HStack(alignment: .center, spacing: SQSpace.lg) {
                 avatar
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
-                    Text(profile?.displayName ?? model.prefill?.displayName ?? "Utilisateur")
-                        .font(SQType.title)
-                        .foregroundStyle(SQColor.label)
-                        .lineLimit(2)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(profile?.displayName ?? model.prefill?.displayName ?? "Utilisateur")
+                            .font(SQType.title)
+                            .foregroundStyle(SQColor.label)
+                            .lineLimit(2)
+                        // Badges sociaux (`accountBadges`), distincts des succès
+                        // de gamification affichés plus bas dans la page.
+                        SQUserBadges(badges: profile?.accountBadges ?? [], size: 15)
+                    }
                     if let handle = profile?.handle ?? model.prefill?.handle {
                         Text("@\(handle)")
                             .font(SQType.caption)

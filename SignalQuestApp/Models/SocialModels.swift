@@ -471,6 +471,10 @@ struct SocialUserProfile: Codable, Equatable {
     let bio: String?
     let avatarUrl: URL?
     let createdAt: Date?
+    /// Badges SOCIAUX. Champ distinct de `badges` côté serveur, qui porte les
+    /// succès de GAMIFICATION — deux systèmes, un même mot. Les confondre
+    /// casserait le web et Android, qui lisent déjà le premier.
+    let accountBadges: [SocialUserBadge]
     let isSelf: Bool
     let isFriend: Bool
     var isFollowing: Bool
@@ -486,6 +490,7 @@ struct SocialUserProfile: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, name, handle, bio, avatarUrl, createdAt, isSelf, isFriend
         case isFollowing, followersCount, followingCount, canMessage, stats
+        case accountBadges
     }
 
     init(
@@ -501,7 +506,8 @@ struct SocialUserProfile: Codable, Equatable {
         followersCount: Int,
         followingCount: Int,
         canMessage: Bool?,
-        stats: SocialUserProfileStats?
+        stats: SocialUserProfileStats?,
+        accountBadges: [SocialUserBadge] = []
     ) {
         self.id = id
         self.name = name
@@ -516,6 +522,7 @@ struct SocialUserProfile: Codable, Equatable {
         self.followingCount = followingCount
         self.canMessage = canMessage
         self.stats = stats
+        self.accountBadges = accountBadges
     }
 
     init(from decoder: Decoder) throws {
@@ -533,6 +540,7 @@ struct SocialUserProfile: Codable, Equatable {
         followingCount = (try? c.decode(Int.self, forKey: .followingCount)) ?? 0
         canMessage = try? c.decodeIfPresent(Bool.self, forKey: .canMessage)
         stats = try? c.decodeIfPresent(SocialUserProfileStats.self, forKey: .stats)
+        accountBadges = c.decodeLossyArray([SocialUserBadge].self, forKey: .accountBadges)
     }
 }
 

@@ -324,10 +324,14 @@ struct MessagesView: View {
                 }
             }
             VStack(alignment: .leading, spacing: SQSpace.xxs) {
-                Text(title.isEmpty ? "Conversation" : title)
-                    .font(SQFont.body(16, .semibold))
-                    .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Text(title.isEmpty ? "Conversation" : title)
+                        .font(SQFont.body(16, .semibold))
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(1)
+                    // Badges de l'interlocuteur, comme dans le fil.
+                    SQUserBadges(badges: conversation.otherParticipantBadges(excluding: currentUserId), size: 12)
+                }
                 HStack(spacing: SQSpace.xs + 1) {
                     if conversation.e2eeEnabled == true {
                         Image(systemName: "lock.fill")

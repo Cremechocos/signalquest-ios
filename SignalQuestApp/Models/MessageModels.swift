@@ -39,6 +39,18 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
         return names.joined(separator: ", ")
     }
 
+    /// Badges de l'INTERLOCUTEUR, en tête-à-tête seulement.
+    ///
+    /// Dans un groupe, empiler les badges de tous les participants à côté du nom
+    /// du groupe ne dirait rien de personne — et un groupe porte souvent son
+    /// propre titre, sans rapport avec ses membres.
+    func otherParticipantBadges(excluding currentUserId: String?) -> [SocialUserBadge] {
+        guard !isGroup else { return [] }
+        let others = participants.filter { currentUserId == nil || $0.userId != currentUserId }
+        guard others.count == 1, let other = others.first else { return [] }
+        return other.user.badges
+    }
+
     enum CodingKeys: String, CodingKey {
         case id, title, isGroup, e2eeEnabled, groupPhotoUrl, createdAt, updatedAt, lastMessageAt, lastReadAt, pinnedAt, participants, lastMessage
     }
@@ -103,16 +115,20 @@ struct MessageUser: Decodable, Identifiable, Equatable {
     let name: String?
     let email: String
     let avatarUrl: URL?
+    /// Badges sociaux : ceux accordés par l'équipe, plus celui dérivé de
+    /// l'abonnement actif. Même contrat que `SocialFeedAuthor.badges`.
+    let badges: [SocialUserBadge]
 
     var displayName: String { name ?? email.components(separatedBy: "@").first ?? "Utilisateur" }
 
-    enum CodingKeys: String, CodingKey { case id, name, email, avatarUrl }
+    enum CodingKeys: String, CodingKey { case id, name, email, avatarUrl, badges }
 
-    init(id: String, name: String?, email: String, avatarUrl: URL?) {
+    init(id: String, name: String?, email: String, avatarUrl: URL?, badges: [SocialUserBadge] = []) {
         self.id = id
         self.name = name
         self.email = email
         self.avatarUrl = avatarUrl
+        self.badges = badges
     }
 
     init(from decoder: Decoder) throws {
@@ -121,6 +137,7 @@ struct MessageUser: Decodable, Identifiable, Equatable {
         name = c.decodeFlexibleString(forKey: .name)
         email = c.decodeFlexibleString(forKey: .email) ?? ""
         avatarUrl = c.decodeLossyURL(forKey: .avatarUrl)
+        badges = c.decodeLossyArray([SocialUserBadge].self, forKey: .badges)
     }
 }
 

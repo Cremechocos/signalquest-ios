@@ -401,10 +401,16 @@ struct ConversationDetailView: View {
             .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(conversationTitle)
-                    .font(SQFont.body(16, .semibold))
-                    .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Text(conversationTitle)
+                        .font(SQFont.body(16, .semibold))
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(1)
+                    SQUserBadges(
+                        badges: conversation.otherParticipantBadges(excluding: currentUserId),
+                        size: 12
+                    )
+                }
                 if otherIsOnline {
                     Text("en ligne")
                         .font(SQFont.body(12))
