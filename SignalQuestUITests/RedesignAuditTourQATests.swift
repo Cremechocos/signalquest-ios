@@ -91,7 +91,8 @@ final class RedesignAuditTourQATests: XCTestCase {
             ("Réglages", "b2-reglages"),
             ("Récompenses", "b3-recompenses"),
             ("Abonnements", "b4-abonnements"),
-            ("Amis", "b5-amis"),
+            // « Amis » a quitté le menu Profil pour le menu `⋯` de Communauté :
+            // il est capturé plus bas, avec son nouvel écran d'accueil.
             ("Photos", "b6-photos"),
             ("Mes mesures", "b7-mes-mesures"),
             ("Confidentialité", "b8-confidentialite")

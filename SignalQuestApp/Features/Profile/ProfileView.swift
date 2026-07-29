@@ -42,6 +42,11 @@ struct ProfileView: View {
                         .sqFadeUp()
                 }
 
+                // Récompenses, Classements, Territoires : juste sous le niveau
+                // et les points auxquels ils se rapportent.
+                progressionTiles
+                    .sqFadeUp()
+
                 GradientButton("Éditer le profil", systemImage: "person.crop.circle", style: .secondary) {
                     showEdit = true
                 }
@@ -205,128 +210,154 @@ struct ProfileView: View {
 
     // MARK: - Menu
 
+    // MARK: - Menu
+    //
+    // Le menu ne garde QUE ce qui relève du profil : ce que l'utilisateur a
+    // produit, et son compte. Le reste a rejoint l'onglet où on le cherche —
+    // Carte ANFR et Statistiques ANFR dans Carte, Amis / Notifications /
+    // Appels / Préférences du fil dans Communauté — et la progression est
+    // remontée en tuiles sous l'en-tête, à côté du niveau qu'elle prolonge.
+    // Dix-neuf entrées à plat ne se lisaient plus.
+
     private var menuCard: some View {
-        VStack(spacing: 0) {
-            NavigationLink {
-                GamificationView(service: services.gamification)
-            } label: {
-                menuRow(title: "Récompenses", icon: "rosette")
+        VStack(spacing: SQSpace.lg) {
+            menuSection("Mes relevés") {
+                NavigationLink {
+                    SessionsListView(service: services.sessions)
+                } label: {
+                    menuRow(title: "Mes sessions / Logs", icon: "point.topleft.down.curvedto.point.bottomright.up")
+                }
+                menuSeparator
+                NavigationLink {
+                    MyMeasurementsView(service: services.sessions)
+                } label: {
+                    menuRow(title: "Mes mesures", icon: "mappin.and.ellipse")
+                }
+                menuSeparator
+                NavigationLink {
+                    RadioLogsView(
+                        service: services.radioLogs,
+                        antennas: services.antennas,
+                        networkPath: services.networkPath
+                    )
+                } label: {
+                    menuRow(title: "Logs antennes", icon: "antenna.radiowaves.left.and.right")
+                }
+                menuSeparator
+                NavigationLink {
+                    RadioLogImportView(service: services.radioLogImport)
+                } label: {
+                    menuRow(title: "Importer des logs radio", icon: "square.and.arrow.down")
+                }
+                menuSeparator
+                NavigationLink {
+                    MyIdentificationsView(service: services.identify)
+                } label: {
+                    menuRow(title: "Mes identifications", icon: "checkmark.seal")
+                }
+                menuSeparator
+                NavigationLink {
+                    AntennaReportsListView(service: services.antennaReports)
+                } label: {
+                    menuRow(title: "Mes signalements d'antenne", icon: "exclamationmark.bubble")
+                }
+                menuSeparator
+                NavigationLink {
+                    PhotosView(service: services.photos)
+                } label: {
+                    menuRow(title: "Photos", icon: "photo.stack")
+                }
             }
-            menuSeparator
-            NavigationLink {
-                TerritoriesView(service: services.gamification)
-            } label: {
-                menuRow(title: "Territoires", icon: "square.grid.3x3.fill")
-            }
-            menuSeparator
-            NavigationLink {
-                FeedPreferencesView(service: services.feed)
-            } label: {
-                menuRow(title: "Préférences du fil", icon: "slider.horizontal.3")
-            }
-            menuSeparator
-            NavigationLink {
-                PaywallView(store: services.entitlements, entryPoint: .profile)
-            } label: {
-                menuRow(title: "Abonnements", icon: "checkmark.seal.fill")
-            }
-            menuSeparator
-            NavigationLink {
-                LeaderboardsView(service: services.leaderboards, gamification: services.gamification, user: user)
-            } label: {
-                menuRow(title: "Classements", icon: "trophy")
-            }
-            menuSeparator
-            NavigationLink {
-                FriendsListView(service: services.friends)
-            } label: {
-                menuRow(title: "Amis", icon: "person.2.fill")
-            }
-            menuSeparator
-            NavigationLink {
-                PhotosView(service: services.photos)
-            } label: {
-                menuRow(title: "Photos", icon: "photo.stack")
-            }
-            menuSeparator
-            NavigationLink {
-                SessionsListView(service: services.sessions)
-            } label: {
-                menuRow(title: "Mes sessions / Logs", icon: "point.topleft.down.curvedto.point.bottomright.up")
-            }
-            menuSeparator
-            NavigationLink {
-                MyMeasurementsView(service: services.sessions)
-            } label: {
-                menuRow(title: "Mes mesures", icon: "mappin.and.ellipse")
-            }
-            menuSeparator
-            NavigationLink {
-                MyIdentificationsView(service: services.identify)
-            } label: {
-                menuRow(title: "Mes identifications", icon: "checkmark.seal")
-            }
-            menuSeparator
-            NavigationLink {
-                RadioLogsView(
-                    service: services.radioLogs,
-                    antennas: services.antennas,
-                    networkPath: services.networkPath
-                )
-            } label: {
-                menuRow(title: "Logs antennes", icon: "antenna.radiowaves.left.and.right")
-            }
-            menuSeparator
-            NavigationLink {
-                RadioLogImportView(service: services.radioLogImport)
-            } label: {
-                menuRow(title: "Importer des logs radio", icon: "square.and.arrow.down")
-            }
-            menuSeparator
-            NavigationLink {
-                AntennaReportsListView(service: services.antennaReports)
-            } label: {
-                menuRow(title: "Mes signalements d'antenne", icon: "exclamationmark.bubble")
-            }
-            menuSeparator
-            NavigationLink {
-                ANFRMapView(service: services.anfr)
-            } label: {
-                menuRow(title: "Carte ANFR", icon: "antenna.radiowaves.left.and.right")
-            }
-            menuSeparator
-            NavigationLink {
-                ANFRStatsView(service: services.anfr)
-            } label: {
-                menuRow(title: "Statistiques ANFR", icon: "chart.bar.xaxis")
-            }
-            menuSeparator
-            NavigationLink {
-                NotificationsCenterView(service: services.notifications)
-            } label: {
-                menuRow(title: "Notifications", icon: "bell.fill")
-            }
-            menuSeparator
-            NavigationLink {
-                CallHistoryView(service: services.calls)
-            } label: {
-                menuRow(title: "Appels", icon: "phone.circle")
-            }
-            menuSeparator
-            NavigationLink {
-                PrivacySettingsView(service: services.privacy)
-            } label: {
-                menuRow(title: "Confidentialité", icon: "hand.raised.fill")
-            }
-            menuSeparator
-            NavigationLink {
-                SettingsView(userService: services.users, authService: services.auth)
-            } label: {
-                menuRow(title: "Réglages", icon: "gearshape.fill")
+
+            menuSection("Compte") {
+                NavigationLink {
+                    PaywallView(store: services.entitlements, entryPoint: .profile)
+                } label: {
+                    menuRow(title: "Abonnements", icon: "creditcard.fill")
+                }
+                menuSeparator
+                NavigationLink {
+                    PrivacySettingsView(service: services.privacy)
+                } label: {
+                    menuRow(title: "Confidentialité", icon: "hand.raised.fill")
+                }
+                menuSeparator
+                NavigationLink {
+                    SettingsView(userService: services.users, authService: services.auth)
+                } label: {
+                    menuRow(title: "Réglages", icon: "gearshape.fill")
+                }
             }
         }
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+    }
+
+    /// Une section du menu : intertitre discret + carte. L'intertitre est en
+    /// casse normale — la DA « Crème & Terre cuite » proscrit les micro-labels
+    /// majuscules tracés (cf. `sqKicker`).
+    @ViewBuilder
+    private func menuSection<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text(LocalizedStringKey(title))
+                .font(SQFont.body(13, .semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+                .padding(.leading, SQSpace.xs)
+                .accessibilityAddTraits(.isHeader)
+            VStack(spacing: 0) { content() }
+                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                .sqShadowCard()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Progression : les trois écrans de jeu, en tuiles sous l'en-tête plutôt
+    /// qu'en lignes de menu. Ils prolongent le niveau et les points déjà
+    /// affichés au-dessus — les ranger vingt lignes plus bas les coupait de
+    /// leur contexte.
+    private var progressionTiles: some View {
+        HStack(spacing: SQSpace.md) {
+            progressionTile("Récompenses", icon: "rosette") {
+                GamificationView(service: services.gamification)
+            }
+            progressionTile("Classements", icon: "trophy.fill") {
+                LeaderboardsView(service: services.leaderboards, gamification: services.gamification, user: user)
+            }
+            progressionTile("Territoires", icon: "square.grid.3x3.fill") {
+                TerritoriesView(service: services.gamification)
+            }
+        }
+    }
+
+    private func progressionTile<Destination: View>(
+        _ title: String,
+        icon: String,
+        @ViewBuilder destination: @escaping () -> Destination
+    ) -> some View {
+        NavigationLink {
+            destination()
+        } label: {
+            VStack(spacing: SQSpace.sm) {
+                Image(systemName: icon)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(SQColor.brandRed)
+                    .frame(width: 40, height: 40)
+                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .accessibilityHidden(true)
+                Text(LocalizedStringKey(title))
+                    .font(SQFont.body(12.5, .semibold))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, SQSpace.md)
+            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            .sqShadowCard()
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var menuSeparator: some View {

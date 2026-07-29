@@ -933,6 +933,9 @@ struct MapExplorerView: View {
     @State private var fetchTask: Task<Void, Never>?
     @State private var lastRegion: MKCoordinateRegion
     @State private var showFilterSheet = false
+    // Écrans ANFR, repris du menu Profil : c'est ici qu'on cherche une carte.
+    @State private var showsANFRMap = false
+    @State private var showsANFRStats = false
 
     init(service: MapSnapshotServicing,
          antennas: AntennasServicing,
@@ -959,6 +962,12 @@ struct MapExplorerView: View {
             controlsLayer
         }
         .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(isPresented: $showsANFRMap) {
+            ANFRMapView(service: services.anfr)
+        }
+        .navigationDestination(isPresented: $showsANFRStats) {
+            ANFRStatsView(service: services.anfr)
+        }
         .sheet(item: $selectedItem) { item in MapItemSheet(item: item) }
         .sheet(item: $selectedOutage) { site in
             OutageDetailSheet(site: site)
@@ -1428,7 +1437,32 @@ struct MapExplorerView: View {
         HStack(spacing: SQSpace.sm) {
             mapSearchField
             filterButton
+            anfrButton
         }
+    }
+
+    /// Accès aux données ANFR — le référentiel public des antennes.
+    ///
+    /// Elles vivaient dans le menu du Profil, où personne ne va chercher une
+    /// carte. Elles appartiennent à l'onglet Carte : c'est la même matière que
+    /// ce qui est affiché ici, sous un autre angle.
+    private var anfrButton: some View {
+        Menu {
+            Button { showsANFRMap = true } label: {
+                Label("Carte ANFR", systemImage: "map.fill")
+            }
+            Button { showsANFRStats = true } label: {
+                Label("Statistiques ANFR", systemImage: "chart.bar.xaxis")
+            }
+        } label: {
+            Image(systemName: "building.2.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(SQColor.label)
+                .frame(width: 42, height: 42)
+                .background { mapGlassBackground(Circle()) }
+                .sqShadowCard()
+        }
+        .accessibilityLabel("Données ANFR")
     }
 
     /// Barre de recherche flottante : capsule 42 pt « verre crème » + blur,

@@ -52,7 +52,9 @@ final class AppRouter: ObservableObject {
             selectedTab = .community
         } else if AppEnvironment.opensANFRMap ||
                     AppEnvironment.opensANFRStats {
-            selectedTab = .profile
+            // Les écrans ANFR ont quitté le menu Profil pour l'onglet Carte,
+            // où l'on va naturellement chercher une carte d'antennes.
+            selectedTab = .map
         } else {
             selectedTab = .home
         }

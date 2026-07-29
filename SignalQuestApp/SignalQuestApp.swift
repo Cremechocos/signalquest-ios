@@ -409,7 +409,17 @@ struct MainTabView: View {
                 .tabItem { Label("Accueil", systemImage: "house") }
                 .tag(AppRouter.AppTab.home)
 
-            NavigationStack { MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets) }
+            NavigationStack {
+                MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets)
+#if DEBUG
+                    .navigationDestination(isPresented: .constant(AppEnvironment.opensANFRMap)) {
+                        ANFRMapView(service: services.anfr)
+                    }
+                    .navigationDestination(isPresented: .constant(AppEnvironment.opensANFRStats)) {
+                        ANFRStatsView(service: services.anfr)
+                    }
+#endif
+            }
                 .tabItem { Label("Carte", systemImage: "map") }
                 .tag(AppRouter.AppTab.map)
 
@@ -425,17 +435,7 @@ struct MainTabView: View {
                 .tag(AppRouter.AppTab.community)
                 .badge(services.unreadConversations)
 
-            NavigationStack {
-                ProfileView(user: user)
-#if DEBUG
-                    .navigationDestination(isPresented: .constant(AppEnvironment.opensANFRMap)) {
-                        ANFRMapView(service: services.anfr)
-                    }
-                    .navigationDestination(isPresented: .constant(AppEnvironment.opensANFRStats)) {
-                        ANFRStatsView(service: services.anfr)
-                    }
-#endif
-            }
+            NavigationStack { ProfileView(user: user) }
             .tabItem { Label("Profil", systemImage: "person.crop.circle") }
             .tag(AppRouter.AppTab.profile)
         }
@@ -456,19 +456,8 @@ struct MainTabView: View {
                 .sqDockSafeArea()
                 .tag(AppRouter.AppTab.home)
 
-            NavigationStack { MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets).toolbar(.hidden, for: .tabBar) }
-                .tag(AppRouter.AppTab.map)
-
-            NavigationStack { SpeedtestView().toolbar(.hidden, for: .tabBar) }
-                .sqDockSafeArea()
-                .tag(AppRouter.AppTab.speed)
-
-            NavigationStack { FeedView(service: services.feed, location: services.location).toolbar(.hidden, for: .tabBar) }
-                .sqDockSafeArea(!router.isDockHidden)
-                .tag(AppRouter.AppTab.community)
-
             NavigationStack {
-                ProfileView(user: user)
+                MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets)
                     .toolbar(.hidden, for: .tabBar)
 #if DEBUG
                     .navigationDestination(isPresented: .constant(AppEnvironment.opensANFRMap)) {
@@ -479,6 +468,17 @@ struct MainTabView: View {
                     }
 #endif
             }
+                .tag(AppRouter.AppTab.map)
+
+            NavigationStack { SpeedtestView().toolbar(.hidden, for: .tabBar) }
+                .sqDockSafeArea()
+                .tag(AppRouter.AppTab.speed)
+
+            NavigationStack { FeedView(service: services.feed, location: services.location).toolbar(.hidden, for: .tabBar) }
+                .sqDockSafeArea(!router.isDockHidden)
+                .tag(AppRouter.AppTab.community)
+
+            NavigationStack { ProfileView(user: user).toolbar(.hidden, for: .tabBar) }
             .sqDockSafeArea()
             .tag(AppRouter.AppTab.profile)
         }

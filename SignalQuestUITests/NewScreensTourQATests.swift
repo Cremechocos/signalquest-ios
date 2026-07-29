@@ -96,20 +96,43 @@ final class NewScreensTourQATests: XCTestCase {
         profile.tap()
         _ = app.staticTexts.firstMatch.waitForExistence(timeout: 6)
 
-        for (label, name) in [(labels.territories, "territoires"),
-                              (labels.feedPreferences, "preferences-fil")] {
-            let entry = app.staticTexts[label].firstMatch
-            guard entry.waitForExistence(timeout: 6) else {
-                // Signalé, jamais silencieux : un `guard … else { return }` muet
-                // faisait passer le test en ne capturant RIEN — un faux vert.
-                print("SQ_TOUR MANQUANT \(label)")
-                continue
-            }
-            entry.tap()
+        // Territoires est resté dans le Profil, en tuile sous l'en-tête.
+        let territories = app.staticTexts[labels.territories].firstMatch
+        if territories.waitForExistence(timeout: 6) {
+            territories.tap()
             _ = app.staticTexts.firstMatch.waitForExistence(timeout: 8)
-            capture(app, named: "\(prefix)-\(name)")
+            capture(app, named: "\(prefix)-territoires")
             app.navigationBars.buttons.element(boundBy: 0).tap()
             _ = app.staticTexts[labels.territories].waitForExistence(timeout: 4)
+        } else {
+            // Signalé, jamais silencieux : un `guard … else { return }` muet
+            // faisait passer le test en ne capturant RIEN — un faux vert.
+            print("SQ_TOUR MANQUANT \(labels.territories)")
         }
+
+        // « Préférences du fil » a rejoint le menu `⋯` de Communauté : c'est un
+        // réglage du fil, il n'avait rien à faire dans le menu du Profil.
+        let communityTab = SignalQuestUITestSupport.tab(named: labels.community, in: app)
+        guard communityTab.waitForExistence(timeout: 10) else {
+            print("SQ_TOUR MANQUANT \(labels.community)")
+            return
+        }
+        communityTab.tap()
+        _ = app.staticTexts.firstMatch.waitForExistence(timeout: 6)
+
+        let overflow = app.buttons["Plus"].firstMatch
+        guard overflow.waitForExistence(timeout: 6) else {
+            print("SQ_TOUR MANQUANT menu Plus")
+            return
+        }
+        overflow.tap()
+        let preferences = app.buttons[labels.feedPreferences].firstMatch
+        guard preferences.waitForExistence(timeout: 6) else {
+            print("SQ_TOUR MANQUANT \(labels.feedPreferences)")
+            return
+        }
+        preferences.tap()
+        _ = app.staticTexts.firstMatch.waitForExistence(timeout: 8)
+        capture(app, named: "\(prefix)-preferences-fil")
     }
 }

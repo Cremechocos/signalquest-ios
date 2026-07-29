@@ -399,6 +399,12 @@ struct FeedView: View {
     @State private var showComposer = false
     @State private var showExplore = false
     @State private var showMessages = false
+    // Destinations reprises du menu Profil : elles relèvent de la communauté,
+    // c'est ici qu'on les cherche.
+    @State private var showFriends = false
+    @State private var showNotifications = false
+    @State private var showCalls = false
+    @State private var showFeedPreferences = false
     /// Auteur dont on pousse le profil public (cards, commentaires, stories…).
     @State private var profileAuthor: SocialFeedAuthor?
     /// Profil demandé par notification (follow) via AppRouter — par id seul.
@@ -512,6 +518,21 @@ struct FeedView: View {
         .overlay(alignment: .bottom) { shareUndoPill }
         // Header custom (DA Crème) : plus de gros titre nav système.
         .toolbar(.hidden, for: .navigationBar)
+        // Destinations du menu `⋯`. En navigation (et non en feuille) : ce sont
+        // des écrans à part entière, avec leur propre profondeur, exactement
+        // comme quand ils vivaient dans le menu du Profil.
+        .navigationDestination(isPresented: $showFriends) {
+            FriendsListView(service: services.friends)
+        }
+        .navigationDestination(isPresented: $showNotifications) {
+            NotificationsCenterView(service: services.notifications)
+        }
+        .navigationDestination(isPresented: $showCalls) {
+            CallHistoryView(service: services.calls)
+        }
+        .navigationDestination(isPresented: $showFeedPreferences) {
+            FeedPreferencesView(service: services.feed)
+        }
         .signalQuestBackground()
         .task {
             if model.page == nil { await model.load() }
@@ -798,17 +819,51 @@ struct FeedView: View {
             .accessibilityValue(services.unreadConversations == 0
                                 ? "Aucun message non lu"
                                 : "\(services.unreadConversations) conversations non lues")
-            headerButton(systemImage: "calendar", label: "Ma semaine") {
-                showRecap = true
-            }
             headerButton(systemImage: "magnifyingglass", label: "Explorer") {
                 showExplore = true
             }
             headerButton(systemImage: "square.and.pencil", label: "Créer une publication") {
                 showComposer = true
             }
+            // Menu de débordement. Il accueille ce qui vivait dans le menu du
+            // Profil sans y avoir sa place — Amis, Notifications, Appels,
+            // Préférences du fil — plus « Ma semaine ». Un cinquième bouton rond
+            // n'était pas possible : à quatre, le titre « Communauté » se
+            // rétrécissait déjà pour tenir.
+            communityMenu
         }
         .accessibilityElement(children: .contain)
+    }
+
+    /// `⋯` — les destinations de la communauté qui ne méritent pas un bouton
+    /// permanent, mais qu'on cherchait jusqu'ici dans l'onglet Profil.
+    private var communityMenu: some View {
+        Menu {
+            Button { showFriends = true } label: {
+                Label("Amis", systemImage: "person.2.fill")
+            }
+            Button { showNotifications = true } label: {
+                Label("Notifications", systemImage: "bell.fill")
+            }
+            Button { showCalls = true } label: {
+                Label("Appels", systemImage: "phone.circle")
+            }
+            Divider()
+            Button { showRecap = true } label: {
+                Label("Ma semaine", systemImage: "calendar")
+            }
+            Button { showFeedPreferences = true } label: {
+                Label("Préférences du fil", systemImage: "slider.horizontal.3")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(SQColor.label)
+                .frame(width: 42, height: 42)
+                .background(SQColor.surface, in: Circle())
+                .sqShadowSoft()
+        }
+        .accessibilityLabel("Plus")
     }
 
     /// Bouton circulaire d'en-tête 42 pt : fond surface + ombre douce, icône
