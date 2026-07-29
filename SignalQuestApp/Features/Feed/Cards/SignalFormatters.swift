@@ -26,8 +26,7 @@ enum SignalFormatters {
 
     static func meters(_ value: Double?) -> String {
         guard let value else { return "—" }
-        if value >= 1000 { return String(format: "%.1f km", value / 1000) }
-        return "\(Int(value)) m"
+        return SQUnits.distance(meters: value)
     }
 
     static func duration(_ seconds: Double?) -> String {

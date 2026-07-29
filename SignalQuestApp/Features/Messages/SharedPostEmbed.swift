@@ -454,7 +454,7 @@ struct SharedPostEmbedBubble: View {
                 }
             case "session", "coverage", "drive_test":
                 let chips: [String] = [
-                    signal.distanceMeters.map { String(format: "%.1f km", $0 / 1000) },
+                    signal.distanceMeters.map { SQUnits.distance(meters: $0) },
                     signal.durationSeconds.flatMap { $0 > 0 ? "\(Int($0 / 60)) min" : nil },
                     signal.detectedTechs.isEmpty ? nil : signal.detectedTechs.joined(separator: " · ")
                 ].compactMap { $0 }
@@ -507,7 +507,7 @@ struct SharedPostEmbedBubble: View {
                 unit: "points",
                 tint: SQColor.brandRed,
                 chips: [
-                    se.distanceKm.map { String(format: "%.1f km", $0) },
+                    se.distanceKm.map { SQUnits.distance(kilometers: $0) },
                     se.durationSeconds.flatMap { $0 > 0 ? "\($0 / 60) min" : nil },
                     se.technologies
                 ].compactMap { $0 }

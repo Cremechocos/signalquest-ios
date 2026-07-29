@@ -580,7 +580,7 @@ struct SessionDetailView: View {
 
     static func formatKm(_ km: Double) -> String {
         if km < 1 { return "\(Int((km * 1000).rounded())) m" }
-        return String(format: "%.1f km", km)
+        return SQUnits.distance(kilometers: km)
     }
 
     static func statusColor(_ s: ServingStatus) -> Color {

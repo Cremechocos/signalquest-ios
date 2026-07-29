@@ -363,9 +363,7 @@ struct RadioLogSiteHypothesis: Sendable, Equatable {
         var parts: [String] = []
         if let confidenceScore { parts.append("confiance \(confidenceScore) %") }
         if let distanceMeters {
-            parts.append(distanceMeters >= 1000
-                ? String(format: "%.1f km", Double(distanceMeters) / 1000)
-                : "\(distanceMeters) m")
+            parts.append(SQUnits.distance(meters: Double(distanceMeters)))
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }

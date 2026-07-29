@@ -1724,7 +1724,7 @@ struct DriveTestView: View {
 
     private var sectorDetail: String? {
         guard let distance = model.nearestDistanceMeters else { return nil }
-        let distanceText = distance >= 1000 ? String(format: "%.1f km", distance / 1000) : "\(Int(distance)) m"
+        let distanceText = SQUnits.distance(meters: distance)
         if let offset = model.sectorOffsetDegrees {
             return String(localized: "Antenne la plus proche · \(distanceText) · écart \(Int(offset.rounded()))°")
         }

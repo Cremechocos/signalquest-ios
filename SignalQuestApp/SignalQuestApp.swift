@@ -90,6 +90,10 @@ struct AppRootView: View {
     @ObservedObject var appLock: AppLockController
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("sq.hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    /// Miroir observable de l'unité de distance. Détenu ICI, là où se fait
+    /// l'injection : les vues s'y abonnent pour se rafraîchir au changement,
+    /// les formateurs purs (`SQUnits`) lisent le `UserDefaults` derrière.
+    @StateObject private var unitsStore = SQUnitsStore()
 
     /// Enregistre les notifications APNs + le token VoIP dès que la session
     /// devient authentifiée. Idempotent : `requestAuthorizationAndRegister` ne
@@ -119,6 +123,7 @@ struct AppRootView: View {
             .environmentObject(services.router)
             .environmentObject(services.callManager)
             .environmentObject(services.networkPath)
+            .environmentObject(unitsStore)
             // Injecté SÉPARÉMENT, comme networkPath et callManager : un
             // ObservableObject imbriqué dans AppServices n'est pas observé
             // de façon transitive, donc `RootView` ne se reconstruirait pas

@@ -24,9 +24,7 @@ struct RadioLogCandidate: Identifiable, Equatable {
 
     var distanceLabel: String? {
         guard let distanceMeters else { return nil }
-        return distanceMeters >= 1000
-            ? String(format: "%.1f km", Double(distanceMeters) / 1000)
-            : "\(distanceMeters) m"
+        return SQUnits.distance(meters: Double(distanceMeters))
     }
 }
 

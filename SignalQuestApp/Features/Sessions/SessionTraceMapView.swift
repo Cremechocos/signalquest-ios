@@ -181,7 +181,7 @@ final class ServingAntennaAnnotation: NSObject, MKAnnotation {
     var subtitle: String? {
         var parts: [String] = [antenna.status.label]
         if let d = antenna.distanceKm, d > 0 {
-            parts.append(d < 1 ? "\(Int((d * 1000).rounded())) m" : String(format: "%.1f km", d))
+            parts.append(SQUnits.distance(kilometers: d))
         }
         return parts.joined(separator: " · ")
     }

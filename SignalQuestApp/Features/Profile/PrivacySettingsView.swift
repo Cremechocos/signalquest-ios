@@ -17,6 +17,20 @@ final class PrivacySettingsViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var savedConfirmation = false
 
+    // Préférences de compte et zones privées. Côté serveur elles vivent hors de
+    // `/social/privacy`, mais pour l'utilisateur c'est le même sujet — et elles
+    // n'étaient exposées nulle part dans l'app.
+    @Published var preferences = UserPreferences()
+    @Published var zones: [PrivacyZone] = []
+    @Published var zoneBusyId: String?
+
+    /// Zones posées par l'utilisateur : celles qu'il vient régler ici.
+    var declaredZones: [PrivacyZone] { zones.filter { !$0.isAutoDetected } }
+    /// Hypothèses du système d'apprentissage. Repliées : mesuré sur un compte
+    /// réel, 72 sur 73 — à plat, elles noyaient la seule zone déclarée.
+    var detectedZones: [PrivacyZone] { zones.filter(\.isAutoDetected) }
+    var hiddenDetectedCount: Int { detectedZones.filter(\.hideSpeedtestsOnMap).count }
+
     private let service: PrivacyServicing
     init(service: PrivacyServicing) { self.service = service }
 
@@ -24,11 +38,71 @@ final class PrivacySettingsViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+        // Les trois lectures sont indépendantes : en série, l'écran attendrait
+        // trois allers-retours avant d'afficher quoi que ce soit.
+        async let privacy = service.get()
+        async let prefs = try? service.preferences()
+        async let zoneList = try? service.zones()
         do {
-            apply(try await service.get())
+            apply(try await privacy)
             loaded = true
         } catch {
             errorMessage = error.localizedDescription
+        }
+        if let loadedPrefs = await prefs {
+            preferences = loadedPrefs
+            unitsStore?.apply(loadedPrefs.unitsSystem)
+        }
+        zones = await zoneList ?? []
+    }
+
+    /// Injecté par la vue : le miroir observable de l'unité, pour que le reste de
+    /// l'app suive immédiatement un changement fait ici.
+    weak var unitsStore: SQUnitsStore?
+
+    func setUnits(_ system: SQUnitsSystem) async {
+        let previous = preferences.unitsSystem
+        preferences.unitsSystem = system
+        unitsStore?.apply(system)
+        do {
+            preferences = try await service.updatePreferences(preferences)
+            unitsStore?.apply(preferences.unitsSystem)
+            Haptics.success()
+        } catch {
+            // Retour à l'état précédent : afficher des miles que le serveur n'a
+            // pas enregistrés ferait mentir l'écran au prochain lancement.
+            preferences.unitsSystem = previous
+            unitsStore?.apply(previous)
+            errorMessage = error.localizedDescription
+            Haptics.error()
+        }
+    }
+
+    func setShowHandleOnLeaderboard(_ value: Bool) async {
+        let previous = preferences.showHandleOnLeaderboard
+        preferences.showHandleOnLeaderboard = value
+        do {
+            preferences = try await service.updatePreferences(preferences)
+            Haptics.success()
+        } catch {
+            preferences.showHandleOnLeaderboard = previous
+            errorMessage = error.localizedDescription
+            Haptics.error()
+        }
+    }
+
+    func setZoneHidden(_ zone: PrivacyZone, hidden: Bool) async {
+        zoneBusyId = zone.id
+        defer { zoneBusyId = nil }
+        do {
+            try await service.updateZone(id: zone.id, hideSpeedtestsOnMap: hidden, isActive: nil)
+            if let index = zones.firstIndex(where: { $0.id == zone.id }) {
+                zones[index].hideSpeedtestsOnMap = hidden
+            }
+            Haptics.success()
+        } catch {
+            errorMessage = error.localizedDescription
+            Haptics.error()
         }
     }
 
@@ -87,6 +161,7 @@ struct PrivacySettingsView: View {
     /// partage de position (PRIV-LOC-CONSENT-01) : on explique ce que les amis
     /// verront avant que l'activation ne soit informée puis confirmée.
     @State private var showLiveShareDisclosure = false
+    @EnvironmentObject private var unitsStore: SQUnitsStore
 
     init(service: PrivacyServicing) {
         _model = StateObject(wrappedValue: PrivacySettingsViewModel(service: service))
@@ -122,6 +197,88 @@ struct PrivacySettingsView: View {
                 Text(model.shareLiveLocationWithFriends
                      ? model.liveShareMode.detail
                      : "Ces partages sont désactivés par défaut. Les désactiver retire aussi les données temps réel déjà publiées.")
+            }
+            .tint(SQColor.brandRed)
+            .listRowBackground(SQColor.surface)
+
+            // ── Classements ──────────────────────────────────────────────────
+            Section {
+                Toggle(
+                    "Afficher mon identifiant plutôt que mon nom",
+                    isOn: Binding(
+                        get: { model.preferences.showHandleOnLeaderboard },
+                        set: { value in Task { await model.setShowHandleOnLeaderboard(value) } }
+                    )
+                )
+            } header: {
+                Text("Classements")
+            } footer: {
+                Text("Les classements sont publics. Ce réglage y remplace ton nom par ton @, sans te retirer du classement.")
+            }
+            .tint(SQColor.brandRed)
+            .listRowBackground(SQColor.surface)
+
+            // ── Unités ───────────────────────────────────────────────────────
+            Section {
+                Picker(
+                    "Distances",
+                    selection: Binding(
+                        get: { model.preferences.unitsSystem },
+                        set: { value in Task { await model.setUnits(value) } }
+                    )
+                ) {
+                    ForEach(SQUnitsSystem.allCases, id: \.self) { system in
+                        Text(system.label).tag(system)
+                    }
+                }
+            } header: {
+                Text("Unités")
+            } footer: {
+                Text(model.preferences.unitsSystem.hint + ". Le réglage s'applique partout dans l'app et suit ton compte sur le web et Android.")
+            }
+            .tint(SQColor.brandRed)
+            .listRowBackground(SQColor.surface)
+
+            // ── Zones privées ────────────────────────────────────────────────
+            //
+            // DEUX natures, et il faut les séparer. Les zones DÉCLARÉES (domicile,
+            // travail) sont celles qu'on a posées soi-même et qu'on vient régler
+            // ici. Les zones AUTO-DÉTECTÉES sont les hypothèses du système
+            // d'apprentissage : mesuré sur un compte réel, 72 sur 73 — les lister
+            // à plat noyait la seule qui compte et repoussait les réglages
+            // suivants hors de portée du défilement.
+            Section {
+                if model.declaredZones.isEmpty && model.detectedZones.isEmpty {
+                    Text("Aucune zone privée. Tu peux en créer depuis le site ou l'application Android.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                } else {
+                    ForEach(model.declaredZones) { zone in
+                        zoneRow(zone)
+                    }
+                    if !model.detectedZones.isEmpty {
+                        DisclosureGroup {
+                            ForEach(model.detectedZones) { zone in
+                                zoneRow(zone)
+                            }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("\(model.detectedZones.count) lieux détectés automatiquement")
+                                    .font(SQFont.body(15, .medium))
+                                    .foregroundStyle(SQColor.label)
+                                Text(model.hiddenDetectedCount == 0
+                                     ? "Aucun n'est masqué"
+                                     : "\(model.hiddenDetectedCount) masqué(s) sur la carte")
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                            }
+                        }
+                    }
+                }
+            } header: {
+                Text("Zones privées")
+            } footer: {
+                Text("Activé, tes speedtests réalisés dans cette zone n'apparaissent pas sur la carte publique. Utile autour de chez toi ou de ton lieu de travail.")
             }
             .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
@@ -195,7 +352,11 @@ struct PrivacySettingsView: View {
         .signalQuestBackground()
         .navigationTitle("Confidentialité")
         .navigationBarTitleDisplayMode(.inline)
-        .task { if !model.loaded { await model.load() } }
+                .task {
+            // Le modèle propage l'unité au reste de l'app via ce miroir.
+            model.unitsStore = unitsStore
+            if !model.loaded { await model.load() }
+        }
         .onChangeCompat(of: model.liveShareMode) { _, newMode in
             services.livePresence.setMode(newMode)
         }
@@ -213,6 +374,45 @@ struct PrivacySettingsView: View {
                 ProgressView().tint(SQColor.brandRed)
             }
         }
+    }
+
+    @ViewBuilder
+    private func zoneRow(_ zone: PrivacyZone) -> some View {
+        HStack(spacing: SQSpace.md) {
+            Image(systemName: zone.typeIcon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(width: 28)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(zone.name)
+                    .font(SQFont.body(15, .medium))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(1)
+                // Le type n'est répété que s'il n'est pas déjà le nom : une zone
+                // « Domicile » de type « Domicile » se lisait « Domicile ·
+                // Domicile · 121 m ».
+                Text([zone.typeLabel == zone.name ? "" : zone.typeLabel, zone.summary]
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " · "))
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            if model.zoneBusyId == zone.id {
+                ProgressView()
+            } else {
+                Toggle("", isOn: Binding(
+                    get: { zone.hideSpeedtestsOnMap },
+                    set: { hidden in Task { await model.setZoneHidden(zone, hidden: hidden) } }
+                ))
+                .labelsHidden()
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(zone.name), masquer mes speedtests")
+        .accessibilityValue(zone.hideSpeedtestsOnMap ? "activé" : "désactivé")
     }
 }
 
@@ -322,4 +522,5 @@ private struct LiveLocationDisclosureSheet: View {
             }
         }
     }
+
 }

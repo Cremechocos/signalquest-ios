@@ -279,7 +279,7 @@ struct SharedPostCardBubble: View {
                 primary: session.points.map { "\($0)" } ?? "—",
                 unit: "points",
                 tint: mine ? SQColor.onAccent : SQColor.brandRed,
-                chips: [session.distanceKm.map { String(format: "%.1f km", $0) },
+                chips: [session.distanceKm.map { SQUnits.distance(kilometers: $0) },
                         session.durationSeconds.map { formatDuration($0) }, session.technologies]
             )
         }

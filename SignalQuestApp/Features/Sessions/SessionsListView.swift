@@ -159,7 +159,7 @@ private struct SessionRow: View {
                         Label("\(points)", systemImage: "mappin.and.ellipse")
                     }
                     if let km = session.distanceKm, km > 0 {
-                        Label(km < 1 ? "\(Int((km * 1000).rounded())) m" : String(format: "%.1f km", km), systemImage: "ruler")
+                        Label(SQUnits.distance(kilometers: km), systemImage: "ruler")
                     }
                     if let rsrp = session.avgSignalStrength {
                         Label("\(Int(rsrp)) dBm", systemImage: "antenna.radiowaves.left.and.right")
