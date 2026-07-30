@@ -617,22 +617,30 @@ struct SocialProfileOperatorShare: Codable, Equatable, Identifiable {
     let count: Int
     /// Part entre 0 et 1.
     let share: Double
-    /// Marques MVNO rencontrées sur ce réseau (« Lebara » sur Bouygues).
+    /// Réseau HÔTE quand `key` désigne un MVNO, `nil` quand `key` est déjà un MNO.
     ///
-    /// ⚠️ `key` reste le réseau HÔTE : un MVNO n'a pas de cellules, donc la
-    /// couverture et les identifications sont rattachées à l'hôte. Ces marques
-    /// servent uniquement à nommer ce que la personne lit sur son téléphone.
-    let brands: [String]
+    /// Le regroupement est fait sur la marque que la personne LIT sur son
+    /// téléphone (« Lebara »), pas sur l'hôte. La couverture et les
+    /// identifications, elles, restent rattachées à l'hôte côté serveur : deux
+    /// vérités à deux étages, qui ne s'opposent pas. Ce champ sert à teinter la
+    /// marque de la couleur de son hôte et à le mentionner.
+    let hostKey: String?
+    /// Libellé de marque fourni par le serveur (« Lebara »), `nil` pour un MNO.
+    let brandLabel: String?
 
     var id: String { key }
 
-    enum CodingKeys: String, CodingKey { case key, count, share, brands }
+    /// Vrai quand cette part est une marque MVNO adossée à un réseau hôte.
+    var isMvno: Bool { hostKey != nil }
 
-    init(key: String, count: Int, share: Double, brands: [String] = []) {
+    enum CodingKeys: String, CodingKey { case key, count, share, hostKey, brandLabel }
+
+    init(key: String, count: Int, share: Double, hostKey: String? = nil, brandLabel: String? = nil) {
         self.key = key
         self.count = count
         self.share = share
-        self.brands = brands
+        self.hostKey = hostKey
+        self.brandLabel = brandLabel
     }
 
     init(from decoder: Decoder) throws {
@@ -640,7 +648,8 @@ struct SocialProfileOperatorShare: Codable, Equatable, Identifiable {
         key = c.decodeFlexibleString(forKey: .key) ?? ""
         count = (try? c.decodeIfPresent(Int.self, forKey: .count)) ?? 0
         share = (try? c.decodeIfPresent(Double.self, forKey: .share)) ?? 0
-        brands = c.decodeLossyArray([String].self, forKey: .brands)
+        hostKey = c.decodeFlexibleString(forKey: .hostKey)
+        brandLabel = c.decodeFlexibleString(forKey: .brandLabel)
     }
 
     var label: String { key.capitalized }

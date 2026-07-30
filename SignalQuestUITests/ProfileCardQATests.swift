@@ -46,7 +46,23 @@ final class ProfileCardQATests: XCTestCase {
         //
         // « SFR » et non « Sfr » : les noms d'opérateurs sont des sigles, ils
         // passent par le registre de marque.
-        for legend in ["Orange : 52 % des mesures", "SFR : 38 % des mesures"] {
+        // Un MVNO porte SON nom, pas celui de son hôte — c'est ce que la personne
+        // lit sur son téléphone. L'hôte n'est pas perdu : il passe dans le
+        // libellé d'accessibilité, pour ne pas réserver l'information à qui sait
+        // décoder une couleur.
+        //
+        // « Free 4 % » est là exprès : l'ancien plancher à 5 % masquait des
+        // réseaux réellement mesurés sans le dire.
+        // ⚠️ Les noms attendus sont ceux de `SQBrand` (« Bouygues », « Free »),
+        // PAS ceux du registre backend (« Bouygues Telecom », « Free Mobile ») :
+        // iOS affiche les noms courts. Deux sources de libellés, ne pas les
+        // confondre en écrivant un test.
+        for legend in [
+            "Orange : 52 % des mesures",
+            "SFR : 30 % des mesures",
+            "Lebara, sur le réseau Bouygues : 8 % des mesures",
+            "Free : 4 % des mesures"
+        ] {
             XCTAssertTrue(
                 app.otherElements[legend].exists || app.staticTexts[legend].exists,
                 "Légende « \(legend) » absente de la barre empilée"

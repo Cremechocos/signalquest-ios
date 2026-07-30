@@ -216,7 +216,16 @@ final class UserProfileViewModel: ObservableObject {
                 countryIsDeclared: false,
                 operators: [
                     SocialProfileOperatorShare(key: "orange", count: 104, share: 0.52),
-                    SocialProfileOperatorShare(key: "sfr", count: 76, share: 0.38)
+                    SocialProfileOperatorShare(key: "sfr", count: 60, share: 0.30),
+                    // Part MVNO : exerce le nommage par la marque et la teinte
+                    // atténuée de l'hôte, que les seules parts MNO ne couvraient pas.
+                    SocialProfileOperatorShare(
+                        key: "LEBARA", count: 16, share: 0.08,
+                        hostKey: "BOUYGUES", brandLabel: "Lebara"
+                    ),
+                    // Sous l'ancien plancher de 5 % : présent pour verrouiller sa
+                    // suppression, qui masquait des réseaux réellement mesurés.
+                    SocialProfileOperatorShare(key: "free", count: 8, share: 0.04)
                 ],
                 sampleSize: 200
             )
@@ -556,7 +565,7 @@ struct UserProfileView: View {
                 HStack(spacing: 0) {
                     ForEach(networks.operators) { entry in
                         Rectangle()
-                            .fill(Self.tint(for: entry.key))
+                            .fill(Self.tint(for: entry))
                             .frame(width: max(2, proxy.size.width * entry.share))
                     }
                     Spacer(minLength: 0)
@@ -574,7 +583,7 @@ struct UserProfileView: View {
                     let name = Self.operatorLabel(for: entry)
                     HStack(spacing: 6) {
                         Circle()
-                            .fill(Self.tint(for: entry.key))
+                            .fill(Self.tint(for: entry))
                             .frame(width: 9, height: 9)
                         Text("\(name) \(entry.percentLabel)")
                             .font(SQFont.body(12))
@@ -582,7 +591,7 @@ struct UserProfileView: View {
                             .foregroundStyle(SQColor.labelSecondary)
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(name) : \(entry.percentLabel) des mesures")
+                    .accessibilityLabel(Self.accessibilityLabel(for: entry))
                 }
             }
 
@@ -608,17 +617,29 @@ struct UserProfileView: View {
     /// (`radio-market-registry`), pour que web, Android et iOS nomment la même
     /// chose pareil.
     private static func operatorLabel(for entry: SocialProfileOperatorShare) -> String {
+        // Un MVNO porte SON nom : c'est celui que la personne lit sur son
+        // téléphone. Afficher l'hôte serait exact techniquement et faux de son
+        // point de vue — l'hôte est mentionné dans le libellé d'accessibilité et
+        // suggéré par la teinte.
+        if let brand = entry.brandLabel, !brand.isEmpty { return brand }
         if unresolvedOperatorKeys.contains(entry.key.uppercased()) {
             return String(localized: "Réseau observé")
         }
         // Les noms d'opérateurs sont des sigles : `entry.label` (`capitalized`)
         // donnait « Sfr ». Le registre de marque rend « SFR » ou « TELUS ».
-        let network = SQBrand.operatorName(entry.key) ?? entry.label
-        guard !entry.brands.isEmpty else { return network }
-        // « Bouygues (via Lebara) » : le réseau d'abord, la marque entre
-        // parenthèses. L'inverse laisserait croire que Lebara EST un réseau,
-        // alors que ses mesures comptent dans la couverture de Bouygues.
-        return "\(network) (via \(entry.brands.joined(separator: ", ")))"
+        return SQBrand.operatorName(entry.key) ?? entry.label
+    }
+
+    /// Libellé lu par VoiceOver. Il porte, lui, le réseau hôte : « Lebara, sur le
+    /// réseau Bouygues Telecom » — l'information ne doit pas être réservée à qui
+    /// sait décoder une couleur.
+    private static func accessibilityLabel(for entry: SocialProfileOperatorShare) -> String {
+        let name = operatorLabel(for: entry)
+        guard let hostKey = entry.hostKey,
+              let host = SQBrand.operatorName(hostKey) else {
+            return "\(name) : \(entry.percentLabel) des mesures"
+        }
+        return "\(name), sur le réseau \(host) : \(entry.percentLabel) des mesures"
     }
 
     /// Teinte d'une part de réseau. Une clé non résolue reçoit un gris neutre :
@@ -628,6 +649,17 @@ struct UserProfileView: View {
         unresolvedOperatorKeys.contains(key.uppercased())
             ? SQColor.labelTertiary
             : SQBrand.operatorColor(key)
+    }
+
+    /// Teinte d'une part. Un MVNO prend la couleur de son HÔTE, atténuée : il
+    /// utilise bien ce réseau, mais le distinguer évite de le confondre avec les
+    /// mesures faites sur une SIM de l'opérateur lui-même.
+    ///
+    /// ⚠️ Passer `entry.key` à `SQBrand.operatorColor` donnerait du rouge SFR
+    /// pour « LEBARA », le registre retombant sur SFR pour toute clé inconnue.
+    private static func tint(for entry: SocialProfileOperatorShare) -> Color {
+        guard let hostKey = entry.hostKey else { return tint(for: entry.key) }
+        return SQBrand.operatorColor(hostKey).opacity(0.55)
     }
 
     private var avatar: some View {
