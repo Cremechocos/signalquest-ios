@@ -252,6 +252,7 @@
       }
     },
     "%@ · %lld antenne%@ · %lld cellule%@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -425,6 +426,9 @@
         }
       }
     },
+    "%@, masquer mes speedtests" : {
+
+    },
     "%@. %@" : {
       "localizations" : {
         "en" : {
@@ -568,6 +572,9 @@
         }
       }
     },
+    "%lld lieux détectés automatiquement" : {
+
+    },
     "%lld m parcourus" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -608,6 +615,9 @@
           }
         }
       }
+    },
+    "%lld masqué(s) sur la carte" : {
+
     },
     "%lld Mbps" : {
       "localizations" : {
@@ -810,6 +820,7 @@
       }
     },
     "%lld PCI · %lld %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1824,6 +1835,9 @@
         }
       }
     },
+    "Activé, tes speedtests réalisés dans cette zone n'apparaissent pas sur la carte publique. Utile autour de chez toi ou de ton lieu de travail." : {
+
+    },
     "Activée" : {
       "localizations" : {
         "en" : {
@@ -2036,6 +2050,9 @@
           }
         }
       }
+    },
+    "Afficher mon identifiant plutôt que mon nom" : {
+
     },
     "Ajoute des amis pour affiner l'audience." : {
       "extractionState" : "stale",
@@ -2428,6 +2445,9 @@
           }
         }
       }
+    },
+    "Antennes affichées : %@" : {
+
     },
     "Antennes au relevé" : {
       "extractionState" : "stale",
@@ -2837,6 +2857,7 @@
       }
     },
     "Aucun import" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2888,6 +2909,9 @@
           }
         }
       }
+    },
+    "Aucun n'est masqué" : {
+
     },
     "Aucun point géolocalisé pour cette session." : {
       "localizations" : {
@@ -3320,6 +3344,9 @@
         }
       }
     },
+    "Aucune zone privée. Tu peux en créer depuis le site ou l'application Android." : {
+
+    },
     "Audience" : {
       "localizations" : {
         "en" : {
@@ -3565,6 +3592,9 @@
           }
         }
       }
+    },
+    "Basic" : {
+
     },
     "Bientôt au maximum de points enregistrables" : {
       "extractionState" : "manual",
@@ -3971,6 +4001,7 @@
       }
     },
     "Cellule" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4258,6 +4289,7 @@
       }
     },
     "Choisir un fichier (.csv, .ntm)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4991,6 +5023,9 @@
         }
       }
     },
+    "Conversation indisponible" : {
+
+    },
     "Conversations chiffrées" : {
       "localizations" : {
         "en" : {
@@ -5325,6 +5360,9 @@
           }
         }
       }
+    },
+    "Créateur" : {
+
     },
     "Creation..." : {
       "localizations" : {
@@ -6140,6 +6178,9 @@
         }
       }
     },
+    "détectée" : {
+
+    },
     "Détection en cours…" : {
       "localizations" : {
         "en" : {
@@ -6274,6 +6315,9 @@
         }
       }
     },
+    "Distances" : {
+
+    },
     "DL max" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6295,6 +6339,9 @@
           }
         }
       }
+    },
+    "Domicile" : {
+
     },
     "Donnée" : {
       "extractionState" : "stale",
@@ -7102,6 +7149,9 @@
         }
       }
     },
+    "Envoyer un message à %@" : {
+
+    },
     "Envoyer une demande à %@" : {
       "localizations" : {
         "en" : {
@@ -7122,6 +7172,9 @@
         }
       }
     },
+    "Équipe" : {
+
+    },
     "Équipe SignalQuest" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -7134,6 +7187,7 @@
       }
     },
     "Erreur" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7171,6 +7225,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Try another name or an @handle."
+          }
+        }
+      }
+    },
+    "Étape %lld sur %lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Étape %1$lld sur %2$lld"
           }
         }
       }
@@ -7448,9 +7512,6 @@
         }
       }
     },
-    "Filtrer les antennes" : {
-
-    },
     "Filtres du fil" : {
       "localizations" : {
         "en" : {
@@ -7481,6 +7542,9 @@
           }
         }
       }
+    },
+    "France (outre-mer)" : {
+
     },
     "Fréquence" : {
       "extractionState" : "stale",
@@ -7856,6 +7920,7 @@
 
     },
     "Identifier cette antenne" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7909,7 +7974,11 @@
         }
       }
     },
+    "Impérial" : {
+
+    },
     "Importe un export « eNB Analytics » (CSV) ou NetMonster (.ntm) pour afficher, identifier et gérer les antennes détectées." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7931,6 +8000,7 @@
       }
     },
     "Imports" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8353,6 +8423,9 @@
         }
       }
     },
+    "kilomètres et mètres" : {
+
+    },
     "L’achat est en attente de validation par l’App Store." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -8737,6 +8810,9 @@
         }
       }
     },
+    "Le serveur a renvoyé une pagination incomplète : synchronisation interrompue." : {
+
+    },
     "Le serveur de droits est indisponible. Les nouveaux achats sont bloqués par sécurité." : {
       "localizations" : {
         "en" : {
@@ -8834,6 +8910,9 @@
           }
         }
       }
+    },
+    "Les classements sont publics. Ce réglage y remplace ton nom par ton @, sans te retirer du classement." : {
+
     },
     "Les deux" : {
       "extractionState" : "stale",
@@ -9775,6 +9854,9 @@
         }
       }
     },
+    "Métrique" : {
+
+    },
     "Métrique du classement" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -9796,6 +9878,9 @@
           }
         }
       }
+    },
+    "miles et pieds" : {
+
     },
     "Min / Max" : {
       "extractionState" : "stale",
@@ -9881,6 +9966,9 @@
           }
         }
       }
+    },
+    "Modérateur" : {
+
     },
     "modifié" : {
       "localizations" : {
@@ -10137,6 +10225,7 @@
       }
     },
     "Nœud & opérateur" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -10465,6 +10554,9 @@
           }
         }
       }
+    },
+    "Officiel" : {
+
     },
     "OK" : {
       "localizations" : {
@@ -10891,6 +10983,7 @@
       }
     },
     "Page %lld sur %lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11209,6 +11302,7 @@
       }
     },
     "PCI %lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11239,6 +11333,9 @@
           }
         }
       }
+    },
+    "Personnalisée" : {
+
     },
     "Personne" : {
       "localizations" : {
@@ -11315,6 +11412,9 @@
           }
         }
       }
+    },
+    "Photo de %@" : {
+
     },
     "Photo de la publication" : {
       "extractionState" : "stale",
@@ -11598,6 +11698,9 @@
         }
       }
     },
+    "Pionnier" : {
+
+    },
     "Plafond de données" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11759,6 +11862,7 @@
       }
     },
     "Position" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11918,6 +12022,9 @@
           }
         }
       }
+    },
+    "Premium" : {
+
     },
     "Préparation…" : {
       "localizations" : {
@@ -12427,6 +12534,7 @@
       }
     },
     "Radio" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13228,6 +13336,9 @@
         }
       }
     },
+    "Réseau observé" : {
+
+    },
     "Réseau très faible" : {
       "localizations" : {
         "en" : {
@@ -13237,6 +13348,9 @@
           }
         }
       }
+    },
+    "Réseaux mesurés" : {
+
     },
     "Réservé à Premium" : {
       "localizations" : {
@@ -13259,6 +13373,7 @@
       }
     },
     "Résolution des identifications…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14789,6 +14904,7 @@
       }
     },
     "Statut" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15149,6 +15265,7 @@
       }
     },
     "Supprimer tous les imports" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15159,6 +15276,7 @@
       }
     },
     "Supprimer tous les imports ?" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15177,6 +15295,9 @@
           }
         }
       }
+    },
+    "Sur %lld tests où un réseau a été détecté." : {
+
     },
     "Suspendre" : {
 
@@ -15760,6 +15881,7 @@
       }
     },
     "Tous les opérateurs" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15823,7 +15945,6 @@
       }
     },
     "Toutes" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15865,6 +15986,9 @@
           }
         }
       }
+    },
+    "Travail" : {
+
     },
     "Très bon" : {
       "localizations" : {
@@ -16189,6 +16313,9 @@
         }
       }
     },
+    "Unités" : {
+
+    },
     "Upgrade en attente" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16388,6 +16515,7 @@
       }
     },
     "Vérif." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -16442,6 +16570,9 @@
 
     },
     "Vérification…" : {
+
+    },
+    "Vérifié" : {
 
     },
     "Vérifie ta connexion" : {
@@ -16664,6 +16795,9 @@
     "vus en dernier" : {
 
     },
+    "Zone" : {
+
+    },
     "Zone blanche" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -16685,6 +16819,9 @@
           }
         }
       }
+    },
+    "Zones privées" : {
+
     },
     "Zoome pour afficher les antennes." : {
 

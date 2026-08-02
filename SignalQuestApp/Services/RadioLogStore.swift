@@ -24,7 +24,7 @@ protocol RadioLogStoring: Sendable {
     /// Applique un lot reçu du serveur : upsert par `dedupeKey`, et RETRAIT des
     /// lignes portant une pierre tombale. Écrit une seule fois.
     @discardableResult
-    func merge(incoming: [RadioLogEntry], cursor: RadioLogCursor?, nowMs: Int) -> RadioLogSnapshot
+    func merge(incoming: [RadioLogEntry], cursor: RadioLogCursor?, nowMs: Int, markSynced: Bool) -> RadioLogSnapshot
     func clear()
 }
 
@@ -56,12 +56,12 @@ final class RadioLogStore: RadioLogStoring, @unchecked Sendable {
     }
 
     @discardableResult
-    func merge(incoming: [RadioLogEntry], cursor: RadioLogCursor?, nowMs: Int) -> RadioLogSnapshot {
+    func merge(incoming: [RadioLogEntry], cursor: RadioLogCursor?, nowMs: Int, markSynced: Bool = true) -> RadioLogSnapshot {
         lock.lock(); defer { lock.unlock() }
         var snapshot = (try? readUnlocked()) ?? RadioLogSnapshot()
         snapshot.entries = Self.applying(incoming: incoming, to: snapshot.entries)
         if let cursor { snapshot.cursor = cursor }
-        snapshot.lastSyncedAtMs = nowMs
+        if markSynced { snapshot.lastSyncedAtMs = nowMs }
         try? writeUnlocked(snapshot)
         return snapshot
     }
@@ -75,9 +75,9 @@ final class RadioLogStore: RadioLogStoring, @unchecked Sendable {
 
     /// Fusion pure — extraite pour être testable sans toucher au disque.
     ///
-    /// Le serveur peut renvoyer PLUSIEURS fois la même ligne au sein d'un même
-    /// rattrapage (le recul de sécurité du curseur en garantit le recouvrement) :
-    /// l'application doit donc être idempotente, et le dernier état reçu gagne.
+    /// Le rattrapage peut revoir une ligne (notamment lors d'une reprise avant le
+    /// dernier curseur) : l'application doit donc être idempotente, et le dernier
+    /// état reçu gagne.
     static func applying(incoming: [RadioLogEntry], to existing: [RadioLogEntry]) -> [RadioLogEntry] {
         var byKey = Dictionary(existing.map { ($0.dedupeKey, $0) }, uniquingKeysWith: { _, last in last })
         for entry in incoming {

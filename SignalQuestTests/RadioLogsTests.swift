@@ -69,9 +69,8 @@ final class RadioLogsTests: XCTestCase {
 
     // MARK: Fusion
 
-    /// Le curseur recule de 5 s à chaque page : le serveur RENVOIE des lignes
-    /// déjà reçues. L'application doit donc être idempotente, et le dernier
-    /// état reçu doit gagner.
+    /// Une reprise peut revoir des lignes déjà reçues. L'application doit donc
+    /// être idempotente, et le dernier état reçu doit gagner.
     func testMergeIsIdempotentAndLastWriteWins() throws {
         let first = try entry(id: "a", dedupeKey: "cap|1", pci: 35)
         let updated = try entry(id: "a", dedupeKey: "cap|1", pci: 112)

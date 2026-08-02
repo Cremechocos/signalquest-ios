@@ -69,8 +69,7 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
     private let logger = Logger(subsystem: "fr.signalquest.ios", category: "RadioLogs")
 
     /// Taille de page du `pull`. Le serveur plafonne à 1 000 ; on prend le maximum
-    /// parce que le rattrapage initial porte sur des dizaines de milliers de lignes
-    /// et que chaque aller-retour recouvre les 5 s de recul de sécurité.
+    /// parce que le rattrapage initial porte sur des dizaines de milliers de lignes.
     private let pullLimit = 1000
     /// Sites par fenêtre du balayage. La route plafonne à 200 : 150 laisse la marge
     /// qu'Android s'est donnée après avoir pris des 413 en pleine passe.
@@ -99,10 +98,6 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
     /// doit pas manquer une ligne committée hors ordre juste après le dernier
     /// passage. Le surcoût est nul, l'application étant idempotente.
     private let resumeRewind: TimeInterval = 60
-
-    /// Recul de sécurité appliqué par le SERVEUR au curseur reçu
-    /// (`SAFETY_REWIND_MS` dans `radio-logs/pull/route.ts`).
-    private let serverRewind: TimeInterval = 5
 
     init(
         api: APIClient,
@@ -150,14 +145,13 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
         var seenKeys = Set<String>()
         var received = 0
         var readOnly = false
-        /// Compensation du recul serveur, enclenchée après un blocage avéré.
-        var compensatesRewind = false
+        var completed = false
         var failure: RadioLogSyncFailure?
 
         while !Task.isCancelled {
             let page: RadioLogPullPage
             do {
-                page = try await pull(cursor: cursor, compensatesRewind: compensatesRewind)
+                page = try await pull(cursor: cursor)
             } catch {
                 if error.isCancellation { break }
                 logger.error("pull échoué: \(error.localizedDescription, privacy: .public)")
@@ -176,10 +170,8 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
             if let next = page.nextCursor { lastCursor = next }
 
             // Progression réelle : combien de lignes de cette page n'avaient pas
-            // déjà été vues DANS CE RATTRAPAGE. Le serveur recule son curseur de
-            // 5 s à chaque page, donc un recouvrement est normal ; l'absence
-            // TOTALE de nouveauté, elle, signale que le curseur ne peut plus
-            // avancer. Sans garde, la boucle redemanderait indéfiniment la même page.
+            // déjà été vues DANS CE RATTRAPAGE. Le serveur utilise un keyset strict ;
+            // l'absence totale de nouveauté signale donc un curseur bloqué.
             let freshCount = page.items.reduce(into: 0) { count, entry in
                 if seenKeys.insert(entry.dedupeKey).inserted { count += 1 }
             }
@@ -193,21 +185,21 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
                 )
             )
 
-            guard page.hasMore, let next = page.nextCursor else { break }
+            guard page.hasMore else {
+                completed = true
+                break
+            }
 
-            if freshCount == 0 {
-                guard !compensatesRewind else {
-                    // Déjà compensé et toujours aucune nouveauté : il faudrait
-                    // qu'une page entière de lignes partage la MÊME milliseconde.
-                    // On s'arrête en le disant, plutôt que de sauter des lignes
-                    // pour faire avancer un compteur.
-                    logger.error("curseur bloqué malgré la compensation — rattrapage interrompu")
-                    failure = .network(String(localized: "Le serveur renvoie toujours les mêmes relevés : synchronisation incomplète."))
-                    break
-                }
-                // Blocage avéré : on compense le recul serveur à partir d'ici.
-                compensatesRewind = true
-                logger.notice("curseur bloqué → compensation du recul serveur activée")
+            guard let next = page.nextCursor else {
+                logger.error("pagination sans curseur suivant — rattrapage interrompu")
+                failure = .network(String(localized: "Le serveur a renvoyé une pagination incomplète : synchronisation interrompue."))
+                break
+            }
+
+            if freshCount == 0 || next == cursor {
+                logger.error("curseur bloqué — rattrapage interrompu")
+                failure = .network(String(localized: "Le serveur renvoie toujours les mêmes relevés : synchronisation incomplète."))
+                break
             }
             cursor = next
         }
@@ -215,10 +207,13 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
         // Écriture UNIQUE. Y compris après un échec en cours de route : les pages
         // déjà reçues sont bonnes, les jeter obligerait à tout retélécharger au
         // prochain essai.
-        guard !incoming.isEmpty || failure != nil else { return }
-        let snapshot = incoming.isEmpty
-            ? initial
-            : store.merge(incoming: incoming, cursor: lastCursor, nowMs: nowMs())
+        guard !incoming.isEmpty || failure != nil || completed else { return }
+        let snapshot = store.merge(
+            incoming: incoming,
+            cursor: lastCursor,
+            nowMs: nowMs(),
+            markSynced: completed
+        )
         continuation.yield(
             RadioLogSyncProgress(
                 snapshot: snapshot,
@@ -232,42 +227,14 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
 
     /// Une page du journal.
     ///
-    /// COMPENSATION DU RECUL SERVEUR — pourquoi exactement `recul − 1 ms`.
-    ///
-    /// Le serveur filtre sur `updatedAt > (sinceAt − 5 s)`, et son départage
-    /// d'égalité ne s'applique qu'à `updatedAt == sinceAt − 5 s` pile, donc
-    /// jamais. Quand une page entière de lignes tient dans ces 5 s — le cas d'un
-    /// import de masse — la page suivante renvoie exactement les mêmes lignes et
-    /// la pagination n'avance plus. MESURÉ sur un journal réel de 15 555 lignes :
-    /// 1 000 lignes étalées sur 3,5 s, page 2 identique à page 1 à 100 %, un
-    /// blocage sur les 17 pages du rattrapage.
-    ///
-    /// On avance donc de `5 s − 1 ms` : le plancher serveur retombe juste SOUS la
-    /// dernière ligne reçue, qu'on re-reçoit (application idempotente) sans rien
-    /// sauter. MESURÉ : 1 ligne de recouvrement, 999 nouvelles, aucun trou, et
-    /// un rattrapage complet à la ligne près.
-    ///
-    /// Une avance plus large (+6 s) débloque aussi, mais laisse un trou d'une
-    /// seconde entre la dernière ligne reçue et la première ligne suivante. Sur
-    /// CE journal ce trou est vide — c'est même la raison du blocage — donc rien
-    /// n'y est perdu ; sur un journal plus dense, si. `5 s − 1 ms` est sans perte
-    /// par construction, pas par chance : c'est la seule raison de préférer
-    /// cette valeur.
-    ///
-    /// La compensation ne s'active qu'après un blocage constaté : tant que la
-    /// pagination avance, le recul du serveur protège réellement contre les
-    /// commits hors ordre, et le neutraliser d'office serait une régression.
-    private func pull(cursor: RadioLogCursor?, compensatesRewind: Bool) async throws -> RadioLogPullPage {
+    /// La pagination est strictement keysetée par `(updatedAt, id)`. Le curseur
+    /// est donc transmis tel quel : aucune compensation temporelle locale ne
+    /// doit pouvoir créer un trou entre deux pages.
+    private func pull(cursor: RadioLogCursor?) async throws -> RadioLogPullPage {
         var query = [URLQueryItem(name: "limit", value: String(pullLimit))]
         if let cursor {
-            let effective = compensatesRewind
-                ? RadioLogCursor(
-                    sinceAt: cursor.sinceAt.addingTimeInterval(serverRewind - 0.001),
-                    sinceId: cursor.sinceId
-                )
-                : cursor
-            query.append(URLQueryItem(name: "sinceAt", value: effective.sinceAtParameter))
-            query.append(URLQueryItem(name: "sinceId", value: effective.sinceId))
+            query.append(URLQueryItem(name: "sinceAt", value: cursor.sinceAtParameter))
+            query.append(URLQueryItem(name: "sinceId", value: cursor.sinceId))
         }
         do {
             return try await api.request(

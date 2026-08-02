@@ -22,27 +22,25 @@ enum SQFeatures {
     /// n'est pas explicitement ouvert après la campagne de tests.
     static let callScreenSharingEnabled = false
 
-    /// Achat App Store. Ouvert en build **staging uniquement** le temps de
-    /// valider la chaîne complète (produits App Store Connect + endpoint de
-    /// validation serveur + App Store Server Notifications) contre un backend de
-    /// pré-production. Debug (services prod) et Release restent fermés : passer
-    /// ces deux flags à `true` inconditionnellement une fois la recette prod faite.
-    #if STAGING
+    /// Achat App Store. Ouvert sur **toutes** les configurations depuis la
+    /// recette de production : la chaîne serveur est en place (variables
+    /// `APPLE_ROOT_CERTIFICATES_BASE64` / `APPLE_BUNDLE_ID` présentes, vérifié
+    /// par `/api/billing/apple/notifications` qui les contrôle avant de lire son
+    /// corps de requête) et les quatre produits sont enregistrés en base avec
+    /// `provider = 'app_store'`, seule forme que la résolution de palier lit.
+    ///
+    /// L'ouverture ne dépend PAS de l'état d'App Store Connect : tant qu'aucun
+    /// produit n'y est disponible, `Product.products(for:)` rend une liste vide
+    /// et l'écran affiche « Catalogue App Store non configuré » — aucun achat ne
+    /// peut partir, donc aucun paiement ne peut rester sans contrepartie.
     static let storeKitPurchasesEnabled = true
-    #else
-    static let storeKitPurchasesEnabled = false
-    #endif
 
     /// Livraison d'une transaction StoreKit vérifiée au backend. Ce second
     /// verrou empêche qu'un simple changement du flag d'UI autorise un achat
     /// local sans octroyer les droits multiplateformes côté serveur. Aligné sur
     /// `storeKitPurchasesEnabled` : les deux doivent être vrais (et le
     /// synchroniseur présent) pour qu'un achat soit éligible.
-    #if STAGING
     static let storeKitServerVerificationEnabled = true
-    #else
-    static let storeKitServerVerificationEnabled = false
-    #endif
 }
 
 struct AppConfig: Equatable {
