@@ -2264,7 +2264,7 @@ struct MapExplorerView: View {
             (model.isCommunityOnlyMarket && filters.contains(.antenna))
         guard showsLayer else { return [] }
         var seen = Set<String>()
-        return model.communitySiteTiles.flatMap(\.markers).compactMap { marker in
+        let payloads: [MapAnnotationPayload] = model.communitySiteTiles.flatMap(\.markers).compactMap { marker in
             guard seen.insert(marker.id).inserted else { return nil }
             guard marker.lat != 0 || marker.lng != 0 else { return nil }
             let isProbable = marker.candidateKind == "community_probable"
@@ -2294,6 +2294,17 @@ struct MapExplorerView: View {
                 communityObserved: !isProbable
             )
         }
+        // Sans regroupement, le Luxembourg affiche ses cellules et ses 693 sites
+        // ajoutés d'un coup à z10 : plus de 700 `MKAnnotationView` vivantes, et
+        // la carte devient pâteuse. Les antennes étaient déjà clusterisées, pas
+        // ces deux couches-là.
+        return clusteredPayloads(
+            from: payloads,
+            kind: .communitySite,
+            idPrefix: "community-site",
+            minCount: Self.communityClusterThreshold,
+            label: { "\($0) cellules" }
+        )
     }
 
     /// Couche « Sites ajoutés » : pylônes pointés à la main par les membres.
@@ -2307,7 +2318,7 @@ struct MapExplorerView: View {
         guard filters.contains(.customSite)
             || (model.isCommunityOnlyMarket && filters.contains(.antenna)) else { return [] }
         var seen = Set<String>()
-        return model.customSiteTiles.flatMap(\.markers).compactMap { marker in
+        let payloads: [MapAnnotationPayload] = model.customSiteTiles.flatMap(\.markers).compactMap { marker in
             guard seen.insert(marker.id).inserted else { return nil }
             guard marker.lat != 0 || marker.lng != 0 else { return nil }
             let radio = marker.radio
@@ -2341,7 +2352,21 @@ struct MapExplorerView: View {
                 hasEnb: marker.isValidated
             )
         }
+        return clusteredPayloads(
+            from: payloads,
+            kind: .customSite,
+            idPrefix: "custom-site",
+            minCount: Self.communityClusterThreshold,
+            label: { "\($0) sites ajoutés" }
+        )
     }
+
+    /// Seuil de regroupement des couches communautaires.
+    ///
+    /// Plus bas que celui des antennes (160) : ces couches s'AJOUTENT aux
+    /// antennes déjà à l'écran, donc elles partagent le même budget de
+    /// marqueurs. Et à z < 14, sept cents points ne distinguent plus rien.
+    private static let communityClusterThreshold = 60
 
     /// Couche Photos : vignettes géolocalisées affichées directement sur la
     /// carte. Tap → `MapPhotoViewer` (photo en grand, infos antenne, like,
