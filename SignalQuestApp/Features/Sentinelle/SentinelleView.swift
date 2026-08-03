@@ -14,6 +14,13 @@ struct SentinelleView: View {
     @State private var isLoading = true
     @State private var accessDenied = false
     @State private var errorMessage: String?
+    @State private var lastRefresh: Date?
+
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// La sonde mesure au mieux une fois par minute : interroger plus souvent
+    /// ne renverrait que la même valeur, en consommant batterie et données.
+    private static let refreshInterval: Duration = .seconds(60)
 
     var body: some View {
         Group {
@@ -48,7 +55,37 @@ struct SentinelleView: View {
         }
         .navigationTitle("Sentinelle")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
+        .toolbar {
+            if let lastRefresh {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Text("à jour · \(lastRefresh.formatted(date: .omitted, time: .shortened))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .refreshable { await load(silently: true) }
+        .task {
+            await load()
+            // Boucle de rafraîchissement. `.task` est annulée quand la vue
+            // disparaît, ce qui suffit à l'arrêter à la sortie de l'écran ;
+            // l'arrière-plan, lui, ne l'annule pas, d'où le test de phase :
+            // rien ne sert de relever des mesures que personne ne regarde.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.refreshInterval)
+                guard !Task.isCancelled, scenePhase == .active else { continue }
+                await load(silently: true)
+            }
+        }
+        // Forme à un paramètre : l'app est déployée en deçà d'iOS 17, où la
+        // variante `onChange(of:initial:_:)` n'existe pas encore.
+        .onChange(of: scenePhase) { phase in
+            // Au retour au premier plan, l'écran peut afficher un état vieux de
+            // plusieurs heures : on rattrape immédiatement plutôt que d'attendre
+            // la fin du cycle en cours.
+            guard phase == .active, !isLoading else { return }
+            Task { await load(silently: true) }
+        }
     }
 
     private func targetRow(_ target: SentinelleTarget) -> some View {
@@ -96,7 +133,11 @@ struct SentinelleView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func load() async {
+    /// - Parameter silently: rafraîchissement de fond. Une erreur passagère ne
+    ///   doit alors PAS remplacer un écran de données valides par un message
+    ///   d'échec : perdre le réseau une seconde effacerait ce que l'utilisateur
+    ///   est en train de lire. On garde l'affichage précédent et on retentera.
+    private func load(silently: Bool = false) async {
         do {
             let response = try await service.targets()
             targets = response.targets
@@ -106,12 +147,14 @@ struct SentinelleView: View {
                 collected[target.id] = (try? await service.detail(targetId: target.id))?.incidents ?? []
             }
             incidentsByTarget = collected
+            errorMessage = nil
         } catch is SentinelleAccessDenied {
             accessDenied = true
         } catch {
-            errorMessage = error.localizedDescription
+            if !silently { errorMessage = error.localizedDescription }
         }
         isLoading = false
+        lastRefresh = Date()
     }
 
     private func statusColor(_ status: String) -> Color {
