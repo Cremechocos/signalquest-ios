@@ -90,30 +90,43 @@ struct SQAntennaMarker: View {
     var isSelected = false
     var tint: Color = SQColor.brandRed
     var diameter: CGFloat = 34
+    /// Pictogramme au centre. Désactivé par défaut : sur une carte d'antennes,
+    /// un glyphe d'antenne ne distingue rien — c'est la couleur (opérateur) et
+    /// les lobes (orientation) qui portent l'information. Aligné sur le marqueur
+    /// de la carte principale (`SQMapKitMarkerView`), qui est un point plein.
+    var showsGlyph = false
+    /// Portée des lobes, en multiples du diamètre.
+    var reachRatio: CGFloat = 1.95
 
     var body: some View {
         ZStack {
             ForEach(Array(azimuths.enumerated()), id: \.offset) { _, azimuth in
                 SQAzimuthWedge()
-                    .fill(tint.opacity(isSelected ? 0.45 : 0.28))
-                    .frame(width: diameter * 1.95, height: diameter * 1.95)
+                    .fill(tint.opacity(isSelected ? 0.38 : 0.28))
+                    .frame(width: diameter * reachRatio, height: diameter * reachRatio)
                     // 0° = nord géographique, et l'axe des Y d'un écran descend :
                     // une rotation directe suffit, le repère de la vue est déjà
                     // orienté nord-haut sur une carte non pivotée.
                     .rotationEffect(.degrees(azimuth))
             }
             Circle()
-                .fill(isSelected ? tint : SQColor.surface)
+                .fill(tint)
                 .frame(width: diameter, height: diameter)
+                // Liseré crème CONSTANT : `onAccent`/`onInk` basculent au noir en
+                // mode sombre (jetons de texte sur aplat), ce qui borderait le
+                // point de noir sur la carte la nuit.
+                .overlay(Circle().stroke(Color(hex: 0xFBF7EF), lineWidth: diameter * 0.09))
                 .sqShadowSoft()
-            SQAntennaGlyph()
-                .stroke(
-                    isSelected ? SQColor.onAccent : tint,
-                    style: StrokeStyle(lineWidth: diameter * 0.075, lineCap: .round, lineJoin: .round)
-                )
-                .frame(width: diameter * 0.56, height: diameter * 0.56)
+            if showsGlyph {
+                SQAntennaGlyph()
+                    .stroke(
+                        SQColor.onAccent,
+                        style: StrokeStyle(lineWidth: diameter * 0.075, lineCap: .round, lineJoin: .round)
+                    )
+                    .frame(width: diameter * 0.56, height: diameter * 0.56)
+            }
         }
-        .frame(width: diameter * 1.95, height: diameter * 1.95)
+        .frame(width: diameter * reachRatio, height: diameter * reachRatio)
         .allowsHitTesting(true)
     }
 }

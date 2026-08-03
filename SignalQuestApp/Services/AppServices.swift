@@ -13,6 +13,9 @@ final class AppServices: ObservableObject {
     let map: MapSnapshotServicing
     let markets: MarketRegistryServicing
     let antennas: AntennasServicing
+    /// Relief et bâti le long d'une ligne de visée — alimente le profil
+    /// d'altitude de la fiche antenne.
+    let terrain: TerrainServicing
     /// Signalements d'antenne (émission, suivi, discussion avec la modération).
     let antennaReports: AntennaReportsServicing
     let anfr: ANFRServicing
@@ -78,6 +81,7 @@ final class AppServices: ObservableObject {
         let marketsService = MarketRegistryService(api: api)
         markets = marketsService
         antennas = AntennasService(api: api)
+        terrain = TerrainService(api: api)
         antennaReports = AntennaReportsService(api: api)
         anfr = ANFRService(api: api)
         let networkOperatorService = NetworkOperatorService(api: api)

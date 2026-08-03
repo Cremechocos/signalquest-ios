@@ -66,7 +66,6 @@ struct MapKitMapView: UIViewRepresentable {
         // plus re-hasher/comparer des milliers d'éléments — seule la caméra est appliquée.
         if context.coordinator.lastRenderVersion != renderVersion {
             context.coordinator.lastRenderVersion = renderVersion
-            context.coordinator.setCones(from: annotations, on: map)
             context.coordinator.setCoverage(coverageHeatFeatures, on: map)
             context.coordinator.setSpeedtest(speedtestFeatures, on: map)
             context.coordinator.apply(annotations: annotations, on: map)
@@ -90,12 +89,13 @@ struct MapKitMapView: UIViewRepresentable {
         var latestSpeedtestFeatures: [SpeedtestFeature] = []
         var coverageOverlay: SQMapKitDotsOverlay?
         var speedtestOverlay: SQMapKitDotsOverlay?
-        var conePolygons: [MKPolygon] = []
-        var coneColors: [ObjectIdentifier: UIColor] = [:]
-        var coneSignature = 0
         var appliedBackdrop: MapBackdrop?
         var tileOverlay: MKTileOverlay?
         var lastRenderVersion = -1
+        /// Dernier cap de carte propagé aux marqueurs. Les lobes d'azimut sont
+        /// dessinés en repère écran : ils doivent contre-tourner quand la carte
+        /// pivote, mais ne rien recalculer tant qu'elle ne pivote pas.
+        var lastAppliedMapHeading: Double = 0
 
         init(center: Binding<CLLocationCoordinate2D>, zoom: Binding<Double>,
              onMoveEnd: @escaping (MapBounds, Double) -> Void,
@@ -240,30 +240,22 @@ struct MapKitMapView: UIViewRepresentable {
             }
         }
 
-        /// Cônes de secteur des antennes (affichés z≥14) → polygones MapKit, colorés
-        /// par opérateur. Reconstruits seulement quand l'ensemble change.
-        func setCones(from annotations: [MapAnnotationPayload], on map: MKMapView) {
-            var hasher = Hasher()
-            for p in annotations where p.showsAzimuths && !p.azimuths.isEmpty {
-                hasher.combine(p.id); hasher.combine(p.coordinate.latitude); hasher.combine(p.coordinate.longitude)
-                for a in p.azimuths { hasher.combine(a) }
+        /// Propage le cap de la carte aux marqueurs d'antenne, qui dessinent leurs
+        /// lobes en repère écran. Sans cela, faire pivoter la carte ferait pointer
+        /// tous les secteurs dans la mauvaise direction.
+        ///
+        /// Borné à ce qui est visible et gardé par un seuil : tant que la carte
+        /// n'est pas pivotée — le cas courant — cette méthode ne fait rien, alors
+        /// qu'elle est appelée à chaque frame de pan/zoom.
+        func applyMapHeading(on map: MKMapView, force: Bool = false) {
+            let heading = map.camera.heading
+            guard force || abs(heading - lastAppliedMapHeading) > 0.5 else { return }
+            lastAppliedMapHeading = heading
+            for annotation in map.annotations(in: map.visibleMapRect) {
+                guard let annotation = annotation as? MKAnnotation,
+                      let view = map.view(for: annotation) as? SQMapKitMarkerView else { continue }
+                view.applyMapHeading(heading)
             }
-            let sig = hasher.finalize()
-            guard sig != coneSignature else { return }
-            coneSignature = sig
-            if !conePolygons.isEmpty { map.removeOverlays(conePolygons); conePolygons.removeAll() }
-            coneColors.removeAll()
-            for p in annotations where p.showsAzimuths && !p.azimuths.isEmpty {
-                let color = UIColor(p.markerColor)
-                for az in p.azimuths {
-                    var coords = AntennaSectorGeometry.sectorConeCoordinates(apex: p.coordinate, azimuth: az, lengthMeters: 320)
-                    guard coords.count >= 3 else { continue }
-                    let poly = MKPolygon(coordinates: &coords, count: coords.count)
-                    coneColors[ObjectIdentifier(poly)] = color
-                    conePolygons.append(poly)
-                }
-            }
-            if !conePolygons.isEmpty { map.addOverlays(conePolygons, level: .aboveLabels) }
         }
 
         func mapView(_ map: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
@@ -272,14 +264,6 @@ struct MapKitMapView: UIViewRepresentable {
             }
             if let dots = overlay as? SQMapKitDotsOverlay {
                 return SQMapKitDotsRenderer(overlay: dots)
-            }
-            if let poly = overlay as? MKPolygon {
-                let r = MKPolygonRenderer(polygon: poly)
-                let color = coneColors[ObjectIdentifier(poly)] ?? .systemOrange
-                r.fillColor = color.withAlphaComponent(0.18)
-                r.strokeColor = color.withAlphaComponent(0.5)
-                r.lineWidth = 1
-                return r
             }
             return MKOverlayRenderer(overlay: overlay)
         }
@@ -401,9 +385,16 @@ struct MapKitMapView: UIViewRepresentable {
             view.annotation = annotation
             view.canShowCallout = false
             view.apply(sq.payload)
+            // Une vue créée (ou recyclée) alors que la carte est déjà pivotée doit
+            // naître à la bonne orientation, pas attendre le prochain geste.
+            view.applyMapHeading(map.camera.heading)
             view.isAccessibilityElement = true
             view.accessibilityLabel = sq.payload.accessibilityLabel
             return view
+        }
+
+        func mapViewDidChangeVisibleRegion(_ map: MKMapView) {
+            applyMapHeading(on: map)
         }
 
         func mapView(_ map: MKMapView, didSelect view: MKAnnotationView) {

@@ -885,12 +885,15 @@ final class MapExplorerViewModel: ObservableObject {
                 azimuths: marker.azimuts,
                 sharingType: marker.sharingType ?? marker.zbLeader.map { "ZB \($0)" },
                 crozonLeader: marker.crozonLeader,
+                isZTD: marker.isZTD,
                 address: marker.address,
                 height: nil,
                 owner: marker.operator
             )
             site.photoCount = marker.photoCount
             site.validationCount = marker.validationCount
+            site.hasEnb = marker.hasEnb
+            site.hasGnb = marker.hasGnb
             return site
         }
     }
@@ -1807,11 +1810,12 @@ struct MapExplorerView: View {
     /// Reconstruit le cache des couches lourdes. Appelé uniquement sur changement
     /// de données (`model.dataVersion`), de couches actives (`filters`) ou de zoom
     /// — jamais à chaque rendu de `body`.
-    /// Palier de zoom affectant le RENDU des annotations (clustering + cônes).
+    /// Palier de zoom affectant le RENDU des annotations (clustering + lobes).
     /// Frontières : 11, 12,5, 13, 13,5, 14 — exactement les seuils utilisés par
     /// `clusteredPayloads`/`clusteredPhotoPayloads` (taille de cellule, `shouldCluster`)
-    /// et `showsAzimuths` (cônes ≥ z14). Entre deux frontières, `annotationPayloads`
-    /// est identique pour des données constantes → reconstruction inutile.
+    /// et `showsAzimuths` (lobes ≥ z14) — plus 15 et 16, où la longueur des lobes
+    /// change (`azimuthReach`). Entre deux frontières, `annotationPayloads` est
+    /// identique pour des données constantes → reconstruction inutile.
     private static func zoomRenderBucket(for zoom: Double) -> Int {
         switch zoom {
         case ..<11:    return 0
@@ -1819,7 +1823,25 @@ struct MapExplorerView: View {
         case ..<13:    return 2
         case ..<13.5:  return 3
         case ..<14:    return 4
-        default:       return 5
+        case ..<15:    return 5
+        case ..<16:    return 6
+        default:       return 7
+        }
+    }
+
+    /// Longueur des lobes d'azimut en points d'écran, selon le zoom.
+    ///
+    /// Elle CROÎT avec le zoom, ce qui paraît contre-intuitif mais correspond à ce
+    /// qu'on voit : plus on zoome, plus deux sites voisins s'écartent à l'écran, et
+    /// plus il y a de place pour déployer leurs secteurs. C'est à z14, en centre
+    /// dense, que des lobes longs se recouvriraient au point de ne plus être
+    /// attribuables à un pylône.
+    static func azimuthReach(for zoom: Double) -> CGFloat {
+        switch zoom {
+        case ..<14: return 0
+        case ..<15: return 24
+        case ..<16: return 32
+        default:    return 44
         }
     }
 
@@ -1930,7 +1952,11 @@ struct MapExplorerView: View {
                     azimuths: site.azimuths,
                     showsAzimuths: mapZoom >= 14,
                     tint: model.operatorAccent(site.operators.first ?? model.operatorFilter),
-                    contributionPhotos: site.photoCount
+                    contributionPhotos: site.photoCount,
+                    hasEnb: site.hasEnb,
+                    hasGnb: site.hasGnb,
+                    has5G: site.has5G,
+                    azimuthReachPoints: Self.azimuthReach(for: mapZoom)
                 )
             }
             payloads += clusteredPayloads(from: antennaPayloads, kind: .antenna, idPrefix: "antenna", minCount: 160, label: { "\($0) antennes" })

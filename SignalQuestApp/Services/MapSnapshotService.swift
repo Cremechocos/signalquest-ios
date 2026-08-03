@@ -190,7 +190,11 @@ final class MapSnapshotService: MapSnapshotServicing {
             bounds: bounds,
             zoom: zoom,
             cacheKey: { tile in
-                "antennas:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):az=\(withAzimuth):bands=\(bandKey)"
+                // `antennas-v2` : la tuile porte désormais hasEnb/hasGnb et les
+                // composants d'adresse. `TileCache.removeAll()` ne vide que la
+                // mémoire — sans changer le préfixe, les tuiles déjà sur disque
+                // (1 h) se rendraient sans coche ni adresse.
+                "antennas-v2:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):az=\(withAzimuth):bands=\(bandKey)"
             },
             endpoint: { tile in
                 var query = [

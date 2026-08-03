@@ -7,6 +7,15 @@
     " : " : {
 
     },
+    " La hauteur de l'antenne étant inconnue, 25 m ont été supposés." : {
+
+    },
+    " La hauteur utilisée est celle du support, pas celle de l'antenne." : {
+
+    },
+    " Les hauteurs sont à l'échelle du graphe, dont l'axe vertical est dilaté pour rester lisible." : {
+
+    },
     " sur la période." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -284,6 +293,9 @@
         }
       }
     },
+    "%@ · échelle verticale non proportionnelle" : {
+
+    },
     "%@ · Fil réseau" : {
       "localizations" : {
         "en" : {
@@ -426,6 +438,16 @@
         }
       }
     },
+    "%@, %@. Toucher pour copier." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@. Toucher pour copier."
+          }
+        }
+      }
+    },
     "%@, masquer mes speedtests" : {
 
     },
@@ -516,6 +538,16 @@
     "%lld %% vérifié" : {
 
     },
+    "%lld cellule%@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld cellule%2$@"
+          }
+        }
+      }
+    },
     "%lld conversations non lues" : {
       "localizations" : {
         "en" : {
@@ -573,6 +605,9 @@
       }
     },
     "%lld lieux détectés automatiquement" : {
+
+    },
+    "%lld m" : {
 
     },
     "%lld m parcourus" : {
@@ -1835,6 +1870,9 @@
         }
       }
     },
+    "Active la localisation pour situer ce site par rapport à toi." : {
+
+    },
     "Activé, tes speedtests réalisés dans cette zone n'apparaissent pas sur la carte publique. Utile autour de chez toi ou de ton lieu de travail." : {
 
     },
@@ -2490,6 +2528,9 @@
         }
       }
     },
+    "Aperçu du relief entre ta position et l'antenne" : {
+
+    },
     "Aperçu photo" : {
       "localizations" : {
         "en" : {
@@ -2856,6 +2897,9 @@
         }
       }
     },
+    "Aucun identifiant de site connu pour cet opérateur." : {
+
+    },
     "Aucun import" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -3075,6 +3119,9 @@
           }
         }
       }
+    },
+    "Aucune cellule identifiée sur ce secteur." : {
+
     },
     "Aucune clé de chiffrement de bout en bout n'existe encore pour ce compte. Choisis un mot de passe : il chiffre ta clé privée et lui seul peut la déverrouiller — ne le perds pas." : {
       "localizations" : {
@@ -3596,6 +3643,12 @@
     "Basic" : {
 
     },
+    "Bâti" : {
+
+    },
+    "Bâtiment" : {
+
+    },
     "Bientôt au maximum de points enregistrables" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3732,6 +3785,9 @@
         }
       }
     },
+    "Boussole pointant l'antenne, relèvement %lld degrés" : {
+
+    },
     "Bug confirmé" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -3753,6 +3809,22 @@
         }
       }
     },
+    "Ça frôle un obstacle à %@ — %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ça frôle un obstacle à %1$@ — %2$@"
+          }
+        }
+      }
+    },
+    "Calcul fait sur le relief (IGN) et sur la hauteur des bâtiments connue d'OpenStreetMap." : {
+
+    },
+    "Calcul fait sur le relief seul : aucun bâtiment n'est connu sur ce trajet." : {
+
+    },
     "Calques & filtres" : {
       "localizations" : {
         "en" : {
@@ -3769,6 +3841,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Layers and filters"
+          }
+        }
+      }
+    },
+    "cap %lld° %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "cap %1$lld° %2$@"
           }
         }
       }
@@ -3812,6 +3894,9 @@
           }
         }
       }
+    },
+    "Carte du site" : {
+
     },
     "Carte ouverte seulement" : {
       "extractionState" : "manual",
@@ -3936,6 +4021,9 @@
     "Ce relevé ne porte aucun identifiant radio (eNB, gNB ou PCI)." : {
 
     },
+    "Ce site n'a pas de coordonnées exploitables." : {
+
+    },
     "Ce site n'expose pas d'azimuts de secteur." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -3991,6 +4079,7 @@
       }
     },
     "Cell ID" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4010,6 +4099,9 @@
           }
         }
       }
+    },
+    "Cellule %@. Toucher pour copier." : {
+
     },
     "Cellule observée" : {
       "extractionState" : "stale",
@@ -4032,6 +4124,9 @@
           }
         }
       }
+    },
+    "Cellules non rattachées à un secteur" : {
+
     },
     "Cellules observées" : {
       "localizations" : {
@@ -4223,6 +4318,9 @@
           }
         }
       }
+    },
+    "Château d'eau" : {
+
     },
     "Chiffrée — déverrouille pour lire" : {
       "localizations" : {
@@ -4475,6 +4573,9 @@
           }
         }
       }
+    },
+    "Clocher" : {
+
     },
     "Clos" : {
       "localizations" : {
@@ -6559,6 +6660,9 @@
         }
       }
     },
+    "ECI %@" : {
+
+    },
     "Écris une réponse" : {
       "localizations" : {
         "en" : {
@@ -6638,6 +6742,15 @@
           }
         }
       }
+    },
+    "élévation %@°" : {
+
+    },
+    "élévation %@° · hauteur du support" : {
+
+    },
+    "élévation %@° · hauteur inconnue" : {
+
     },
     "Elle expire toute seule" : {
       "extractionState" : "stale",
@@ -7162,6 +7275,9 @@
         }
       }
     },
+    "Éolienne" : {
+
+    },
     "Épingler" : {
       "localizations" : {
         "en" : {
@@ -7228,6 +7344,9 @@
           }
         }
       }
+    },
+    "est" : {
+
     },
     "Étape %lld sur %lld" : {
       "localizations" : {
@@ -7701,7 +7820,6 @@
       }
     },
     "Hauteur" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7710,6 +7828,9 @@
           }
         }
       }
+    },
+    "Hauteur (support)" : {
+
     },
     "Historique des modifications" : {
       "extractionState" : "stale",
@@ -7728,6 +7849,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Offline — some actions are unavailable"
+          }
+        }
+      }
+    },
+    "Hors lobe — le secteur le plus proche pointe à %lld° (écart %lld°)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Hors lobe — le secteur le plus proche pointe à %1$lld° (écart %2$lld°)"
           }
         }
       }
@@ -8188,6 +8319,9 @@
         }
       }
     },
+    "Intérieur" : {
+
+    },
     "Interruption de service" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8503,6 +8637,9 @@
         }
       }
     },
+    "La liaison frôle un obstacle" : {
+
+    },
     "La localisation est désactivée pour SignalQuest. Active-la dans les Réglages pour situer tes mesures sur la carte. Le test fonctionne quand même sans." : {
       "localizations" : {
         "en" : {
@@ -8556,6 +8693,9 @@
           }
         }
       }
+    },
+    "La végétation, les bâtiments sans hauteur renseignée et les obstacles récents n'y figurent pas." : {
+
     },
     "Lance la conversation." : {
       "extractionState" : "stale",
@@ -8836,6 +8976,12 @@
         }
       }
     },
+    "Le site est masqué" : {
+
+    },
+    "Lecture du relief…" : {
+
+    },
     "Légende" : {
       "localizations" : {
         "en" : {
@@ -9075,6 +9221,9 @@
         }
       }
     },
+    "Ligne de visée" : {
+
+    },
     "Liker" : {
       "localizations" : {
         "en" : {
@@ -9258,6 +9407,16 @@
         }
       }
     },
+    "Masqué à %@%@ — %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Masqué à %1$@%2$@ — %3$@"
+          }
+        }
+      }
+    },
     "Masque ou affiche les antennes prévues selon leur avancement ANFR." : {
       "localizations" : {
         "en" : {
@@ -9288,6 +9447,9 @@
           }
         }
       }
+    },
+    "Mât" : {
+
     },
     "Max" : {
       "localizations" : {
@@ -10391,6 +10553,15 @@
         }
       }
     },
+    "nord" : {
+
+    },
+    "nord-est" : {
+
+    },
+    "nord-ouest" : {
+
+    },
     "Note %lld sur 5" : {
       "localizations" : {
         "en" : {
@@ -10802,6 +10973,9 @@
         }
       }
     },
+    "ouest" : {
+
+    },
     "ouvert" : {
       "localizations" : {
         "en" : {
@@ -10881,6 +11055,9 @@
           }
         }
       }
+    },
+    "Ouvre le profil d'altitude détaillé" : {
+
     },
     "Ouvre le profil de %@" : {
       "localizations" : {
@@ -11281,6 +11458,9 @@
         }
       }
     },
+    "Passage au ras d'un obstacle — %@" : {
+
+    },
     "Passer" : {
       "localizations" : {
         "en" : {
@@ -11292,6 +11472,7 @@
       }
     },
     "PCI" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -12139,6 +12320,25 @@
         }
       }
     },
+    "Profil d'altitude" : {
+
+    },
+    "Profil du relief : toi à %lld mètres d'altitude, site %@ à %lld mètres, distants de %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Profil du relief : toi à %1$lld mètres d'altitude, site %2$@ à %3$lld mètres, distants de %4$@"
+          }
+        }
+      }
+    },
+    "Profil du relief vers le site %@" : {
+
+    },
+    "Profil du trajet" : {
+
+    },
     "Profil indisponible" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -12337,6 +12537,15 @@
           }
         }
       }
+    },
+    "Pylône" : {
+
+    },
+    "Pylône arbre" : {
+
+    },
+    "Pylône haubané" : {
+
     },
     "QR code de configuration 2FA" : {
       "localizations" : {
@@ -13056,6 +13265,21 @@
         }
       }
     },
+    "Relèvement de l'antenne : %lld degrés" : {
+
+    },
+    "Relief" : {
+
+    },
+    "relief et bâtiments" : {
+
+    },
+    "Relief indisponible pour ce trajet." : {
+
+    },
+    "relief seul" : {
+
+    },
     "Repartager" : {
       "localizations" : {
         "en" : {
@@ -13658,6 +13882,9 @@
         }
       }
     },
+    "Rien ne masque le site" : {
+
+    },
     "RSRP" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -13848,6 +14075,19 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sector"
+          }
+        }
+      }
+    },
+    "Secteur %lld" : {
+
+    },
+    "Secteur %lld · %lld°" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Secteur %1$lld · %2$lld°"
           }
         }
       }
@@ -14997,6 +15237,15 @@
         }
       }
     },
+    "sud" : {
+
+    },
+    "sud-est" : {
+
+    },
+    "sud-ouest" : {
+
+    },
     "Suis des membres, lance un speedtest ou publie ta première mesure : le fil se remplira au fur et à mesure." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -15663,6 +15912,9 @@
         }
       }
     },
+    "toi" : {
+
+    },
     "Ton abonnement %@ est déjà géré par %@. Gère-le sur cette plateforme pour éviter un doublon." : {
       "localizations" : {
         "en" : {
@@ -15799,6 +16051,9 @@
         }
       }
     },
+    "Toucher pour déplier" : {
+
+    },
     "Toucher pour écouter" : {
       "localizations" : {
         "en" : {
@@ -15839,6 +16094,12 @@
         }
       }
     },
+    "Toucher pour replier" : {
+
+    },
+    "Toucher pour replier les cellules" : {
+
+    },
     "Toucher pour retirer ta réaction" : {
       "localizations" : {
         "en" : {
@@ -15848,6 +16109,9 @@
           }
         }
       }
+    },
+    "Toucher pour voir les cellules" : {
+
     },
     "Toucher pour voter" : {
       "localizations" : {
@@ -16057,6 +16321,16 @@
         }
       }
     },
+    "Tu es dans le lobe du secteur %lld° (écart %lld°)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tu es dans le lobe du secteur %1$lld° (écart %2$lld°)"
+          }
+        }
+      }
+    },
     "Tu ne pourras plus te connecter via Apple. Si ton compte a été créé avec Apple, définis d'abord un mot de passe via « Mot de passe oublié » pour ne pas perdre l'accès." : {
       "localizations" : {
         "en" : {
@@ -16214,6 +16488,9 @@
           }
         }
       }
+    },
+    "Un obstacle masque le site — %@" : {
+
     },
     "Un réseau « au top » doit à la fois **bien capter** et **être rapide**. On retient donc le **moins bon** des deux critères." : {
       "localizations" : {
@@ -16792,6 +17069,9 @@
         }
       }
     },
+    "Vue dégagée jusqu'au site — %@" : {
+
+    },
     "vus en dernier" : {
 
     },
@@ -16808,6 +17088,9 @@
           }
         }
       }
+    },
+    "Zone de Fresnel" : {
+
     },
     "Zone trop large : certains territoires ne sont pas affichés" : {
       "extractionState" : "stale",

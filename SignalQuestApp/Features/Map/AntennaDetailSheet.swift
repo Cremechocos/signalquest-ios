@@ -1,6 +1,8 @@
 import SwiftUI
 import PhotosUI
 import UIKit
+import MapKit
+import CoreLocation
 
 @MainActor
 final class AntennaDetailViewModel: ObservableObject {
@@ -89,16 +91,17 @@ struct AntennaDetailSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
+                // Ordre voulu : ce qui répond aux questions du terrain d'abord
+                // (où est ce site par rapport à moi, est-ce que je le vois), la
+                // fiche technique ensuite, repliée. Les trois premiers blocs
+                // doivent tenir dans le detent `.medium`.
                 VStack(alignment: .leading, spacing: 14) {
                     header
+                    sightCard
+                    miniMap
                     if let details = model.details {
-                        techGrid(details)
-                        let sectors = sectorInfos(details)
-                        if !sectors.isEmpty {
-                            sectorFanCard(sectors)
-                        }
-                        validationsSection(details)
-                        androidParitySections(details)
+                        keyFigures(details)
+                        collapsibleSections(details)
                     } else if let error = model.error {
                         Label(error, systemImage: "exclamationmark.triangle")
                             .foregroundStyle(SQColor.danger)
@@ -106,12 +109,6 @@ struct AntennaDetailSheet: View {
                         ProgressView().tint(SQColor.brandRed).frame(maxWidth: .infinity)
                     }
                     reportCard
-                    if let address = site.address {
-                        Label(address, systemImage: "mappin")
-                            .font(SQType.callout)
-                            .foregroundStyle(SQColor.label)
-                            .sqSheetCard()
-                    }
                 }
                 .padding(SQSpace.lg + 2)
             }
@@ -161,12 +158,11 @@ struct AntennaDetailSheet: View {
         }
     }
 
-    /// Carte « Ajouter une photo » : disponible quelle que soit la présence de
-    /// photos existantes. Réutilise `PhotoService.uploadPhoto` (siteId/anfr/opérateur).
-    private var addPhotoCard: some View {
+    /// « Ajouter une photo » : disponible quelle que soit la présence de photos
+    /// existantes. Réutilise `PhotoService.uploadPhoto` (siteId/anfr/opérateur).
+    private var addPhotoContent: some View {
         let uploading = model.isUploadingPhoto
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
-            AntennaSectionHeader(kicker: "Contribuer", title: "Ajouter une photo", systemImage: "camera")
             PhotosPicker(selection: $photoPickerItem, matching: .images) {
                 HStack(spacing: SQSpace.sm) {
                     if uploading {
@@ -191,7 +187,6 @@ struct AntennaDetailSheet: View {
             }
         }
         .foregroundStyle(SQColor.label)
-        .sqSheetCard()
     }
 
     /// Carte « Signaler un problème » : ouvre le formulaire de signalement d'antenne.
@@ -252,9 +247,18 @@ struct AntennaDetailSheet: View {
                     Text("Site \(site.siteId ?? site.id)")
                         .font(SQType.title)
                         .foregroundStyle(SQColor.label)
-                    Text(site.owner ?? "Opérateurs inconnus")
-                        .font(SQType.subhead)
-                        .foregroundStyle(SQColor.labelSecondary)
+                    // L'adresse était reléguée tout en bas de la fiche : c'est
+                    // pourtant ce qui permet de reconnaître le site sur place.
+                    if let location = locationLine {
+                        Text(location)
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text(site.owner ?? "Opérateurs inconnus")
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
                 }
                 Spacer()
             }
@@ -269,10 +273,103 @@ struct AntennaDetailSheet: View {
                     ForEach(site.technologies, id: \.self) { tech in
                         SQEditorialTag(text: tech, color: SQBrand.techColor(tech))
                     }
+                    statusTag
                 }
                 .padding(.vertical, 1)
             }
         }
+    }
+
+    /// Adresse lisible : celle de la fiche détaillée si elle est chargée, sinon
+    /// celle portée par le marqueur.
+    private var locationLine: String? {
+        let candidate = model.details?.core?.fullAddress ?? site.address
+        guard let candidate, !candidate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return candidate
+    }
+
+    /// Badge de statut ANFR. Un site « Projet approuvé » est déclaré mais éteint :
+    /// sans ce badge, la fiche laissait croire à une antenne en service.
+    @ViewBuilder
+    private var statusTag: some View {
+        if let core = model.details?.core, let status = core.status, !status.isEmpty {
+            SQEditorialTag(text: status, color: core.isInService ? SQColor.success : SQColor.warning)
+        }
+    }
+
+    /// Le bloc calculé « depuis ta position ». Il est en haut parce que c'est la
+    /// première question qu'on se pose devant un pylône, pas la dernière.
+    private var sightCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            AntennaSectionHeader(kicker: "Repérage", title: "Depuis ta position", systemImage: "location.north.line")
+            AntennaSightCard(
+                site: site,
+                details: model.details,
+                userLocation: services.location.lastLocation,
+                tint: operatorColor,
+                terrain: services.terrain
+            )
+        }
+        .foregroundStyle(SQColor.label)
+        .sqSheetCard(strong: true)
+    }
+
+    /// Mini-carte du site. Non interactive : la carte principale est juste
+    /// derrière, un pan ici ne ferait que voler des gestes au scroll de la fiche.
+    @ViewBuilder
+    private var miniMap: some View {
+        if let coordinate = siteCoordinate {
+            SQRegionMap(
+                region: .constant(MKCoordinateRegion(
+                    center: coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 0.006, longitudeDelta: 0.006)
+                )),
+                items: [SQMapPin(coordinate: coordinate)],
+                annotationContent: { pin in
+                    MapAnnotation(coordinate: pin.coordinate) {
+                        SQAntennaMarker(
+                            azimuths: displayedAzimuths,
+                            isSelected: true,
+                            tint: operatorColor,
+                            diameter: 30
+                        )
+                    }
+                }
+            )
+            .frame(height: 150)
+            .allowsHitTesting(false)
+            .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+            .sqShadowCard()
+            .overlay(alignment: .bottomTrailing) {
+                if let userLocation = services.location.lastLocation {
+                    let distance = userLocation.distance(from: CLLocation(
+                        latitude: coordinate.latitude,
+                        longitude: coordinate.longitude
+                    ))
+                    Text(SQUnits.distance(meters: distance))
+                        .font(SQFont.archivo(11, .bold))
+                        .foregroundStyle(SQColor.label)
+                        .padding(.horizontal, SQSpace.sm)
+                        .padding(.vertical, SQSpace.xs)
+                        .background(SQColor.surface, in: Capsule(style: .continuous))
+                        .padding(SQSpace.sm)
+                }
+            }
+            .accessibilityLabel("Carte du site")
+        }
+    }
+
+    private var siteCoordinate: CLLocationCoordinate2D? {
+        if let core = model.details?.core, core.lat != 0 || core.lng != 0 {
+            return CLLocationCoordinate2D(latitude: core.lat, longitude: core.lng)
+        }
+        guard site.hasValidCoordinate, let latitude = site.latitude, let longitude = site.longitude else { return nil }
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    private var displayedAzimuths: [Double] {
+        let core = model.details?.core?.azimuts ?? []
+        return core.isEmpty ? site.azimuths : core
     }
 
     /// Tag opérateur. Sur un site partagé, il devient un bouton de bascule :
@@ -307,14 +404,31 @@ struct AntennaDetailSheet: View {
         }
     }
 
-    private func techGrid(_ details: AntennaDetails) -> some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
-            CardMetricTile(label: "Validations", value: details.validationsCount.map(String.init) ?? "—", highlight: true)
-            CardMetricTile(label: "Photos", value: details.photosCount.map(String.init) ?? "—")
-            CardMetricTile(label: "Speedtests", value: details.speedtestsCount.map(String.init) ?? "—")
-            CardMetricTile(label: "Hauteur", value: details.height.map { "\(Int($0)) m" } ?? "—")
-            CardMetricTile(label: "Bandes", value: details.bands.prefix(4).joined(separator: " / ").isEmpty ? "—" : details.bands.prefix(4).joined(separator: " / "))
-            CardMetricTile(label: "Secteurs", value: details.sectors.prefix(4).map(String.init).joined(separator: " · ").isEmpty ? "—" : details.sectors.prefix(4).map(String.init).joined(separator: " · "))
+    /// Quatre chiffres, pas six : validations et speedtests redescendent dans
+    /// leurs sections respectives, où ils ont le contexte qui les rend lisibles.
+    private func keyFigures(_ details: AntennaDetails) -> some View {
+        let heightValue = details.core?.siteInfo.radiatingHeightMeters ?? details.height
+        let heightLabel = details.core?.siteInfo.radiatingHeightIsEstimated == true
+            ? String(localized: "Hauteur (support)")
+            : String(localized: "Hauteur")
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
+            CardMetricTile(label: heightLabel, value: heightValue.map { "\(Int($0.rounded())) m" } ?? "—", highlight: true)
+            CardMetricTile(
+                label: "Secteurs",
+                value: details.core?.siteInfo.sectorCount.map(String.init)
+                    ?? (displayedAzimuths.isEmpty ? "—" : String(displayedAzimuths.count))
+            )
+            CardMetricTile(
+                label: "Bandes",
+                value: details.bands.prefix(4).joined(separator: " / ").isEmpty ? "—" : details.bands.prefix(4).joined(separator: " / ")
+            )
+            // `photosCount` est nil sur le chemin wrapper : la galerie déjà
+            // chargée est alors la seule source fiable du nombre.
+            CardMetricTile(
+                label: "Photos",
+                value: (details.photosCount ?? (details.photos.isEmpty ? nil : details.photos.count))
+                    .map(String.init) ?? "—"
+            )
         }
     }
 
@@ -359,9 +473,8 @@ struct AntennaDetailSheet: View {
         }
     }
 
-    private func sectorFanCard(_ sectors: [SectorDisplayInfo]) -> some View {
+    private func sectorFanContent(_ sectors: [SectorDisplayInfo]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            AntennaSectionHeader(kicker: "Rayonnement", title: "Secteurs & azimuts", systemImage: "safari")
             AzimuthFanView(azimuths: sectors.map(\.azimuth), color: operatorColor)
                 .frame(height: 190)
                 .frame(maxWidth: .infinity)
@@ -392,29 +505,82 @@ struct AntennaDetailSheet: View {
             }
         }
         .foregroundStyle(SQColor.label)
-        .sqSheetCard()
     }
 
-    // MARK: Validations
+    // MARK: Sections repliables
 
-    private func validationsSection(_ details: AntennaDetails) -> some View {
+    /// Toute la fiche technique, repliée. Rien n'est retiré par rapport à la
+    /// version précédente : les mêmes blocs sont là, mais fermés par défaut —
+    /// sauf le rayonnement, qui est ce qu'on vient chercher le plus souvent.
+    @ViewBuilder
+    private func collapsibleSections(_ details: AntennaDetails) -> some View {
+        let sectors = sectorInfos(details)
+        if !sectors.isEmpty {
+            AntennaDisclosureSection(title: "Secteurs & azimuts", systemImage: "safari", initiallyExpanded: true) {
+                sectorFanContent(sectors)
+            }
+        }
+        if let core = details.core {
+            AntennaDisclosureSection(title: "Site", systemImage: "mappin.and.ellipse") {
+                siteContent(core)
+            }
+            AntennaDisclosureSection(title: "Technique", systemImage: "antenna.radiowaves.left.and.right") {
+                technicalContent(core)
+            }
+            if !core.cellIdentifiers.enb.isEmpty || !core.cellIdentifiers.gnb.isEmpty
+                || !core.cellIdentifiers.pci.isEmpty || !core.cellIdentifiers.cellId.isEmpty {
+                AntennaDisclosureSection(title: "Identifiants radio", systemImage: "number") {
+                    radioIdentifiersContent(core)
+                }
+            }
+            if !core.radioCarriers.isEmpty {
+                AntennaDisclosureSection(title: "Porteuses radio", systemImage: "dot.radiowaves.left.and.right") {
+                    carriersContent(core)
+                }
+            }
+        }
+        AntennaDisclosureSection(title: "Communauté", systemImage: "checkmark.seal") {
+            communityContent(details)
+        }
+        if !details.nearbySpeedtests.isEmpty {
+            AntennaDisclosureSection(title: "Speedtests proches", systemImage: "speedometer") {
+                speedtestsContent(details)
+            }
+        }
+        AntennaDisclosureSection(
+            title: details.photos.isEmpty ? "Photos" : "Photos (\(details.photos.count))",
+            systemImage: "photo.on.rectangle",
+            // Ouverte quand le site EST photographié : une galerie repliée derrière
+            // un titre se lit comme une absence de photos.
+            initiallyExpanded: !details.photos.isEmpty
+        ) {
+            photosContent(details)
+        }
+        Text("Les données radio affichées ici viennent du backend SignalQuest, d’Android ou de sources publiques. iOS ne collecte pas ces métriques.")
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+    }
+
+    private func communityContent(_ details: AntennaDetails) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            AntennaSectionHeader(kicker: "Communauté", title: "Validations communautaires", systemImage: "checkmark.seal")
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
                 CardMetricTile(label: "Validations", value: details.validationsCount.map(String.init) ?? "—", highlight: true)
                 CardMetricTile(label: "Mesures", value: details.signalStats.map { "\($0.measurementCount)" } ?? "—")
+                CardMetricTile(label: "Speedtests", value: details.speedtestsCount.map(String.init) ?? "—")
+                CardMetricTile(label: "RSRP moy.", value: SignalFormatters.dbm(details.signalStats?.avgRsrp))
             }
-            detailRow("Dernière activité", details.signalStats?.lastMeasurement)
+            if let stats = details.signalStats {
+                detailRow("RSRQ moy.", SignalFormatters.db(stats.avgRsrq))
+                detailRow("SNR moy.", SignalFormatters.db(stats.avgSnr))
+                detailRow("TAC", stats.tac)
+                detailRow("Dernière mesure", SignalFormatters.date(stats.lastMeasurement, includingTime: true, relative: true))
+            }
         }
         .foregroundStyle(SQColor.label)
-        .sqSheetCard(strong: true)
     }
 
-    @ViewBuilder
-    private func androidParitySections(_ details: AntennaDetails) -> some View {
-        if let core = details.core {
-            VStack(alignment: .leading, spacing: 12) {
-                AntennaSectionHeader(kicker: "Localisation", title: "Site", systemImage: "mappin.and.ellipse")
+    private func siteContent(_ core: AntennaCoreDetails) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
                 detailRow("SUP ID", core.supId)
                 detailRow("ANFR / source", core.anfrCode.isEmpty ? nil : core.anfrCode)
                 detailRow("Marché", core.market)
@@ -422,65 +588,46 @@ struct AntennaDetailSheet: View {
                 detailRow("Adresse", core.address)
                 detailRow("Partage", [core.sharingKind, core.crozonLeader.map { "Crozon \($0)" }, core.zbLeader.map { "ZB \($0)" }].compactMap { $0 }.joined(separator: " · "))
                 detailRow("Coordonnées", String(format: "%.5f, %.5f", core.lat, core.lng))
-            }
-            .foregroundStyle(SQColor.label)
-            .sqSheetCard()
+        }
+        .foregroundStyle(SQColor.label)
+    }
 
-            VStack(alignment: .leading, spacing: 12) {
-                AntennaSectionHeader(kicker: "Technique", title: "Technique", systemImage: "antenna.radiowaves.left.and.right")
+    private func technicalContent(_ core: AntennaCoreDetails) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
                 detailRow("Technos", core.technologies.joined(separator: " / "))
+                if !core.technologiesInProject.isEmpty {
+                    // Déclaré à l'ANFR mais pas allumé : la distinction n'était
+                    // visible que sur le site web.
+                    detailRow("En projet", core.technologiesInProject.joined(separator: " · "))
+                }
                 detailRow("Bandes", core.frequencyBands.joined(separator: " / "))
                 detailRow("Azimuts", core.azimuts.prefix(12).map { "\(Int($0.rounded()))°" }.joined(separator: " · "))
                 detailRow("Support", core.siteInfo.supportType ?? core.technical.supportType)
-                detailRow("Hauteur support", core.siteInfo.supportHeight)
+                detailRow("Hauteur support", core.siteInfo.supportHeight ?? core.siteInfo.pylonHeight.map { "\(Int($0.rounded())) m" })
+                detailRow("Types d'antennes", core.siteInfo.antennaTypes.prefix(6).joined(separator: " · "))
                 detailRow("Propriétaire", core.siteInfo.supportOwner ?? core.rawLicenseeName)
                 detailRow("Secteurs", core.siteInfo.sectorCount.map(String.init))
                 detailRow("Faisceau hertzien", core.technical.hasFh.map { $0 ? "Oui" : "Non" })
-                detailRow("Première activation", core.siteInfo.firstActivation)
-                detailRow("Dernière mise en service", core.siteInfo.lastCommissioned)
-            }
-            .foregroundStyle(SQColor.label)
-            .sqSheetCard()
+                detailRow("Statut", core.status)
+                detailRow("Implantation", SignalFormatters.date(core.siteInfo.implantationDate))
+                detailRow("Première activation", SignalFormatters.date(core.siteInfo.firstActivation))
+                detailRow("Mise en service", SignalFormatters.date(core.siteInfo.commissioningDate ?? core.siteInfo.lastCommissioned))
+                detailRow("Dernière mise à jour", SignalFormatters.date(core.siteInfo.lastUpdated, relative: true))
+        }
+        .foregroundStyle(SQColor.label)
+    }
 
-            if !core.cellIdentifiers.enb.isEmpty || !core.cellIdentifiers.gnb.isEmpty || !core.cellIdentifiers.pci.isEmpty || !core.cellIdentifiers.cellId.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                        AntennaSectionHeader(kicker: "Réseau", title: "Identifiants radio", systemImage: "number")
-                        detailRow("eNB", core.cellIdentifiers.enb.prefix(8).joined(separator: " · "))
-                        detailRow("gNB", core.cellIdentifiers.gnb.prefix(8).joined(separator: " · "))
-                        if !core.cellIdentifiers.pci.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("PCI")
-                                    .font(SQType.micro)
-                                    .foregroundStyle(SQColor.labelSecondary)
-                                ForEach(core.cellIdentifiers.pci.prefix(8)) { pci in
-                                    detailRow(
-                                        pci.value,
-                                        [pci.tech, pci.band.map { "B\($0)" }, pci.sector.map { "secteur \($0)" }, pci.frequency].compactMap { $0 }.joined(separator: " · ")
-                                    )
-                                }
-                            }
-                        }
-                        if !core.cellIdentifiers.cellId.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Cell ID")
-                                    .font(SQType.micro)
-                                    .foregroundStyle(SQColor.labelSecondary)
-                                ForEach(core.cellIdentifiers.cellId.prefix(8)) { cell in
-                                    detailRow(
-                                        cell.value,
-                                        [cell.tech, cell.band.map { "B\($0)" }, cell.pci.map { "PCI \($0)" }, cell.earfcn.map { "EARFCN \($0)" }, cell.arfcn.map { "ARFCN \($0)" }].compactMap { $0 }.joined(separator: " · ")
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    .foregroundStyle(SQColor.label)
-                .sqSheetCard()
-            }
+    private func radioIdentifiersContent(_ core: AntennaCoreDetails) -> some View {
+        AntennaRadioIdentifiersView(
+            identifiers: core.cellIdentifiers,
+            azimuths: displayedAzimuths,
+            tint: operatorColor
+        )
+        .foregroundStyle(SQColor.label)
+    }
 
-            if !core.radioCarriers.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                        AntennaSectionHeader(kicker: "Spectre", title: "Porteuses radio", systemImage: "dot.radiowaves.left.and.right")
+    private func carriersContent(_ core: AntennaCoreDetails) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
                         ForEach(core.radioCarriers.prefix(10)) { carrier in
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack {
@@ -498,38 +645,19 @@ struct AntennaDetailSheet: View {
                                 detailRow("Secteur", [carrier.sectorAzimuthDeg.map { "\(Int($0.rounded()))°" }, carrier.sectorBeamwidthDeg.map { "beam \(Int($0.rounded()))°" }, carrier.antennaType].compactMap { $0 }.joined(separator: " · "))
                                 detailRow("Cell IDs", carrier.cellIds.prefix(5).joined(separator: " · "))
                                 detailRow("Physical IDs", carrier.physicalIds.prefix(5).joined(separator: " · "))
-                                detailRow("Mise à jour", carrier.dateLastChanged)
+                                detailRow("Mise à jour", SignalFormatters.date(carrier.dateLastChanged))
                             }
                             .padding(.vertical, 8)
                             .overlay(alignment: .bottom) {
                                 Rectangle().fill(SQColor.separator).frame(height: 1).opacity(0.5)
                             }
                         }
-                    }
-                    .foregroundStyle(SQColor.label)
-                .sqSheetCard()
-            }
         }
+        .foregroundStyle(SQColor.label)
+    }
 
-        if let stats = details.signalStats {
-            VStack(alignment: .leading, spacing: 12) {
-                AntennaSectionHeader(kicker: "Mesures", title: "Mesures communautaires", systemImage: "waveform.path.ecg")
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
-                    CardMetricTile(label: "RSRP moy.", value: SignalFormatters.dbm(stats.avgRsrp), highlight: true)
-                    CardMetricTile(label: "RSRQ moy.", value: SignalFormatters.db(stats.avgRsrq))
-                    CardMetricTile(label: "SNR moy.", value: SignalFormatters.db(stats.avgSnr))
-                    CardMetricTile(label: "Mesures", value: "\(stats.measurementCount)")
-                }
-                detailRow("TAC", stats.tac)
-                detailRow("Dernière mesure", stats.lastMeasurement)
-            }
-            .foregroundStyle(SQColor.label)
-            .sqSheetCard()
-        }
-
-        if !details.nearbySpeedtests.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                AntennaSectionHeader(kicker: "Débits", title: "Speedtests proches", systemImage: "speedometer")
+    private func speedtestsContent(_ details: AntennaDetails) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
                 ForEach(details.nearbySpeedtests.prefix(5)) { speed in
                     detailRow(
                         SignalFormatters.speed(speed.downloadMbps),
@@ -537,18 +665,17 @@ struct AntennaDetailSheet: View {
                             SignalFormatters.speed(speed.uploadMbps),
                             SignalFormatters.ms(speed.pingMs),
                             speed.tech,
-                            speed.timestamp
+                            SignalFormatters.date(speed.timestamp, includingTime: true, relative: true)
                         ].compactMap { $0 }.joined(separator: " · ")
                     )
                 }
-            }
-            .foregroundStyle(SQColor.label)
-            .sqSheetCard()
         }
+        .foregroundStyle(SQColor.label)
+    }
 
-        if !details.photos.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                AntennaSectionHeader(kicker: "Galerie", title: "Photos du site", systemImage: "photo.on.rectangle")
+    private func photosContent(_ details: AntennaDetails) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if !details.photos.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         ForEach(details.photos.prefix(8)) { photo in
@@ -569,16 +696,10 @@ struct AntennaDetailSheet: View {
                     }
                 }
             }
-            .foregroundStyle(SQColor.label)
-            .sqSheetCard()
+            // Toujours proposer la contribution d'une photo (avec ou sans galerie).
+            addPhotoContent
         }
-
-        // Toujours proposer la contribution d'une photo (avec ou sans galerie).
-        addPhotoCard
-
-        Text("Les données radio affichées ici viennent du backend SignalQuest, d’Android ou de sources publiques. iOS ne collecte pas ces métriques.")
-            .font(SQType.caption)
-            .foregroundStyle(SQColor.labelSecondary)
+        .foregroundStyle(SQColor.label)
     }
 
     private func detailRow(_ label: String, _ value: String?) -> some View {
@@ -610,6 +731,67 @@ private extension View {
             .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
             .sqShadowCard()
             .sqFadeUp()
+    }
+}
+
+/// Section repliable de la fiche antenne : même carte crème que les blocs
+/// pleins, mais son en-tête est un bouton.
+///
+/// La fiche empilait huit cartes ouvertes : exhaustive, illisible, et le bloc
+/// utile sur le terrain se trouvait au bout de plusieurs écrans de défilement.
+/// Rien n'est retiré — tout est à un tap.
+private struct AntennaDisclosureSection<Content: View>: View {
+    let title: String
+    let systemImage: String
+    var initiallyExpanded = false
+    @ViewBuilder let content: () -> Content
+
+    @State private var isExpanded: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(
+        title: String,
+        systemImage: String,
+        initiallyExpanded: Bool = false,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.title = title
+        self.systemImage = systemImage
+        self.initiallyExpanded = initiallyExpanded
+        self.content = content
+        _isExpanded = State(initialValue: initiallyExpanded)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: isExpanded ? 12 : 0) {
+            Button {
+                Haptics.light()
+                withAnimation(reduceMotion ? nil : SQMotion.standard) { isExpanded.toggle() }
+            } label: {
+                HStack(spacing: SQSpace.sm) {
+                    Label(LocalizedStringKey(title), systemImage: systemImage)
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.label)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(SQColor.labelTertiary)
+                        .rotationEffect(.degrees(isExpanded ? 0 : -90))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityAddTraits(isExpanded ? .isSelected : [])
+            .accessibilityHint(isExpanded ? "Toucher pour replier" : "Toucher pour déplier")
+            if isExpanded {
+                content()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(SQSpace.lg)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
+        .sqFadeUp()
     }
 }
 

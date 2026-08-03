@@ -627,13 +627,25 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
     let azimuts: [Double]
     let bands: [Int]
     let address: String?
+    let isZTD: Bool
     /// Nombre de photos/validations publiques sur le site (ajouté par le backend
     /// au zoom ≥ 13). Sert le badge « photos disponibles » sur le marqueur.
     let photoCount: Int
     let validationCount: Int
+    /// eNB / gNB du site identifiés par la communauté (backend, zoom ≥ 13).
+    /// Absents des tuiles servies avant le déploiement de l'enrichissement →
+    /// `false`, et le marqueur se rend simplement sans coche.
+    let hasEnb: Bool
+    let hasGnb: Bool
 
     enum CodingKeys: String, CodingKey {
-        case id, supId, anfrCode, lat, lng, `operator`, operators, sharingType, crozonLeader, zbLeader, technologies, azimuts, bands, address, photoCount, validationCount
+        case id, supId, anfrCode, lat, lng, `operator`, operators, sharingType, crozonLeader, zbLeader, technologies, azimuts, bands, address, isZTD, photoCount, validationCount, hasEnb, hasGnb
+        // Le backend n'émet PAS de clé `address` : il envoie les composants ANFR
+        // séparément. Sans eux, l'adresse d'un site venu des tuiles restait vide.
+        case adrLbAdd1 = "adr_lb_add1"
+        case adrLbLieu = "adr_lb_lieu"
+        case adrNmCp = "adr_nm_cp"
+        case commune
     }
 
     init(from decoder: Decoder) throws {
@@ -651,9 +663,26 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
         technologies = c.decodeLossyArray([String].self, forKey: .technologies)
         azimuts = c.decodeLossyArray([Double].self, forKey: .azimuts)
         bands = c.decodeLossyArray([Int].self, forKey: .bands)
-        address = c.decodeFlexibleString(forKey: .address)
+        address = Self.composedAddress(from: c)
+        isZTD = (try? c.decodeIfPresent(Bool.self, forKey: .isZTD)) ?? false
         photoCount = (try? c.decodeIfPresent(Int.self, forKey: .photoCount)) ?? 0
         validationCount = (try? c.decodeIfPresent(Int.self, forKey: .validationCount)) ?? 0
+        hasEnb = (try? c.decodeIfPresent(Bool.self, forKey: .hasEnb)) ?? false
+        hasGnb = (try? c.decodeIfPresent(Bool.self, forKey: .hasGnb)) ?? false
+    }
+
+    /// Adresse lisible reconstituée depuis les champs ANFR : rue (ou lieu-dit),
+    /// puis code postal et commune. `nil` si rien d'exploitable — mieux vaut pas
+    /// de ligne qu'une ligne vide dans la fiche.
+    private static func composedAddress(from c: KeyedDecodingContainer<CodingKeys>) -> String? {
+        if let direct = c.decodeFlexibleString(forKey: .address), !direct.isEmpty { return direct }
+        let street = c.decodeFlexibleString(forKey: .adrLbAdd1) ?? c.decodeFlexibleString(forKey: .adrLbLieu)
+        let city = [c.decodeFlexibleString(forKey: .adrNmCp), c.decodeFlexibleString(forKey: .commune)]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let parts = [street, city.isEmpty ? nil : city].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 }
 

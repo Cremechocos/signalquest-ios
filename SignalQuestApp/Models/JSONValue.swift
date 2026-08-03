@@ -55,7 +55,7 @@ enum JSONValue: Codable, Equatable, Sendable {
 /// configurés à l'initialisation puis **seulement lus** (parsing). `DateFormatter`
 /// est thread-safe depuis iOS 7 ; `nonisolated(unsafe)` documente ce partage
 /// concurrent sûr (les types Foundation ne sont pas `Sendable`).
-private enum SQDateParsing {
+enum SQDateParsing {
     nonisolated(unsafe) private static let isoWithFraction: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

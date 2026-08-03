@@ -30,6 +30,20 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     /// Mis à nil par l'appelant en fin de session (drive test).
     var onLocationUpdate: (@MainActor (CLLocation) -> Void)?
 
+    /// Cap de l'appareil en degrés (0 = nord géographique), `nil` tant que
+    /// personne ne l'a demandé ou si le magnétomètre est indisponible ou non
+    /// calibré. Sert à orienter une visée : une flèche qui tourne avec le
+    /// téléphone désigne l'antenne dans le monde réel, là où un relèvement en
+    /// degrés demande de faire le calcul soi-même.
+    ///
+    /// On ne publie qu'un scalaire, pas le `CLHeading` : la classe n'est pas
+    /// `Sendable` et ne peut pas traverser vers le main actor sous Swift 6.
+    @Published private(set) var headingDegrees: Double?
+    /// Nombre d'écrans qui ont demandé le cap. Le magnétomètre consomme : on ne
+    /// l'arrête que lorsque le DERNIER écran le relâche, sinon deux fiches
+    /// ouvertes en pile s'éteignent mutuellement.
+    private var headingSubscribers = 0
+
     override init() {
         manager = CLLocationManager()
         authorizationStatus = manager.authorizationStatus
@@ -80,6 +94,23 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         }
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         manager.distanceFilter = kCLDistanceFilterNone
+    }
+
+    /// Démarre la diffusion du cap. Aucune autorisation supplémentaire n'est
+    /// requise : le cap relève de la même permission de localisation. À appeler
+    /// à l'apparition d'un écran qui vise, et à relâcher à sa disparition.
+    func startHeadingUpdates() {
+        headingSubscribers += 1
+        guard headingSubscribers == 1, CLLocationManager.headingAvailable() else { return }
+        manager.headingFilter = 2 // degrés : sous ce seuil, la flèche ne bouge pas à l'œil
+        manager.startUpdatingHeading()
+    }
+
+    func stopHeadingUpdates() {
+        headingSubscribers = max(0, headingSubscribers - 1)
+        guard headingSubscribers == 0 else { return }
+        manager.stopUpdatingHeading()
+        headingDegrees = nil
     }
 
     func requestOneShotLocation() {
@@ -160,6 +191,25 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
             if let last = locations.last { onLocationUpdate?(last) }
             locationContinuation?.resume(returning: locations.last)
             locationContinuation = nil
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        // Une précision négative signale un magnétomètre non calibré, et un
+        // `trueHeading` négatif un cap géographique indisponible (pas de position) :
+        // mieux vaut pas de flèche qu'une flèche qui pointe n'importe où. Le cap
+        // magnétique reste utilisable à défaut — la déclinaison est de l'ordre du
+        // degré en France, invisible sur un cadran de 90 pt.
+        let degrees: Double?
+        if newHeading.headingAccuracy < 0 {
+            degrees = nil
+        } else if newHeading.trueHeading >= 0 {
+            degrees = newHeading.trueHeading
+        } else {
+            degrees = newHeading.magneticHeading >= 0 ? newHeading.magneticHeading : nil
+        }
+        Task { @MainActor in
+            headingDegrees = degrees
         }
     }
 

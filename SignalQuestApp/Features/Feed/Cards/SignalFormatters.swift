@@ -43,6 +43,45 @@ enum SignalFormatters {
         if value >= 1_000 { return String(format: "%.1fk", Double(value) / 1000) }
         return "\(value)"
     }
+
+    nonisolated(unsafe) private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter
+    }()
+
+    nonisolated(unsafe) private static let dayTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
+    nonisolated(unsafe) private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter
+    }()
+
+    /// Une date renvoyée par l'API, rendue lisible.
+    ///
+    /// Le backend émet de l'ISO 8601 brut (`2026-05-11T12:46:37.220Z`) : affiché
+    /// tel quel, c'est illisible, et le parser sans `.withFractionalSeconds`
+    /// échoue silencieusement sur les millisecondes. `SQDateParsing.parse` couvre
+    /// déjà toutes les formes reçues (ISO avec/sans fraction, local, jour seul).
+    ///
+    /// `relative` donne « il y a 3 jours » — juste pour une mesure récente, mais
+    /// trompeur pour une date de mise en service qui remonte à des années : au
+    /// delà d'un mois, on retombe sur la date absolue.
+    static func date(_ value: String?, includingTime: Bool = false, relative: Bool = false) -> String? {
+        guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        guard let date = SQDateParsing.parse(value) else { return value }
+        if relative, abs(date.timeIntervalSinceNow) < 30 * 24 * 60 * 60 {
+            return relativeFormatter.localizedString(for: date, relativeTo: Date())
+        }
+        return includingTime ? dayTimeFormatter.string(from: date) : dayFormatter.string(from: date)
+    }
 }
 
 /// A small accent palette indexed by network technology. Routed through the

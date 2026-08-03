@@ -52,6 +52,17 @@ struct MapAnnotationPayload: Identifiable, Equatable {
     var glyphOverride: String? = nil
     /// Nombre de photos publiques sur le site (antennes) → badge appareil-photo.
     var contributionPhotos: Int = 0
+    /// eNB du site identifié par la communauté → coche verte sur le marqueur.
+    var hasEnb: Bool = false
+    /// gNB identifié → l'anneau 5G passe au vert (sinon il reste à la couleur
+    /// opérateur : le site émet en 5G, mais personne ne l'a encore identifiée).
+    var hasGnb: Bool = false
+    /// Le site porte de la 5G → anneau fin autour de la pastille.
+    var has5G: Bool = false
+    /// Longueur des lobes d'azimut, en points d'écran. 0 = pas de lobes. Croît
+    /// avec le zoom : à z14 les sites sont serrés à l'écran et des lobes longs se
+    /// recouvriraient ; plus on zoome, plus il y a de place pour les déployer.
+    var azimuthReachPoints: CGFloat = 0
     /// Données d'un ami vivant (couche Amis) : pilote le rendu « Find My ».
     var friend: FriendAnnotationInfo? = nil
 
@@ -87,6 +98,10 @@ struct MapAnnotationPayload: Identifiable, Equatable {
         lhs.plannedStatus == rhs.plannedStatus &&
         lhs.glyphOverride == rhs.glyphOverride &&
         lhs.contributionPhotos == rhs.contributionPhotos &&
+        lhs.hasEnb == rhs.hasEnb &&
+        lhs.hasGnb == rhs.hasGnb &&
+        lhs.has5G == rhs.has5G &&
+        lhs.azimuthReachPoints == rhs.azimuthReachPoints &&
         lhs.friend == rhs.friend
     }
 }

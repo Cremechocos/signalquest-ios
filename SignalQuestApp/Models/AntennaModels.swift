@@ -22,6 +22,15 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
     /// backend au zoom ≥ 13. Pilotent le badge « photos » sur le marqueur.
     var photoCount: Int = 0
     var validationCount: Int = 0
+    /// Identifiants radio connus de la communauté (backend, zoom ≥ 13). La coche
+    /// du marqueur porte sur l'eNB ; sur un site 5G, l'anneau ne passe au vert
+    /// que si le gNB l'est aussi.
+    var hasEnb: Bool = false
+    var hasGnb: Bool = false
+
+    /// Le site porte-t-il de la 5G ? `technologies` est déjà normalisé en
+    /// « 5G / 4G / 3G / 2G » par `normalizedTechnologies`, le test est donc sûr.
+    var has5G: Bool { technologies.contains("5G") }
 
     /// A site is mappable only with finite, in-range coordinates that aren't the
     /// 0,0 "null island" placeholder.
@@ -311,6 +320,18 @@ struct AntennaCoreDetails: Decodable, Equatable {
     let radioCarriers: [AntennaRadioCarrier]
     let cellIdentifiers: AntennaCellIdentifiers
     let siteInfo: AntennaSiteInfo
+    /// Statut ANFR brut (« En service », « Projet approuvé »…). Champ additif :
+    /// `nil` sur un backend antérieur, et la fiche n'affiche alors pas de badge.
+    let status: String?
+    /// Technologies déclarées mais pas encore allumées sur ce site.
+    let technologiesInProject: [String]
+
+    /// Le site est-il réellement en service ? L'ANFR distingue « En service » de
+    /// « Techniquement opérationnel » (prêt, pas ouvert) et de « Projet approuvé ».
+    var isInService: Bool {
+        guard let status = status?.lowercased() else { return true }
+        return status.contains("en service")
+    }
 
     var fullAddress: String? {
         let values = [address, postalCode, commune]
@@ -321,6 +342,29 @@ struct AntennaCoreDetails: Decodable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, supId, siteKey, anfrCode, market, rawLicenseeName, lat, lng, address, commune, postalCode, operators, operatorScope, operatorFacets, sharingKind, crozonLeader, zbLeader, technologies, azimuts, technical, frequencyBands, radioCarriers, cellIdentifiers, siteInfo
+        case status, technologiesInProject
+    }
+
+    /// `technologies_projet` arrive en objet `{ lte: [...], "5g": [...] }` : on
+    /// l'aplatit en une liste de libellés, la seule forme dont la fiche a besoin.
+    private struct TechnologiesInProject: Decodable {
+        let lte: [String]
+        let fiveG: [String]
+
+        enum CodingKeys: String, CodingKey {
+            case lte
+            case fiveG = "5g"
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            lte = (try? c.decodeIfPresent([String].self, forKey: .lte)) as? [String] ?? []
+            fiveG = (try? c.decodeIfPresent([String].self, forKey: .fiveG)) as? [String] ?? []
+        }
+
+        var labels: [String] {
+            fiveG.map { "5G \($0)" } + lte.map { "4G \($0)" }
+        }
     }
 
     init(from decoder: Decoder) throws {
@@ -349,6 +393,9 @@ struct AntennaCoreDetails: Decodable, Equatable {
         radioCarriers = c.decodeLossyArray([AntennaRadioCarrier].self, forKey: .radioCarriers)
         cellIdentifiers = (try? c.decode(AntennaCellIdentifiers.self, forKey: .cellIdentifiers)) ?? AntennaCellIdentifiers()
         siteInfo = (try? c.decode(AntennaSiteInfo.self, forKey: .siteInfo)) ?? AntennaSiteInfo()
+        status = c.decodeFlexibleString(forKey: .status)
+        technologiesInProject = (try? c.decodeIfPresent(TechnologiesInProject.self, forKey: .technologiesInProject))
+            .flatMap { $0?.labels } ?? []
     }
 }
 
@@ -416,6 +463,12 @@ struct AntennaCellIdEntry: Decodable, Equatable, Identifiable {
     let frequency: String?
     let earfcn: Int?
     let arfcn: Int?
+    /// Secteur porteur, quand le backend le connaît — c'est ce qui permet de
+    /// ranger les cellules sous leur secteur plutôt qu'en liste indifférenciée.
+    let sector: Int?
+    /// Identité de cellule dans l'eNB/gNB (CI/ECI), distincte de l'identifiant
+    /// global `value`.
+    let ci: String?
 }
 
 struct AntennaSiteInfo: Decodable, Equatable {
@@ -427,6 +480,14 @@ struct AntennaSiteInfo: Decodable, Equatable {
     let antennaHeight5g: Int?
     let firstActivation: String?
     let lastCommissioned: String?
+    /// Hauteur du pylône (m). Repli quand `supportHeight` est absent — un calcul
+    /// de ligne de visée a besoin d'une hauteur, pas d'un trou. Champs additifs :
+    /// absents des backends antérieurs, ils restent simplement `nil`.
+    let pylonHeight: Double?
+    let antennaTypes: [String]
+    let implantationDate: String?
+    let commissioningDate: String?
+    let lastUpdated: String?
 
     init(
         supportType: String? = nil,
@@ -436,7 +497,12 @@ struct AntennaSiteInfo: Decodable, Equatable {
         antennaHeight4g: Int? = nil,
         antennaHeight5g: Int? = nil,
         firstActivation: String? = nil,
-        lastCommissioned: String? = nil
+        lastCommissioned: String? = nil,
+        pylonHeight: Double? = nil,
+        antennaTypes: [String] = [],
+        implantationDate: String? = nil,
+        commissioningDate: String? = nil,
+        lastUpdated: String? = nil
     ) {
         self.supportType = supportType
         self.supportHeight = supportHeight
@@ -446,6 +512,34 @@ struct AntennaSiteInfo: Decodable, Equatable {
         self.antennaHeight5g = antennaHeight5g
         self.firstActivation = firstActivation
         self.lastCommissioned = lastCommissioned
+        self.pylonHeight = pylonHeight
+        self.antennaTypes = antennaTypes
+        self.implantationDate = implantationDate
+        self.commissioningDate = commissioningDate
+        self.lastUpdated = lastUpdated
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case supportType, supportHeight, supportOwner, sectorCount, antennaHeight4g, antennaHeight5g
+        case firstActivation, lastCommissioned, pylonHeight, antennaTypes
+        case implantationDate, commissioningDate, lastUpdated
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        supportType = c.decodeFlexibleString(forKey: .supportType)
+        supportHeight = c.decodeFlexibleString(forKey: .supportHeight)
+        supportOwner = c.decodeFlexibleString(forKey: .supportOwner)
+        sectorCount = try? c.decodeIfPresent(Int.self, forKey: .sectorCount)
+        antennaHeight4g = try? c.decodeIfPresent(Int.self, forKey: .antennaHeight4g)
+        antennaHeight5g = try? c.decodeIfPresent(Int.self, forKey: .antennaHeight5g)
+        firstActivation = c.decodeFlexibleString(forKey: .firstActivation)
+        lastCommissioned = c.decodeFlexibleString(forKey: .lastCommissioned)
+        pylonHeight = try? c.decodeIfPresent(Double.self, forKey: .pylonHeight)
+        antennaTypes = c.decodeLossyArray([String].self, forKey: .antennaTypes)
+        implantationDate = c.decodeFlexibleString(forKey: .implantationDate)
+        commissioningDate = c.decodeFlexibleString(forKey: .commissioningDate)
+        lastUpdated = c.decodeFlexibleString(forKey: .lastUpdated)
     }
 
     var supportHeightMeters: Double? {
@@ -453,6 +547,25 @@ struct AntennaSiteInfo: Decodable, Equatable {
         let normalized = supportHeight.replacingOccurrences(of: ",", with: ".")
         let value = normalized.filter { $0.isNumber || $0 == "." || $0 == "-" }
         return Double(value)
+    }
+
+    /// Hauteur à laquelle rayonne l'antenne, du plus précis au plus grossier :
+    /// hauteur d'antenne déclarée, puis hauteur du support, puis du pylône.
+    /// `nil` quand rien n'est connu — auquel cas l'interface doit le dire plutôt
+    /// que de laisser croire à une mesure.
+    var radiatingHeightMeters: Double? {
+        if let antennaHeight5g, antennaHeight5g > 0 { return Double(antennaHeight5g) }
+        if let antennaHeight4g, antennaHeight4g > 0 { return Double(antennaHeight4g) }
+        if let supportHeightMeters, supportHeightMeters > 0 { return supportHeightMeters }
+        if let pylonHeight, pylonHeight > 0 { return pylonHeight }
+        return nil
+    }
+
+    /// La hauteur vient-elle du support plutôt que de l'antenne elle-même ?
+    /// L'interface l'annonce comme estimée dans ce cas.
+    var radiatingHeightIsEstimated: Bool {
+        let hasAntennaHeight = (antennaHeight5g ?? 0) > 0 || (antennaHeight4g ?? 0) > 0
+        return !hasAntennaHeight && radiatingHeightMeters != nil
     }
 }
 
