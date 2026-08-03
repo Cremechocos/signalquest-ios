@@ -335,6 +335,19 @@ struct AntennaCoreDetails: Decodable, Equatable {
     /// mêmes bandes », et la fiche montre alors `frequencyBands` une seule fois
     /// au lieu de la répéter sous chaque azimut.
     let sectorSystems: [AntennaSectorSystems]
+    /// Site pointé à la main par un membre plutôt qu'issu d'un registre officiel.
+    /// La même route de détail sert les deux : ce drapeau décide de la provenance
+    /// affichée, pas de la structure de la fiche.
+    let isCustomSite: Bool
+    /// « validated » dès qu'une identification non automatique confirme le site.
+    let validationStatus: String?
+    /// Origine de la donnée telle que le backend la qualifie (« user »…).
+    let source: String?
+    /// Nom donné par le contributeur (« Pylône BH Telecom »). Les sites officiels
+    /// n'en ont pas : la fiche retombe alors sur l'identifiant.
+    let displayName: String?
+    /// Commentaire libre du contributeur.
+    let description: String?
 
     /// Le site est-il réellement en service ? L'ANFR distingue « En service » de
     /// « Techniquement opérationnel » (prêt, pas ouvert) et de « Projet approuvé ».
@@ -390,6 +403,9 @@ struct AntennaCoreDetails: Decodable, Equatable {
     /// Libellé de l'identifiant de site, selon le régulateur du marché. « ANFR »
     /// n'a aucun sens devant un identifiant ISED, BIPT ou OFCOM.
     var registryLabel: String {
+        // Un site relevé par un membre n'a pas d'identifiant de régulateur : son
+        // `anfrCode` est le slug interne (« cs-site-250 »).
+        if isCustomSite { return String(localized: "Référence du site") }
         switch market?.uppercased() {
         case "CA": return String(localized: "Identifiant ISED")
         case "BE": return String(localized: "Identifiant BIPT")
@@ -413,6 +429,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, supId, siteKey, anfrCode, market, rawLicenseeName, lat, lng, address, commune, postalCode, operators, operatorScope, operatorFacets, sharingKind, crozonLeader, zbLeader, technologies, azimuts, technical, frequencyBands, radioCarriers, cellIdentifiers, siteInfo
         case status, technologiesInProject, sectorSystems
+        case isCustomSite, validationStatus, source, displayName, description
     }
 
     /// `technologies_projet` arrive en objet `{ lte: [...], "5g": [...] }` : on
@@ -468,6 +485,11 @@ struct AntennaCoreDetails: Decodable, Equatable {
             .flatMap { $0?.labels } ?? []
         sectorSystems = c.decodeLossyArray([AntennaSectorSystems].self, forKey: .sectorSystems)
             .sorted { $0.azimuth < $1.azimuth }
+        isCustomSite = (try? c.decodeIfPresent(Bool.self, forKey: .isCustomSite)) as? Bool ?? false
+        validationStatus = c.decodeFlexibleString(forKey: .validationStatus)
+        source = c.decodeFlexibleString(forKey: .source)
+        displayName = c.decodeFlexibleString(forKey: .displayName)
+        description = c.decodeFlexibleString(forKey: .description)
     }
 }
 

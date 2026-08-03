@@ -106,7 +106,49 @@ final class AntennaMarketAdaptationTests: XCTestCase {
         let ca = try core(minimal(market: "CA", extraSiteInfo: "\"supportHeight\": \"4\","))
         XCTAssertEqual(ca.siteInfo.supportHeightMeters ?? 0, 4, accuracy: 0.001)
     }
+
+    // MARK: Sites relevés par un membre
+
+    /// `/map/antenna/{id}` sert AUSSI les sites pointés à la main : la fiche est
+    /// la même, seule la provenance change. JSON réel du site bosnien.
+    func testCustomSiteDetailIsDecodedWithItsProvenance() throws {
+        let core = try core("""
+        {
+          "id": "cmrvefks50b0f01qzafukx84k", "supId": "cmrvefks50b0f01qzafukx84k",
+          "anfrCode": "cs-site-250", "siteKey": "cs-site-250",
+          "displayName": "Pylône BH Telecom", "source": "user",
+          "isCustomSite": true, "validationStatus": "validated",
+          "status": null, "description": null,
+          "lat": 43.823190524392345, "lng": 18.211460717057633,
+          "address": "4 Kopišanj II, 71240 Hadžići", "commune": null,
+          "market": "BA", "marketCode": "BA",
+          "operators": ["BH_MOBILE_BA", "BH MOBILE"], "technologies": ["4G"],
+          "azimuts": [], "frequencyBands": ["4G B3 (1820 MHz)"], "radioCarriers": [],
+          "cellIdentifiers": { "enb": ["250"], "gnb": [], "pci": [], "cellId": [] },
+          "technical": {}, "siteInfo": {}
+        }
+        """)
+        XCTAssertTrue(core.isCustomSite)
+        XCTAssertEqual(core.displayName, "Pylône BH Telecom")
+        XCTAssertEqual(core.source, "user")
+        XCTAssertEqual(core.validationStatus, "validated")
+        XCTAssertEqual(core.address, "4 Kopišanj II, 71240 Hadžići")
+        XCTAssertEqual(core.cellIdentifiers.enb, ["250"])
+        // Le slug interne n'est l'identifiant d'aucun régulateur.
+        XCTAssertEqual(core.registryLabel, "Référence du site")
+        XCTAssertNil(core.displayStatus)
+        XCTAssertFalse(core.hasStructuralData)
+    }
+
+    /// Une fiche officielle ne doit jamais être prise pour une contribution.
+    func testOfficialSiteIsNotFlaggedAsCustom() throws {
+        let core = try core(minimal(market: "FR", status: "En service", supportType: "Immeuble"))
+        XCTAssertFalse(core.isCustomSite)
+        XCTAssertNil(core.displayName)
+        XCTAssertEqual(core.registryLabel, "Code ANFR")
+    }
 }
+
 
 /// Sites pointés à la main : seule couche d'antennes disponible dans les pays
 /// sans open data. Le JSON ci-dessous est la réponse RÉELLE de la tuile

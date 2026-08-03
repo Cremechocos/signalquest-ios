@@ -69,6 +69,10 @@ final class AntennaDetailViewModel: ObservableObject {
 struct AntennaDetailSheet: View {
     let site: AntennaSite
     let market: String
+    /// Marqueur d'origine quand la fiche est ouverte depuis la couche « Sites
+    /// ajoutés ». La route de détail sert les deux types de sites, mais elle ne
+    /// renvoie ni l'auteur ni la date d'ajout : ils viennent de la tuile.
+    let customSite: AndroidCustomSiteMarker?
     /// Opérateur dont on affiche la fiche. Modifiable in-situ pour les sites
     /// partagés (multi-opérateurs) : l'utilisateur passe de l'un à l'autre sans
     /// rouvrir la carte.
@@ -80,9 +84,16 @@ struct AntennaDetailSheet: View {
     @State private var photoPickerItem: PhotosPickerItem?
     @State private var showReportSheet = false
 
-    init(site: AntennaSite, market: String = "FR", operatorName: String = "SFR", service: AntennasServicing) {
+    init(
+        site: AntennaSite,
+        market: String = "FR",
+        operatorName: String = "SFR",
+        service: AntennasServicing,
+        customSite: AndroidCustomSiteMarker? = nil
+    ) {
         self.site = site
         self.market = market
+        self.customSite = customSite
         let resolved = operatorName == "ALL" ? (site.operators.first ?? "SFR") : operatorName
         _selectedOperator = State(initialValue: resolved)
         _model = StateObject(wrappedValue: AntennaDetailViewModel(service: service))
@@ -113,7 +124,7 @@ struct AntennaDetailSheet: View {
                 .padding(SQSpace.lg + 2)
             }
             .signalQuestBackground()
-            .navigationTitle("Site \(site.siteId ?? site.id)")
+            .navigationTitle(headerTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -238,13 +249,13 @@ struct AntennaDetailSheet: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack(alignment: .top, spacing: SQSpace.md) {
-                Image(systemName: "antenna.radiowaves.left.and.right")
+                Image(systemName: isCustomSite ? "mappin.and.ellipse" : "antenna.radiowaves.left.and.right")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(SQColor.brandRed)
                     .frame(width: 44, height: 44)
                     .background(SQColor.accentSoft, in: Circle())
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
-                    Text("Site \(site.siteId ?? site.id)")
+                    Text(headerTitle)
                         .font(SQType.title)
                         .foregroundStyle(SQColor.label)
                     // L'adresse était reléguée tout en bas de la fiche : c'est
@@ -277,7 +288,70 @@ struct AntennaDetailSheet: View {
                 }
                 .padding(.vertical, 1)
             }
+            contributionBanner
         }
+    }
+
+    /// Un site relevé par un membre n'a pas la même autorité qu'un site publié
+    /// par un régulateur : la fiche le dit, avec qui l'a posé et s'il a été
+    /// confirmé sur le terrain.
+    @ViewBuilder
+    private var contributionBanner: some View {
+        if isCustomSite {
+            let validated = model.details?.core?.validationStatus?.caseInsensitiveCompare("validated") == .orderedSame
+                || customSite?.isValidated == true
+            HStack(alignment: .top, spacing: SQSpace.sm) {
+                Image(systemName: validated ? "checkmark.seal.fill" : "clock.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(validated ? SQColor.success : SQColor.warning)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(validated
+                         ? "Site relevé par un membre, confirmé sur le terrain"
+                         : "Site relevé par un membre, pas encore confirmé")
+                        .font(SQFont.body(13.5, .semibold))
+                        .foregroundStyle(SQColor.label)
+                    if let credit = contributionCredit {
+                        Text(credit)
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(SQSpace.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                (validated ? SQColor.success : SQColor.warning).opacity(0.12),
+                in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+            )
+        }
+    }
+
+    /// « Ajouté par X le 22 juillet 2026 » — l'un ou l'autre suffit.
+    private var contributionCredit: String? {
+        let author = customSite?.createdByDisplayName
+        let date = customSite?.createdAt.map { SignalFormatters.date($0) }
+        switch (author, date) {
+        case let (author?, date?): return "Ajouté par \(author) le \(date)"
+        case let (author?, nil): return "Ajouté par \(author)"
+        case let (nil, date?): return "Ajouté le \(date)"
+        default: return nil
+        }
+    }
+
+    /// Vrai dès que l'une des deux sources le dit : le marqueur le sait tout de
+    /// suite, la fiche seulement une fois chargée.
+    private var isCustomSite: Bool {
+        customSite != nil || model.details?.core?.isCustomSite == true
+    }
+
+    /// Un site relevé porte un nom donné par son auteur ; un site officiel n'a
+    /// que son identifiant de registre.
+    private var headerTitle: String {
+        model.details?.core?.displayName
+            ?? customSite?.name
+            ?? String(localized: "Site \(site.siteId ?? site.id)")
     }
 
     /// Adresse lisible : celle de la fiche détaillée si elle est chargée, sinon
@@ -612,6 +686,11 @@ struct AntennaDetailSheet: View {
     /// Note de couverture du registre, nommé quand on le connaît : « le régulateur »
     /// tout court laisserait croire à une limite de l'app.
     private func registryCoverageNote(for core: AntennaCoreDetails) -> String {
+        // Un site relevé sur le terrain n'a pas de registre derrière lui : parler
+        // du régulateur local ici serait faux.
+        if core.isCustomSite || customSite != nil {
+            return "Site relevé sur le terrain par un membre : sa position et ses identifiants viennent d'un relevé, pas d'un registre. Hauteur, secteurs et azimuts ne sont donc pas connus."
+        }
         let registry: String
         switch core.market?.uppercased() {
         case "BE": registry = "Le registre belge (BIPT)"

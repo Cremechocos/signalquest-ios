@@ -881,6 +881,29 @@ final class MapExplorerViewModel: ObservableObject {
         }
     }
 
+    /// Adapte un site relevé à la main en `AntennaSite`, la forme qu'attend la
+    /// fiche terrain. On ne remplit que ce que la tuile sait : le reste arrive
+    /// avec la réponse de `/map/antenna/{id}`, qui sert les deux types de sites.
+    static func antennaSite(from marker: AndroidCustomSiteMarker) -> AntennaSite {
+        let radio = marker.radio
+        return AntennaSite(
+            id: marker.id,
+            siteId: marker.id,
+            anfrCode: nil,
+            latitude: marker.lat,
+            longitude: marker.lng,
+            operators: [radio?.operatorName].compactMap { $0 },
+            technologies: [radio?.technology].compactMap { $0 },
+            bands: [radio?.band].compactMap { $0 },
+            azimuths: [],
+            sharingType: nil,
+            crozonLeader: nil,
+            address: nil,
+            height: nil,
+            owner: radio?.operatorName
+        )
+    }
+
     private static func antennas(from tiles: [AndroidAntennaTileResponse]) -> [AntennaSite] {
         var seen = Set<String>()
         return tiles.flatMap(\.markers).compactMap { marker -> AntennaSite? in
@@ -996,12 +1019,7 @@ struct MapExplorerView: View {
             OutageDetailSheet(site: site)
         }
         .sheet(item: $selectedCustomSite) { site in
-            CustomSiteDetailSheet(
-                site: site,
-                // L'opérateur d'un site ajouté est un nom libre saisi par un membre,
-                // pas une clé de registre : `SQBrand` fait la résolution tolérante.
-                accent: site.radio?.operatorName.map { SQBrand.operatorColor($0) } ?? SQColor.brandPink
-            )
+            customSiteSheet(site)
         }
         .sheet(item: $selectedPlanned) { site in
             PlannedDetailSheet(site: site, operatorLabel: model.operatorLabel(site.operator ?? "ALL"), operatorAccent: model.operatorAccent(site.operator ?? "ALL"))
@@ -2768,8 +2786,7 @@ struct MapExplorerView: View {
                 return
             }
         }
-        // Site ajouté à la main : fiche dédiée (auteur, confirmation, identifiants
-        // radio relevés). Pas d'ANFR derrière, donc pas de `AntennaDetailSheet`.
+        // Site ajouté à la main : même fiche terrain que les antennes officielles.
         if annotation.kind == .customSite, let siteId = annotation.backendId,
            let site = model.customSiteTiles.flatMap(\.markers).first(where: { $0.id == siteId }) {
             selectedCustomSite = site
@@ -2790,6 +2807,23 @@ struct MapExplorerView: View {
             metric: annotation.metric,
             backendId: annotation.backendId,
             details: annotation.details
+        )
+    }
+
+    /// Fiche d'un site relevé à la main : la MÊME que pour une antenne officielle.
+    /// `/map/antenna/{id}` sert les deux, et un site relevé mérite la boussole, le
+    /// profil d'altitude, les photos et les speedtests proches comme les autres.
+    ///
+    /// Extraite de la chaîne de `.sheet` : en ligne, l'inférence de type du
+    /// compilateur explosait sur l'empilement de modificateurs.
+    private func customSiteSheet(_ site: AndroidCustomSiteMarker) -> some View {
+        let operatorName = site.radio?.operatorName ?? model.operatorFilter
+        return AntennaDetailSheet(
+            site: MapExplorerViewModel.antennaSite(from: site),
+            market: model.marketFilter,
+            operatorName: operatorName,
+            service: services.antennas,
+            customSite: site
         )
     }
 
