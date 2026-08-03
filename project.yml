@@ -67,6 +67,17 @@ targets:
       Release: Config/Release.xcconfig
     settings:
       base:
+        # ⚠️ SwiftData n'existe qu'à partir d'iOS 17, et la cible est iOS 16.
+        # `import SwiftData` produit un LC_LOAD_DYLIB FORT : sur un iPhone 8 en
+        # iOS 16.7, dyld ne trouve pas le framework et TUE le process avant la
+        # première ligne de code — l'app ne démarrait pas du tout (crash
+        # TestFlight 1.0 (74), « Library not loaded: SwiftData »).
+        # Le lien faible rend le framework absent-mais-toléré : les symboles
+        # valent nil sous iOS 17, et personne ne les touche car TOUS les usages
+        # sont derrière `@available(iOS 17, *)` avec repli JSON
+        # (`CoverageSessionStoreFactory`, `SpeedtestPendingStoreFactory`).
+        # Ne pas retirer sans relever IPHONEOS_DEPLOYMENT_TARGET à 17.
+        OTHER_LDFLAGS: -weak_framework SwiftData
         PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios
         PRODUCT_NAME: SignalQuest
         INFOPLIST_FILE: SignalQuestApp/Info.plist
