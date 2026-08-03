@@ -395,12 +395,14 @@ struct AntennaProfileView: View {
             )
             AntennaMetricTile(
                 label: "Support", value: supportHeightMeters.map { "\(Int($0.rounded())) m" } ?? "—",
-                entry: AntennaGlossary.supportHeight(supportHeightMeters, label: supportLabel), selection: $glossaryEntry
+                entry: AntennaGlossary.supportHeight(supportHeightMeters, label: supportLabel, antennaMeters: antennaHeightMeters),
+                selection: $glossaryEntry
             )
             AntennaMetricTile(
                 label: heightIsEstimated ? "Antennes (estim.)" : "Antennes",
                 value: antennaHeightMeters.map { "\(Int($0.rounded())) m" } ?? "—",
-                entry: AntennaGlossary.antennaHeight(antennaHeightMeters, isEstimated: heightIsEstimated),
+                entry: AntennaGlossary.antennaHeight(antennaHeightMeters, isEstimated: heightIsEstimated,
+                                                    supportMeters: supportHeightMeters, supportLabel: supportLabel),
                 selection: $glossaryEntry
             )
             AntennaMetricTile(
@@ -409,11 +411,11 @@ struct AntennaProfileView: View {
             )
             AntennaMetricTile(
                 label: "Ligne de visée", value: lineOfSightLabel,
-                entry: AntennaGlossary.lineOfSight(verdict), selection: $glossaryEntry
+                entry: AntennaGlossary.lineOfSight(verdict, profile: profile), selection: $glossaryEntry
             )
             AntennaMetricTile(
                 label: "Dégagement Fresnel", value: fresnelLabel,
-                entry: AntennaGlossary.fresnelClearance(AntennaSightGeometry.minimumFresnelClearance(for: profile)),
+                entry: AntennaGlossary.fresnelClearance(AntennaSightGeometry.minimumFresnelClearance(for: profile), profile: profile),
                 selection: $glossaryEntry
             )
             AntennaMetricTile(

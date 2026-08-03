@@ -265,6 +265,7 @@
 		AFBEA35CA2303C2A10207310 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A8D289A6D4E7B0C9C621A4 /* PushNotificationService.swift */; };
 		AFCD275D5C3626EAD024EB7B /* UserService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E03EF30DC08FEA39216CD0B /* UserService.swift */; };
 		B11527ED2AE1705CF5EAA4AD /* NotificationsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEAB0F4B51977FF72375533F /* NotificationsService.swift */; };
+		B1553F600EEACD650C4103BE /* AntennaGlossaryIllustrations.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67298253C20F58314208B87 /* AntennaGlossaryIllustrations.swift */; };
 		B2CBF7E2A44D46EA71667D54 /* TerrainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65D805E20FB169DD0A865C6 /* TerrainService.swift */; };
 		B34CAE48D657CA2E1045EDD2 /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AE018DD5313EE91ADC34F09 /* JSONValue.swift */; };
 		B3937EF92DC977D08A91853A /* GamificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47AE72407AC9406E2699806 /* GamificationView.swift */; };
@@ -774,6 +775,7 @@
 		F47CD806E692BAA9C67319EE /* DriveSpeedtestDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSpeedtestDetailSheet.swift; sourceTree = "<group>"; };
 		F4D1A47CF6B448FBD08CC23C /* LocationPrimingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationPrimingSheet.swift; sourceTree = "<group>"; };
 		F629B4E5D61FC9E98885BCD0 /* RemindersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersView.swift; sourceTree = "<group>"; };
+		F67298253C20F58314208B87 /* AntennaGlossaryIllustrations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaGlossaryIllustrations.swift; sourceTree = "<group>"; };
 		F7FC8EF017841F78C280399C /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
 		F81FC163DBCA9F8D2907783C /* ContinuousSessionAccumulator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuousSessionAccumulator.swift; sourceTree = "<group>"; };
 		F95EB05B86F26CEFD0F46621 /* SiteRemapSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteRemapSheet.swift; sourceTree = "<group>"; };
@@ -1572,6 +1574,7 @@
 			children = (
 				1FF3CB12A75C5483284BC5C7 /* AntennaDetailSheet.swift */,
 				D281BCEAB1145BB0193803C1 /* AntennaGlossary.swift */,
+				F67298253C20F58314208B87 /* AntennaGlossaryIllustrations.swift */,
 				55FD59340CD7E3743D7EF4B9 /* AntennaProfileView.swift */,
 				75D22ACFDF645E05F738DB65 /* AntennaRadioIdentifiersView.swift */,
 				B3023383A4E568490429AE96 /* AntennaSectorGridView.swift */,
@@ -1900,6 +1903,7 @@
 				BEBAE07954EA046AB8BFA0F8 /* APIError.swift in Sources */,
 				5D4E6FA318972C48443A9F8A /* AntennaDetailSheet.swift in Sources */,
 				34DA60E5756AEF582D44BEFE /* AntennaGlossary.swift in Sources */,
+				B1553F600EEACD650C4103BE /* AntennaGlossaryIllustrations.swift in Sources */,
 				223A9CEC6280B585F98FB578 /* AntennaModels.swift in Sources */,
 				CD5F4C1007589144E693B08C /* AntennaProfileView.swift in Sources */,
 				136460726EEEE4093C9E2856 /* AntennaRadioIdentifiersView.swift in Sources */,

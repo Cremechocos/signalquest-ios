@@ -15,6 +15,8 @@ struct AntennaGlossaryEntry: Identifiable, Equatable {
     let reading: String?
     /// Repères chiffrés, quand ils aident à situer la valeur.
     let scale: [(String, String)]
+    /// Schéma, quand la grandeur se montre mieux qu'elle ne se décrit.
+    var illustration: AntennaGlossaryIllustration?
 
     static func == (lhs: AntennaGlossaryEntry, rhs: AntennaGlossaryEntry) -> Bool {
         lhs.title == rhs.title && lhs.reading == rhs.reading
@@ -49,7 +51,10 @@ enum AntennaGlossary {
             title: String(localized: "Dénivelé"),
             definition: String(localized: "L'écart d'altitude entre le sol sous tes pieds et le sol au pied du support. Un site perché voit par-dessus les obstacles ; un site en contrebas se fait masquer par le moindre relief."),
             reading: reading,
-            scale: []
+            scale: [],
+            illustration: (user != nil && site != nil)
+                ? .elevationGap(userMeters: user!, siteMeters: site!)
+                : nil
         )
     }
 
@@ -62,7 +67,7 @@ enum AntennaGlossary {
         )
     }
 
-    static func supportHeight(_ meters: Double?, label: String?) -> AntennaGlossaryEntry {
+    static func supportHeight(_ meters: Double?, label: String?, antennaMeters: Double? = nil) -> AntennaGlossaryEntry {
         AntennaGlossaryEntry(
             title: String(localized: "Hauteur du support"),
             definition: String(localized: "La hauteur totale de la structure qui porte les antennes — pylône, château d'eau, clocher, toit d'immeuble. Elle dépasse souvent la hauteur des antennes elles-mêmes."),
@@ -70,11 +75,17 @@ enum AntennaGlossary {
                 let kind = label ?? String(localized: "support")
                 return String(localized: "Ce \(kind.lowercased()) mesure \(Int(value.rounded())) m.")
             },
-            scale: []
+            scale: [],
+            illustration: .heights(supportMeters: meters, antennaMeters: antennaMeters, supportLabel: label)
         )
     }
 
-    static func antennaHeight(_ meters: Double?, isEstimated: Bool) -> AntennaGlossaryEntry {
+    static func antennaHeight(
+        _ meters: Double?,
+        isEstimated: Bool,
+        supportMeters: Double? = nil,
+        supportLabel: String? = nil
+    ) -> AntennaGlossaryEntry {
         AntennaGlossaryEntry(
             title: String(localized: "Hauteur d'antenne"),
             definition: String(localized: "La hauteur à laquelle les antennes rayonnent, au-dessus du sol du site. C'est elle que vise la ligne de visée, et elle qui détermine jusqu'où le signal passe au-dessus des obstacles."),
@@ -83,7 +94,8 @@ enum AntennaGlossary {
                     ? String(localized: "Antennes à environ \(Int(value.rounded())) m — la hauteur exacte n'étant pas publiée, celle du support est utilisée.")
                     : String(localized: "Antennes à \(Int(value.rounded())) m au-dessus du sol du site.")
             },
-            scale: []
+            scale: [],
+            illustration: .heights(supportMeters: supportMeters, antennaMeters: meters, supportLabel: supportLabel)
         )
     }
 
@@ -101,11 +113,15 @@ enum AntennaGlossary {
                 (String(localized: "0 – 3°"), String(localized: "couverture lointaine, typique d'un site rural")),
                 (String(localized: "3 – 8°"), String(localized: "couverture urbaine classique")),
                 (String(localized: "> 10°"), String(localized: "tu es très près du pied du support")),
-            ]
+            ],
+            illustration: degrees.map { .downtilt(degrees: $0) }
         )
     }
 
-    static func lineOfSight(_ verdict: AntennaSightGeometry.SightVerdict?) -> AntennaGlossaryEntry {
+    static func lineOfSight(
+        _ verdict: AntennaSightGeometry.SightVerdict?,
+        profile: [AntennaSightGeometry.ProfilePoint] = []
+    ) -> AntennaGlossaryEntry {
         let reading: String?
         switch verdict?.level {
         case .clear:
@@ -123,11 +139,17 @@ enum AntennaGlossary {
             title: String(localized: "Ligne de visée"),
             definition: String(localized: "La droite entre tes yeux et les antennes. Quand elle est dégagée, la liaison est dite « en visibilité directe » : c'est le cas le plus favorable. Sinon le signal doit contourner ou traverser, et perd beaucoup."),
             reading: reading,
-            scale: []
+            scale: [],
+            illustration: profile.count > 2
+                ? .lineOfSight(profile: profile, blocked: verdict?.level == .blocked)
+                : nil
         )
     }
 
-    static func fresnelClearance(_ ratio: Double?) -> AntennaGlossaryEntry {
+    static func fresnelClearance(
+        _ ratio: Double?,
+        profile: [AntennaSightGeometry.ProfilePoint] = []
+    ) -> AntennaGlossaryEntry {
         AntennaGlossaryEntry(
             title: String(localized: "Dégagement Fresnel"),
             definition: String(localized: "Une onde n'emprunte pas seulement la droite entre les deux points : elle occupe un fuseau autour d'elle, la première zone de Fresnel. Tant que ce fuseau reste libre, la liaison se comporte comme en visibilité directe. Le chiffre indique quelle part en reste dégagée."),
@@ -143,7 +165,8 @@ enum AntennaGlossary {
                 ("60 – 100 %", String(localized: "suffisant, c'est le seuil retenu par l'UIT")),
                 ("< 60 %", String(localized: "atténuation par diffraction")),
                 ("< 0 %", String(localized: "la droite est coupée")),
-            ]
+            ],
+            illustration: profile.count > 2 ? .fresnelClearance(profile: profile) : nil
         )
     }
 
@@ -152,7 +175,8 @@ enum AntennaGlossary {
             title: String(localized: "Rayon de Fresnel"),
             definition: String(localized: "La demi-largeur du fuseau au point le plus large, à mi-parcours. Il grandit avec la distance et rétrécit quand la fréquence monte : une liaison en 700 MHz demande beaucoup plus de dégagement qu'en 3500 MHz."),
             reading: meters.map { String(localized: "Le fuseau atteint \(Int($0.rounded())) m de rayon, calculé à \(Int(frequencyMhz)) MHz — la bande la plus basse du site, la plus exigeante.") },
-            scale: []
+            scale: [],
+            illustration: .fresnelShape(frequencyMhz: frequencyMhz)
         )
     }
 }
@@ -174,6 +198,10 @@ struct AntennaGlossarySheet: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(SQSpace.lg)
                             .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                    }
+
+                    if let illustration = entry.illustration {
+                        AntennaGlossaryIllustrationView(illustration: illustration)
                     }
 
                     Text(entry.definition)
