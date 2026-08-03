@@ -182,3 +182,56 @@ final class AntennaSightGeometryTests: XCTestCase {
         XCTAssertTrue(profile.isEmpty, "Sans relief connu, mieux vaut pas de profil qu'un profil à plat inventé")
     }
 }
+
+/// La boussole de la fiche : une flèche qui pointe l'antenne dans le monde réel.
+/// Un signe inversé ou un repère mal calé y enverrait l'utilisateur à l'opposé,
+/// sans que rien ne le signale à l'écran.
+final class AntennaCompassGeometryTests: XCTestCase {
+
+    /// Sans cap connu, le cadran reste nord en haut : la flèche donne le
+    /// relèvement absolu, ce qui est moins direct mais jamais faux.
+    func testWithoutHeadingTheDialShowsTheAbsoluteBearing() {
+        XCTAssertEqual(AntennaSightGeometry.dialAngle(bearing: 0, deviceHeading: nil), 0, accuracy: 0.001)
+        XCTAssertEqual(AntennaSightGeometry.dialAngle(bearing: 90, deviceHeading: nil), 90, accuracy: 0.001)
+        XCTAssertEqual(AntennaSightGeometry.dialAngle(bearing: 270, deviceHeading: nil), 270, accuracy: 0.001)
+    }
+
+    /// Téléphone pointé sur l'antenne : la flèche doit être droit devant.
+    func testFacingTheSitePutsTheArrowStraightAhead() {
+        XCTAssertEqual(AntennaSightGeometry.dialAngle(bearing: 38, deviceHeading: 38), 0, accuracy: 0.001)
+        XCTAssertEqual(AntennaSightGeometry.dialAngle(bearing: 300, deviceHeading: 300), 0, accuracy: 0.001)
+    }
+
+    /// L'antenne au nord, le téléphone tourné vers l'est : elle est à GAUCHE,
+    /// soit 270° sur un cadran horaire.
+    func testTurningRightMovesTheTargetToTheLeft() {
+        XCTAssertEqual(AntennaSightGeometry.dialAngle(bearing: 0, deviceHeading: 90), 270, accuracy: 0.001)
+        XCTAssertEqual(AntennaSightGeometry.dialAngle(bearing: 0, deviceHeading: 270), 90, accuracy: 0.001)
+    }
+
+    /// Antenne dans le dos.
+    func testSiteBehindPointsDown() {
+        XCTAssertEqual(AntennaSightGeometry.dialAngle(bearing: 0, deviceHeading: 180), 180, accuracy: 0.001)
+    }
+
+    /// Le passage par 360° ne doit produire ni angle négatif ni saut.
+    func testAngleStaysWithinATurn() {
+        for heading in stride(from: 0.0, through: 350.0, by: 10) {
+            for bearing in stride(from: 0.0, through: 350.0, by: 10) {
+                let angle = AntennaSightGeometry.dialAngle(bearing: bearing, deviceHeading: heading)
+                XCTAssertGreaterThanOrEqual(angle, 0)
+                XCTAssertLessThan(angle, 360)
+            }
+        }
+    }
+
+    /// Cohérence avec le relèvement géographique : une antenne plein est d'un
+    /// observateur doit donner 90° sur un cadran non tourné.
+    func testDialAgreesWithGeographicBearing() {
+        let user = CLLocationCoordinate2D(latitude: 45.0, longitude: 5.0)
+        let east = CLLocationCoordinate2D(latitude: 45.0, longitude: 5.01)
+        let bearing = AntennaSectorGeometry.bearing(from: user, to: east)
+        XCTAssertEqual(bearing, 90, accuracy: 0.5)
+        XCTAssertEqual(AntennaSightGeometry.dialAngle(bearing: bearing, deviceHeading: nil), 90, accuracy: 0.5)
+    }
+}

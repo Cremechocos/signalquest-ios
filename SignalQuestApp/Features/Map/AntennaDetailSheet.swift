@@ -305,7 +305,7 @@ struct AntennaDetailSheet: View {
             AntennaSightCard(
                 site: site,
                 details: model.details,
-                userLocation: services.location.lastLocation,
+                location: services.location,
                 tint: operatorColor,
                 terrain: services.terrain
             )
@@ -418,9 +418,13 @@ struct AntennaDetailSheet: View {
                 value: details.core?.siteInfo.sectorCount.map(String.init)
                     ?? (displayedAzimuths.isEmpty ? "—" : String(displayedAzimuths.count))
             )
+            // Les bandes figuraient ici ET dans la grille juste en dessous. À la
+            // place, le signal communautaire : combien de personnes ont identifié
+            // ce site — c'est ce que porte la coche sur la carte.
             CardMetricTile(
-                label: "Bandes",
-                value: details.bands.prefix(4).joined(separator: " / ").isEmpty ? "—" : details.bands.prefix(4).joined(separator: " / ")
+                label: "Identifications",
+                value: (details.validationsCount ?? (site.validationCount > 0 ? site.validationCount : nil))
+                    .map(String.init) ?? "—"
             )
             // `photosCount` est nil sur le chemin wrapper : la galerie déjà
             // chargée est alors la seule source fiable du nombre.
@@ -442,6 +446,7 @@ struct AntennaDetailSheet: View {
             siteBands: (details.core?.frequencyBands ?? []).isEmpty ? details.bands : (details.core?.frequencyBands ?? []),
             sectorSystems: details.core?.sectorSystems ?? [],
             technologies: (details.core?.technologies ?? []).isEmpty ? details.technologies : (details.core?.technologies ?? []),
+            projectBands: details.core?.technologiesInProject ?? [],
             antennaHeightMeters: details.core?.siteInfo.radiatingHeightMeters,
             tint: operatorColor
         )

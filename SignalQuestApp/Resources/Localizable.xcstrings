@@ -367,6 +367,26 @@
     "%@ de données" : {
 
     },
+    "%@ déclaré mais pas encore en service sur le secteur %lld degrés" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ déclaré mais pas encore en service sur le secteur %2$lld degrés"
+          }
+        }
+      }
+    },
+    "%@ en service sur le secteur %lld degrés" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ en service sur le secteur %2$lld degrés"
+          }
+        }
+      }
+    },
     "%@ est identifié sur le site %@." : {
       "localizations" : {
         "fr" : {
@@ -415,16 +435,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ will be able to see your profile and contact you again."
-          }
-        }
-      }
-    },
-    "%@ présent sur le secteur %lld degrés" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ présent sur le secteur %2$lld degrés"
           }
         }
       }
@@ -555,6 +565,12 @@
         }
       }
     },
+    "%lld %% de la zone reste libre : au-dessus du seuil, la liaison n'est pas pénalisée." : {
+
+    },
+    "%lld %% seulement : sous le seuil de 60 %%, le signal s'atténue même sans obstacle franc." : {
+
+    },
     "%lld %% vérifié" : {
 
     },
@@ -628,6 +644,9 @@
 
     },
     "%lld m" : {
+
+    },
+    "%lld m au-dessus du niveau de la mer." : {
 
     },
     "%lld m parcourus" : {
@@ -1431,6 +1450,15 @@
         }
       }
     },
+    "< 300 m" : {
+
+    },
+    "> 5 km" : {
+
+    },
+    "> 10°" : {
+
+    },
     "👑" : {
       "localizations" : {
         "en" : {
@@ -1482,6 +1510,9 @@
         }
       }
     },
+    "0 – 3°" : {
+
+    },
     "1" : {
       "localizations" : {
         "en" : {
@@ -1512,6 +1543,9 @@
           }
         }
       }
+    },
+    "3 – 8°" : {
+
     },
     "3 images maximum par message." : {
       "extractionState" : "manual",
@@ -1627,6 +1661,9 @@
           }
         }
       }
+    },
+    "300 m – 2 km" : {
+
     },
     "à " : {
       "extractionState" : "stale",
@@ -1772,6 +1809,9 @@
           }
         }
       }
+    },
+    "absent" : {
+
     },
     "Accepté" : {
       "localizations" : {
@@ -2312,6 +2352,12 @@
         }
       }
     },
+    "Altitude du site" : {
+
+    },
+    "Altitude du sol au-dessus du niveau de la mer, lue dans le modèle numérique de terrain de l'IGN — pas dans le GPS, dont la précision verticale est bien plus faible." : {
+
+    },
     "Amérique du Nord" : {
       "localizations" : {
         "en" : {
@@ -2506,6 +2552,12 @@
           }
         }
       }
+    },
+    "Antennes à %lld m au-dessus du sol du site." : {
+
+    },
+    "Antennes à environ %lld m — la hauteur exacte n'étant pas publiée, celle du support est utilisée." : {
+
     },
     "Antennes affichées : %@" : {
 
@@ -2796,6 +2848,9 @@
           }
         }
       }
+    },
+    "atténuation par diffraction" : {
+
     },
     "Au moins 8 caractères" : {
       "localizations" : {
@@ -3990,6 +4045,16 @@
     },
     "Catalogue vérifié à %lld pour cent" : {
 
+    },
+    "Ce %@ mesure %lld m." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ce %1$@ mesure %2$lld m."
+          }
+        }
+      }
     },
     "Ce diagnostic s'appuie sur les mesures partagées par la communauté SignalQuest à moins de %@ de toi, pour le réseau %@." : {
       "localizations" : {
@@ -5480,6 +5545,9 @@
         }
       }
     },
+    "couverture lointaine, typique d'un site rural" : {
+
+    },
     "Couverture non envoyée — VPN actif" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5490,6 +5558,9 @@
           }
         }
       }
+    },
+    "couverture urbaine classique" : {
+
     },
     "Créateur" : {
 
@@ -5832,6 +5903,9 @@
         }
       }
     },
+    "déclaré, pas encore allumé" : {
+
+    },
     "Déconnexion" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5875,6 +5949,9 @@
       }
     },
     "dégagée" : {
+
+    },
+    "Dégagement Fresnel" : {
 
     },
     "Dégradé" : {
@@ -6043,6 +6120,9 @@
           }
         }
       }
+    },
+    "Dénivelé" : {
+
     },
     "Département" : {
       "extractionState" : "stale",
@@ -6441,7 +6521,6 @@
       }
     },
     "Distance" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6974,6 +7053,9 @@
           }
         }
       }
+    },
+    "en service" : {
+
     },
     "En service" : {
       "extractionState" : "manual",
@@ -7722,6 +7804,9 @@
         }
       }
     },
+    "fuseau entièrement libre" : {
+
+    },
     "Génération" : {
       "localizations" : {
         "en" : {
@@ -7865,6 +7950,12 @@
       }
     },
     "Hauteur (support)" : {
+
+    },
+    "Hauteur d'antenne" : {
+
+    },
+    "Hauteur du support" : {
 
     },
     "Historique des modifications" : {
@@ -8619,6 +8710,9 @@
         }
       }
     },
+    "L'écart d'altitude entre le sol sous tes pieds et le sol au pied du support. Un site perché voit par-dessus les obstacles ; un site en contrebas se fait masquer par le moindre relief." : {
+
+    },
     "L'équipe de modération te répondra ici. Tu peux ajouter des précisions ou des photos." : {
       "localizations" : {
         "en" : {
@@ -8630,6 +8724,9 @@
       }
     },
     "L'identifiant radio ne correspond pas au site choisi." : {
+
+    },
+    "L'inclinaison d'une antenne vers le bas. Les opérateurs l'utilisent pour concentrer l'énergie sur la zone à couvrir plutôt que de l'envoyer à l'horizon, où elle brouillerait les cellules voisines. Le chiffre donné ici est purement géométrique : c'est l'angle qui pointerait exactement sur toi." : {
 
     },
     "la biométrie" : {
@@ -8664,6 +8761,21 @@
         }
       }
     },
+    "La demi-largeur du fuseau au point le plus large, à mi-parcours. Il grandit avec la distance et rétrécit quand la fréquence monte : une liaison en 700 MHz demande beaucoup plus de dégagement qu'en 3500 MHz." : {
+
+    },
+    "La distance à vol d'oiseau entre toi et le pied du support, mesurée sur l'ellipsoïde terrestre. Ce n'est pas la longueur du trajet radio, qui monte jusqu'aux antennes." : {
+
+    },
+    "La droite entre tes yeux et les antennes. Quand elle est dégagée, la liaison est dite « en visibilité directe » : c'est le cas le plus favorable. Sinon le signal doit contourner ou traverser, et perd beaucoup." : {
+
+    },
+    "la droite est coupée" : {
+
+    },
+    "La droite passe, mais un obstacle entame la zone de Fresnel : le signal s'atténue sans être coupé." : {
+
+    },
     "La génération, pas le signal" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8674,6 +8786,12 @@
           }
         }
       }
+    },
+    "La hauteur à laquelle les antennes rayonnent, au-dessus du sol du site. C'est elle que vise la ligne de visée, et elle qui détermine jusqu'où le signal passe au-dessus des obstacles." : {
+
+    },
+    "La hauteur totale de la structure qui porte les antennes — pylône, château d'eau, clocher, toit d'immeuble. Elle dépasse souvent la hauteur des antennes elles-mêmes." : {
+
     },
     "La liaison frôle un obstacle" : {
 
@@ -8733,6 +8851,12 @@
       }
     },
     "La végétation, les bâtiments sans hauteur renseignée et les obstacles récents n'y figurent pas." : {
+
+    },
+    "La zone est entièrement libre (%lld %%) — la liaison se comporte comme en visibilité directe." : {
+
+    },
+    "La zone est obstruée : la ligne de visée elle-même est coupée." : {
 
     },
     "Lance la conversation." : {
@@ -8894,6 +9018,16 @@
         }
       }
     },
+    "Le fuseau atteint %lld m de rayon, calculé à %lld MHz — la bande la plus basse du site, la plus exigeante." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Le fuseau atteint %1$lld m de rayon, calculé à %2$lld MHz — la bande la plus basse du site, la plus exigeante."
+          }
+        }
+      }
+    },
     "Le mot de passe doit faire au moins 8 caractères." : {
       "localizations" : {
         "en" : {
@@ -9013,6 +9147,9 @@
           }
         }
       }
+    },
+    "Le site domine ta position de %lld m." : {
+
     },
     "Le site est masqué" : {
 
@@ -12068,6 +12205,9 @@
         }
       }
     },
+    "portée urbaine typique en 3500 MHz" : {
+
+    },
     "Porteuses radio" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -12866,6 +13006,9 @@
         }
       }
     },
+    "Rayon de Fresnel" : {
+
+    },
     "Ré-identifier ici" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -13348,6 +13491,9 @@
           }
         }
       }
+    },
+    "Repères" : {
+
     },
     "Répondre" : {
       "localizations" : {
@@ -13931,6 +14077,9 @@
         }
       }
     },
+    "Rien ne coupe la droite entre tes yeux et les antennes." : {
+
+    },
     "Rien ne masque le site" : {
 
     },
@@ -14462,6 +14611,9 @@
           }
         }
       }
+    },
+    "seules les bandes basses (700, 800 MHz) portent aussi loin" : {
+
     },
     "Seuls tes amis y ont accès. Le partage suit le mode que tu choisis juste en dessous." : {
       "extractionState" : "stale",
@@ -15295,6 +15447,9 @@
     "sud-ouest" : {
 
     },
+    "suffisant, c'est le seuil retenu par l'UIT" : {
+
+    },
     "Suis des membres, lance un speedtest ou publie ta première mesure : le fil se remplira au fur et à mesure." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -15335,6 +15490,9 @@
           }
         }
       }
+    },
+    "support" : {
+
     },
     "Support %@" : {
       "localizations" : {
@@ -15961,6 +16119,9 @@
         }
       }
     },
+    "Tilt" : {
+
+    },
     "toi" : {
 
     },
@@ -15979,6 +16140,9 @@
           }
         }
       }
+    },
+    "Ton altitude" : {
+
     },
     "Ton bilan de la semaine est déjà en story." : {
       "extractionState" : "stale",
@@ -16099,6 +16263,9 @@
           }
         }
       }
+    },
+    "Toucher pour comprendre cette mesure" : {
+
     },
     "Toucher pour déplier" : {
 
@@ -16333,6 +16500,9 @@
         }
       }
     },
+    "très proche, le signal dépend surtout de l'orientation du secteur" : {
+
+    },
     "Trier et filtrer" : {
 
     },
@@ -16370,6 +16540,15 @@
         }
       }
     },
+    "Tu domines le site de %lld m." : {
+
+    },
+    "Tu es à %@ du site." : {
+
+    },
+    "Tu es au-dessus de l'antenne : il faudrait la relever de %@° pour te viser." : {
+
+    },
     "Tu es dans le lobe du secteur %lld° (écart %lld°)" : {
       "localizations" : {
         "fr" : {
@@ -16379,6 +16558,9 @@
           }
         }
       }
+    },
+    "tu es très près du pied du support" : {
+
     },
     "Tu ne pourras plus te connecter via Apple. Si ton compte a été créé avec Apple, définis d'abord un mot de passe via « Mot de passe oublié » pour ne pas perdre l'accès." : {
       "localizations" : {
@@ -16538,6 +16720,12 @@
         }
       }
     },
+    "Un obstacle coupe la droite à %@." : {
+
+    },
+    "Un obstacle coupe la droite." : {
+
+    },
     "Un obstacle masque le site — %@" : {
 
     },
@@ -16587,6 +16775,9 @@
         }
       }
     },
+    "Une antenne inclinée de %@° vers le bas te viserait exactement." : {
+
+    },
     "une autre plateforme" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -16627,6 +16818,9 @@
           }
         }
       }
+    },
+    "Une onde n'emprunte pas seulement la droite entre les deux points : elle occupe un fuseau autour d'elle, la première zone de Fresnel. Tant que ce fuseau reste libre, la liaison se comporte comme en visibilité directe. Le chiffre indique quelle part en reste dégagée." : {
+
     },
     "Une position arrondie à environ 50 mètres" : {
       "extractionState" : "manual",

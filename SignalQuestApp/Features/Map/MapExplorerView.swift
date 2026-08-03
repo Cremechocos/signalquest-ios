@@ -1838,11 +1838,11 @@ struct MapExplorerView: View {
     /// attribuables à un pylône.
     static func azimuthReach(for zoom: Double) -> CGFloat {
         switch zoom {
-        case ..<13: return 0
-        case ..<14: return 26
-        case ..<15: return 38
-        case ..<16: return 50
-        default:    return 62
+        case ..<9: return 0
+        case ..<10: return 32
+        case ..<11: return 42
+        case ..<12: return 55
+        default:    return 66
         }
     }
 

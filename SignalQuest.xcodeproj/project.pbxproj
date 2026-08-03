@@ -92,6 +92,7 @@
 		33C988E6EFCB2A0AD84D7D26 /* CredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AEDFB065EC3512D77D7569B /* CredentialStore.swift */; };
 		344AD863842861AB53EF46B3 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4F8B268ACB58F2F9B93795E /* KeychainStore.swift */; };
 		34BA73B5085E3FEA3207B12F /* ProfileCardQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4886511AB14489C9F2B2CD6B /* ProfileCardQATests.swift */; };
+		34DA60E5756AEF582D44BEFE /* AntennaGlossary.swift in Sources */ = {isa = PBXBuildFile; fileRef = D281BCEAB1145BB0193803C1 /* AntennaGlossary.swift */; };
 		3544D1A314DE63A90BF89006 /* DriveTestMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF6741C3A6C32E6A351617E7 /* DriveTestMapView.swift */; };
 		36498E869AD0176877E7A254 /* SocialPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F24B90CDD67FFE038702151 /* SocialPreferences.swift */; };
 		372D167F0B48A125051CD026 /* SignatureSpeedDial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D454E35F1134B2689C8BF45 /* SignatureSpeedDial.swift */; };
@@ -722,6 +723,7 @@
 		CE9C7190AEB0D08E27839A20 /* CallsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallsService.swift; sourceTree = "<group>"; };
 		CFDF16B243853AE40E37D07C /* FluidityQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FluidityQATests.swift; sourceTree = "<group>"; };
 		D1BEC83B3F33FA570E6B4C6C /* RadioLogsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogsViewModel.swift; sourceTree = "<group>"; };
+		D281BCEAB1145BB0193803C1 /* AntennaGlossary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaGlossary.swift; sourceTree = "<group>"; };
 		D29224A48769AB74981281AE /* MessagingFixesQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagingFixesQATests.swift; sourceTree = "<group>"; };
 		D2F641884A080F0EC459B546 /* PhotoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoService.swift; sourceTree = "<group>"; };
 		D39C1D3B6CAAB2272A0E6B6C /* MapAccessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAccessibility.swift; sourceTree = "<group>"; };
@@ -1569,6 +1571,7 @@
 			isa = PBXGroup;
 			children = (
 				1FF3CB12A75C5483284BC5C7 /* AntennaDetailSheet.swift */,
+				D281BCEAB1145BB0193803C1 /* AntennaGlossary.swift */,
 				55FD59340CD7E3743D7EF4B9 /* AntennaProfileView.swift */,
 				75D22ACFDF645E05F738DB65 /* AntennaRadioIdentifiersView.swift */,
 				B3023383A4E568490429AE96 /* AntennaSectorGridView.swift */,
@@ -1896,6 +1899,7 @@
 				BA3FFF639F273E45CBB1D64D /* APIEndpoint.swift in Sources */,
 				BEBAE07954EA046AB8BFA0F8 /* APIError.swift in Sources */,
 				5D4E6FA318972C48443A9F8A /* AntennaDetailSheet.swift in Sources */,
+				34DA60E5756AEF582D44BEFE /* AntennaGlossary.swift in Sources */,
 				223A9CEC6280B585F98FB578 /* AntennaModels.swift in Sources */,
 				CD5F4C1007589144E693B08C /* AntennaProfileView.swift in Sources */,
 				136460726EEEE4093C9E2856 /* AntennaRadioIdentifiersView.swift in Sources */,

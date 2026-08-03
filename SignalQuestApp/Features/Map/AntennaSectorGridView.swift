@@ -20,6 +20,8 @@ struct AntennaSectorGridView: View {
     /// Détail par secteur — vide quand tous les secteurs sont identiques.
     let sectorSystems: [AntennaSectorSystems]
     let technologies: [String]
+    /// Bandes déclarées à l'ANFR mais pas encore allumées.
+    let projectBands: [String]
     let antennaHeightMeters: Double?
     let tint: Color
 
@@ -33,6 +35,7 @@ struct AntennaSectorGridView: View {
                 // comparer : la grille n'apporterait qu'une colonne de points.
                 bandRow
             }
+            if columns.count > 1 { stateLegend }
             AzimuthFanView(azimuths: columns.map(\.azimuth), color: tint)
                 .frame(height: 170)
                 .frame(maxWidth: .infinity)
@@ -55,10 +58,16 @@ struct AntennaSectorGridView: View {
     /// décroissante — la 5G 3500 en haut, la 4G 700 en bas : c'est l'ordre dans
     /// lequel on cherche « est-ce que ce site a la 3500 ? ».
     private var rows: [String] {
-        let source = hasSectorDetail
+        let measured = hasSectorDetail
             ? Array(Set(sectorSystems.flatMap(\.systems)))
             : siteBands
-        return source.sorted { left, right in
+        // Une bande seulement déclarée mérite sa ligne : c'est justement ce qu'on
+        // vient vérifier quand on se demande si la 3500 est allumée sur ce site.
+        let plannedOnly = projectBands.filter { planned in
+            !measured.contains { Self.technology(of: $0) == Self.technology(of: planned)
+                && Self.frequency(in: $0) == Self.frequency(in: planned) }
+        }
+        return (measured + plannedOnly).sorted { left, right in
             let leftRank = Self.technologyRank(left)
             let rightRank = Self.technologyRank(right)
             if leftRank != rightRank { return leftRank < rightRank }
@@ -140,15 +149,84 @@ struct AntennaSectorGridView: View {
         }
     }
 
+    /// État d'une bande sur un secteur. La couleur ne redit plus la technologie —
+    /// elle est déjà portée par la ligne et par les badges du haut — mais répond
+    /// à la seule question utile devant une grille : est-ce que ça émet ?
+    private enum BandState {
+        case active, planned, absent
+
+        var color: Color {
+            switch self {
+            case .active: return SQColor.success
+            case .planned: return SQColor.warning
+            case .absent: return SQColor.separator
+            }
+        }
+
+        var diameter: CGFloat {
+            switch self {
+            case .active: return 9
+            case .planned: return 9
+            case .absent: return 6
+            }
+        }
+    }
+
+    private func state(of band: String, on sector: AntennaSectorSystems) -> BandState {
+        if sector.systems.contains(band) { return .active }
+        return isPlanned(band) ? .planned : .absent
+    }
+
+    /// Les libellés du projet ANFR (« 5G 3500 ») ne s'écrivent pas comme ceux des
+    /// systèmes en service (« 5G NR 3500 ») : on compare la technologie et la
+    /// fréquence plutôt que les chaînes.
+    private func isPlanned(_ band: String) -> Bool {
+        let tech = Self.technology(of: band)
+        let frequency = Self.frequency(in: band)
+        return projectBands.contains { planned in
+            Self.technology(of: planned) == tech && Self.frequency(in: planned) == frequency
+        }
+    }
+
     private func cell(band: String, sector: AntennaSectorSystems) -> some View {
-        let present = sector.systems.contains(band)
+        let state = state(of: band, on: sector)
         return Circle()
-            .fill(present ? SQBrand.techColor(Self.technology(of: band)) : SQColor.separator)
-            .frame(width: present ? 9 : 6, height: present ? 9 : 6)
+            .fill(state.color)
+            .frame(width: state.diameter, height: state.diameter)
             .frame(maxWidth: .infinity)
-            .accessibilityLabel(present
-                ? String(localized: "\(band) présent sur le secteur \(Int(sector.azimuth.rounded())) degrés")
-                : String(localized: "\(band) absent du secteur \(Int(sector.azimuth.rounded())) degrés"))
+            .accessibilityLabel(accessibilityLabel(for: state, band: band, sector: sector))
+    }
+
+    private func accessibilityLabel(for state: BandState, band: String, sector: AntennaSectorSystems) -> String {
+        let azimuth = Int(sector.azimuth.rounded())
+        switch state {
+        case .active: return String(localized: "\(band) en service sur le secteur \(azimuth) degrés")
+        case .planned: return String(localized: "\(band) déclaré mais pas encore en service sur le secteur \(azimuth) degrés")
+        case .absent: return String(localized: "\(band) absent du secteur \(azimuth) degrés")
+        }
+    }
+
+    /// Légende des trois états — sans elle, trois couleurs de points ne veulent
+    /// rien dire.
+    private var stateLegend: some View {
+        FlowLayout(spacing: 10) {
+            legendDot(.active, label: String(localized: "en service"))
+            if rows.contains(where: { isPlanned($0) }) {
+                legendDot(.planned, label: String(localized: "déclaré, pas encore allumé"))
+            }
+            if rows.contains(where: { band in columns.contains { !$0.systems.contains(band) } }) {
+                legendDot(.absent, label: String(localized: "absent"))
+            }
+        }
+    }
+
+    private func legendDot(_ state: BandState, label: String) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(state.color).frame(width: 7, height: 7)
+            Text(label)
+                .font(SQType.micro)
+                .foregroundStyle(SQColor.labelSecondary)
+        }
     }
 
     private func isUniform(_ band: String) -> Bool {

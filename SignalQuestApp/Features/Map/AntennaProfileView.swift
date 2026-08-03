@@ -22,6 +22,9 @@ struct AntennaProfileView: View {
     /// Types d'antennes ANFR déclarés sur le site (panneau, parabolique…).
     let antennaTypes: [String]
     let tint: Color
+    /// Fréquence servant au calcul de Fresnel — la plus basse du site.
+    var frequencyMhz: Double = 2100
+    @State private var glossaryEntry: AntennaGlossaryEntry?
     @Environment(\.dismiss) private var dismiss
 
     private var userGround: Double? { profile.first?.groundMeters }
@@ -63,6 +66,9 @@ struct AntennaProfileView: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .sheet(item: $glossaryEntry) { entry in
+            AntennaGlossarySheet(entry: entry)
+        }
     }
 
     private var chart: some View {
@@ -85,12 +91,12 @@ struct AntennaProfileView: View {
             let minValue = rawMin
             let total = max(profile.last?.distanceMeters ?? 1, 1)
 
-            // Marge droite généreuse : le support est dessiné À l'extrémité du
-            // trajet, avec sa silhouette, ses antennes et ses deux cotes. Sans
-            // cette réserve, la cote de hauteur du support tombait hors du cadre
-            // et restait invisible.
-            let leftInset: CGFloat = 44
-            let rightInset: CGFloat = 58
+            // Juste de quoi loger la silhouette du support, dessinée à
+            // l'extrémité du trajet. Ses hauteurs ne sont plus cotées ici : elles
+            // figurent déjà dans les tuiles sous le graphe, et les cotes prenaient
+            // une bande de largeur au détriment du profil lui-même.
+            let leftInset: CGFloat = 40
+            let rightInset: CGFloat = 30
             // Les deux étiquettes d'extrémité (nom puis altitude) et la ligne
             // d'échelle se superposaient : chacune a maintenant sa ligne.
             let bottomInset: CGFloat = 44
@@ -325,21 +331,6 @@ struct AntennaProfileView: View {
             context.stroke(dish, with: .color(tint), lineWidth: 1.4)
         }
 
-        // Cotes de part et d'autre : la hauteur du support à droite, celle des
-        // antennes à gauche. La marge droite du graphe leur est réservée.
-        drawDimension(
-            context: context, x: x + width * 0.5 + 18, fromY: groundY, toY: topY,
-            label: supportHeightMeters.map { "\(Int($0.rounded())) m" } ?? "—",
-            color: SQColor.labelSecondary
-        )
-        if let antennaHeightMeters, supportHeightMeters == nil || abs((supportHeightMeters ?? 0) - antennaHeightMeters) > 0.5 {
-            drawDimension(
-                context: context, x: x - width * 0.5 - 18, fromY: groundY, toY: antennaY,
-                label: "\(Int(antennaHeightMeters.rounded())) m",
-                color: tint
-            )
-        }
-
         context.draw(
             Text(supportLabel ?? AntennaSupportSilhouette.fallbackLabel(for: family))
                 .font(SQFont.archivo(9, .bold))
@@ -349,35 +340,6 @@ struct AntennaProfileView: View {
         context.draw(
             Text("\(Int(altitude.rounded())) m").font(SQFont.archivo(9, .semibold)).foregroundColor(SQColor.labelSecondary),
             at: CGPoint(x: x + 4, y: bottom + 24), anchor: .trailing
-        )
-    }
-
-    /// Cote verticale : deux embouts, un trait, et la valeur au milieu.
-    private func drawDimension(
-        context: GraphicsContext,
-        x: CGFloat,
-        fromY: CGFloat,
-        toY: CGFloat,
-        label: String,
-        color: Color
-    ) {
-        guard abs(fromY - toY) > 18 else { return }
-        var path = Path()
-        path.move(to: CGPoint(x: x, y: fromY))
-        path.addLine(to: CGPoint(x: x, y: toY))
-        for endY in [fromY, toY] {
-            path.move(to: CGPoint(x: x - 3, y: endY))
-            path.addLine(to: CGPoint(x: x + 3, y: endY))
-        }
-        context.stroke(path, with: .color(color.opacity(0.65)), lineWidth: 1)
-        let middle = CGPoint(x: x, y: (fromY + toY) / 2)
-        context.fill(
-            Path(roundedRect: CGRect(x: middle.x - 16, y: middle.y - 7, width: 32, height: 14), cornerRadius: 4),
-            with: .color(SQColor.surface)
-        )
-        context.draw(
-            Text(label).font(SQFont.archivo(9, .bold)).foregroundColor(color),
-            at: middle
         )
     }
 
@@ -405,33 +367,66 @@ struct AntennaProfileView: View {
 
     private var figures: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
-            CardMetricTile(label: "Distance", value: SQUnits.distance(meters: distanceMeters), highlight: true)
-            CardMetricTile(label: "Dénivelé", value: elevationDifference)
-            CardMetricTile(label: "Ton altitude", value: userGround.map { "\(Int($0.rounded())) m" } ?? "—")
-            CardMetricTile(label: "Altitude du site", value: antennaGround.map { "\(Int($0.rounded())) m" } ?? "—")
-            CardMetricTile(
-                label: "Support",
-                value: supportHeightMeters.map { "\(Int($0.rounded())) m" } ?? "—"
+            AntennaMetricTile(
+                label: "Distance", value: SQUnits.distance(meters: distanceMeters), highlight: true,
+                entry: AntennaGlossary.distance(distanceMeters), selection: $glossaryEntry
             )
-            CardMetricTile(
+            AntennaMetricTile(
+                label: "Dénivelé", value: elevationDifference,
+                entry: AntennaGlossary.elevationGap(user: userGround, site: antennaGround), selection: $glossaryEntry
+            )
+            AntennaMetricTile(
+                label: "Ton altitude", value: userGround.map { "\(Int($0.rounded())) m" } ?? "—",
+                entry: AntennaGlossary.altitude(userGround, isSite: false), selection: $glossaryEntry
+            )
+            AntennaMetricTile(
+                label: "Altitude du site", value: antennaGround.map { "\(Int($0.rounded())) m" } ?? "—",
+                entry: AntennaGlossary.altitude(antennaGround, isSite: true), selection: $glossaryEntry
+            )
+            AntennaMetricTile(
+                label: "Support", value: supportHeightMeters.map { "\(Int($0.rounded())) m" } ?? "—",
+                entry: AntennaGlossary.supportHeight(supportHeightMeters, label: supportLabel), selection: $glossaryEntry
+            )
+            AntennaMetricTile(
                 label: heightIsEstimated ? "Antennes (estim.)" : "Antennes",
-                value: antennaHeightMeters.map { "\(Int($0.rounded())) m" } ?? "—"
+                value: antennaHeightMeters.map { "\(Int($0.rounded())) m" } ?? "—",
+                entry: AntennaGlossary.antennaHeight(antennaHeightMeters, isEstimated: heightIsEstimated),
+                selection: $glossaryEntry
             )
-            CardMetricTile(label: "Tilt pour te viser", value: downtiltLabel)
-            CardMetricTile(label: "Ligne de visée", value: lineOfSightLabel)
-            CardMetricTile(label: "Dégagement Fresnel", value: fresnelLabel)
-            CardMetricTile(label: "Rayon Fresnel max.", value: fresnelRadiusLabel)
+            AntennaMetricTile(
+                label: "Tilt pour te viser", value: downtiltLabel,
+                entry: AntennaGlossary.downtilt(downtiltDegrees), selection: $glossaryEntry
+            )
+            AntennaMetricTile(
+                label: "Ligne de visée", value: lineOfSightLabel,
+                entry: AntennaGlossary.lineOfSight(verdict), selection: $glossaryEntry
+            )
+            AntennaMetricTile(
+                label: "Dégagement Fresnel", value: fresnelLabel,
+                entry: AntennaGlossary.fresnelClearance(AntennaSightGeometry.minimumFresnelClearance(for: profile)),
+                selection: $glossaryEntry
+            )
+            AntennaMetricTile(
+                label: "Rayon Fresnel max.", value: fresnelRadiusLabel,
+                entry: AntennaGlossary.fresnelRadius(profile.map(\.fresnelRadiusMeters).max(), frequencyMhz: frequencyMhz),
+                selection: $glossaryEntry
+            )
         }
+    }
+
+    /// Tilt en degrés, avant mise en forme — partagé par la tuile et le glossaire.
+    private var downtiltDegrees: Double? {
+        guard let last = profile.last, let first = profile.first else { return nil }
+        return AntennaSightGeometry.downtiltToward(
+            distanceMeters: distanceMeters,
+            antennaTopMeters: last.sightLineMeters,
+            observerTopMeters: first.sightLineMeters
+        )
     }
 
     /// Inclinaison géométrique qui pointerait l'antenne exactement sur toi.
     private var downtiltLabel: String {
-        guard let last = profile.last, let first = profile.first else { return "—" }
-        guard let tilt = AntennaSightGeometry.downtiltToward(
-            distanceMeters: distanceMeters,
-            antennaTopMeters: last.sightLineMeters,
-            observerTopMeters: first.sightLineMeters
-        ) else { return "—" }
+        guard let tilt = downtiltDegrees else { return "—" }
         let rounded = (abs(tilt) * 10).rounded() / 10
         let value = String(format: "%.1f", rounded).replacingOccurrences(of: ".", with: ",")
         // Un tilt négatif voudrait dire viser au-dessus de l'horizontale : c'est

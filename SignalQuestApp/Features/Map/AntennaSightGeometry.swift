@@ -27,6 +27,17 @@ enum AntennaSightGeometry {
         return atan2(deltaHeightMeters, distanceMeters) * 180 / .pi
     }
 
+    /// Direction, en degrés SUR LE CADRAN, où pointer une cible de relèvement
+    /// `bearing` quand l'appareil est orienté au cap `deviceHeading`.
+    ///
+    /// 0 = vers le haut de l'écran, sens horaire. Sans cap connu, le cadran reste
+    /// nord en haut et la flèche donne le relèvement absolu ; avec le cap, elle
+    /// désigne la direction réelle dans laquelle tourner la tête.
+    static func dialAngle(bearing: Double, deviceHeading: Double?) -> Double {
+        let raw = bearing - (deviceHeading ?? 0)
+        return (raw.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+    }
+
     /// Point cardinal en 8 secteurs, pour dire « nord-est » plutôt que « 38° » —
     /// un cap parlant se lit sans conversion mentale.
     static func cardinal(for bearing: Double) -> String {

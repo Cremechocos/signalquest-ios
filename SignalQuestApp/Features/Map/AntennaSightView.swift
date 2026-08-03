@@ -14,9 +14,44 @@ final class AntennaSightViewModel: ObservableObject {
 
     private let terrain: TerrainServicing
     private var loadedKey: String?
+    /// Élévations et bâti déjà obtenus pour le trajet en cours.
+    ///
+    /// La fiche s'ouvre AVANT que le détail du site n'arrive : la hauteur
+    /// d'antenne vaut alors 25 m par défaut, et le profil calculé avec cette
+    /// valeur restait figé, puisque la clé de rechargement ne dépend que des
+    /// coordonnées. La ligne de visée pointait donc 14 m trop bas jusqu'au
+    /// prochain déplacement. Conserver les mesures permet de recalculer
+    /// localement dès que la vraie hauteur arrive, sans rappeler le réseau.
+    private var cachedElevations: [Double?] = []
+    private var cachedBuildings: [Double?] = []
+    private var cachedDistance: Double = 0
+    private var cachedAntennaHeight: Double?
+    private var cachedFrequency: Double = 2100
 
     init(terrain: TerrainServicing) {
         self.terrain = terrain
+    }
+
+    /// Recalcule le profil avec une nouvelle hauteur d'antenne, à partir des
+    /// mesures déjà en main. Instantané : aucun appel réseau.
+    func reprojected(antennaHeightMeters: Double, frequencyMhz: Double) {
+        guard !cachedElevations.isEmpty, cachedDistance > 0 else { return }
+        guard cachedAntennaHeight != antennaHeightMeters || cachedFrequency != frequencyMhz else { return }
+        cachedAntennaHeight = antennaHeightMeters
+        cachedFrequency = frequencyMhz
+        let points = AntennaSightGeometry.buildProfile(
+            distanceMeters: cachedDistance,
+            groundElevations: cachedElevations,
+            clutterHeights: cachedBuildings,
+            antennaHeightMeters: antennaHeightMeters,
+            frequencyMhz: frequencyMhz
+        )
+        guard !points.isEmpty else { return }
+        profile = points
+        verdict = AntennaSightGeometry.verdict(
+            for: points,
+            includesBuildings: cachedBuildings.contains { ($0 ?? 0) > 0 }
+        )
     }
 
     /// Altitude du sol sous l'utilisateur et sous l'antenne, telles que lues dans
@@ -52,8 +87,12 @@ final class AntennaSightViewModel: ObservableObject {
         async let elevationTask = terrain.elevations(for: path)
         async let buildingTask: [Double?]? = try? await terrain.buildingHeights(for: path)
 
+        cachedDistance = distanceMeters
+        cachedAntennaHeight = antennaHeightMeters
+        cachedFrequency = frequencyMhz
         do {
             let elevations = try await elevationTask
+            cachedElevations = elevations
             let relief = AntennaSightGeometry.buildProfile(
                 distanceMeters: distanceMeters,
                 groundElevations: elevations,
@@ -73,7 +112,9 @@ final class AntennaSightViewModel: ObservableObject {
             isLoading = false
 
             // Puis le bâti vient l'enrichir, sans jamais le remplacer par du vide.
-            guard let buildings = await buildingTask, buildings.contains(where: { ($0 ?? 0) > 0 }) else { return }
+            guard let buildings = await buildingTask else { return }
+            cachedBuildings = buildings
+            guard buildings.contains(where: { ($0 ?? 0) > 0 }) else { return }
             let enriched = AntennaSightGeometry.buildProfile(
                 distanceMeters: distanceMeters,
                 groundElevations: elevations,
@@ -96,6 +137,8 @@ final class AntennaSightViewModel: ObservableObject {
     /// que le cache aurait considéré comme identique.
     func invalidate() {
         loadedKey = nil
+        cachedElevations = []
+        cachedBuildings = []
     }
 }
 
@@ -104,7 +147,13 @@ final class AntennaSightViewModel: ObservableObject {
 struct AntennaSightCard: View {
     let site: AntennaSite
     let details: AntennaDetails?
-    let userLocation: CLLocation?
+    /// Le service est OBSERVÉ, pas seulement lu.
+    ///
+    /// `AppServices` ne republie pas les changements de `LocationService` : une
+    /// vue qui se contentait de lire `services.location` ne se rafraîchissait
+    /// donc jamais. La flèche de la boussole restait figée, et la distance
+    /// gardait la valeur d'ouverture de la fiche même après un relevé GPS.
+    @ObservedObject var location: LocationService
     let tint: Color
     @EnvironmentObject private var services: AppServices
     @StateObject private var model: AntennaSightViewModel
@@ -112,13 +161,15 @@ struct AntennaSightCard: View {
     @State private var isRefreshing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(site: AntennaSite, details: AntennaDetails?, userLocation: CLLocation?, tint: Color, terrain: TerrainServicing) {
+    init(site: AntennaSite, details: AntennaDetails?, location: LocationService, tint: Color, terrain: TerrainServicing) {
         self.site = site
         self.details = details
-        self.userLocation = userLocation
+        self.location = location
         self.tint = tint
         _model = StateObject(wrappedValue: AntennaSightViewModel(terrain: terrain))
     }
+
+    private var userLocation: CLLocation? { location.lastLocation }
 
     private var antennaCoordinate: CLLocationCoordinate2D? {
         if let core = details?.core, core.lat != 0 || core.lng != 0 {
@@ -184,12 +235,12 @@ struct AntennaSightCard: View {
                 HStack(alignment: .center, spacing: SQSpace.lg) {
                     AntennaCompassDial(
                         bearing: bearing,
-                        deviceHeading: services.location.headingDegrees,
+                        deviceHeading: location.headingDegrees,
                         sectorAzimuth: alignedSector?.azimuth,
                         tint: tint
                     )
                     .frame(width: 92, height: 92)
-                    .animation(reduceMotion ? nil : SQMotion.standard, value: services.location.headingDegrees)
+                    .animation(reduceMotion ? nil : SQMotion.standard, value: location.headingDegrees)
 
                     VStack(alignment: .leading, spacing: SQSpace.xs) {
                         Text(SQUnits.distance(meters: distanceMeters))
@@ -215,8 +266,15 @@ struct AntennaSightCard: View {
         }
         .foregroundStyle(SQColor.label)
         .task(id: sightTaskKey) { await loadProfile() }
-        .onAppear { services.location.startHeadingUpdates() }
-        .onDisappear { services.location.stopHeadingUpdates() }
+        // La fiche s'affiche avant que le détail du site n'arrive : quand la vraie
+        // hauteur d'antenne se substitue à la valeur par défaut, le profil est
+        // reprojeté sur les mesures déjà en main, sans nouvel appel réseau.
+        .onChangeCompat(of: antennaHeightMeters) { _, newValue in
+            guard let newValue else { return }
+            model.reprojected(antennaHeightMeters: newValue, frequencyMhz: frequencyMhz)
+        }
+        .onAppear { location.startHeadingUpdates() }
+        .onDisappear { location.stopHeadingUpdates() }
         .sheet(isPresented: $showsProfile) {
             AntennaProfileView(
                 profile: model.profile,
@@ -229,7 +287,8 @@ struct AntennaSightCard: View {
                     ?? details?.core?.siteInfo.pylonHeight,
                 supportLabel: details?.core?.siteInfo.supportType ?? details?.core?.technical.supportType,
                 antennaTypes: details?.core?.siteInfo.antennaTypes ?? [],
-                tint: tint
+                tint: tint,
+                frequencyMhz: frequencyMhz
             )
         }
     }
@@ -269,7 +328,7 @@ struct AntennaSightCard: View {
         defer { isRefreshing = false }
         // `maxAge: 0` force un vrai relevé : le service renverrait sinon le fix
         // en cache, qui est précisément celui qu'on cherche à remplacer.
-        _ = await services.location.currentLocation(timeoutSeconds: 10, maxAge: 0)
+        _ = await location.currentLocation(timeoutSeconds: 10, maxAge: 0)
         model.invalidate()
         await loadProfile()
     }
@@ -484,7 +543,7 @@ struct AntennaCompassDial: View {
             }
 
             // Flèche vers l'antenne.
-            let angle = bearing - rotation
+            let angle = AntennaSightGeometry.dialAngle(bearing: bearing, deviceHeading: deviceHeading)
             var arrow = Path()
             let tip = point(from: center, angle: angle, distance: radius - 6)
             let left = point(from: center, angle: angle + 148, distance: radius * 0.42)
