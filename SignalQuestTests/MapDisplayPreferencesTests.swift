@@ -49,8 +49,10 @@ final class MapDisplayPreferencesTests: XCTestCase {
 
     // MARK: Style d'azimut
 
-    func testAzimuthStyleDefaultsToLobes() {
-        XCTAssertEqual(MapAzimuthStyleStore.last(), .lobes)
+    /// Les traits sont le défaut : ils restent lisibles en zone dense, et ce sont
+    /// eux qui portent la couleur par opérateur sur un support partagé.
+    func testAzimuthStyleDefaultsToLines() {
+        XCTAssertEqual(MapAzimuthStyleStore.last(), .lines)
     }
 
     func testAzimuthStyleRoundTrips() {
@@ -60,9 +62,9 @@ final class MapDisplayPreferencesTests: XCTestCase {
         }
     }
 
-    func testUnknownStoredAzimuthStyleFallsBackToLobes() {
+    func testUnknownStoredAzimuthStyleFallsBackToTheDefault() {
         UserDefaults.standard.set("fleches", forKey: MapAzimuthStyleStore.key)
-        XCTAssertEqual(MapAzimuthStyleStore.last(), .lobes)
+        XCTAssertEqual(MapAzimuthStyleStore.last(), .lines)
     }
 
     /// Trois styles proposés, dont « aucun » : le quatrième (flèches) a été

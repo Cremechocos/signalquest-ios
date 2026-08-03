@@ -194,3 +194,22 @@ extension MapAnnotationPayload {
         }
     }
 }
+
+extension AndroidCustomSiteMarker {
+    /// Couleur de l'opérateur du site.
+    ///
+    /// `radio.operator` porte le plus souvent une CLÉ de registre (« TANGO_LU »,
+    /// « POST_LU ») que seul le registre du marché sait colorier — `SQBrand`, qui
+    /// ne connaît que la France, les rendait toutes en gris neutre. Quelques
+    /// saisies gardent un nom libre (« BH Mobile ») : `operatorKey`, quand le
+    /// backend l'émet, donne alors la clé exacte, sinon on retombe sur la
+    /// résolution tolérante par nom.
+    func operatorTint(resolve registryColor: (String) -> Color) -> Color? {
+        if let key = operatorKey, !key.isEmpty { return registryColor(key) }
+        guard let name = radio?.operatorName, !name.isEmpty else { return nil }
+        // Une clé de registre est en majuscules sans espace : la distinguer d'un
+        // nom libre évite d'interroger le registre pour rien.
+        let looksLikeKey = name == name.uppercased() && !name.contains(" ")
+        return looksLikeKey ? registryColor(name) : SQBrand.operatorColor(name)
+    }
+}

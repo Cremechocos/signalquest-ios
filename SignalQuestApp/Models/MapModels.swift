@@ -970,12 +970,16 @@ struct AndroidCustomSiteMarker: Decodable, Identifiable, Equatable, Sendable {
     let primaryPhotoUrl: String?
     /// "validated" dès qu'une identification non automatique existe, sinon "pending".
     let validationStatus: String?
+    /// Clé registre de l'opérateur propriétaire de l'infra, quand le backend
+    /// l'émet. Plus fiable que `radio.operator`, qui peut être un nom libre.
+    let operatorKey: String?
     let radio: AndroidCustomSiteRadio?
 
     enum CodingKeys: String, CodingKey {
         case id, lat, lng, name, type, description, createdByUserId
         case createdByDisplayName, createdAt, photoCount, primaryPhotoUrl
         case validationStatus, radio
+        case operatorKey, infraOwnerOperator
     }
 
     init(from decoder: Decoder) throws {
@@ -992,6 +996,8 @@ struct AndroidCustomSiteMarker: Decodable, Identifiable, Equatable, Sendable {
         photoCount = (try? c.decodeIfPresent(Int.self, forKey: .photoCount)) ?? 0
         primaryPhotoUrl = c.decodeFlexibleString(forKey: .primaryPhotoUrl)
         validationStatus = c.decodeFlexibleString(forKey: .validationStatus)
+        operatorKey = c.decodeFlexibleString(forKey: .operatorKey)
+            ?? c.decodeFlexibleString(forKey: .infraOwnerOperator)
         radio = (try? c.decodeIfPresent(AndroidCustomSiteRadio.self, forKey: .radio)) ?? nil
     }
 

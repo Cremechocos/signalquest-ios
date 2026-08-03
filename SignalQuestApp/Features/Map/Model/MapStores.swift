@@ -85,6 +85,10 @@ enum MapBandMatchStore {
 
 /// Rendu des azimuts sur la carte. Purement local : aucun aller-retour serveur,
 /// c'est un réglage d'affichage.
+///
+/// Le défaut est `lines` : les traits restent lisibles en zone dense, là où les
+/// lobes se recouvrent, et ce sont eux qui portent la couleur par opérateur sur
+/// un support partagé.
 enum AzimuthStyle: String, CaseIterable, Sendable {
     /// Secteurs larges : montrent l'ouverture réelle du faisceau.
     case lobes
@@ -119,7 +123,7 @@ enum MapAzimuthStyleStore {
 
     static func last() -> AzimuthStyle {
         UserDefaults.standard.string(forKey: key)
-            .flatMap(AzimuthStyle.init(rawValue:)) ?? .lobes
+            .flatMap(AzimuthStyle.init(rawValue:)) ?? .lines
     }
 
     static func reset() { UserDefaults.standard.removeObject(forKey: key) }

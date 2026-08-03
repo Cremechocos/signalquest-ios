@@ -49,11 +49,11 @@ struct MapAdvancedFilterSheet: View {
     }
 
     /// Couches proposées : un marché communautaire se limite aux couches
-    /// pertinentes (sites communautaires + speedtests).
+    /// pertinentes (cellules observées + sites ajoutés + speedtests).
     var layerOptions: [(MapDisplayItem.Kind, String, String)] {
         if selectedEntry?.isCommunityOnly == true {
             return [
-                (.communitySite, String(localized: "Sites communautaires"), "dot.radiowaves.up.forward"),
+                (.communitySite, String(localized: "Cellules observées"), "dot.radiowaves.up.forward"),
                 // Sans open data, les sites pointés à la main sont souvent la seule
                 // antenne visible du pays : la couche doit rester proposée ici.
                 (.customSite, String(localized: "Sites ajoutés"), "mappin.and.ellipse"),
@@ -76,7 +76,7 @@ struct MapAdvancedFilterSheet: View {
             options.append((.planned, "Prévisionnels", "calendar.badge.clock"))
         }
         if selectedEntry?.capabilities.communityLayers == true {
-            options.append((.communitySite, "Sites communautaires", "dot.radiowaves.up.forward"))
+            options.append((.communitySite, "Cellules observées", "dot.radiowaves.up.forward"))
         }
         return options
     }

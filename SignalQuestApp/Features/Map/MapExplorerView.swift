@@ -545,8 +545,10 @@ final class MapExplorerViewModel: ObservableObject {
         let wantsCommunitySites = (filters.contains(.communitySite) || (communityOnly && filters.contains(.antenna))) && supportsCommunity
         // Sites personnalisés : AUCUNE garde de marché. Ils sont saisis à la main,
         // donc ils existent partout — et dans un pays sans open data (Bosnie,
-        // Portugal…) ils sont la SEULE antenne que la carte puisse montrer.
-        let wantsCustomSites = filters.contains(.customSite)
+        // Portugal…) ils sont la SEULE antenne que la carte puisse montrer. C'est
+        // pourquoi « Antennes » les entraîne sur ces marchés : y demander des
+        // antennes sans les obtenir n'aurait aucun sens.
+        let wantsCustomSites = filters.contains(.customSite) || (communityOnly && filters.contains(.antenna))
         let wantsSpeedtest = filters.contains(.speedtest)
         // Sites prévisionnels et pannes : FR métropole ET DROM (le backend répond
         // pour FR/DROM). En DROM on déduit le territoire (974, 971…) du centre du
@@ -2282,7 +2284,10 @@ struct MapExplorerView: View {
     /// data. Sans elle, un pays sans régulateur ouvert (Bosnie, Portugal, Espagne)
     /// affiche une carte vide alors que la donnée existe côté serveur.
     private var customSitePayloads: [MapAnnotationPayload] {
-        guard filters.contains(.customSite) else { return [] }
+        // Sur un marché sans open data, « Antennes » entraîne cette couche : c'est
+        // la seule qui puisse répondre à la demande.
+        guard filters.contains(.customSite)
+            || (model.isCommunityOnlyMarket && filters.contains(.antenna)) else { return [] }
         var seen = Set<String>()
         return model.customSiteTiles.flatMap(\.markers).compactMap { marker in
             guard seen.insert(marker.id).inserted else { return nil }
@@ -2309,11 +2314,11 @@ struct MapExplorerView: View {
                 clusterCount: nil,
                 azimuths: [],
                 showsAzimuths: false,
-                // L'opérateur d'un site ajouté est un nom libre saisi par un membre
-                // (« BH Mobile »), pas une clé de registre : `operatorAccent` ne le
-                // résoudrait pas. `SQBrand` fait la résolution tolérante, et son
-                // repli est désormais neutre plutôt que rouge SFR.
-                tint: radio?.operatorName.map { SQBrand.operatorColor($0) },
+                // Le registre d'abord : la plupart des sites ajoutés portent déjà
+                // une CLÉ de registre (« TANGO_LU », « POST_LU »), que `SQBrand`
+                // — qui ne connaît que la France — rendait en gris neutre. Le nom
+                // libre (« BH Mobile ») retombe sur la résolution tolérante.
+                tint: marker.operatorTint(resolve: { model.operatorAccent($0) }),
                 contributionPhotos: marker.photoCount,
                 hasEnb: marker.isValidated
             )
