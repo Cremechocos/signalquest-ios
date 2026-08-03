@@ -678,6 +678,19 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
             guard let hauteur else { return nil }
             return Double(hauteur.replacingOccurrences(of: ",", with: ".").filter { $0.isNumber || $0 == "." })
         }
+
+        /// Nature du support, SEULEMENT si c'est un libellé.
+        ///
+        /// Les tuiles métropolitaines renvoient « Monument religieux », mais les
+        /// DROM renvoient le code ANFR brut (« 23 ») et le Canada le code de
+        /// structure ISED (« T »). Les afficher tels quels donnerait « Ce 23
+        /// mesure 38 m » dans la fiche, et choisirait la mauvaise silhouette. La
+        /// fiche détaillée, elle, résout les libellés : on l'attend plutôt que
+        /// d'inventer.
+        var resolvedNature: String? {
+            guard let nature = nature?.trimmingCharacters(in: .whitespaces), nature.count > 3 else { return nil }
+            return nature.contains(where: { $0.isLetter }) ? nature : nil
+        }
     }
 
     init(from decoder: Decoder) throws {
@@ -703,7 +716,7 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
         hasGnb = (try? c.decodeIfPresent(Bool.self, forKey: .hasGnb)) ?? false
         let support = (try? c.decodeIfPresent(SupportInfo.self, forKey: .supportInfo)) ?? nil
         supportHeightMeters = support?.meters
-        supportNature = support?.nature
+        supportNature = support?.resolvedNature
         radioSystems = c.decodeLossyArray([String].self, forKey: .emrLbSysteme)
     }
 

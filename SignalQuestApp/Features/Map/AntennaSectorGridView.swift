@@ -36,9 +36,13 @@ struct AntennaSectorGridView: View {
                 bandRow
             }
             if columns.count > 1 { stateLegend }
-            AzimuthFanView(azimuths: columns.map(\.azimuth), color: tint)
-                .frame(height: 170)
-                .frame(maxWidth: .infinity)
+            // Une rose sans azimut n'est qu'un cercle vide : les datasets DROM ne
+            // publient pas l'orientation des secteurs, autant le dire.
+            if !columns.isEmpty {
+                AzimuthFanView(azimuths: columns.map(\.azimuth), color: tint)
+                    .frame(height: 170)
+                    .frame(maxWidth: .infinity)
+            }
             footnote
         }
     }
@@ -250,6 +254,9 @@ struct AntennaSectorGridView: View {
 
     private var sectorCountLabel: String {
         let count = columns.count
+        if count == 0 {
+            return String(localized: "L'orientation des secteurs n'est pas publiée pour ce site — seules ses bandes le sont.")
+        }
         guard count > 1 else {
             return String(localized: "Bandes déclarées à l'ANFR pour ce site.")
         }
