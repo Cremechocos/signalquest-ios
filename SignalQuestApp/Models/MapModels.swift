@@ -638,6 +638,17 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
     let hasEnb: Bool
     let hasGnb: Bool
 
+    /// Hauteur et nature du support, telles que les tuiles les portent déjà.
+    ///
+    /// Sans elles, la fiche s'ouvrait sans aucune hauteur et calculait sa ligne
+    /// de visée sur une valeur par défaut de 25 m, le temps que l'appel détail
+    /// réponde. Le profil était donc faux au premier affichage.
+    let supportHeightMeters: Double?
+    let supportNature: String?
+    /// Systèmes radio déclarés (« LTE 800 », « 5G NR 3500 ») : ils donnent la
+    /// bande la plus basse, celle qui sert au calcul de Fresnel.
+    let radioSystems: [String]
+
     enum CodingKeys: String, CodingKey {
         case id, supId, anfrCode, lat, lng, `operator`, operators, sharingType, crozonLeader, zbLeader, technologies, azimuts, bands, address, isZTD, photoCount, validationCount, hasEnb, hasGnb
         // Le backend n'émet PAS de clé `address` : il envoie les composants ANFR
@@ -646,6 +657,27 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
         case adrLbLieu = "adr_lb_lieu"
         case adrNmCp = "adr_nm_cp"
         case commune
+        case supportInfo = "support_info"
+        case emrLbSysteme = "emr_lb_systeme"
+    }
+
+    private struct SupportInfo: Decodable {
+        let hauteur: String?
+        let nature: String?
+
+        enum CodingKeys: String, CodingKey { case hauteur, nature }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            hauteur = c.decodeFlexibleString(forKey: .hauteur)
+            nature = c.decodeFlexibleString(forKey: .nature)
+        }
+
+        /// « 52,2 » → 52,2. La virgule décimale est celle de l'ANFR.
+        var meters: Double? {
+            guard let hauteur else { return nil }
+            return Double(hauteur.replacingOccurrences(of: ",", with: ".").filter { $0.isNumber || $0 == "." })
+        }
     }
 
     init(from decoder: Decoder) throws {
@@ -669,6 +701,10 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
         validationCount = (try? c.decodeIfPresent(Int.self, forKey: .validationCount)) ?? 0
         hasEnb = (try? c.decodeIfPresent(Bool.self, forKey: .hasEnb)) ?? false
         hasGnb = (try? c.decodeIfPresent(Bool.self, forKey: .hasGnb)) ?? false
+        let support = (try? c.decodeIfPresent(SupportInfo.self, forKey: .supportInfo)) ?? nil
+        supportHeightMeters = support?.meters
+        supportNature = support?.nature
+        radioSystems = c.decodeLossyArray([String].self, forKey: .emrLbSysteme)
     }
 
     /// Adresse lisible reconstituée depuis les champs ANFR : rue (ou lieu-dit),

@@ -25,26 +25,41 @@ final class AntennaSightViewModel: ObservableObject {
     private var cachedElevations: [Double?] = []
     private var cachedBuildings: [Double?] = []
     private var cachedDistance: Double = 0
-    private var cachedAntennaHeight: Double?
-    private var cachedFrequency: Double = 2100
+    /// Géométrie courante, relue à chaque construction plutôt que capturée.
+    private var antennaHeight: Double = 25
+    private var frequency: Double = 2100
 
     init(terrain: TerrainServicing) {
         self.terrain = terrain
     }
 
-    /// Recalcule le profil avec une nouvelle hauteur d'antenne, à partir des
-    /// mesures déjà en main. Instantané : aucun appel réseau.
-    func reprojected(antennaHeightMeters: Double, frequencyMhz: Double) {
+    /// Déclare la hauteur d'antenne et la fréquence à utiliser.
+    ///
+    /// Appelée à chaque fois que la vue en sait davantage — à l'ouverture avec ce
+    /// que porte la tuile, puis quand le détail du site répond. La valeur est
+    /// STOCKÉE et relue au moment de construire le profil : le calcul de relief
+    /// en cours l'utilisera, même s'il a démarré avant. C'est ce qui manquait —
+    /// la hauteur était capturée à l'appel, si bien qu'une réponse arrivée
+    /// pendant le chargement du terrain ne changeait plus rien, et la ligne de
+    /// visée restait fausse jusqu'à ce qu'on actualise à la main.
+    func setGeometry(antennaHeightMeters: Double, frequencyMhz: Double) {
+        guard antennaHeight != antennaHeightMeters || frequency != frequencyMhz else { return }
+        antennaHeight = antennaHeightMeters
+        frequency = frequencyMhz
+        rebuildFromCache()
+    }
+
+    /// Reconstruit le profil sur les mesures déjà en main. Instantané : aucun
+    /// appel réseau. Sans effet tant que le relief n'est pas arrivé — le calcul
+    /// en cours reprendra alors la hauteur courante de lui-même.
+    private func rebuildFromCache() {
         guard !cachedElevations.isEmpty, cachedDistance > 0 else { return }
-        guard cachedAntennaHeight != antennaHeightMeters || cachedFrequency != frequencyMhz else { return }
-        cachedAntennaHeight = antennaHeightMeters
-        cachedFrequency = frequencyMhz
         let points = AntennaSightGeometry.buildProfile(
             distanceMeters: cachedDistance,
             groundElevations: cachedElevations,
             clutterHeights: cachedBuildings,
-            antennaHeightMeters: antennaHeightMeters,
-            frequencyMhz: frequencyMhz
+            antennaHeightMeters: antennaHeight,
+            frequencyMhz: frequency
         )
         guard !points.isEmpty else { return }
         profile = points
@@ -62,9 +77,7 @@ final class AntennaSightViewModel: ObservableObject {
     func load(
         user: CLLocationCoordinate2D,
         antenna: CLLocationCoordinate2D,
-        distanceMeters: Double,
-        antennaHeightMeters: Double,
-        frequencyMhz: Double
+        distanceMeters: Double
     ) async {
         // Recharger sur un déplacement de quelques mètres ferait un appel réseau
         // à chaque respiration du GPS : la clé est arrondie à ~100 m.
@@ -88,17 +101,18 @@ final class AntennaSightViewModel: ObservableObject {
         async let buildingTask: [Double?]? = try? await terrain.buildingHeights(for: path)
 
         cachedDistance = distanceMeters
-        cachedAntennaHeight = antennaHeightMeters
-        cachedFrequency = frequencyMhz
         do {
             let elevations = try await elevationTask
             cachedElevations = elevations
+            // `antennaHeight` est relue ICI, pas au démarrage : si le détail du
+            // site a répondu pendant le chargement du relief, sa hauteur est
+            // déjà prise en compte.
             let relief = AntennaSightGeometry.buildProfile(
                 distanceMeters: distanceMeters,
                 groundElevations: elevations,
                 clutterHeights: [],
-                antennaHeightMeters: antennaHeightMeters,
-                frequencyMhz: frequencyMhz
+                antennaHeightMeters: antennaHeight,
+                frequencyMhz: frequency
             )
             guard !relief.isEmpty else {
                 failed = true
@@ -119,8 +133,8 @@ final class AntennaSightViewModel: ObservableObject {
                 distanceMeters: distanceMeters,
                 groundElevations: elevations,
                 clutterHeights: buildings,
-                antennaHeightMeters: antennaHeightMeters,
-                frequencyMhz: frequencyMhz
+                antennaHeightMeters: antennaHeight,
+                frequencyMhz: frequency
             )
             guard !enriched.isEmpty else { return }
             profile = enriched
@@ -196,8 +210,16 @@ struct AntennaSightCard: View {
         return AntennaSectorGeometry.bestSector(antenna: antenna, azimuths: azimuths, user: userLocation.coordinate)
     }
 
+    /// Hauteur de rayonnement, du plus précis au plus grossier. `site.height`
+    /// vient de la tuile (`support_info.hauteur`) : il permet une première visée
+    /// juste dès l'ouverture, sans attendre la réponse du détail.
     private var antennaHeightMeters: Double? {
         details?.core?.siteInfo.radiatingHeightMeters ?? site.height
+    }
+
+    /// Nature du support — connue elle aussi dès la tuile.
+    private var supportLabel: String? {
+        details?.core?.siteInfo.supportType ?? details?.core?.technical.supportType ?? site.supportNature
     }
 
     /// Différence de hauteur entre le sommet de l'antenne et les yeux de
@@ -222,11 +244,14 @@ struct AntennaSightCard: View {
     /// celle qui compte quand on cherche à savoir si le site atteint l'endroit
     /// où l'on est. C'est aussi le cas le plus exigeant en zone de Fresnel.
     private var frequencyMhz: Double {
-        let fromLabels = (details?.core?.frequencyBands ?? []).compactMap { label -> Double? in
+        let labels = (details?.core?.frequencyBands ?? []).isEmpty
+            ? site.radioSystems
+            : (details?.core?.frequencyBands ?? [])
+        let frequencies = labels.compactMap { label -> Double? in
             guard let range = label.range(of: #"\d{3,4}"#, options: .regularExpression) else { return nil }
             return Double(label[range])
         }
-        return fromLabels.min() ?? 2100
+        return frequencies.min() ?? 2100
     }
 
     var body: some View {
@@ -269,9 +294,8 @@ struct AntennaSightCard: View {
         // La fiche s'affiche avant que le détail du site n'arrive : quand la vraie
         // hauteur d'antenne se substitue à la valeur par défaut, le profil est
         // reprojeté sur les mesures déjà en main, sans nouvel appel réseau.
-        .onChangeCompat(of: antennaHeightMeters) { _, newValue in
-            guard let newValue else { return }
-            model.reprojected(antennaHeightMeters: newValue, frequencyMhz: frequencyMhz)
+        .onChangeCompat(of: geometryKey) { _, _ in
+            model.setGeometry(antennaHeightMeters: antennaHeightMeters ?? 25, frequencyMhz: frequencyMhz)
         }
         .onAppear { location.startHeadingUpdates() }
         .onDisappear { location.stopHeadingUpdates() }
@@ -284,8 +308,9 @@ struct AntennaSightCard: View {
                 antennaHeightMeters: antennaHeightMeters,
                 heightIsEstimated: details?.core?.siteInfo.radiatingHeightIsEstimated ?? false,
                 supportHeightMeters: details?.core?.siteInfo.supportHeightMeters
-                    ?? details?.core?.siteInfo.pylonHeight,
-                supportLabel: details?.core?.siteInfo.supportType ?? details?.core?.technical.supportType,
+                    ?? details?.core?.siteInfo.pylonHeight
+                    ?? site.height,
+                supportLabel: supportLabel,
                 antennaTypes: details?.core?.siteInfo.antennaTypes ?? [],
                 tint: tint,
                 frequencyMhz: frequencyMhz
@@ -333,6 +358,12 @@ struct AntennaSightCard: View {
         await loadProfile()
     }
 
+    /// Change dès que la hauteur d'antenne ou la bande de référence évoluent —
+    /// typiquement quand le détail du site remplace ce que portait la tuile.
+    private var geometryKey: String {
+        "\(antennaHeightMeters ?? -1)|\(frequencyMhz)"
+    }
+
     /// Recharge quand la position bouge d'environ 100 m ou que le site change.
     private var sightTaskKey: String {
         guard let userLocation, let antenna = antennaCoordinate else { return "none" }
@@ -345,13 +376,10 @@ struct AntennaSightCard: View {
 
     private func loadProfile() async {
         guard let userLocation, let antenna = antennaCoordinate, let distanceMeters else { return }
-        await model.load(
-            user: userLocation.coordinate,
-            antenna: antenna,
-            distanceMeters: distanceMeters,
-            antennaHeightMeters: antennaHeightMeters ?? 25,
-            frequencyMhz: frequencyMhz
-        )
+        // La géométrie est déclarée AVANT le chargement, et de nouveau à chaque
+        // fois qu'on en sait plus : le modèle la relit au moment de construire.
+        model.setGeometry(antennaHeightMeters: antennaHeightMeters ?? 25, frequencyMhz: frequencyMhz)
+        await model.load(user: userLocation.coordinate, antenna: antenna, distanceMeters: distanceMeters)
     }
 
     private func elevationLabel(_ angle: Double) -> String {
@@ -404,9 +432,10 @@ struct AntennaSightCard: View {
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
                     AntennaTerrainPreview(
                         profile: model.profile,
-                        supportLabel: details?.core?.siteInfo.supportType ?? details?.core?.technical.supportType,
+                        supportLabel: supportLabel,
                         supportHeightMeters: details?.core?.siteInfo.supportHeightMeters
                             ?? details?.core?.siteInfo.pylonHeight
+                            ?? site.height
                             ?? antennaHeightMeters,
                         antennaHeightMeters: antennaHeightMeters,
                         tint: tint

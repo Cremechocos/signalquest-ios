@@ -887,13 +887,18 @@ final class MapExplorerViewModel: ObservableObject {
                 crozonLeader: marker.crozonLeader,
                 isZTD: marker.isZTD,
                 address: marker.address,
-                height: nil,
+                // La tuile porte `support_info.hauteur` : la retenir évite à la
+                // fiche de calculer sa ligne de visée sur une hauteur par défaut
+                // en attendant la réponse du détail.
+                height: marker.supportHeightMeters,
                 owner: marker.operator
             )
             site.photoCount = marker.photoCount
             site.validationCount = marker.validationCount
             site.hasEnb = marker.hasEnb
             site.hasGnb = marker.hasGnb
+            site.supportNature = marker.supportNature
+            site.radioSystems = marker.radioSystems
             return site
         }
     }

@@ -156,3 +156,67 @@ final class AntennaMarkerDecodeTests: XCTestCase {
         XCTAssertFalse(unknown.radiatingHeightIsEstimated, "Rien à estimer quand rien n'est connu")
     }
 }
+
+/// La fiche s'ouvre avant que le détail du site ne réponde. Ce que la tuile
+/// porte déjà — hauteur du support, nature, systèmes radio — décide donc de la
+/// justesse du premier affichage : sans ces champs, la ligne de visée se
+/// calculait sur une hauteur par défaut et restait fausse jusqu'à ce qu'on
+/// actualise à la main.
+final class AntennaTileGeometryDecodeTests: XCTestCase {
+
+    private func decode(_ json: String) throws -> AndroidAntennaMarker {
+        try JSONDecoder.signalQuest.decode(AndroidAntennaMarker.self, from: Data(json.utf8))
+    }
+
+    func testSupportHeightIsReadFromTheTile() throws {
+        let marker = try decode("""
+        {
+          "id": "2877566", "supId": "2877566", "lat": 45.65, "lng": 5.47,
+          "operators": ["SFR"], "technologies": ["5G"], "azimuts": [0, 90, 270], "bands": [],
+          "support_info": {"hauteur": "52,2", "nature": "Monument religieux", "type_proprietaire": "Commune"}
+        }
+        """)
+        // La virgule décimale est celle de l'ANFR : la lire comme un séparateur
+        // de milliers donnerait 522 m.
+        XCTAssertEqual(try XCTUnwrap(marker.supportHeightMeters), 52.2, accuracy: 0.01)
+        XCTAssertEqual(marker.supportNature, "Monument religieux")
+    }
+
+    func testRadioSystemsGiveTheLowestBand() throws {
+        let marker = try decode("""
+        {
+          "id": "1", "lat": 45.65, "lng": 5.47, "operators": [], "technologies": [],
+          "azimuts": [], "bands": [],
+          "emr_lb_systeme": ["5G NR 3500", "LTE 700", "LTE 2600"]
+        }
+        """)
+        XCTAssertEqual(marker.radioSystems.count, 3)
+        let frequencies = marker.radioSystems.compactMap { label -> Int? in
+            guard let range = label.range(of: #"\d{3,4}"#, options: .regularExpression) else { return nil }
+            return Int(label[range])
+        }
+        XCTAssertEqual(frequencies.min(), 700, "C'est la bande la plus basse qui sert au calcul de Fresnel")
+    }
+
+    /// Une tuile sans ces champs doit rester décodable : le site s'affichera
+    /// simplement sans hauteur, comme avant.
+    func testTileWithoutSupportInfoStillDecodes() throws {
+        let marker = try decode("""
+        {"id": "1", "lat": 45.65, "lng": 5.47, "operators": [], "technologies": [], "azimuts": [], "bands": []}
+        """)
+        XCTAssertNil(marker.supportHeightMeters)
+        XCTAssertNil(marker.supportNature)
+        XCTAssertTrue(marker.radioSystems.isEmpty)
+    }
+
+    func testMalformedSupportHeightIsIgnoredRatherThanGuessed() throws {
+        let marker = try decode("""
+        {
+          "id": "1", "lat": 45.65, "lng": 5.47, "operators": [], "technologies": [], "azimuts": [], "bands": [],
+          "support_info": {"nature": "Pylône treillis"}
+        }
+        """)
+        XCTAssertNil(marker.supportHeightMeters)
+        XCTAssertEqual(marker.supportNature, "Pylône treillis")
+    }
+}

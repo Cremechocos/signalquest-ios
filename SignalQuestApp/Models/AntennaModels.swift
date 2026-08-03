@@ -27,6 +27,11 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
     /// que si le gNB l'est aussi.
     var hasEnb: Bool = false
     var hasGnb: Bool = false
+    /// Nature du support et systèmes radio, connus dès la carte grâce aux tuiles.
+    /// Ils permettent à la fiche de dessiner le bon support et de calculer une
+    /// ligne de visée juste sans attendre la réponse du détail.
+    var supportNature: String?
+    var radioSystems: [String] = []
 
     /// Le site porte-t-il de la 5G ? `technologies` est déjà normalisé en
     /// « 5G / 4G / 3G / 2G » par `normalizedTechnologies`, le test est donc sûr.
