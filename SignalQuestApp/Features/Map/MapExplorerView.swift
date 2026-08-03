@@ -1032,6 +1032,10 @@ struct MapExplorerView: View {
     @State private var selectedPlanned: PlannedSiteLive?
     @State private var selectedFriend: SocialFriendLive?
     @State private var selectedCustomSite: AndroidCustomSiteMarker?
+    @State private var selectedObservedCell: AndroidCommunitySiteMarker?
+    /// Cellules retenues pour créer un site — non vide = l'écran de création
+    /// est présenté.
+    @State private var cellsForNewSite: [AndroidCommunitySiteMarker] = []
     @State private var fetchTask: Task<Void, Never>?
     @State private var lastRegion: MKCoordinateRegion
     @State private var showFilterSheet = false
@@ -1076,6 +1080,20 @@ struct MapExplorerView: View {
         }
         .sheet(item: $selectedCustomSite) { site in
             customSiteSheet(site)
+        }
+        .sheet(item: $selectedObservedCell) { cell in
+            observedCellSheet(cell)
+        }
+        .sheet(isPresented: Binding(
+            get: { !cellsForNewSite.isEmpty },
+            set: { if !$0 { cellsForNewSite = [] } }
+        )) {
+            CreateSiteFromCellsView(
+                cells: cellsForNewSite,
+                operatorLabel: { model.operatorLabel($0) },
+                service: services.customSites,
+                onCreated: { Task { await reloadCurrentRegion() } }
+            )
         }
         .sheet(item: $selectedPlanned) { site in
             PlannedDetailSheet(site: site, operatorLabel: model.operatorLabel(site.operator ?? "ALL"), operatorAccent: model.operatorAccent(site.operator ?? "ALL"))
@@ -2880,6 +2898,14 @@ struct MapExplorerView: View {
                 return
             }
         }
+        // Cellule observée : fiche dédiée. Ce n'est PAS un site — sa position est
+        // un centroïde de mesures — et la fiche propose justement d'en poser un.
+        if annotation.kind == .communitySite, let cellId = annotation.backendId ?? annotation.antennaId,
+           let cell = model.communitySiteTiles.flatMap(\.markers)
+               .first(where: { $0.id == cellId || $0.candidateKey == cellId }) {
+            selectedObservedCell = cell
+            return
+        }
         // Site ajouté à la main : même fiche terrain que les antennes officielles.
         if annotation.kind == .customSite, let siteId = annotation.backendId,
            let site = model.customSiteTiles.flatMap(\.markers).first(where: { $0.id == siteId }) {
@@ -2960,6 +2986,42 @@ struct MapExplorerView: View {
             guard !Task.isCancelled else { return }
             await model.load(bounds: bounds, zoom: zoom, filters: filters, lightweight: true)
         }
+    }
+
+    /// Recharge la zone visible. Appelé après création d'un site pour que le
+    /// marqueur apparaisse sans attendre le prochain déplacement de carte.
+    private func reloadCurrentRegion() async {
+        await model.load(region: lastRegion, zoom: mapZoom, filters: filters)
+    }
+
+    /// Fiche d'une cellule observée, avec les autres cellules du même endroit
+    /// proposées au regroupement (un pylône porte souvent plusieurs opérateurs).
+    private func observedCellSheet(_ cell: AndroidCommunitySiteMarker) -> some View {
+        let nearby = model.communitySiteTiles.flatMap(\.markers).filter { other in
+            other.id != cell.id && Self.isSameSpot(cell, other)
+        }
+        return ObservedCellSheet(
+            cell: cell,
+            nearbyCells: nearby,
+            operatorLabel: { model.operatorLabel($0) },
+            accent: model.operatorAccent(cell.operatorKey ?? "ALL"),
+            onCreateSite: { selected in
+                selectedObservedCell = nil
+                // Laisser la première feuille se fermer avant d'en présenter une
+                // autre : deux `sheet` simultanées s'annulent sous iOS 16.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    cellsForNewSite = selected
+                }
+            }
+        )
+    }
+
+    /// Deux cellules « au même endroit » : moins de 150 m. Assez large pour
+    /// réunir les opérateurs d'un même pylône dont les centroïdes diffèrent,
+    /// assez serré pour ne pas agréger deux sites d'une même rue.
+    private static func isSameSpot(_ a: AndroidCommunitySiteMarker, _ b: AndroidCommunitySiteMarker) -> Bool {
+        CLLocation(latitude: a.lat, longitude: a.lng)
+            .distance(from: CLLocation(latitude: b.lat, longitude: b.lng)) <= 150
     }
 
     private func zoom(for region: MKCoordinateRegion) -> Double {

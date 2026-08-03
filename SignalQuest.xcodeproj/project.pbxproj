@@ -106,6 +106,7 @@
 		3D1F0588D592CF8DED9BD1EB /* FluidityQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFDF16B243853AE40E37D07C /* FluidityQATests.swift */; };
 		3F1956951AB95E899EC52726 /* SpeedtestPhase+Display.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93B1CEE997E54F26D8E2E986 /* SpeedtestPhase+Display.swift */; };
 		4062FC76DAFABCDD6E5C6901 /* AntennasService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB24C8F6F0931F6D99B18115 /* AntennasService.swift */; };
+		40ADB14D3FEDE7371042A6BA /* CustomSitesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74C44E54A806F05156B150F1 /* CustomSitesService.swift */; };
 		410070C7BCF48B0D6C417526 /* SmokeTourQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB7D271F7EF3536DB6B7C1A1 /* SmokeTourQATests.swift */; };
 		41CCD76BD13F09EF27F0904C /* SpeedtestLiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761DCC23E9E837925496D61E /* SpeedtestLiveActivityController.swift */; };
 		427E9F89223F62FF1D193AEF /* AuthTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7ACE7CF4C567524403CDD7 /* AuthTransportTests.swift */; };
@@ -114,6 +115,7 @@
 		457C2A59F2A7938C086C2669 /* FeedItemCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F4F7435470D7B186E080C8E /* FeedItemCard.swift */; };
 		45E031C6AB7C6A13B13FCE19 /* ICMPPinger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4667EE4B0BF1383A8D24C87E /* ICMPPinger.swift */; };
 		479DAA09F0F70F020AB8CA4F /* ANFRSiteDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8327BBD2C2D10A320833EC79 /* ANFRSiteDetailSheet.swift */; };
+		480E595E70AD0121DC5AFD80 /* CreateSiteFromCellsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D504BC2C0CFB4CA628B1C909 /* CreateSiteFromCellsView.swift */; };
 		4865973FD58147AC8822EADD /* SpeedtestDetailSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3E33D670CB07FB413E537F1 /* SpeedtestDetailSheetTests.swift */; };
 		48C419E3E4CA1E519CB37A9B /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 2FB40D9CA1FEA6EDBD36D021 /* FirebaseCrashlytics */; };
 		4A25941995D0EC7FD14AEC6C /* SQRadius.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FB22F5DE6B092A44B9F7A91 /* SQRadius.swift */; };
@@ -326,6 +328,7 @@
 		D8B502074515888EFFA296B9 /* GroupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E2756E12B4DD8420E4E6FC4 /* GroupSettingsView.swift */; };
 		D8D71CD3AB926175688AD739 /* ScheduledMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA71E3F29A86476A36C8900F /* ScheduledMessagesView.swift */; };
 		D9270EE5F2BA3509FBF72312 /* SavedMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD7AF3FD3C9A5C4D2280D2B5 /* SavedMessagesView.swift */; };
+		DA3469640194E43FFDC39C39 /* CustomSiteDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3F7311EB7FEBC85F9AD1E6 /* CustomSiteDraftTests.swift */; };
 		DA97C11B6664887E0F4F3C42 /* PostCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA923675E56186A1BD8D5B7F /* PostCardView.swift */; };
 		DB0BAEE35242EC8E2A1F6515 /* VersionPolicyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D9D541BEF00A9C73ECDCC19 /* VersionPolicyService.swift */; };
 		DBBD52313A6831B3403676BC /* GlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF71EBDA3DD738BAEF9242E3 /* GlassCard.swift */; };
@@ -339,6 +342,7 @@
 		E156E1B5171E02B1878DA63A /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F378A97EE08A97DD345A432F /* FeedView.swift */; };
 		E157C7D20328C987CA6CAC09 /* Territory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A003CFB7415DD224E468A2D5 /* Territory.swift */; };
 		E1B2D16B328B500C0B3E1E1E /* RadioLogsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4346B0324DBC983FC6001FF7 /* RadioLogsTests.swift */; };
+		E324B778DDBD2190BB193839 /* ObservedCellSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B49585CCEE5ACBC0C1E3F60E /* ObservedCellSheet.swift */; };
 		E334F060DA22618A06883CC7 /* VoiceNoteRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97E995D86EB1D6FE8BFA16CA /* VoiceNoteRecorder.swift */; };
 		E4D3352BEA88542E42F96E7B /* ValidationsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8738D9A09B93678F37E5A510 /* ValidationsSheet.swift */; };
 		E53F5CF267D21D6EBCBBB070 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 6EAEE5F367C7CB8690FF7147 /* FirebaseMessaging */; };
@@ -526,6 +530,7 @@
 		4A30FBE643735E6E375B3948 /* NewModelDecodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewModelDecodeTests.swift; sourceTree = "<group>"; };
 		4A392F27A37DB201C942F22D /* MessageSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageSyncEngine.swift; sourceTree = "<group>"; };
 		4C859D91AFCEFBFEE4E43C47 /* ANFRModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRModels.swift; sourceTree = "<group>"; };
+		4D3F7311EB7FEBC85F9AD1E6 /* CustomSiteDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomSiteDraftTests.swift; sourceTree = "<group>"; };
 		4DBC54E804678243BC1BCC4C /* AuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthModels.swift; sourceTree = "<group>"; };
 		4FD1C03F7963002D147C2B6A /* OutageDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutageDetailSheet.swift; sourceTree = "<group>"; };
 		50E224DF9C30B2416798A0F5 /* AntennaSightGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaSightGeometryTests.swift; sourceTree = "<group>"; };
@@ -585,6 +590,7 @@
 		71F03A270597876371BF433F /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		729C9DEBA4E8FC4DD397E20E /* SpeedtestTriMetric.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestTriMetric.swift; sourceTree = "<group>"; };
 		743199D868E04642B691ED1A /* MentionAutocomplete.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionAutocomplete.swift; sourceTree = "<group>"; };
+		74C44E54A806F05156B150F1 /* CustomSitesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomSitesService.swift; sourceTree = "<group>"; };
 		74CF7E1DDA21B03198307ED6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		75277B9215C74B786F3456E4 /* FeedSignalsCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedSignalsCollector.swift; sourceTree = "<group>"; };
 		752CA575743D913E207E4A67 /* ChooseHandleSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChooseHandleSheet.swift; sourceTree = "<group>"; };
@@ -690,6 +696,7 @@
 		B32C6BDB8AAAE92F19CCDB1F /* Comparable+Clamp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Comparable+Clamp.swift"; sourceTree = "<group>"; };
 		B3E12C14EC03895F48D39245 /* CallManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallManager.swift; sourceTree = "<group>"; };
 		B3F7194ED546885B8FCFAFCB /* FeedTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedTab.swift; sourceTree = "<group>"; };
+		B49585CCEE5ACBC0C1E3F60E /* ObservedCellSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObservedCellSheet.swift; sourceTree = "<group>"; };
 		B4C73A379F93D002ADB36740 /* AntennaReportsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaReportsListView.swift; sourceTree = "<group>"; };
 		B4D1C18861E6114F7226BF02 /* BricolageGrotesque-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "BricolageGrotesque-Bold.ttf"; sourceTree = "<group>"; };
 		B4EBB8F2A133C7E7E8BFE147 /* AntennaMarkerDecodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaMarkerDecodeTests.swift; sourceTree = "<group>"; };
@@ -735,6 +742,7 @@
 		D39C1D3B6CAAB2272A0E6B6C /* MapAccessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAccessibility.swift; sourceTree = "<group>"; };
 		D3B3876EB852F87013AA160D /* RadioLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogsView.swift; sourceTree = "<group>"; };
 		D4B43802B3725DE1A21B9D53 /* FeedPoll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedPoll.swift; sourceTree = "<group>"; };
+		D504BC2C0CFB4CA628B1C909 /* CreateSiteFromCellsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateSiteFromCellsView.swift; sourceTree = "<group>"; };
 		D6A0DBB96F9423CDD0C043B6 /* SpeedtestShareQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestShareQATests.swift; sourceTree = "<group>"; };
 		D6FFA250C4BE27D4200678E2 /* ModelDecodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDecodeTests.swift; sourceTree = "<group>"; };
 		D7454A1BEDAD17CEBB961A3D /* SignalQuestTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SignalQuestTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1460,6 +1468,7 @@
 				92E156E2B3CA6D911D4A0C30 /* AuthService.swift */,
 				CE9C7190AEB0D08E27839A20 /* CallsService.swift */,
 				26BF4AF46D1515F881E4DF50 /* CommentsService.swift */,
+				74C44E54A806F05156B150F1 /* CustomSitesService.swift */,
 				8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */,
 				510C718208A0F0CD33A6405E /* EntitlementsService.swift */,
 				75277B9215C74B786F3456E4 /* FeedSignalsCollector.swift */,
@@ -1513,6 +1522,7 @@
 				0DA0BEDA1A291F4FBD677EF4 /* CoordinateGridTests.swift */,
 				0B9B5640F38ED77C1C34D499 /* CoverageRenderPolicyTests.swift */,
 				067D3AF65AE57675EBBE798B /* CrashHardeningTests.swift */,
+				4D3F7311EB7FEBC85F9AD1E6 /* CustomSiteDraftTests.swift */,
 				A84A348D80B0B5882E1A9AC9 /* DesignTokenContrastTests.swift */,
 				87AE9139473E16EE1FB4FFE7 /* DriveTestDataBudgetTests.swift */,
 				1483D87FE8E1D946F88F7C05 /* E2EETests.swift */,
@@ -1590,6 +1600,7 @@
 				1DAA7D338C028E555F8CBAFC /* AntennaSightGeometry.swift */,
 				56C63E44A7E96FCFBDBE3BD8 /* AntennaSightView.swift */,
 				AEC8C52D6E947CD2FC669EFE /* AntennaSupportSilhouette.swift */,
+				D504BC2C0CFB4CA628B1C909 /* CreateSiteFromCellsView.swift */,
 				CB55790C931377A64C3D3477 /* DromRegion.swift */,
 				A7FCE24EAE6C3426959B07BC /* FriendLiveSheet.swift */,
 				6A8E6D81B9432117EA5197F0 /* MapAdvancedFilterSheet.swift */,
@@ -1597,6 +1608,7 @@
 				ACB33739AFC84C313844322C /* MapExplorerView.swift */,
 				846A05DBDA256496DC1A6AFF /* MapFilterCatalog.swift */,
 				A3943DEC3A15CC630D29F54A /* MapPhotoViewer.swift */,
+				B49585CCEE5ACBC0C1E3F60E /* ObservedCellSheet.swift */,
 				4FD1C03F7963002D147C2B6A /* OutageDetailSheet.swift */,
 				610EE8D2CB67E2741D6E1701 /* PlannedDetailSheet.swift */,
 				3E56653C936C5B86173CE9F8 /* MapKit */,
@@ -1954,7 +1966,9 @@
 				0CF9145D3ADC8FEEB0F4702E /* ConversationModels.swift in Sources */,
 				F22045A3CF1CDB73F010AB90 /* CoordinateGrid.swift in Sources */,
 				81672BA3E386570C6398A008 /* CoverageCardView.swift in Sources */,
+				480E595E70AD0121DC5AFD80 /* CreateSiteFromCellsView.swift in Sources */,
 				33C988E6EFCB2A0AD84D7D26 /* CredentialStore.swift in Sources */,
+				40ADB14D3FEDE7371042A6BA /* CustomSitesService.swift in Sources */,
 				1C8AA28EE4CFA6F012C5B69F /* DiskCache.swift in Sources */,
 				76BB800EF2BE8540711AEF12 /* DriveSpeedtestDetailSheet.swift in Sources */,
 				3926E2BDC6467D138E73947C /* DriveTestDisclosureView.swift in Sources */,
@@ -2037,6 +2051,7 @@
 				1903FFA116C3304098389589 /* NewPollView.swift in Sources */,
 				92554F6DCF00E04342046FDE /* NotificationsCenterView.swift in Sources */,
 				B11527ED2AE1705CF5EAA4AD /* NotificationsService.swift in Sources */,
+				E324B778DDBD2190BB193839 /* ObservedCellSheet.swift in Sources */,
 				598103B3A8E554B580FBDC13 /* OnboardingView.swift in Sources */,
 				4AD407D0ECC09A2E4AEB9EEE /* OutageDetailSheet.swift in Sources */,
 				CE66573428F3BB839C2DF76B /* PaywallView.swift in Sources */,
@@ -2225,6 +2240,7 @@
 				86B8A5872A08214CDCDE5633 /* CoordinateGridTests.swift in Sources */,
 				59319D5732AB2088D06F5F8D /* CoverageRenderPolicyTests.swift in Sources */,
 				53C2F8D7E0BE624F1C800C35 /* CrashHardeningTests.swift in Sources */,
+				DA3469640194E43FFDC39C39 /* CustomSiteDraftTests.swift in Sources */,
 				5D7466C54936C9FAEC120C2D /* DesignTokenContrastTests.swift in Sources */,
 				FCA0F934683B2BC6C982C8B8 /* DriveTestDataBudgetTests.swift in Sources */,
 				A9AA093F88B7A4E23A7EE3A7 /* E2EETests.swift in Sources */,

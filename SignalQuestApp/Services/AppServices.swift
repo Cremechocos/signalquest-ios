@@ -18,6 +18,8 @@ final class AppServices: ObservableObject {
     let terrain: TerrainServicing
     /// Signalements d'antenne (émission, suivi, discussion avec la modération).
     let antennaReports: AntennaReportsServicing
+    /// Création de sites pointés à la main (dont ceux déduits de cellules observées).
+    let customSites: CustomSitesServicing
     let anfr: ANFRServicing
     let speedtest: SpeedtestService
     let networkOperator: NetworkOperatorServicing
@@ -83,6 +85,7 @@ final class AppServices: ObservableObject {
         antennas = AntennasService(api: api)
         terrain = TerrainService(api: api)
         antennaReports = AntennaReportsService(api: api)
+        customSites = CustomSitesService(api: api)
         anfr = ANFRService(api: api)
         let networkOperatorService = NetworkOperatorService(api: api)
         networkOperator = networkOperatorService

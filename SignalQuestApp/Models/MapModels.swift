@@ -840,6 +840,19 @@ struct AndroidCommunitySiteMarker: Decodable, Identifiable, Equatable, Sendable 
     let radioNodeType: String?
     let enb: String?
     let gnb: String?
+    /// Identité radio complète. Sans elle on ne peut pas pré-remplir un site à
+    /// partir d'une cellule : l'eNB seul ne suffit ni à décrire la porteuse, ni
+    /// à retrouver l'opérateur par PLMN.
+    let cellId: String?
+    let ci: String?
+    let pci: Int?
+    let tac: String?
+    let earfcn: Int?
+    let nrarfcn: Int?
+    let band: Int?
+    let mcc: Int?
+    let mnc: Int?
+    let firstObservedAt: Date?
     let lat: Double
     let lng: Double
     let radiusMeters: Double?
@@ -847,12 +860,16 @@ struct AndroidCommunitySiteMarker: Decodable, Identifiable, Equatable, Sendable 
     let confidenceLevel: String?
     let observationCount: Int?
     let distinctUserCount: Int?
+    /// Précision GPS médiane des mesures : dit à quel point le centroïde est sûr.
+    let medianAccuracyMeters: Double?
     let lastObservedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, candidateKey, candidateKind, marketCode, operatorKey, networkGroupKey
         case radioNodeType, enb, gnb, lat, lng, radiusMeters, confidenceScore
         case confidenceLevel, observationCount, distinctUserCount, lastObservedAt
+        case cellId, ci, pci, tac, earfcn, nrarfcn, band, mcc, mnc, firstObservedAt
+        case medianAccuracyMeters
     }
 
     init(from decoder: Decoder) throws {
@@ -876,6 +893,17 @@ struct AndroidCommunitySiteMarker: Decodable, Identifiable, Equatable, Sendable 
         observationCount = (try? c.decodeIfPresent(Int.self, forKey: .observationCount)) ?? nil
         distinctUserCount = (try? c.decodeIfPresent(Int.self, forKey: .distinctUserCount)) ?? nil
         lastObservedAt = (try? c.decodeIfPresent(Date.self, forKey: .lastObservedAt)) ?? nil
+        cellId = c.decodeFlexibleString(forKey: .cellId)
+        ci = c.decodeFlexibleString(forKey: .ci)
+        pci = (try? c.decodeIfPresent(Int.self, forKey: .pci)) ?? nil
+        tac = c.decodeFlexibleString(forKey: .tac)
+        earfcn = (try? c.decodeIfPresent(Int.self, forKey: .earfcn)) ?? nil
+        nrarfcn = (try? c.decodeIfPresent(Int.self, forKey: .nrarfcn)) ?? nil
+        band = (try? c.decodeIfPresent(Int.self, forKey: .band)) ?? nil
+        mcc = (try? c.decodeIfPresent(Int.self, forKey: .mcc)) ?? nil
+        mnc = (try? c.decodeIfPresent(Int.self, forKey: .mnc)) ?? nil
+        firstObservedAt = (try? c.decodeIfPresent(Date.self, forKey: .firstObservedAt)) ?? nil
+        medianAccuracyMeters = (try? c.decodeIfPresent(Double.self, forKey: .medianAccuracyMeters)) ?? nil
     }
 }
 
