@@ -44,7 +44,11 @@ struct AntennaProfileView: View {
                     chart
                         .frame(height: 330)
                         .frame(maxWidth: .infinity)
-                        .padding(SQSpace.md)
+                        // Padding horizontal resserré : le graphe est déjà borné
+                        // par ses propres marges internes, et deux niveaux de
+                        // retrait laissaient une bande vide le long du cadre.
+                        .padding(.vertical, SQSpace.md)
+                        .padding(.horizontal, SQSpace.sm)
                         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
                         .sqShadowCard()
 
@@ -96,7 +100,7 @@ struct AntennaProfileView: View {
             // figurent déjà dans les tuiles sous le graphe, et les cotes prenaient
             // une bande de largeur au détriment du profil lui-même.
             let leftInset: CGFloat = 40
-            let rightInset: CGFloat = 30
+            let rightInset: CGFloat = 26
             // Les deux étiquettes d'extrémité (nom puis altitude) et la ligne
             // d'échelle se superposaient : chacune a maintenant sa ligne.
             let bottomInset: CGFloat = 44
@@ -114,11 +118,17 @@ struct AntennaProfileView: View {
 
             drawAltitudeAxis(context: context, size: size, minValue: minValue, span: span, leftInset: leftInset, y: y)
 
-            // Relief
+            // Relief. Il se prolonge jusqu'au bord droit du cadre en gardant
+            // l'altitude du site : la marge réservée à la silhouette du support
+            // laissait sinon un rectangle vide sous les antennes, comme si le sol
+            // s'arrêtait au pied du pylône.
             var ground = Path()
             ground.move(to: CGPoint(x: leftInset, y: size.height - bottomInset))
             for p in profile { ground.addLine(to: point(p, p.groundMeters)) }
-            ground.addLine(to: CGPoint(x: x(total), y: size.height - bottomInset))
+            if let last = profile.last {
+                ground.addLine(to: CGPoint(x: size.width, y: y(last.groundMeters)))
+            }
+            ground.addLine(to: CGPoint(x: size.width, y: size.height - bottomInset))
             ground.closeSubpath()
             context.fill(ground, with: .color(SQColor.labelSecondary.opacity(0.26)))
 
@@ -309,7 +319,7 @@ struct AntennaProfileView: View {
         // Un pylône réel tient dans un rapport de l'ordre de 1 pour 8 ; on s'en
         // approche, avec un plancher qui garde les traverses lisibles.
         let height = max(groundY - topY, 1)
-        let width = max(min(height * 0.16, 46), 16)
+        let width = max(min(height * 0.12, 36), 14)
         let structure = AntennaSupportSilhouette.strokePath(
             family: family, baseX: x, baseY: groundY, topY: topY, width: width
         )
