@@ -35,6 +35,8 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
     /// Azimuts par opérateur sur un support partagé. Vide sur un site
     /// mono-opérateur, ou tant que le backend ne l'émet pas.
     var azimuthsByOperator: [String: [Double]] = [:]
+    /// Opérateurs du site qui émettent en 5G (support partagé uniquement).
+    var operators5G: [String] = []
 
     /// Le site porte-t-il de la 5G ? `technologies` est déjà normalisé en
     /// « 5G / 4G / 3G / 2G » par `normalizedTechnologies`, le test est donc sûr.

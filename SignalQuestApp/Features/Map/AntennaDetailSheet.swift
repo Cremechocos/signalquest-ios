@@ -73,6 +73,9 @@ struct AntennaDetailSheet: View {
     /// ajoutés ». La route de détail sert les deux types de sites, mais elle ne
     /// renvoie ni l'auteur ni la date d'ajout : ils viennent de la tuile.
     let customSite: AndroidCustomSiteMarker?
+    /// Demande à la carte de n'afficher que la couverture de ce site. `nil` quand
+    /// la fiche est ouverte hors de la carte.
+    var onIsolateCoverage: ((AntennaCoverageFocus) -> Void)?
     /// Opérateur dont on affiche la fiche. Modifiable in-situ pour les sites
     /// partagés (multi-opérateurs) : l'utilisateur passe de l'un à l'autre sans
     /// rouvrir la carte.
@@ -89,11 +92,13 @@ struct AntennaDetailSheet: View {
         market: String = "FR",
         operatorName: String = "SFR",
         service: AntennasServicing,
-        customSite: AndroidCustomSiteMarker? = nil
+        customSite: AndroidCustomSiteMarker? = nil,
+        onIsolateCoverage: ((AntennaCoverageFocus) -> Void)? = nil
     ) {
         self.site = site
         self.market = market
         self.customSite = customSite
+        self.onIsolateCoverage = onIsolateCoverage
         let resolved = operatorName == "ALL" ? (site.operators.first ?? "SFR") : operatorName
         _selectedOperator = State(initialValue: resolved)
         _model = StateObject(wrappedValue: AntennaDetailViewModel(service: service))
@@ -119,6 +124,7 @@ struct AntennaDetailSheet: View {
                     } else {
                         ProgressView().tint(SQColor.brandRed).frame(maxWidth: .infinity)
                     }
+                    siteActions
                     reportCard
                 }
                 .padding(SQSpace.lg + 2)
@@ -198,6 +204,69 @@ struct AntennaDetailSheet: View {
             }
         }
         .foregroundStyle(SQColor.label)
+    }
+
+    /// Deux gestes qu'on veut faire une fois sur place — ou avant d'y aller :
+    /// s'y rendre, et voir ce que la communauté a mesuré sur CE site.
+    @ViewBuilder
+    private var siteActions: some View {
+        if let coordinate = siteCoordinate {
+            HStack(spacing: SQSpace.sm) {
+                actionButton("Itinéraire", icon: "car.fill") {
+                    openRoute(to: coordinate)
+                }
+                if let onIsolateCoverage, let focus = coverageFocus {
+                    actionButton("Sa couverture", icon: "dot.radiowaves.left.and.right") {
+                        onIsolateCoverage(focus)
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Identité radio permettant d'isoler les mesures de CE site.
+    ///
+    /// Sans eNB ni gNB connu, la couverture ne peut pas être rattachée au site :
+    /// mieux vaut ne pas proposer le bouton que de renvoyer une carte vide.
+    private var coverageFocus: AntennaCoverageFocus? {
+        let identifiers = model.details?.core?.cellIdentifiers
+        let enb = identifiers?.enb.first ?? customSite?.radio?.enb
+        let gnb = identifiers?.gnb.first ?? customSite?.radio?.gnb
+        guard enb != nil || gnb != nil else { return nil }
+        return AntennaCoverageFocus(
+            siteLabel: headerTitle,
+            operatorKey: selectedOperator,
+            enb: enb,
+            gnb: gnb
+        )
+    }
+
+    /// Ouvre Plan avec un itinéraire. Le nom du site sert d'étiquette pour que
+    /// la destination soit reconnaissable dans l'app Plan.
+    private func openRoute(to coordinate: CLLocationCoordinate2D) {
+        Haptics.light()
+        let placemark = MKPlacemark(coordinate: coordinate)
+        let item = MKMapItem(placemark: placemark)
+        item.name = headerTitle
+        item.openInMaps(launchOptions: [
+            MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
+        ])
+    }
+
+    private func actionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: SQSpace.xs + 2) {
+                Image(systemName: icon).font(.system(size: 14, weight: .semibold))
+                Text(LocalizedStringKey(title)).font(SQFont.body(14, .semibold))
+            }
+            .foregroundStyle(SQColor.label)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, SQSpace.md - 1)
+            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .sqShadowCard()
+        }
+        .buttonStyle(SQPressButtonStyle())
     }
 
     /// Carte « Signaler un problème » : ouvre le formulaire de signalement d'antenne.

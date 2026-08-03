@@ -34,6 +34,8 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     /// Un calque par couleur d'opérateur pour les traits d'azimut. Les tirets de
     /// chacun sont décalés pour s'entrelacer sur une direction partagée.
     private var beamLayers: [CAShapeLayer] = []
+    /// Arcs d'anneau 5G, un par opérateur concerné sur un support partagé.
+    private var ringArcs: [CAShapeLayer] = []
     private let checkBadge = UIImageView()
     private let photoBadge = UIImageView()
 
@@ -114,6 +116,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             glyph.isHidden = true
             hidePie()
             hideBeams()
+            hideRingArcs()
             lobes.path = nil
             ring.path = nil
             checkBadge.isHidden = true
@@ -349,10 +352,22 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     private func applyRing(_ payload: MapAnnotationPayload, size: CGFloat, color: UIColor) {
         guard payload.kind == .antenna, payload.has5G else {
             ring.path = nil
+            hideRingArcs()
             return
         }
         let radius = size / 2 + 4
         let center = CGPoint(x: bounds.midX, y: bounds.midY)
+
+        // Support partagé dont on sait QUI émet en 5G : un arc par opérateur
+        // concerné, découpé sur les mêmes secteurs que le camembert. L'arc coiffe
+        // donc exactement la part de son opérateur — on lit d'un coup d'œil qui
+        // a la 5G et qui ne l'a pas.
+        if !payload.fiveGTintIndices.isEmpty, payload.operatorTints.count > 1 {
+            ring.path = nil
+            applyRingArcs(payload, radius: radius, center: center)
+            return
+        }
+        hideRingArcs()
         ring.path = UIBezierPath(
             arcCenter: center,
             radius: radius,
@@ -363,6 +378,53 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         // Vert = le gNB de ce site 5G est identifié. Couleur opérateur = il émet
         // en 5G mais personne n'a encore trouvé son gNB.
         ring.strokeColor = (payload.hasGnb ? UIColor(SQColor.success) : color).cgColor
+    }
+
+    /// Un arc d'anneau par opérateur 5G, aligné sur sa part de camembert.
+    ///
+    /// Les arcs sont RACCOURCIS de quelques degrés à chaque extrémité : deux arcs
+    /// jointifs se toucheraient et se liraient comme un anneau continu, ce qui
+    /// ferait croire que tous les opérateurs ont la 5G.
+    private func applyRingArcs(_ payload: MapAnnotationPayload, radius: CGFloat, center: CGPoint) {
+        let tints = payload.operatorTints
+        let step = (.pi * 2) / CGFloat(tints.count)
+        // 6° de respiration de chaque côté, un peu moins quand les parts sont
+        // étroites — sinon un arc de 90° amputé de 12° paraît flotter.
+        let gap: CGFloat = min(6 * .pi / 180, step * 0.12)
+        let indices = payload.fiveGTintIndices.filter { $0 < tints.count }
+
+        for index in 0..<max(indices.count, ringArcs.count) {
+            if index >= ringArcs.count {
+                let arc = CAShapeLayer()
+                arc.fillColor = nil
+                arc.lineWidth = 2.2
+                arc.lineCap = .round
+                layer.insertSublayer(arc, above: ring)
+                ringArcs.append(arc)
+            }
+            let arc = ringArcs[index]
+            guard index < indices.count else { arc.isHidden = true; continue }
+            let slot = indices[index]
+            arc.isHidden = false
+            arc.bounds = CGRect(origin: .zero, size: bounds.size)
+            arc.position = CGPoint(x: bounds.midX, y: bounds.midY)
+            // Même origine que le camembert : première part au sommet (−90°).
+            let start = -CGFloat.pi / 2 + step * CGFloat(slot)
+            arc.path = UIBezierPath(
+                arcCenter: center,
+                radius: radius,
+                startAngle: start + gap,
+                endAngle: start + step - gap,
+                clockwise: true
+            ).cgPath
+            // Vert quand le gNB du SITE est identifié : la donnée n'est pas
+            // ventilée par opérateur, on ne prétend donc pas qu'elle l'est.
+            arc.strokeColor = (payload.hasGnb ? UIColor(SQColor.success) : UIColor(tints[slot])).cgColor
+        }
+    }
+
+    private func hideRingArcs() {
+        for arc in ringArcs { arc.isHidden = true }
     }
 
     private func applyBadges(_ payload: MapAnnotationPayload, size: CGFloat) {

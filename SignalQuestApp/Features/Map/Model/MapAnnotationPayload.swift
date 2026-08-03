@@ -80,6 +80,10 @@ struct MapAnnotationPayload: Identifiable, Equatable {
     var operatorTints: [Color] = []
     /// Rendu des azimuts choisi par l'utilisateur.
     var azimuthStyle: AzimuthStyle = .lobes
+    /// Parmi `operatorTints`, lesquelles émettent en 5G — mêmes indices, donc
+    /// l'arc d'un opérateur se dessine exactement au-dessus de sa part de
+    /// camembert. Vide → anneau 5G classique d'une seule couleur.
+    var fiveGTintIndices: [Int] = []
     /// Azimuts groupés par direction avec les couleurs des opérateurs qui la
     /// pointent. Vide → tous les azimuts prennent la couleur du site (cas
     /// mono-opérateur, ou backend qui n'émet pas encore le détail par facette).
@@ -125,6 +129,7 @@ struct MapAnnotationPayload: Identifiable, Equatable {
         lhs.azimuthReachPoints == rhs.azimuthReachPoints &&
         lhs.operatorTints == rhs.operatorTints &&
         lhs.azimuthStyle == rhs.azimuthStyle &&
+        lhs.fiveGTintIndices == rhs.fiveGTintIndices &&
         lhs.azimuthBeams == rhs.azimuthBeams &&
         lhs.friend == rhs.friend
     }

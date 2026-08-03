@@ -317,6 +317,7 @@
 		CE1EF5972BC43FC3B9598D5D /* MapAccessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = D39C1D3B6CAAB2272A0E6B6C /* MapAccessibility.swift */; };
 		CE66573428F3BB839C2DF76B /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53842ADB5CE6AC861978B14B /* PaywallView.swift */; };
 		CFBA45A0F84A42EAA877DE8A /* FeedTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F7194ED546885B8FCFAFCB /* FeedTab.swift */; };
+		D0A7A2B036271364A7174960 /* CoverageFocusAndFiveGTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE01721AE7EDEE86744D7C7 /* CoverageFocusAndFiveGTests.swift */; };
 		D1212A2119E013814872AB77 /* MessageComposerBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E9816756A77B99C80C56487 /* MessageComposerBar.swift */; };
 		D14E7CF676EC9E09D02D37D5 /* MessageSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E65943B243D74D4B50717E71 /* MessageSearchView.swift */; };
 		D1A58B2BB8DD3C9F24E5DAC3 /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEB3FB0048F8A13762D3E9A7 /* EditProfileView.swift */; };
@@ -358,6 +359,7 @@
 		ECBDC1919F95968B3CBB37C0 /* ThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF1F41B3B9C7134D4B1810A3 /* ThreadView.swift */; };
 		ECC09E7CA1AB0F9C9BE01F32 /* DriveTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07ACC9D1192AB45142AE044 /* DriveTestView.swift */; };
 		ED9476A999CCD805CDEBF75B /* SpeedtestDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C770C2B428D4F156C88972B0 /* SpeedtestDetailSheet.swift */; };
+		EDA2AC7EAF239065EC5A756C /* AntennaCoverageFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C0D9C041D8E61783255A67B /* AntennaCoverageFocus.swift */; };
 		EE47E722A4FE5F89F50C9523 /* MarketRegistryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 182127C92C62ADE344EDBCD1 /* MarketRegistryService.swift */; };
 		F22045A3CF1CDB73F010AB90 /* CoordinateGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65EBA6352C0FC36FBB95501E /* CoordinateGrid.swift */; };
 		F2C6455F39565642CFC5EA48 /* NearbyNetworkQualityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02B8E44000E7F6CDC6104D82 /* NearbyNetworkQualityService.swift */; };
@@ -636,6 +638,7 @@
 		8A4F1A6B2D39931723BEF026 /* NetworkWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkWidget.swift; sourceTree = "<group>"; };
 		8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEService.swift; sourceTree = "<group>"; };
 		8BCDF535985DE44CBDD88A60 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		8C0D9C041D8E61783255A67B /* AntennaCoverageFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaCoverageFocus.swift; sourceTree = "<group>"; };
 		8C29B55C40CE44D0AA0D262A /* LeaderboardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardsView.swift; sourceTree = "<group>"; };
 		8C94749CE21617DB555FC5D6 /* ANFRDemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRDemoData.swift; sourceTree = "<group>"; };
 		8D2BA4BE9B82CEBAF420AC06 /* RadioLogsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogsService.swift; sourceTree = "<group>"; };
@@ -772,6 +775,7 @@
 		EC5255F7439DB3A81B3C67F6 /* SQUserBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQUserBadge.swift; sourceTree = "<group>"; };
 		EC90EEA12944FF6F69C6632B /* ICMPPingerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICMPPingerTests.swift; sourceTree = "<group>"; };
 		ED23939334EC481F2A096590 /* ReportsRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsRoutingTests.swift; sourceTree = "<group>"; };
+		EDE01721AE7EDEE86744D7C7 /* CoverageFocusAndFiveGTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageFocusAndFiveGTests.swift; sourceTree = "<group>"; };
 		EF1CBBB47AF9B0D1E7B04560 /* TerritoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerritoryTests.swift; sourceTree = "<group>"; };
 		EF6835ADAA41625A09DC3013 /* PollBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollBubble.swift; sourceTree = "<group>"; };
 		F031B14E382FDADDEAEFECE1 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
@@ -1520,6 +1524,7 @@
 				B070C4F0FF01A239CDF93570 /* CallReliabilityTests.swift */,
 				FD162FB28B7CB0A7E2FE891E /* ComposerPollTests.swift */,
 				0DA0BEDA1A291F4FBD677EF4 /* CoordinateGridTests.swift */,
+				EDE01721AE7EDEE86744D7C7 /* CoverageFocusAndFiveGTests.swift */,
 				0B9B5640F38ED77C1C34D499 /* CoverageRenderPolicyTests.swift */,
 				067D3AF65AE57675EBBE798B /* CrashHardeningTests.swift */,
 				4D3F7311EB7FEBC85F9AD1E6 /* CustomSiteDraftTests.swift */,
@@ -1591,6 +1596,7 @@
 		E63F52EB0C002AB0C5DC514F /* Map */ = {
 			isa = PBXGroup;
 			children = (
+				8C0D9C041D8E61783255A67B /* AntennaCoverageFocus.swift */,
 				1FF3CB12A75C5483284BC5C7 /* AntennaDetailSheet.swift */,
 				D281BCEAB1145BB0193803C1 /* AntennaGlossary.swift */,
 				F67298253C20F58314208B87 /* AntennaGlossaryIllustrations.swift */,
@@ -1922,6 +1928,7 @@
 				DF096DA80BE358FA48F3E8C4 /* APIClient.swift in Sources */,
 				BA3FFF639F273E45CBB1D64D /* APIEndpoint.swift in Sources */,
 				BEBAE07954EA046AB8BFA0F8 /* APIError.swift in Sources */,
+				EDA2AC7EAF239065EC5A756C /* AntennaCoverageFocus.swift in Sources */,
 				5D4E6FA318972C48443A9F8A /* AntennaDetailSheet.swift in Sources */,
 				34DA60E5756AEF582D44BEFE /* AntennaGlossary.swift in Sources */,
 				B1553F600EEACD650C4103BE /* AntennaGlossaryIllustrations.swift in Sources */,
@@ -2238,6 +2245,7 @@
 				989DD213B201095FFA84F05D /* CallReliabilityTests.swift in Sources */,
 				0A7916FE1A3236A3599113ED /* ComposerPollTests.swift in Sources */,
 				86B8A5872A08214CDCDE5633 /* CoordinateGridTests.swift in Sources */,
+				D0A7A2B036271364A7174960 /* CoverageFocusAndFiveGTests.swift in Sources */,
 				59319D5732AB2088D06F5F8D /* CoverageRenderPolicyTests.swift in Sources */,
 				53C2F8D7E0BE624F1C800C35 /* CrashHardeningTests.swift in Sources */,
 				DA3469640194E43FFDC39C39 /* CustomSiteDraftTests.swift in Sources */,

@@ -13,6 +13,7 @@ protocol MapSnapshotServicing: Sendable {
     func antennaTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, withAzimuth: Bool, bands: Set<Int>) async throws -> [AndroidAntennaTileResponse]
     func speedtestTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?) async throws -> [AndroidSpeedtestTileResponse]
     func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?) async throws -> [AndroidCoverageTileResponse]
+    func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?, focus: AntennaCoverageFocus?) async throws -> [AndroidCoverageTileResponse]
     func communitySiteTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, includeObserved: Bool, bands: Set<Int>) async throws -> [AndroidCommunitySiteTileResponse]
     func customSiteTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String) async throws -> [AndroidCustomSiteTileResponse]
 }
@@ -288,7 +289,14 @@ final class MapSnapshotService: MapSnapshotServicing {
     }
 
     func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0, bands: Set<Int> = [], maxAge: TimeInterval? = nil) async throws -> [AndroidCoverageTileResponse] {
+        try await coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: operatorName, days: days, bands: bands, maxAge: maxAge, focus: nil)
+    }
+
+    func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0, bands: Set<Int> = [], maxAge: TimeInterval? = nil, focus: AntennaCoverageFocus?) async throws -> [AndroidCoverageTileResponse] {
         let bandKey = Self.bandCacheKey(bands)
+        // Le focus entre dans la CLÉ de cache : sans ça, la couverture isolée
+        // d'un site servirait les tuiles déjà en cache pour « tout l'opérateur ».
+        let focusKey = focus.map { "|focus=\($0.id)" } ?? ""
         // COV-DENSITY : au DÉZOOM uniquement (z<11), tuiles PLUS FINES (tile.z +1). Le
         // backend plafonne ~2000 pts/tuile ; des tuiles plus petites = moins d'écrêtage
         // = plus de points (trails continus, moins de « sauts »). On limite le boost au
@@ -305,7 +313,7 @@ final class MapSnapshotService: MapSnapshotServicing {
             cacheKey: { tile in
                 // Le z fait partie de la clé, donc detail/limit (dérivés du z)
                 // sont couverts ; days et bandes doivent être explicites.
-                "coverage:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):days=\(days):bands=\(bandKey)"
+                "coverage:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):days=\(days):bands=\(bandKey)\(focusKey)"
             },
             endpoint: { tile in
                 var query = [
@@ -314,6 +322,8 @@ final class MapSnapshotService: MapSnapshotServicing {
                     URLQueryItem(name: "days", value: days <= 0 ? "all" : String(days))
                 ]
                 query.append(contentsOf: Self.bandQueryItems(bands))
+                // Couverture isolée : le backend croise eNB et gNB en OU.
+                if let focus { query.append(contentsOf: focus.queryItems) }
                 // Points bruts dès le « zoom ville » (z11) ; clusters (overview) en
                 // dessous. Seuil iOS uniquement — Android garde sa propre constante (z13).
                 if tile.z < CoverageRenderPolicy.rawPointsFromZoom {

@@ -78,6 +78,9 @@ final class MapExplorerViewModel: ObservableObject {
     @Published var azimuthStyle: AzimuthStyle = MapAzimuthStyleStore.last() {
         didSet { MapAzimuthStyleStore.save(azimuthStyle) }
     }
+    /// Couverture restreinte à un site. Non nil = la couche couverture ne montre
+    /// que les mesures rattachées à son eNB/gNB.
+    @Published var coverageFocus: AntennaCoverageFocus?
     @Published var sharingFilters: Set<String> = []
     /// Statuts prévisionnels visibles (croisement ANFR). Par défaut : les 4.
     /// Filtre 100 % client (les sites sont déjà chargés) → pas de refetch backend.
@@ -534,6 +537,7 @@ final class MapExplorerViewModel: ObservableObject {
         let techs = techFilters
         let bands = bandFilters
         let bandMatchMode = bandMatch
+        let focus = coverageFocus
         let sharing = sharingFilters
         let includeObserved = includeObservedSites
         let stDays = speedtestDays
@@ -626,8 +630,11 @@ final class MapExplorerViewModel: ObservableObject {
         }()
         async let coverageRaw: (value: (tiles: [AndroidCoverageTileResponse], heat: [CoverageHeatPoint])?, error: String?) = {
             guard wantsCoverage else { return (([], []), nil) }
-            let tiles = (try? await svc.coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: covDays, bands: bands, maxAge: nil)) ?? []
-            if tiles.isEmpty {
+            let tiles = (try? await svc.coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: covDays, bands: bands, maxAge: nil, focus: focus)) ?? []
+            // Le repli « points bruts » n'a pas de filtre par site : l'utiliser
+            // en couverture isolée afficherait TOUT l'opérateur en prétendant
+            // montrer ce pylône. Mieux vaut une carte vide qu'une carte fausse.
+            if tiles.isEmpty, focus == nil {
                 // Repli points bruts : source TERMINALE de la couche → son échec est
                 // signalé (couche conservée) au lieu d'être avalé en « vide ».
                 do {
@@ -992,6 +999,7 @@ final class MapExplorerViewModel: ObservableObject {
             site.supportNature = marker.supportNature
             site.radioSystems = marker.radioSystems
             site.azimuthsByOperator = marker.azimutsByOperator
+            site.operators5G = marker.operators5G
             return site
         }
     }
@@ -1104,7 +1112,13 @@ struct MapExplorerView: View {
                 .presentationBackgroundCompat(SQColor.bg)
         }
         .sheet(item: $selectedAntenna) { site in
-            AntennaDetailSheet(site: site, market: model.marketFilter, operatorName: model.operatorFilter, service: services.antennas)
+            AntennaDetailSheet(
+                site: site,
+                market: model.marketFilter,
+                operatorName: model.operatorFilter,
+                service: services.antennas,
+                onIsolateCoverage: { focus in isolateCoverage(focus) }
+            )
         }
         .fullScreenCover(item: $selectedPhoto) { target in
             MapPhotoViewer(
@@ -1483,6 +1497,7 @@ struct MapExplorerView: View {
         VStack(spacing: SQSpace.sm) {
             Spacer()
             if filters.contains(.coverage) {
+                coverageFocusBanner
                 coverageColoringToggle
                 coverageLegendCompact
             }
@@ -1738,6 +1753,42 @@ struct MapExplorerView: View {
         shape
             .fill(SQColor.surfaceGlass)
             .background(.ultraThinMaterial, in: shape)
+    }
+
+    /// Bandeau « couverture isolée » : sans lui, une carte presque vide passerait
+    /// pour un bug alors que c'est un filtre volontaire — et rien ne dirait
+    /// comment en sortir.
+    @ViewBuilder
+    private var coverageFocusBanner: some View {
+        if let focus = model.coverageFocus {
+            HStack(spacing: SQSpace.sm) {
+                Image(systemName: "dot.radiowaves.left.and.right")
+                    .font(.system(size: 13, weight: .semibold))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Couverture de ce site seulement")
+                        .font(SQFont.body(13, .semibold))
+                    Text(focus.summary)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: SQSpace.sm)
+                Button {
+                    Haptics.light()
+                    clearCoverageFocus()
+                } label: {
+                    Text("Tout voir").font(SQFont.body(13, .semibold))
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .tint(SQColor.brandRed)
+            }
+            .foregroundStyle(SQColor.label)
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm + 1)
+            .background(SQColor.surface, in: Capsule(style: .continuous))
+            .sqShadowCard()
+            .padding(.horizontal, SQSpace.lg)
+        }
     }
 
     @ViewBuilder
@@ -2082,6 +2133,7 @@ struct MapExplorerView: View {
                     azimuthReachPoints: Self.azimuthReach(for: mapZoom),
                     operatorTints: operatorTints(for: site),
                     azimuthStyle: model.azimuthStyle,
+                    fiveGTintIndices: fiveGTintIndices(for: site),
                     azimuthBeams: azimuthBeams(for: site)
                 )
             }
@@ -2680,6 +2732,23 @@ struct MapExplorerView: View {
             .map { model.operatorAccent($0) }
     }
 
+    /// Indices, dans `operatorTints`, des opérateurs qui émettent en 5G.
+    ///
+    /// On travaille en INDICES et non en couleurs : deux opérateurs peuvent
+    /// partager une teinte (registre incomplet), et il faut alors distinguer
+    /// leurs parts. L'anneau se découpe sur les mêmes secteurs que le camembert,
+    /// donc l'arc 5G d'un opérateur coiffe exactement sa part.
+    private func fiveGTintIndices(for site: AntennaSite) -> [Int] {
+        let tints = operatorTints(for: site)
+        guard tints.count > 1, !site.operators5G.isEmpty else { return [] }
+        var seen = Set<String>()
+        let ordered = site.operators.filter { seen.insert($0.uppercased()).inserted }
+        let fiveG = Set(site.operators5G.map { $0.uppercased() })
+        return ordered.enumerated()
+            .filter { $0.offset < tints.count && fiveG.contains($0.element.uppercased()) }
+            .map(\.offset)
+    }
+
     /// Regroupe les azimuts d'un site partagé par DIRECTION, avec les couleurs
     /// des opérateurs qui la pointent.
     ///
@@ -2968,7 +3037,8 @@ struct MapExplorerView: View {
             market: model.marketFilter,
             operatorName: operatorName,
             service: services.antennas,
-            customSite: site
+            customSite: site,
+            onIsolateCoverage: { focus in isolateCoverage(focus) }
         )
     }
 
@@ -3011,6 +3081,25 @@ struct MapExplorerView: View {
             guard !Task.isCancelled else { return }
             await model.load(bounds: bounds, zoom: zoom, filters: filters, lightweight: true)
         }
+    }
+
+    /// N'affiche plus que la couverture d'UN site.
+    ///
+    /// La couche couverture exige un opérateur précis (superposer tous les
+    /// opérateurs n'a pas de sens) : on cale donc le filtre sur celui de la
+    /// fiche, sinon la couche resterait muette en « Tous ».
+    private func isolateCoverage(_ focus: AntennaCoverageFocus) {
+        guard focus.isUsable else { return }
+        model.coverageFocus = focus
+        if model.operatorFilter.uppercased() == "ALL" { model.operatorFilter = focus.operatorKey }
+        filters.insert(.coverage)
+        MapFilterStore.save(filters)
+        Task { await reloadCurrentRegion() }
+    }
+
+    private func clearCoverageFocus() {
+        model.coverageFocus = nil
+        Task { await reloadCurrentRegion() }
     }
 
     /// Recharge la zone visible. Appelé après création d'un site pour que le
