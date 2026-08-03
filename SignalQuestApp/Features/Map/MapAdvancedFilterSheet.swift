@@ -6,6 +6,8 @@ struct MapAdvancedFilterSheet: View {
     @Binding var operatorName: String
     @Binding var technologies: Set<String>
     @Binding var bands: Set<Int>
+    @Binding var bandMatch: BandMatchMode
+    @Binding var azimuthStyle: AzimuthStyle
     @Binding var sharing: Set<String>
     @Binding var speedtestDays: Int
     @Binding var coverageDays: Int
@@ -220,6 +222,36 @@ struct MapAdvancedFilterSheet: View {
                                 }
                             }
                         }
+                        // Le mode de croisement ne veut rien dire sans bande cochée :
+                        // l'afficher tout le temps ferait réfléchir à un réglage sans
+                        // effet. Il apparaît quand il commence à compter.
+                        if !bands.isEmpty {
+                            Picker("Croisement des bandes", selection: $bandMatch) {
+                                ForEach(BandMatchMode.allCases, id: \.self) { mode in
+                                    Text(mode.label).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .padding(.top, SQSpace.sm)
+                            Text(bandMatch.explanation)
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+
+                    // Rendu des azimuts : réglage d'affichage pur, sans rechargement.
+                    // Les lobes montrent l'ouverture du faisceau, les traits la seule
+                    // direction — l'un ou l'autre selon qu'on est en ville ou non.
+                    filterSection("Azimuts", icon: "safari") {
+                        LazyVGrid(columns: filterColumns, spacing: 8) {
+                            ForEach(AzimuthStyle.allCases, id: \.self) { style in
+                                filterChip(title: style.label, icon: style.icon, active: azimuthStyle == style) {
+                                    azimuthStyle = style
+                                }
+                            }
+                        }
                     }
 
                     filterSection("Période", icon: "calendar") {
@@ -242,6 +274,8 @@ struct MapAdvancedFilterSheet: View {
                         operatorName = MapMarketStore.initialOperatorKey()
                         technologies.removeAll()
                         bands.removeAll()
+                        bandMatch = .any
+                        azimuthStyle = .lobes
                         sharing.removeAll()
                         speedtestDays = 0
                         coverageDays = 0

@@ -27,6 +27,10 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     /// n'apporterait que du coût de composition.
     private let lobes = CAShapeLayer()
     private let ring = CAShapeLayer()
+    /// Parts d'un site partagé. Un calque par part — `CAShapeLayer` n'a qu'une
+    /// couleur de remplissage — mais recyclés d'un `apply` à l'autre : cette
+    /// méthode est appelée pour CHAQUE annotation à chaque resynchronisation.
+    private var pieSlices: [CAShapeLayer] = []
     private let checkBadge = UIImageView()
     private let photoBadge = UIImageView()
 
@@ -79,6 +83,9 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         layer.addSublayer(ring)
         addSubview(dot)
         dot.addSubview(glyph)
+        // Les parts sont rognées par le cercle du dot : `masksToBounds` ne peut
+        // pas cohabiter avec l'ombre portée, donc c'est le TRACÉ de chaque part
+        // qui reste dans le disque (cf. `applyPie`).
         dot.addSubview(countLabel)
         addSubview(checkBadge)
         addSubview(photoBadge)
@@ -102,6 +109,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             countLabel.text = count > 999 ? "999+" : "\(count)"
             countLabel.isHidden = false
             glyph.isHidden = true
+            hidePie()
             lobes.path = nil
             ring.path = nil
             checkBadge.isHidden = true
@@ -127,6 +135,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
                     .withConfiguration(UIImage.SymbolConfiguration(pointSize: 13, weight: .bold))
                 glyph.isHidden = false
             }
+            applyPie(payload, size: size, fallback: color)
             applyLobes(payload, reach: reach, color: color)
             applyRing(payload, size: size, color: color)
             applyBadges(payload, size: size)
@@ -155,8 +164,15 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         ring.position = center
     }
 
+    /// Azimuts, dans le style choisi par l'utilisateur.
+    ///
+    /// Les lobes disent l'ouverture du faisceau — juste physiquement, mais ils se
+    /// recouvrent en centre-ville. Les traits ne disent que la direction et
+    /// laissent la carte lisible. Aucun des deux n'est « meilleur » : ça dépend du
+    /// terrain, d'où le réglage.
     private func applyLobes(_ payload: MapAnnotationPayload, reach: CGFloat, color: UIColor) {
-        guard reach > 0, payload.showsAzimuths, !payload.azimuths.isEmpty else {
+        guard reach > 0, payload.showsAzimuths, !payload.azimuths.isEmpty,
+              payload.azimuthStyle != .hidden else {
             lobes.path = nil
             return
         }
@@ -166,14 +182,84 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         for azimuth in payload.azimuths.prefix(8) {
             // Azimut 0° = nord = vers le haut de l'écran ; l'axe des Y de UIKit
             // descend, d'où le −90° pour passer du compas au repère de la vue.
-            let start = (azimuth - 90 - halfBeam) * .pi / 180
-            let end = (azimuth - 90 + halfBeam) * .pi / 180
-            path.move(to: center)
-            path.addArc(withCenter: center, radius: reach, startAngle: start, endAngle: end, clockwise: true)
-            path.close()
+            let screenAngle = (azimuth - 90) * .pi / 180
+            switch payload.azimuthStyle {
+            case .lobes:
+                let start = screenAngle - halfBeam * .pi / 180
+                let end = screenAngle + halfBeam * .pi / 180
+                path.move(to: center)
+                path.addArc(withCenter: center, radius: reach, startAngle: start, endAngle: end, clockwise: true)
+                path.close()
+            case .lines:
+                path.move(to: center)
+                path.addLine(to: CGPoint(
+                    x: center.x + cos(screenAngle) * reach,
+                    y: center.y + sin(screenAngle) * reach
+                ))
+            case .hidden:
+                break
+            }
         }
         lobes.path = path.cgPath
-        lobes.fillColor = color.withAlphaComponent(0.28).cgColor
+        switch payload.azimuthStyle {
+        case .lobes:
+            lobes.fillColor = color.withAlphaComponent(0.28).cgColor
+            lobes.strokeColor = nil
+            lobes.lineWidth = 0
+        case .lines, .hidden:
+            // Un trait part du CENTRE de la pastille : sans opacité il déborderait
+            // visiblement dessus. 0,85 le garde net sans écraser le point.
+            lobes.fillColor = nil
+            lobes.strokeColor = color.withAlphaComponent(0.85).cgColor
+            lobes.lineWidth = 2.5
+            lobes.lineCap = .round
+        }
+    }
+
+    /// Camembert des opérateurs d'un site partagé.
+    ///
+    /// N'a de sens qu'en filtre « Tous » : dès qu'un opérateur est sélectionné, le
+    /// backend ne renvoie que sa facette du site et il n'y a plus qu'une couleur.
+    /// Le disque est libre — c'est l'ANNEAU qui est déjà pris par la 5G.
+    private func applyPie(_ payload: MapAnnotationPayload, size: CGFloat, fallback: UIColor) {
+        let tints = payload.operatorTints
+        guard payload.kind == .antenna, tints.count > 1 else {
+            hidePie()
+            dot.backgroundColor = fallback
+            return
+        }
+        // Le fond reste peint : il bouche les jointures entre parts au rendu.
+        dot.backgroundColor = UIColor(tints[0])
+        let center = CGPoint(x: size / 2, y: size / 2)
+        // Le rayon mord de 0,5 pt sous le bord crème pour qu'aucune part ne
+        // dépasse en anticrénelage.
+        let radius = size / 2 - 0.5
+        let step = (.pi * 2) / CGFloat(tints.count)
+        for index in 0..<max(tints.count, pieSlices.count) {
+            if index >= pieSlices.count {
+                let slice = CAShapeLayer()
+                slice.strokeColor = nil
+                dot.layer.insertSublayer(slice, at: 0)
+                pieSlices.append(slice)
+            }
+            let slice = pieSlices[index]
+            guard index < tints.count else { slice.isHidden = true; continue }
+            slice.isHidden = false
+            slice.frame = CGRect(origin: .zero, size: CGSize(width: size, height: size))
+            // Première part au sommet (−90°), puis sens horaire : l'ordre suit
+            // celui des opérateurs du site, stable d'un rendu à l'autre.
+            let start = -CGFloat.pi / 2 + step * CGFloat(index)
+            let path = UIBezierPath()
+            path.move(to: center)
+            path.addArc(withCenter: center, radius: radius, startAngle: start, endAngle: start + step, clockwise: true)
+            path.close()
+            slice.path = path.cgPath
+            slice.fillColor = UIColor(tints[index]).cgColor
+        }
+    }
+
+    private func hidePie() {
+        for slice in pieSlices { slice.isHidden = true }
     }
 
     private func applyRing(_ payload: MapAnnotationPayload, size: CGFloat, color: UIColor) {

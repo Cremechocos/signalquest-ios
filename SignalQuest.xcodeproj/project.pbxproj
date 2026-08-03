@@ -74,6 +74,7 @@
 		280856D3EB97C75ED97A90A4 /* LaunchLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B1F180671AE87E17BF1EC7A /* LaunchLoadingView.swift */; };
 		29E12F800448A8C0B72CFC17 /* PhotoCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 763622AD001158FA3157D839 /* PhotoCardView.swift */; };
 		2A2F82E9AFE1A042BD7029F8 /* PluralVariationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6152347A6C95B7293AB82BFB /* PluralVariationTests.swift */; };
+		2A342FEE30C81599FFBF2CB8 /* MapDisplayPreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52E42B98FC629E7504CCF403 /* MapDisplayPreferencesTests.swift */; };
 		2A75C227B62E74818271FE0A /* E2EEService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */; };
 		2AE3D8AFA78A50D3114E392A /* PhotoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2F641884A080F0EC459B546 /* PhotoService.swift */; };
 		2B0A8A353E00456F4887BBEC /* ValidationCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B0A1DB2B40E7DCA6398C55 /* ValidationCardView.swift */; };
@@ -529,6 +530,7 @@
 		50E224DF9C30B2416798A0F5 /* AntennaSightGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaSightGeometryTests.swift; sourceTree = "<group>"; };
 		510C718208A0F0CD33A6405E /* EntitlementsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitlementsService.swift; sourceTree = "<group>"; };
 		522FEF871CE53739FE2CB92C /* SQColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQColors.swift; sourceTree = "<group>"; };
+		52E42B98FC629E7504CCF403 /* MapDisplayPreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapDisplayPreferencesTests.swift; sourceTree = "<group>"; };
 		53482F595BA7C9973BE76955 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		53842ADB5CE6AC861978B14B /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		551B7C118FD22A527E98C238 /* Figtree-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-Bold.ttf"; sourceTree = "<group>"; };
@@ -1517,6 +1519,7 @@
 				EC90EEA12944FF6F69C6632B /* ICMPPingerTests.swift */,
 				74CF7E1DDA21B03198307ED6 /* Info.plist */,
 				C6D04C87CE6B4E179FE38964 /* MapAccessibilityTests.swift */,
+				52E42B98FC629E7504CCF403 /* MapDisplayPreferencesTests.swift */,
 				B1F4DC14B58C08DADF46E158 /* MapFilterStoreTests.swift */,
 				AB3FB8DEBAD180B509683C8D /* MapSearchTests.swift */,
 				43A01E23F145B917FF35CD53 /* MentionAutocompleteTests.swift */,
@@ -2226,6 +2229,7 @@
 				E7A894ACE7F80EAF9B2A46B9 /* FriendsContractTests.swift in Sources */,
 				E7CE9DC50F6EB2A39D1FB723 /* ICMPPingerTests.swift in Sources */,
 				5B9F06F814F19495F2842E1C /* MapAccessibilityTests.swift in Sources */,
+				2A342FEE30C81599FFBF2CB8 /* MapDisplayPreferencesTests.swift in Sources */,
 				5BB7F333FAEBC17CD67A33C2 /* MapFilterStoreTests.swift in Sources */,
 				E9D5E1E145866A01C6966810 /* MapSearchTests.swift in Sources */,
 				1E85BE17631EC5FEDBB2967B /* MentionAutocompleteTests.swift in Sources */,

@@ -467,6 +467,7 @@ private struct StubAntennasService: AntennasServicing {
     func list(bbox: BoundingBox) async throws -> [AntennaSite] { [] }
     func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>) async throws -> [AntennaSite] { [] }
     func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>, bands: Set<Int>, sharing: Set<String>) async throws -> [AntennaSite] { [] }
+    func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>, bands: Set<Int>, bandMatch: BandMatchMode, sharing: Set<String>) async throws -> [AntennaSite] { [] }
     func details(id: String) async throws -> AntennaDetails { throw APIError.cancelled }
     func details(id: String, market: String, operatorName: String) async throws -> AntennaDetails { throw APIError.cancelled }
     func details(id: String, market: String, operatorName: String, anfrCode: String?) async throws -> AntennaDetails { throw APIError.cancelled }

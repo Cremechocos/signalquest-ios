@@ -36,6 +36,95 @@ enum MapRegionStore {
     }
 }
 
+/// Comment croiser plusieurs bandes cochées dans le filtre carte.
+///
+/// La valeur brute part telle quelle au backend (`?bandMatch=`) : garder les
+/// mêmes jetons des deux côtés évite une table de correspondance à maintenir.
+enum BandMatchMode: String, CaseIterable, Sendable {
+    /// Le site porte au moins une des bandes cochées. Défaut historique.
+    case any
+    /// Le site porte toutes les bandes cochées, quitte à en porter d'autres.
+    case all
+    /// Le site ne porte que des bandes cochées — les sites mono-bande.
+    case only
+
+    var label: String {
+        switch self {
+        case .any: return String(localized: "Au moins une")
+        case .all: return String(localized: "Toutes")
+        case .only: return String(localized: "Exclusivement")
+        }
+    }
+
+    /// Phrase d'aide sous le sélecteur : la nuance entre « toutes » et
+    /// « exclusivement » ne se devine pas d'un libellé de trois mots.
+    var explanation: String {
+        switch self {
+        case .any: return String(localized: "Les sites qui portent l'une des bandes cochées.")
+        case .all: return String(localized: "Les sites qui portent toutes les bandes cochées, même s'ils en ont d'autres.")
+        case .only: return String(localized: "Les sites qui ne portent rien d'autre que les bandes cochées.")
+        }
+    }
+}
+
+/// Persiste le mode de croisement des bandes, à côté des autres réglages carte.
+enum MapBandMatchStore {
+    static let key = "map.bandMatch.v1"
+
+    static func save(_ mode: BandMatchMode) {
+        UserDefaults.standard.set(mode.rawValue, forKey: key)
+    }
+
+    static func last() -> BandMatchMode {
+        UserDefaults.standard.string(forKey: key)
+            .flatMap(BandMatchMode.init(rawValue:)) ?? .any
+    }
+
+    static func reset() { UserDefaults.standard.removeObject(forKey: key) }
+}
+
+/// Rendu des azimuts sur la carte. Purement local : aucun aller-retour serveur,
+/// c'est un réglage d'affichage.
+enum AzimuthStyle: String, CaseIterable, Sendable {
+    /// Secteurs larges : montrent l'ouverture réelle du faisceau.
+    case lobes
+    /// Traits fins : direction seule, sans recouvrement en zone dense.
+    case lines
+    /// Rien du tout.
+    case hidden
+
+    var label: String {
+        switch self {
+        case .lobes: return String(localized: "Lobes")
+        case .lines: return String(localized: "Traits")
+        case .hidden: return String(localized: "Aucun")
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .lobes: return "chart.pie"
+        case .lines: return "line.3.crossed.swirl.circle"
+        case .hidden: return "eye.slash"
+        }
+    }
+}
+
+enum MapAzimuthStyleStore {
+    static let key = "map.azimuthStyle.v1"
+
+    static func save(_ style: AzimuthStyle) {
+        UserDefaults.standard.set(style.rawValue, forKey: key)
+    }
+
+    static func last() -> AzimuthStyle {
+        UserDefaults.standard.string(forKey: key)
+            .flatMap(AzimuthStyle.init(rawValue:)) ?? .lobes
+    }
+
+    static func reset() { UserDefaults.standard.removeObject(forKey: key) }
+}
+
 /// Persiste le dernier marché + opérateur sélectionnés sur la carte, pour rouvrir
 /// sur le choix de l'utilisateur plutôt que sur un défaut codé en dur (France).
 /// (UserDefaults déclaré dans PrivacyInfo.xcprivacy sous la raison CA92.1.)

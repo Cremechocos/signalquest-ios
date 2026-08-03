@@ -273,8 +273,18 @@ struct AntennaDetailSheet: View {
                 }
                 Spacer()
             }
+            // Les tags opérateur SONT des boutons sur un site partagé, mais rien
+            // ne le disait : personne ne découvrait qu'on peut basculer d'une
+            // fiche à l'autre sans rouvrir la carte. Le dire coûte une ligne.
             if site.operators.count > 1 {
-                Text("Opérateur du site").sqKicker()
+                HStack(spacing: SQSpace.xs) {
+                    Image(systemName: "hand.tap")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("Site partagé — touche un opérateur pour voir sa fiche")
+                }
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: SQSpace.xs + 2) {
@@ -465,19 +475,28 @@ struct AntennaDetailSheet: View {
                 Haptics.selection()
                 selectedOperator = op
             } label: {
-                Text(op)
-                    .font(SQFont.body(11.5, .semibold))
-                    .lineLimit(1)
-                    .padding(.horizontal, SQSpace.sm + 2)
-                    .padding(.vertical, SQSpace.xs + 1)
-                    .foregroundStyle(isActive ? Color.white : color)
-                    .background(
-                        isActive ? color : color.opacity(0.13),
-                        in: Capsule(style: .continuous)
-                    )
+                HStack(spacing: 4) {
+                    // Une coche sur l'actif : sans elle, « plein contre teinté » se
+                    // lit comme une différence décorative, pas comme un état.
+                    if isActive {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    Text(op)
+                        .font(SQFont.body(11.5, .semibold))
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, SQSpace.sm + 2)
+                .padding(.vertical, SQSpace.xs + 1)
+                .foregroundStyle(isActive ? Color.white : color)
+                .background(
+                    isActive ? color : color.opacity(0.13),
+                    in: Capsule(style: .continuous)
+                )
             }
             .buttonStyle(SQPressButtonStyle())
             .accessibilityAddTraits(isActive ? .isSelected : [])
+            .accessibilityHint(isActive ? "" : String(localized: "Affiche la fiche de cet opérateur"))
         } else {
             SQEditorialTag(text: op, color: color)
         }

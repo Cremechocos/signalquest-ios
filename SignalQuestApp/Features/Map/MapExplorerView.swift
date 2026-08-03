@@ -69,6 +69,15 @@ final class MapExplorerViewModel: ObservableObject {
     @Published var currentDromRegion: DromRegion?
     @Published var techFilters: Set<String> = []
     @Published var bandFilters: Set<Int> = []
+    /// Comment croiser les bandes cochées (au moins une / toutes / exclusivement).
+    /// Sans effet tant qu'aucune bande n'est cochée.
+    @Published var bandMatch: BandMatchMode = MapBandMatchStore.last() {
+        didSet { MapBandMatchStore.save(bandMatch) }
+    }
+    /// Rendu des azimuts. Purement local, aucun rechargement de données.
+    @Published var azimuthStyle: AzimuthStyle = MapAzimuthStyleStore.last() {
+        didSet { MapAzimuthStyleStore.save(azimuthStyle) }
+    }
     @Published var sharingFilters: Set<String> = []
     /// Statuts prévisionnels visibles (croisement ANFR). Par défaut : les 4.
     /// Filtre 100 % client (les sites sont déjà chargés) → pas de refetch backend.
@@ -524,6 +533,7 @@ final class MapExplorerViewModel: ObservableObject {
         let op = operatorFilter
         let techs = techFilters
         let bands = bandFilters
+        let bandMatchMode = bandMatch
         let sharing = sharingFilters
         let includeObserved = includeObservedSites
         let stDays = speedtestDays
@@ -574,7 +584,7 @@ final class MapExplorerViewModel: ObservableObject {
                 return (tiles, nil, nil)
             }
             do {
-                let list = try await antennasSvc.list(bbox: bounds.asBoundingBox, market: market, operatorName: op, technologies: techs, bands: bands, sharing: sharing)
+                let list = try await antennasSvc.list(bbox: bounds.asBoundingBox, market: market, operatorName: op, technologies: techs, bands: bands, bandMatch: bandMatchMode, sharing: sharing)
                 return (nil, list, nil)
             } catch {
                 return (nil, nil, error.isCancellation ? nil : error.localizedDescription)
@@ -1046,6 +1056,8 @@ struct MapExplorerView: View {
                 operatorName: $model.operatorFilter,
                 technologies: $model.techFilters,
                 bands: $model.bandFilters,
+                bandMatch: $model.bandMatch,
+                azimuthStyle: $model.azimuthStyle,
                 sharing: $model.sharingFilters,
                 speedtestDays: $model.speedtestDays,
                 coverageDays: $model.coverageDays,
@@ -2003,7 +2015,9 @@ struct MapExplorerView: View {
                     hasEnb: site.hasEnb,
                     hasGnb: site.hasGnb,
                     has5G: site.has5G,
-                    azimuthReachPoints: Self.azimuthReach(for: mapZoom)
+                    azimuthReachPoints: Self.azimuthReach(for: mapZoom),
+                    operatorTints: operatorTints(for: site),
+                    azimuthStyle: model.azimuthStyle
                 )
             }
             payloads += clusteredPayloads(from: antennaPayloads, kind: .antenna, idPrefix: "antenna", minCount: 160, label: { "\($0) antennes" })
@@ -2557,6 +2571,20 @@ struct MapExplorerView: View {
         guard !model.bandFilters.isEmpty else { return true }
         guard let band else { return false }
         return model.bandFilters.contains(band)
+    }
+
+    /// Couleurs des opérateurs d'un site, pour le camembert des sites partagés.
+    ///
+    /// Vide dès qu'un opérateur précis est sélectionné : le backend ne renvoie
+    /// alors que sa facette du site, donc découper le point donnerait un
+    /// camembert d'une seule part — ou pire, ferait croire à un partage là où
+    /// c'est juste le filtre qui masque les autres.
+    private func operatorTints(for site: AntennaSite) -> [Color] {
+        guard model.operatorFilter.uppercased() == "ALL", site.operators.count > 1 else { return [] }
+        var seen = Set<String>()
+        return site.operators
+            .filter { seen.insert($0.uppercased()).inserted }
+            .map { model.operatorAccent($0) }
     }
 
     private func matchesSelectedBands(_ bands: [Int]) -> Bool {

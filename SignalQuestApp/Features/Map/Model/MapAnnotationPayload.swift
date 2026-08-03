@@ -63,6 +63,12 @@ struct MapAnnotationPayload: Identifiable, Equatable {
     /// avec le zoom : à z14 les sites sont serrés à l'écran et des lobes longs se
     /// recouvriraient ; plus on zoome, plus il y a de place pour les déployer.
     var azimuthReachPoints: CGFloat = 0
+    /// Couleurs des opérateurs du site, dans l'ordre du backend. Une seule (ou
+    /// zéro) → pastille unie ; plusieurs → camembert. N'est peuplé qu'en filtre
+    /// « Tous » : sur un opérateur précis, le site n'a qu'une facette.
+    var operatorTints: [Color] = []
+    /// Rendu des azimuts choisi par l'utilisateur.
+    var azimuthStyle: AzimuthStyle = .lobes
     /// Données d'un ami vivant (couche Amis) : pilote le rendu « Find My ».
     var friend: FriendAnnotationInfo? = nil
 
@@ -102,6 +108,8 @@ struct MapAnnotationPayload: Identifiable, Equatable {
         lhs.hasGnb == rhs.hasGnb &&
         lhs.has5G == rhs.has5G &&
         lhs.azimuthReachPoints == rhs.azimuthReachPoints &&
+        lhs.operatorTints == rhs.operatorTints &&
+        lhs.azimuthStyle == rhs.azimuthStyle &&
         lhs.friend == rhs.friend
     }
 }

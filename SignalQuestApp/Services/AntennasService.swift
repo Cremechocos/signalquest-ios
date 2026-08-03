@@ -20,6 +20,7 @@ protocol AntennasServicing: Sendable {
     func list(bbox: BoundingBox) async throws -> [AntennaSite]
     func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>) async throws -> [AntennaSite]
     func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>, bands: Set<Int>, sharing: Set<String>) async throws -> [AntennaSite]
+    func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>, bands: Set<Int>, bandMatch: BandMatchMode, sharing: Set<String>) async throws -> [AntennaSite]
     func details(id: String) async throws -> AntennaDetails
     func details(id: String, market: String, operatorName: String) async throws -> AntennaDetails
     func details(id: String, market: String, operatorName: String, anfrCode: String?) async throws -> AntennaDetails
@@ -40,6 +41,10 @@ final class AntennasService: AntennasServicing {
     }
 
     func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>, bands: Set<Int>, sharing: Set<String>) async throws -> [AntennaSite] {
+        try await list(bbox: bbox, market: market, operatorName: operatorName, technologies: technologies, bands: bands, bandMatch: .any, sharing: sharing)
+    }
+
+    func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>, bands: Set<Int>, bandMatch: BandMatchMode, sharing: Set<String>) async throws -> [AntennaSite] {
         let operators: [String]
         if operatorName == "ALL" {
             operators = market == "FR" ? ["SFR", "BOUYGUES", "ALL"] : ["ALL"]
@@ -56,7 +61,7 @@ final class AntennasService: AntennasServicing {
                 group.addTask {
                     try await self.fetchAntennas(
                         bbox: bbox, market: market, operatorName: op,
-                        technologies: technologies, bands: bands
+                        technologies: technologies, bands: bands, bandMatch: bandMatch
                     )
                 }
             }
@@ -76,7 +81,7 @@ final class AntennasService: AntennasServicing {
     /// Une requête `/api/antennas` pour UN opérateur (brique du fan-out parallèle).
     private func fetchAntennas(
         bbox: BoundingBox, market: String, operatorName op: String,
-        technologies: Set<String>, bands: Set<Int>
+        technologies: Set<String>, bands: Set<Int>, bandMatch: BandMatchMode = .any
     ) async throws -> [AntennaSite] {
         var query = bbox.queryItems
         query.append(URLQueryItem(name: "market", value: market))
@@ -87,6 +92,11 @@ final class AntennasService: AntennasServicing {
             query.append(URLQueryItem(name: "technologies", value: technologies.sorted().joined(separator: ",")))
         }
         if !bands.isEmpty {
+            // Omis en mode « au moins une » : un backend antérieur ignore le
+            // paramètre, mais autant ne pas l'envoyer quand il ne change rien.
+            if bandMatch != .any {
+                query.append(URLQueryItem(name: "bandMatch", value: bandMatch.rawValue))
+            }
             query.append(contentsOf: Self.bandQueryItems(bands))
         }
         // NB : le filtre « Partage » (ZB/Crozon/ZTD) n'est PAS un paramètre de
