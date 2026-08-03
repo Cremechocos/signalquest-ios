@@ -292,8 +292,13 @@ struct AntennaDetailSheet: View {
     /// sans ce badge, la fiche laissait croire à une antenne en service.
     @ViewBuilder
     private var statusTag: some View {
-        if let core = model.details?.core, let status = core.status, !status.isEmpty {
-            SQEditorialTag(text: status, color: core.isInService ? SQColor.success : SQColor.warning)
+        if let core = model.details?.core, let status = core.displayStatus {
+            SQEditorialTag(
+                text: status,
+                color: core.isInService ? SQColor.success
+                    : core.isPendingStatus ? SQColor.warning
+                    : SQColor.labelSecondary
+            )
         }
     }
 
@@ -527,9 +532,11 @@ struct AntennaDetailSheet: View {
     private func siteContent(_ core: AntennaCoreDetails) -> some View {
         VStack(alignment: .leading, spacing: 12) {
                 detailRow("SUP ID", core.supId)
-                detailRow("ANFR / source", core.anfrCode.isEmpty ? nil : core.anfrCode)
+                // Le libellé suit le régulateur du marché : « Code ANFR » devant un
+                // identifiant ISED ou OFCOM serait faux.
+                detailRow(core.registryLabel, core.anfrCode.isEmpty ? nil : core.anfrCode)
                 detailRow("Marché", core.market)
-                detailRow("Commune", [core.postalCode, core.commune].compactMap { $0 }.joined(separator: " "))
+                detailRow(core.localityLabel, [core.postalCode, core.commune].compactMap { $0 }.joined(separator: " "))
                 detailRow("Adresse", core.address)
                 detailRow("Partage", [core.sharingKind, core.crozonLeader.map { "Crozon \($0)" }, core.zbLeader.map { "ZB \($0)" }].compactMap { $0 }.joined(separator: " · "))
                 detailRow("Coordonnées", String(format: "%.5f, %.5f", core.lat, core.lng))
@@ -571,18 +578,48 @@ struct AntennaDetailSheet: View {
                 detailRow("Bandes", core.frequencyBands.joined(separator: " / "))
                 detailRow("Azimuts", core.azimuts.prefix(12).map { "\(Int($0.rounded()))°" }.joined(separator: " · "))
                 detailRow("Support", core.siteInfo.supportType ?? core.technical.supportType)
-                detailRow("Hauteur support", core.siteInfo.supportHeight ?? core.siteInfo.pylonHeight.map { "\(Int($0.rounded())) m" })
+                // `supportHeight` est une chaîne brute du registre (« 29,5 », « 4 ») :
+                // l'afficher telle quelle donnait une hauteur sans unité.
+                detailRow(
+                    "Hauteur support",
+                    (core.siteInfo.supportHeightMeters ?? core.siteInfo.pylonHeight)
+                        .map { "\(Int($0.rounded())) m" }
+                )
                 detailRow("Types d'antennes", core.siteInfo.antennaTypes.prefix(6).joined(separator: " · "))
                 detailRow("Propriétaire", core.siteInfo.supportOwner ?? core.rawLicenseeName)
                 detailRow("Secteurs", core.siteInfo.sectorCount.map(String.init))
                 detailRow("Faisceau hertzien", core.technical.hasFh.map { $0 ? "Oui" : "Non" })
-                detailRow("Statut", core.status)
+                detailRow("Statut", core.displayStatus)
                 ForEach(lifecycleDates(core), id: \.0) { label, value in
                     detailRow(label, value)
                 }
                 detailRow("Dernière mise à jour", SignalFormatters.date(core.siteInfo.lastUpdated, relative: true))
+                // Belgique, Suisse, Canada : le régulateur publie la position et
+                // l'opérateur, mais ni hauteur, ni secteurs, ni azimuts. Le dire
+                // évite que la fiche passe pour un chargement raté.
+                if !core.hasStructuralData {
+                    Text(registryCoverageNote(for: core))
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 2)
+                }
         }
         .foregroundStyle(SQColor.label)
+    }
+
+    /// Note de couverture du registre, nommé quand on le connaît : « le régulateur »
+    /// tout court laisserait croire à une limite de l'app.
+    private func registryCoverageNote(for core: AntennaCoreDetails) -> String {
+        let registry: String
+        switch core.market?.uppercased() {
+        case "BE": registry = "Le registre belge (BIPT)"
+        case "CH": registry = "Le registre suisse (OFCOM)"
+        case "CA": registry = "Le registre canadien (ISED)"
+        default: registry = "Le registre de ce pays"
+        }
+        return "\(registry) publie la position et l'exploitant, mais ni hauteur, ni secteurs, ni azimuts : ces lignes resteront vides tant que la source ne les donnera pas."
     }
 
     private func radioIdentifiersContent(_ core: AntennaCoreDetails) -> some View {

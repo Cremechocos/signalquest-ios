@@ -270,6 +270,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         case .outage: return "exclamationmark.triangle.fill"
         case .planned: return "calendar.badge.clock"
         case .communitySite: return "dot.radiowaves.up.forward"
+        case .customSite: return "mappin.and.ellipse"
         case .speedtest: return "speedometer"
         case .coverage: return "dot.radiowaves.left.and.right"
         }

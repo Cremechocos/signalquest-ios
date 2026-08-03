@@ -52,11 +52,15 @@ struct MapAdvancedFilterSheet: View {
         if selectedEntry?.isCommunityOnly == true {
             return [
                 (.communitySite, String(localized: "Sites communautaires"), "dot.radiowaves.up.forward"),
+                // Sans open data, les sites pointés à la main sont souvent la seule
+                // antenne visible du pays : la couche doit rester proposée ici.
+                (.customSite, String(localized: "Sites ajoutés"), "mappin.and.ellipse"),
                 (.speedtest, String(localized: "Speedtests"), "speedometer")
             ]
         }
         var options: [(MapDisplayItem.Kind, String, String)] = [
             (.antenna, String(localized: "Antennes"), "antenna.radiowaves.left.and.right"),
+            (.customSite, String(localized: "Sites ajoutés"), "mappin.and.ellipse"),
             (.speedtest, String(localized: "Speedtests"), "speedometer"),
             (.photo, String(localized: "Photos"), "photo"),
             (.friend, String(localized: "Amis"), "person.2"),

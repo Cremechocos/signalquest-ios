@@ -41,6 +41,7 @@ final class MapExplorerViewModel: ObservableObject {
     @Published var speedtestTiles: [AndroidSpeedtestTileResponse] = []
     @Published var coverageTiles: [AndroidCoverageTileResponse] = []
     @Published var communitySiteTiles: [AndroidCommunitySiteTileResponse] = []
+    @Published var customSiteTiles: [AndroidCustomSiteTileResponse] = []
     @Published var plannedSites: [PlannedSiteLive] = []
     @Published var outages: [OutageSiteLive] = []
     @Published var coverageHeat: [CoverageHeatPoint] = []
@@ -532,6 +533,10 @@ final class MapExplorerViewModel: ObservableObject {
 
         let wantsAntenna = filters.contains(.antenna) && !communityOnly
         let wantsCommunitySites = (filters.contains(.communitySite) || (communityOnly && filters.contains(.antenna))) && supportsCommunity
+        // Sites personnalisés : AUCUNE garde de marché. Ils sont saisis à la main,
+        // donc ils existent partout — et dans un pays sans open data (Bosnie,
+        // Portugal…) ils sont la SEULE antenne que la carte puisse montrer.
+        let wantsCustomSites = filters.contains(.customSite)
         let wantsSpeedtest = filters.contains(.speedtest)
         // Sites prévisionnels et pannes : FR métropole ET DROM (le backend répond
         // pour FR/DROM). En DROM on déduit le territoire (974, 971…) du centre du
@@ -578,6 +583,11 @@ final class MapExplorerViewModel: ObservableObject {
         async let communityRaw: (value: [AndroidCommunitySiteTileResponse]?, error: String?) = {
             guard wantsCommunitySites else { return ([], nil) }
             do { return (try await svc.communitySiteTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, includeObserved: includeObserved, bands: bands), nil) }
+            catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
+        }()
+        async let customRaw: (value: [AndroidCustomSiteTileResponse]?, error: String?) = {
+            guard wantsCustomSites else { return ([], nil) }
+            do { return (try await svc.customSiteTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op), nil) }
             catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
         async let speedtestRaw: (value: [AndroidSpeedtestTileResponse]?, error: String?) = {
@@ -628,6 +638,7 @@ final class MapExplorerViewModel: ObservableObject {
         let snap = await snapshotResult
         let antenna = await antennaRaw
         let community = await communityRaw
+        let custom = await customRaw
         let speedtest = await speedtestRaw
         let planned = await plannedRaw
         let outage = await outageRaw
@@ -673,6 +684,9 @@ final class MapExplorerViewModel: ObservableObject {
 
         if let value = community.value { communitySiteTiles = value }
         else if let error = community.error { layerError = layerError ?? error }
+
+        if let value = custom.value { customSiteTiles = value }
+        else if let error = custom.error { layerError = layerError ?? error }
 
         if let value = speedtest.value { speedtestTiles = value }
         else if let error = speedtest.error { layerError = layerError ?? error }
@@ -938,6 +952,7 @@ struct MapExplorerView: View {
     @State private var selectedOutage: OutageSiteLive?
     @State private var selectedPlanned: PlannedSiteLive?
     @State private var selectedFriend: SocialFriendLive?
+    @State private var selectedCustomSite: AndroidCustomSiteMarker?
     @State private var fetchTask: Task<Void, Never>?
     @State private var lastRegion: MKCoordinateRegion
     @State private var showFilterSheet = false
@@ -979,6 +994,14 @@ struct MapExplorerView: View {
         .sheet(item: $selectedItem) { item in MapItemSheet(item: item) }
         .sheet(item: $selectedOutage) { site in
             OutageDetailSheet(site: site)
+        }
+        .sheet(item: $selectedCustomSite) { site in
+            CustomSiteDetailSheet(
+                site: site,
+                // L'opérateur d'un site ajouté est un nom libre saisi par un membre,
+                // pas une clé de registre : `SQBrand` fait la résolution tolérante.
+                accent: site.radio?.operatorName.map { SQBrand.operatorColor($0) } ?? SQColor.brandPink
+            )
         }
         .sheet(item: $selectedPlanned) { site in
             PlannedDetailSheet(site: site, operatorLabel: model.operatorLabel(site.operator ?? "ALL"), operatorAccent: model.operatorAccent(site.operator ?? "ALL"))
@@ -1968,6 +1991,7 @@ struct MapExplorerView: View {
             payloads += clusteredPayloads(from: antennaPayloads, kind: .antenna, idPrefix: "antenna", minCount: 160, label: { "\($0) antennes" })
         }
         payloads += communitySitePayloads
+        payloads += customSitePayloads
         payloads += photoPayloads
         payloads += plannedPayloads
         payloads += outagePayloads
@@ -2171,6 +2195,50 @@ struct MapExplorerView: View {
                 showsAzimuths: false,
                 tint: model.operatorAccent(marker.operatorKey ?? "ALL"),
                 communityObserved: !isProbable
+            )
+        }
+    }
+
+    /// Couche « Sites ajoutés » : pylônes pointés à la main par les membres.
+    ///
+    /// Visible sur TOUS les marchés, contrairement aux couches dérivées de l'open
+    /// data. Sans elle, un pays sans régulateur ouvert (Bosnie, Portugal, Espagne)
+    /// affiche une carte vide alors que la donnée existe côté serveur.
+    private var customSitePayloads: [MapAnnotationPayload] {
+        guard filters.contains(.customSite) else { return [] }
+        var seen = Set<String>()
+        return model.customSiteTiles.flatMap(\.markers).compactMap { marker in
+            guard seen.insert(marker.id).inserted else { return nil }
+            guard marker.lat != 0 || marker.lng != 0 else { return nil }
+            let radio = marker.radio
+            return MapAnnotationPayload(
+                id: "custom-site-\(marker.id)",
+                kind: .customSite,
+                title: marker.name ?? marker.typeLabel ?? "Site ajouté",
+                subtitle: [
+                    marker.typeLabel,
+                    radio?.operatorName,
+                    radio?.technology
+                ].compactMap { $0 }.joined(separator: " · "),
+                coordinate: CLLocationCoordinate2D(latitude: marker.lat, longitude: marker.lng),
+                metric: radio?.enb.map { "eNB \($0)" } ?? radio?.gnb.map { "gNB \($0)" },
+                backendId: marker.id,
+                details: MapItemDetails(
+                    timestamp: marker.createdAt,
+                    operatorName: radio?.operatorName,
+                    note: marker.description
+                ),
+                antennaId: nil,
+                clusterCount: nil,
+                azimuths: [],
+                showsAzimuths: false,
+                // L'opérateur d'un site ajouté est un nom libre saisi par un membre
+                // (« BH Mobile »), pas une clé de registre : `operatorAccent` ne le
+                // résoudrait pas. `SQBrand` fait la résolution tolérante, et son
+                // repli est désormais neutre plutôt que rouge SFR.
+                tint: radio?.operatorName.map { SQBrand.operatorColor($0) },
+                contributionPhotos: marker.photoCount,
+                hasEnb: marker.isValidated
             )
         }
     }
@@ -2700,6 +2768,13 @@ struct MapExplorerView: View {
                 return
             }
         }
+        // Site ajouté à la main : fiche dédiée (auteur, confirmation, identifiants
+        // radio relevés). Pas d'ANFR derrière, donc pas de `AntennaDetailSheet`.
+        if annotation.kind == .customSite, let siteId = annotation.backendId,
+           let site = model.customSiteTiles.flatMap(\.markers).first(where: { $0.id == siteId }) {
+            selectedCustomSite = site
+            return
+        }
         // Ami vivant : fiche riche (présence, radio, distance, raccourcis message/profil).
         if annotation.kind == .friend, let friendId = annotation.backendId,
            let friend = model.liveFriends.first(where: { $0.id == friendId }) {
@@ -2775,6 +2850,7 @@ struct MapExplorerView: View {
         case .planned: return "calendar.badge.clock"
         case .antenna: return "antenna.radiowaves.left.and.right"
         case .communitySite: return "dot.radiowaves.up.forward"
+        case .customSite: return "mappin.and.ellipse"
         }
     }
 
@@ -2790,6 +2866,7 @@ struct MapExplorerView: View {
         case .antenna: return SQColor.brandBlue
         case .session: return SQColor.brandOrange
         case .communitySite: return SQColor.brandPink
+        case .customSite: return SQColor.brandPink
         }
     }
 

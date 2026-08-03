@@ -32,6 +32,10 @@ enum SQBrand {
         "bouygues": .init(start: Color(hex: 0x1A3A7F), end: Color(hex: 0x3B5BDB), name: "Bouygues"),
         "orange": .init(start: Color(hex: 0xFF6B35), end: Color(hex: 0xFFA44F), name: "Orange"),
         "free": .init(start: Color(hex: 0x52525B), end: Color(hex: 0x27272A), name: "Free"),
+        // Free Caraïbes n'est pas Free Mobile : le registre lui donne le rouge
+        // #DC2626, pas le gris métropolitain. Sans entrée dédiée, la branche
+        // `contains("free")` le peignait en gris.
+        "freecaraibes": .init(start: Color(hex: 0xDC2626), end: Color(hex: 0xF87171), name: "Free Caraibes"),
         "digicel": .init(start: Color(hex: 0xB91C1C), end: Color(hex: 0xF97316), name: "Digicel"),
         "outremer": .init(start: Color(hex: 0x8B5CF6), end: Color(hex: 0x22D3EE), name: "Outremer Telecom"),
         "srr": .init(start: Color(hex: 0x0EA5E9), end: Color(hex: 0x38BDF8), name: "SRR"),
@@ -46,7 +50,22 @@ enum SQBrand {
         "regional": .init(start: Color(hex: 0xD97706), end: Color(hex: 0xF59E0B), name: "Regional"),
     ]
 
-    static let defaultOperator = operators["sfr"]!
+    /// Repli quand la clé n'est reconnue par aucune règle.
+    ///
+    /// C'était SFR, ce qui peignait en rouge SFR tout opérateur hors de la
+    /// palette : Proximus, Swisscom, Sunrise, Salt, POST, Tango, « Autres » des
+    /// DROM… et jusqu'aux amas d'antennes « tous opérateurs », dont le sous-titre
+    /// ne contient aucun nom d'opérateur. Le gris ardoise est celui que le
+    /// registre donne lui-même à `ALL` / `DROM_OTHER` : neutre, il annonce
+    /// « opérateur non identifié » au lieu d'affirmer le mauvais.
+    ///
+    /// Ce repli ne concerne QUE les écrans sans registre de marché sous la main :
+    /// la carte passe par `operatorAccent`, qui lit la couleur du registre.
+    static let defaultOperator = OperatorColors(
+        start: Color(hex: 0x64748B),
+        end: Color(hex: 0x94A3B8),
+        name: "Inconnu"
+    )
 
     /// Résolution tolérante, même heuristique que getOperatorColors web.
     static func operatorColors(_ rawName: String?) -> OperatorColors {
@@ -55,6 +74,7 @@ enum SQBrand {
         if n.contains("sfr") && !n.contains("srr") { return operators["sfr"]! }
         if n.contains("bouygues") || n.contains("bytel") { return operators["bouygues"]! }
         if n.contains("orange") { return operators["orange"]! }
+        if n.contains("free") && (n.contains("caraib") || n.contains("caraïb")) { return operators["freecaraibes"]! }
         if n.contains("free") && !n.contains("freedom") { return operators["free"]! }
         if n.contains("digicel") { return operators["digicel"]! }
         if n.contains("outremer") || n.contains("only") { return operators["outremer"]! }
@@ -83,12 +103,9 @@ enum SQBrand {
     static func operatorName(_ rawName: String?) -> String? {
         guard let rawName, !rawName.isEmpty else { return nil }
         let resolved = operatorColors(rawName)
-        guard resolved.name != defaultOperator.name else {
-            // Le repli EST SFR : on ne le retient que si la clé le dit vraiment.
-            let n = rawName.lowercased()
-            return (n.contains("sfr") && !n.contains("srr")) ? resolved.name : nil
-        }
-        return resolved.name
+        // Le repli ne porte pas de nom d'opérateur : on renvoie nil plutôt que
+        // d'étiqueter une clé inconnue.
+        return resolved.name == defaultOperator.name ? nil : resolved.name
     }
 }
 

@@ -46,21 +46,41 @@ enum MapRegionStore {
 enum MapFilterStore {
     static let key = "map.lastFilters.v1"
 
-    /// Couches par défaut : antennes seule.
-    static let defaultFilters: Set<MapDisplayItem.Kind> = [.antenna]
+    /// Drapeau de migration : « la couche Sites ajoutés a été proposée une fois ».
+    private static let customSiteMigrationKey = "map.lastFilters.customSiteAdded.v1"
+
+    /// Couches par défaut : antennes + sites ajoutés à la main. Ces derniers sont
+    /// la SEULE antenne visible dans un pays sans open data — les laisser
+    /// décochés par défaut y donnerait une carte vide.
+    static let defaultFilters: Set<MapDisplayItem.Kind> = [.antenna, .customSite]
 
     static func save(_ filters: Set<MapDisplayItem.Kind>) {
         UserDefaults.standard.set(filters.map(\.rawValue), forKey: key)
+        // Sauvegarder vaut décision de l'utilisateur : ne plus rien réinjecter.
+        UserDefaults.standard.set(true, forKey: customSiteMigrationKey)
     }
 
     /// Couches mémorisées (éventuellement vide si tout désactivé), ou `nil` si jamais
     /// enregistrées → l'appelant retombe sur `defaultFilters`.
+    ///
+    /// Un jeu de filtres enregistré par une version antérieure ne peut pas contenir
+    /// `.customSite` : sans réinjection, ces utilisateurs ne verraient jamais la
+    /// nouvelle couche sans aller la cocher. On l'ajoute donc UNE fois, puis le
+    /// drapeau garantit qu'un décochage volontaire est respecté ensuite.
     static func lastFilters() -> Set<MapDisplayItem.Kind>? {
         guard let raw = UserDefaults.standard.array(forKey: key) as? [String] else { return nil }
-        return Set(raw.compactMap(MapDisplayItem.Kind.init(rawValue:)))
+        var filters = Set(raw.compactMap(MapDisplayItem.Kind.init(rawValue:)))
+        if !UserDefaults.standard.bool(forKey: customSiteMigrationKey) {
+            UserDefaults.standard.set(true, forKey: customSiteMigrationKey)
+            filters.insert(.customSite)
+        }
+        return filters
     }
 
-    static func reset() { UserDefaults.standard.removeObject(forKey: key) }
+    static func reset() {
+        UserDefaults.standard.removeObject(forKey: key)
+        UserDefaults.standard.removeObject(forKey: customSiteMigrationKey)
+    }
 }
 
 enum MapMarketStore {

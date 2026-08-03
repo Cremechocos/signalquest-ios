@@ -58,6 +58,7 @@ enum MapAccessibility {
         case .outage: return String(localized: "Incident")
         case .planned: return String(localized: "Site prévu")
         case .communitySite: return String(localized: "Site communautaire")
+        case .customSite: return String(localized: "Site ajouté par un membre")
         case .speedtest: return String(localized: "Mesure de débit")
         case .coverage: return String(localized: "Point de couverture")
         }
@@ -73,6 +74,7 @@ enum MapAccessibility {
         case .outage: return String(localized: "incidents")
         case .planned: return String(localized: "sites prévus")
         case .communitySite: return String(localized: "sites communautaires")
+        case .customSite: return String(localized: "sites ajoutés par des membres")
         case .speedtest: return String(localized: "mesures de débit")
         case .coverage: return String(localized: "points de couverture")
         }
@@ -91,6 +93,7 @@ enum MapAccessibility {
         case .friend: return String(localized: "Ouvre la fiche de l'ami")
         case .outage: return String(localized: "Ouvre le détail de l'incident")
         case .planned: return String(localized: "Ouvre le détail du site prévu")
+        case .customSite: return String(localized: "Ouvre la fiche du site ajouté")
         case .communitySite, .validation, .session, .speedtest, .coverage: return nil
         }
     }

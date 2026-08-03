@@ -130,6 +130,9 @@ extension MapAnnotationPayload {
         case .session: return SQColor.brandOrange
         case .antenna: return .red
         case .communitySite: return SQColor.brandPink
+        // Site pointé à la main : rose communautaire quand l'opérateur saisi n'a
+        // pas pu être résolu en couleur de marque (`tint` absent).
+        case .customSite: return SQColor.brandPink
         }
     }
 

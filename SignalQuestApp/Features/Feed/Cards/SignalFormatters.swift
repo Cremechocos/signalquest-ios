@@ -77,6 +77,12 @@ enum SignalFormatters {
     static func date(_ value: String?, includingTime: Bool = false, relative: Bool = false) -> String? {
         guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         guard let date = SQDateParsing.parse(value) else { return value }
+        return self.date(date, includingTime: includingTime, relative: relative)
+    }
+
+    /// Même rendu, pour les modèles qui décodent déjà une `Date` (tuiles carte)
+    /// et n'ont donc pas de chaîne brute à reparser.
+    static func date(_ date: Date, includingTime: Bool = false, relative: Bool = false) -> String {
         if relative, abs(date.timeIntervalSinceNow) < 30 * 24 * 60 * 60 {
             return relativeFormatter.localizedString(for: date, relativeTo: Date())
         }

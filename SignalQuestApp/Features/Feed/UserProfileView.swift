@@ -642,9 +642,11 @@ struct UserProfileView: View {
         return "\(name), sur le réseau \(host) : \(entry.percentLabel) des mesures"
     }
 
-    /// Teinte d'une part de réseau. Une clé non résolue reçoit un gris neutre :
-    /// `SQBrand.operatorColor` retombe sur le rouge SFR, ce qui ferait passer
-    /// un réseau inconnu pour SFR dans la barre comme dans la légende.
+    /// Teinte d'une part de réseau. Une clé non résolue reçoit un gris neutre,
+    /// pour ne pas faire passer un réseau inconnu pour un opérateur connu dans la
+    /// barre comme dans la légende. (Le repli de `SQBrand` est lui aussi neutre
+    /// depuis qu'il ne retombe plus sur le rouge SFR ; ce garde-fou explicite
+    /// couvre les clés que la liste connaît comme non résolues.)
     private static func tint(for key: String) -> Color {
         unresolvedOperatorKeys.contains(key.uppercased())
             ? SQColor.labelTertiary
@@ -655,8 +657,8 @@ struct UserProfileView: View {
     /// utilise bien ce réseau, mais le distinguer évite de le confondre avec les
     /// mesures faites sur une SIM de l'opérateur lui-même.
     ///
-    /// ⚠️ Passer `entry.key` à `SQBrand.operatorColor` donnerait du rouge SFR
-    /// pour « LEBARA », le registre retombant sur SFR pour toute clé inconnue.
+    /// ⚠️ Passer `entry.key` à `SQBrand.operatorColor` donnerait le gris « inconnu »
+    /// pour « LEBARA » : c'est l'hôte qui porte la couleur, pas le MVNO.
     private static func tint(for entry: SocialProfileOperatorShare) -> Color {
         guard let hostKey = entry.hostKey else { return tint(for: entry.key) }
         return SQBrand.operatorColor(hostKey).opacity(0.55)

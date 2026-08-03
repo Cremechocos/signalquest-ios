@@ -331,7 +331,9 @@ struct RadioLogsView: View {
                         .font(SQFont.body(13, .bold))
                     Text("un site après l'autre, sortie à tout moment")
                         .font(SQFont.body(11.5))
-                        .foregroundStyle(P.onAccent.opacity(0.86))
+                        // Pas d'opacité sous 13 pt sur aplat brique : l'anti-crénelage
+                        // mange déjà ~23 % du contraste (DesignTokenContrastTests).
+                        .foregroundStyle(P.onAccent)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))

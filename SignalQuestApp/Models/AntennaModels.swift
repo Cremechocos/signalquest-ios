@@ -343,11 +343,71 @@ struct AntennaCoreDetails: Decodable, Equatable {
         return status.contains("en service")
     }
 
+    /// Ce que le registre du pays met dans `status`, quand c'en est vraiment un.
+    ///
+    /// Le champ n'a pas le même sens partout : la France y met un statut
+    /// d'exploitation (« En service », « Projet approuvé »), la Belgique un statut
+    /// de licence (« Octroye »), et la Suisse y recopie la **classe
+    /// d'installation** OFCOM (« Outdoor > 6 Werp ») — qui n'est pas un statut du
+    /// tout. Afficher ce dernier en badge orange laissait croire à un site à
+    /// l'arrêt. On ne garde donc que ce qui décrit un état.
+    var displayStatus: String? {
+        guard let raw = status?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
+        // Suisse : `status` duplique la nature du support. C'est le signe fiable
+        // que la source n'a pas de statut à donner.
+        let supportType = siteInfo.supportType ?? technical.supportType
+        if let supportType, raw.compare(supportType, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame {
+            return nil
+        }
+        // Belgique : « Octroye » (sans accent, tel que le BIPT le publie).
+        if raw.compare("Octroye", options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame {
+            return String(localized: "Licence octroyée")
+        }
+        return raw
+    }
+
+    /// Un statut n'est « à surveiller » (orange) que si l'on sait qu'il décrit un
+    /// site pas encore allumé. Un statut simplement inconnu reste neutre : le
+    /// peindre en orange inventait une alerte.
+    var isPendingStatus: Bool {
+        guard let raw = displayStatus?.lowercased() else { return false }
+        return raw.contains("projet") || raw.contains("prévu") || raw.contains("octroy")
+    }
+
     var fullAddress: String? {
         let values = [address, postalCode, commune]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return values.isEmpty ? nil : values.joined(separator: " ")
+    }
+
+    /// Libellé du champ « commune ». Le Canada y met le code de province
+    /// (« QC »), pas une commune : l'étiqueter « Commune » était faux.
+    var localityLabel: String {
+        market?.uppercased() == "CA" ? String(localized: "Province") : String(localized: "Commune")
+    }
+
+    /// Libellé de l'identifiant de site, selon le régulateur du marché. « ANFR »
+    /// n'a aucun sens devant un identifiant ISED, BIPT ou OFCOM.
+    var registryLabel: String {
+        switch market?.uppercased() {
+        case "CA": return String(localized: "Identifiant ISED")
+        case "BE": return String(localized: "Identifiant BIPT")
+        case "CH": return String(localized: "Identifiant OFCOM")
+        case "FR", "DROM": return String(localized: "Code ANFR")
+        default: return String(localized: "Identifiant du registre")
+        }
+    }
+
+    /// Le registre du pays ne publie ni géométrie d'antenne ni caractéristiques
+    /// de support. Sert à expliquer une fiche maigre au lieu de la laisser
+    /// ressembler à un chargement raté.
+    var hasStructuralData: Bool {
+        siteInfo.supportHeight != nil
+            || siteInfo.pylonHeight != nil
+            || siteInfo.sectorCount != nil
+            || !azimuts.isEmpty
+            || !siteInfo.antennaTypes.isEmpty
     }
 
     enum CodingKeys: String, CodingKey {

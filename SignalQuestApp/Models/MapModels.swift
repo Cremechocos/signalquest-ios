@@ -873,6 +873,147 @@ struct AndroidCommunitySiteMarker: Decodable, Identifiable, Equatable, Sendable 
     }
 }
 
+/// Sites ajoutés à la main par les membres
+/// (GET /api/android/map/tiles/custom-sites/{z}/{x}/{y}).
+///
+/// Distincts des `AndroidCommunitySiteMarker`, qui sont *déduits* des mesures :
+/// ici quelqu'un a pointé un pylône, l'a nommé, parfois photographié, et y a
+/// attaché les identifiants radio relevés. C'est la seule couche d'antennes qui
+/// existe dans les pays sans open data (Bosnie, Portugal, Espagne…), d'où son
+/// affichage sur TOUS les marchés.
+struct AndroidCustomSiteTileResponse: Decodable, Equatable, Sendable {
+    let tile: AndroidMapTile
+    let markers: [AndroidCustomSiteMarker]
+
+    enum CodingKeys: String, CodingKey {
+        case tile, markers
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        tile = (try? c.decode(AndroidMapTile.self, forKey: .tile)) ?? AndroidMapTile(z: 0, x: 0, y: 0)
+        markers = c.decodeLossyArray([AndroidCustomSiteMarker].self, forKey: .markers)
+    }
+}
+
+/// Identifiants radio relevés sur un site personnalisé. Tous optionnels : un
+/// membre peut n'avoir noté que l'eNB, ou rien du tout.
+struct AndroidCustomSiteRadio: Decodable, Equatable, Sendable {
+    let enb: String?
+    let gnb: String?
+    let cellId: String?
+    let pci: Int?
+    let tac: String?
+    let earfcn: Int?
+    let nrarfcn: Int?
+    let band: Int?
+    let mcc: Int?
+    let mnc: Int?
+    let operatorName: String?
+    let technology: String?
+
+    enum CodingKeys: String, CodingKey {
+        case enb, gnb, cellId, pci, tac, earfcn, nrarfcn, band, mcc, mnc
+        case operatorName = "operator"
+        case technology
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // `decodeFlexibleString` : le backend émet ces champs tantôt en nombre,
+        // tantôt en chaîne selon la saisie du membre.
+        enb = c.decodeFlexibleString(forKey: .enb)
+        gnb = c.decodeFlexibleString(forKey: .gnb)
+        cellId = c.decodeFlexibleString(forKey: .cellId)
+        pci = (try? c.decodeIfPresent(Int.self, forKey: .pci)) ?? nil
+        tac = c.decodeFlexibleString(forKey: .tac)
+        earfcn = (try? c.decodeIfPresent(Int.self, forKey: .earfcn)) ?? nil
+        nrarfcn = (try? c.decodeIfPresent(Int.self, forKey: .nrarfcn)) ?? nil
+        band = (try? c.decodeIfPresent(Int.self, forKey: .band)) ?? nil
+        mcc = (try? c.decodeIfPresent(Int.self, forKey: .mcc)) ?? nil
+        mnc = (try? c.decodeIfPresent(Int.self, forKey: .mnc)) ?? nil
+        operatorName = c.decodeFlexibleString(forKey: .operatorName)
+        technology = c.decodeFlexibleString(forKey: .technology)
+    }
+
+    /// PLMN « 218-90 », quand les deux moitiés sont là.
+    var plmn: String? {
+        guard let mcc, let mnc else { return nil }
+        return String(format: "%03d-%02d", mcc, mnc)
+    }
+
+    var isEmpty: Bool {
+        enb == nil && gnb == nil && cellId == nil && pci == nil && tac == nil
+            && earfcn == nil && nrarfcn == nil && band == nil && plmn == nil
+            && operatorName == nil && technology == nil
+    }
+}
+
+struct AndroidCustomSiteMarker: Decodable, Identifiable, Equatable, Sendable {
+    let id: String
+    let lat: Double
+    let lng: Double
+    let name: String?
+    /// Type déclaré : "PYLONE", "TOIT", "CHATEAU_EAU"… (majuscules côté backend).
+    let type: String?
+    let description: String?
+    let createdByUserId: String?
+    let createdByDisplayName: String?
+    let createdAt: Date?
+    let photoCount: Int
+    let primaryPhotoUrl: String?
+    /// "validated" dès qu'une identification non automatique existe, sinon "pending".
+    let validationStatus: String?
+    let radio: AndroidCustomSiteRadio?
+
+    enum CodingKeys: String, CodingKey {
+        case id, lat, lng, name, type, description, createdByUserId
+        case createdByDisplayName, createdAt, photoCount, primaryPhotoUrl
+        case validationStatus, radio
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.decodeFlexibleString(forKey: .id) ?? UUID().uuidString
+        lat = (try? c.decode(Double.self, forKey: .lat)) ?? 0
+        lng = (try? c.decode(Double.self, forKey: .lng)) ?? 0
+        name = c.decodeFlexibleString(forKey: .name)
+        type = c.decodeFlexibleString(forKey: .type)
+        description = c.decodeFlexibleString(forKey: .description)
+        createdByUserId = c.decodeFlexibleString(forKey: .createdByUserId)
+        createdByDisplayName = c.decodeFlexibleString(forKey: .createdByDisplayName)
+        createdAt = (try? c.decodeIfPresent(Date.self, forKey: .createdAt)) ?? nil
+        photoCount = (try? c.decodeIfPresent(Int.self, forKey: .photoCount)) ?? 0
+        primaryPhotoUrl = c.decodeFlexibleString(forKey: .primaryPhotoUrl)
+        validationStatus = c.decodeFlexibleString(forKey: .validationStatus)
+        radio = (try? c.decodeIfPresent(AndroidCustomSiteRadio.self, forKey: .radio)) ?? nil
+    }
+
+    var isValidated: Bool {
+        validationStatus?.caseInsensitiveCompare("validated") == .orderedSame
+    }
+
+    /// Libellé humain du type déclaré. Le backend stocke des constantes en
+    /// majuscules sans accents : les afficher telles quelles donnerait
+    /// « CHATEAU_EAU » au milieu d'une fiche en français.
+    var typeLabel: String? {
+        guard let raw = type?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return nil }
+        switch raw.uppercased() {
+        case "PYLONE", "PYLON": return "Pylône"
+        case "TOIT", "ROOFTOP", "TOITURE": return "Toit-terrasse"
+        case "CHATEAU_EAU", "WATER_TOWER": return "Château d'eau"
+        case "MAT", "MAST": return "Mât"
+        case "EGLISE", "CHURCH": return "Clocher"
+        case "SILO": return "Silo"
+        case "IMMEUBLE", "BUILDING": return "Immeuble"
+        case "AUTRE", "OTHER": return "Autre"
+        default:
+            // Type inconnu : on rend la constante lisible plutôt que de la masquer.
+            return raw.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+}
+
 struct AndroidCoverageStats: Decodable, Equatable, Sendable {
     let avgRsrp: Double?
     let sampleCount: Int
@@ -898,6 +1039,7 @@ struct MapDisplayItem: Identifiable, Equatable {
         case planned
         case antenna
         case communitySite
+        case customSite
     }
 
     let id: String

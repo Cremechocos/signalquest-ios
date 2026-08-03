@@ -258,7 +258,9 @@ struct AntennaSectorGridView: View {
             return String(localized: "L'orientation des secteurs n'est pas publiée pour ce site — seules ses bandes le sont.")
         }
         guard count > 1 else {
-            return String(localized: "Bandes déclarées à l'ANFR pour ce site.")
+            // Pas « à l'ANFR » : la même grille sert le Canada (ISED), la Belgique
+            // (BIPT) et la Suisse (OFCOM).
+            return String(localized: "Bandes déclarées au registre pour ce site.")
         }
         return String(localized: "Les \(count) secteurs portent les mêmes bandes.")
     }

@@ -14,6 +14,7 @@ protocol MapSnapshotServicing: Sendable {
     func speedtestTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?) async throws -> [AndroidSpeedtestTileResponse]
     func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int, bands: Set<Int>, maxAge: TimeInterval?) async throws -> [AndroidCoverageTileResponse]
     func communitySiteTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, includeObserved: Bool, bands: Set<Int>) async throws -> [AndroidCommunitySiteTileResponse]
+    func customSiteTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String) async throws -> [AndroidCustomSiteTileResponse]
 }
 
 struct MapBounds: Equatable, Sendable {
@@ -349,6 +350,28 @@ final class MapSnapshotService: MapSnapshotServicing {
                 return APIEndpoint(
                     path: "/api/android/map/tiles/community-sites/\(tile.z)/\(tile.x)/\(tile.y)",
                     query: query
+                )
+            }
+        )
+    }
+
+    /// Sites ajoutés à la main par les membres.
+    ///
+    /// Pas de filtre `bands` ni `includeObserved` : la route n'accepte que
+    /// `market` et `operator`. Et pas de garde de marché côté client — c'est la
+    /// seule couche d'antennes qui existe là où il n'y a pas d'open data.
+    func customSiteTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String) async throws -> [AndroidCustomSiteTileResponse] {
+        try await fetchTiles(
+            bounds: bounds,
+            zoom: zoom,
+            cacheKey: { tile in "custom-sites:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y)" },
+            endpoint: { tile in
+                APIEndpoint(
+                    path: "/api/android/map/tiles/custom-sites/\(tile.z)/\(tile.x)/\(tile.y)",
+                    query: [
+                        URLQueryItem(name: "market", value: market),
+                        URLQueryItem(name: "operator", value: operatorName)
+                    ]
                 )
             }
         )
