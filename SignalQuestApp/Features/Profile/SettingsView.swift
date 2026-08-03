@@ -163,6 +163,21 @@ struct SettingsView: View {
                 Text("Sécurité")
             }
             .listRowBackground(SQColor.surface)
+            // `Section` porte des surcharges pour List ET pour Table : quand la
+            // première expression du bloc est un NavigationLink à fermeture
+            // traînante, Swift résout vers TableRowContent. Un Text concret en
+            // tête ancre la résolution côté vues.
+            Section {
+                Text("État de votre connexion fixe, surveillée en continu depuis nos serveurs.")
+                    .font(SQFont.body(12))
+                    .foregroundStyle(SQColor.labelSecondary)
+                NavigationLink {
+                    SentinelleView(service: services.sentinelle)
+                } label: { settingsLabel("Sentinelle", systemImage: "wifi.router") }
+            } header: {
+                Text("Ma connexion")
+            }
+            .listRowBackground(SQColor.surface)
             Section {
                 Toggle(isOn: $pureBlack) {
                     settingsLabel("Noir intense (OLED)", systemImage: "circle.lefthalf.filled")

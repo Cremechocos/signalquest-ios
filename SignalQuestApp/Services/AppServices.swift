@@ -41,6 +41,7 @@ final class AppServices: ObservableObject {
     let notifications: NotificationsServicing
     let calls: CallsServicing
     let users: UserServicing
+    let sentinelle: SentinelleServicing
     let entitlements: EntitlementsStore
     let push: PushNotificationService
     let router: AppRouter
@@ -115,6 +116,7 @@ final class AppServices: ObservableObject {
         let callsService = CallsService(api: api)
         calls = callsService
         users = UserService(api: api)
+        sentinelle = SentinelleService(api: api)
         // Synchroniseur Apple branché : livre les transactions StoreKit vérifiées
         // au backend et lit l'entitlement canonique. Les achats restent malgré
         // tout fermés tant que les flags `SQFeatures.storeKit*` sont à `false`

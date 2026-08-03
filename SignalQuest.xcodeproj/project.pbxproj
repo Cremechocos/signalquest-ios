@@ -99,6 +99,7 @@
 		36498E869AD0176877E7A254 /* SocialPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F24B90CDD67FFE038702151 /* SocialPreferences.swift */; };
 		372D167F0B48A125051CD026 /* SignatureSpeedDial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D454E35F1134B2689C8BF45 /* SignatureSpeedDial.swift */; };
 		3817114389C995BBD5971D41 /* RadioLogIdentifySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCDE3C255B3CDE0E30DC180A /* RadioLogIdentifySheet.swift */; };
+		3866C1CA8EEC2E696EAE8C8E /* SentinelleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 430454E901BFB79E1C37A0E2 /* SentinelleView.swift */; };
 		38D0EA9A66A425D012948A8E /* SpeedtestShareImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C011703B46C9CCF1394D3BA4 /* SpeedtestShareImageRenderer.swift */; };
 		3926E2BDC6467D138E73947C /* DriveTestDisclosureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868C6042160013413633BB71 /* DriveTestDisclosureView.swift */; };
 		3AE2A1D61D1D7996E56BC9CF /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D755436C239643387D984492 /* LocationService.swift */; };
@@ -295,6 +296,7 @@
 		C12138B326842FEB27D2C5BF /* SQAccessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = A41B467FC7CE900FFE562268 /* SQAccessibility.swift */; };
 		C134EE7EE5A3C4839129FCA6 /* SpeedtestServerBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A854933EFE8A92EBE2DE533 /* SpeedtestServerBar.swift */; };
 		C1512C2EF1DD555F7B6975BD /* FriendsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2CA58924E285286ACEFF82F /* FriendsService.swift */; };
+		C16CE8B5E0E7FC0AD46DE729 /* SentinelleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A09B51D17D8BEFBF8E501 /* SentinelleService.swift */; };
 		C3B0B1D99C78B3D0E3E7A676 /* PostDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E77FAF7EF72C921A19826A6 /* PostDetailView.swift */; };
 		C44E2B39CE80E88513F8DD18 /* WidgetSharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E5547A4163714BB45440475 /* WidgetSharedStore.swift */; };
 		C47BAA50DD2B3D902FBF08B0 /* SignupConsentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E309C5B2B935EA2E5944068 /* SignupConsentTests.swift */; };
@@ -459,6 +461,7 @@
 		1907E549B13F0B983DD9CCC8 /* BiometricAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricAuth.swift; sourceTree = "<group>"; };
 		1910B256F9C57AE17860A42A /* AntennaProfileGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaProfileGeometryTests.swift; sourceTree = "<group>"; };
 		1AA0F72C82A77725FACCD301 /* SQDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQDock.swift; sourceTree = "<group>"; };
+		1B6A09B51D17D8BEFBF8E501 /* SentinelleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleService.swift; sourceTree = "<group>"; };
 		1B7D91FD53A512C0A154BCFB /* AutoRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRefreshTests.swift; sourceTree = "<group>"; };
 		1BA27C4F6CA354680172A364 /* TwoFactorSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFactorSetupView.swift; sourceTree = "<group>"; };
 		1CBEF5719666A1FBE7A1BD0A /* StoryComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryComposer.swift; sourceTree = "<group>"; };
@@ -518,6 +521,7 @@
 		413FB8DE8180198C52ED7167 /* SessionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsService.swift; sourceTree = "<group>"; };
 		420C779CFB15C46F531F88B0 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		42D4BA9134FD958EE6A2E58F /* AntennaSectorGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaSectorGeometry.swift; sourceTree = "<group>"; };
+		430454E901BFB79E1C37A0E2 /* SentinelleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleView.swift; sourceTree = "<group>"; };
 		4346B0324DBC983FC6001FF7 /* RadioLogsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogsTests.swift; sourceTree = "<group>"; };
 		43A01E23F145B917FF35CD53 /* MentionAutocompleteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionAutocompleteTests.swift; sourceTree = "<group>"; };
 		43F86F356FE7B0E322F9B79A /* RadioLogIdentifyPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogIdentifyPicker.swift; sourceTree = "<group>"; };
@@ -1018,6 +1022,7 @@
 				2A10CEC1AE5133DC2359EA2B /* Photos */,
 				3C6C0845A097E28771A42C47 /* Profile */,
 				1467E7550F3281C1D812D1AB /* RadioLogs */,
+				6811460E85C45EC0D7D20167 /* Sentinelle */,
 				B367C49F9620A202AB659ACA /* Sessions */,
 				BB98C3F61016E4C3E6F242E0 /* Speedtest */,
 				CB54DA7B29F0BFAFEC958486 /* Territories */,
@@ -1211,6 +1216,14 @@
 				2A5251F96893CB76BAAC1239 /* SignalQuestWidget.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		6811460E85C45EC0D7D20167 /* Sentinelle */ = {
+			isa = PBXGroup;
+			children = (
+				430454E901BFB79E1C37A0E2 /* SentinelleView.swift */,
+			);
+			path = Sentinelle;
 			sourceTree = "<group>";
 		};
 		6FA09B3B1EBFEDE109421C1E /* Friends */ = {
@@ -1493,6 +1506,7 @@
 				8D2BA4BE9B82CEBAF420AC06 /* RadioLogsService.swift */,
 				C9D767888C889FD28F3AA8DF /* RadioLogStore.swift */,
 				BF5C473D670B7B2938ABCB45 /* ReportsService.swift */,
+				1B6A09B51D17D8BEFBF8E501 /* SentinelleService.swift */,
 				413FB8DE8180198C52ED7167 /* SessionsService.swift */,
 				109A301B55F7538F8267E4DB /* SocialFeedService.swift */,
 				2A7E285B40002E79EA8CC1BB /* SpeedtestService.swift */,
@@ -2129,6 +2143,8 @@
 				D8D71CD3AB926175688AD739 /* ScheduledMessagesView.swift in Sources */,
 				1B46DD506F06F337F9743269 /* SectorEditSheet.swift in Sources */,
 				F6BC5F6AB5F5BC1D5D2B282E /* SectorNumbering.swift in Sources */,
+				C16CE8B5E0E7FC0AD46DE729 /* SentinelleService.swift in Sources */,
+				3866C1CA8EEC2E696EAE8C8E /* SentinelleView.swift in Sources */,
 				9B23A9464CD35CCB2BED5DD8 /* SessionDetailView.swift in Sources */,
 				8CC009E03CB57D8B8159BCAA /* SessionModels.swift in Sources */,
 				E0941F020DD3319E69F428FE /* SessionTraceMapView.swift in Sources */,
