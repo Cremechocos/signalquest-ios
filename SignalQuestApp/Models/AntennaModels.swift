@@ -325,6 +325,11 @@ struct AntennaCoreDetails: Decodable, Equatable {
     let status: String?
     /// Technologies déclarées mais pas encore allumées sur ce site.
     let technologiesInProject: [String]
+    /// Systèmes rayonnés par secteur — présent UNIQUEMENT quand les secteurs
+    /// diffèrent réellement. Vide, cela veut dire « tous les secteurs portent les
+    /// mêmes bandes », et la fiche montre alors `frequencyBands` une seule fois
+    /// au lieu de la répéter sous chaque azimut.
+    let sectorSystems: [AntennaSectorSystems]
 
     /// Le site est-il réellement en service ? L'ANFR distingue « En service » de
     /// « Techniquement opérationnel » (prêt, pas ouvert) et de « Projet approuvé ».
@@ -342,7 +347,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, supId, siteKey, anfrCode, market, rawLicenseeName, lat, lng, address, commune, postalCode, operators, operatorScope, operatorFacets, sharingKind, crozonLeader, zbLeader, technologies, azimuts, technical, frequencyBands, radioCarriers, cellIdentifiers, siteInfo
-        case status, technologiesInProject
+        case status, technologiesInProject, sectorSystems
     }
 
     /// `technologies_projet` arrive en objet `{ lte: [...], "5g": [...] }` : on
@@ -396,7 +401,16 @@ struct AntennaCoreDetails: Decodable, Equatable {
         status = c.decodeFlexibleString(forKey: .status)
         technologiesInProject = (try? c.decodeIfPresent(TechnologiesInProject.self, forKey: .technologiesInProject))
             .flatMap { $0?.labels } ?? []
+        sectorSystems = c.decodeLossyArray([AntennaSectorSystems].self, forKey: .sectorSystems)
+            .sorted { $0.azimuth < $1.azimuth }
     }
+}
+
+/// Ce qu'un secteur rayonne réellement, quand il se distingue de ses voisins.
+struct AntennaSectorSystems: Decodable, Equatable, Identifiable {
+    var id: Double { azimuth }
+    let azimuth: Double
+    let systems: [String]
 }
 
 struct AntennaRadioCarrier: Decodable, Equatable, Identifiable {

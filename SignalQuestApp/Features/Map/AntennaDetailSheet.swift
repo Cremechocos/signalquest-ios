@@ -434,76 +434,17 @@ struct AntennaDetailSheet: View {
 
     // MARK: Secteurs & azimuts
 
-    /// Construit la liste des secteurs : porteuses radio groupées par azimut
-    /// quand elles existent, sinon azimuts bruts avec les technos/bandes du site.
-    private func sectorInfos(_ details: AntennaDetails) -> [SectorDisplayInfo] {
-        let carriers = (details.core?.radioCarriers ?? []).filter { $0.sectorAzimuthDeg != nil }
-        if !carriers.isEmpty {
-            let grouped = Dictionary(grouping: carriers) { Int(($0.sectorAzimuthDeg ?? 0).rounded()) }
-            return grouped.keys.sorted().map { azimuth in
-                let items = grouped[azimuth] ?? []
-                var techs: [String] = []
-                var bands: [String] = []
-                for item in items {
-                    if let tech = item.technology, !techs.contains(tech) {
-                        techs.append(tech)
-                    }
-                    if let band = item.bandLabel ?? item.band.map({ "B\($0)" }), !bands.contains(band) {
-                        bands.append(band)
-                    }
-                }
-                return SectorDisplayInfo(
-                    id: "sector-\(azimuth)",
-                    azimuth: Double(azimuth),
-                    technologies: techs,
-                    bands: bands
-                )
-            }
-        }
-        let coreAzimuts = details.core?.azimuts ?? []
-        let azimuths = coreAzimuts.isEmpty ? site.azimuths : coreAzimuts
-        guard !azimuths.isEmpty else { return [] }
-        return azimuths.enumerated().map { index, azimuth in
-            SectorDisplayInfo(
-                id: "sector-\(index)-\(Int(azimuth.rounded()))",
-                azimuth: azimuth,
-                technologies: details.technologies,
-                bands: Array(details.bands.prefix(4))
-            )
-        }
-    }
-
-    private func sectorFanContent(_ sectors: [SectorDisplayInfo]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            AzimuthFanView(azimuths: sectors.map(\.azimuth), color: operatorColor)
-                .frame(height: 190)
-                .frame(maxWidth: .infinity)
-            ForEach(sectors.prefix(8)) { sector in
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(operatorColor)
-                            .frame(width: 7, height: 7)
-                        Text("Secteur \(Int(sector.azimuth.rounded()))°")
-                            .font(SQFont.archivo(12, .bold))
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                    if !sector.technologies.isEmpty || !sector.bands.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: SQSpace.xs + 2) {
-                                ForEach(sector.technologies, id: \.self) { tech in
-                                    SQEditorialTag(text: tech, color: SQBrand.techColor(tech))
-                                }
-                                ForEach(sector.bands, id: \.self) { band in
-                                    SQEditorialTag(text: band, color: SQColor.labelSecondary)
-                                }
-                            }
-                            .padding(.vertical, 1)
-                        }
-                    }
-                }
-            }
-        }
+    /// Le rayonnement du site : technologies, bandes, et — seulement quand les
+    /// secteurs diffèrent réellement — la grille qui montre où est l'écart.
+    private func sectorContent(_ details: AntennaDetails) -> some View {
+        AntennaSectorGridView(
+            azimuths: displayedAzimuths,
+            siteBands: (details.core?.frequencyBands ?? []).isEmpty ? details.bands : (details.core?.frequencyBands ?? []),
+            sectorSystems: details.core?.sectorSystems ?? [],
+            technologies: (details.core?.technologies ?? []).isEmpty ? details.technologies : (details.core?.technologies ?? []),
+            antennaHeightMeters: details.core?.siteInfo.radiatingHeightMeters,
+            tint: operatorColor
+        )
         .foregroundStyle(SQColor.label)
     }
 
@@ -514,10 +455,9 @@ struct AntennaDetailSheet: View {
     /// sauf le rayonnement, qui est ce qu'on vient chercher le plus souvent.
     @ViewBuilder
     private func collapsibleSections(_ details: AntennaDetails) -> some View {
-        let sectors = sectorInfos(details)
-        if !sectors.isEmpty {
+        if !displayedAzimuths.isEmpty || !details.bands.isEmpty {
             AntennaDisclosureSection(title: "Secteurs & azimuts", systemImage: "safari", initiallyExpanded: true) {
-                sectorFanContent(sectors)
+                sectorContent(details)
             }
         }
         if let core = details.core {
@@ -811,17 +751,9 @@ private struct AntennaSectionHeader: View {
     }
 }
 
-/// Secteur affiché dans la fiche : azimut + technologies/bandes associées.
-private struct SectorDisplayInfo: Identifiable {
-    let id: String
-    let azimuth: Double
-    let technologies: [String]
-    let bands: [String]
-}
-
 /// Éventail des azimuts dessiné en Canvas : chaque secteur est un cône
 /// orienté selon son azimut (0° = nord), coloré avec la couleur opérateur.
-private struct AzimuthFanView: View {
+struct AzimuthFanView: View {
     let azimuths: [Double]
     let color: Color
 

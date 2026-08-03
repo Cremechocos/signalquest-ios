@@ -44,32 +44,58 @@ final class AntennaSightViewModel: ObservableObject {
         defer { isLoading = false }
 
         let path = AntennaSightGeometry.samplePath(from: user, to: antenna, distanceMeters: distanceMeters)
+
+        // Les deux sources partent EN MÊME TEMPS : le relief vient de l'IGN,
+        // rapide, le bâti d'Overpass, souvent bien plus lent. Les enchaîner
+        // faisait attendre le profil entier au rythme du plus lent, alors que le
+        // relief suffit à afficher quelque chose d'utile.
+        async let elevationTask = terrain.elevations(for: path)
+        async let buildingTask: [Double?]? = try? await terrain.buildingHeights(for: path)
+
         do {
-            let elevations = try await terrain.elevations(for: path)
-            // Le bâti est un bonus : s'il manque, le profil reste juste sur le
-            // relief. On ne perd pas tout le calcul pour une couche optionnelle.
-            let buildings = (try? await terrain.buildingHeights(for: path)) ?? []
-            let hasBuildings = buildings.contains { ($0 ?? 0) > 0 }
-            let points = AntennaSightGeometry.buildProfile(
+            let elevations = try await elevationTask
+            let relief = AntennaSightGeometry.buildProfile(
+                distanceMeters: distanceMeters,
+                groundElevations: elevations,
+                clutterHeights: [],
+                antennaHeightMeters: antennaHeightMeters,
+                frequencyMhz: frequencyMhz
+            )
+            guard !relief.isEmpty else {
+                failed = true
+                loadedKey = nil
+                return
+            }
+            // Premier rendu dès que le relief est là : l'utilisateur voit son
+            // profil pendant qu'Overpass réfléchit encore.
+            profile = relief
+            verdict = AntennaSightGeometry.verdict(for: relief, includesBuildings: false)
+            isLoading = false
+
+            // Puis le bâti vient l'enrichir, sans jamais le remplacer par du vide.
+            guard let buildings = await buildingTask, buildings.contains(where: { ($0 ?? 0) > 0 }) else { return }
+            let enriched = AntennaSightGeometry.buildProfile(
                 distanceMeters: distanceMeters,
                 groundElevations: elevations,
                 clutterHeights: buildings,
                 antennaHeightMeters: antennaHeightMeters,
                 frequencyMhz: frequencyMhz
             )
-            guard !points.isEmpty else {
-                failed = true
-                loadedKey = nil
-                return
-            }
-            profile = points
-            verdict = AntennaSightGeometry.verdict(for: points, includesBuildings: hasBuildings)
+            guard !enriched.isEmpty else { return }
+            profile = enriched
+            verdict = AntennaSightGeometry.verdict(for: enriched, includesBuildings: true)
         } catch {
             failed = true
             // Un échec ne doit pas geler la vue sur cette clé : la prochaine
             // apparition de la fiche pourra réessayer.
             loadedKey = nil
         }
+    }
+
+    /// Force un recalcul, même position et même antenne — après un déplacement
+    /// que le cache aurait considéré comme identique.
+    func invalidate() {
+        loadedKey = nil
     }
 }
 
@@ -83,6 +109,7 @@ struct AntennaSightCard: View {
     @EnvironmentObject private var services: AppServices
     @StateObject private var model: AntennaSightViewModel
     @State private var showsProfile = false
+    @State private var isRefreshing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(site: AntennaSite, details: AntennaDetails?, userLocation: CLLocation?, tint: Color, terrain: TerrainServicing) {
@@ -178,6 +205,7 @@ struct AntennaSightCard: View {
                         }
                     }
                     Spacer(minLength: 0)
+                    refreshButton
                 }
                 sectorLine
                 terrainPreview
@@ -204,6 +232,46 @@ struct AntennaSightCard: View {
                 tint: tint
             )
         }
+    }
+
+    /// Redemande un point GPS et recalcule la visée depuis là.
+    ///
+    /// Utile dès qu'on se déplace pour chercher un dégagement : sans cela, la
+    /// fiche garde la position d'ouverture, et le profil resterait celui d'un
+    /// endroit qu'on vient de quitter.
+    private var refreshButton: some View {
+        Button {
+            Haptics.light()
+            Task { await refreshPosition() }
+        } label: {
+            Image(systemName: "location.circle")
+                .font(.system(size: 19, weight: .medium))
+                .foregroundStyle(isRefreshing ? SQColor.labelTertiary : tint)
+                .rotationEffect(.degrees(isRefreshing ? 360 : 0))
+                .animation(
+                    isRefreshing && !reduceMotion
+                        ? .linear(duration: 1).repeatForever(autoreverses: false)
+                        : .default,
+                    value: isRefreshing
+                )
+                .frame(width: 34, height: 34)
+                .background(SQColor.surfaceMuted, in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .disabled(isRefreshing)
+        .accessibilityLabel("Actualiser ma position")
+        .accessibilityHint("Recalcule la distance et le profil depuis l'endroit où tu es maintenant")
+    }
+
+    private func refreshPosition() async {
+        isRefreshing = true
+        defer { isRefreshing = false }
+        // `maxAge: 0` force un vrai relevé : le service renverrait sinon le fix
+        // en cache, qui est précisément celui qu'on cherche à remplacer.
+        _ = await services.location.currentLocation(timeoutSeconds: 10, maxAge: 0)
+        model.invalidate()
+        await loadProfile()
     }
 
     /// Recharge quand la position bouge d'environ 100 m ou que le site change.

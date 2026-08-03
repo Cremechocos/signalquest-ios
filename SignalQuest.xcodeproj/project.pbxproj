@@ -256,6 +256,7 @@
 		AAF92F511259C586D92636FC /* AntennaPhotoQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1DBE566F150964A2AF9D0EE /* AntennaPhotoQATests.swift */; };
 		AB121B4872EDC7356BEC694D /* UserPreferencesModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EF500D8FCED373A2FCD5FF8 /* UserPreferencesModels.swift */; };
 		ABC8DD56868B3F5E0F9BC4DE /* SQOledPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 764597B2F05EB51056FE2ECD /* SQOledPalette.swift */; };
+		ABC9F8282F99A9040260EFCE /* AntennaProfileGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1910B256F9C57AE17860A42A /* AntennaProfileGeometryTests.swift */; };
 		AC0E3A17246AC53079793B7E /* RadioLogsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D2BA4BE9B82CEBAF420AC06 /* RadioLogsService.swift */; };
 		AC94D51B2FCCA7EE1B96BA59 /* AntennaSightGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50E224DF9C30B2416798A0F5 /* AntennaSightGeometryTests.swift */; };
 		AE4252E6C806B316DED09768 /* MyIdentificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B3358D3E2CFEC772D02F2D2 /* MyIdentificationsView.swift */; };
@@ -364,6 +365,7 @@
 		F6EF1D45622D7CC867AF4F04 /* SpeedtestTriMetric.swift in Sources */ = {isa = PBXBuildFile; fileRef = 729C9DEBA4E8FC4DD397E20E /* SpeedtestTriMetric.swift */; };
 		F7CFE8B7F8498A974CD80BEC /* AccountSettingsQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21471D2C10A3FFD059193B78 /* AccountSettingsQATests.swift */; };
 		F87A9373237B5F0AE131AA87 /* RadioLogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D767888C889FD28F3AA8DF /* RadioLogStore.swift */; };
+		F988AD7664A31CFCFD9E94CA /* AntennaSectorGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3023383A4E568490429AE96 /* AntennaSectorGridView.swift */; };
 		FA1FA3B1FB3F9621CC897800 /* ReportsRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED23939334EC481F2A096590 /* ReportsRoutingTests.swift */; };
 		FA8A1167522105F2D6EBEFB7 /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9594367DF3047FDF3B240AB /* MockURLProtocol.swift */; };
 		FB57CD4C24B26102CCD880A0 /* SpeedtestBurstSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8E8ED2F3CAFB9F5358E68F4 /* SpeedtestBurstSummary.swift */; };
@@ -444,6 +446,7 @@
 		188B982997C559D0E38231B7 /* SpeedtestTrendWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestTrendWidget.swift; sourceTree = "<group>"; };
 		18C58605C20828352068B1EE /* SectorEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectorEditSheet.swift; sourceTree = "<group>"; };
 		1907E549B13F0B983DD9CCC8 /* BiometricAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricAuth.swift; sourceTree = "<group>"; };
+		1910B256F9C57AE17860A42A /* AntennaProfileGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaProfileGeometryTests.swift; sourceTree = "<group>"; };
 		1AA0F72C82A77725FACCD301 /* SQDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQDock.swift; sourceTree = "<group>"; };
 		1B7D91FD53A512C0A154BCFB /* AutoRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRefreshTests.swift; sourceTree = "<group>"; };
 		1BA27C4F6CA354680172A364 /* TwoFactorSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFactorSetupView.swift; sourceTree = "<group>"; };
@@ -676,6 +679,7 @@
 		B070C4F0FF01A239CDF93570 /* CallReliabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallReliabilityTests.swift; sourceTree = "<group>"; };
 		B0E1077E22C2EA2D3D667108 /* RadioLogsTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogsTokens.swift; sourceTree = "<group>"; };
 		B1F4DC14B58C08DADF46E158 /* MapFilterStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapFilterStoreTests.swift; sourceTree = "<group>"; };
+		B3023383A4E568490429AE96 /* AntennaSectorGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaSectorGridView.swift; sourceTree = "<group>"; };
 		B32C6BDB8AAAE92F19CCDB1F /* Comparable+Clamp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Comparable+Clamp.swift"; sourceTree = "<group>"; };
 		B3E12C14EC03895F48D39245 /* CallManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallManager.swift; sourceTree = "<group>"; };
 		B3F7194ED546885B8FCFAFCB /* FeedTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedTab.swift; sourceTree = "<group>"; };
@@ -1483,6 +1487,7 @@
 			children = (
 				B4EBB8F2A133C7E7E8BFE147 /* AntennaMarkerDecodeTests.swift */,
 				FCC9C691A3F3F1874DAD506F /* AntennaMarkerRenderTests.swift */,
+				1910B256F9C57AE17860A42A /* AntennaProfileGeometryTests.swift */,
 				50E224DF9C30B2416798A0F5 /* AntennaSightGeometryTests.swift */,
 				5C14BE7BE1D4056FB4421D16 /* APIClientTests.swift */,
 				057F3D0D16C169E912292708 /* AppStoreSyncTests.swift */,
@@ -1566,6 +1571,7 @@
 				1FF3CB12A75C5483284BC5C7 /* AntennaDetailSheet.swift */,
 				55FD59340CD7E3743D7EF4B9 /* AntennaProfileView.swift */,
 				75D22ACFDF645E05F738DB65 /* AntennaRadioIdentifiersView.swift */,
+				B3023383A4E568490429AE96 /* AntennaSectorGridView.swift */,
 				1DAA7D338C028E555F8CBAFC /* AntennaSightGeometry.swift */,
 				56C63E44A7E96FCFBDBE3BD8 /* AntennaSightView.swift */,
 				AEC8C52D6E947CD2FC669EFE /* AntennaSupportSilhouette.swift */,
@@ -1899,6 +1905,7 @@
 				75BFED4817463517F5991DE3 /* AntennaReportsListView.swift in Sources */,
 				60EBDACADAAACBFFF77481DA /* AntennaReportsService.swift in Sources */,
 				715EF9F210C7031757AEAD25 /* AntennaSectorGeometry.swift in Sources */,
+				F988AD7664A31CFCFD9E94CA /* AntennaSectorGridView.swift in Sources */,
 				D49656ADC5C1C28BD4B49534 /* AntennaSightGeometry.swift in Sources */,
 				08C4813D780CB4C1366889E7 /* AntennaSightView.swift in Sources */,
 				5C55F01FFB08015438F91B91 /* AntennaSupportSilhouette.swift in Sources */,
@@ -2186,6 +2193,7 @@
 				FD8C8A4E55F6F7F937636C0E /* APIClientTests.swift in Sources */,
 				2D45A38C6DD966DDBFB53451 /* AntennaMarkerDecodeTests.swift in Sources */,
 				2D7B3DBF75B6EA5D1E059052 /* AntennaMarkerRenderTests.swift in Sources */,
+				ABC9F8282F99A9040260EFCE /* AntennaProfileGeometryTests.swift in Sources */,
 				AC94D51B2FCCA7EE1B96BA59 /* AntennaSightGeometryTests.swift in Sources */,
 				B9D52362A2FFC61D1DC2E2B0 /* AppStoreSyncTests.swift in Sources */,
 				4A54B72BCBA77DBCE0F62CD9 /* AuthCookieStoreTests.swift in Sources */,

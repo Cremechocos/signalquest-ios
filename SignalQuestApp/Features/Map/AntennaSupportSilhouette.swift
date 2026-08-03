@@ -54,6 +54,26 @@ enum AntennaSupportSilhouette {
         }
     }
 
+    /// Largeur de la structure à une hauteur donnée (`ratio` = 0 au sol, 1 au
+    /// sommet). Sert à poser les antennes SUR le fût plutôt qu'à côté : un pylône
+    /// s'affine en montant, un bâtiment non.
+    static func width(family: Family, at ratio: CGFloat, baseWidth: CGFloat) -> CGFloat {
+        let clamped = min(max(ratio, 0), 1)
+        switch family {
+        case .lattice:
+            // Même interpolation que les montants : de `half` au sol à `0.3 · half`.
+            return baseWidth * (1 + (0.3 - 1) * clamped)
+        case .guyed, .tube, .tree, .turbine:
+            return baseWidth * 0.5
+        case .waterTower:
+            return clamped > 0.6 ? baseWidth : baseWidth * 0.6
+        case .steeple:
+            return baseWidth * (clamped > 0.7 ? 0.5 : 1.2)
+        case .building, .indoor:
+            return baseWidth * 1.4
+        }
+    }
+
     /// Le support dessiné en TRAIT, du sol (`baseY`) à son sommet (`topY`).
     /// `width` est la largeur au sol. Les coordonnées sont en repère écran (Y vers
     /// le bas), prêtes à être tracées dans le `Canvas` du profil.

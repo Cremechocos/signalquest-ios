@@ -84,10 +84,15 @@ struct AntennaProfileView: View {
             let minValue = rawMin
             let total = max(profile.last?.distanceMeters ?? 1, 1)
 
+            // Marge droite généreuse : le support est dessiné À l'extrémité du
+            // trajet, avec sa silhouette, ses antennes et ses deux cotes. Sans
+            // cette réserve, la cote de hauteur du support tombait hors du cadre
+            // et restait invisible.
             let leftInset: CGFloat = 44
+            let rightInset: CGFloat = 58
             let bottomInset: CGFloat = 30
-            let topInset: CGFloat = 10
-            let plotWidth = size.width - leftInset - 8
+            let topInset: CGFloat = 16
+            let plotWidth = size.width - leftInset - rightInset
             let plotHeight = size.height - bottomInset - topInset
 
             func x(_ distance: Double) -> CGFloat { leftInset + plotWidth * distance / total }
@@ -275,7 +280,11 @@ struct AntennaProfileView: View {
         altitude: Double,
         bottom: CGFloat
     ) {
-        let width = max(min((groundY - topY) * 0.34, 26), 10)
+        // Une structure de 350 px de haut pour 26 de large donnait une aiguille.
+        // Un pylône réel tient dans un rapport de l'ordre de 1 pour 8 ; on s'en
+        // approche, avec un plancher qui garde les traverses lisibles.
+        let height = max(groundY - topY, 1)
+        let width = max(min(height * 0.16, 46), 16)
         let structure = AntennaSupportSilhouette.strokePath(
             family: family, baseX: x, baseY: groundY, topY: topY, width: width
         )
@@ -284,24 +293,29 @@ struct AntennaProfileView: View {
         }
         context.stroke(structure, with: .color(tint), style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
 
+        // Les antennes se posent SUR le fût : leur écartement suit la largeur de
+        // la structure à leur hauteur, pas une constante — sinon elles flottaient
+        // à côté du support au lieu d'y être accrochées.
+        let antennaRatio = height > 0 ? (groundY - antennaY) / height : 0
+        let widthAtAntenna = AntennaSupportSilhouette.width(family: family, at: antennaRatio, baseWidth: width)
         let antennas = AntennaSupportSilhouette.antennaPath(
-            antennaTypes: antennaTypes, centerX: x, antennaY: antennaY, width: width
+            antennaTypes: antennaTypes, centerX: x, antennaY: antennaY, width: widthAtAntenna
         )
         context.fill(antennas.panels, with: .color(tint))
         if let dish = antennas.dish {
             context.stroke(dish, with: .color(tint), lineWidth: 1.4)
         }
 
-        // Cotes. Celle du support est décalée pour ne pas se superposer à celle
-        // des antennes quand les deux hauteurs sont proches.
+        // Cotes de part et d'autre : la hauteur du support à droite, celle des
+        // antennes à gauche. La marge droite du graphe leur est réservée.
         drawDimension(
-            context: context, x: x + width * 0.9 + 12, fromY: groundY, toY: topY,
+            context: context, x: x + width * 0.5 + 18, fromY: groundY, toY: topY,
             label: supportHeightMeters.map { "\(Int($0.rounded())) m" } ?? "—",
             color: SQColor.labelSecondary
         )
         if let antennaHeightMeters, supportHeightMeters == nil || abs((supportHeightMeters ?? 0) - antennaHeightMeters) > 0.5 {
             drawDimension(
-                context: context, x: x - width * 0.9 - 12, fromY: groundY, toY: antennaY,
+                context: context, x: x - width * 0.5 - 18, fromY: groundY, toY: antennaY,
                 label: "\(Int(antennaHeightMeters.rounded())) m",
                 color: tint
             )
