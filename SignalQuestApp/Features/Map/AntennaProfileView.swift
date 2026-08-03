@@ -39,7 +39,7 @@ struct AntennaProfileView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
                     chart
-                        .frame(height: 280)
+                        .frame(height: 330)
                         .frame(maxWidth: .infinity)
                         .padding(SQSpace.md)
                         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
@@ -79,8 +79,9 @@ struct AntennaProfileView: View {
             values.append(antennaGround + structureHeight)
             values.append(userGround)
             guard let rawMin = values.min(), let rawMax = values.max() else { return }
-            // Marge haute pour les antennes et les cotes.
-            let span = max(rawMax - rawMin, 1) * 1.08
+            // Juste ce qu'il faut au-dessus du sommet du support : au-delà, c'est
+            // du vide qui écrase le relief en bas du cadre.
+            let span = max(rawMax - rawMin, 1) * 1.02
             let minValue = rawMin
             let total = max(profile.last?.distanceMeters ?? 1, 1)
 
@@ -90,8 +91,10 @@ struct AntennaProfileView: View {
             // et restait invisible.
             let leftInset: CGFloat = 44
             let rightInset: CGFloat = 58
-            let bottomInset: CGFloat = 30
-            let topInset: CGFloat = 16
+            // Les deux étiquettes d'extrémité (nom puis altitude) et la ligne
+            // d'échelle se superposaient : chacune a maintenant sa ligne.
+            let bottomInset: CGFloat = 44
+            let topInset: CGFloat = 6
             let plotWidth = size.width - leftInset - rightInset
             let plotHeight = size.height - bottomInset - topInset
 
@@ -132,6 +135,22 @@ struct AntennaProfileView: View {
             for p in profile.dropFirst() { sight.addLine(to: point(p, p.sightLineMeters)) }
             context.stroke(sight, with: .color(tint), style: StrokeStyle(lineWidth: 2, dash: [5, 4]))
 
+            // Repère au point visé — la BASE des antennes, pas le sommet du
+            // support, qui le dépasse souvent de plusieurs mètres. Sans lui, la
+            // ligne semblait s'arrêter à mi-pylône sans qu'on comprenne pourquoi.
+            if let last = profile.last {
+                let target = point(last, last.sightLineMeters)
+                context.fill(
+                    Path(ellipseIn: CGRect(x: target.x - 3.5, y: target.y - 3.5, width: 7, height: 7)),
+                    with: .color(tint)
+                )
+                context.stroke(
+                    Path(ellipseIn: CGRect(x: target.x - 6.5, y: target.y - 6.5, width: 13, height: 13)),
+                    with: .color(tint.opacity(0.45)),
+                    lineWidth: 1.2
+                )
+            }
+
             // Obstacle le plus pénalisant
             if let distance = verdict?.obstacleDistanceMeters,
                let hit = profile.min(by: { abs($0.distanceMeters - distance) < abs($1.distanceMeters - distance) }) {
@@ -163,7 +182,7 @@ struct AntennaProfileView: View {
                 Text("\(SQUnits.distance(meters: total)) · échelle verticale non proportionnelle")
                     .font(SQFont.archivo(9, .semibold))
                     .foregroundColor(SQColor.labelTertiary),
-                at: CGPoint(x: leftInset + plotWidth / 2, y: size.height - 6)
+                at: CGPoint(x: size.width / 2, y: size.height - 5)
             )
         }
         .accessibilityLabel(accessibilitySummary)
@@ -261,11 +280,11 @@ struct AntennaProfileView: View {
 
         context.draw(
             Text("toi").font(SQFont.archivo(9.5, .bold)).foregroundColor(SQColor.label),
-            at: CGPoint(x: x + 2, y: bottom + 9)
+            at: CGPoint(x: x + 2, y: bottom + 11)
         )
         context.draw(
             Text("\(Int(altitude.rounded())) m").font(SQFont.archivo(9, .semibold)).foregroundColor(SQColor.labelSecondary),
-            at: CGPoint(x: x + 2, y: bottom + 20)
+            at: CGPoint(x: x + 2, y: bottom + 24)
         )
     }
 
@@ -323,13 +342,13 @@ struct AntennaProfileView: View {
 
         context.draw(
             Text(supportLabel ?? AntennaSupportSilhouette.fallbackLabel(for: family))
-                .font(SQFont.archivo(9.5, .bold))
+                .font(SQFont.archivo(9, .bold))
                 .foregroundColor(SQColor.label),
-            at: CGPoint(x: x - 4, y: bottom + 9), anchor: .trailing
+            at: CGPoint(x: x + 4, y: bottom + 11), anchor: .trailing
         )
         context.draw(
             Text("\(Int(altitude.rounded())) m").font(SQFont.archivo(9, .semibold)).foregroundColor(SQColor.labelSecondary),
-            at: CGPoint(x: x - 4, y: bottom + 20), anchor: .trailing
+            at: CGPoint(x: x + 4, y: bottom + 24), anchor: .trailing
         )
     }
 
@@ -398,7 +417,47 @@ struct AntennaProfileView: View {
                 label: heightIsEstimated ? "Antennes (estim.)" : "Antennes",
                 value: antennaHeightMeters.map { "\(Int($0.rounded())) m" } ?? "—"
             )
+            CardMetricTile(label: "Tilt pour te viser", value: downtiltLabel)
+            CardMetricTile(label: "Ligne de visée", value: lineOfSightLabel)
+            CardMetricTile(label: "Dégagement Fresnel", value: fresnelLabel)
+            CardMetricTile(label: "Rayon Fresnel max.", value: fresnelRadiusLabel)
         }
+    }
+
+    /// Inclinaison géométrique qui pointerait l'antenne exactement sur toi.
+    private var downtiltLabel: String {
+        guard let last = profile.last, let first = profile.first else { return "—" }
+        guard let tilt = AntennaSightGeometry.downtiltToward(
+            distanceMeters: distanceMeters,
+            antennaTopMeters: last.sightLineMeters,
+            observerTopMeters: first.sightLineMeters
+        ) else { return "—" }
+        let rounded = (abs(tilt) * 10).rounded() / 10
+        let value = String(format: "%.1f", rounded).replacingOccurrences(of: ".", with: ",")
+        // Un tilt négatif voudrait dire viser au-dessus de l'horizontale : c'est
+        // le cas quand on domine l'antenne, et ça se dit « uptilt ».
+        return tilt >= 0 ? "\(value)° bas" : "\(value)° haut"
+    }
+
+    private var lineOfSightLabel: String {
+        switch verdict?.level {
+        case .clear, .grazing: return String(localized: "dégagée")
+        case .blocked: return String(localized: "coupée")
+        case nil: return "—"
+        }
+    }
+
+    /// Sous 60 %, une liaison s'atténue même sans obstacle franc : c'est le seuil
+    /// que retient l'ITU, et celui que trace la bande du graphe.
+    private var fresnelLabel: String {
+        guard let clearance = AntennaSightGeometry.minimumFresnelClearance(for: profile) else { return "—" }
+        let percent = Int((clearance * 100).rounded())
+        return percent < 0 ? String(localized: "obstruée") : "\(percent) %"
+    }
+
+    private var fresnelRadiusLabel: String {
+        guard let radius = profile.map(\.fresnelRadiusMeters).max(), radius > 0 else { return "—" }
+        return "\(Int(radius.rounded())) m"
     }
 
     /// Différence d'altitude du SOL entre les deux points — ce qui explique

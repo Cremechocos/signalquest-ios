@@ -532,6 +532,29 @@ struct AntennaDetailSheet: View {
         .foregroundStyle(SQColor.label)
     }
 
+    /// Les dates du site, sans répétition.
+    ///
+    /// Quatre champs décrivent le même cycle de vie par deux chemins : la date de
+    /// mise en service administrative de la station (`SUP_STATION`) et la date du
+    /// premier émetteur allumé (observatoire ANFR) tombent presque toujours le
+    /// même jour, ce qui affichait deux lignes identiques. On ne garde qu'une
+    /// occurrence de chaque date, dans l'ordre chronologique du cycle.
+    private func lifecycleDates(_ core: AntennaCoreDetails) -> [(String, String)] {
+        let candidates: [(String, String?)] = [
+            (String(localized: "Implantation"), core.siteInfo.implantationDate),
+            (String(localized: "Mise en service"), core.siteInfo.commissioningDate ?? core.siteInfo.firstActivation),
+            (String(localized: "Première activation"), core.siteInfo.firstActivation),
+            (String(localized: "Dernière évolution"), core.siteInfo.lastCommissioned),
+        ]
+        var seen = Set<String>()
+        var result: [(String, String)] = []
+        for (label, raw) in candidates {
+            guard let formatted = SignalFormatters.date(raw), seen.insert(formatted).inserted else { continue }
+            result.append((label, formatted))
+        }
+        return result
+    }
+
     private func technicalContent(_ core: AntennaCoreDetails) -> some View {
         VStack(alignment: .leading, spacing: 12) {
                 detailRow("Technos", core.technologies.joined(separator: " / "))
@@ -549,9 +572,9 @@ struct AntennaDetailSheet: View {
                 detailRow("Secteurs", core.siteInfo.sectorCount.map(String.init))
                 detailRow("Faisceau hertzien", core.technical.hasFh.map { $0 ? "Oui" : "Non" })
                 detailRow("Statut", core.status)
-                detailRow("Implantation", SignalFormatters.date(core.siteInfo.implantationDate))
-                detailRow("Première activation", SignalFormatters.date(core.siteInfo.firstActivation))
-                detailRow("Mise en service", SignalFormatters.date(core.siteInfo.commissioningDate ?? core.siteInfo.lastCommissioned))
+                ForEach(lifecycleDates(core), id: \.0) { label, value in
+                    detailRow(label, value)
+                }
                 detailRow("Dernière mise à jour", SignalFormatters.date(core.siteInfo.lastUpdated, relative: true))
         }
         .foregroundStyle(SQColor.label)

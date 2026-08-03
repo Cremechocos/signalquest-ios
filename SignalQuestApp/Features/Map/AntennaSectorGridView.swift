@@ -26,23 +26,30 @@ struct AntennaSectorGridView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             technologyRow
-            if hasSectorDetail {
+            if columns.count > 1 {
                 grid
             } else {
+                // Un site mono-secteur (omni, indoor) n'a pas de colonnes à
+                // comparer : la grille n'apporterait qu'une colonne de points.
                 bandRow
             }
-            AzimuthFanView(azimuths: displayedAzimuths, color: tint)
+            AzimuthFanView(azimuths: columns.map(\.azimuth), color: tint)
                 .frame(height: 170)
                 .frame(maxWidth: .infinity)
             footnote
         }
     }
 
-    private var hasSectorDetail: Bool { sectorSystems.count > 1 }
-
-    private var displayedAzimuths: [Double] {
-        hasSectorDetail ? sectorSystems.map(\.azimuth) : azimuths
+    /// Le backend n'envoie le détail par secteur que lorsque les secteurs
+    /// DIFFÈRENT. Son absence n'est donc pas un trou : elle affirme que chaque
+    /// secteur porte toutes les bandes du site, et la grille se remplit
+    /// entièrement. C'est cette lecture qui permet de l'afficher toujours.
+    private var columns: [AntennaSectorSystems] {
+        if sectorSystems.count > 1 { return sectorSystems }
+        return azimuths.map { AntennaSectorSystems(azimuth: $0, systems: siteBands) }
     }
+
+    private var hasSectorDetail: Bool { sectorSystems.count > 1 }
 
     /// Toutes les bandes rencontrées, triées par technologie puis par fréquence
     /// décroissante — la 5G 3500 en haut, la 4G 700 en bas : c'est l'ordre dans
@@ -100,7 +107,7 @@ struct AntennaSectorGridView: View {
             HStack(spacing: 0) {
                 Text("")
                     .frame(maxWidth: .infinity, alignment: .leading)
-                ForEach(sectorSystems) { sector in
+                ForEach(columns) { sector in
                     Text("\(Int(sector.azimuth.rounded()))°")
                         .font(SQFont.archivo(10.5, .bold))
                         .foregroundStyle(SQColor.labelSecondary)
@@ -117,7 +124,7 @@ struct AntennaSectorGridView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    ForEach(sectorSystems) { sector in
+                    ForEach(columns) { sector in
                         cell(band: band, sector: sector)
                             .frame(width: 42)
                     }
@@ -145,7 +152,7 @@ struct AntennaSectorGridView: View {
     }
 
     private func isUniform(_ band: String) -> Bool {
-        sectorSystems.allSatisfy { $0.systems.contains(band) }
+        columns.allSatisfy { $0.systems.contains(band) }
     }
 
     @ViewBuilder
@@ -164,7 +171,7 @@ struct AntennaSectorGridView: View {
     }
 
     private var sectorCountLabel: String {
-        let count = displayedAzimuths.count
+        let count = columns.count
         guard count > 1 else {
             return String(localized: "Bandes déclarées à l'ANFR pour ce site.")
         }

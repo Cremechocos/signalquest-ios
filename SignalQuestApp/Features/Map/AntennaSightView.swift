@@ -349,6 +349,7 @@ struct AntennaSightCard: View {
                         supportHeightMeters: details?.core?.siteInfo.supportHeightMeters
                             ?? details?.core?.siteInfo.pylonHeight
                             ?? antennaHeightMeters,
+                        antennaHeightMeters: antennaHeightMeters,
                         tint: tint
                     )
                     .frame(height: 82)
@@ -519,6 +520,10 @@ struct AntennaTerrainPreview: View {
     let profile: [AntennaSightGeometry.ProfilePoint]
     let supportLabel: String?
     let supportHeightMeters: Double?
+    /// Hauteur de RAYONNEMENT, distincte de celle du support : c'est elle que
+    /// vise la ligne. Les dessiner au sommet du support faisait pointer la visée
+    /// à mi-hauteur du pylône, très loin des antennes.
+    let antennaHeightMeters: Double?
     let tint: Color
 
     var body: some View {
@@ -570,8 +575,16 @@ struct AntennaTerrainPreview: View {
                 family: family, baseX: x(total), baseY: groundY, topY: topY, width: width
             )
             context.stroke(structure, with: .color(tint), style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))
+
+            // Les antennes à LEUR hauteur, sur le fût — c'est le point que vise
+            // la ligne de visée, et les deux doivent se rejoindre à l'œil.
+            let radiatingY = y(antennaGround + (antennaHeightMeters ?? structureHeight))
+            let ratio = structureHeight > 0 ? (antennaHeightMeters ?? structureHeight) / structureHeight : 1
             let antennas = AntennaSupportSilhouette.antennaPath(
-                antennaTypes: [], centerX: x(total), antennaY: topY + 2, width: width
+                antennaTypes: [],
+                centerX: x(total),
+                antennaY: radiatingY,
+                width: AntennaSupportSilhouette.width(family: family, at: CGFloat(ratio), baseWidth: width)
             )
             context.fill(antennas.panels, with: .color(tint))
         }

@@ -1838,10 +1838,11 @@ struct MapExplorerView: View {
     /// attribuables à un pylône.
     static func azimuthReach(for zoom: Double) -> CGFloat {
         switch zoom {
-        case ..<14: return 0
-        case ..<15: return 24
-        case ..<16: return 32
-        default:    return 44
+        case ..<13: return 0
+        case ..<14: return 26
+        case ..<15: return 38
+        case ..<16: return 50
+        default:    return 62
         }
     }
 
@@ -1950,7 +1951,7 @@ struct MapExplorerView: View {
                     antennaId: site.id,
                     clusterCount: nil,
                     azimuths: site.azimuths,
-                    showsAzimuths: mapZoom >= 14,
+                    showsAzimuths: mapZoom >= 13,
                     tint: model.operatorAccent(site.operators.first ?? model.operatorFilter),
                     contributionPhotos: site.photoCount,
                     hasEnb: site.hasEnb,

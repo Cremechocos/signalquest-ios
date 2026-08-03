@@ -151,6 +151,33 @@ enum AntennaSightGeometry {
         }
     }
 
+    /// Inclinaison que l'antenne devrait avoir pour pointer exactement sur
+    /// l'observateur — le « tilt » que cherchent les ingénieurs radio.
+    ///
+    /// C'est l'angle de dépression depuis le sommet de l'antenne : positif quand
+    /// il faut piquer vers le bas, ce qui est le cas courant, l'antenne dominant
+    /// son point de couverture. Purement géométrique : il ne dit pas quel tilt
+    /// EST appliqué, seulement lequel viserait cet endroit précis.
+    static func downtiltToward(
+        distanceMeters: Double,
+        antennaTopMeters: Double,
+        observerTopMeters: Double
+    ) -> Double? {
+        guard distanceMeters > 0, distanceMeters.isFinite else { return nil }
+        let drop = antennaTopMeters - observerTopMeters
+        guard drop.isFinite else { return nil }
+        return atan2(drop, distanceMeters) * 180 / .pi
+    }
+
+    /// Part de la première zone de Fresnel restée libre, au point le plus serré
+    /// du trajet. 1 = entièrement dégagée ; sous 0,6 la liaison s'atténue même
+    /// sans obstacle franc ; négatif = la ligne de visée elle-même est coupée.
+    static func minimumFresnelClearance(for profile: [ProfilePoint]) -> Double? {
+        let interior = profile.dropFirst().dropLast().filter { $0.fresnelRadiusMeters > 0 }
+        guard !interior.isEmpty else { return nil }
+        return interior.map { $0.clearanceMeters / $0.fresnelRadiusMeters }.min()
+    }
+
     /// Cherche l'obstacle le plus pénalisant du profil. Les extrémités sont
     /// ignorées : le sol sous les pieds de l'observateur et le pied du pylône
     /// touchent toujours la ligne de visée sans rien masquer.

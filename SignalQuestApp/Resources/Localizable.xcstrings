@@ -338,6 +338,16 @@
         }
       }
     },
+    "%@ absent du secteur %lld degrés" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ absent du secteur %2$lld degrés"
+          }
+        }
+      }
+    },
     "%@ de %@ à %@ supports" : {
       "localizations" : {
         "en" : {
@@ -405,6 +415,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ will be able to see your profile and contact you again."
+          }
+        }
+      }
+    },
+    "%@ présent sur le secteur %lld degrés" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ présent sur le secteur %2$lld degrés"
           }
         }
       }
@@ -1967,6 +1987,9 @@
           }
         }
       }
+    },
+    "Actualiser ma position" : {
+
     },
     "Actuel" : {
       "localizations" : {
@@ -3640,6 +3663,9 @@
         }
       }
     },
+    "Bandes déclarées à l'ANFR pour ce site." : {
+
+    },
     "Basic" : {
 
     },
@@ -5209,6 +5235,9 @@
         }
       }
     },
+    "coupée" : {
+
+    },
     "Couper la caméra" : {
       "localizations" : {
         "en" : {
@@ -5845,6 +5874,9 @@
         }
       }
     },
+    "dégagée" : {
+
+    },
     "Dégradé" : {
       "localizations" : {
         "en" : {
@@ -6075,6 +6107,9 @@
           }
         }
       }
+    },
+    "Dernière évolution" : {
+
     },
     "Dernière mesure" : {
       "extractionState" : "stale",
@@ -8108,6 +8143,9 @@
     "Impérial" : {
 
     },
+    "Implantation" : {
+
+    },
     "Importe un export « eNB Analytics » (CSV) ou NetMonster (.ntm) pour afficher, identifier et gérer les antennes détectées." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -9026,6 +9064,9 @@
     "Les %lld relevés synchronisés seront effacés du serveur et de cet appareil. Les identifications que tu as faites, elles, sont conservées." : {
 
     },
+    "Les %lld secteurs portent les mêmes bandes." : {
+
+    },
     "Les achats App Store seront ouverts après validation serveur en staging. Aucun débit ne peut être lancé pour le moment." : {
       "localizations" : {
         "en" : {
@@ -9157,6 +9198,9 @@
           }
         }
       }
+    },
+    "Les secteurs de ce site ne portent pas les mêmes bandes — les lignes surlignées sont celles qui diffèrent." : {
+
     },
     "Les serveurs speedtest sont occupés ou injoignables depuis ce réseau. Réessaie dans un instant." : {
       "localizations" : {
@@ -10716,6 +10760,9 @@
         }
       }
     },
+    "obstruée" : {
+
+    },
     "Océanie" : {
       "localizations" : {
         "en" : {
@@ -12194,7 +12241,6 @@
       }
     },
     "Première activation" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -12881,6 +12927,9 @@
           }
         }
       }
+    },
+    "Recalcule la distance et le profil depuis l'endroit où tu es maintenant" : {
+
     },
     "Récence" : {
 
