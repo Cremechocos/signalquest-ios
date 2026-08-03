@@ -91,13 +91,18 @@ enum MapFilterCatalog {
         let icon: String
     }
 
-    /// Catégories de partage par marché. Seuls FR et DROM exposent la
-    /// mutualisation (ZB, leaders Crozon, ZTD) — les autres marchés n'ont pas
-    /// d'équivalent exploitable côté carte (le Canada a ses propres motifs ISED,
-    /// non encore portés). Retour vide ⇒ la section « Partage » est masquée.
+    /// Catégories de partage par marché. Seule la métropole expose la
+    /// mutualisation (ZB, leaders Crozon, ZTD).
+    ///
+    /// Les DROM figuraient ici, mais leur dataset ne porte ni `sharingType` ni
+    /// `isZTD` — et le backend réserve explicitement ces filtres à `market === 'FR'`.
+    /// Cocher n'importe laquelle de ces options en Martinique ou à La Réunion
+    /// faisait donc disparaître TOUTES les antennes, sans rien expliquer. Le
+    /// Canada a ses propres motifs ISED, non encore portés. Retour vide ⇒ la
+    /// section « Partage » est masquée.
     static func sharing(forMarket code: String) -> [SharingOption] {
         switch normalize(code) {
-        case "FR", "DROM":
+        case "FR":
             return [
                 SharingOption(value: "ZB", label: "ZB", icon: "antenna.radiowaves.left.and.right"),
                 SharingOption(value: "CROZON_LEADER_SFR", label: "Crozon SFR", icon: "arrow.triangle.branch"),
