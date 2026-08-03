@@ -31,6 +31,9 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     /// couleur de remplissage — mais recyclés d'un `apply` à l'autre : cette
     /// méthode est appelée pour CHAQUE annotation à chaque resynchronisation.
     private var pieSlices: [CAShapeLayer] = []
+    /// Un calque par couleur d'opérateur pour les traits d'azimut. Les tirets de
+    /// chacun sont décalés pour s'entrelacer sur une direction partagée.
+    private var beamLayers: [CAShapeLayer] = []
     private let checkBadge = UIImageView()
     private let photoBadge = UIImageView()
 
@@ -110,6 +113,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             countLabel.isHidden = false
             glyph.isHidden = true
             hidePie()
+            hideBeams()
             lobes.path = nil
             ring.path = nil
             checkBadge.isHidden = true
@@ -174,8 +178,17 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         guard reach > 0, payload.showsAzimuths, !payload.azimuths.isEmpty,
               payload.azimuthStyle != .hidden else {
             lobes.path = nil
+            hideBeams()
             return
         }
+        // Traits + site partagé : chaque direction prend la ou les couleurs des
+        // opérateurs qui la pointent, et le calque unique n'a plus rien à tracer.
+        if payload.azimuthStyle == .lines, !payload.azimuthBeams.isEmpty {
+            lobes.path = nil
+            applyColoredBeams(payload.azimuthBeams, reach: reach)
+            return
+        }
+        hideBeams()
         let center = CGPoint(x: bounds.midX, y: bounds.midY)
         let path = UIBezierPath()
         let halfBeam = AntennaSectorGeometry.defaultHalfBeamDegrees
@@ -214,6 +227,77 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             lobes.lineWidth = 2.5
             lobes.lineCap = .round
         }
+    }
+
+    /// Traits d'azimut colorés par opérateur.
+    ///
+    /// Une direction pointée par plusieurs opérateurs devient UN trait dont les
+    /// tirets alternent leurs couleurs : deux traits superposés n'en laisseraient
+    /// voir qu'un, et les écarter mentirait sur la direction — or c'est
+    /// exactement ce qu'on regarde pour viser une antenne.
+    ///
+    /// Un calque par couleur, et non par direction : le nombre de calques reste
+    /// borné par le nombre d'opérateurs du site (4 au plus en France), quel que
+    /// soit le nombre de secteurs.
+    private func applyColoredBeams(_ beams: [AzimuthBeam], reach: CGFloat) {
+        let center = CGPoint(x: bounds.midX, y: bounds.midY)
+        // Chaque couleur reçoit son propre chemin, et un décalage de tirets qui
+        // dépend du nombre d'opérateurs SUR SA DIRECTION la plus partagée.
+        var pathsByTint: [(tint: UIColor, path: UIBezierPath, slots: Int, slot: Int)] = []
+        for beam in beams {
+            let angle = (beam.azimuth - 90) * .pi / 180
+            let end = CGPoint(x: center.x + cos(angle) * reach, y: center.y + sin(angle) * reach)
+            for (slot, tint) in beam.tints.enumerated() {
+                let color = UIColor(tint)
+                let index = pathsByTint.firstIndex {
+                    $0.tint == color && $0.slots == beam.tints.count && $0.slot == slot
+                }
+                if let index {
+                    pathsByTint[index].path.move(to: center)
+                    pathsByTint[index].path.addLine(to: end)
+                } else {
+                    let path = UIBezierPath()
+                    path.move(to: center)
+                    path.addLine(to: end)
+                    pathsByTint.append((color, path, beam.tints.count, slot))
+                }
+            }
+        }
+
+        for index in 0..<max(pathsByTint.count, beamLayers.count) {
+            if index >= beamLayers.count {
+                let beamLayer = CAShapeLayer()
+                beamLayer.fillColor = nil
+                beamLayer.lineWidth = 2.8
+                layer.insertSublayer(beamLayer, above: lobes)
+                beamLayers.append(beamLayer)
+            }
+            let beamLayer = beamLayers[index]
+            guard index < pathsByTint.count else { beamLayer.isHidden = true; continue }
+            let entry = pathsByTint[index]
+            beamLayer.isHidden = false
+            beamLayer.bounds = CGRect(origin: .zero, size: bounds.size)
+            beamLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
+            beamLayer.path = entry.path.cgPath
+            beamLayer.strokeColor = entry.tint.withAlphaComponent(0.9).cgColor
+            if entry.slots > 1 {
+                // Un tiret « à moi », puis un vide de la longueur des autres :
+                // les couleurs s'intercalent sans jamais se recouvrir.
+                let dash: CGFloat = 5
+                beamLayer.lineDashPattern = [NSNumber(value: Double(dash)),
+                                             NSNumber(value: Double(dash * CGFloat(entry.slots - 1)))]
+                beamLayer.lineDashPhase = -dash * CGFloat(entry.slot)
+                beamLayer.lineCap = .butt
+            } else {
+                beamLayer.lineDashPattern = nil
+                beamLayer.lineDashPhase = 0
+                beamLayer.lineCap = .round
+            }
+        }
+    }
+
+    private func hideBeams() {
+        for beamLayer in beamLayers { beamLayer.isHidden = true }
     }
 
     /// Camembert des opérateurs d'un site partagé.

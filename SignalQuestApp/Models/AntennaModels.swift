@@ -32,6 +32,9 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
     /// ligne de visée juste sans attendre la réponse du détail.
     var supportNature: String?
     var radioSystems: [String] = []
+    /// Azimuts par opérateur sur un support partagé. Vide sur un site
+    /// mono-opérateur, ou tant que le backend ne l'émet pas.
+    var azimuthsByOperator: [String: [Double]] = [:]
 
     /// Le site porte-t-il de la 5G ? `technologies` est déjà normalisé en
     /// « 5G / 4G / 3G / 2G » par `normalizedTechnologies`, le test est donc sûr.

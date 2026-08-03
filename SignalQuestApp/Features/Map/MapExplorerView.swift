@@ -891,6 +891,49 @@ final class MapExplorerViewModel: ObservableObject {
         }
     }
 
+    /// Groupe les azimuts d'un site partagé par DIRECTION, avec les couleurs des
+    /// opérateurs qui la pointent.
+    ///
+    /// Deux opérateurs déclarant 0° et 1° visent la même chose : les traiter
+    /// comme deux directions donnerait deux traits superposés dont un seul
+    /// serait visible.
+    /// `nonisolated` : la fonction est pure, elle ne touche à rien du modèle —
+    /// et les tests doivent pouvoir l'appeler hors du main actor.
+    nonisolated static func groupAzimuthBeams(
+        operators: [String],
+        azimuthsByOperator: [String: [Double]],
+        tint: (String) -> Color
+    ) -> [AzimuthBeam] {
+        // Ordre du site, pas celui du dictionnaire : la séquence des couleurs
+        // doit rester stable d'un rendu à l'autre, sinon les tirets sautent.
+        let ordered = operators.filter { azimuthsByOperator[$0] != nil }
+        let keys = ordered.isEmpty ? azimuthsByOperator.keys.sorted() : ordered
+
+        var beams: [(azimuth: Double, tints: [Color])] = []
+        for key in keys {
+            let color = tint(key)
+            for azimuth in azimuthsByOperator[key] ?? [] {
+                if let index = beams.firstIndex(where: { isSameDirection($0.azimuth, azimuth) }) {
+                    if !beams[index].tints.contains(color) { beams[index].tints.append(color) }
+                } else {
+                    beams.append((azimuth, [color]))
+                }
+            }
+        }
+        return beams
+            .sorted { $0.azimuth < $1.azimuth }
+            .map { AzimuthBeam(azimuth: $0.azimuth, tints: $0.tints) }
+    }
+
+    /// Deux azimuts à moins de 6° l'un de l'autre pointent la même direction.
+    /// Le seuil reste bien sous l'ouverture d'un secteur (65°) : il fusionne des
+    /// déclarations voisines, jamais deux secteurs distincts. Le calcul passe par
+    /// l'écart circulaire, sinon 358° et 2° sembleraient opposés.
+    nonisolated static func isSameDirection(_ a: Double, _ b: Double) -> Bool {
+        let delta = abs(a - b).truncatingRemainder(dividingBy: 360)
+        return min(delta, 360 - delta) <= 6
+    }
+
     /// Adapte un site relevé à la main en `AntennaSite`, la forme qu'attend la
     /// fiche terrain. On ne remplit que ce que la tuile sait : le reste arrive
     /// avec la réponse de `/map/antenna/{id}`, qui sert les deux types de sites.
@@ -946,6 +989,7 @@ final class MapExplorerViewModel: ObservableObject {
             site.hasGnb = marker.hasGnb
             site.supportNature = marker.supportNature
             site.radioSystems = marker.radioSystems
+            site.azimuthsByOperator = marker.azimutsByOperator
             return site
         }
     }
@@ -2017,7 +2061,8 @@ struct MapExplorerView: View {
                     has5G: site.has5G,
                     azimuthReachPoints: Self.azimuthReach(for: mapZoom),
                     operatorTints: operatorTints(for: site),
-                    azimuthStyle: model.azimuthStyle
+                    azimuthStyle: model.azimuthStyle,
+                    azimuthBeams: azimuthBeams(for: site)
                 )
             }
             payloads += clusteredPayloads(from: antennaPayloads, kind: .antenna, idPrefix: "antenna", minCount: 160, label: { "\($0) antennes" })
@@ -2585,6 +2630,22 @@ struct MapExplorerView: View {
         return site.operators
             .filter { seen.insert($0.uppercased()).inserted }
             .map { model.operatorAccent($0) }
+    }
+
+    /// Regroupe les azimuts d'un site partagé par DIRECTION, avec les couleurs
+    /// des opérateurs qui la pointent.
+    ///
+    /// Deux opérateurs déclarant 0° et 1° visent la même chose : les traiter
+    /// comme deux directions donnerait deux traits qui se chevauchent et dont un
+    /// seul serait visible. La tolérance les fond en un seul faisceau bicolore.
+    private func azimuthBeams(for site: AntennaSite) -> [AzimuthBeam] {
+        guard model.operatorFilter.uppercased() == "ALL",
+              site.azimuthsByOperator.count > 1 else { return [] }
+        return MapExplorerViewModel.groupAzimuthBeams(
+            operators: site.operators,
+            azimuthsByOperator: site.azimuthsByOperator,
+            tint: { [model] key in model.operatorAccent(key) }
+        )
     }
 
     private func matchesSelectedBands(_ bands: [Int]) -> Bool {

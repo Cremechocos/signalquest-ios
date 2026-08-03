@@ -625,6 +625,11 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
     let zbLeader: String?
     let technologies: [String]
     let azimuts: [Double]
+    /// Azimuts par opérateur, présent uniquement sur un support PARTAGÉ vu en
+    /// « Tous ». Sans lui, `azimuts` ne porte que ceux du premier opérateur
+    /// fusionné : la carte montrait donc les secteurs d'un seul, sans le dire.
+    /// Absent des tuiles servies avant le déploiement → vide, rendu inchangé.
+    let azimutsByOperator: [String: [Double]]
     let bands: [Int]
     let address: String?
     let isZTD: Bool
@@ -650,7 +655,7 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
     let radioSystems: [String]
 
     enum CodingKeys: String, CodingKey {
-        case id, supId, anfrCode, lat, lng, `operator`, operators, sharingType, crozonLeader, zbLeader, technologies, azimuts, bands, address, isZTD, photoCount, validationCount, hasEnb, hasGnb
+        case id, supId, anfrCode, lat, lng, `operator`, operators, sharingType, crozonLeader, zbLeader, technologies, azimuts, azimutsByOperator, bands, address, isZTD, photoCount, validationCount, hasEnb, hasGnb
         // Le backend n'émet PAS de clé `address` : il envoie les composants ANFR
         // séparément. Sans eux, l'adresse d'un site venu des tuiles restait vide.
         case adrLbAdd1 = "adr_lb_add1"
@@ -707,6 +712,7 @@ struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
         zbLeader = c.decodeFlexibleString(forKey: .zbLeader)
         technologies = c.decodeLossyArray([String].self, forKey: .technologies)
         azimuts = c.decodeLossyArray([Double].self, forKey: .azimuts)
+        azimutsByOperator = ((try? c.decodeIfPresent([String: [Double]].self, forKey: .azimutsByOperator)) ?? nil) ?? [:]
         bands = c.decodeLossyArray([Int].self, forKey: .bands)
         address = Self.composedAddress(from: c)
         isZTD = (try? c.decodeIfPresent(Bool.self, forKey: .isZTD)) ?? false

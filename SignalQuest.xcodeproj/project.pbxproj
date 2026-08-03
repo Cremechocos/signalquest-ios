@@ -369,6 +369,7 @@
 		F6EF1D45622D7CC867AF4F04 /* SpeedtestTriMetric.swift in Sources */ = {isa = PBXBuildFile; fileRef = 729C9DEBA4E8FC4DD397E20E /* SpeedtestTriMetric.swift */; };
 		F7CFE8B7F8498A974CD80BEC /* AccountSettingsQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21471D2C10A3FFD059193B78 /* AccountSettingsQATests.swift */; };
 		F87A9373237B5F0AE131AA87 /* RadioLogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D767888C889FD28F3AA8DF /* RadioLogStore.swift */; };
+		F8990AF87CBFD65EE0F0EF56 /* AzimuthBeamGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3C35085148C3D31C62F37F3 /* AzimuthBeamGroupingTests.swift */; };
 		F988AD7664A31CFCFD9E94CA /* AntennaSectorGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3023383A4E568490429AE96 /* AntennaSectorGridView.swift */; };
 		FA1FA3B1FB3F9621CC897800 /* ReportsRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED23939334EC481F2A096590 /* ReportsRoutingTests.swift */; };
 		FA8A1167522105F2D6EBEFB7 /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9594367DF3047FDF3B240AB /* MockURLProtocol.swift */; };
@@ -749,6 +750,7 @@
 		E1D216600CE3DCF8B267BD70 /* PhotoUploadPreparation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoUploadPreparation.swift; sourceTree = "<group>"; };
 		E31D4A2FC853B46DC0196738 /* SessionTraceMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTraceMapView.swift; sourceTree = "<group>"; };
 		E39D8D7ADDF4C4A7FF55C92C /* PhotoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoModels.swift; sourceTree = "<group>"; };
+		E3C35085148C3D31C62F37F3 /* AzimuthBeamGroupingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzimuthBeamGroupingTests.swift; sourceTree = "<group>"; };
 		E3E33D670CB07FB413E537F1 /* SpeedtestDetailSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestDetailSheetTests.swift; sourceTree = "<group>"; };
 		E4D38E0CB180E8E0F533A27D /* MapBands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapBands.swift; sourceTree = "<group>"; };
 		E5F08F6ECE4166CBD8CCC080 /* MapFeatures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapFeatures.swift; sourceTree = "<group>"; };
@@ -1504,6 +1506,7 @@
 				670C9CDB66FCC050C0142C58 /* AuthSessionTests.swift */,
 				9A7ACE7CF4C567524403CDD7 /* AuthTransportTests.swift */,
 				1B7D91FD53A512C0A154BCFB /* AutoRefreshTests.swift */,
+				E3C35085148C3D31C62F37F3 /* AzimuthBeamGroupingTests.swift */,
 				389D21260C9885B53E70B525 /* BackgroundLifecycleTests.swift */,
 				B070C4F0FF01A239CDF93570 /* CallReliabilityTests.swift */,
 				FD162FB28B7CB0A7E2FE891E /* ComposerPollTests.swift */,
@@ -2215,6 +2218,7 @@
 				5FC825F33AD5AE53302210C6 /* AuthSessionTests.swift in Sources */,
 				427E9F89223F62FF1D193AEF /* AuthTransportTests.swift in Sources */,
 				5F7AF0A6DEEB9A788A1199E7 /* AutoRefreshTests.swift in Sources */,
+				F8990AF87CBFD65EE0F0EF56 /* AzimuthBeamGroupingTests.swift in Sources */,
 				05B7E7D7DB5CC95AFF2328E5 /* BackgroundLifecycleTests.swift in Sources */,
 				989DD213B201095FFA84F05D /* CallReliabilityTests.swift in Sources */,
 				0A7916FE1A3236A3599113ED /* ComposerPollTests.swift in Sources */,

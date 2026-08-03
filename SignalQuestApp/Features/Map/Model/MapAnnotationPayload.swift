@@ -23,6 +23,17 @@ struct FriendAnnotationInfo: Equatable {
     let isStale: Bool
 }
 
+/// Une direction et les opérateurs qui la pointent.
+///
+/// Sur un support partagé, deux opérateurs visent souvent le même azimut (site
+/// 1853200 : Bouygues et Free tous deux à 0/120/240). Les grouper permet de
+/// tracer UN trait dont les tirets alternent les couleurs, au lieu de deux
+/// traits superposés dont un seul serait visible.
+struct AzimuthBeam: Equatable {
+    let azimuth: Double
+    let tints: [Color]
+}
+
 struct MapAnnotationPayload: Identifiable, Equatable {
     let id: String
     let kind: MapDisplayItem.Kind
@@ -69,6 +80,10 @@ struct MapAnnotationPayload: Identifiable, Equatable {
     var operatorTints: [Color] = []
     /// Rendu des azimuts choisi par l'utilisateur.
     var azimuthStyle: AzimuthStyle = .lobes
+    /// Azimuts groupés par direction avec les couleurs des opérateurs qui la
+    /// pointent. Vide → tous les azimuts prennent la couleur du site (cas
+    /// mono-opérateur, ou backend qui n'émet pas encore le détail par facette).
+    var azimuthBeams: [AzimuthBeam] = []
     /// Données d'un ami vivant (couche Amis) : pilote le rendu « Find My ».
     var friend: FriendAnnotationInfo? = nil
 
@@ -110,6 +125,7 @@ struct MapAnnotationPayload: Identifiable, Equatable {
         lhs.azimuthReachPoints == rhs.azimuthReachPoints &&
         lhs.operatorTints == rhs.operatorTints &&
         lhs.azimuthStyle == rhs.azimuthStyle &&
+        lhs.azimuthBeams == rhs.azimuthBeams &&
         lhs.friend == rhs.friend
     }
 }
