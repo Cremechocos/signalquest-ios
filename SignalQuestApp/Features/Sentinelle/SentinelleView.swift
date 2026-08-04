@@ -112,8 +112,12 @@ final class SentinelleViewModel: ObservableObject {
         }
     }
 
-    func create(label: String, address: String) async {
-        await mutate { try await self.service.create(label: label, address: address) }
+    func create(label: String, address: String, ownerLabel: String? = nil, ownerEmoji: String? = nil) async {
+        await mutate {
+            try await self.service.create(
+                label: label, address: address, ownerLabel: ownerLabel, ownerEmoji: ownerEmoji
+            )
+        }
     }
 
     func setAddress(targetId: String, family: SentinelleFamily, address: String) async {
@@ -267,8 +271,8 @@ struct SentinelleView: View {
             SentinelleAlertSettingsSheet(service: model.service)
         }
         .sheet(isPresented: $showCreate) {
-            SentinelleCreateSheet(quota: model.quota, currentIp: { await model.currentIp() }) { label, address in
-                Task { await model.create(label: label, address: address) }
+            SentinelleCreateSheet(quota: model.quota, currentIp: { await model.currentIp() }) { label, address, ownerLabel, ownerEmoji in
+                Task { await model.create(label: label, address: address, ownerLabel: ownerLabel, ownerEmoji: ownerEmoji) }
             }
         }
         .alert(
@@ -357,6 +361,15 @@ struct SentinelleBoxCard: View {
                 HStack(alignment: .top, spacing: SQSpace.sm + 2) {
                     SentinelleStatusDot(color: SentinelleWording.statusColor(target.status))
                         .padding(.top, 6)
+                    // L'emoji AVANT le verdict : dans une liste, c'est lui qui
+                    // distingue une box d'une autre avant même qu'on lise la
+                    // phrase.
+                    if let emoji = target.ownerEmoji, !emoji.isEmpty {
+                        Text(emoji)
+                            .font(.system(size: 19))
+                            .padding(.top, 1)
+                            .sqDecorative()
+                    }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(SentinelleWording.verdict(target))
                             .font(SQType.heading)
@@ -368,6 +381,15 @@ struct SentinelleBoxCard: View {
                             .foregroundStyle(SQColor.labelSecondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
+                        // L'attribution complète la ligne d'adresses, elle ne
+                        // la remplace pas : les deux disent des choses
+                        // différentes.
+                        if let owner = target.ownerLabel, !owner.isEmpty {
+                            Text(owner)
+                                .font(SQFont.body(12))
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .lineLimit(1)
+                        }
                     }
                     Spacer(minLength: SQSpace.sm)
                     Image(systemName: "chevron.right")

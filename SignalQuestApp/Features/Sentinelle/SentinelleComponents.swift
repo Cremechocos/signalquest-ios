@@ -274,11 +274,13 @@ private struct SentinelleSheetShell<Content: View>: View {
 struct SentinelleCreateSheet: View {
     let quota: SentinelleQuota?
     let currentIp: () async -> SentinelleCurrentIp?
-    let onCreate: (String, String) -> Void
+    let onCreate: (_ label: String, _ address: String, _ ownerLabel: String?, _ ownerEmoji: String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var label = ""
     @State private var address = ""
+    @State private var ownerLabel = ""
+    @State private var ownerEmoji = ""
     @State private var detected: SentinelleCurrentIp?
 
     var body: some View {
@@ -287,6 +289,11 @@ struct SentinelleCreateSheet: View {
             subtitle: String(localized: "Sentinelle l’interrogera chaque minute depuis nos serveurs — téléphone éteint compris.")
         ) {
             SentinelleField(title: "Nom", placeholder: "Ma box", text: $label)
+
+            // L'attribution sert à parler juste sur le lien partagé : « Votre
+            // connexion » y est faux, celui qui lit regarde la connexion de
+            // quelqu'un d'autre.
+            SentinelleOwnerField(label: $ownerLabel, emoji: $ownerEmoji)
             SentinelleField(
                 title: "Adresse ou nom d’hôte",
                 placeholder: "79.88.27.93",
@@ -306,7 +313,9 @@ struct SentinelleCreateSheet: View {
             GradientButton("Commencer la surveillance", systemImage: "dot.radiowaves.left.and.right") {
                 onCreate(
                     label.trimmingCharacters(in: .whitespacesAndNewlines),
-                    address.trimmingCharacters(in: .whitespacesAndNewlines)
+                    address.trimmingCharacters(in: .whitespacesAndNewlines),
+                    SentinelleOwnerLabel.normalise(ownerLabel),
+                    ownerEmoji.isEmpty ? nil : ownerEmoji
                 )
                 dismiss()
             }

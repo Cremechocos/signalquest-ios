@@ -64,7 +64,8 @@ protocol SentinelleServicing: Sendable {
     func diagnostic(targetId: String, family: SentinelleFamily?) async throws -> SentinelleDiagnostic
     func trends(targetId: String, family: SentinelleFamily?) async throws -> SentinelleTrends
     func proof(targetId: String, family: SentinelleFamily?) async throws -> SentinelleProof
-    func create(label: String, address: String) async throws
+    func create(label: String, address: String, ownerLabel: String?, ownerEmoji: String?) async throws
+    func setOwner(targetId: String, ownerLabel: String?, ownerEmoji: String?) async throws
     func setAddress(targetId: String, family: SentinelleFamily, address: String) async throws
     func delete(targetId: String) async throws
     func currentIp() async throws -> SentinelleCurrentIp
@@ -114,7 +115,7 @@ final class SentinelleService: SentinelleServicing, @unchecked Sendable {
         try await get(insights(targetId: targetId, section: "proof", family: family))
     }
 
-    func create(label: String, address: String) async throws {
+    func create(label: String, address: String, ownerLabel: String?, ownerEmoji: String?) async throws {
         // On laisse le serveur trancher ce qu'il accepte de sonder : dupliquer
         // ses règles ici les ferait diverger, et c'est une frontière de sécurité.
         // Le client ne décide que du CHAMP, que le contrat impose de nommer.
@@ -126,10 +127,29 @@ final class SentinelleService: SentinelleServicing, @unchecked Sendable {
         } else {
             field = "hostname"
         }
+        // Les champs vides sont OMIS plutôt qu'envoyés nuls : le serveur
+        // distingue « non fourni » de « effacer », et une création n'a rien à
+        // effacer.
+        // Les champs vides sont OMIS plutôt qu'envoyés vides : une création
+        // n'a rien à effacer.
+        var body: [String: String] = ["label": label, field: address]
+        if let owner = SentinelleOwnerLabel.normalise(ownerLabel) { body["ownerLabel"] = owner }
+        if let emoji = ownerEmoji, !emoji.isEmpty { body["ownerEmoji"] = emoji }
+        try await send(path: "/api/sentinelle/targets", method: .post, body: body)
+    }
+
+    /// Change l'attribution. La chaîne VIDE efface : le serveur la normalise
+    /// en `null` (`normaliseOwnerLabel`). C'est ce qui permet de retirer une
+    /// étiquette sans introduire un corps de requête à valeurs nulles, que
+    /// `send` — typé `[String: String]` — ne saurait pas transporter.
+    func setOwner(targetId: String, ownerLabel: String?, ownerEmoji: String?) async throws {
         try await send(
-            path: "/api/sentinelle/targets",
-            method: .post,
-            body: ["label": label, field: address]
+            path: "/api/sentinelle/targets/\(targetId)",
+            method: .patch,
+            body: [
+                "ownerLabel": SentinelleOwnerLabel.normalise(ownerLabel) ?? "",
+                "ownerEmoji": ownerEmoji ?? "",
+            ]
         )
     }
 

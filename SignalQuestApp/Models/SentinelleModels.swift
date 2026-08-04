@@ -40,6 +40,10 @@ struct SentinelleAddress: Identifiable, Hashable, Sendable {
 struct SentinelleTarget: Decodable, Identifiable, Hashable, Sendable {
     let id: String
     let label: String
+    /// À qui appartient la connexion — « Moi », « Mes parents »… Facultatif.
+    let ownerLabel: String?
+    /// Emoji qui accompagne l'attribution, pour repérer la box dans une liste.
+    let ownerEmoji: String?
     let hostname: String?
     let ipv4: String?
     let ipv6: String?
@@ -60,7 +64,7 @@ struct SentinelleTarget: Decodable, Identifiable, Hashable, Sendable {
     let publicExpiresAt: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, label, hostname, ipv4, ipv6, resolvedIpv4, resolvedIpv6
+        case id, label, ownerLabel, ownerEmoji, hostname, ipv4, ipv6, resolvedIpv4, resolvedIpv6
         case isPublic, publicSlug, publicExpiresAt
         case status, statusSince, lastProbeAt
         // `protocol` est un mot réservé en Swift : on le renomme sans toucher au contrat serveur.
