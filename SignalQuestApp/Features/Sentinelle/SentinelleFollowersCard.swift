@@ -14,7 +14,9 @@ struct SentinelleFollowersCard: View {
     @State private var busy: String?
     @State private var shared: Bool?
     @State private var expiresAt: String?
+    @State private var slug: String?
     @State private var sharing = false
+    @State private var copied = false
 
     var body: some View {
         // Tant que la liste n'est pas arrivée, on n'affiche RIEN plutôt qu'une
@@ -113,6 +115,41 @@ struct SentinelleFollowersCard: View {
             .disabled(sharing)
             .tint(SQColor.brandRed)
 
+            // Le lien lui-même, visible et partageable. L'activer sans pouvoir
+            // le récupérer ne sert à rien — et le copier en silence à
+            // l'activation ne se voit pas.
+            if isShared, let url = shareURL {
+                HStack(spacing: SQSpace.sm) {
+                    Text(url.absoluteString)
+                        .font(SQFont.body(11))
+                        .monospaced()
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .foregroundStyle(SQColor.labelSecondary)
+
+                    Spacer(minLength: 0)
+
+                    Button {
+                        UIPasteboard.general.string = url.absoluteString
+                        copied = true
+                        Haptics.light()
+                    } label: {
+                        Label(copied ? "Copié" : "Copier", systemImage: copied ? "checkmark" : "doc.on.doc")
+                            .labelStyle(.iconOnly)
+                    }
+                    .tint(SQColor.labelSecondary)
+
+                    // Feuille de partage native : c'est par elle qu'on envoie
+                    // vraiment un lien, pas par le presse-papier.
+                    ShareLink(item: url) {
+                        Label("Partager", systemImage: "square.and.arrow.up")
+                            .labelStyle(.iconOnly)
+                    }
+                    .tint(SQColor.brandRed)
+                }
+                .padding(.top, SQSpace.xs)
+            }
+
             // La durée ne se règle QUE si le lien est actif : la proposer avant
             // reviendrait à fixer l'échéance de quelque chose qui n'existe pas.
             if isShared {
@@ -142,6 +179,11 @@ struct SentinelleFollowersCard: View {
 
     private var currentExpiry: String? { expiresAt ?? target.publicExpiresAt }
 
+    private var shareURL: URL? {
+        guard let value = slug ?? target.publicSlug else { return nil }
+        return URL(string: "https://signalquest.fr/sentinelle/p/\(value)")
+    }
+
     private func setSharing(_ changes: SentinelleSharingPatch) async {
         sharing = true
         defer { sharing = false }
@@ -150,6 +192,10 @@ struct SentinelleFollowersCard: View {
         if let updated = try? await service.setSharing(targetId: target.id, changes: changes) {
             shared = updated.isPublic
             expiresAt = updated.publicExpiresAt
+            slug = updated.publicSlug
+            // Le lien change à chaque réactivation : un « Copié » hérité du
+            // précédent laisserait croire qu'on tient le bon.
+            copied = false
         }
     }
 
