@@ -1,152 +1,79 @@
 import SwiftUI
 
-/// Sentinelle — consultation de l'état des connexions surveillées.
+/// Sentinelle — l'état de la connexion fixe, vu depuis la sonde serveur.
 ///
-/// Écran de lecture seule : la sonde est côté serveur. La configuration fine
-/// (seuils d'alerte, heures calmes, webhook) reste sur le web ; en mobilité, la
-/// seule question qui compte est « est-ce que ma box est tombée, et depuis
-/// quand ? ».
-struct SentinelleView: View {
+/// Trois niveaux, du plus général au plus précis :
+///
+///  1. l'ACCUEIL liste les box surveillées — sauf s'il n'y en a qu'une, auquel
+///     cas sa page EST l'accueil : une liste à un seul élément n'est qu'un écran
+///     de plus à traverser ;
+///  2. la page d'une BOX répond à « est-ce que ma connexion est tombée », et
+///     surtout montre CHACUNE de ses adresses avec son état propre ;
+///  3. la page d'une ADRESSE dit « quel maillon », « depuis quand » et « qu'est-ce
+///     que j'oppose à mon opérateur », pour cette famille seulement.
+///
+/// Ce découpage n'est pas un rangement : en IPv6 il n'y a pas de NAT, donc une
+/// box peut répondre parfaitement en IPv4 pendant que son IPv6 est morte.
+/// Fondues dans une moyenne unique, ces pannes-là restent invisibles.
+@MainActor
+final class SentinelleViewModel: ObservableObject {
+    @Published private(set) var targets: [SentinelleTarget] = []
+    @Published private(set) var incidents: [String: [SentinelleIncident]] = [:]
+    @Published private(set) var points: [String: [SentinelleSeriesPoint]] = [:]
+    @Published private(set) var quota: SentinelleQuota?
+    @Published private(set) var isLoading = true
+    @Published private(set) var accessDenied = false
+    @Published private(set) var errorMessage: String?
+    @Published private(set) var lastRefresh: Date?
+    @Published private(set) var isBusy = false
+    /// Échec d'une action de l'utilisateur (création, correction, retrait). Il se
+    /// dit tout de suite et à part : le confondre avec une erreur de chargement
+    /// remplacerait un écran de données valides par un message d'échec.
+    @Published var actionError: String?
+
     let service: SentinelleServicing
 
-    @State private var targets: [SentinelleTarget] = []
-    @State private var incidentsByTarget: [String: [SentinelleIncident]] = [:]
-    @State private var isLoading = true
-    @State private var accessDenied = false
-    @State private var errorMessage: String?
-    @State private var lastRefresh: Date?
-
-    @Environment(\.scenePhase) private var scenePhase
-
-    /// La sonde mesure au mieux une fois par minute : interroger plus souvent
-    /// ne renverrait que la même valeur, en consommant batterie et données.
-    private static let refreshInterval: Duration = .seconds(60)
-
-    var body: some View {
-        Group {
-            if isLoading {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if accessDenied {
-                message(
-                    title: "Réservé aux membres Premium",
-                    body: "Sentinelle surveille votre connexion en continu : disponibilité, latence, "
-                        + "perte de paquets et historique daté de chaque coupure."
-                )
-            } else if let errorMessage {
-                message(title: "Chargement impossible", body: errorMessage)
-            } else if targets.isEmpty {
-                message(
-                    title: "Aucune cible surveillée",
-                    body: "Ajoutez l’adresse publique de votre box depuis le site pour suivre sa disponibilité."
-                )
-            } else {
-                List {
-                    ForEach(targets) { target in
-                        Section {
-                            targetRow(target)
-                            ForEach(incidentsByTarget[target.id]?.prefix(3).map { $0 } ?? []) { incident in
-                                incidentRow(incident)
-                            }
-                        }
-                    }
-                }
-                .listStyle(.insetGrouped)
-            }
-        }
-        .navigationTitle("Sentinelle")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if let lastRefresh {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Text("à jour · \(lastRefresh.formatted(date: .omitted, time: .shortened))")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .refreshable { await load(silently: true) }
-        .task {
-            await load()
-            // Boucle de rafraîchissement. `.task` est annulée quand la vue
-            // disparaît, ce qui suffit à l'arrêter à la sortie de l'écran ;
-            // l'arrière-plan, lui, ne l'annule pas, d'où le test de phase :
-            // rien ne sert de relever des mesures que personne ne regarde.
-            while !Task.isCancelled {
-                try? await Task.sleep(for: Self.refreshInterval)
-                guard !Task.isCancelled, scenePhase == .active else { continue }
-                await load(silently: true)
-            }
-        }
-        // Forme à un paramètre : l'app est déployée en deçà d'iOS 17, où la
-        // variante `onChange(of:initial:_:)` n'existe pas encore.
-        .onChange(of: scenePhase) { phase in
-            // Au retour au premier plan, l'écran peut afficher un état vieux de
-            // plusieurs heures : on rattrape immédiatement plutôt que d'attendre
-            // la fin du cycle en cours.
-            guard phase == .active, !isLoading else { return }
-            Task { await load(silently: true) }
-        }
+    init(service: SentinelleServicing) {
+        self.service = service
     }
 
-    private func targetRow(_ target: SentinelleTarget) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Circle().fill(statusColor(target.status)).frame(width: 10, height: 10)
-                Text(target.label).font(.headline)
-            }
-            Text(statusLabel(target.status))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Text(target.displayAddress)
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
-            if target.suspendedReason != nil {
-                Text("Surveillance suspendue : l’adresse a changé de réseau. Vérifiez depuis le site qu’elle vous appartient toujours.")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .padding(.top, 4)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    private func incidentRow(_ incident: SentinelleIncident) -> some View {
-        HStack {
-            Text(shortDate(incident.startedAt) + causeSuffix(incident))
-                .font(.caption)
-            Spacer()
-            Text(incident.endedAt == nil ? "en cours" : formatDuration(incident.durationSec))
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func message(title: String, body: String) -> some View {
-        VStack(spacing: 8) {
-            Text(title).font(.headline)
-            Text(body)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    func target(_ id: String) -> SentinelleTarget? {
+        targets.first { $0.id == id }
     }
 
     /// - Parameter silently: rafraîchissement de fond. Une erreur passagère ne
     ///   doit alors PAS remplacer un écran de données valides par un message
     ///   d'échec : perdre le réseau une seconde effacerait ce que l'utilisateur
     ///   est en train de lire. On garde l'affichage précédent et on retentera.
-    private func load(silently: Bool = false) async {
+    func load(silently: Bool = false) async {
         do {
             let response = try await service.targets()
             targets = response.targets
-            // Détail chargé uniquement pour les cibles affichées.
-            var collected: [String: [SentinelleIncident]] = [:]
+            quota = response.quota
+
+            var collectedIncidents: [String: [SentinelleIncident]] = [:]
+            var collectedPoints: [String: [SentinelleSeriesPoint]] = [:]
             for target in response.targets {
-                collected[target.id] = (try? await service.detail(targetId: target.id))?.incidents ?? []
+                // Une requête en échec laisse la clé ABSENTE, et l'écran se tait.
+                // Retomber sur un tableau vide ferait dire « aucune coupure
+                // enregistrée » à une simple perte de réseau — une affirmation
+                // que la donnée ne soutient pas.
+                if let detail = try? await service.detail(targetId: target.id) {
+                    collectedIncidents[target.id] = detail.incidents
+                } else if let previous = incidents[target.id] {
+                    collectedIncidents[target.id] = previous
+                }
+                // Les points servent DEUX lectures : les agrégats de la box et
+                // l'état de chacune de ses adresses. Une seule requête par cible
+                // suffit donc — la famille se lit sur chaque point.
+                if let series = try? await service.series(targetId: target.id, window: .h24, family: nil) {
+                    collectedPoints[target.id] = series.points
+                } else if let previous = points[target.id] {
+                    collectedPoints[target.id] = previous
+                }
             }
-            incidentsByTarget = collected
+            incidents = collectedIncidents
+            points = collectedPoints
             errorMessage = nil
         } catch is SentinelleAccessDenied {
             accessDenied = true
@@ -157,49 +84,324 @@ struct SentinelleView: View {
         lastRefresh = Date()
     }
 
-    private func statusColor(_ status: String) -> Color {
-        switch status {
-        case "up": return Color(red: 0.25, green: 0.61, blue: 0.43)
-        case "down": return Color(red: 0.76, green: 0.25, blue: 0.24)
-        case "degraded": return Color(red: 0.79, green: 0.60, blue: 0.18)
-        default: return .secondary
+    func create(label: String, address: String) async {
+        await mutate { try await self.service.create(label: label, address: address) }
+    }
+
+    func setAddress(targetId: String, family: SentinelleFamily, address: String) async {
+        await mutate { try await self.service.setAddress(targetId: targetId, family: family, address: address) }
+    }
+
+    /// - Returns: vrai quand la cible a bien été retirée, pour que la page
+    ///   ouverte sur cette cible puisse se refermer plutôt que rester vide.
+    @discardableResult
+    func delete(targetId: String) async -> Bool {
+        await mutate { try await self.service.delete(targetId: targetId) }
+    }
+
+    func currentIp() async -> SentinelleCurrentIp? {
+        try? await service.currentIp()
+    }
+
+    /// Toute écriture suit le même chemin : occupée, relecture, et l'échec se
+    /// dit — une correction d'adresse avalée en silence est la pire des issues,
+    /// l'utilisateur croirait sa box de nouveau surveillée.
+    @discardableResult
+    private func mutate(_ action: @escaping () async throws -> Void) async -> Bool {
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            try await action()
+            await load(silently: true)
+            return true
+        } catch is SentinelleAccessDenied {
+            accessDenied = true
+            return false
+        } catch {
+            actionError = error.localizedDescription
+            return false
+        }
+    }
+}
+
+struct SentinelleView: View {
+    @StateObject private var model: SentinelleViewModel
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var showCreate = false
+
+    init(service: SentinelleServicing) {
+        _model = StateObject(wrappedValue: SentinelleViewModel(service: service))
+    }
+
+    /// La sonde mesure au mieux une fois par minute : interroger plus souvent
+    /// ne renverrait que la même valeur, en consommant batterie et données.
+    private static let refreshInterval: Duration = .seconds(60)
+
+    var body: some View {
+        Group {
+            if model.isLoading && model.targets.isEmpty {
+                loadingState
+            } else if model.accessDenied {
+                EmptyStateView(
+                    title: "Réservé aux membres Premium",
+                    message: "Sentinelle surveille votre connexion en continu : disponibilité, "
+                        + "latence, perte de paquets et historique daté de chaque coupure.",
+                    systemImage: "crown.fill"
+                )
+                .padding(SQSpace.lg)
+            } else if let errorMessage = model.errorMessage, model.targets.isEmpty {
+                ErrorStateView(title: "Chargement impossible", message: errorMessage) {
+                    Task { await model.load() }
+                }
+                .padding(SQSpace.lg)
+            } else if model.targets.isEmpty {
+                EmptyStateView(
+                    title: "Aucune connexion surveillée",
+                    message: "Ajoutez l’adresse publique de votre box : Sentinelle l’interrogera "
+                        + "chaque minute depuis nos serveurs, téléphone éteint compris.",
+                    systemImage: "wifi.router"
+                )
+                .padding(SQSpace.lg)
+            } else if let single = singleTarget {
+                // Une liste à un seul élément n'apporte rien : la box unique EST
+                // l'accueil.
+                SentinelleBoxView(model: model, targetId: single.id, isRoot: true)
+            } else {
+                boxList
+            }
+        }
+        .navigationTitle(title)
+        .toolbarTitleInlineCompat()
+        .signalQuestBackground()
+        .toolbar {
+            // L'ajout n'existe qu'au niveau ACCUEIL, y compris quand celui-ci
+            // prend la forme de la box unique : le masquer dans ce cas rendrait
+            // la deuxième connexion impossible à créer. Il crée toujours une
+            // NOUVELLE box — compléter une box existante se fait sur sa page.
+            if canCreate {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        Haptics.light()
+                        showCreate = true
+                    } label: {
+                        Label("Ajouter une connexion", systemImage: "plus")
+                    }
+                    .tint(SQColor.brandRed)
+                }
+            }
+        }
+        .refreshable { await model.load(silently: true) }
+        .task {
+            await model.load()
+            // Boucle de rafraîchissement. `.task` est annulée quand la vue
+            // disparaît, ce qui suffit à l'arrêter à la sortie de l'écran ;
+            // l'arrière-plan, lui, ne l'annule pas, d'où le test de phase :
+            // rien ne sert de relever des mesures que personne ne regarde.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.refreshInterval)
+                guard !Task.isCancelled, scenePhase == .active else { continue }
+                await model.load(silently: true)
+            }
+        }
+        // Forme à un paramètre : l'app est déployée en deçà d'iOS 17, où la
+        // variante `onChange(of:initial:_:)` n'existe pas encore.
+        .onChange(of: scenePhase) { phase in
+            // Au retour au premier plan, l'écran peut afficher un état vieux de
+            // plusieurs heures : on rattrape immédiatement plutôt que d'attendre
+            // la fin du cycle en cours.
+            guard phase == .active, !model.isLoading else { return }
+            Task { await model.load(silently: true) }
+        }
+        .sheet(isPresented: $showCreate) {
+            SentinelleCreateSheet(quota: model.quota, currentIp: { await model.currentIp() }) { label, address in
+                Task { await model.create(label: label, address: address) }
+            }
+        }
+        .alert(
+            "Action impossible",
+            isPresented: Binding(
+                get: { model.actionError != nil },
+                set: { if !$0 { model.actionError = nil } }
+            )
+        ) {
+            Button("Fermer", role: .cancel) { model.actionError = nil }
+        } message: {
+            Text(model.actionError ?? "")
         }
     }
 
-    private func statusLabel(_ status: String) -> String {
-        switch status {
-        case "up": return "En ligne"
-        case "down": return "Hors ligne"
-        case "degraded": return "Connexion dégradée"
-        default: return "En attente de mesure"
+    private var singleTarget: SentinelleTarget? {
+        model.targets.count == 1 ? model.targets.first : nil
+    }
+
+    /// Le titre suit le niveau affiché : sur la box unique, c'est son nom qui
+    /// situe, pas le nom de la fonctionnalité.
+    private var title: String {
+        singleTarget?.label ?? String(localized: "Sentinelle")
+    }
+
+    private var canCreate: Bool {
+        !model.accessDenied && !model.isLoading && model.quota?.isFull != true
+    }
+
+    private var boxList: some View {
+        ScrollView {
+            VStack(spacing: SQSpace.md + 2) {
+                ForEach(model.targets) { target in
+                    NavigationLink {
+                        SentinelleBoxView(model: model, targetId: target.id)
+                    } label: {
+                        SentinelleBoxCard(
+                            target: target,
+                            points: model.points[target.id] ?? [],
+                            incidents: model.incidents[target.id]
+                        )
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                }
+                SentinelleFreshness(date: model.lastRefresh)
+            }
+            .padding(.horizontal, SQSpace.lg)
+            // Rien ne sépare visuellement la barre de navigation du contenu :
+            // une marge pleine y creusait un vide que l'utilisateur a signalé.
+            // Même valeur qu'Android.
+            .padding(.top, SQSpace.sm)
+            .padding(.bottom, SQSpace.huge)
+            .sqReadableWidth()
         }
     }
 
-    private func causeSuffix(_ incident: SentinelleIncident) -> String {
-        switch incident.cause {
-        case "local": return " · chez vous"
-        case "isp": return " · chez votre opérateur"
-        case "transit": return " · sur le trajet"
-        default:
-            let others = incident.correlatedUsers ?? 0
-            return others > 0 ? " · \(others) autres touchés" : ""
+    private var loadingState: some View {
+        VStack(spacing: SQSpace.lg) {
+            ProgressView().tint(SQColor.brandRed)
+            Text("Lecture de la surveillance…")
+                .font(SQType.subhead)
+                .foregroundStyle(SQColor.labelSecondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Une box dans la liste : son verdict, ses familles en raccourci, ses coupures.
+struct SentinelleBoxCard: View {
+    let target: SentinelleTarget
+    let points: [SentinelleSeriesPoint]
+    let incidents: [SentinelleIncident]?
+
+    var body: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                HStack(alignment: .top, spacing: SQSpace.sm + 2) {
+                    SentinelleStatusDot(color: SentinelleWording.statusColor(target.status))
+                        .padding(.top, 6)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(SentinelleWording.verdict(target))
+                            .font(SQType.heading)
+                            .foregroundStyle(SQColor.label)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(subtitle)
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    Spacer(minLength: SQSpace.sm)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(SQColor.labelTertiary)
+                        .sqDecorative()
+                }
+
+                SentinelleDeadFamilyNote(target: target, points: points)
+                SentinelleSuspendedNote(target: target)
+                SentinelleOutagesLine(incidents: incidents)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .sqCard(
+            label: SentinelleWording.verdict(target),
+            value: subtitle,
+            hint: NSLocalizedString("Ouvrir le détail de cette connexion", comment: "")
+        )
+    }
+
+    private var subtitle: String {
+        if let hostname = target.hostname { return hostname }
+        let families = target.addresses.map(\.familyLabel)
+        return families.isEmpty
+            ? String(localized: "en attente d’adresse")
+            : families.joined(separator: " · ")
+    }
+}
+
+/// Une famille morte pendant que l'autre répond ne se voit dans AUCUNE moyenne :
+/// c'est la seule ligne de la liste qui la signale.
+struct SentinelleDeadFamilyNote: View {
+    let target: SentinelleTarget
+    let points: [SentinelleSeriesPoint]
+
+    var body: some View {
+        let dead = target.addresses.filter { points.inFamily($0.family).addressState == .down }
+        if !dead.isEmpty, target.status != "down" {
+            Text("\(dead.map(\.familyLabel).joined(separator: " et ")) ne répond plus, l’autre famille tient la connexion.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.dangerInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, SQSpace.xs)
         }
     }
+}
 
-    /// Les dates arrivent en ISO 8601 ; on n'affiche que le jour et l'heure.
-    private func shortDate(_ iso: String) -> String {
-        let parts = iso.split(separator: "T")
-        guard parts.count == 2 else { return iso }
-        let date = parts[0].split(separator: "-")
-        guard date.count == 3 else { return iso }
-        return "\(date[2])/\(date[1]) \(parts[1].prefix(5))"
+struct SentinelleSuspendedNote: View {
+    let target: SentinelleTarget
+
+    var body: some View {
+        if target.suspendedReason != nil {
+            Text("Surveillance suspendue : l’adresse a changé de réseau. Vérifiez depuis le site qu’elle vous appartient toujours.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.dangerInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, SQSpace.xs)
+        }
     }
+}
 
-    private func formatDuration(_ seconds: Int?) -> String {
-        guard let seconds else { return "—" }
-        if seconds < 60 { return "\(seconds) s" }
-        let minutes = seconds / 60
-        if minutes < 60 { return "\(minutes) min" }
-        return "\(minutes / 60) h \(String(format: "%02d", minutes % 60))"
+/// Le décompte des coupures — ou rien du tout.
+///
+/// `incidents` vaut `nil` tant que le journal n'a pas été lu : on ne dit alors
+/// RIEN, plutôt que d'annoncer « aucune coupure enregistrée » pour une lecture
+/// qui n'a simplement pas abouti.
+struct SentinelleOutagesLine: View {
+    let incidents: [SentinelleIncident]?
+
+    var body: some View {
+        if let incidents {
+            let outages = incidents.filter(\.isOutage)
+            let count = SentinelleWording.outages(outages.count)
+            Text(outages.isEmpty
+                ? String(localized: "Aucune coupure enregistrée.")
+                : String(localized: "\(count) · la dernière \(SentinelleWording.date(outages.first?.startedAt))"))
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, SQSpace.xs)
+        }
+    }
+}
+
+/// Horodatage de la dernière relecture. Discret par nature : il ne compte que
+/// quand on se demande si ce qu'on lit est vieux.
+struct SentinelleFreshness: View {
+    let date: Date?
+
+    var body: some View {
+        if let date {
+            Text("Mesures relues à \(date.formatted(date: .omitted, time: .shortened))")
+                .font(SQType.micro)
+                .foregroundStyle(SQColor.labelTertiary)
+                .frame(maxWidth: .infinity)
+                .padding(.top, SQSpace.sm)
+        }
     }
 }

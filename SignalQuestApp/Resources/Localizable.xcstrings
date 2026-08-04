@@ -296,6 +296,9 @@
     "%@ · échelle verticale non proportionnelle" : {
 
     },
+    "%@ · en attente de mesure" : {
+
+    },
     "%@ · Fil réseau" : {
       "localizations" : {
         "en" : {
@@ -305,6 +308,19 @@
           }
         }
       }
+    },
+    "%@ · la dernière %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · la dernière %2$@"
+          }
+        }
+      }
+    },
+    "%@ · toute la connexion" : {
+
     },
     "%@ / %@ pts" : {
       "localizations" : {
@@ -338,12 +354,32 @@
         }
       }
     },
+    "%@ à %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ à %2$@"
+          }
+        }
+      }
+    },
     "%@ absent du secteur %lld degrés" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ absent du secteur %2$lld degrés"
+          }
+        }
+      }
+    },
+    "%@ de %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ de %2$@"
           }
         }
       }
@@ -407,6 +443,12 @@
         }
       }
     },
+    "%@ ne répond plus, l’autre famille tient la connexion." : {
+
+    },
+    "%@ ne répond plus." : {
+
+    },
     "%@ parcourus" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -439,6 +481,32 @@
         }
       }
     },
+    "%@ répond en %@." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ répond en %2$@."
+          }
+        }
+      }
+    },
+    "%@ répond mal en %@." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ répond mal en %2$@."
+          }
+        }
+      }
+    },
+    "%@ répond mal." : {
+
+    },
+    "%@ répond normalement." : {
+
+    },
     "%@ sites" : {
 
     },
@@ -448,6 +516,16 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ sites · %2$@ relevés"
+          }
+        }
+      }
+    },
+    "%@ sur %lld." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ sur %2$lld."
           }
         }
       }
@@ -497,6 +575,16 @@
         }
       }
     },
+    "%@%lld m" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%2$lld m"
+          }
+        }
+      }
+    },
     "%@%lld pts" : {
       "localizations" : {
         "en" : {
@@ -512,6 +600,9 @@
           }
         }
       }
+    },
+    "%@°" : {
+
     },
     "%lld" : {
       "localizations" : {
@@ -574,6 +665,46 @@
     "%lld %% vérifié" : {
 
     },
+    "%lld autre abonné touché" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld other subscriber affected"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld other subscribers affected"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld autre abonné touché"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld autres abonnés touchés"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld cellule%@" : {
       "localizations" : {
         "fr" : {
@@ -584,12 +715,92 @@
         }
       }
     },
+    "%lld connexion surveillée" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld monitored connection"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld monitored connections"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld connexion surveillée"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld connexions surveillées"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld conversations non lues" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld unread conversations"
+          }
+        }
+      }
+    },
+    "%lld coupure" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld outage"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld outages"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld coupure"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld coupures"
+                }
+              }
+            }
           }
         }
       }
@@ -843,6 +1054,9 @@
         }
       }
     },
+    "%lld MHz — plus la fréquence monte, plus le fuseau s'affine" : {
+
+    },
     "%lld ms" : {
       "localizations" : {
         "en" : {
@@ -1082,6 +1296,46 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld réponses"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld salve perdue" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lost burst"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lost bursts"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld salve perdue"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld salves perdues"
                 }
               }
             }
@@ -1420,6 +1674,9 @@
         }
       }
     },
+    "+ %@" : {
+
+    },
     "+%lld" : {
       "localizations" : {
         "en" : {
@@ -1609,6 +1866,9 @@
         }
       }
     },
+    "7 jours" : {
+
+    },
     "10 antennes validées" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1631,6 +1891,9 @@
         }
       }
     },
+    "24 heures" : {
+
+    },
     "30 j" : {
       "localizations" : {
         "en" : {
@@ -1640,6 +1903,9 @@
           }
         }
       }
+    },
+    "30 jours" : {
+
     },
     "50 speedtests" : {
       "extractionState" : "stale",
@@ -1661,6 +1927,9 @@
           }
         }
       }
+    },
+    "90 jours" : {
+
     },
     "300 m – 2 km" : {
 
@@ -1899,6 +2168,9 @@
         }
       }
     },
+    "Action impossible" : {
+
+    },
     "Action non autorisée." : {
       "localizations" : {
         "en" : {
@@ -2082,6 +2354,9 @@
         }
       }
     },
+    "Adresse obtenue en résolvant %@ : elle suit le DNS, il n’y a rien à saisir ici." : {
+
+    },
     "Affichage" : {
       "localizations" : {
         "en" : {
@@ -2101,6 +2376,9 @@
           }
         }
       }
+    },
+    "Affiche la fiche de cet opérateur" : {
+
     },
     "Affiche les publications reçues" : {
       "localizations" : {
@@ -2238,6 +2516,9 @@
         }
       }
     },
+    "Ajouter cette adresse" : {
+
+    },
     "Ajouter des membres" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2268,6 +2549,9 @@
           }
         }
       }
+    },
+    "Ajouter l’%@" : {
+
     },
     "Ajouter le rappel" : {
       "extractionState" : "stale",
@@ -2331,6 +2615,9 @@
           }
         }
       }
+    },
+    "Ajouter une connexion" : {
+
     },
     "Ajouter une option" : {
       "localizations" : {
@@ -2862,6 +3149,12 @@
         }
       }
     },
+    "Au moins une" : {
+
+    },
+    "au plus serré ici" : {
+
+    },
     "au repos" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2948,6 +3241,9 @@
           }
         }
       }
+    },
+    "Aucun créneau ne se détache : la ligne se comporte de la même façon à toute heure." : {
+
     },
     "Aucun de ces relevés ne porte de position : impossible de proposer une antenne." : {
 
@@ -3078,6 +3374,9 @@
         }
       }
     },
+    "Aucun relevé de chemin sur les dernières heures. Le premier arrive au plus tard un quart d’heure après la mise sous surveillance." : {
+
+    },
     "Aucun résultat" : {
       "localizations" : {
         "en" : {
@@ -3154,6 +3453,9 @@
           }
         }
       }
+    },
+    "Aucune adresse connue pour l’instant : la première résolution arrive au prochain cycle de sonde." : {
+
     },
     "Aucune antenne au relevé courant." : {
       "localizations" : {
@@ -3232,6 +3534,12 @@
         }
       }
     },
+    "Aucune coupure enregistrée en %@ sur 30 jours." : {
+
+    },
+    "Aucune coupure enregistrée." : {
+
+    },
     "Aucune donnée" : {
       "localizations" : {
         "en" : {
@@ -3264,6 +3572,9 @@
         }
       }
     },
+    "Aucune latence à tracer sur %@." : {
+
+    },
     "Aucune mesure" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -3275,6 +3586,9 @@
         }
       }
     },
+    "Aucune mesure comparable sur %@." : {
+
+    },
     "Aucune mesure d'opérateur partagée dans ce rayon pour l'instant." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -3285,6 +3599,12 @@
           }
         }
       }
+    },
+    "Aucune mesure en %@ pour l’instant." : {
+
+    },
+    "Aucune mesure en %@ sur cette période. La sonde en produit une par minute." : {
+
     },
     "Aucune mesure géolocalisée pour l'instant." : {
       "extractionState" : "stale",
@@ -3394,6 +3714,16 @@
         }
       }
     },
+    "Aucune réponse en %@ sur %@ : il n’y a pas de latence à tracer, seulement des pertes." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Aucune réponse en %1$@ sur %2$@ : il n’y a pas de latence à tracer, seulement des pertes."
+          }
+        }
+      }
+    },
     "Aucune réponse pour l'instant." : {
       "localizations" : {
         "en" : {
@@ -3413,6 +3743,9 @@
           }
         }
       }
+    },
+    "aucune salve perdue" : {
+
     },
     "Aucune session" : {
       "extractionState" : "stale",
@@ -3533,6 +3866,9 @@
         }
       }
     },
+    "Autre" : {
+
+    },
     "Autre problème" : {
       "localizations" : {
         "en" : {
@@ -3542,6 +3878,9 @@
           }
         }
       }
+    },
+    "Autres cellules à proximité" : {
+
     },
     "Autres quêtes" : {
       "localizations" : {
@@ -3718,7 +4057,7 @@
         }
       }
     },
-    "Bandes déclarées à l'ANFR pour ce site." : {
+    "Bandes déclarées au registre pour ce site." : {
 
     },
     "Basic" : {
@@ -4082,6 +4421,12 @@
         }
       }
     },
+    "Ce point est la moyenne des endroits où la cellule a été captée — l'antenne est ailleurs." : {
+
+    },
+    "Ce point est la moyenne des endroits où la cellule a été captée. L'antenne se trouve quelque part dans un rayon de %@." : {
+
+    },
     "Ce qu'un Drive Test partage" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4181,7 +4526,6 @@
       }
     },
     "Cellule" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4195,7 +4539,6 @@
 
     },
     "Cellule observée" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4217,6 +4560,9 @@
       }
     },
     "Cellules non rattachées à un secteur" : {
+
+    },
+    "cellules observées" : {
 
     },
     "Cellules observées" : {
@@ -4253,6 +4599,9 @@
         }
       }
     },
+    "Cette adresse rejoint « %@ » : même historique, même alerte, même quota. Ce n’est pas une seconde connexion." : {
+
+    },
     "Cette antenne est indiquée comme %@. Confirme uniquement si tu l'as sélectionnée comme antenne réelle." : {
       "localizations" : {
         "en" : {
@@ -4275,6 +4624,9 @@
       }
     },
     "Cette identification est publique et attribuée à ton compte. Tu peux la retirer depuis « Mes identifications »." : {
+
+    },
+    "Cette lecture n’est pas encore disponible sur ce serveur." : {
 
     },
     "Cette offre n'est pas disponible dans l'App Store." : {
@@ -4339,6 +4691,12 @@
           }
         }
       }
+    },
+    "Chaque famille est sondée séparément, et répond — ou pas — pour son propre compte." : {
+
+    },
+    "Chaque maillon est mesuré depuis nos serveurs. Un saut muet ne répond pas aux sondes mais laisse passer le trafic : ce n’est pas une panne." : {
+
     },
     "Chargement de l'historique…" : {
       "localizations" : {
@@ -4750,6 +5108,9 @@
         }
       }
     },
+    "Code ANFR" : {
+
+    },
     "Code de réinitialisation" : {
       "localizations" : {
         "en" : {
@@ -4849,6 +5210,9 @@
           }
         }
       }
+    },
+    "Commune" : {
+
     },
     "Complète" : {
       "extractionState" : "stale",
@@ -5300,6 +5664,9 @@
         }
       }
     },
+    "coupé ici" : {
+
+    },
     "coupée" : {
 
     },
@@ -5452,6 +5819,9 @@
         }
       }
     },
+    "Couverture de ce site seulement" : {
+
+    },
     "Couverture enregistrée : %lld point" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5575,6 +5945,9 @@
         }
       }
     },
+    "Création…" : {
+
+    },
     "Créée le" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5606,6 +5979,15 @@
           }
         }
       }
+    },
+    "Créer le site" : {
+
+    },
+    "Créer le site à partir de %lld cellules" : {
+
+    },
+    "Créer le site à partir de cette cellule" : {
+
     },
     "Créer le sondage" : {
       "extractionState" : "stale",
@@ -5669,6 +6051,9 @@
           }
         }
       }
+    },
+    "Croisement des bandes" : {
+
     },
     "Crozon Bytel" : {
       "extractionState" : "stale",
@@ -5741,6 +6126,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Avg dBm"
+          }
+        }
+      }
+    },
+    "de %@ à %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "de %1$@ à %2$@"
           }
         }
       }
@@ -5873,7 +6268,6 @@
       }
     },
     "Début" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5947,6 +6341,9 @@
           }
         }
       }
+    },
+    "Déduite de la connexion depuis laquelle vous consultez." : {
+
     },
     "dégagée" : {
 
@@ -6145,6 +6542,9 @@
         }
       }
     },
+    "Déplace la carte pour viser le pylône. Le point de départ est la moyenne des mesures, pas l'antenne." : {
+
+    },
     "Déployer la navigation" : {
       "localizations" : {
         "en" : {
@@ -6165,6 +6565,12 @@
           }
         }
       }
+    },
+    "Depuis votre box, cherchez son adresse %@ publique." : {
+
+    },
+    "Dérive sur douze semaines" : {
+
     },
     "Dernier relevé" : {
       "extractionState" : "stale",
@@ -6189,6 +6595,9 @@
       }
     },
     "Dernière évolution" : {
+
+    },
+    "dernière mesure" : {
 
     },
     "Dernière mesure" : {
@@ -6232,6 +6641,9 @@
           }
         }
       }
+    },
+    "Dernière salve %@." : {
+
     },
     "Dernière validation" : {
       "extractionState" : "stale",
@@ -6397,6 +6809,16 @@
     "détectée" : {
 
     },
+    "Détectée en %@ · %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Détectée en %1$@ · %2$@"
+          }
+        }
+      }
+    },
     "Détection en cours…" : {
       "localizations" : {
         "en" : {
@@ -6406,6 +6828,9 @@
           }
         }
       }
+    },
+    "Deux piles réseau distinctes, mesurées séparément. Les superposer est le seul moyen de voir laquelle décroche." : {
+
     },
     "Deuxième" : {
       "localizations" : {
@@ -6468,6 +6893,9 @@
           }
         }
       }
+    },
+    "dimanche" : {
+
     },
     "Discussion" : {
       "localizations" : {
@@ -6908,6 +7336,9 @@
         }
       }
     },
+    "en attente d’adresse" : {
+
+    },
     "En attente de la caméra distante" : {
       "localizations" : {
         "en" : {
@@ -6917,6 +7348,9 @@
           }
         }
       }
+    },
+    "En attente de mesure" : {
+
     },
     "En attente de réponse" : {
       "localizations" : {
@@ -7080,6 +7514,9 @@
           }
         }
       }
+    },
+    "eNB %@" : {
+
     },
     "eNB croissant" : {
 
@@ -7475,6 +7912,9 @@
         }
       }
     },
+    "État de votre connexion fixe, surveillée en continu depuis nos serveurs." : {
+
+    },
     "État iPerf3 inattendu (%d)" : {
       "localizations" : {
         "en" : {
@@ -7570,6 +8010,9 @@
         }
       }
     },
+    "Exclusivement" : {
+
+    },
     "Exige %@ à l’ouverture après le délai d’inactivité choisi. La déconnexion automatique efface la session après une inactivité prolongée." : {
       "localizations" : {
         "en" : {
@@ -7653,6 +8096,9 @@
           }
         }
       }
+    },
+    "Famille" : {
+
     },
     "Feed indisponible" : {
       "extractionState" : "stale",
@@ -7757,6 +8203,9 @@
           }
         }
       }
+    },
+    "Fin" : {
+
     },
     "Fond de carte" : {
       "localizations" : {
@@ -7866,6 +8315,9 @@
           }
         }
       }
+    },
+    "gNB %@" : {
+
     },
     "Groupe" : {
       "localizations" : {
@@ -8059,6 +8511,18 @@
         }
       }
     },
+    "Identifiant BIPT" : {
+
+    },
+    "Identifiant du registre" : {
+
+    },
+    "Identifiant ISED" : {
+
+    },
+    "Identifiant OFCOM" : {
+
+    },
     "Identifiants radio" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -8069,6 +8533,9 @@
           }
         }
       }
+    },
+    "Identifiants repris" : {
+
     },
     "Identification" : {
       "localizations" : {
@@ -8210,6 +8677,24 @@
           }
         }
       }
+    },
+    "Il faut au moins deux semaines de mesures pour parler de dérive." : {
+
+    },
+    "il y a 1 h" : {
+
+    },
+    "il y a 7 j" : {
+
+    },
+    "il y a 24 h" : {
+
+    },
+    "il y a 30 j" : {
+
+    },
+    "il y a 90 j" : {
+
     },
     "Imagerie aérienne Apple (native)" : {
       "localizations" : {
@@ -8448,6 +8933,12 @@
         }
       }
     },
+    "Infrastructure" : {
+
+    },
+    "Instant" : {
+
+    },
     "Intérieur" : {
 
     },
@@ -8599,6 +9090,9 @@
         }
       }
     },
+    "jeudi" : {
+
+    },
     "Jitter" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -8700,6 +9194,12 @@
         }
       }
     },
+    "L’adresse IPv6 de cet appareil change régulièrement : la surveiller reviendrait à déclencher une fausse alerte dès demain. Nous proposons l’adresse habituelle de votre box sur le même préfixe — corrigez-la si la vôtre diffère." : {
+
+    },
+    "l'antenne pique vers toi" : {
+
+    },
     "L'appel s'est terminé pendant la connexion." : {
       "localizations" : {
         "en" : {
@@ -8729,6 +9229,9 @@
     "L'inclinaison d'une antenne vers le bas. Les opérateurs l'utilisent pour concentrer l'énergie sur la zone à couvrir plutôt que de l'envoyer à l'horizon, où elle brouillerait les cellules voisines. Le chiffre donné ici est purement géométrique : c'est l'angle qui pointerait exactement sur toi." : {
 
     },
+    "L'orientation des secteurs n'est pas publiée pour ce site — seules ses bandes le sont." : {
+
+    },
     "la biométrie" : {
       "localizations" : {
         "en" : {
@@ -8738,6 +9241,9 @@
           }
         }
       }
+    },
+    "La box est réputée joignable dès qu’UNE de ses adresses répond : c’est pourquoi ces nombres peuvent rester bons alors qu’une famille est tombée." : {
+
     },
     "la conversation" : {
       "extractionState" : "stale",
@@ -8762,6 +9268,9 @@
       }
     },
     "La demi-largeur du fuseau au point le plus large, à mi-parcours. Il grandit avec la distance et rétrécit quand la fréquence monte : une liaison en 700 MHz demande beaucoup plus de dégagement qu'en 3500 MHz." : {
+
+    },
+    "la dernière heure" : {
 
     },
     "La distance à vol d'oiseau entre toi et le pied du support, mesurée sur l'ellipsoïde terrestre. Ce n'est pas la longueur du trajet radio, qui monte jusqu'aux antennes." : {
@@ -8976,6 +9485,32 @@
         }
       }
     },
+    "Latence" : {
+
+    },
+    "Latence comparée sur %@ : " : {
+
+    },
+    "Latence sur %@ : dernière mesure %@, minimum %@, maximum %@, %@." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Latence sur %1$@ : dernière mesure %2$@, minimum %3$@, maximum %4$@, %5$@."
+          }
+        }
+      }
+    },
+    "Le créneau le plus lent est le %@ vers %@ h, à %@." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Le créneau le plus lent est le %1$@ vers %2$@ h, à %3$@."
+          }
+        }
+      }
+    },
     "le débit médian" : {
       "localizations" : {
         "en" : {
@@ -9154,6 +9689,9 @@
     "Le site est masqué" : {
 
     },
+    "Lecture de la surveillance…" : {
+
+    },
     "Lecture du relief…" : {
 
     },
@@ -9270,6 +9808,12 @@
         }
       }
     },
+    "Les identifiants radio sont repris tels quels ; c'est toi qui places l'antenne au bon endroit." : {
+
+    },
+    "Les mesures, les coupures et les relevés de chemin partent avec elle. C’est sans retour." : {
+
+    },
     "Les notifications sont désactivées pour SignalQuest. Aucune alerte n’arrivera tant qu’elles ne sont pas réactivées dans les Réglages iOS." : {
       "localizations" : {
         "en" : {
@@ -9349,6 +9893,15 @@
         }
       }
     },
+    "Les sites qui ne portent rien d'autre que les bandes cochées." : {
+
+    },
+    "Les sites qui portent l'une des bandes cochées." : {
+
+    },
+    "Les sites qui portent toutes les bandes cochées, même s'ils en ont d'autres." : {
+
+    },
     "Les tests s'espacent selon la DISTANCE parcourue, pas le temps : les mesures se répartissent le long du trajet au lieu de s'entasser dans les bouchons. À l'arrêt, « Tester maintenant » force une mesure." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9402,6 +9955,12 @@
         }
       }
     },
+    "Licence octroyée" : {
+
+    },
+    "Lieu public" : {
+
+    },
     "Ligne de visée" : {
 
     },
@@ -9434,6 +9993,9 @@
           }
         }
       }
+    },
+    "Lobes" : {
+
     },
     "Localisation désactivée" : {
       "localizations" : {
@@ -9489,6 +10051,9 @@
         }
       }
     },
+    "lundi" : {
+
+    },
     "Lyon Presqu'île" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -9499,6 +10064,9 @@
           }
         }
       }
+    },
+    "Ma connexion" : {
+
     },
     "Ma progression" : {
       "localizations" : {
@@ -9546,6 +10114,9 @@
         }
       }
     },
+    "maintenant" : {
+
+    },
     "Maintenant" : {
       "localizations" : {
         "en" : {
@@ -9576,6 +10147,9 @@
           }
         }
       }
+    },
+    "mardi" : {
+
     },
     "Marseille Vieux-Port" : {
       "extractionState" : "stale",
@@ -9759,6 +10333,9 @@
           }
         }
       }
+    },
+    "mercredi" : {
+
     },
     "Mes amis uniquement" : {
       "localizations" : {
@@ -10187,6 +10764,19 @@
         }
       }
     },
+    "Mesures relevées en %@ : ce serveur ne sait pas encore isoler l’%@." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Mesures relevées en %1$@ : ce serveur ne sait pas encore isoler l’%2$@."
+          }
+        }
+      }
+    },
+    "Mesures relues à %@" : {
+
+    },
     "Méthode" : {
       "localizations" : {
         "en" : {
@@ -10232,6 +10822,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Min / Max"
+          }
+        }
+      }
+    },
+    "min %@ · max %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "min %1$@ · max %2$@"
           }
         }
       }
@@ -10342,6 +10942,9 @@
           }
         }
       }
+    },
+    "Modifier l’%@" : {
+
     },
     "Modifier le message" : {
       "extractionState" : "stale",
@@ -10536,6 +11139,12 @@
         }
       }
     },
+    "Ne plus surveiller cette connexion" : {
+
+    },
+    "Ne répond plus" : {
+
+    },
     "Niv. %lld" : {
       "localizations" : {
         "en" : {
@@ -10627,6 +11236,9 @@
           }
         }
       }
+    },
+    "Nom du site" : {
+
     },
     "Nom, handle ou email" : {
       "localizations" : {
@@ -10743,6 +11355,9 @@
     "nord-ouest" : {
 
     },
+    "Note (facultatif)" : {
+
+    },
     "Note %lld sur 5" : {
       "localizations" : {
         "en" : {
@@ -10825,6 +11440,9 @@
         }
       }
     },
+    "Nouveau site" : {
+
+    },
     "Nouveau site visité" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -10845,6 +11463,9 @@
           }
         }
       }
+    },
+    "Nouvelle connexion" : {
+
     },
     "Nouvelle conversation" : {
       "localizations" : {
@@ -10992,6 +11613,7 @@
 
     },
     "Opérateur du site" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11147,6 +11769,9 @@
         }
       }
     },
+    "origine non déterminée" : {
+
+    },
     "ou" : {
       "localizations" : {
         "en" : {
@@ -11156,6 +11781,9 @@
           }
         }
       }
+    },
+    "Où est l'antenne ?" : {
+
     },
     "ouest" : {
 
@@ -11199,6 +11827,9 @@
           }
         }
       }
+    },
+    "Ouvre la fiche du site ajouté" : {
+
     },
     "Ouvre la messagerie chiffrée SignalQuest." : {
       "localizations" : {
@@ -11312,6 +11943,9 @@
           }
         }
       }
+    },
+    "Ouvrir le détail de cette connexion" : {
+
     },
     "Ouvrir le partage" : {
       "localizations" : {
@@ -11586,6 +12220,12 @@
           }
         }
       }
+    },
+    "Pas encore assez d’heures mesurées pour avancer une disponibilité opposable." : {
+
+    },
+    "Pas encore assez de mesures pour tracer une courbe." : {
+
     },
     "Pas encore de bilan" : {
       "extractionState" : "stale",
@@ -12091,6 +12731,9 @@
     "Plus" : {
 
     },
+    "Plus aucune réponse en %@." : {
+
+    },
     "Plus d'actions" : {
       "localizations" : {
         "en" : {
@@ -12253,6 +12896,9 @@
     "Position des relevés" : {
 
     },
+    "Position estimée, pas relevée" : {
+
+    },
     "Position indisponible — autorise la localisation dans les réglages." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -12376,6 +13022,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Preferences saved"
+          }
+        }
+      }
+    },
+    "Préfixe %@\nProposé %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Préfixe %1$@\nProposé %2$@"
           }
         }
       }
@@ -12612,6 +13268,9 @@
           }
         }
       }
+    },
+    "Province" : {
+
     },
     "Proximité ANFR" : {
       "localizations" : {
@@ -13009,6 +13668,9 @@
     "Rayon de Fresnel" : {
 
     },
+    "rayon max." : {
+
+    },
     "Ré-identifier ici" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -13334,6 +13996,9 @@
         }
       }
     },
+    "Référence du site" : {
+
+    },
     "Refusé" : {
       "localizations" : {
         "en" : {
@@ -13495,6 +14160,9 @@
     "Repères" : {
 
     },
+    "Répond%@" : {
+
+    },
     "Répondre" : {
       "localizations" : {
         "en" : {
@@ -13608,6 +14276,9 @@
           }
         }
       }
+    },
+    "Réponses irrégulières%@" : {
+
     },
     "Reprendre" : {
 
@@ -13734,6 +14405,9 @@
         }
       }
     },
+    "réseau interne · %lld sauts" : {
+
+    },
     "Réseau limité" : {
       "localizations" : {
         "en" : {
@@ -13756,6 +14430,9 @@
       }
     },
     "Réseau observé" : {
+
+    },
+    "réseau opérateur" : {
 
     },
     "Réseau très faible" : {
@@ -13790,6 +14467,9 @@
           }
         }
       }
+    },
+    "Résolues depuis le nom d’hôte à chaque cycle : elles se consultent, elles ne se saisissent pas." : {
+
     },
     "Résolution des identifications…" : {
       "extractionState" : "stale",
@@ -14197,6 +14877,9 @@
         }
       }
     },
+    "samedi" : {
+
+    },
     "sans nom" : {
       "localizations" : {
         "en" : {
@@ -14207,6 +14890,19 @@
         }
       }
     },
+    "Saut %lld, %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Saut %1$lld, %2$@"
+          }
+        }
+      }
+    },
+    "saut muet" : {
+
+    },
     "Scanne le QR avec Authy, Google Authenticator ou 1Password puis valide avec un code généré." : {
       "localizations" : {
         "en" : {
@@ -14216,6 +14912,27 @@
           }
         }
       }
+    },
+    "Schéma d'une antenne inclinée vers son point de couverture" : {
+
+    },
+    "Schéma d'une ligne de visée coupée par un obstacle" : {
+
+    },
+    "Schéma d'une ligne de visée dégagée" : {
+
+    },
+    "Schéma du dénivelé entre ta position et le site" : {
+
+    },
+    "Schéma du fuseau de Fresnel au-dessus du relief, avec le point le plus serré du trajet" : {
+
+    },
+    "Schéma du fuseau de Fresnel, large au milieu et pincé aux extrémités" : {
+
+    },
+    "Schéma du support et de la hauteur de ses antennes" : {
+
     },
     "Se connecter" : {
       "localizations" : {
@@ -14384,6 +15101,9 @@
         }
       }
     },
+    "Segment" : {
+
+    },
     "sélectionné" : {
       "localizations" : {
         "en" : {
@@ -14415,6 +15135,12 @@
         }
       }
     },
+    "Sentinelle" : {
+
+    },
+    "Sentinelle l’interrogera chaque minute depuis nos serveurs — téléphone éteint compris." : {
+
+    },
     "Sera anonymisé et conservé" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -14436,6 +15162,9 @@
           }
         }
       }
+    },
+    "Série" : {
+
     },
     "Serveur" : {
       "extractionState" : "stale",
@@ -14792,6 +15521,9 @@
         }
       }
     },
+    "site" : {
+
+    },
     "Site" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -14855,6 +15587,9 @@
         }
       }
     },
+    "Site ajouté par un membre" : {
+
+    },
     "Site ANFR" : {
       "localizations" : {
         "en" : {
@@ -14876,6 +15611,7 @@
       }
     },
     "Site communautaire" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14965,6 +15701,9 @@
     "Site introuvable : aucune antenne connue pour cet identifiant." : {
 
     },
+    "Site partagé — touche un opérateur pour voir sa fiche" : {
+
+    },
     "Site prévisionnel" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -14996,6 +15735,12 @@
         }
       }
     },
+    "Site relevé par un membre, confirmé sur le terrain" : {
+
+    },
+    "Site relevé par un membre, pas encore confirmé" : {
+
+    },
     "Site urbain validé par la communauté" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -15007,7 +15752,14 @@
         }
       }
     },
+    "Sites ajoutés" : {
+
+    },
+    "sites ajoutés par des membres" : {
+
+    },
     "sites communautaires" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15071,6 +15823,9 @@
         }
       }
     },
+    "Son %@ tomberait sans que vous le sachiez." : {
+
+    },
     "Sondage" : {
       "localizations" : {
         "en" : {
@@ -15080,6 +15835,9 @@
           }
         }
       }
+    },
+    "Sonde ICMP depuis nos serveurs, cinq paquets par salve, une salve par minute — accélérée à une toutes les dix secondes dès qu’un paquet manque, afin de dater une coupure à la dizaine de secondes près. IPv4 et IPv6 sont mesurées séparément ; %@ est réputée joignable dès qu’une des deux répond." : {
+
     },
     "Sonnerie" : {
       "extractionState" : "manual",
@@ -15471,6 +16229,9 @@
         }
       }
     },
+    "Suivie en %@ seulement" : {
+
+    },
     "Suivre" : {
       "localizations" : {
         "en" : {
@@ -15564,6 +16325,9 @@
         }
       }
     },
+    "Supprimer cette connexion ?" : {
+
+    },
     "Supprimer cette mesure" : {
       "localizations" : {
         "en" : {
@@ -15623,6 +16387,9 @@
           }
         }
       }
+    },
+    "Supprimer et effacer l’historique" : {
+
     },
     "Supprimer l'option %@" : {
       "localizations" : {
@@ -15753,6 +16520,9 @@
       }
     },
     "Sur %lld tests où un réseau a été détecté." : {
+
+    },
+    "Surveillance suspendue : l’adresse a changé de réseau. Vérifiez depuis le site qu’elle vous appartient toujours." : {
 
     },
     "Suspendre" : {
@@ -16125,6 +16895,9 @@
     "toi" : {
 
     },
+    "Toit-terrasse" : {
+
+    },
     "Ton abonnement %@ est déjà géré par %@. Gère-le sur cette plateforme pour éviter un doublon." : {
       "localizations" : {
         "en" : {
@@ -16424,6 +17197,9 @@
         }
       }
     },
+    "Tout voir" : {
+
+    },
     "Toutes" : {
       "localizations" : {
         "en" : {
@@ -16433,6 +17209,9 @@
           }
         }
       }
+    },
+    "Traits" : {
+
     },
     "Trajet suivi" : {
       "extractionState" : "manual",
@@ -16466,6 +17245,9 @@
           }
         }
       }
+    },
+    "transit" : {
+
     },
     "Travail" : {
 
@@ -16657,6 +17439,9 @@
         }
       }
     },
+    "Type de support" : {
+
+    },
     "UL max" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -16719,6 +17504,9 @@
           }
         }
       }
+    },
+    "Un même pylône porte souvent plusieurs opérateurs. Coche celles qui sont sur le même support pour n'en faire qu'un site." : {
+
     },
     "Un obstacle coupe la droite à %@." : {
 
@@ -16879,6 +17667,12 @@
         }
       }
     },
+    "Utiliser" : {
+
+    },
+    "Utiliser ma connexion actuelle" : {
+
+    },
     "Valeur actuelle affichée" : {
       "localizations" : {
         "en" : {
@@ -17033,6 +17827,9 @@
           }
         }
       }
+    },
+    "vendredi" : {
+
     },
     "Vérif." : {
       "extractionState" : "stale",
@@ -17224,6 +18021,25 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "See who viewed the story"
+          }
+        }
+      }
+    },
+    "votre connexion" : {
+
+    },
+    "Votre connexion actuelle n’est pas joignable de l’extérieur — saisissez l’adresse." : {
+
+    },
+    "Votre connexion actuelle n’est pas joignable depuis l’extérieur." : {
+
+    },
+    "Votre connexion répond plus vite que %lld %% des %lld lignes comparables du même opérateur." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Votre connexion répond plus vite que %1$lld %% des %2$lld lignes comparables du même opérateur."
           }
         }
       }
