@@ -226,6 +226,7 @@
 		8A4136A5D87AAEDAB5407344 /* ANFRDemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C94749CE21617DB555FC5D6 /* ANFRDemoData.swift */; };
 		8A731C079D449D10B1E7ADD3 /* DockMinimizeQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E978EE2EBFDAD88C880B9C9 /* DockMinimizeQATests.swift */; };
 		8A9E4F0BAF7ACD8DDD8B61FA /* DromRegion.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB55790C931377A64C3D3477 /* DromRegion.swift */; };
+		8B4D481EAB5B3A87D1416B21 /* SentinelleAlertSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A5D2DCFD4D9B4C849B3BD4C /* SentinelleAlertSettingsSheet.swift */; };
 		8C7659AD0943ED428E44029F /* FriendsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D871487D03A7164E856392DE /* FriendsListView.swift */; };
 		8CC009E03CB57D8B8159BCAA /* SessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD5D954E6102D732D621D8E6 /* SessionModels.swift */; };
 		8D6A1FFFCEC4DF3C5D0246A9 /* SignalQuestWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2A5251F96893CB76BAAC1239 /* SignalQuestWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -468,6 +469,7 @@
 		18C58605C20828352068B1EE /* SectorEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectorEditSheet.swift; sourceTree = "<group>"; };
 		1907E549B13F0B983DD9CCC8 /* BiometricAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricAuth.swift; sourceTree = "<group>"; };
 		1910B256F9C57AE17860A42A /* AntennaProfileGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaProfileGeometryTests.swift; sourceTree = "<group>"; };
+		1A5D2DCFD4D9B4C849B3BD4C /* SentinelleAlertSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleAlertSettingsSheet.swift; sourceTree = "<group>"; };
 		1AA0F72C82A77725FACCD301 /* SQDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQDock.swift; sourceTree = "<group>"; };
 		1B6A09B51D17D8BEFBF8E501 /* SentinelleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleService.swift; sourceTree = "<group>"; };
 		1B7D91FD53A512C0A154BCFB /* AutoRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRefreshTests.swift; sourceTree = "<group>"; };
@@ -1238,6 +1240,7 @@
 			isa = PBXGroup;
 			children = (
 				B87D924C6BBFE1B8AAD4790A /* SentinelleAddressView.swift */,
+				1A5D2DCFD4D9B4C849B3BD4C /* SentinelleAlertSettingsSheet.swift */,
 				AD2EBD9C272198901276D84C /* SentinelleBoxView.swift */,
 				B0421A119135C490C2075C09 /* SentinelleCharts.swift */,
 				CB5E20693F10585EE50EAF49 /* SentinelleComponents.swift */,
@@ -2165,6 +2168,7 @@
 				1B46DD506F06F337F9743269 /* SectorEditSheet.swift in Sources */,
 				F6BC5F6AB5F5BC1D5D2B282E /* SectorNumbering.swift in Sources */,
 				05EE88A8F44A25554E44E766 /* SentinelleAddressView.swift in Sources */,
+				8B4D481EAB5B3A87D1416B21 /* SentinelleAlertSettingsSheet.swift in Sources */,
 				AF48C78CE4288133C08989E4 /* SentinelleBoxView.swift in Sources */,
 				02593AF0CFF83B2C69D9F79A /* SentinelleCharts.swift in Sources */,
 				24D52A559727A045715483FF /* SentinelleComponents.swift in Sources */,

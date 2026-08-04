@@ -68,6 +68,9 @@ protocol SentinelleServicing: Sendable {
     func setAddress(targetId: String, family: SentinelleFamily, address: String) async throws
     func delete(targetId: String) async throws
     func currentIp() async throws -> SentinelleCurrentIp
+    func preferences() async throws -> SentinellePreferencesResponse
+    func savePreferences(_ changes: SentinellePreferencesPatch) async throws
+    func testWebhook() async throws -> SentinelleWebhookTest
 }
 
 final class SentinelleService: SentinelleServicing, @unchecked Sendable {
@@ -154,6 +157,33 @@ final class SentinelleService: SentinelleServicing, @unchecked Sendable {
     }
 
     // MARK: Transport
+
+    func preferences() async throws -> SentinellePreferencesResponse {
+        try await get(APIEndpoint(path: "/api/sentinelle/preferences"))
+    }
+
+    func savePreferences(_ changes: SentinellePreferencesPatch) async throws {
+        do {
+            var endpoint = APIEndpoint(path: "/api/sentinelle/preferences", method: .patch)
+            endpoint.headers = ["Content-Type": "application/json"]
+            endpoint.body = try JSONEncoder.signalQuest.encode(changes)
+            try await api.request(endpoint)
+        } catch {
+            throw Self.mapping(error)
+        }
+    }
+
+    /// Le serveur répond 200 même quand le destinataire refuse : c'est `ok` qui
+    /// tranche et `status` qui dit pourquoi. Un webhook Discord mal formé
+    /// échouait jusqu'ici en silence — tout l'intérêt est d'exposer ce code.
+    func testWebhook() async throws -> SentinelleWebhookTest {
+        do {
+            let endpoint = APIEndpoint(path: "/api/sentinelle/preferences/test-webhook", method: .post)
+            return try await api.request(endpoint, as: SentinelleWebhookTest.self)
+        } catch {
+            throw Self.mapping(error)
+        }
+    }
 
     private func get<T: Decodable>(_ endpoint: APIEndpoint) async throws -> T {
         do {

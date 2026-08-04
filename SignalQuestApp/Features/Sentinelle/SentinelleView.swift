@@ -128,6 +128,7 @@ struct SentinelleView: View {
     @StateObject private var model: SentinelleViewModel
     @Environment(\.scenePhase) private var scenePhase
     @State private var showCreate = false
+    @State private var showSettings = false
 
     init(service: SentinelleServicing) {
         _model = StateObject(wrappedValue: SentinelleViewModel(service: service))
@@ -178,6 +179,20 @@ struct SentinelleView: View {
             // prend la forme de la box unique : le masquer dans ce cas rendrait
             // la deuxième connexion impossible à créer. Il crée toujours une
             // NOUVELLE box — compléter une box existante se fait sur sa page.
+            // Les réglages d'alerte vivaient uniquement sur le web. Or c'est en
+            // mobilité qu'on découvre n'avoir pas été prévenu, donc là qu'on veut
+            // corriger.
+            if !model.accessDenied {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        Haptics.light()
+                        showSettings = true
+                    } label: {
+                        Label("Réglages des alertes", systemImage: "bell.badge")
+                    }
+                    .tint(SQColor.labelSecondary)
+                }
+            }
             if canCreate {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -211,6 +226,9 @@ struct SentinelleView: View {
             // la fin du cycle en cours.
             guard phase == .active, !model.isLoading else { return }
             Task { await model.load(silently: true) }
+        }
+        .sheet(isPresented: $showSettings) {
+            SentinelleAlertSettingsSheet(service: model.service)
         }
         .sheet(isPresented: $showCreate) {
             SentinelleCreateSheet(quota: model.quota, currentIp: { await model.currentIp() }) { label, address in

@@ -456,3 +456,51 @@ private extension Array where Element == Double {
         isEmpty ? nil : reduce(0, +) / Double(count)
     }
 }
+
+
+/// Réglages d'alerte du compte.
+///
+/// La route enveloppe sa charge utile dans `preferences`, comme `targets` le
+/// fait pour la liste des cibles — lire la racine rendrait silencieusement des
+/// valeurs par défaut, donc plausibles et fausses.
+struct SentinellePreferencesResponse: Codable, Sendable {
+    let preferences: SentinellePreferences
+}
+
+struct SentinellePreferences: Codable, Sendable {
+    let notifyDown: Bool
+    let notifyUp: Bool
+    let downThresholdSec: Int
+    let webhookUrl: String?
+}
+
+/// Modification partielle : seuls les champs présents sont écrits, d'où les
+/// optionnels et l'encodage qui omet les absents.
+struct SentinellePreferencesPatch: Encodable, Sendable {
+    var notifyDown: Bool?
+    var notifyUp: Bool?
+    var downThresholdSec: Int?
+    /// `.some(nil)` retire le webhook, `nil` le laisse tel quel — la nuance
+    /// compte, un champ vidé n'est pas un champ absent.
+    var webhookUrl: String??
+
+    enum CodingKeys: String, CodingKey { case notifyDown, notifyUp, downThresholdSec, webhookUrl }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(notifyDown, forKey: .notifyDown)
+        try container.encodeIfPresent(notifyUp, forKey: .notifyUp)
+        try container.encodeIfPresent(downThresholdSec, forKey: .downThresholdSec)
+        if let webhookUrl {
+            try container.encode(webhookUrl, forKey: .webhookUrl)
+        }
+    }
+}
+
+/// Verdict d'un essai de webhook, avec le code rendu par le DESTINATAIRE.
+struct SentinelleWebhookTest: Codable, Sendable {
+    let ok: Bool
+    let status: Int?
+    let destination: String?
+    let message: String
+}
