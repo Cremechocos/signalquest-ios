@@ -246,6 +246,36 @@ private struct SQDockAutoMinimize: ViewModifier {
     }
 }
 
+extension SQDock {
+    /// Dégagement bas à réserver pour un contenu FLOTTANT posé sur une carte
+    /// plein écran (légende, notice, contrôles) — pas pour un contenu scrollable,
+    /// qui passe par `sqDockSafeArea()`.
+    ///
+    /// Avec la barre NATIVE Liquid Glass (iOS 26+), la safe area est DÉJÀ décalée
+    /// par la barre : un petit dégagement suffit. Avec le dock custom, c'est une
+    /// simple superposition qui ne décale PAS la safe area — il faut réserver
+    /// toute sa hauteur, sinon le contenu passe dessous et devient illisible.
+    ///
+    /// Sans cette distinction, l'un des deux cas est forcément faux : ou bien le
+    /// contenu est caché par le dock custom, ou bien un grand vide s'ouvre sous
+    /// la barre native.
+    static var floatingContentInset: CGFloat {
+        if #available(iOS 26.0, *), !usesLegacyDock {
+            return SQSpace.lg
+        }
+        return SQSpace.lg + 2 + clearance
+    }
+
+    /// Le QA peut forcer le dock custom sur un OS qui aurait la barre native.
+    static var usesLegacyDock: Bool {
+        #if DEBUG
+        AppEnvironment.usesLegacyDock
+        #else
+        false
+        #endif
+    }
+}
+
 extension View {
     /// Réserve la place du dock flottant en bas des contenus scrollables.
     /// À appliquer autour de chaque `NavigationStack` d'onglet : tout l'arbre

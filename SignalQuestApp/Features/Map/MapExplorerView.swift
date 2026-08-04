@@ -1472,13 +1472,7 @@ struct MapExplorerView: View {
     /// area → il faut réserver toute sa hauteur (`SQDock.clearance`). Sans cette
     /// distinction, les 98 pt du dock custom s'ajoutaient PAR-DESSUS l'inset natif →
     /// grand vide entre les boutons et la barre.
-    private var mapControlsBottomInset: CGFloat {
-        if #available(iOS 26.0, *), !Self.forcesLegacyDock {
-            return SQSpace.lg
-        } else {
-            return SQSpace.lg + 2 + SQDock.clearance
-        }
-    }
+    private var mapControlsBottomInset: CGFloat { SQDock.floatingContentInset }
 
     private static var forcesLegacyDock: Bool {
         #if DEBUG

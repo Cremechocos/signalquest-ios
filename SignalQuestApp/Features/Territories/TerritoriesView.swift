@@ -42,6 +42,10 @@ struct TerritoriesView: View {
                 legend
             }
             .padding(SQSpace.lg)
+            // La carte ignore la safe area et le dock flotte par-dessus : sans ce
+            // dégagement, notice et légende passent DESSOUS et deviennent
+            // illisibles (retour testeur TestFlight, 4 août 2026).
+            .padding(.bottom, SQDock.floatingContentInset - SQSpace.lg)
         }
         .overlay(alignment: .top) {
             if model.isLoading {

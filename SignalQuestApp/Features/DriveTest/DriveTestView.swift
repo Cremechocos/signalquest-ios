@@ -1163,6 +1163,11 @@ struct DriveTestView: View {
                 .ignoresSafeArea()
             controlPanel
                 .padding(SQSpace.md)
+                // La carte ignore la safe area : le panneau posé dessus retombe au
+                // bas PHYSIQUE de l'écran, où le dock flottant le recouvre. Le
+                // `sqDockSafeArea()` de l'onglet ne l'atteint pas — même cause que
+                // sur Territoires.
+                .padding(.bottom, SQDock.floatingContentInset - SQSpace.md)
         }
         .overlay(alignment: .topTrailing) { mapLegendControl }
         .navigationTitle("Drive Test")
