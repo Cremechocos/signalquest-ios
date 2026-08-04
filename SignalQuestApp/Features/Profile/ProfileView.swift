@@ -6,6 +6,13 @@ struct AntennaReportDeepLink: Identifiable {
     let id: String
 }
 
+/// Sans identifiant de box, on ouvre quand même Sentinelle : une alerte de
+/// coupure doit mener à l'écran, même si le payload est incomplet.
+struct SentinelleDeepLink: Identifiable {
+    let id: String
+    var targetId: String? { id.isEmpty ? nil : id }
+}
+
 /// Profil « Crème & Terre cuite » : en-tête centré (avatar 88 + ombre accent),
 /// carte stats 4 cellules, carte progression (niveau/points), menu en carte
 /// unique rayon 22 et déconnexion en capsule danger. Header custom scrollable
@@ -22,6 +29,8 @@ struct ProfileView: View {
     /// Fil de signalement à ouvrir en sheet (tap sur une notification
     /// `antenna_report_reply`), résolu depuis `router.openAntennaReportId`.
     @State private var deepLinkReport: AntennaReportDeepLink?
+    /// Écran Sentinelle à ouvrir en sheet (tap sur une notification de coupure).
+    @State private var deepLinkSentinelle: SentinelleDeepLink?
 
     var body: some View {
         ScrollView {
@@ -84,14 +93,32 @@ struct ProfileView: View {
                 )
             }
         }
-        .onAppear { consumeAntennaReportDeepLink() }
+        // Sentinelle vit dans les réglages, eux-mêmes sous l'onglet Profil : une
+        // sheet évite d'avoir à dérouler cette pile pour arriver à la box.
+        .sheet(item: $deepLinkSentinelle) { link in
+            NavigationStack {
+                SentinelleView(service: services.sentinelle, initialTargetId: link.targetId)
+            }
+        }
+        .onAppear { consumeAntennaReportDeepLink(); consumeSentinelleDeepLink() }
         .onChangeCompat(of: router.openAntennaReportId) { _, _ in consumeAntennaReportDeepLink() }
+        .onChangeCompat(of: router.openSentinelle) { _, _ in consumeSentinelleDeepLink() }
         .task { await loadStats() }
         .refreshable { await loadStats() }
     }
 
     /// Consomme l'intention de deep link posée par le routeur (idempotent : on
     /// remet la valeur à `nil` une fois lue, comme `openSiteFromRouterIfNeeded`).
+    /// Même contrat que ci-dessous : idempotent, l'intention est remise à zéro
+    /// une fois lue.
+    private func consumeSentinelleDeepLink() {
+        guard router.openSentinelle else { return }
+        let targetId = router.openSentinelleTargetId
+        router.openSentinelle = false
+        router.openSentinelleTargetId = nil
+        deepLinkSentinelle = SentinelleDeepLink(id: targetId ?? "")
+    }
+
     private func consumeAntennaReportDeepLink() {
         guard let id = router.openAntennaReportId else { return }
         router.openAntennaReportId = nil

@@ -158,8 +158,12 @@ struct SentinelleView: View {
     @State private var showCreate = false
     @State private var showSettings = false
 
-    init(service: SentinelleServicing) {
+    /// Box à ouvrir d'emblée, quand on arrive depuis une notification de coupure.
+    private let initialTargetId: String?
+
+    init(service: SentinelleServicing, initialTargetId: String? = nil) {
         _model = StateObject(wrappedValue: SentinelleViewModel(service: service))
+        self.initialTargetId = initialTargetId
     }
 
     /// La justification d'origine — « la sonde mesure au mieux une fois par
@@ -194,10 +198,11 @@ struct SentinelleView: View {
                     systemImage: "wifi.router"
                 )
                 .padding(SQSpace.lg)
-            } else if let single = singleTarget {
+            } else if let root = rootTarget {
                 // Une liste à un seul élément n'apporte rien : la box unique EST
-                // l'accueil.
-                SentinelleBoxView(model: model, targetId: single.id, isRoot: true)
+                // l'accueil. Une box désignée par une notification l'est aussi —
+                // on réutilise le même chemin, déjà éprouvé.
+                SentinelleBoxView(model: model, targetId: root.id, isRoot: true)
             } else {
                 boxList
             }
@@ -283,10 +288,19 @@ struct SentinelleView: View {
         model.targets.count == 1 ? model.targets.first : nil
     }
 
+    /// La box qui tient lieu d'accueil : celle que la notification désigne si on
+    /// arrive par là et qu'elle existe encore, sinon l'unique box s'il n'y en a
+    /// qu'une. Une cible supprimée entre-temps retombe donc sur la liste plutôt
+    /// que sur un écran vide.
+    private var rootTarget: SentinelleTarget? {
+        if let id = initialTargetId, let target = model.target(id) { return target }
+        return singleTarget
+    }
+
     /// Le titre suit le niveau affiché : sur la box unique, c'est son nom qui
     /// situe, pas le nom de la fonctionnalité.
     private var title: String {
-        singleTarget?.label ?? String(localized: "Sentinelle")
+        rootTarget?.label ?? String(localized: "Sentinelle")
     }
 
     private var canCreate: Bool {

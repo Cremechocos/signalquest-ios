@@ -23,6 +23,11 @@ final class AppRouter: ObservableObject {
     /// (tap sur une notification `antenna_report_reply`). Consommé par ProfileView,
     /// racine de l'onglet Profil qui héberge « Mes signalements d'antenne ».
     @Published var openAntennaReportId: String?
+    /// Box Sentinelle à ouvrir (tap sur une notification de coupure). Consommé
+    /// par ProfileView : Sentinelle vit sous l'onglet Profil, dans les réglages.
+    /// Sans identifiant, l'écran s'ouvre quand même — sur son accueil.
+    @Published var openSentinelleTargetId: String?
+    @Published var openSentinelle = false
     /// Coordonnée à cadrer sur la carte (posée depuis un test de l'historique,
     /// consommée par MapExplorerView une fois l'onglet carte actif).
     @Published var pendingMapFocus: Coordinates?
@@ -64,7 +69,7 @@ final class AppRouter: ObservableObject {
     /// off the (non-Sendable) `userInfo` dictionary so only `String?` values cross
     /// the actor boundary. The backend uses Firebase-style payloads, so callers
     /// look identifiers up under both camelCase and snake_case.
-    func handle(type rawType: String?, conversationId: String?, postId: String?, userId: String? = nil, siteId: String? = nil, reportId: String? = nil) {
+    func handle(type rawType: String?, conversationId: String?, postId: String?, userId: String? = nil, siteId: String? = nil, reportId: String? = nil, targetId: String? = nil) {
         switch rawType?.lowercased() {
         case "message", "conversation", "call", "dm":
             route(toConversation: conversationId)
@@ -76,6 +81,8 @@ final class AppRouter: ObservableObject {
             route(toAntennaReport: reportId)
         case "site", "antenna", "validation":
             route(toSite: siteId)
+        case "sentinelle":
+            route(toSentinelle: targetId)
         default:
             if reportId != nil {
                 route(toAntennaReport: reportId)
@@ -89,6 +96,14 @@ final class AppRouter: ObservableObject {
                 route(toSite: siteId)
             }
         }
+    }
+
+    /// Une alerte de coupure doit mener à LA box concernée : quand on en
+    /// surveille plusieurs, un écran d'accueil oblige à chercher laquelle.
+    func route(toSentinelle id: String?) {
+        selectedTab = .profile
+        openSentinelleTargetId = id
+        openSentinelle = true
     }
 
     func route(toConversation id: String?) {
