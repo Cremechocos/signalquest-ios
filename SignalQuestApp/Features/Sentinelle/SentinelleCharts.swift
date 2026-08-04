@@ -247,6 +247,11 @@ struct SentinelleFamilyChart: View {
     let points: [SentinelleSeriesPoint]
     let window: SentinelleWindow
 
+    /// Instant lu sous le doigt. Il vaut pour les DEUX familles à la fois :
+    /// l'intérêt de ce graphe est justement de les comparer au même moment,
+    /// donc un curseur par courbe irait contre son propos.
+    @State private var readAt: Date?
+
     /// Les deux couleurs primaires de la DA, et pas une teinte de plus : brique
     /// pour l'IPv4, encre pour l'IPv6. Une troisième couleur (bleu, ambre…)
     /// entrerait en concurrence avec les états, qui eux SIGNIFIENT quelque chose.
@@ -284,8 +289,76 @@ struct SentinelleFamilyChart: View {
         .chartYAxis { SentinelleChartAxes.latency }
         .chartXAxis { SentinelleChartAxes.time(window) }
         .chartPlotStyle { plot in plot.background(Color.clear) }
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in scrub(to: value.location.x, proxy, geometry, series) }
+                            .onEnded { _ in readAt = nil }
+                    )
+            }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(summary(series))
+
+        // Les valeurs des deux piles à l'instant lu, côte à côte. C'est la
+        // raison d'être de ce graphe : voir l'écart au MÊME moment, pas deux
+        // chiffres relevés à deux instants différents.
+        readings(series)
+    }
+
+    @ViewBuilder
+    private func readings(_ series: [(SentinelleFamily, SentinelleLatencySeries)]) -> some View {
+        if let readAt {
+            HStack(spacing: SQSpace.md) {
+                ForEach(series, id: \.0) { family, familySeries in
+                    let sample = Self.nearest(in: familySeries, to: readAt)
+                    HStack(spacing: SQSpace.xs) {
+                        Text(family.label)
+                            .font(SQFont.body(11))
+                            .foregroundStyle(SQColor.labelSecondary)
+                        // Une famille muette à cet instant affiche un tiret, et
+                        // non la valeur voisine : c'est précisément le trou qu'on
+                        // vient chercher.
+                        Text(sample.map { String(format: "%.0f ms", $0.rttMs) } ?? "—")
+                            .font(SQFont.body(13, .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(Self.colors[family] ?? SQColor.label)
+                    }
+                }
+                Spacer()
+                Text(readAt.formatted(date: .omitted, time: .shortened))
+                    .font(SQFont.body(11))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            .padding(.top, SQSpace.xs)
+        }
+    }
+
+    /// Mesure réelle la plus proche, jamais une interpolation — et `nil` quand
+    /// cette famille n'a rien relevé dans les parages.
+    private static func nearest(
+        in series: SentinelleLatencySeries,
+        to date: Date
+    ) -> SentinelleLatencySample? {
+        series.samples.min { abs($0.at.timeIntervalSince(date)) < abs($1.at.timeIntervalSince(date)) }
+    }
+
+    private func scrub(
+        to x: CGFloat,
+        _ proxy: ChartProxy,
+        _ geometry: GeometryProxy,
+        _ series: [(SentinelleFamily, SentinelleLatencySeries)]
+    ) {
+        guard series.contains(where: { !$0.1.samples.isEmpty }) else { return }
+        let origin = SentinelleChartScale.plotOriginX(proxy, geometry)
+        guard let date: Date = proxy.value(atX: x - origin) else { return }
+        if readAt == nil { Haptics.selection() }
+        readAt = date
     }
 
     /// Légende maison : celle de Swift Charts ne connaît ni la typographie ni
