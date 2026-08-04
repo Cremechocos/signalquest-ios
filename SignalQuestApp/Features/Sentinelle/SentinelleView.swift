@@ -196,6 +196,10 @@ struct SentinelleView: View {
     @State private var showCreate = false
     @State private var showSettings = false
     @State private var showFollow = false
+    // Réglages purement locaux : un ordre d'affichage est une préférence de
+    // lecture du moment, pas une propriété de la connexion.
+    @State private var sort: SentinelleListOrder.Sort = .state
+    @State private var group: SentinelleListOrder.Group = .operatorKey
 
     /// Box à ouvrir d'emblée, quand on arrive depuis une notification de coupure.
     private let initialTargetId: String?
@@ -367,6 +371,22 @@ struct SentinelleView: View {
                     }
                 }
 
+                // Dès DEUX box : au-dessous il n'y a rien à ordonner, mais à
+                // deux la fonction doit être VISIBLE — la cacher donnerait
+                // l'impression qu'elle n'existe pas.
+                if model.targets.count + model.following.count >= 2 {
+                    VStack(spacing: SQSpace.xs) {
+                        Picker("Regrouper", selection: $group) {
+                            ForEach(SentinelleListOrder.Group.allCases) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        Picker("Trier", selection: $sort) {
+                            ForEach(SentinelleListOrder.Sort.allCases) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                }
+
                 // Les deux groupes ne se distinguent que s'il y a les deux : un
                 // seul en-tête au-dessus d'une liste homogène serait du bruit.
                 if !model.targets.isEmpty && !model.following.isEmpty {
@@ -378,7 +398,14 @@ struct SentinelleView: View {
                     }
                 }
 
-                ForEach(model.targets) { target in
+                ForEach(SentinelleListOrder.grouped(model.targets, by: group, sort: sort)) { bucket in
+                if let key = bucket.key {
+                    HStack {
+                        Text(key).font(SQFont.body(12)).foregroundStyle(SQColor.labelSecondary)
+                        Spacer()
+                    }
+                }
+                ForEach(bucket.boxes) { target in
                     NavigationLink {
                         SentinelleBoxView(model: model, targetId: target.id)
                     } label: {
@@ -389,6 +416,7 @@ struct SentinelleView: View {
                         )
                     }
                     .buttonStyle(SQPressButtonStyle())
+                }
                 }
 
                 // Les connexions suivies viennent APRÈS les siennes : on regarde
@@ -402,9 +430,17 @@ struct SentinelleView: View {
                     }
                     .padding(.top, SQSpace.xs)
 
-                    ForEach(model.following) { followed in
-                        SentinelleFollowedCard(box: followed) {
-                            Task { await model.unfollow(followed) }
+                    ForEach(SentinelleListOrder.grouped(model.following, by: group, sort: sort)) { bucket in
+                        if let key = bucket.key {
+                            HStack {
+                                Text(key).font(SQFont.body(12)).foregroundStyle(SQColor.labelSecondary)
+                                Spacer()
+                            }
+                        }
+                        ForEach(bucket.boxes) { followed in
+                            SentinelleFollowedCard(box: followed) {
+                                Task { await model.unfollow(followed) }
+                            }
                         }
                     }
                 }

@@ -592,6 +592,9 @@ struct SentinelleFollowedBox: Decodable, Identifiable, Sendable {
     let lastRttMs: Double?
     let uptimePct: Double?
     let families: [String]
+    /// L'opérateur ne dit pas qui l'on est : il peut s'afficher, et servir au
+    /// regroupement, même sur une connexion suivie.
+    let operatorKey: String?
     let incidents: [SentinelleFollowedIncident]
 
     var id: String { followId }

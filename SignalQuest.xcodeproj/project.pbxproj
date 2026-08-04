@@ -37,6 +37,7 @@
 		0F93CA162732A4E9F82EC1AF /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD246E248AC961551013A82C /* Haptics.swift */; };
 		0FC1E05534800C8F2C87ABD4 /* SQFriendMarkerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E75516A87ED197A5BB4AB1 /* SQFriendMarkerView.swift */; };
 		10DD4DD2B9C039C5DDDFA23C /* TerritoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF1CBBB47AF9B0D1E7B04560 /* TerritoryTests.swift */; };
+		11C64CBAF87EBE6915652C0B /* SentinelleListOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42B46F01A99508A96172EE09 /* SentinelleListOrder.swift */; };
 		1234F1B035A6A4539442AF80 /* ForcedUpdateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A07829DA27967AD22385C1 /* ForcedUpdateView.swift */; };
 		136460726EEEE4093C9E2856 /* AntennaRadioIdentifiersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75D22ACFDF645E05F738DB65 /* AntennaRadioIdentifiersView.swift */; };
 		14EAB8C4698346A19781589C /* Figtree-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 06CBBB2A485EB0E8C6DC23BB /* Figtree-Medium.ttf */; };
@@ -538,6 +539,7 @@
 		3FA954636DB0A4A82D56EFD1 /* MapBounds+Geometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MapBounds+Geometry.swift"; sourceTree = "<group>"; };
 		413FB8DE8180198C52ED7167 /* SessionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsService.swift; sourceTree = "<group>"; };
 		420C779CFB15C46F531F88B0 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		42B46F01A99508A96172EE09 /* SentinelleListOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleListOrder.swift; sourceTree = "<group>"; };
 		42D4BA9134FD958EE6A2E58F /* AntennaSectorGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaSectorGeometry.swift; sourceTree = "<group>"; };
 		430454E901BFB79E1C37A0E2 /* SentinelleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleView.swift; sourceTree = "<group>"; };
 		4346B0324DBC983FC6001FF7 /* RadioLogsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogsTests.swift; sourceTree = "<group>"; };
@@ -1256,6 +1258,7 @@
 				CB5E20693F10585EE50EAF49 /* SentinelleComponents.swift */,
 				5C3F9188D592CBD95A39EFA6 /* SentinelleFollowersCard.swift */,
 				E0B975ADACD15B14BF001583 /* SentinelleFollowing.swift */,
+				42B46F01A99508A96172EE09 /* SentinelleListOrder.swift */,
 				1D82B3CC62FAF373BB6EB036 /* SentinelleOwnerField.swift */,
 				6714ECEA3256C6DAF0E2BCA0 /* SentinelleOwnerLabel.swift */,
 				B52FFC1246246B1DBB37E5B9 /* SentinelleShareLink.swift */,
@@ -2190,6 +2193,7 @@
 				90E4AD9B1C5017530A3E09E1 /* SentinelleFollowersCard.swift in Sources */,
 				9840E5D22D0D29431DB0A3E3 /* SentinelleFollowing.swift in Sources */,
 				29016F5B320C5506ADEFC97E /* SentinelleIpv6.swift in Sources */,
+				11C64CBAF87EBE6915652C0B /* SentinelleListOrder.swift in Sources */,
 				2EFC3E650E7CCF5783FA85FB /* SentinelleModels.swift in Sources */,
 				D96A72F6B5BEC5D882DC76EF /* SentinelleOwnerField.swift in Sources */,
 				6B0FD6F8C15034A7A364DFEC /* SentinelleOwnerLabel.swift in Sources */,

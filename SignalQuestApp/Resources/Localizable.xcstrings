@@ -194,6 +194,16 @@
         }
       }
     },
+    "%@  %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@  %2$@"
+          }
+        }
+      }
+    },
     "%@ — %lld test" : {
       "localizations" : {
         "en" : {
@@ -2029,6 +2039,9 @@
           }
         }
       }
+    },
+    "À qui est cette box ? (facultatif)" : {
+
     },
     "À rafraîchir" : {
       "extractionState" : "stale",
@@ -4420,6 +4433,9 @@
         }
       }
     },
+    "Ce lien ne ressemble pas à un lien de partage Sentinelle." : {
+
+    },
     "Ce nom est trop long." : {
       "localizations" : {
         "en" : {
@@ -4844,6 +4860,9 @@
         }
       }
     },
+    "Choisir un emoji" : {
+
+    },
     "Choisir un fichier (.csv, .ntm)" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5150,6 +5169,12 @@
         }
       }
     },
+    "Coller un lien" : {
+
+    },
+    "Collez le lien qu’on vous a envoyé. Vous verrez l’état de la connexion et ses coupures — jamais son adresse. Son propriétaire saura que vous la suivez et pourra retirer cet accès." : {
+
+    },
     "Coloration couverture" : {
       "localizations" : {
         "en" : {
@@ -5407,6 +5432,9 @@
         }
       }
     },
+    "Connectez-vous pour la suivre et la retrouver ici." : {
+
+    },
     "Connexion" : {
       "localizations" : {
         "en" : {
@@ -5487,6 +5515,9 @@
         }
       }
     },
+    "Connexion partagée avec vous" : {
+
+    },
     "Connexion vidéo…" : {
       "localizations" : {
         "en" : {
@@ -5506,6 +5537,9 @@
           }
         }
       }
+    },
+    "Connexions partagées" : {
+
     },
     "Contenu illégal" : {
       "localizations" : {
@@ -5621,6 +5655,9 @@
           }
         }
       }
+    },
+    "Copié" : {
+
     },
     "Copier" : {
       "localizations" : {
@@ -7094,6 +7131,9 @@
         }
       }
     },
+    "Durée du lien" : {
+
+    },
     "Durée longue réservée aux comptes Premium." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -7327,6 +7367,9 @@
         }
       }
     },
+    "Emoji : %@. Changer" : {
+
+    },
     "En appel" : {
       "localizations" : {
         "en" : {
@@ -7360,6 +7403,9 @@
           }
         }
       }
+    },
+    "en attente de mesure" : {
+
     },
     "En attente de mesure" : {
 
@@ -9976,6 +10022,9 @@
     "Licence octroyée" : {
 
     },
+    "Lien de partage actif" : {
+
+    },
     "Lieu public" : {
 
     },
@@ -10370,6 +10419,9 @@
           }
         }
       }
+    },
+    "Mes connexions" : {
+
     },
     "Mes identifications" : {
       "localizations" : {
@@ -12072,6 +12124,9 @@
         }
       }
     },
+    "Partage désactivé" : {
+
+    },
     "Partage ton premier speedtest ou post." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -12378,6 +12433,9 @@
           }
         }
       }
+    },
+    "Personne ne peut suivre cette connexion." : {
+
     },
     "Personne pour l'instant" : {
       "extractionState" : "stale",
@@ -13549,6 +13607,9 @@
           }
         }
       }
+    },
+    "Qui a le lien et un compte peut suivre cette connexion." : {
+
     },
     "Qui peut me contacter" : {
       "localizations" : {
@@ -16296,6 +16357,12 @@
           }
         }
       }
+    },
+    "Suivre la connexion d’un proche" : {
+
+    },
+    "Suivre une connexion partagée" : {
+
     },
     "support" : {
 
