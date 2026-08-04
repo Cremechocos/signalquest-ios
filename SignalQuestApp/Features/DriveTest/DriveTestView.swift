@@ -1167,7 +1167,7 @@ struct DriveTestView: View {
                 // bas PHYSIQUE de l'écran, où le dock flottant le recouvre. Le
                 // `sqDockSafeArea()` de l'onglet ne l'atteint pas — même cause que
                 // sur Territoires.
-                .padding(.bottom, SQDock.floatingContentInset - SQSpace.md)
+                .padding(.bottom, SQDock.floatingContentInset(subtracting: SQSpace.md))
         }
         .overlay(alignment: .topTrailing) { mapLegendControl }
         .navigationTitle("Drive Test")

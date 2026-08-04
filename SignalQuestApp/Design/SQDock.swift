@@ -266,6 +266,17 @@ extension SQDock {
         return SQSpace.lg + 2 + clearance
     }
 
+    /// Dégagement RESTANT à ajouter quand le contenu porte déjà une marge.
+    ///
+    /// Les vues concernées ont un `.padding(SQSpace.md/lg)` d'habillage : sans
+    /// cette soustraction on cumulerait deux marges. Bornée à zéro, car avec la
+    /// barre native l'inset vaut exactement `SQSpace.lg` — une soustraction nue
+    /// donnerait alors un padding NÉGATIF, qui retire de l'espace au lieu d'en
+    /// ajouter.
+    static func floatingContentInset(subtracting existingPadding: CGFloat) -> CGFloat {
+        max(0, floatingContentInset - existingPadding)
+    }
+
     /// Le QA peut forcer le dock custom sur un OS qui aurait la barre native.
     static var usesLegacyDock: Bool {
         #if DEBUG

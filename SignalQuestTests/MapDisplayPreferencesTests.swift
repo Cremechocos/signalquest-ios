@@ -98,11 +98,21 @@ final class DockFloatingInsetTests: XCTestCase {
         }
     }
 
-    /// La valeur sert de base à des `padding(.bottom, floatingContentInset - X)`
-    /// où X vaut `SQSpace.md` ou `SQSpace.lg` : le résultat doit rester positif,
-    /// sinon on RETIRERAIT de la marge au lieu d'en ajouter.
-    func testInsetStaysAboveThePaddingsItIsCombinedWith() {
-        XCTAssertGreaterThan(SQDock.floatingContentInset, SQSpace.lg)
-        XCTAssertGreaterThan(SQDock.floatingContentInset, SQSpace.md)
+    /// Les vues combinent l'inset avec leur propre marge d'habillage. Avec la
+    /// barre native l'inset VAUT `SQSpace.lg` : une soustraction nue donnerait
+    /// alors zéro — acceptable — mais une marge plus grande donnerait un padding
+    /// négatif, qui retire de l'espace. Le helper doit borner à zéro.
+    func testCombinedInsetNeverGoesNegative() {
+        XCTAssertGreaterThanOrEqual(SQDock.floatingContentInset(subtracting: SQSpace.lg), 0)
+        XCTAssertGreaterThanOrEqual(SQDock.floatingContentInset(subtracting: SQSpace.md), 0)
+        // Cas extrême : une marge bien plus grande que l'inset.
+        XCTAssertEqual(SQDock.floatingContentInset(subtracting: 500), 0)
+    }
+
+    /// Avec le dock custom, le dégagement combiné doit rester substantiel :
+    /// c'est lui qui empêche la légende de passer sous la capsule flottante.
+    func testLegacyDockKeepsARealClearanceAfterSubtraction() throws {
+        try XCTSkipUnless(SQDock.usesLegacyDock, "cas du dock custom uniquement")
+        XCTAssertGreaterThanOrEqual(SQDock.floatingContentInset(subtracting: SQSpace.lg), SQDock.clearance - SQSpace.lg)
     }
 }
