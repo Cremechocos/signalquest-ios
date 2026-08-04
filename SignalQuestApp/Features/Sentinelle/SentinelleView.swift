@@ -47,31 +47,41 @@ final class SentinelleViewModel: ObservableObject {
     ///   est en train de lire. On garde l'affichage précédent et on retentera.
     func load(silently: Bool = false) async {
         do {
-            let response = try await service.targets()
+            let response = try await loadTargets()
             targets = response.targets
             quota = response.quota
 
+            // Les détails partent EN PARALLÈLE. Enchaînés, ils faisaient sept
+            // allers-retours en série pour trois box — plusieurs secondes d'écran
+            // vide avant le premier chiffre. Ils sont indépendants les uns des
+            // autres : rien ne justifiait de les attendre l'un après l'autre.
             var collectedIncidents: [String: [SentinelleIncident]] = [:]
             var collectedPoints: [String: [SentinelleSeriesPoint]] = [:]
-            for target in response.targets {
-                // Une requête en échec laisse la clé ABSENTE, et l'écran se tait.
-                // Retomber sur un tableau vide ferait dire « aucune coupure
-                // enregistrée » à une simple perte de réseau — une affirmation
-                // que la donnée ne soutient pas.
-                if let detail = try? await service.detail(targetId: target.id) {
-                    collectedIncidents[target.id] = detail.incidents
-                } else if let previous = incidents[target.id] {
-                    collectedIncidents[target.id] = previous
+
+            await withTaskGroup(of: (String, [SentinelleIncident]?, [SentinelleSeriesPoint]?).self) { group in
+                for target in response.targets {
+                    group.addTask { [service] in
+                        // Les deux requêtes d'une même box partent elles aussi
+                        // ensemble : la série ne dépend pas du détail.
+                        async let detail = try? await service.detail(targetId: target.id)
+                        async let series = try? await service.series(
+                            targetId: target.id, window: .h24, family: nil
+                        )
+                        return (target.id, await detail?.incidents, await series?.points)
+                    }
                 }
-                // Les points servent DEUX lectures : les agrégats de la box et
-                // l'état de chacune de ses adresses. Une seule requête par cible
-                // suffit donc — la famille se lit sur chaque point.
-                if let series = try? await service.series(targetId: target.id, window: .h24, family: nil) {
-                    collectedPoints[target.id] = series.points
-                } else if let previous = points[target.id] {
-                    collectedPoints[target.id] = previous
+                for await (id, incidents, points) in group {
+                    // Une requête en échec laisse la clé ABSENTE, et l'écran se
+                    // tait. Retomber sur un tableau vide ferait dire « aucune
+                    // coupure enregistrée » à une simple perte de réseau — une
+                    // affirmation que la donnée ne soutient pas.
+                    if let incidents { collectedIncidents[id] = incidents }
+                    else if let previous = self.incidents[id] { collectedIncidents[id] = previous }
+                    if let points { collectedPoints[id] = points }
+                    else if let previous = self.points[id] { collectedPoints[id] = previous }
                 }
             }
+
             incidents = collectedIncidents
             points = collectedPoints
             errorMessage = nil
@@ -82,6 +92,24 @@ final class SentinelleViewModel: ObservableObject {
         }
         isLoading = false
         lastRefresh = Date()
+    }
+
+    /// Charge la liste, avec UNE seconde tentative.
+    ///
+    /// Au démarrage, cet écran partait avant que la session ne soit rétablie :
+    /// l'appel échouait, « Chargement impossible » s'affichait, et un appui sur
+    /// « Réessayer » réussissait aussitôt — la preuve que l'échec était de
+    /// timing, pas de fond. Une seule reprise suffit donc, et un second échec
+    /// reste annoncé : on ne masque pas une panne réelle sous des reprises.
+    private func loadTargets() async throws -> SentinelleTargetsResponse {
+        do {
+            return try await service.targets()
+        } catch is SentinelleAccessDenied {
+            throw SentinelleAccessDenied()
+        } catch {
+            try? await Task.sleep(for: .milliseconds(400))
+            return try await service.targets()
+        }
     }
 
     func create(label: String, address: String) async {
