@@ -17,6 +17,9 @@ struct SentinelleFollowedCard: View {
     let onUnfollow: () -> Void
 
     @State private var confirming = false
+    // Le détail s'ouvre au TAP sur la carte, comme une box à soi : un bouton
+    // « Détails » à côté serait une commande de plus pour le même geste.
+    @State private var open = false
 
     var body: some View {
         GlassCard {
@@ -38,6 +41,47 @@ struct SentinelleFollowedCard: View {
                             .foregroundStyle(SQColor.labelSecondary)
                     }
                     Spacer(minLength: SQSpace.sm)
+                    Image(systemName: open ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(SQColor.labelTertiary)
+                        .sqDecorative()
+                }
+
+                if open {
+                    Divider().overlay(SQColor.separator)
+
+                    HStack(spacing: SQSpace.md) {
+                        detailStat("Dispo. 30 j", box.uptimePct.map { String(format: "%.2f %%", $0) })
+                        detailStat("Latence", box.lastRttMs.map { String(format: "%.0f ms", $0) })
+                        detailStat("Coupures", "\(box.outages)")
+                    }
+
+                    if box.incidents.isEmpty {
+                        Text("Aucune coupure enregistrée sur la période.")
+                            .font(SQFont.body(12))
+                            .foregroundStyle(SQColor.labelSecondary)
+                    } else {
+                        VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                            ForEach(box.incidents.prefix(6), id: \.startedAt) { incident in
+                                HStack {
+                                    Text(SentinelleWording.date(incident.startedAt))
+                                        .font(SQFont.body(12))
+                                    Spacer()
+                                    Text(incident.endedAt == nil
+                                        ? String(localized: "en cours")
+                                        : SentinelleWording.duration(incident.durationSec))
+                                        .font(.system(size: 12, design: .monospaced))
+                                        .foregroundStyle(SQColor.labelSecondary)
+                                }
+                            }
+                        }
+                    }
+
+                    Text("Ni adresse ni chemin réseau : c’est ce qui distingue une connexion "
+                        + "suivie d’une box à soi.")
+                        .font(SQFont.body(11))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 if confirming {
@@ -58,6 +102,21 @@ struct SentinelleFollowedCard: View {
                 }
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture { withAnimation(.easeOut(duration: 0.18)) { open.toggle() } }
+    }
+
+    private func detailStat(_ label: String, _ value: String?) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label)
+                .font(.system(size: 9, weight: .semibold))
+                .textCase(.uppercase)
+                .foregroundStyle(SQColor.labelSecondary)
+            Text(value ?? "—")
+                .font(.system(size: 15, design: .monospaced))
+                .foregroundStyle(SQColor.label)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var verdict: String {
