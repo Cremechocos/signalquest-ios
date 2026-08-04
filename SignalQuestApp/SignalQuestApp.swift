@@ -373,6 +373,12 @@ struct MainTabView: View {
             if hidden { router.isDockMinimized = false }
         }
         .onOpenURL { url in handleDeepLink(url) }
+        // Lien universel : `onOpenURL` ne suffit pas au démarrage à froid, où
+        // iOS passe par une activité de navigation. Les deux chemins mènent au
+        // même routage.
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            if let url = activity.webpageURL { handleDeepLink(url) }
+        }
     }
 
     /// iOS 26+ : tab bar système Liquid Glass native — vrai verre, glissement
@@ -520,6 +526,18 @@ struct MainTabView: View {
 
     /// Deep-link de l'environnement (widgets, raccourcis) → onglet correspondant.
     private func handleDeepLink(_ url: URL) {
+        // Lien universel https : seul le partage Sentinelle est revendiqué côté
+        // app pour l'instant. Le chemin est vérifié ici ET dans
+        // .well-known/apple-app-site-association — iOS n'ouvre l'app que si les
+        // deux concordent.
+        if url.scheme == "https" {
+            let parts = url.path.split(separator: "/").map(String.init)
+            if parts.count >= 3, parts[0] == "sentinelle", parts[1] == "p" {
+                router.route(toSentinelleShare: parts[2])
+            }
+            return
+        }
+
         guard url.scheme == SQSharedConfiguration.urlScheme else { return }
         switch url.host {
         case "speedtest", "speed": router.selectedTab = .speed

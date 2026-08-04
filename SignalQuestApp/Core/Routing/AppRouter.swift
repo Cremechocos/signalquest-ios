@@ -28,6 +28,8 @@ final class AppRouter: ObservableObject {
     /// Sans identifiant, l'écran s'ouvre quand même — sur son accueil.
     @Published var openSentinelleTargetId: String?
     @Published var openSentinelle = false
+    /// Jeton d'un lien de partage ouvert depuis l'extérieur (lien universel).
+    @Published var openSentinelleShareSlug: String?
     /// Coordonnée à cadrer sur la carte (posée depuis un test de l'historique,
     /// consommée par MapExplorerView une fois l'onglet carte actif).
     @Published var pendingMapFocus: Coordinates?
@@ -104,6 +106,12 @@ final class AppRouter: ObservableObject {
         selectedTab = .profile
         openSentinelleTargetId = id
         openSentinelle = true
+    }
+
+    /// Un lien de partage reçu par message ouvre la box, pas Safari.
+    func route(toSentinelleShare slug: String) {
+        selectedTab = .profile
+        openSentinelleShareSlug = slug
     }
 
     func route(toConversation id: String?) {

@@ -11,6 +11,7 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>$(SQ_ASSOCIATED_DOMAIN)</string>
+		<string>$(SQ_APPLINKS_DOMAIN)</string>
 	</array>
 	<key>com.apple.developer.networking.wifi-info</key>
 	<true/>

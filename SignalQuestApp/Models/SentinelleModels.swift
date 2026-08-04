@@ -555,6 +555,28 @@ struct SentinelleSharingPatch: Encodable, Sendable {
     }
 }
 
+/// L'état d'une box partagée, tel qu'un porteur de lien peut le voir.
+///
+/// Aucune adresse et aucun chemin réseau : le serveur ne les envoie pas, et ce
+/// type n'a pas de champ pour les accueillir.
+struct SentinelleSharedBox: Decodable, Sendable {
+    let label: String
+    let status: String
+    let lastProbeAt: String?
+    let uptimePct: Double?
+    let families: [String]
+    let ownerLabel: String?
+    let ownerEmoji: String?
+    let incidents: [SentinelleFollowedIncident]
+    /// L'appelant est déjà propriétaire : on ne lui propose pas de se suivre.
+    let isOwner: Bool
+    let isFollowing: Bool
+    /// Sans compte, l'écran invite à se connecter plutôt qu'à appuyer dans le vide.
+    let canFollow: Bool
+
+    var outages: Int { incidents.count }
+}
+
 /// Une box qu'on SUIT sans en être propriétaire.
 ///
 /// Elle ne porte aucune adresse et aucun relevé de chemin : le serveur les

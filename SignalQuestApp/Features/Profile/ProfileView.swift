@@ -31,6 +31,8 @@ struct ProfileView: View {
     @State private var deepLinkReport: AntennaReportDeepLink?
     /// Écran Sentinelle à ouvrir en sheet (tap sur une notification de coupure).
     @State private var deepLinkSentinelle: SentinelleDeepLink?
+    /// Box partagée ouverte depuis un lien universel.
+    @State private var deepLinkShare: SentinelleDeepLink?
 
     var body: some View {
         ScrollView {
@@ -100,7 +102,13 @@ struct ProfileView: View {
                 SentinelleView(service: services.sentinelle, initialTargetId: link.targetId)
             }
         }
-        .onAppear { consumeAntennaReportDeepLink(); consumeSentinelleDeepLink() }
+        .sheet(item: $deepLinkShare) { link in
+            NavigationStack {
+                SentinelleSharedView(slug: link.id, service: services.sentinelle)
+            }
+        }
+        .onAppear { consumeAntennaReportDeepLink(); consumeSentinelleDeepLink(); consumeShareDeepLink() }
+        .onChangeCompat(of: router.openSentinelleShareSlug) { _, _ in consumeShareDeepLink() }
         .onChangeCompat(of: router.openAntennaReportId) { _, _ in consumeAntennaReportDeepLink() }
         .onChangeCompat(of: router.openSentinelle) { _, _ in consumeSentinelleDeepLink() }
         .task { await loadStats() }
@@ -111,6 +119,13 @@ struct ProfileView: View {
     /// remet la valeur à `nil` une fois lue, comme `openSiteFromRouterIfNeeded`).
     /// Même contrat que ci-dessous : idempotent, l'intention est remise à zéro
     /// une fois lue.
+    /// Même contrat : idempotent, l'intention est remise à zéro une fois lue.
+    private func consumeShareDeepLink() {
+        guard let slug = router.openSentinelleShareSlug else { return }
+        router.openSentinelleShareSlug = nil
+        deepLinkShare = SentinelleDeepLink(id: slug)
+    }
+
     private func consumeSentinelleDeepLink() {
         guard router.openSentinelle else { return }
         let targetId = router.openSentinelleTargetId

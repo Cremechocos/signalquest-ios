@@ -74,6 +74,7 @@ protocol SentinelleServicing: Sendable {
     func testWebhook() async throws -> SentinelleWebhookTest
     func followers(targetId: String) async throws -> SentinelleFollowersResponse
     func following() async throws -> SentinelleFollowingResponse
+    func sharedBox(slug: String) async throws -> SentinelleSharedBox
     func follow(shareInput: String) async throws
     func unfollow(followId: String) async throws
     func revokeFollower(targetId: String, followerId: String) async throws
@@ -217,6 +218,12 @@ final class SentinelleService: SentinelleServicing, @unchecked Sendable {
     /// alors que la liste de mes propres box, si. Les enchaîner ferait
     /// disparaître les abonnements d'un utilisateur Free derrière un 403 qui ne
     /// les concerne pas.
+    /// Lit une box partagée à partir de son jeton. Sans authentification —
+    /// mais l'identité, si elle existe, sert au serveur à dire si on suit déjà.
+    func sharedBox(slug: String) async throws -> SentinelleSharedBox {
+        try await get(APIEndpoint(path: "/api/sentinelle/p/\(slug)", method: .get))
+    }
+
     func following() async throws -> SentinelleFollowingResponse {
         try await get(APIEndpoint(path: "/api/sentinelle/following", method: .get))
     }
