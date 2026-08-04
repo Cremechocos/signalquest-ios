@@ -555,6 +555,37 @@ struct SentinelleSharingPatch: Encodable, Sendable {
     }
 }
 
+/// Une box qu'on SUIT sans en être propriétaire.
+///
+/// Elle ne porte aucune adresse et aucun relevé de chemin : le serveur les
+/// retire (`buildFollowerTargetView`), et ce type n'a simplement pas de champ
+/// pour les accueillir. Les piles se nomment — « IPv4 », « IPv6 » — sans se
+/// montrer.
+struct SentinelleFollowedBox: Decodable, Identifiable, Sendable {
+    /// Identifiant de l'ABONNEMENT, pas de la cible : c'est lui qu'on retire.
+    let followId: String
+    let displayName: String
+    let status: String
+    let lastProbeAt: String?
+    let lastRttMs: Double?
+    let uptimePct: Double?
+    let families: [String]
+    let incidents: [SentinelleFollowedIncident]
+
+    var id: String { followId }
+    var outages: Int { incidents.count }
+}
+
+struct SentinelleFollowedIncident: Decodable, Sendable {
+    let startedAt: String
+    let endedAt: String?
+    let durationSec: Int?
+}
+
+struct SentinelleFollowingResponse: Decodable, Sendable {
+    let following: [SentinelleFollowedBox]
+}
+
 struct SentinelleTargetResponse: Decodable, Sendable {
     let target: SentinelleTarget
 }

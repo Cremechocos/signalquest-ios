@@ -23,6 +23,8 @@ final class SentinelleViewModel: ObservableObject {
     @Published private(set) var quota: SentinelleQuota?
     @Published private(set) var isLoading = true
     @Published private(set) var accessDenied = false
+    /// Les connexions suivies. Chargées à part de `targets` — voir `load`.
+    @Published private(set) var following: [SentinelleFollowedBox] = []
     @Published private(set) var errorMessage: String?
     @Published private(set) var lastRefresh: Date?
     @Published private(set) var isBusy = false
@@ -46,6 +48,13 @@ final class SentinelleViewModel: ObservableObject {
     ///   d'échec : perdre le réseau une seconde effacerait ce que l'utilisateur
     ///   est en train de lire. On garde l'affichage précédent et on retentera.
     func load(silently: Bool = false) async {
+        // Chargé à part et AVANT le reste : la liste de mes box exige Premium,
+        // mes abonnements non. Les enchaîner ferait disparaître les connexions
+        // suivies d'un utilisateur Free derrière un 403 qui ne les concerne pas.
+        if let response = try? await service.following() {
+            following = response.following
+        }
+
         do {
             let response = try await loadTargets()
             targets = response.targets
@@ -112,6 +121,15 @@ final class SentinelleViewModel: ObservableObject {
         }
     }
 
+    func follow(shareInput: String) async throws {
+        try await service.follow(shareInput: shareInput)
+        await load(silently: true)
+    }
+
+    func unfollow(_ box: SentinelleFollowedBox) async {
+        await mutate { try await self.service.unfollow(followId: box.followId) }
+    }
+
     func create(label: String, address: String, ownerLabel: String? = nil, ownerEmoji: String? = nil) async {
         await mutate {
             try await self.service.create(
@@ -161,6 +179,7 @@ struct SentinelleView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showCreate = false
     @State private var showSettings = false
+    @State private var showFollow = false
 
     /// Box à ouvrir d'emblée, quand on arrive depuis une notification de coupure.
     private let initialTargetId: String?
@@ -181,7 +200,7 @@ struct SentinelleView: View {
         Group {
             if model.isLoading && model.targets.isEmpty {
                 loadingState
-            } else if model.accessDenied {
+            } else if model.accessDenied && model.following.isEmpty {
                 EmptyStateView(
                     title: "Réservé aux membres Premium",
                     message: "Sentinelle surveille votre connexion en continu : disponibilité, "
@@ -194,7 +213,7 @@ struct SentinelleView: View {
                     Task { await model.load() }
                 }
                 .padding(SQSpace.lg)
-            } else if model.targets.isEmpty {
+            } else if model.targets.isEmpty && model.following.isEmpty {
                 EmptyStateView(
                     title: "Aucune connexion surveillée",
                     message: "Ajoutez l’adresse publique de votre box : Sentinelle l’interrogera "
@@ -270,6 +289,9 @@ struct SentinelleView: View {
         .sheet(isPresented: $showSettings) {
             SentinelleAlertSettingsSheet(service: model.service)
         }
+        .sheet(isPresented: $showFollow) {
+            SentinelleFollowSheet { input in try await model.follow(shareInput: input) }
+        }
         .sheet(isPresented: $showCreate) {
             SentinelleCreateSheet(quota: model.quota, currentIp: { await model.currentIp() }) { label, address, ownerLabel, ownerEmoji in
                 Task { await model.create(label: label, address: address, ownerLabel: ownerLabel, ownerEmoji: ownerEmoji) }
@@ -298,7 +320,10 @@ struct SentinelleView: View {
     /// que sur un écran vide.
     private var rootTarget: SentinelleTarget? {
         if let id = initialTargetId, let target = model.target(id) { return target }
-        return singleTarget
+        // Une box unique n'EST l'accueil que s'il n'y a rien d'autre à montrer.
+        // Avec des connexions suivies, la liste reprend ses droits — sinon elles
+        // seraient invisibles pour qui n'a qu'une box à lui.
+        return model.following.isEmpty ? singleTarget : nil
     }
 
     /// Le titre suit le niveau affiché : sur la box unique, c'est son nom qui
@@ -326,6 +351,27 @@ struct SentinelleView: View {
                     }
                     .buttonStyle(SQPressButtonStyle())
                 }
+
+                // Les connexions suivies viennent APRÈS les siennes : on regarde
+                // d'abord ce dont on est responsable.
+                if !model.following.isEmpty {
+                    HStack {
+                        Text("Connexions suivies")
+                            .font(SQFont.body(13))
+                            .foregroundStyle(SQColor.labelSecondary)
+                        Spacer()
+                    }
+                    .padding(.top, SQSpace.xs)
+
+                    ForEach(model.following) { followed in
+                        SentinelleFollowedCard(box: followed) {
+                            Task { await model.unfollow(followed) }
+                        }
+                    }
+                }
+
+                SentinelleFollowInvite { showFollow = true }
+
                 SentinelleFreshness(date: model.lastRefresh)
             }
             .padding(.horizontal, SQSpace.lg)

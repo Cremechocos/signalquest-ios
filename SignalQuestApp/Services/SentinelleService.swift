@@ -73,6 +73,9 @@ protocol SentinelleServicing: Sendable {
     func savePreferences(_ changes: SentinellePreferencesPatch) async throws
     func testWebhook() async throws -> SentinelleWebhookTest
     func followers(targetId: String) async throws -> SentinelleFollowersResponse
+    func following() async throws -> SentinelleFollowingResponse
+    func follow(shareInput: String) async throws
+    func unfollow(followId: String) async throws
     func revokeFollower(targetId: String, followerId: String) async throws
     func setSharing(targetId: String, changes: SentinelleSharingPatch) async throws -> SentinelleTarget
 }
@@ -206,6 +209,29 @@ final class SentinelleService: SentinelleServicing, @unchecked Sendable {
         } catch {
             throw Self.mapping(error)
         }
+    }
+
+    /// Les connexions que JE suis.
+    ///
+    /// Volontairement séparé de `targets()` : cette route n'exige PAS Premium,
+    /// alors que la liste de mes propres box, si. Les enchaîner ferait
+    /// disparaître les abonnements d'un utilisateur Free derrière un 403 qui ne
+    /// les concerne pas.
+    func following() async throws -> SentinelleFollowingResponse {
+        try await get(APIEndpoint(path: "/api/sentinelle/following", method: .get))
+    }
+
+    /// Suit une box à partir de son lien de partage. Le jeton fait l'autorisation.
+    func follow(shareInput: String) async throws {
+        guard let slug = SentinelleShareLink.extractSlug(shareInput) else {
+            throw SentinelleShareLinkError.invalid
+        }
+        try await send(path: "/api/sentinelle/p/\(slug)/follow", method: .post, body: nil)
+    }
+
+    /// Ne plus suivre. Le serveur révoque la ligne, il ne la supprime pas.
+    func unfollow(followId: String) async throws {
+        try await send(path: "/api/sentinelle/following/\(followId)", method: .delete, body: nil)
     }
 
     func followers(targetId: String) async throws -> SentinelleFollowersResponse {

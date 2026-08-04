@@ -241,7 +241,7 @@ struct SentinelleDetectedAddress: View {
 }
 
 /// Enveloppe commune des deux feuilles de saisie : poignée, titre, explication.
-private struct SentinelleSheetShell<Content: View>: View {
+struct SentinelleSheetShell<Content: View>: View {
     let title: String
     let subtitle: String
     @ViewBuilder var content: () -> Content
