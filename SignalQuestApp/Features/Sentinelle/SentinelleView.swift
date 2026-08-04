@@ -132,8 +132,8 @@ final class SentinelleViewModel: ObservableObject {
         }
     }
 
-    func followedSeries(_ box: SentinelleFollowedBox) async -> [SentinelleSeriesPoint] {
-        (try? await service.followedSeries(followId: box.followId))?.points ?? []
+    func followedSeries(_ box: SentinelleFollowedBox, window: SentinelleWindow) async -> [SentinelleSeriesPoint] {
+        (try? await service.followedSeries(followId: box.followId, window: window))?.points ?? []
     }
 
     func followPendingShare() async {
@@ -445,7 +445,7 @@ struct SentinelleView: View {
                             SentinelleFollowedCard(
                                 box: followed,
                                 onUnfollow: { Task { await model.unfollow(followed) } },
-                                loadSeries: { await model.followedSeries(followed) }
+                                loadSeries: { window in await model.followedSeries(followed, window: window) }
                             )
                         }
                     }

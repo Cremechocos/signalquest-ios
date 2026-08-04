@@ -3556,6 +3556,9 @@
     "Aucune coupure enregistrée en %@ sur 30 jours." : {
 
     },
+    "Aucune coupure enregistrée sur la période." : {
+
+    },
     "Aucune coupure enregistrée." : {
 
     },
@@ -6956,6 +6959,9 @@
         }
       }
     },
+    "Dispo." : {
+
+    },
     "Disponible pour tous" : {
       "localizations" : {
         "en" : {
@@ -7972,6 +7978,9 @@
           }
         }
       }
+    },
+    "État" : {
+
     },
     "État de votre connexion fixe, surveillée en continu depuis nos serveurs." : {
 
@@ -9550,6 +9559,9 @@
       }
     },
     "Latence" : {
+
+    },
+    "Latence · IPv4 et IPv6" : {
 
     },
     "Latence comparée sur %@ : " : {
@@ -12092,7 +12104,6 @@
       }
     },
     "Par opérateur" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14140,6 +14151,9 @@
         }
       }
     },
+    "Regrouper" : {
+
+    },
     "Réinitialiser" : {
       "localizations" : {
         "en" : {
@@ -14984,6 +14998,9 @@
       }
     },
     "samedi" : {
+
+    },
+    "Sans groupe" : {
 
     },
     "sans nom" : {
@@ -17395,6 +17412,9 @@
       }
     },
     "très proche, le signal dépend surtout de l'orientation du secteur" : {
+
+    },
+    "Trier" : {
 
     },
     "Trier et filtrer" : {

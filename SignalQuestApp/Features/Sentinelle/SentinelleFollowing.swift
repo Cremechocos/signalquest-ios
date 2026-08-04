@@ -17,9 +17,10 @@ struct SentinelleFollowedCard: View {
     let onUnfollow: () -> Void
     /// Chargée à l'OUVERTURE seulement : la précharger ferait une requête par
     /// connexion suivie à chaque affichage de la page.
-    var loadSeries: (() async -> [SentinelleSeriesPoint])? = nil
+    var loadSeries: ((SentinelleWindow) async -> [SentinelleSeriesPoint])? = nil
 
     @State private var points: [SentinelleSeriesPoint] = []
+    @State private var window: SentinelleWindow = .h24
 
     @State private var confirming = false
     // Le détail s'ouvre au TAP sur la carte, comme une box à soi : un bouton
@@ -51,15 +52,28 @@ struct SentinelleFollowedCard: View {
                         .foregroundStyle(SQColor.labelTertiary)
                         .sqDecorative()
                 }
+                // Le tap n'est porté QUE par le résumé : posé sur la carte
+                // entière, il refermait le détail dès qu'on glissait sur le
+                // graphe pour y lire une valeur.
+                .contentShape(Rectangle())
+                .onTapGesture { withAnimation(.easeOut(duration: 0.18)) { open.toggle() } }
 
                 if open {
                     Divider().overlay(SQColor.separator)
+
+                    Picker("Période", selection: $window) {
+                        ForEach(SentinelleWindow.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
 
                     if !points.isEmpty {
                         Text("Latence · IPv4 et IPv6")
                             .font(SQFont.body(12))
                             .foregroundStyle(SQColor.labelSecondary)
-                        SentinelleFamilyChart(points: points, window: .h24)
+                        // Le graphe porte SON propre geste de lecture au doigt.
+                        // Il ne doit donc pas hériter du tap de la carte, qui
+                        // refermerait le détail au moindre glissement.
+                        SentinelleFamilyChart(points: points, window: window)
                             .frame(height: 120)
                     }
 
@@ -115,11 +129,13 @@ struct SentinelleFollowedCard: View {
                 }
             }
         }
-        .contentShape(Rectangle())
-        .onTapGesture { withAnimation(.easeOut(duration: 0.18)) { open.toggle() } }
         .onChangeCompat(of: open) { _, isOpen in
             guard isOpen, points.isEmpty, let loadSeries else { return }
-            Task { points = await loadSeries() }
+            Task { points = await loadSeries(window) }
+        }
+        .onChangeCompat(of: window) { _, newWindow in
+            guard open, let loadSeries else { return }
+            Task { points = await loadSeries(newWindow) }
         }
     }
 
