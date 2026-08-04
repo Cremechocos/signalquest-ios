@@ -15,6 +15,11 @@ import SwiftUI
 struct SentinelleFollowedCard: View {
     let box: SentinelleFollowedBox
     let onUnfollow: () -> Void
+    /// Chargée à l'OUVERTURE seulement : la précharger ferait une requête par
+    /// connexion suivie à chaque affichage de la page.
+    var loadSeries: (() async -> [SentinelleSeriesPoint])? = nil
+
+    @State private var points: [SentinelleSeriesPoint] = []
 
     @State private var confirming = false
     // Le détail s'ouvre au TAP sur la carte, comme une box à soi : un bouton
@@ -49,6 +54,14 @@ struct SentinelleFollowedCard: View {
 
                 if open {
                     Divider().overlay(SQColor.separator)
+
+                    if !points.isEmpty {
+                        Text("Latence · IPv4 et IPv6")
+                            .font(SQFont.body(12))
+                            .foregroundStyle(SQColor.labelSecondary)
+                        SentinelleFamilyChart(points: points, window: .h24)
+                            .frame(height: 120)
+                    }
 
                     HStack(spacing: SQSpace.md) {
                         detailStat("Dispo. 30 j", box.uptimePct.map { String(format: "%.2f %%", $0) })
@@ -104,6 +117,10 @@ struct SentinelleFollowedCard: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { withAnimation(.easeOut(duration: 0.18)) { open.toggle() } }
+        .onChangeCompat(of: open) { _, isOpen in
+            guard isOpen, points.isEmpty, let loadSeries else { return }
+            Task { points = await loadSeries() }
+        }
     }
 
     private func detailStat(_ label: String, _ value: String?) -> some View {

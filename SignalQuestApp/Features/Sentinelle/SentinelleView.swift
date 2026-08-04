@@ -132,6 +132,10 @@ final class SentinelleViewModel: ObservableObject {
         }
     }
 
+    func followedSeries(_ box: SentinelleFollowedBox) async -> [SentinelleSeriesPoint] {
+        (try? await service.followedSeries(followId: box.followId))?.points ?? []
+    }
+
     func followPendingShare() async {
         guard let slug = pendingShareSlug else { return }
         await mutate { try await self.service.follow(shareInput: slug) }
@@ -438,9 +442,11 @@ struct SentinelleView: View {
                             }
                         }
                         ForEach(bucket.boxes) { followed in
-                            SentinelleFollowedCard(box: followed) {
-                                Task { await model.unfollow(followed) }
-                            }
+                            SentinelleFollowedCard(
+                                box: followed,
+                                onUnfollow: { Task { await model.unfollow(followed) } },
+                                loadSeries: { await model.followedSeries(followed) }
+                            )
                         }
                     }
                 }

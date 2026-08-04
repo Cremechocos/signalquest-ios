@@ -74,6 +74,7 @@ protocol SentinelleServicing: Sendable {
     func testWebhook() async throws -> SentinelleWebhookTest
     func followers(targetId: String) async throws -> SentinelleFollowersResponse
     func following() async throws -> SentinelleFollowingResponse
+    func followedSeries(followId: String) async throws -> SentinelleSeriesResponse
     func sharedBox(slug: String) async throws -> SentinelleSharedBox
     func follow(shareInput: String) async throws
     func unfollow(followId: String) async throws
@@ -222,6 +223,18 @@ final class SentinelleService: SentinelleServicing, @unchecked Sendable {
     /// mais l'identité, si elle existe, sert au serveur à dire si on suit déjà.
     func sharedBox(slug: String) async throws -> SentinelleSharedBox {
         try await get(APIEndpoint(path: "/api/sentinelle/p/\(slug)", method: .get))
+    }
+
+    /// La courbe d'une box qu'on SUIT. Elle passe par l'identifiant de
+    /// L'ABONNEMENT, jamais par le jeton de partage : le suiveur n'a pas ce
+    /// jeton et ne doit pas l'obtenir — il pourrait le rediffuser, alors que le
+    /// propriétaire n'a autorisé que lui.
+    func followedSeries(followId: String) async throws -> SentinelleSeriesResponse {
+        try await get(APIEndpoint(
+            path: "/api/sentinelle/following/\(followId)/series",
+            method: .get,
+            query: [URLQueryItem(name: "window", value: SentinelleWindow.h24.rawValue)]
+        ))
     }
 
     func following() async throws -> SentinelleFollowingResponse {
