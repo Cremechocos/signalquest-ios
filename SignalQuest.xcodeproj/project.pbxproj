@@ -64,7 +64,6 @@
 		1F8C1DCA6F43C1E6ECF1C518 /* MapKitMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F39D38251CE95547ECFA065 /* MapKitMapView.swift */; };
 		2178A64BBFDCF36192FACCD4 /* AppleDeviceDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F5CFE5CCBA408F62BDCC840 /* AppleDeviceDescriptor.swift */; };
 		223A9CEC6280B585F98FB578 /* AntennaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DA025CCAC0DF6A4A8AD5A6E /* AntennaModels.swift */; };
-		22CD85C7B9180364B59C12BB /* SentinelleSharedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79905A005F6D78F44796B356 /* SentinelleSharedView.swift */; };
 		244EC68604DEEC5E82995E8E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 420C779CFB15C46F531F88B0 /* PrivacyInfo.xcprivacy */; };
 		24D52A559727A045715483FF /* SentinelleComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB5E20693F10585EE50EAF49 /* SentinelleComponents.swift */; };
 		2516E3C8A6050766B3839034 /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55CF1B9AC2B2537FE31D0FED /* SignupView.swift */; };
@@ -628,7 +627,6 @@
 		764597B2F05EB51056FE2ECD /* SQOledPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQOledPalette.swift; sourceTree = "<group>"; };
 		78913AE6513A3E22DD8F8B87 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		78F38B35680E7C99DE20288D /* ConversationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationModels.swift; sourceTree = "<group>"; };
-		79905A005F6D78F44796B356 /* SentinelleSharedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleSharedView.swift; sourceTree = "<group>"; };
 		7A46F0D8DF52ED42DAFFC731 /* CallHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallHistoryView.swift; sourceTree = "<group>"; };
 		7A87DB3713AB0F5246741CCA /* Sora-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Sora-Variable.ttf"; sourceTree = "<group>"; };
 		7AE018DD5313EE91ADC34F09 /* JSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONValue.swift; sourceTree = "<group>"; };
@@ -1260,7 +1258,6 @@
 				E0B975ADACD15B14BF001583 /* SentinelleFollowing.swift */,
 				1D82B3CC62FAF373BB6EB036 /* SentinelleOwnerField.swift */,
 				6714ECEA3256C6DAF0E2BCA0 /* SentinelleOwnerLabel.swift */,
-				79905A005F6D78F44796B356 /* SentinelleSharedView.swift */,
 				B52FFC1246246B1DBB37E5B9 /* SentinelleShareLink.swift */,
 				430454E901BFB79E1C37A0E2 /* SentinelleView.swift */,
 			);
@@ -2198,7 +2195,6 @@
 				6B0FD6F8C15034A7A364DFEC /* SentinelleOwnerLabel.swift in Sources */,
 				C16CE8B5E0E7FC0AD46DE729 /* SentinelleService.swift in Sources */,
 				5A418CD0D6BF9D9C5DCF3918 /* SentinelleShareLink.swift in Sources */,
-				22CD85C7B9180364B59C12BB /* SentinelleSharedView.swift in Sources */,
 				3866C1CA8EEC2E696EAE8C8E /* SentinelleView.swift in Sources */,
 				9B23A9464CD35CCB2BED5DD8 /* SessionDetailView.swift in Sources */,
 				8CC009E03CB57D8B8159BCAA /* SessionModels.swift in Sources */,

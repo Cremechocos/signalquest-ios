@@ -104,7 +104,9 @@ struct ProfileView: View {
         }
         .sheet(item: $deepLinkShare) { link in
             NavigationStack {
-                SentinelleSharedView(slug: link.id, service: services.sentinelle)
+                // La page Sentinelle habituelle, avec le jeton : l'écran dédié
+                // a été retiré, son contenu a sa place dans la liste.
+                SentinelleView(service: services.sentinelle, initialShareSlug: link.id)
             }
         }
         .onAppear { consumeAntennaReportDeepLink(); consumeSentinelleDeepLink(); consumeShareDeepLink() }

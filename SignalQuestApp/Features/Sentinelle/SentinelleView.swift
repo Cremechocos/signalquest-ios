@@ -25,6 +25,11 @@ final class SentinelleViewModel: ObservableObject {
     @Published private(set) var accessDenied = false
     /// Les connexions suivies. Chargées à part de `targets` — voir `load`.
     @Published private(set) var following: [SentinelleFollowedBox] = []
+    /// Box désignée par un lien reçu, tant qu'on ne la suit pas. Une fois
+    /// suivie, elle rejoint `following` et l'invitation disparaît d'elle-même.
+    @Published private(set) var sharedInvite: SentinelleSharedBox?
+    /// Jeton porté par le lien d'arrivée, s'il y en a un.
+    var pendingShareSlug: String?
     @Published private(set) var errorMessage: String?
     @Published private(set) var lastRefresh: Date?
     @Published private(set) var isBusy = false
@@ -53,6 +58,12 @@ final class SentinelleViewModel: ObservableObject {
         // suivies d'un utilisateur Free derrière un 403 qui ne les concerne pas.
         if let response = try? await service.following() {
             following = response.following
+        }
+
+        if let slug = pendingShareSlug, let box = try? await service.sharedBox(slug: slug) {
+            // Déjà suivie ou déjà à soi : rien à proposer. Un bouton « suivre »
+            // qui répondrait par une erreur n'a pas sa place.
+            sharedInvite = (box.isFollowing || box.isOwner) ? nil : box
         }
 
         do {
@@ -121,6 +132,11 @@ final class SentinelleViewModel: ObservableObject {
         }
     }
 
+    func followPendingShare() async {
+        guard let slug = pendingShareSlug else { return }
+        await mutate { try await self.service.follow(shareInput: slug) }
+    }
+
     func follow(shareInput: String) async throws {
         try await service.follow(shareInput: shareInput)
         await load(silently: true)
@@ -183,10 +199,13 @@ struct SentinelleView: View {
 
     /// Box à ouvrir d'emblée, quand on arrive depuis une notification de coupure.
     private let initialTargetId: String?
+    /// Jeton d'un lien de partage : on propose alors de suivre, en tête de page.
+    private let initialShareSlug: String?
 
-    init(service: SentinelleServicing, initialTargetId: String? = nil) {
+    init(service: SentinelleServicing, initialTargetId: String? = nil, initialShareSlug: String? = nil) {
         _model = StateObject(wrappedValue: SentinelleViewModel(service: service))
         self.initialTargetId = initialTargetId
+        self.initialShareSlug = initialShareSlug
     }
 
     /// La justification d'origine — « la sonde mesure au mieux une fois par
@@ -266,6 +285,7 @@ struct SentinelleView: View {
         }
         .refreshable { await model.load(silently: true) }
         .task {
+            model.pendingShareSlug = initialShareSlug
             await model.load()
             // Boucle de rafraîchissement. `.task` est annulée quand la vue
             // disparaît, ce qui suffit à l'arrêter à la sortie de l'écran ;
@@ -339,6 +359,25 @@ struct SentinelleView: View {
     private var boxList: some View {
         ScrollView {
             VStack(spacing: SQSpace.md + 2) {
+                // L'invitation venue d'un lien passe AVANT tout : c'est ce qu'on
+                // vient de faire, et elle disparaît dès qu'on a suivi.
+                if let invite = model.sharedInvite {
+                    SentinelleShareInvite(box: invite) {
+                        Task { await model.followPendingShare() }
+                    }
+                }
+
+                // Les deux groupes ne se distinguent que s'il y a les deux : un
+                // seul en-tête au-dessus d'une liste homogène serait du bruit.
+                if !model.targets.isEmpty && !model.following.isEmpty {
+                    HStack {
+                        Text("Mes connexions")
+                            .font(SQFont.body(13))
+                            .foregroundStyle(SQColor.labelSecondary)
+                        Spacer()
+                    }
+                }
+
                 ForEach(model.targets) { target in
                     NavigationLink {
                         SentinelleBoxView(model: model, targetId: target.id)
@@ -356,7 +395,7 @@ struct SentinelleView: View {
                 // d'abord ce dont on est responsable.
                 if !model.following.isEmpty {
                     HStack {
-                        Text("Connexions suivies")
+                        Text("Connexions partagées")
                             .font(SQFont.body(13))
                             .foregroundStyle(SQColor.labelSecondary)
                         Spacer()

@@ -152,3 +152,59 @@ struct SentinelleFollowInvite: View {
         }
     }
 }
+
+/// L'invitation venue d'un lien reçu, en tête de la page Sentinelle.
+///
+/// Elle remplace l'écran dédié : une page à part obligeait à comprendre OÙ
+/// l'on était avant de comprendre ce qu'on regardait, pour un contenu qui a sa
+/// place dans la liste. Elle disparaît d'elle-même une fois la box suivie.
+struct SentinelleShareInvite: View {
+    let box: SentinelleSharedBox
+    let onFollow: () -> Void
+
+    @State private var busy = false
+
+    var body: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                Text("Connexion partagée avec vous")
+                    .font(SQFont.body(12))
+                    .foregroundStyle(SQColor.labelSecondary)
+
+                HStack(alignment: .top, spacing: SQSpace.sm + 2) {
+                    SentinelleStatusDot(color: SentinelleWording.statusColor(box.status))
+                        .padding(.top, 6)
+                    if let emoji = box.ownerEmoji, !emoji.isEmpty {
+                        Text(emoji).font(.system(size: 19)).sqDecorative()
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(box.label)
+                            .font(SQType.heading)
+                            .foregroundStyle(SQColor.label)
+                        // Les piles se nomment, elles ne se montrent pas.
+                        Text(box.families.isEmpty
+                            ? String(localized: "en attente de mesure")
+                            : box.families.joined(separator: " · "))
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    Spacer(minLength: SQSpace.sm)
+                }
+
+                if box.canFollow {
+                    GradientButton(busy ? "…" : "Suivre cette connexion", systemImage: "person.badge.plus") {
+                        busy = true
+                        onFollow()
+                    }
+                    .disabled(busy)
+                } else {
+                    // Un bouton qui répondrait « connectez-vous » après coup
+                    // serait une fausse promesse : on le dit avant.
+                    Text("Connectez-vous pour la suivre et la retrouver ici.")
+                        .font(SQFont.body(13))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+        }
+    }
+}
