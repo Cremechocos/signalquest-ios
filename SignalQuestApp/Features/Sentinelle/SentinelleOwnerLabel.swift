@@ -22,7 +22,7 @@ enum SentinelleOwnerLabel {
 
     static let suggestions: [Suggestion] = [
         Suggestion(value: "Moi", emoji: "🏠"),
-        Suggestion(value: "Mes parents", emoji: "👨‍👩‍👦"),
+        Suggestion(value: "Mes parents", emoji: "👪"),
         Suggestion(value: "Mes grands-parents", emoji: "👵"),
         Suggestion(value: "Mon enfant", emoji: "🧒"),
         Suggestion(value: "Un ami", emoji: "🙂"),
@@ -35,7 +35,7 @@ enum SentinelleOwnerLabel {
     /// complet est un composant à lui seul, et l'objet ici est de repérer une
     /// box d'un coup d'œil dans une liste, pas de s'exprimer.
     static let emojiPalette: [String] = [
-        "🏠", "👨‍👩‍👦", "👵", "🧒", "🙂", "🏖️", "💼", "🤝",
+        "🏠", "👪", "👵", "🧒", "🙂", "🏖️", "💼", "🤝",
         "🏡", "🏢", "🛖", "⛺", "🚐", "🐈", "🐕", "🌱",
         "📚", "🎮", "🎣", "⚓", "🍇", "☕",
     ]
