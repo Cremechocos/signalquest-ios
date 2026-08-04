@@ -162,9 +162,12 @@ struct SentinelleView: View {
         _model = StateObject(wrappedValue: SentinelleViewModel(service: service))
     }
 
-    /// La sonde mesure au mieux une fois par minute : interroger plus souvent
-    /// ne renverrait que la même valeur, en consommant batterie et données.
-    private static let refreshInterval: Duration = .seconds(60)
+    /// La justification d'origine — « la sonde mesure au mieux une fois par
+    /// minute » — n'est plus vraie : la cadence est réglable par cible
+    /// (60/30/10 s) et descend à 5 s pendant une coupure. À 60 s, le ping
+    /// affiché retardait sur la mesure réelle, et une adresse ajoutée depuis
+    /// le web ou Android mettait jusqu'à une minute à apparaître ici.
+    private static let refreshInterval: Duration = .seconds(20)
 
     var body: some View {
         Group {
