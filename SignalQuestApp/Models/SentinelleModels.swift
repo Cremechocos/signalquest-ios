@@ -53,9 +53,11 @@ struct SentinelleTarget: Decodable, Identifiable, Hashable, Sendable {
     let isActive: Bool?
     let suspendedReason: String?
     let operatorKey: String?
+    /// Le lien de partage est actif : la box peut être suivie.
+    let isPublic: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case id, label, hostname, ipv4, ipv6, resolvedIpv4, resolvedIpv6
+        case id, label, hostname, ipv4, ipv6, resolvedIpv4, resolvedIpv6, isPublic
         case status, statusSince, lastProbeAt
         // `protocol` est un mot réservé en Swift : on le renomme sans toucher au contrat serveur.
         case protocolName = "protocol"
@@ -503,4 +505,23 @@ struct SentinelleWebhookTest: Codable, Sendable {
     let status: Int?
     let destination: String?
     let message: String
+}
+
+
+/// Quelqu'un qui suit une box partagée.
+///
+/// Les accès RETIRÉS sont conservés : savoir qui a suivi sa connexion par le
+/// passé fait partie de ce que le propriétaire est en droit de consulter.
+struct SentinelleFollower: Decodable, Identifiable, Sendable {
+    let id: String
+    let userId: String
+    let name: String?
+    let since: String
+    let revokedAt: String?
+
+    var isActive: Bool { revokedAt == nil }
+}
+
+struct SentinelleFollowersResponse: Decodable, Sendable {
+    let followers: [SentinelleFollower]
 }

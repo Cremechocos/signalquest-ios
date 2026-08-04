@@ -236,6 +236,7 @@
 		8F7B904F932F0DFB126BFD79 /* VersionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DD37884E4B468579B8A6FA7 /* VersionPolicyTests.swift */; };
 		902F95C7CCB9DD4867C917D2 /* market_registry_fallback.json in Resources */ = {isa = PBXBuildFile; fileRef = 65CA75BF3F0519CFD6B732AE /* market_registry_fallback.json */; };
 		90B7AE3977363612D175DFCE /* WeeklyRecapRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04E7CFD4D0CDDBC795F7E0B0 /* WeeklyRecapRenderTests.swift */; };
+		90E4AD9B1C5017530A3E09E1 /* SentinelleFollowersCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3F9188D592CBD95A39EFA6 /* SentinelleFollowersCard.swift */; };
 		92554F6DCF00E04342046FDE /* NotificationsCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 958A673DD4304B8B309E66C5 /* NotificationsCenterView.swift */; };
 		930DDBADA24A609397564342 /* SiteRemapSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F95EB05B86F26CEFD0F46621 /* SiteRemapSheet.swift */; };
 		938A4CDAB66991434228E103 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DA29CF4FE66121B9C7C8ECC /* ProfileView.swift */; };
@@ -569,6 +570,7 @@
 		5AEDFB065EC3512D77D7569B /* CredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialStore.swift; sourceTree = "<group>"; };
 		5B45485E64C72BC0A432936C /* E2EEUnlockSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEUnlockSheet.swift; sourceTree = "<group>"; };
 		5C14BE7BE1D4056FB4421D16 /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
+		5C3F9188D592CBD95A39EFA6 /* SentinelleFollowersCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleFollowersCard.swift; sourceTree = "<group>"; };
 		5D3298EDB2E0523439799250 /* TypingDotsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingDotsView.swift; sourceTree = "<group>"; };
 		5D7C53B1F380E7089AC55E11 /* AntennaMarketAdaptationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaMarketAdaptationTests.swift; sourceTree = "<group>"; };
 		5E03418AAFBEEEBDF356739B /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
@@ -1244,6 +1246,7 @@
 				AD2EBD9C272198901276D84C /* SentinelleBoxView.swift */,
 				B0421A119135C490C2075C09 /* SentinelleCharts.swift */,
 				CB5E20693F10585EE50EAF49 /* SentinelleComponents.swift */,
+				5C3F9188D592CBD95A39EFA6 /* SentinelleFollowersCard.swift */,
 				430454E901BFB79E1C37A0E2 /* SentinelleView.swift */,
 			);
 			path = Sentinelle;
@@ -2172,6 +2175,7 @@
 				AF48C78CE4288133C08989E4 /* SentinelleBoxView.swift in Sources */,
 				02593AF0CFF83B2C69D9F79A /* SentinelleCharts.swift in Sources */,
 				24D52A559727A045715483FF /* SentinelleComponents.swift in Sources */,
+				90E4AD9B1C5017530A3E09E1 /* SentinelleFollowersCard.swift in Sources */,
 				29016F5B320C5506ADEFC97E /* SentinelleIpv6.swift in Sources */,
 				2EFC3E650E7CCF5783FA85FB /* SentinelleModels.swift in Sources */,
 				C16CE8B5E0E7FC0AD46DE729 /* SentinelleService.swift in Sources */,

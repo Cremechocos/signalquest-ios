@@ -71,6 +71,8 @@ protocol SentinelleServicing: Sendable {
     func preferences() async throws -> SentinellePreferencesResponse
     func savePreferences(_ changes: SentinellePreferencesPatch) async throws
     func testWebhook() async throws -> SentinelleWebhookTest
+    func followers(targetId: String) async throws -> SentinelleFollowersResponse
+    func revokeFollower(targetId: String, followerId: String) async throws
 }
 
 final class SentinelleService: SentinelleServicing, @unchecked Sendable {
@@ -180,6 +182,25 @@ final class SentinelleService: SentinelleServicing, @unchecked Sendable {
         do {
             let endpoint = APIEndpoint(path: "/api/sentinelle/preferences/test-webhook", method: .post)
             return try await api.request(endpoint, as: SentinelleWebhookTest.self)
+        } catch {
+            throw Self.mapping(error)
+        }
+    }
+
+    func followers(targetId: String) async throws -> SentinelleFollowersResponse {
+        try await get(APIEndpoint(path: "/api/sentinelle/targets/\(targetId)/followers"))
+    }
+
+    /// Le serveur pose `revokedAt`, il ne supprime pas la ligne : l'historique
+    /// des accès reste consultable par le propriétaire.
+    func revokeFollower(targetId: String, followerId: String) async throws {
+        do {
+            let endpoint = APIEndpoint(
+                path: "/api/sentinelle/targets/\(targetId)/followers",
+                method: .delete,
+                query: [URLQueryItem(name: "followerId", value: followerId)]
+            )
+            try await api.request(endpoint)
         } catch {
             throw Self.mapping(error)
         }

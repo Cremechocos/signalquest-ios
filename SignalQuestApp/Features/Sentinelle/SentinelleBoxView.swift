@@ -46,6 +46,9 @@ struct SentinelleBoxView: View {
                     verdictCard(target)
                     if hasBothFamilies { comparisonCard }
                     metricsCard
+                    // Les abonnés se gèrent depuis la page de la BOX : on partage
+                    // une connexion, pas une pile réseau.
+                    SentinelleFollowersCard(target: target, service: model.service)
                     addressesCard(target)
                     deleteRow(target)
                     SentinelleFreshness(date: model.lastRefresh)
