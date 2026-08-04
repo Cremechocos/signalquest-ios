@@ -665,6 +665,9 @@
     "%lld %% vérifié" : {
 
     },
+    "%lld accès ont été retirés par le passé." : {
+
+    },
     "%lld autre abonné touché" : {
       "localizations" : {
         "en" : {
@@ -2639,6 +2642,9 @@
         }
       }
     },
+    "Alertes" : {
+
+    },
     "Altitude du site" : {
 
     },
@@ -3743,6 +3749,9 @@
           }
         }
       }
+    },
+    "Aucune réponse sur %@, dans aucune des deux familles : il n’y a pas de latence à comparer." : {
+
     },
     "aucune salve perdue" : {
 
@@ -6566,6 +6575,9 @@
         }
       }
     },
+    "depuis le %@" : {
+
+    },
     "Depuis votre box, cherchez son adresse %@ publique." : {
 
     },
@@ -7819,6 +7831,9 @@
     "Envoyer un message à %@" : {
 
     },
+    "Envoyer un message d’essai" : {
+
+    },
     "Envoyer une demande à %@" : {
       "localizations" : {
         "en" : {
@@ -8440,6 +8455,9 @@
           }
         }
       }
+    },
+    "https://discord.com/api/webhooks/…" : {
+
     },
     "Hypothèse" : {
       "localizations" : {
@@ -10261,6 +10279,12 @@
           }
         }
       }
+    },
+    "Me prévenir au rétablissement" : {
+
+    },
+    "Me prévenir en cas de coupure" : {
+
     },
     "Me rappeler le" : {
       "localizations" : {
@@ -12227,6 +12251,9 @@
     "Pas encore assez de mesures pour tracer une courbe." : {
 
     },
+    "Pas encore assez de mesures sur %@ pour comparer les deux familles." : {
+
+    },
     "Pas encore de bilan" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -12362,6 +12389,12 @@
           }
         }
       }
+    },
+    "Personne pour l’instant. Partagez le lien pour qu’un proche puisse suivre." : {
+
+    },
+    "Personne. Le partage est désactivé." : {
+
     },
     "Pertinence" : {
 
@@ -13527,6 +13560,9 @@
         }
       }
     },
+    "Qui suit cette connexion" : {
+
+    },
     "Quitter" : {
       "localizations" : {
         "en" : {
@@ -14018,6 +14054,9 @@
           }
         }
       }
+    },
+    "Réglages des alertes" : {
+
     },
     "Réglages du groupe" : {
       "localizations" : {
@@ -14705,6 +14744,9 @@
         }
       }
     },
+    "Retirer le webhook" : {
+
+    },
     "Retour" : {
       "localizations" : {
         "en" : {
@@ -14724,6 +14766,9 @@
           }
         }
       }
+    },
+    "Retrait…" : {
+
     },
     "Rétrograder" : {
       "localizations" : {
@@ -17474,6 +17519,9 @@
         }
       }
     },
+    "Un accès a été retiré par le passé." : {
+
+    },
     "Un achat App Store est détecté sur cet appareil, mais son activation serveur n'est pas encore confirmée." : {
       "localizations" : {
         "en" : {
@@ -18132,6 +18180,9 @@
 
     },
     "vus en dernier" : {
+
+    },
+    "Webhook" : {
 
     },
     "Zone" : {

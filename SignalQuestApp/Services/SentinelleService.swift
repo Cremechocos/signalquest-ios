@@ -73,6 +73,7 @@ protocol SentinelleServicing: Sendable {
     func testWebhook() async throws -> SentinelleWebhookTest
     func followers(targetId: String) async throws -> SentinelleFollowersResponse
     func revokeFollower(targetId: String, followerId: String) async throws
+    func setSharing(targetId: String, changes: SentinelleSharingPatch) async throws -> SentinelleTarget
 }
 
 final class SentinelleService: SentinelleServicing, @unchecked Sendable {
@@ -201,6 +202,18 @@ final class SentinelleService: SentinelleServicing, @unchecked Sendable {
                 query: [URLQueryItem(name: "followerId", value: followerId)]
             )
             try await api.request(endpoint)
+        } catch {
+            throw Self.mapping(error)
+        }
+    }
+
+    func setSharing(targetId: String, changes: SentinelleSharingPatch) async throws -> SentinelleTarget {
+        do {
+            var endpoint = APIEndpoint(path: "/api/sentinelle/targets/\(targetId)", method: .patch)
+            endpoint.headers = ["Content-Type": "application/json"]
+            endpoint.body = try JSONEncoder.signalQuest.encode(changes)
+            let response = try await api.request(endpoint, as: SentinelleTargetResponse.self)
+            return response.target
         } catch {
             throw Self.mapping(error)
         }

@@ -55,9 +55,13 @@ struct SentinelleTarget: Decodable, Identifiable, Hashable, Sendable {
     let operatorKey: String?
     /// Le lien de partage est actif : la box peut être suivie.
     let isPublic: Bool?
+    let publicSlug: String?
+    /// Échéance du lien, en ISO 8601. Nul = sans limite de durée.
+    let publicExpiresAt: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, label, hostname, ipv4, ipv6, resolvedIpv4, resolvedIpv6, isPublic
+        case id, label, hostname, ipv4, ipv6, resolvedIpv4, resolvedIpv6
+        case isPublic, publicSlug, publicExpiresAt
         case status, statusSince, lastProbeAt
         // `protocol` est un mot réservé en Swift : on le renomme sans toucher au contrat serveur.
         case protocolName = "protocol"
@@ -524,4 +528,66 @@ struct SentinelleFollower: Decodable, Identifiable, Sendable {
 
 struct SentinelleFollowersResponse: Decodable, Sendable {
     let followers: [SentinelleFollower]
+}
+
+
+/// Modification du partage d'une box.
+///
+/// `expiresInHours` distingue trois cas et non deux : absent laisse l'échéance
+/// telle quelle, `.some(nil)` la retire, une valeur la fixe. Régler la durée ne
+/// doit pas rallumer un partage éteint, ni l'inverse.
+struct SentinelleSharingPatch: Encodable, Sendable {
+    var isPublic: Bool?
+    var publicExpiresInHours: Int??
+
+    enum CodingKeys: String, CodingKey { case isPublic, publicExpiresInHours }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(isPublic, forKey: .isPublic)
+        if let publicExpiresInHours {
+            try container.encode(publicExpiresInHours, forKey: .publicExpiresInHours)
+        }
+    }
+}
+
+struct SentinelleTargetResponse: Decodable, Sendable {
+    let target: SentinelleTarget
+}
+
+/// Durées proposées. 24 h en tête : un lien se donne le plus souvent pour une
+/// occasion. « Sans limite » existe, mais en DERNIER — c'est un choix, pas le
+/// réglage par défaut.
+enum SentinelleShareDuration: CaseIterable, Identifiable, Sendable {
+    case day, week, month, unlimited
+
+    var id: String { label }
+
+    var label: String {
+        switch self {
+        case .day: return "24 h"
+        case .week: return "7 j"
+        case .month: return "30 j"
+        case .unlimited: return "sans limite"
+        }
+    }
+
+    var hours: Int? {
+        switch self {
+        case .day: return 24
+        case .week: return 24 * 7
+        case .month: return 24 * 30
+        case .unlimited: return nil
+        }
+    }
+
+    /// Une échéance ne se compare pas à la seconde : elle a été posée il y a un
+    /// moment et le temps a passé depuis. On retient l'option la plus proche, à
+    /// une heure près, plutôt que de n'en surligner aucune.
+    func matches(_ expiresAt: String?) -> Bool {
+        guard let hours else { return expiresAt == nil }
+        guard let expiresAt, let date = ISO8601DateFormatter().date(from: expiresAt) else { return false }
+        let remaining = date.timeIntervalSinceNow / 3600
+        return abs(remaining - Double(hours)) < 1
+    }
 }
