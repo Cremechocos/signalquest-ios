@@ -17,6 +17,8 @@ struct SentinelleBoxView: View {
     @State private var openedFamily: SentinelleFamily?
     @State private var editing: EditingAddress?
     @State private var confirmDelete = false
+    @State private var ownerLabel = ""
+    @State private var ownerEmoji = ""
 
     /// Fenêtre du graphe comparé, et elle seule : les agrégats de la box et
     /// l'état de chaque adresse restent lus sur 24 h, sans quoi leurs libellés
@@ -50,6 +52,7 @@ struct SentinelleBoxView: View {
                     // une connexion, pas une pile réseau.
                     SentinelleFollowersCard(target: target, service: model.service)
                     addressesCard(target)
+                    ownerCard(target)
                     deleteRow(target)
                     SentinelleFreshness(date: model.lastRefresh)
                 }
@@ -207,14 +210,19 @@ struct SentinelleBoxView: View {
         // l'autre fenêtre — mais seulement quand la fenêtre a changé, sinon
         // chaque cycle de rafraîchissement ferait clignoter le graphe.
         if loadedWindow != window { otherWindowPoints = nil }
-        guard let response = try? await model.service.series(
-            targetId: targetId, window: window, family: nil
-        ) else {
-            otherWindowPoints = otherWindowPoints ?? []
+        do {
+            let response = try await model.service.series(
+                targetId: targetId, window: window, family: nil
+            )
+            otherWindowPoints = response.points
+            loadedWindow = window
+        } catch is CancellationError {
+            // Annulée ≠ vide : on garde ce qu'on avait plutôt que d'annoncer une
+            // absence de mesure qu'on n'a pas constatée.
             return
+        } catch {
+            otherWindowPoints = otherWindowPoints ?? []
         }
-        otherWindowPoints = response.points
-        loadedWindow = window
     }
 
     // MARK: Mesures de la box
@@ -369,6 +377,68 @@ struct SentinelleBoxView: View {
         .padding(.vertical, SQSpace.sm)
         .padding(.horizontal, SQSpace.md)
         .background(SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    }
+
+    // MARK: Attribution
+
+    /// À qui appartient cette box — modifiable APRÈS coup.
+    ///
+    /// Le champ n'existait que dans la feuille de création : une box ajoutée sans
+    /// étiquette ne pouvait plus jamais en recevoir. `SentinelleService.setOwner`
+    /// était écrit, documenté, et n'avait aucun appelant.
+    ///
+    /// L'étiquette n'est pas un rangement mais une question de langue : sur un
+    /// lien partagé, « Votre connexion est en ligne » est FAUX, celui qui lit
+    /// regarde la connexion de quelqu'un d'autre.
+    private func ownerCard(_ target: SentinelleTarget) -> some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                SentinelleSectionTitle(title: "À qui appartient cette connexion", systemImage: "person.crop.circle")
+                Text("Sert à parler juste sur un lien partagé : « Votre connexion » y serait faux.")
+                    .font(SQFont.body(12))
+                    .foregroundStyle(SQColor.labelSecondary)
+
+                SentinelleOwnerField(label: $ownerLabel, emoji: $ownerEmoji)
+
+                if ownerChanged(target) {
+                    HStack(spacing: SQSpace.sm) {
+                        Button("Annuler") {
+                            ownerLabel = target.ownerLabel ?? ""
+                            ownerEmoji = target.ownerEmoji ?? ""
+                        }
+                        .font(SQFont.body(14))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .padding(.vertical, SQSpace.sm)
+
+                        Spacer()
+
+                        Button("Enregistrer") {
+                            Task {
+                                try? await model.service.setOwner(
+                                    targetId: target.id,
+                                    ownerLabel: ownerLabel.isEmpty ? nil : ownerLabel,
+                                    ownerEmoji: ownerEmoji.isEmpty ? nil : ownerEmoji
+                                )
+                                await model.load(silently: true)
+                            }
+                        }
+                        .font(SQFont.body(14, .semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                        .padding(.vertical, SQSpace.sm)
+                        .padding(.horizontal, SQSpace.md)
+                        .background(SQColor.accentSoft, in: Capsule(style: .continuous))
+                    }
+                }
+            }
+        }
+        .task(id: target.id) {
+            ownerLabel = target.ownerLabel ?? ""
+            ownerEmoji = target.ownerEmoji ?? ""
+        }
+    }
+
+    private func ownerChanged(_ target: SentinelleTarget) -> Bool {
+        ownerLabel != (target.ownerLabel ?? "") || ownerEmoji != (target.ownerEmoji ?? "")
     }
 
     // MARK: Retrait

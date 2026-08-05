@@ -29,7 +29,14 @@ final class SentinelleViewModel: ObservableObject {
     /// suivie, elle rejoint `following` et l'invitation disparaît d'elle-même.
     @Published private(set) var sharedInvite: SentinelleSharedBox?
     /// Jeton porté par le lien d'arrivée, s'il y en a un.
+    /// Le lien à consulter, effacé dès la PREMIÈRE lecture : sans ça, la requête
+    /// repartait toutes les vingt secondes pour un lien déjà traité, à vie.
     var pendingShareSlug: String?
+    /// Le même jeton, conservé pour l'action « suivre » de l'invitation affichée.
+    private(set) var inviteSlug: String?
+    /// Un lien invalide ou expiré doit se DIRE : sinon l'app s'ouvre et il ne se
+    /// passe rien, ce qui est le pire retour pour qui vient de cliquer un lien.
+    var shareLinkError: String?
     @Published private(set) var errorMessage: String?
     @Published private(set) var lastRefresh: Date?
     @Published private(set) var isBusy = false
@@ -60,10 +67,23 @@ final class SentinelleViewModel: ObservableObject {
             following = response.following
         }
 
-        if let slug = pendingShareSlug, let box = try? await service.sharedBox(slug: slug) {
-            // Déjà suivie ou déjà à soi : rien à proposer. Un bouton « suivre »
-            // qui répondrait par une erreur n'a pas sa place.
-            sharedInvite = (box.isFollowing || box.isOwner) ? nil : box
+        // Le lien reçu ne se consulte qu'UNE fois. Il n'était jamais oublié :
+        // la requête repartait toutes les vingt secondes, à vie, pour un lien
+        // déjà traité. Et un lien invalide ou expiré ne disait RIEN — l'app
+        // s'ouvrait et il ne se passait simplement rien, ce qui est le pire
+        // retour possible pour quelqu'un qui vient de cliquer un lien reçu.
+        if let slug = pendingShareSlug {
+            pendingShareSlug = nil
+            inviteSlug = slug
+            do {
+                let box = try await service.sharedBox(slug: slug)
+                // Déjà suivie ou déjà à soi : rien à proposer. Un bouton « suivre »
+                // qui répondrait par une erreur n'a pas sa place.
+                sharedInvite = (box.isFollowing || box.isOwner) ? nil : box
+            } catch {
+                shareLinkError = "Ce lien de partage n’est plus valide. "
+                    + "Demandez-en un nouveau à la personne qui vous l’a envoyé."
+            }
         }
 
         do {
@@ -105,13 +125,24 @@ final class SentinelleViewModel: ObservableObject {
             incidents = collectedIncidents
             points = collectedPoints
             errorMessage = nil
+            // Écrit UNIQUEMENT en cas de succès, pour deux raisons.
+            //
+            // C'est d'abord la vérité : « dernière mise à jour » doit dater le
+            // dernier chargement RÉUSSI, pas la dernière tentative. Une API
+            // injoignable affichait « à l'instant » sur des données figées.
+            //
+            // C'est ensuite une question de coût : `lastRefresh` sert de clé aux
+            // `.task(id:)` de la page d'une box et de celle d'une adresse. Le
+            // réécrire à chaque cycle relançait ces tâches toutes les vingt
+            // secondes — avec trois box et une adresse ouverte, huit requêtes
+            // par cycle au lieu d'une.
+            lastRefresh = Date()
         } catch is SentinelleAccessDenied {
             accessDenied = true
         } catch {
             if !silently { errorMessage = error.localizedDescription }
         }
         isLoading = false
-        lastRefresh = Date()
     }
 
     /// Charge la liste, avec UNE seconde tentative.
@@ -137,7 +168,10 @@ final class SentinelleViewModel: ObservableObject {
     }
 
     func followPendingShare() async {
-        guard let slug = pendingShareSlug else { return }
+        // Le jeton se lit sur l'invitation affichée et non sur `pendingShareSlug`,
+        // qui est effacé dès la première lecture pour ne pas relancer la requête
+        // à chaque cycle.
+        guard let slug = inviteSlug else { return }
         await mutate { try await self.service.follow(shareInput: slug) }
     }
 
@@ -292,16 +326,21 @@ struct SentinelleView: View {
             }
         }
         .refreshable { await model.load(silently: true) }
-        .task {
+        // La boucle est attachée à la PHASE, pas au simple cycle de vie de la vue.
+        //
+        // Elle testait `scenePhase` à l'intérieur d'une `.task` lancée une seule
+        // fois : `scenePhase` étant un `@Environment` lu sur la valeur capturée à
+        // la création de la tâche, le test ne voyait jamais le changement et le
+        // sondage continuait en arrière-plan — l'inverse exact de ce que le
+        // commentaire affirmait. En mettant la phase en `id:`, SwiftUI annule et
+        // relance la tâche à chaque bascule, ce qui arrête vraiment la boucle.
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
             model.pendingShareSlug = initialShareSlug
             await model.load()
-            // Boucle de rafraîchissement. `.task` est annulée quand la vue
-            // disparaît, ce qui suffit à l'arrêter à la sortie de l'écran ;
-            // l'arrière-plan, lui, ne l'annule pas, d'où le test de phase :
-            // rien ne sert de relever des mesures que personne ne regarde.
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.refreshInterval)
-                guard !Task.isCancelled, scenePhase == .active else { continue }
+                guard !Task.isCancelled else { break }
                 await model.load(silently: true)
             }
         }

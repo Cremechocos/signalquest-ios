@@ -43,6 +43,10 @@ struct SentinelleAlertSettingsSheet: View {
         .task { await load() }
     }
 
+    /// Seuils proposés, identiques au web et à Android. 5 s en tête : c'est le
+    /// plancher que la sonde sait tenir, sa boucle tournant toutes les 5 s.
+    private static let thresholds = [5, 30, 120, 300, 900]
+
     @ViewBuilder
     private func form(_ current: SentinellePreferences) -> some View {
         Form {
@@ -51,6 +55,21 @@ struct SentinelleAlertSettingsSheet: View {
                     get: { current.notifyDown },
                     set: { value in save(SentinellePreferencesPatch(notifyDown: value)) }
                 ))
+                // Le seuil n'était qu'AFFICHÉ en pied de section, alors que le
+                // patch le supporte, que l'API l'accepte depuis 5 s et que le web
+                // le règle. Il compte plus qu'il n'y paraît : un redémarrage de
+                // box dure vingt à quarante secondes, donc au seuil d'une minute
+                // l'événement le plus courant ne déclenche jamais rien.
+                if current.notifyDown {
+                    Picker("Seuil de coupure", selection: Binding(
+                        get: { current.downThresholdSec },
+                        set: { value in save(SentinellePreferencesPatch(downThresholdSec: value)) }
+                    )) {
+                        ForEach(Self.thresholds, id: \.self) { seconds in
+                            Text(formatSeconds(seconds)).tag(seconds)
+                        }
+                    }
+                }
                 Toggle("Me prévenir au rétablissement", isOn: Binding(
                     get: { current.notifyUp },
                     set: { value in save(SentinellePreferencesPatch(notifyUp: value)) }
@@ -58,8 +77,8 @@ struct SentinelleAlertSettingsSheet: View {
             } header: {
                 Text("Notifications")
             } footer: {
-                Text("Au-delà de \(formatSeconds(current.downThresholdSec)). Une coupure plus courte "
-                     + "est enregistrée dans l’historique sans déclencher d’alerte.")
+                Text("Une coupure plus courte que ce seuil est enregistrée dans l’historique "
+                     + "sans déclencher d’alerte.")
             }
 
             Section {

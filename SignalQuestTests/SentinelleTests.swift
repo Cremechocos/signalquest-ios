@@ -251,3 +251,111 @@ final class SentinelleReadingTests: XCTestCase {
         XCTAssertTrue(empty.isEmpty)
     }
 }
+
+/// Ordre et regroupement de la liste des box.
+///
+/// `SentinelleListOrder.swift` affirme dans son en-tête que « les trois
+/// plateformes doivent trier IDENTIQUEMENT » et renvoie aux huit tests du web
+/// comme référence normative — sans qu'aucun test iOS ne le vérifie. Ce sont les
+/// mêmes cas que `list-order.test.ts` et que le portage Kotlin.
+final class SentinelleListOrderTests: XCTestCase {
+
+    private struct Box: SentinelleListOrder.Orderable {
+        let orderLabel: String
+        let orderStatus: String
+        var orderOperator: String?
+        var orderUptimePct: Double?
+    }
+
+    func testLeTriParEtatMetLePireEnTete() {
+        // C'est la raison d'ouvrir la page : une liste qui commence par ce qui va
+        // bien oblige à chercher ce qui ne va pas.
+        let boxes = [
+            Box(orderLabel: "saine", orderStatus: "up"),
+            Box(orderLabel: "inconnue", orderStatus: "unknown"),
+            Box(orderLabel: "morte", orderStatus: "down"),
+            Box(orderLabel: "moyenne", orderStatus: "degraded"),
+        ]
+        XCTAssertEqual(
+            SentinelleListOrder.sorted(boxes, by: .state).map(\.orderLabel),
+            ["morte", "moyenne", "inconnue", "saine"]
+        )
+    }
+
+    func testUneBoxSansMesurePasseEnQueueDuTriParDisponibilite() {
+        // Sans donnée elle n'est pas « parfaite », elle est inconnue : la placer
+        // devant une box à 91 % ferait passer l'ignorance pour une bonne nouvelle.
+        let boxes = [
+            Box(orderLabel: "sans mesure", orderStatus: "unknown", orderUptimePct: nil),
+            Box(orderLabel: "bonne", orderStatus: "up", orderUptimePct: 99.9),
+            Box(orderLabel: "mediocre", orderStatus: "degraded", orderUptimePct: 91.0),
+        ]
+        XCTAssertEqual(
+            SentinelleListOrder.sorted(boxes, by: .uptime).map(\.orderLabel),
+            ["mediocre", "bonne", "sans mesure"]
+        )
+    }
+
+    func testLOperateurInconnuFormeUnGroupePlaceEnDernier() {
+        // Les fondre dans un groupe existant serait un mensonge ; les cacher
+        // ferait disparaître une connexion de la liste.
+        let boxes = [
+            Box(orderLabel: "x", orderStatus: "up", orderOperator: nil),
+            Box(orderLabel: "y", orderStatus: "up", orderOperator: "SFR"),
+            Box(orderLabel: "z", orderStatus: "up", orderOperator: "FREE"),
+        ]
+        let buckets = SentinelleListOrder.grouped(boxes, by: .operatorKey, sort: .name)
+        XCTAssertEqual(buckets.map(\.key), ["FREE", "SFR", SentinelleListOrder.unknownOperator])
+    }
+
+    func testLeTriDemandeSAppliqueDansChaqueGroupe() {
+        let boxes = [
+            Box(orderLabel: "sfr-saine", orderStatus: "up", orderOperator: "SFR"),
+            Box(orderLabel: "sfr-morte", orderStatus: "down", orderOperator: "SFR"),
+            Box(orderLabel: "free-saine", orderStatus: "up", orderOperator: "FREE"),
+        ]
+        let buckets = SentinelleListOrder.grouped(boxes, by: .operatorKey, sort: .state)
+        let sfr = buckets.first { $0.key == "SFR" }
+        XCTAssertEqual(sfr?.boxes.map(\.orderLabel), ["sfr-morte", "sfr-saine"])
+    }
+
+    func testSansRegroupementLaCleEstNulle() {
+        let boxes = [Box(orderLabel: "b", orderStatus: "up"), Box(orderLabel: "a", orderStatus: "down")]
+        let buckets = SentinelleListOrder.grouped(boxes, by: .none, sort: .state)
+        XCTAssertEqual(buckets.count, 1)
+        XCTAssertNil(buckets[0].key)
+        XCTAssertEqual(buckets[0].boxes.map(\.orderLabel), ["a", "b"])
+    }
+}
+
+/// Extraction du jeton d'un lien de partage.
+///
+/// `SentinelleShareLink.swift` annonce une parité stricte avec Android sans
+/// qu'aucun test ne la vérifie — alors que c'est le premier geste de quelqu'un
+/// qui vient de recevoir un lien par message.
+final class SentinelleShareLinkTests: XCTestCase {
+
+    func testUneUrlComplete() {
+        XCTAssertEqual(
+            SentinelleShareLink.extractSlug("https://signalquest.fr/sentinelle/p/AbC123xyz"),
+            "AbC123xyz"
+        )
+    }
+
+    func testUnJetonNu() {
+        // On accepte le code seul : exiger « extrayez le jeton » serait une
+        // demande gratuite adressée à quelqu'un qui vient de coller un message.
+        XCTAssertEqual(SentinelleShareLink.extractSlug("AbC123xyz"), "AbC123xyz")
+    }
+
+    func testLesEspacesEtLaPonctuationSontRognes() {
+        XCTAssertEqual(
+            SentinelleShareLink.extractSlug("  https://signalquest.fr/sentinelle/p/AbC123xyz  "),
+            "AbC123xyz"
+        )
+    }
+
+    func testUneChaineVideNeDonneRien() {
+        XCTAssertNil(SentinelleShareLink.extractSlug("   "))
+    }
+}

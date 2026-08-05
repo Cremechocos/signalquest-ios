@@ -563,19 +563,26 @@ struct SentinelleAddressView: View {
             points = nil
             selected = nil
         }
-        guard let response = try? await model.service.series(
-            targetId: targetId, window: window, family: family
-        ) else {
-            points = points ?? []
+        do {
+            let response = try await model.service.series(
+                targetId: targetId, window: window, family: family
+            )
+            // Filtre REFAIT sur le champ `family` de chaque point : un serveur qui
+            // ignorerait le paramètre renverrait les deux piles mélangées, et une
+            // IPv6 morte se dissoudrait dans les mesures IPv4 — exactement la panne
+            // que cet écran doit rendre visible.
+            points = response.family == nil ? response.points.inFamily(family) : response.points
+            servedFamily = response.family
+            loadedWindow = window
+        } catch is CancellationError {
+            // Une tâche ANNULÉE n'a rien appris. Elle laissait pourtant un
+            // tableau vide, et l'écran annonçait « Aucune mesure sur cette
+            // période. La sonde en produit une par minute. » — une affirmation
+            // fausse, sur la foi d'un simple changement de fenêtre.
             return
+        } catch {
+            points = points ?? []
         }
-        // Filtre REFAIT sur le champ `family` de chaque point : un serveur qui
-        // ignorerait le paramètre renverrait les deux piles mélangées, et une
-        // IPv6 morte se dissoudrait dans les mesures IPv4 — exactement la panne
-        // que cet écran doit rendre visible.
-        points = response.family == nil ? response.points.inFamily(family) : response.points
-        servedFamily = response.family
-        loadedWindow = window
     }
 
     /// Les lectures longues ne sont chargées qu'à l'ouverture de leur onglet :
