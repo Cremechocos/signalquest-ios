@@ -1,4 +1,8 @@
 import SwiftUI
+// `UIApplication.connectedScenes` : depuis que le manifeste autorise plusieurs
+// scènes (CarPlay, fenêtres iPad), le cycle de vie ne peut plus se déduire du
+// seul `scenePhase` d'une vue. Voir « Cycle de vie de la scène » plus bas.
+import UIKit
 
 @MainActor
 final class AppServices: ObservableObject {
@@ -148,6 +152,62 @@ final class AppServices: ObservableObject {
         }
     }
 
+    // MARK: - Amorçage partagé
+
+    private var bootstrapTask: Task<Void, Never>?
+
+    /// Amorçage de session, appelable depuis TOUS les points d'entrée — la
+    /// fenêtre SwiftUI comme la scène CarPlay. Idempotent et coalescé : les
+    /// appelants concurrents attendent le même travail au lieu de le refaire.
+    ///
+    /// Il vivait auparavant dans le seul `.task` d'`AppRootView`, ce qui
+    /// supposait qu'une fenêtre finisse toujours par apparaître. CarPlay casse
+    /// cette hypothèse : au branchement du véhicule, iOS lance l'app en
+    /// arrière-plan et peut ne connecter QUE la scène du véhicule. Sans ce
+    /// point d'entrée, `session.state` resterait sur `.checking` et l'interface
+    /// CarPlay s'ouvrirait sans utilisateur authentifié.
+    ///
+    /// Corollaire utile sur iPad : deux fenêtres ne lancent plus deux
+    /// `bootstrap()` concurrents sur le même modèle de session.
+    func bootstrapIfNeeded(session: AuthSessionViewModel) async {
+        if let bootstrapTask { return await bootstrapTask.value }
+        let task = Task { @MainActor in
+            networkPath.start()
+            await session.bootstrap()
+        }
+        bootstrapTask = task
+        await task.value
+    }
+
+    // MARK: - Multi-scènes
+
+    /// Vrai tant qu'une scène CarPlay est connectée au véhicule.
+    private(set) var isCarPlayConnected = false
+
+    func setCarPlayConnected(_ connected: Bool) {
+        isCarPlayConnected = connected
+    }
+
+    /// Reste-t-il une fenêtre visible ? (La scène CarPlay n'en est pas une :
+    /// elle n'est pas une `UIWindowScene`, et son cas est traité par
+    /// `isCarPlayConnected`.)
+    ///
+    /// `scenePhase` est par scène, alors que ce graphe, `AppLockController` et
+    /// `livePresence` sont uniques au process. Depuis que plusieurs scènes
+    /// coexistent, masquer une fenêtre iPad ne doit plus couper la présence de
+    /// celle qui reste visible — ni la verrouiller.
+    ///
+    /// On lit l'état réel des scènes plutôt que de tenir un compteur : une scène
+    /// détruite en arrière-plan ne décrémenterait rien, et le compteur finirait
+    /// par empêcher toute coupure. UIKit met `activationState` à jour avant de
+    /// notifier le passage en arrière-plan, donc la scène appelante est déjà
+    /// comptée comme partie quand on interroge ici.
+    var hasVisibleWindowScene: Bool {
+        UIApplication.shared.connectedScenes.contains { scene in
+            scene is UIWindowScene && scene.activationState != .background
+        }
+    }
+
     // MARK: - Cycle de vie de la scène
 
     /// Passage en arrière-plan : coupe les boucles réseau qui n'ont plus de
@@ -171,7 +231,13 @@ final class AppServices: ObservableObject {
         // même pendant un drive test ou un appel, sinon le dernier lot meurt
         // avec l'app. C'est un seul POST, sans incidence sur la batterie.
         Task { [feedSignals] in await feedSignals.flushNow() }
-        guard !location.wantsTracking, callManager.activeCall == nil else { return }
+        // `isCarPlayConnected` rejoint la même logique que le drive test et
+        // l'appel en cours : l'écran du véhicule affiche l'app, donc l'activité
+        // de fond est voulue — couper la présence pendant que l'utilisateur
+        // roule reviendrait à le faire disparaître de la carte de ses amis.
+        guard !location.wantsTracking,
+              callManager.activeCall == nil,
+              !isCarPlayConnected else { return }
         livePresence.setAppActive(false)
     }
 

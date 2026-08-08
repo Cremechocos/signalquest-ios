@@ -115,6 +115,9 @@ struct SettingsView: View {
     @AppStorage(AppLockSettings.enabledKey) private var appLockEnabled = false
     @AppStorage(AppLockSettings.lockGraceKey) private var lockGraceSeconds = 0.0
     @AppStorage(SQOledPalette.storageKey) private var pureBlack = false
+    /// Désactivé par défaut : une alerte non sollicitée au volant est au mieux
+    /// une nuisance, et personne ne doit la découvrir en sursautant.
+    @AppStorage(CarPlayAlertSettings.coverageAlertsKey) private var carPlayCoverageAlerts = false
     @AppStorage(AppLockSettings.autoLogoutKey) private var autoLogoutSeconds = 0.0
     @AppStorage(E2EEBiometric.enabledKey) private var e2eeBiometricEnabled = false
     @Environment(\.colorScheme) private var colorScheme
@@ -188,6 +191,18 @@ struct SettingsView: View {
                     .foregroundStyle(SQColor.labelSecondary)
             } header: {
                 Text("Apparence")
+            }
+            .listRowBackground(SQColor.surface)
+            Section {
+                Toggle(isOn: $carPlayCoverageAlerts) {
+                    settingsLabel("Alerte zone mal couverte", systemImage: "car.fill")
+                }
+                .tint(SQColor.brandRed)
+                Text("Sur l'écran de la voiture, te signale quand tu traverses une zone où le réseau est mauvais. Au maximum une alerte toutes les 10 minutes, jamais deux fois la même zone, et rien pendant une manœuvre annoncée.")
+                    .font(SQFont.body(12))
+                    .foregroundStyle(SQColor.labelSecondary)
+            } header: {
+                Text("CarPlay")
             }
             .listRowBackground(SQColor.surface)
             if BiometricAuth.isAvailable {

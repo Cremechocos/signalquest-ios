@@ -40,6 +40,13 @@ output/
 .env
 .env.local
 
+# Surcharges de build locales, par poste (inclus par Config/Debug.xcconfig via
+# `#include?`, donc facultatif). Sert notamment à pointer SQ_ENTITLEMENTS sur
+# SignalQuest.CarPlay.entitlements pour tester la scène CarPlay au simulateur :
+# la clé CarPlay ferait échouer la signature d'un build sur appareil tant
+# qu'Apple ne l'a pas accordée, elle ne doit donc jamais être commitée.
+Config/Local.xcconfig
+
 # Identifiants de comptes de test — NE JAMAIS committer (rotation backend requise)
 # Artefacts de QA/interop locaux : captures de mocks + harnais E2EE (contient du
 # matériel de test sensible). Ne doivent jamais être suivis dans un repo public.

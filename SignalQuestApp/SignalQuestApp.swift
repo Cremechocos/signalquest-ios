@@ -16,9 +16,13 @@ struct SignalQuestApp: App {
     @AppStorage(SQOledPalette.storageKey) private var pureBlack = false
 
     init() {
-        let services = AppServices()
-        _services = StateObject(wrappedValue: services)
-        _session = StateObject(wrappedValue: AuthSessionViewModel(service: services.auth))
+        // Le graphe vient du holder plutôt que d'être construit ici : une scène
+        // CarPlay peut se connecter AVANT cette fenêtre (app lancée en
+        // arrière-plan au branchement du véhicule) et doit partager exactement
+        // le même `AppServices` — deux graphes signifieraient deux `APIClient`,
+        // donc deux jeux de cookies et deux refresh concurrents sur 401.
+        _services = StateObject(wrappedValue: AppServicesHolder.services)
+        _session = StateObject(wrappedValue: AppServicesHolder.session)
         Self.configureNavigationTypography()
     }
 
@@ -137,10 +141,14 @@ struct AppRootView: View {
             .environmentObject(services.versionPolicy)
             .environmentObject(appLock)
             .task {
-                services.networkPath.start()
-                AppDelegate.sharedPush = services.push
-                AppDelegate.sharedCallManager = services.callManager
-                AppDelegate.sharedE2EE = services.e2ee
+                // `networkPath.start()` et `session.bootstrap()` ont migré dans
+                // `bootstrapIfNeeded` : la scène CarPlay a besoin des deux, et
+                // elle peut se connecter sans qu'aucune fenêtre n'apparaisse.
+                // Les ponts `AppDelegate.shared*` sont désormais posés par
+                // `AppServicesHolder` à la construction du graphe — donc avant
+                // le premier rendu, là où ils arrivaient trop tard pour une push
+                // silencieuse reçue au lancement.
+                //
                 // PushKit doit être prêt avant tout `await` de bootstrap : au
                 // lancement à froid provoqué par une push VoIP, retarder la
                 // création du registre peut faire expirer le watchdog avant
@@ -151,7 +159,7 @@ struct AppRootView: View {
                 // bootstrap pour ne pas rallonger le démarrage. Un échec
                 // laisse l'état à `.unknown`, donc l'app fonctionne.
                 Task { await services.versionPolicy.refresh() }
-                await session.bootstrap()
+                await services.bootstrapIfNeeded(session: session)
                 await registerPushIfAuthenticated(session.state)
                 // Verrouillage biométrique à l'ouverture (si activé + authentifié).
                 if case .authenticated = session.state { appLock.lockOnActivationIfNeeded() }
@@ -197,6 +205,18 @@ struct AppRootView: View {
                     }
                     services.enterForeground()
                 case .background:
+                    // On ne coupe QUE si plus aucune fenêtre n'est visible.
+                    // `scenePhase` est par scène, mais `appLock` et `services`
+                    // sont uniques au process : depuis que plusieurs scènes
+                    // coexistent, masquer une fenêtre iPad verrouillait celle
+                    // restée à l'écran — et pouvait même déconnecter la session
+                    // via le délai d'inactivité de `willEnterForeground()`.
+                    //
+                    // Ne pas appeler `didEnterBackground()` laisse
+                    // `backgroundedAt` à nil, ce qui rend le retour au premier
+                    // plan de l'autre fenêtre inoffensif : sa garde anti-boucle
+                    // s'en charge déjà. Corriger ce seul cas suffit donc.
+                    guard !services.hasVisibleWindowScene else { break }
                     appLock.didEnterBackground()
                     services.enterBackground()
                 default:

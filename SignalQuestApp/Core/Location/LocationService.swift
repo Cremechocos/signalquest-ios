@@ -30,6 +30,27 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     /// Mis à nil par l'appelant en fin de session (drive test).
     var onLocationUpdate: (@MainActor (CLLocation) -> Void)?
 
+    /// Abonnés supplémentaires aux positions.
+    ///
+    /// `onLocationUpdate` est un emplacement UNIQUE : le drive test s'y installe
+    /// et le libère en fin de session. Depuis que le guidage CarPlay suit lui
+    /// aussi la position, deux consommateurs peuvent coexister — et l'écraser
+    /// ferait perdre ses fixes à un drive test en cours, sans la moindre erreur.
+    /// Même motif que `headingSubscribers` : on compte les abonnés au lieu de
+    /// supposer qu'il n'y en a qu'un.
+    private var locationObservers: [UUID: @MainActor (CLLocation) -> Void] = [:]
+
+    @discardableResult
+    func addLocationObserver(_ handler: @escaping @MainActor (CLLocation) -> Void) -> UUID {
+        let token = UUID()
+        locationObservers[token] = handler
+        return token
+    }
+
+    func removeLocationObserver(_ token: UUID) {
+        locationObservers[token] = nil
+    }
+
     /// Cap de l'appareil en degrés (0 = nord géographique), `nil` tant que
     /// personne ne l'a demandé ou si le magnétomètre est indisponible ou non
     /// calibré. Sert à orienter une visée : une flèche qui tourne avec le
@@ -188,7 +209,13 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         Task { @MainActor in
             lastLocation = locations.last
             errorMessage = nil
-            if let last = locations.last { onLocationUpdate?(last) }
+            if let last = locations.last {
+                onLocationUpdate?(last)
+                // Copie avant itération : un abonné qui se désabonne depuis son
+                // propre handler (arrivée à destination, par exemple) muterait
+                // le dictionnaire en cours de parcours.
+                for observer in Array(locationObservers.values) { observer(last) }
+            }
             locationContinuation?.resume(returning: locations.last)
             locationContinuation = nil
         }
