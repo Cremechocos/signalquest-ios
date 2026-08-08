@@ -25,6 +25,9 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
     case sbg = "sbg"
     case gra = "gra"
     case bom = "bom"
+    /// Legacy : OVH n'expose plus à Beauharnois que 5208/5209, et ces daemons
+    /// acceptent le TCP sans jamais répondre au handshake iPerf3 — POP retiré du
+    /// catalogue, migre vers Auto.
     case bhs = "bhs"
     case us = "us"
     // Bouygues Telecom iPerf (BBR / CUBIC) — poi.cubic retiré du sélecteur (host down)
@@ -84,8 +87,9 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
             + [.libreSpeed]
     }
 
+    /// Hosts OVH sains (Beauharnois exclu du sélecteur : TCP ouvert, iPerf3 muet).
     static var ovhCases: [SpeedtestDownloadTarget] {
-        [.rbx, .sbg, .gra, .bom, .bhs, .us]
+        [.rbx, .sbg, .gra, .bom, .us]
     }
 
     /// Hosts Bouygues sains (poi.cubic exclu du sélecteur).
@@ -144,7 +148,7 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
     /// Migration douce : CDN legacy + host bytel mort → « Auto ».
     var migrated: SpeedtestDownloadTarget {
         switch self {
-        case .cloudflareR2, .awsCloudFront, .vpsInternal, .bytelPoiCubic:
+        case .cloudflareR2, .awsCloudFront, .vpsInternal, .bytelPoiCubic, .bhs:
             return .hybridAuto
         default:
             return self

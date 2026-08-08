@@ -2464,7 +2464,11 @@ let iperfPublicServers: [IPerfPublicServer] = {
         IPerfPublicServer(hostname: "sbg.proof.ovh.net", name: "Strasbourg (OVH SBG)", latitude: 48.573, longitude: 7.752, code: "SBG", countryCode: "FR", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
         IPerfPublicServer(hostname: "gra.proof.ovh.net", name: "Gravelines (OVH GRA)", latitude: 50.986, longitude: 2.124, code: "GRA", countryCode: "FR", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
         IPerfPublicServer(hostname: "bom.proof.ovh.net", name: "Mumbai (OVH YNM)", latitude: 19.076, longitude: 72.877, code: "YNM", countryCode: "IN", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
-        IPerfPublicServer(hostname: "bhs.proof.ovh.ca", name: "Beauharnois (OVH BHS)", latitude: 45.312, longitude: -73.875, code: "BHS", countryCode: "CA", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
+        // ⚠️ `bhs.proof.ovh.ca` (Beauharnois, QC) RETIRÉ : OVH n'y expose plus que
+        // 5208/5209, et ces deux daemons acceptent le TCP sans jamais répondre au
+        // handshake iPerf3. La sonde de joignabilité ne teste QUE le connect → le
+        // POP était élu, le ping TCP excellent, et le DL mourait sur timeout.
+        // Ashburn devient le POP nord-américain du catalogue.
         IPerfPublicServer(hostname: "proof.ovh.us", name: "Ashburn (OVH US)", latitude: 39.0438, longitude: -77.4874, code: "US", countryCode: "US", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
         // Bouygues Telecom (ports 9200–9240) — BBR & CUBIC (poi.cubic exclu)
         IPerfPublicServer(hostname: "paris.bbr.iperf.bytel.fr", name: "Paris BBR (Bouygues)", latitude: parisLat, longitude: parisLon, code: "PAR-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
@@ -2594,7 +2598,7 @@ private func iperfAutoPriorityBoost(_ server: IPerfPublicServer) -> Int {
 /// OVH `proof` brident fortement leur egress (débit DL très sous-évalué,
 /// asymétrie DL/UL ×10 constatée en test), donc on ne les retient que si aucun
 /// POP non-OVH n'est raisonnablement proche — typiquement un voyage hors Europe
-/// où OVH (Beauharnois / Ashburn / Mumbai) est le seul iPerf3 du catalogue à
+/// où OVH (Ashburn / Mumbai) est le seul iPerf3 du catalogue à
 /// portée. En France/Europe, un POP Bouygues/MilkyWan/Scaleway passe devant.
 /// N'affecte JAMAIS un choix MANUEL de serveur OVH (via `selectIPerfServer`).
 private func iperfProviderDistancePenaltyKm(_ server: IPerfPublicServer) -> Double {
@@ -2612,7 +2616,6 @@ func selectIPerfServer(for target: SpeedtestDownloadTarget, location: Coordinate
     case .sbg: host = "sbg.proof.ovh.net"
     case .gra: host = "gra.proof.ovh.net"
     case .bom: host = "bom.proof.ovh.net"
-    case .bhs: host = "bhs.proof.ovh.ca"
     case .us: host = "proof.ovh.us"
     case .bytelParisBbr: host = "paris.bbr.iperf.bytel.fr"
     case .bytelParisCubic: host = "paris.cubic.iperf.bytel.fr"
@@ -2641,7 +2644,7 @@ func selectIPerfServer(for target: SpeedtestDownloadTarget, location: Coordinate
     case .init7: host = "speedtest.init7.net"
     // .cloudflare n'est pas un serveur iPerf3 : le moteur HTTPS est choisi en
     // amont dans run() ; ici on retombe sur le plus proche par sécurité.
-    case .hybridAuto, .cloudflare, .libreSpeed, .bytelPoiCubic, .cloudflareR2, .awsCloudFront, .vpsInternal:
+    case .hybridAuto, .cloudflare, .libreSpeed, .bytelPoiCubic, .bhs, .cloudflareR2, .awsCloudFront, .vpsInternal:
         host = nil
     }
     if let host, let server = iperfPublicServers.first(where: { $0.hostname == host }) {

@@ -42,6 +42,26 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
     /// « 5G / 4G / 3G / 2G » par `normalizedTechnologies`, le test est donc sûr.
     var has5G: Bool { technologies.contains("5G") }
 
+    /// Les secteurs de CET opérateur sur le support.
+    ///
+    /// Sur un support partagé, la tuile ne met dans `azimuths` que ceux du
+    /// PREMIER opérateur fusionné — le reste est dans `azimuthsByOperator`. S'en
+    /// servir tel quel pour un autre opérateur affichait donc la fiche du
+    /// premier : même lobe, même rose, même compte de secteurs, quel que soit
+    /// l'opérateur choisi.
+    ///
+    /// Le backend n'émet `azimuthsByOperator` que sur un support réellement
+    /// partagé, et n'y met que les opérateurs dont il connaît les secteurs : une
+    /// clé absente de ce dictionnaire non vide veut dire « pas d'azimut publié
+    /// pour lui », pas « prends ceux du voisin ».
+    func azimuths(for operatorKey: String) -> [Double] {
+        guard !azimuthsByOperator.isEmpty else { return azimuths }
+        let key = operatorKey.trimmingCharacters(in: .whitespaces).uppercased()
+        guard !key.isEmpty, key != "ALL" else { return azimuths }
+        guard let scoped = azimuthsByOperator.first(where: { $0.key.uppercased() == key })?.value else { return [] }
+        return Self.normalizedAzimuths(scoped)
+    }
+
     /// A site is mappable only with finite, in-range coordinates that aren't the
     /// 0,0 "null island" placeholder.
     var hasValidCoordinate: Bool {
@@ -325,6 +345,17 @@ struct AntennaCoreDetails: Decodable, Equatable {
     let zbLeader: String?
     let technologies: [String]
     let azimuts: [Double]
+    /// Directions des faisceaux hertziens — les paraboles point-à-point qui
+    /// raccordent le site au réseau. Elles sont volontairement ABSENTES de
+    /// `azimuts` : un FH ne dessert personne, le compter en secteur fausserait
+    /// la couverture. Champ additif : vide sur un backend antérieur, et la fiche
+    /// retombe alors sur le seul `technical.hasFh` (« oui, mais on ne sait pas
+    /// où »).
+    let azimutsFh: [Double]
+    /// Le détail de chaque faisceau (parabole, site visé). Vide sur un backend
+    /// qui ne sert que `azimutsFh` : la fiche retombe alors sur les directions
+    /// seules, ce qu'elle sait déjà afficher.
+    let fhLinks: [AntennaFhLink]
     let technical: AntennaTechnicalInfo
     let frequencyBands: [String]
     let radioCarriers: [AntennaRadioCarrier]
@@ -392,6 +423,19 @@ struct AntennaCoreDetails: Decodable, Equatable {
         return raw.contains("projet") || raw.contains("prévu") || raw.contains("octroy")
     }
 
+    /// Le site relaie-t-il en hertzien ? Les deux sources disent la même chose à
+    /// deux niveaux de précision : le drapeau du registre sait QUE, les azimuts
+    /// savent OÙ. L'un suffit à l'affirmer.
+    var hasFhLink: Bool {
+        !azimutsFh.isEmpty || !fhLinks.isEmpty || technical.hasFh == true
+    }
+
+    /// Les faisceaux à afficher, quel que soit ce que le backend sait en dire :
+    /// le détail complet s'il l'a, sinon les seules directions.
+    var fhBeams: [AntennaFhLink] {
+        fhLinks.isEmpty ? azimutsFh.map { AntennaFhLink(azimuth: $0) } : fhLinks
+    }
+
     var fullAddress: String? {
         let values = [address, postalCode, commune]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -433,7 +477,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, supId, siteKey, anfrCode, market, rawLicenseeName, lat, lng, address, commune, postalCode, operators, operatorScope, operatorFacets, sharingKind, crozonLeader, zbLeader, technologies, azimuts, technical, frequencyBands, radioCarriers, cellIdentifiers, siteInfo
-        case status, technologiesInProject, sectorSystems
+        case status, technologiesInProject, sectorSystems, azimutsFh, fhLinks
         case isCustomSite, validationStatus, source, displayName, description
     }
 
@@ -480,6 +524,9 @@ struct AntennaCoreDetails: Decodable, Equatable {
         zbLeader = c.decodeFlexibleString(forKey: .zbLeader)
         technologies = c.decodeLossyArray([String].self, forKey: .technologies)
         azimuts = c.decodeLossyArray([Double].self, forKey: .azimuts)
+        azimutsFh = c.decodeLossyArray([Double].self, forKey: .azimutsFh)
+        fhLinks = c.decodeLossyArray([AntennaFhLink].self, forKey: .fhLinks)
+            .sorted { $0.azimuth < $1.azimuth }
         technical = (try? c.decode(AntennaTechnicalInfo.self, forKey: .technical)) ?? AntennaTechnicalInfo()
         frequencyBands = c.decodeLossyArray([String].self, forKey: .frequencyBands)
         radioCarriers = c.decodeLossyArray([AntennaRadioCarrier].self, forKey: .radioCarriers)
@@ -495,6 +542,41 @@ struct AntennaCoreDetails: Decodable, Equatable {
         source = c.decodeFlexibleString(forKey: .source)
         displayName = c.decodeFlexibleString(forKey: .displayName)
         description = c.decodeFlexibleString(forKey: .description)
+    }
+}
+
+/// Un faisceau hertzien du site : sa direction, sa parabole, et le site qu'il
+/// vise à l'autre bout du bond.
+struct AntennaFhLink: Decodable, Equatable, Identifiable {
+    var id: Double { azimuth }
+    let azimuth: Double
+    /// Diamètre de la parabole en mètres (0,3 / 0,6 / 1,2 m le plus souvent).
+    /// Il dit la portée du bond : plus l'assiette est grande, plus il va loin.
+    let dishMeters: Double?
+    /// L'autre extrémité du bond — **déduite**, jamais publiée.
+    ///
+    /// Le registre n'écrit nulle part vers quoi une parabole pointe : le backend
+    /// apparie celles qui se répondent. C'est fiable mais pas certain, et
+    /// l'interface doit le présenter comme une déduction. `nil` veut dire « pas
+    /// de partenaire réciproque trouvé », pas « ce faisceau ne va nulle part ».
+    let target: Target?
+
+    struct Target: Decodable, Equatable {
+        let supId: String
+        let anfrCode: String
+        let operatorName: String
+        let distanceKm: Double
+
+        enum CodingKeys: String, CodingKey {
+            case supId, anfrCode, distanceKm
+            case operatorName = "operator"
+        }
+    }
+
+    init(azimuth: Double, dishMeters: Double? = nil, target: Target? = nil) {
+        self.azimuth = azimuth
+        self.dishMeters = dishMeters
+        self.target = target
     }
 }
 

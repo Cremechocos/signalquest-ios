@@ -161,6 +161,13 @@ final class AntennaSightViewModel: ObservableObject {
 struct AntennaSightCard: View {
     let site: AntennaSite
     let details: AntennaDetails?
+    /// Secteurs à utiliser tant que la fiche détaillée n'a pas répondu.
+    ///
+    /// C'est l'appelant qui les scope sur l'opérateur affiché : sur un support
+    /// partagé, `site.azimuths` ne porte que ceux du premier opérateur fusionné,
+    /// et la boussole désignait donc le lobe d'un autre le temps du chargement —
+    /// c'est-à-dire à chaque bascule d'opérateur.
+    let fallbackAzimuths: [Double]
     /// Le service est OBSERVÉ, pas seulement lu.
     ///
     /// `AppServices` ne republie pas les changements de `LocationService` : une
@@ -175,9 +182,17 @@ struct AntennaSightCard: View {
     @State private var isRefreshing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(site: AntennaSite, details: AntennaDetails?, location: LocationService, tint: Color, terrain: TerrainServicing) {
+    init(
+        site: AntennaSite,
+        details: AntennaDetails?,
+        fallbackAzimuths: [Double],
+        location: LocationService,
+        tint: Color,
+        terrain: TerrainServicing
+    ) {
         self.site = site
         self.details = details
+        self.fallbackAzimuths = fallbackAzimuths
         self.location = location
         self.tint = tint
         _model = StateObject(wrappedValue: AntennaSightViewModel(terrain: terrain))
@@ -206,7 +221,7 @@ struct AntennaSightCard: View {
     /// Secteur du site le plus aligné sur l'utilisateur, et s'il le couvre.
     private var alignedSector: (azimuth: Double, offset: Double, inSector: Bool)? {
         guard let userLocation, let antenna = antennaCoordinate else { return nil }
-        let azimuths = (details?.core?.azimuts ?? []).isEmpty ? site.azimuths : (details?.core?.azimuts ?? [])
+        let azimuths = (details?.core?.azimuts ?? []).isEmpty ? fallbackAzimuths : (details?.core?.azimuts ?? [])
         return AntennaSectorGeometry.bestSector(antenna: antenna, azimuths: azimuths, user: userLocation.coordinate)
     }
 

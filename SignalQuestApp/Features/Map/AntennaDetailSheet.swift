@@ -306,8 +306,7 @@ struct AntennaDetailSheet: View {
     /// Azimuts connus (degrés arrondis) proposés comme « secteur concerné » dans
     /// le formulaire de signalement.
     private var reportSectors: [Int] {
-        let source = (model.details?.core?.azimuts ?? []).isEmpty ? site.azimuths : (model.details?.core?.azimuts ?? [])
-        return Array(Set(source.map { Int($0.rounded()) })).sorted()
+        Array(Set(displayedAzimuths.map { Int($0.rounded()) })).sorted()
     }
 
     /// Couleur de l'opérateur affiché (utilisée par l'éventail d'azimuts).
@@ -360,9 +359,10 @@ struct AntennaDetailSheet: View {
                     ForEach(site.operators, id: \.self) { op in
                         operatorTag(op)
                     }
-                    ForEach(site.technologies, id: \.self) { tech in
+                    ForEach(displayedTechnologies, id: \.self) { tech in
                         SQEditorialTag(text: tech, color: SQBrand.techColor(tech))
                     }
+                    fhTag
                     statusTag
                 }
                 .padding(.vertical, 1)
@@ -441,6 +441,18 @@ struct AntennaDetailSheet: View {
         return candidate
     }
 
+    /// Un pylône qui relaie en hertzien n'est pas un pylône comme un autre :
+    /// c'est un nœud du réseau, pas seulement un point de desserte. L'info
+    /// existait déjà, mais en « Oui » au fond de la section Technique repliée —
+    /// autant dire nulle part. En pastille neutre : elle se lit avec les autres
+    /// attributs du site sans se faire passer pour une technologie mobile.
+    @ViewBuilder
+    private var fhTag: some View {
+        if model.details?.core?.hasFhLink == true {
+            SQEditorialTag(text: "Relais hertzien", color: SQColor.labelSecondary)
+        }
+    }
+
     /// Badge de statut ANFR. Un site « Projet approuvé » est déclaré mais éteint :
     /// sans ce badge, la fiche laissait croire à une antenne en service.
     @ViewBuilder
@@ -463,6 +475,7 @@ struct AntennaDetailSheet: View {
             AntennaSightCard(
                 site: site,
                 details: model.details,
+                fallbackAzimuths: operatorAzimuths,
                 location: services.location,
                 tint: operatorColor,
                 terrain: services.terrain
@@ -525,9 +538,32 @@ struct AntennaDetailSheet: View {
         return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 
+    /// Secteurs de l'opérateur affiché. Le repli n'est PAS `site.azimuths` : sur
+    /// un support partagé, la tuile n'y met que ceux du premier opérateur
+    /// fusionné, et la fiche montrait donc les secteurs de SFR sous l'étiquette
+    /// d'Orange le temps que le détail réponde — à chaque bascule.
     private var displayedAzimuths: [Double] {
         let core = model.details?.core?.azimuts ?? []
-        return core.isEmpty ? site.azimuths : core
+        return core.isEmpty ? operatorAzimuths : core
+    }
+
+    private var operatorAzimuths: [Double] {
+        site.azimuths(for: selectedOperator)
+    }
+
+    /// Technologies de l'opérateur affiché.
+    ///
+    /// `site.technologies` est la FUSION du support : sur un site partagé, la
+    /// fiche de Bouygues (5G seule ici) affichait « 5G 4G » parce qu'un voisin a
+    /// de la 4G sur le même pylône. Le détail, lui, est déjà scopé opérateur ;
+    /// tant qu'il n'a pas répondu, `operators5G` permet au moins de ne pas
+    /// prêter la 5G d'un opérateur à un autre.
+    private var displayedTechnologies: [String] {
+        let core = model.details?.core?.technologies ?? []
+        if !core.isEmpty { return core }
+        guard !site.operators5G.isEmpty else { return site.technologies }
+        let has5G = site.operators5G.contains { $0.caseInsensitiveCompare(selectedOperator) == .orderedSame }
+        return has5G ? site.technologies : site.technologies.filter { $0 != "5G" }
     }
 
     /// Tag opérateur. Sur un site partagé, il devient un bouton de bascule :
@@ -612,6 +648,7 @@ struct AntennaDetailSheet: View {
             azimuths: displayedAzimuths,
             siteBands: (details.core?.frequencyBands ?? []).isEmpty ? details.bands : (details.core?.frequencyBands ?? []),
             sectorSystems: details.core?.sectorSystems ?? [],
+            fhBeams: details.core?.fhBeams ?? [],
             technologies: (details.core?.technologies ?? []).isEmpty ? details.technologies : (details.core?.technologies ?? []),
             projectBands: details.core?.technologiesInProject ?? [],
             antennaHeightMeters: details.core?.siteInfo.radiatingHeightMeters,
@@ -750,7 +787,15 @@ struct AntennaDetailSheet: View {
                 detailRow("Types d'antennes", core.siteInfo.antennaTypes.prefix(6).joined(separator: " · "))
                 detailRow("Propriétaire", core.siteInfo.supportOwner ?? core.rawLicenseeName)
                 detailRow("Secteurs", core.siteInfo.sectorCount.map(String.init))
-                detailRow("Faisceau hertzien", core.technical.hasFh.map { $0 ? "Oui" : "Non" })
+                // « Oui » ne disait rien : ni combien, ni où. Quand le registre
+                // publie les directions, on les donne ; sinon on garde le seul
+                // fait connu, mais formulé — pas en booléen.
+                detailRow(
+                    "Faisceau hertzien",
+                    core.fhBeams.isEmpty
+                        ? core.technical.hasFh.map { $0 ? String(localized: "Oui, direction non publiée") : String(localized: "Aucun") }
+                        : core.fhBeams.prefix(12).map { "\(Int($0.azimuth.rounded()))°" }.joined(separator: " · ")
+                )
                 detailRow("Statut", core.displayStatus)
                 ForEach(lifecycleDates(core), id: \.0) { label, value in
                     detailRow(label, value)
@@ -987,6 +1032,12 @@ private struct AntennaSectionHeader: View {
 /// orienté selon son azimut (0° = nord), coloré avec la couleur opérateur.
 struct AzimuthFanView: View {
     let azimuths: [Double]
+    /// Faisceaux hertziens : mêmes directions, tout autre métier. Un secteur
+    /// arrose un quartier, un FH vise une seule antenne à des kilomètres. Les
+    /// dessiner en cône coloré comme les autres laisserait croire à de la
+    /// couverture ; les taire laissait un pylône dont on ne comprend pas la
+    /// moitié des paraboles.
+    var fhAzimuths: [Double] = []
     let color: Color
 
     var body: some View {
@@ -1045,11 +1096,44 @@ struct AzimuthFanView: View {
                 )
             }
 
+            // Faisceaux hertziens : une aiguille, pas un cône. Un trait fin qui
+            // part du centre, franchit le cercle — le lien continue bien au-delà
+            // du site — et se termine par une courte barre perpendiculaire : la
+            // parabole vue de côté. Aucune icône, juste la géométrie du bond.
+            for azimuth in fhAzimuths.prefix(8) {
+                let radians = (azimuth - 90) * .pi / 180
+                let dx = CGFloat(cos(radians))
+                let dy = CGFloat(sin(radians))
+                let tip = CGPoint(x: center.x + dx * (radius + 7), y: center.y + dy * (radius + 7))
+
+                var needle = Path()
+                needle.move(to: CGPoint(x: center.x + dx * 5, y: center.y + dy * 5))
+                needle.addLine(to: tip)
+                context.stroke(
+                    needle,
+                    with: .color(color.opacity(0.75)),
+                    style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [3, 2.5])
+                )
+
+                // La barre du bout, perpendiculaire à l'axe : elle donne
+                // l'échelle du trait et le distingue au premier coup d'œil.
+                var dish = Path()
+                dish.move(to: CGPoint(x: tip.x - dy * 4.5, y: tip.y + dx * 4.5))
+                dish.addLine(to: CGPoint(x: tip.x + dy * 4.5, y: tip.y - dx * 4.5))
+                context.stroke(
+                    dish,
+                    with: .color(color.opacity(0.85)),
+                    style: StrokeStyle(lineWidth: 1.6, lineCap: .round)
+                )
+            }
+
             // Point central (le support)
             let dot = Path(ellipseIn: CGRect(x: center.x - 3.5, y: center.y - 3.5, width: 7, height: 7))
             context.fill(dot, with: .color(color))
         }
-        .accessibilityLabel("Éventail des azimuts des secteurs")
+        .accessibilityLabel(fhAzimuths.isEmpty
+            ? Text("Éventail des azimuts des secteurs")
+            : Text("Éventail des azimuts : \(azimuths.count) secteurs et \(fhAzimuths.count) faisceaux hertziens"))
     }
 }
 
