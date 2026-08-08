@@ -242,10 +242,22 @@ struct AntennaDetailSheet: View {
         )
     }
 
-    /// Ouvre Plan avec un itinéraire. Le nom du site sert d'étiquette pour que
-    /// la destination soit reconnaissable dans l'app Plan.
+    /// Ouvre un itinéraire vers le site.
+    ///
+    /// Quand un véhicule CarPlay est branché, la destination lui est envoyée :
+    /// le guidage se fait alors sur NOTRE carte, antennes et lobes visibles
+    /// par-dessus la route. Passer par Plan dans ce cas ferait basculer l'écran
+    /// du véhicule sur une autre app et perdrait tout l'intérêt.
+    ///
+    /// Hors CarPlay, comportement inchangé : Plan, avec le nom du site comme
+    /// étiquette pour que la destination y soit reconnaissable.
     private func openRoute(to coordinate: CLLocationCoordinate2D) {
         Haptics.light()
+        if services.isCarPlayConnected {
+            CarPlayDestinationStore.record(title: headerTitle, coordinate: coordinate)
+            CarPlayDashboardRoute.request(.map)
+            return
+        }
         let placemark = MKPlacemark(coordinate: coordinate)
         let item = MKMapItem(placemark: placemark)
         item.name = headerTitle

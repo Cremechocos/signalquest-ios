@@ -41,6 +41,9 @@ final class CarPlayCoordinator {
     /// une manœuvre est imminente.
     private var lastProgress: RouteProgress?
     private var voiceGuide: CarPlayVoiceGuide?
+    /// Retenu ici : `CPSearchTemplate.delegate` est faible, un contrôleur local
+    /// serait libéré avant la première frappe.
+    private var searchController: CarPlaySearchController?
     /// Conservées pour recomposer la barre : « Arrêter » n'apparaît que pendant
     /// un guidage, donc les boutons changent en cours de route.
     private var mapActions: CarPlayMapTemplateBuilder.Actions?
@@ -249,7 +252,11 @@ final class CarPlayCoordinator {
         interface.push(LayersGridBuilder.make(
             current: MapFilterStore.lastFilters() ?? MapFilterStore.defaultFilters,
             onToggle: { [weak self] kind in self?.toggleLayer(kind) },
-            onSentinelle: { [weak self] in self?.showSentinelle() }
+            onSentinelle: { [weak self] in self?.showSentinelle() },
+            // Recherche seulement en mode carte : sans `CPMapTemplate`, il n'y a
+            // pas de session de navigation à démarrer derrière un résultat.
+            onSearch: isShowingMap ? { [weak self] in self?.showSearch() } : nil,
+            onRecents: isShowingMap ? { [weak self] in self?.showRecentDestinations() } : nil
         ), animated: true)
     }
 
@@ -586,6 +593,10 @@ final class CarPlayCoordinator {
         interface.pop(animated: true)
         guard let origin = services.location.lastLocation?.coordinate else { return }
         destination = coordinate
+        // Mémorisé AVANT le calcul : une destination choisie reste utile dans les
+        // récents même si l'itinéraire échoue — c'est justement là qu'on voudra
+        // réessayer sans avoir à la ressaisir.
+        CarPlayDestinationStore.record(title: title, coordinate: coordinate)
 
         let task = Task { [weak self] in
             guard let self else { return }
@@ -848,6 +859,34 @@ final class CarPlayCoordinator {
             template.updateSections(filled.sections)
         }
         tasks.append(task)
+    }
+
+    /// Recherche d'une destination — adresse ou site par son code.
+    ///
+    /// Le contrôleur est RETENU par le coordinateur : `CPSearchTemplate.delegate`
+    /// est une référence faible, un contrôleur local serait libéré avant la
+    /// première frappe et la recherche ne répondrait jamais.
+    private func showSearch() {
+        let controller = CarPlaySearchController(
+            antennas: services.antennas,
+            around: { [weak self] in self?.services.location.lastLocation?.coordinate },
+            onSelect: { [weak self] coordinate, title in
+                self?.startNavigation(to: coordinate, title: title)
+            }
+        )
+        searchController = controller
+        interface.push(controller.makeTemplate(), animated: true)
+    }
+
+    /// Destinations récentes : une pression, aucune saisie. Sur les véhicules où
+    /// le clavier se bloque en roulant, c'est la seule source encore utilisable.
+    private func showRecentDestinations() {
+        let template = RecentDestinationsTemplateBuilder.make(
+            CarPlayDestinationStore.all()
+        ) { [weak self] destination in
+            self?.startNavigation(to: destination.coordinate, title: destination.title)
+        }
+        interface.push(template, animated: true)
     }
 
     /// Convertit un site de la liste `/api/antennas` en marqueur, pour que les

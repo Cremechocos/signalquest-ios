@@ -23,12 +23,29 @@ enum LayersGridBuilder {
     ///   l'app dans le véhicule.
     static func make(current: Set<MapDisplayItem.Kind>,
                      onToggle: @escaping (MapDisplayItem.Kind) -> Void,
-                     onSentinelle: (() -> Void)? = nil) -> CPGridTemplate {
+                     onSentinelle: (() -> Void)? = nil,
+                     onSearch: (() -> Void)? = nil,
+                     onRecents: (() -> Void)? = nil) -> CPGridTemplate {
         var buttons = offered.map { kind in
             CPGridButton(
                 titleVariants: [title(for: kind, active: current.contains(kind))],
                 image: image(for: kind, active: current.contains(kind))
             ) { _ in onToggle(kind) }
+        }
+        // Destinations avant Sentinelle : sur les véhicules à clavier bloqué en
+        // roulant, « Récents » est la seule source encore utilisable, elle doit
+        // rester atteignable même si la grille est tronquée.
+        if let onRecents {
+            buttons.append(CPGridButton(
+                titleVariants: [String(localized: "Récents")],
+                image: UIImage(systemName: "clock.arrow.circlepath") ?? UIImage()
+            ) { _ in onRecents() })
+        }
+        if let onSearch {
+            buttons.append(CPGridButton(
+                titleVariants: [String(localized: "Rechercher")],
+                image: UIImage(systemName: "magnifyingglass") ?? UIImage()
+            ) { _ in onSearch() })
         }
         if let onSentinelle {
             buttons.append(CPGridButton(

@@ -86,11 +86,35 @@ final class CarPlaySentinelleTests: XCTestCase {
         XCTAssertFalse(template.emptyViewSubtitleVariants.isEmpty)
     }
 
-    /// La grille reste dans le plafond CarPlay une fois Sentinelle ajoutée —
-    /// au-delà, la dernière entrée disparaîtrait en silence.
-    func testGridStaysWithinLimitWithSentinelleAdded() {
-        let grid = LayersGridBuilder.make(current: [.antenna], onToggle: { _ in }, onSentinelle: {})
-        XCTAssertLessThanOrEqual(grid.gridButtons.count, Int(CPGridTemplateMaximumItems))
-        XCTAssertEqual(grid.gridButtons.count, LayersGridBuilder.offered.count + 1)
+    /// La grille reste dans le plafond CarPlay une fois toutes les entrées
+    /// ajoutées — au-delà, les dernières disparaîtraient en silence.
+    func testGridStaysWithinLimitWithEveryEntryAdded() {
+        let grid = LayersGridBuilder.make(current: [.antenna], onToggle: { _ in },
+                                          onSentinelle: {}, onSearch: {}, onRecents: {})
+        XCTAssertLessThanOrEqual(grid.gridButtons.count, Int(CPGridTemplateMaximumItems),
+                                 "La grille déborde : des entrées seraient tronquées sans avertissement")
+    }
+
+    /// « Récents » doit survivre à une éventuelle troncature : sur les véhicules
+    /// où le clavier se bloque en roulant, c'est la seule source de destination
+    /// encore utilisable.
+    func testRecentsComesBeforeSearchAndSentinelle() {
+        let grid = LayersGridBuilder.make(current: [], onToggle: { _ in },
+                                          onSentinelle: {}, onSearch: {}, onRecents: {})
+        let titles = grid.gridButtons.compactMap(\.titleVariants.first)
+        guard let recents = titles.firstIndex(of: String(localized: "Récents")),
+              let search = titles.firstIndex(of: String(localized: "Rechercher")) else {
+            return XCTFail("Entrées de destination absentes de la grille")
+        }
+        XCTAssertLessThan(recents, search)
+    }
+
+    /// En mode liste, aucune destination n'est proposée : sans carte, il n'y a
+    /// pas de session de navigation à démarrer derrière un résultat.
+    func testNoDestinationEntriesWithoutMap() {
+        let grid = LayersGridBuilder.make(current: [], onToggle: { _ in }, onSentinelle: {})
+        let titles = grid.gridButtons.compactMap(\.titleVariants.first)
+        XCTAssertFalse(titles.contains(String(localized: "Rechercher")))
+        XCTAssertFalse(titles.contains(String(localized: "Récents")))
     }
 }

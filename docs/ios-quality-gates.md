@@ -83,3 +83,50 @@ SQ_CRITICAL_COVERAGE_MIN=90 \
   réseau cellulaire et PiP doivent être mesurés sur appareils physiques ;
 - les parcours staging bout en bout nécessitent les endpoints, secrets et
   datasets synthétiques du VPS staging isolé.
+
+## CarPlay
+
+Rien de CarPlay n'est vérifiable en XCUITest : les templates sont rendus par
+l'interface du véhicule, **hors du process de l'app**, et `XCUIApplication` n'y a
+pas accès. Les tests unitaires couvrent donc les parties pures — construction des
+templates, suivi d'itinéraire, budget de recalcul, cadence des annonces, plafonds
+du SDK — et tout le reste se contrôle à la main.
+
+Prérequis de test :
+
+- l'écran CarPlay du **simulateur** demande `Simulator.app`, qu'Xcode 27
+  n'embarque plus (ses seules apps sont Create ML, Instruments, DeviceHub,
+  FileMerge, Icon Composer, Accessibility Inspector) : installer un Xcode stable
+  à côté ;
+- l'entitlement doit être présent dans le binaire. Le simulateur signe en ad-hoc
+  avec `ENTITLEMENTS_REQUIRED = NO` et n'embarque **aucun** entitlement — pointer
+  `SQ_ENTITLEMENTS` sur `SignalQuest.CarPlay.entitlements` via un
+  `Config/Local.xcconfig` git-ignoré (voir le commentaire en tête de ce fichier).
+
+À contrôler en véhicule, dans cet ordre :
+
+1. **connexion de la scène** — app fermée (le véhicule lance l'app en
+   arrière-plan, la fenêtre iPhone peut ne jamais apparaître), puis app ouverte ;
+2. **lisibilité** — thème jour/nuit du véhicule, longueur des libellés sur
+   l'écran le plus étroit, marqueurs et lobes d'azimut ;
+3. **guidage** — manœuvres, ETA, annonces vocales, sortie de route volontaire :
+   vérifier qu'un aller-retour sur la limite ne déclenche pas une rafale de
+   `MKDirections` (throttlé par Apple) ;
+4. **arbitrage audio** — appel LiveKit reçu PENDANT un guidage : les annonces
+   doivent se taire, pas se superposer. Écrit mais non testable automatiquement,
+   c'est le point le plus important de cette liste ;
+5. **alertes** — zone mal couverte, avec et sans la scène au premier plan (les
+   deux chemins sont exclusifs, l'alerte ne doit jamais arriver en double) ;
+6. **véhicule à molette** — vérifier que tout reste atteignable sans écran
+   tactile, via « Autour de toi » et « Récents » ;
+7. **coupure réseau** en cours de guidage, et **déconnexion** du véhicule : plus
+   aucun timer, abonnement de position ni assertion d'arrière-plan ne doit
+   survivre ;
+8. **batterie et données** sur un trajet réel — GPS haute précision, tuiles
+   denses et recalculs ne se mesurent pas au simulateur.
+
+Deux dépendances externes conditionnent l'usage réel : l'entitlement
+`com.apple.developer.carplay-maps`, à obtenir d'Apple, et l'ajout de
+`"category": "SENTINELLE_ALERT"` au payload APNs côté backend — sans lui, les
+alertes Sentinelle n'atteignent jamais l'écran du véhicule, quelle que soit la
+configuration de l'app.
