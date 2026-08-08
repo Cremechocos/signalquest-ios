@@ -120,17 +120,43 @@ final class CarPlayCoordinator {
 
     private func installRoot() {
         guard isAuthenticated else {
-            interface.setRoot(CarPlayRootTemplateBuilder.root(isAuthenticated: false, showsMap: isShowingMap),
-                              animated: true)
+            interface.setRoot(CarPlayRootTemplateBuilder.signedOut(), animated: true)
             return
         }
         guard let carWindow else {
             // Repli sans carte : Apple n'a pas accordé la catégorie navigation.
-            interface.setRoot(CarPlayRootTemplateBuilder.root(isAuthenticated: true, showsMap: false),
-                              animated: true)
+            // Cette liste EST alors l'application — tout doit y être atteignable.
+            interface.setRoot(CarPlayRootTemplateBuilder.list { [weak self] entry in
+                self?.open(entry)
+            }, animated: true)
+            consumeDashboardRouteIfNeeded()
             return
         }
         installMap(in: carWindow)
+        consumeDashboardRouteIfNeeded()
+    }
+
+    /// Applique l'intention éventuellement déposée par un raccourci du
+    /// Dashboard. Appelé une fois la racine posée : pousser un écran avant
+    /// qu'elle existe laisserait une pile incohérente derrière le bouton retour.
+    private func consumeDashboardRouteIfNeeded() {
+        switch CarPlayDashboardRoute.consume() {
+        case .here: showHere()
+        // La carte est déjà la racine en mode navigation ; en mode liste, on
+        // ouvre ce qui s'en rapproche le plus.
+        case .map: if !isShowingMap { showNearby() }
+        case nil: break
+        }
+    }
+
+    /// Ouvre une entrée de la racine en mode liste.
+    private func open(_ entry: CarPlayRootTemplateBuilder.Entry) {
+        switch entry {
+        case .nearby: showNearby()
+        case .here: showHere()
+        case .speedtest: showSpeedtest()
+        case .sentinelle: showSentinelle()
+        }
     }
 
     private var isAuthenticated: Bool {
@@ -300,10 +326,18 @@ final class CarPlayCoordinator {
         return lastProgress.distanceToManeuver <= 300
     }
 
-    /// Alerte affichée dans le véhicule si la scène est au premier plan, sinon
-    /// déposée en notification locale — qui n'atteindra CarPlay que grâce à la
-    /// catégorie `.allowInCarPlay`.
+    /// Alerte affichée dans le véhicule si notre scène est au premier plan,
+    /// sinon déposée en notification locale.
+    ///
+    /// Les deux chemins sont EXCLUSIFS : émettre les deux ferait recevoir
+    /// l'alerte en double. Et le second est indispensable — l'écran du véhicule
+    /// affiche le plus souvent Plan ou la musique, pas SignalQuest ; sans lui,
+    /// l'alerte n'existerait quasiment jamais.
     private func presentCoverageAlert(_ message: String) {
+        guard isSceneForeground else {
+            postCoverageNotification(message)
+            return
+        }
         let alert = CPAlertTemplate(
             titleVariants: [message],
             actions: [CPAlertAction(title: String(localized: "OK"), style: .default) { [weak self] _ in
@@ -311,6 +345,28 @@ final class CarPlayCoordinator {
             }]
         )
         interface.present(alert, animated: true)
+    }
+
+    /// Notre scène CarPlay est-elle au premier plan de l'écran du véhicule ?
+    private var isSceneForeground: Bool {
+        UIApplication.shared.connectedScenes.contains { scene in
+            scene is CPTemplateApplicationScene && scene.activationState == .foregroundActive
+        }
+    }
+
+    /// Notification locale. Elle n'atteindra l'écran du véhicule que grâce à la
+    /// catégorie `.allowInCarPlay` : sans elle, iOS l'afficherait sur l'iPhone
+    /// et s'arrêterait là.
+    private func postCoverageNotification(_ message: String) {
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "Réseau faible")
+        content.body = message
+        content.categoryIdentifier = CarPlayNotificationCategories.coverageAlert
+        // Déclenchement immédiat : l'information porte sur l'endroit où l'on est
+        // MAINTENANT, elle n'a plus de sens dans une minute.
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        )
     }
 
     // MARK: - Sentinelle
@@ -752,14 +808,69 @@ final class CarPlayCoordinator {
     }
 
     /// Liste « Autour de toi » — le seul chemin vers les fiches sur un véhicule
-    /// à molette, où viser un marqueur est impossible.
+    /// à molette, où viser un marqueur est impossible, et la porte d'entrée des
+    /// antennes en mode liste.
     private func showNearby() {
-        let entries = NearbyListTemplateBuilder.entries(
-            from: loadedLayers.annotations,
-            userLocation: services.location.lastLocation
-        )
-        interface.push(NearbyListTemplateBuilder.make(entries: entries) { [weak self] payload in
+        let template = NearbyListTemplateBuilder.make(
+            entries: NearbyListTemplateBuilder.entries(from: loadedLayers.annotations,
+                                                      userLocation: services.location.lastLocation)
+        ) { [weak self] payload in
             self?.showDetail(for: payload)
-        }, animated: true)
+        }
+        interface.push(template, animated: true)
+
+        // Sans carte, personne n'a chargé de marqueurs : la liste serait vide
+        // alors que c'est le seul accès aux antennes. On les récupère ici, autour
+        // de la position, comme le fait l'écran « Ici ».
+        guard loadedLayers.annotations.isEmpty,
+              let location = services.location.lastLocation else { return }
+        let task = Task { [weak self] in
+            guard let self else { return }
+            let coordinate = location.coordinate
+            let delta = 0.045
+            guard let sites = try? await services.antennas.list(
+                bbox: BoundingBox(north: coordinate.latitude + delta,
+                                  south: coordinate.latitude - delta,
+                                  east: coordinate.longitude + delta,
+                                  west: coordinate.longitude - delta),
+                market: MapMarketStore.initialMarketCode(),
+                operatorName: MapMarketStore.initialOperatorKey(),
+                technologies: []
+            ) else { return }
+            guard !Task.isCancelled else { return }
+            let payloads = sites.compactMap { Self.payload(for: $0) }
+            let entries = NearbyListTemplateBuilder.entries(from: payloads, userLocation: location)
+            let filled = NearbyListTemplateBuilder.make(entries: entries) { [weak self] payload in
+                self?.showDetail(for: payload)
+            }
+            // `updateSections` plutôt qu'un push : l'écran vide et l'écran rempli
+            // sont le même, pas deux étapes de navigation.
+            template.updateSections(filled.sections)
+        }
+        tasks.append(task)
+    }
+
+    /// Convertit un site de la liste `/api/antennas` en marqueur, pour que les
+    /// fiches reçoivent la même forme qu'en mode carte.
+    private static func payload(for site: AntennaSite) -> MapAnnotationPayload? {
+        guard let lat = site.latitude, let lon = site.longitude else { return nil }
+        return MapAnnotationPayload(
+            id: "antenna-\(site.id)",
+            kind: .antenna,
+            title: String(localized: "Site \(site.siteId ?? site.id)"),
+            subtitle: [site.operators.joined(separator: "/"),
+                       site.technologies.prefix(3).joined(separator: "/")]
+                .filter { !$0.isEmpty }
+                .joined(separator: " · "),
+            coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
+            metric: nil,
+            backendId: site.siteId ?? site.id,
+            details: nil,
+            antennaId: site.id,
+            clusterCount: nil,
+            azimuths: site.azimuths,
+            showsAzimuths: false,
+            tint: SQBrand.operatorColor(site.operators.first)
+        )
     }
 }

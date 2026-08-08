@@ -36,20 +36,28 @@ final class CarPlayDashboardSceneDelegate: UIResponder, CPTemplateApplicationDas
         layers = CarPlayLayerController(map: services.map)
         window.rootViewController = controller
 
-        // Deux boutons au maximum, et ils ouvrent l'app plutôt que d'agir sur
-        // place : le Dashboard est une vue de coin d'œil, pas un poste de
-        // pilotage.
+        // Deux boutons au maximum, et ils renvoient vers la scène principale
+        // plutôt que d'agir sur place : le Dashboard est une vue de coin d'œil,
+        // pas un poste de pilotage.
+        //
+        // L'intention passe par `CarPlayDashboardRoute` car la scène principale
+        // n'est pas forcément installée à cet instant — les deux scènes sont
+        // indépendantes. Elle la consommera dès qu'elle sera prête.
         dashboardController.shortcutButtons = [
             CPDashboardButton(
                 titleVariants: [String(localized: "Antennes")],
                 subtitleVariants: [String(localized: "Voir la carte")],
                 image: UIImage(systemName: "antenna.radiowaves.left.and.right") ?? UIImage()
-            ) { _ in },
+            ) { _ in
+                Task { @MainActor in CarPlayDashboardRoute.request(.map) }
+            },
             CPDashboardButton(
                 titleVariants: [String(localized: "Ici")],
                 subtitleVariants: [String(localized: "Réseau autour")],
                 image: UIImage(systemName: "dot.radiowaves.left.and.right") ?? UIImage()
-            ) { _ in },
+            ) { _ in
+                Task { @MainActor in CarPlayDashboardRoute.request(.here) }
+            },
         ]
 
         controller.setZoom(Self.dashboardZoom, animated: false)
