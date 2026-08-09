@@ -75,6 +75,15 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
     func requestAuthorizationAndRegister() async {
         let center = UNUserNotificationCenter.current()
         center.delegate = self
+        // Les catégories sont posées AVANT la demande d'autorisation, et non
+        // après : iOS les consulte à la livraison, y compris pour une
+        // notification arrivée juste après l'accord. Sans `.allowInCarPlay`
+        // (porté par ces catégories), rien n'atteint l'écran du véhicule — même
+        // une notification qui s'affiche parfaitement sur l'iPhone.
+        //
+        // ⚠️ Côté serveur, le payload APNs doit porter le `category`
+        // correspondant, sinon la déclaration ici reste sans effet.
+        center.setNotificationCategories(CarPlayNotificationCategories.all())
         do {
             let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound, .providesAppNotificationSettings])
             logger.info("Notification permission granted=\(granted, privacy: .public)")

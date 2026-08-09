@@ -107,13 +107,15 @@ struct MapKitMapView: UIViewRepresentable {
         }
 
         // MARK: Zoom ↔ span (slippy-map, compatible avec le z des tuiles)
+        // La formule vit dans `SQMapProjection` depuis que CarPlay dessine sa
+        // propre carte : les deux surfaces DOIVENT cadrer identiquement, sinon
+        // elles ne demandent pas les mêmes tuiles. Ces deux appels restent pour
+        // ne pas toucher aux appelants internes.
         static func span(forZoom zoom: Double, width: CGFloat) -> MKCoordinateSpan {
-            let lonDelta = Double(width) * 360.0 / (256.0 * pow(2.0, max(zoom, 0.0)))
-            return MKCoordinateSpan(latitudeDelta: min(170, lonDelta), longitudeDelta: min(360, lonDelta))
+            SQMapProjection.span(forZoom: zoom, width: width)
         }
         static func zoom(forRegion region: MKCoordinateRegion, width: CGFloat) -> Double {
-            let lonDelta = max(region.span.longitudeDelta, 0.0000001)
-            return log2(Double(width) * 360.0 / (256.0 * lonDelta))
+            SQMapProjection.zoom(forRegion: region, width: width)
         }
 
         // MARK: Annotations — diff stable par id (add/remove delta)

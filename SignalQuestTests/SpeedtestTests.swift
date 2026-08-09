@@ -557,10 +557,15 @@ final class SpeedtestTests: XCTestCase {
         let lyo = findClosestIPerfServer(to: lyon)
         XCTAssertTrue(lyo.hostname.contains("lyo") && lyo.hostname.contains("bytel.fr"))
 
-        // Montréal → Beauharnois OVH
+        // Montréal → Ashburn : Beauharnois est RETIRÉ du catalogue (TCP ouvert
+        // sur 5208/5209, handshake iPerf3 muet → ping parfait puis DL mort).
         let montreal = Coordinates(latitude: 45.5017, longitude: -73.5673)
-        let bhs = findClosestIPerfServer(to: montreal)
-        XCTAssertEqual(bhs.hostname, "bhs.proof.ovh.ca")
+        let closestToMontreal = findClosestIPerfServer(to: montreal)
+        XCTAssertEqual(closestToMontreal.hostname, "proof.ovh.us")
+        XCTAssertFalse(
+            iperfPublicServers.contains { $0.hostname == "bhs.proof.ovh.ca" },
+            "Beauharnois accepte le TCP sans parler iPerf3 — ne pas le réintroduire"
+        )
 
         // New York → US proof
         let nyc = Coordinates(latitude: 40.7128, longitude: -74.0060)
@@ -703,11 +708,14 @@ final class SpeedtestTests: XCTestCase {
     func testDownloadTargetPickerMetadata() {
         XCTAssertEqual(SpeedtestDownloadTarget.hybridAuto.displayName, "Auto")
         XCTAssertFalse(SpeedtestDownloadTarget.rbx.subtitle.isEmpty)
-        // Auto + 6 OVH + 13 Bouygues sains + 2 Scaleway + 1 MilkyWan + 7 POP
-        // iPerf3 FR/EU publics + 1 Cloudflare + 1 LibreSpeed. Les 2 cibles Scaleway
-        // « +90 ms » (latence artificielle, debug) ne sont pas proposées : 32 entrées.
-        XCTAssertEqual(SpeedtestDownloadTarget.selectableCases.count, 32)
-        XCTAssertEqual(SpeedtestDownloadTarget.ovhCases.count, 6)
+        // Auto + 5 OVH sains (Beauharnois retiré) + 13 Bouygues sains + 2 Scaleway
+        // + 1 MilkyWan + 7 POP iPerf3 FR/EU publics + 1 Cloudflare + 1 LibreSpeed.
+        // Les 2 cibles Scaleway « +90 ms » (latence artificielle, debug) ne sont
+        // pas proposées : 31 entrées.
+        XCTAssertEqual(SpeedtestDownloadTarget.selectableCases.count, 31)
+        XCTAssertEqual(SpeedtestDownloadTarget.ovhCases.count, 5)
+        XCTAssertFalse(SpeedtestDownloadTarget.ovhCases.contains(.bhs))
+        XCTAssertEqual(SpeedtestDownloadTarget.bhs.migrated, .hybridAuto)
         XCTAssertEqual(SpeedtestDownloadTarget.bouyguesCases.count, 13)
         XCTAssertEqual(SpeedtestDownloadTarget.scalewayCases.count, 2)
         XCTAssertEqual(SpeedtestDownloadTarget.milkywanCases.count, 1)

@@ -120,8 +120,55 @@
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
+		<!-- DOIT valoir true pour CarPlay : la scène du véhicule coexiste avec la
+		     fenêtre iPhone, et UIKit refuse de créer une 2e scène quand cette clé
+		     est à false. La clé est GLOBALE au process, pas par rôle — d'où
+		     l'effet de bord sur iPad (TARGETED_DEVICE_FAMILY "1,2" +
+		     UIRequiresFullScreen à false) : le multi-fenêtres s'y active.
+		     `scenePhase` étant par scène alors qu'AppLockController, AppServices
+		     et AppRouter sont uniques au process, voir les garde-fous ajoutés
+		     dans AppServices (comptage des scènes actives). -->
 		<key>UIApplicationSupportsMultipleScenes</key>
-		<false/>
+		<true/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<!-- SEUL le rôle CarPlay est déclaré. On NE déclare PAS
+			     UIWindowSceneSessionRoleApplication : SwiftUI fournit lui-même la
+			     configuration de la fenêtre, et la déclarer ici obligerait à
+			     nommer une classe de délégué de fenêtre — donc à reprendre à la
+			     main un chemin que WindowGroup gère (cf. la note @Sendable en
+			     tête de SignalQuestApp.swift). Vérifié : la fenêtre s'ouvre
+			     normalement et le gate iPad passe sans ce rôle. -->
+			<key>CPTemplateApplicationSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>CPTemplateApplicationScene</string>
+					<!-- Obligatoire : UIKit s'en sert comme clé d'identité de
+					     session. L'omettre est une cause classique de « la scène
+					     CarPlay ne se connecte jamais ». -->
+					<key>UISceneConfigurationName</key>
+					<string>CarPlay</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).CarPlaySceneDelegate</string>
+				</dict>
+			</array>
+			<!-- Dashboard : la vignette de carte affichée à côté des widgets du
+			     véhicule. Scène DISTINCTE de la précédente — les deux peuvent
+			     être connectées simultanément — mais couverte par le même
+			     entitlement carplay-maps, donc rien de plus à demander à Apple. -->
+			<key>CPTemplateApplicationDashboardSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>CPTemplateApplicationDashboardScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>CarPlay Dashboard</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).CarPlayDashboardSceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
 	</dict>
 	<key>NSSupportsLiveActivities</key>
 	<true/>

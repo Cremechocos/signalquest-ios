@@ -10,4 +10,16 @@ SQ_ASSOCIATED_DOMAIN = webcredentials:signalquest.fr
 // Chemins revendiqués côté serveur, dans .well-known/apple-app-site-association.
 SQ_APPLINKS_DOMAIN = applinks:signalquest.fr
 SQ_URL_SCHEME = signalquest
+// Fichier d'entitlements de la cible app (project.yml lit $(SQ_ENTITLEMENTS)).
+// Surchargeable en local par SignalQuest.CarPlay.entitlements pour tester la
+// scène CarPlay au simulateur — voir Local.xcconfig plus bas.
+SQ_ENTITLEMENTS = SignalQuestApp/SignalQuest.entitlements
 SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG
+
+// Surcharges propres au poste, git-ignorées. Le `?` rend l'inclusion
+// facultative : l'absence du fichier n'est pas une erreur, et rien ne change
+// pour qui n'en a pas. Placé EN DERNIER — en xcconfig, la dernière définition
+// d'une variable gagne, donc un include placé plus haut serait sans effet.
+// Usage type : pointer SQ_ENTITLEMENTS sur SignalQuest.CarPlay.entitlements
+// pour tester la scène CarPlay au simulateur.
+#include? "Local.xcconfig"

@@ -84,7 +84,12 @@ enum SQNetworkColors {
 
     /// Convertit un 0xRRGGBB en `UIColor` (pour les call sites MapKit / Core
     /// Graphics qui ne peuvent pas utiliser `Color`).
-    private static func uiColor(_ v: UInt32) -> UIColor {
+    ///
+    /// Ouvert au module — et non plus privé — depuis que la carte CarPlay colore
+    /// elle aussi ses pastilles de couverture à partir des `colorHex` renvoyés
+    /// par le serveur. C'était ça ou une troisième conversion hex→UIColor dans
+    /// le projet.
+    static func uiColor(_ v: UInt32) -> UIColor {
         UIColor(
             red: CGFloat((v >> 16) & 0xFF) / 255,
             green: CGFloat((v >> 8) & 0xFF) / 255,

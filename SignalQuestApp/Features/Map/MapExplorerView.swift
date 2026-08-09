@@ -2003,14 +2003,10 @@ struct MapExplorerView: View {
     /// plus il y a de place pour déployer leurs secteurs. C'est à z14, en centre
     /// dense, que des lobes longs se recouvriraient au point de ne plus être
     /// attribuables à un pylône.
+    // Définie dans `SQMapProjection` depuis que CarPlay dessine aussi des lobes :
+    // les deux surfaces doivent les dimensionner pareil.
     static func azimuthReach(for zoom: Double) -> CGFloat {
-        switch zoom {
-        case ..<9: return 0
-        case ..<10: return 32
-        case ..<11: return 42
-        case ..<12: return 55
-        default:    return 66
-        }
+        SQMapProjection.azimuthReach(forZoom: zoom)
     }
 
     private func refreshMapRender() {

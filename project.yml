@@ -43,7 +43,11 @@ targets:
         excludes:
           - Resources/**
           - .claude/**
-          - SignalQuest.entitlements
+          # Glob et non un nom précis : il existe DEUX fichiers d'entitlements
+          # (l'ordinaire et celui qui porte la clé CarPlay, cf. SQ_ENTITLEMENTS
+          # dans Config/*.xcconfig). Sans le glob, XcodeGen ajouterait le second
+          # aux sources compilées de la cible.
+          - "*.entitlements"
       - path: SignalQuestApp/Resources/Assets.xcassets
         buildPhase: resources
       - path: SignalQuestApp/Resources/PrivacyInfo.xcprivacy
@@ -81,7 +85,14 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios
         PRODUCT_NAME: SignalQuest
         INFOPLIST_FILE: SignalQuestApp/Info.plist
-        CODE_SIGN_ENTITLEMENTS: SignalQuestApp/SignalQuest.entitlements
+        # Choisi PAR CONFIGURATION via les xcconfig (SQ_ENTITLEMENTS), et non figé
+        # ici : l'entitlement CarPlay ne peut pas figurer dans une archive tant
+        # qu'Apple ne l'a pas accordé (la signature automatique exige que chaque
+        # clé soit présente dans le profil), alors qu'il est nécessaire pour que
+        # la scène CarPlay se connecte au simulateur. La substitution de variables
+        # ne suffit pas : elle change une VALEUR, elle ne peut pas faire
+        # disparaître une clé. D'où deux fichiers.
+        CODE_SIGN_ENTITLEMENTS: $(SQ_ENTITLEMENTS)
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_USER_SCRIPT_SANDBOXING: YES
         # Info.plist référence $(MARKETING_VERSION) / $(CURRENT_PROJECT_VERSION) :

@@ -10,4 +10,8 @@ SQ_ASSOCIATED_DOMAIN = webcredentials:signalquest.fr
 // Chemins revendiqués côté serveur, dans .well-known/apple-app-site-association.
 SQ_APPLINKS_DOMAIN = applinks:signalquest.fr
 SQ_URL_SCHEME = signalquest
+// Fichier d'entitlements de la cible app (project.yml lit $(SQ_ENTITLEMENTS)).
+// Reste SANS la clé CarPlay tant qu'Apple ne l'a pas accordée : elle ferait
+// échouer la signature de l'archive App Store.
+SQ_ENTITLEMENTS = SignalQuestApp/SignalQuest.entitlements
 SWIFT_ACTIVE_COMPILATION_CONDITIONS =

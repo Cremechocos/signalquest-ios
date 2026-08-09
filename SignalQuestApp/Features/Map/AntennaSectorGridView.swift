@@ -19,6 +19,10 @@ struct AntennaSectorGridView: View {
     let siteBands: [String]
     /// Détail par secteur — vide quand tous les secteurs sont identiques.
     let sectorSystems: [AntennaSectorSystems]
+    /// Faisceaux hertziens. Ils n'entrent NI dans la grille NI dans le compte de
+    /// secteurs — un FH ne porte pas de bande mobile — mais ils appartiennent à
+    /// la rose : ce sont des directions réelles du pylône.
+    var fhBeams: [AntennaFhLink] = []
     let technologies: [String]
     /// Bandes déclarées à l'ANFR mais pas encore allumées.
     let projectBands: [String]
@@ -38,11 +42,12 @@ struct AntennaSectorGridView: View {
             if columns.count > 1 { stateLegend }
             // Une rose sans azimut n'est qu'un cercle vide : les datasets DROM ne
             // publient pas l'orientation des secteurs, autant le dire.
-            if !columns.isEmpty {
-                AzimuthFanView(azimuths: columns.map(\.azimuth), color: tint)
+            if !columns.isEmpty || !fhBeams.isEmpty {
+                AzimuthFanView(azimuths: columns.map(\.azimuth), fhAzimuths: fhBeams.map(\.azimuth), color: tint)
                     .frame(height: 170)
                     .frame(maxWidth: .infinity)
             }
+            fhNote
             footnote
         }
     }
@@ -114,17 +119,49 @@ struct AntennaSectorGridView: View {
         }
     }
 
+    /// Largeur de la colonne des bandes. FIXE, et c'est ce qui compte : c'est
+    /// elle qui garantit que toutes les lignes alignent leurs colonnes, et elle
+    /// rend la largeur de la grille prévisible, donc mesurable par
+    /// `ViewThatFits`. En `maxWidth: .infinity`, le `HStack` la partageait à
+    /// parts égales avec les colonnes de secteurs et l'écrasait à ~30 pt.
+    private static let bandColumnWidth: CGFloat = 88
+
     /// Cas hétérogène : la grille, où l'écart saute aux yeux.
+    ///
+    /// La grille s'adapte à la largeur disponible au lieu de l'imposer. Avec des
+    /// colonnes rigides de 42 pt, un site à dix secteurs réclamait 420 pt là où
+    /// la fiche en propose ~325 : la colonne des bandes tombait à zéro (libellés
+    /// invisibles) et surtout TOUTE la fiche devenait plus large que l'écran, que
+    /// le ScrollView centrait alors — rognée des deux côtés, sur toute sa hauteur.
+    /// Sous six secteurs, la première candidate passe et le rendu est inchangé.
     private var grid: some View {
+        ViewThatFits(in: .horizontal) {
+            gridBody(columnWidth: 42)
+            gridBody(columnWidth: 34)
+            gridBody(columnWidth: 27)
+            gridBody(columnWidth: 22)
+            // Filet de sécurité : au-delà d'une douzaine de secteurs, même la
+            // grille la plus serrée déborde. Un ScrollView prend toujours la
+            // largeur qu'on lui propose — la fiche reste cadrée quoi qu'il arrive.
+            ScrollView(.horizontal, showsIndicators: false) {
+                gridBody(columnWidth: 27)
+            }
+        }
+    }
+
+    private func gridBody(columnWidth: CGFloat) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 Text("")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(width: Self.bandColumnWidth, alignment: .leading)
+                Spacer(minLength: 0)
                 ForEach(columns) { sector in
                     Text("\(Int(sector.azimuth.rounded()))°")
                         .font(SQFont.archivo(10.5, .bold))
                         .foregroundStyle(SQColor.labelSecondary)
-                        .frame(width: 42)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                        .frame(width: columnWidth)
                 }
             }
             .padding(.bottom, 4)
@@ -136,10 +173,11 @@ struct AntennaSectorGridView: View {
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(width: Self.bandColumnWidth, alignment: .leading)
+                    Spacer(minLength: 0)
                     ForEach(columns) { sector in
                         cell(band: band, sector: sector)
-                            .frame(width: 42)
+                            .frame(width: columnWidth)
                     }
                 }
                 .padding(.vertical, 5)
@@ -237,6 +275,75 @@ struct AntennaSectorGridView: View {
         columns.allSatisfy { $0.systems.contains(band) }
     }
 
+    /// Ce que dit l'aiguille de la rose, et ce qu'elle ne dit pas.
+    ///
+    /// La légende est le dessin lui-même, repris en miniature : rien à traduire
+    /// entre la rose et sa clé.
+    @ViewBuilder
+    private var fhNote: some View {
+        if !fhBeams.isEmpty {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    FhNeedleKey(color: tint)
+                        .frame(width: 26, height: 9)
+                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] + 1 }
+                    Text(fhBeams.count == 1
+                         ? String(localized: "Faisceau hertzien")
+                         : String(localized: "\(fhBeams.count) faisceaux hertziens"))
+                        .font(SQFont.body(11.5, .semibold))
+                        .foregroundStyle(SQColor.label)
+                }
+
+                // Une ligne par parabole : direction, taille, et vers quoi elle
+                // pointe. L'azimut tient une colonne fixe — sans elle, l'œil ne
+                // retrouve plus la direction d'une ligne à l'autre.
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(fhBeams.prefix(8)) { beam in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("\(Int(beam.azimuth.rounded()))°")
+                                .font(SQFont.archivo(11.5, .bold))
+                                .foregroundStyle(tint)
+                                .frame(width: 34, alignment: .leading)
+                            Text(describe(beam))
+                                .font(SQType.micro)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+
+                // Dire d'où vient chaque limite vaut mieux que laisser croire à
+                // un trou de l'app. Deux limites, deux natures : la fréquence
+                // n'est pas publiée, le site visé n'est pas publié NON PLUS mais
+                // se déduit — et une déduction se présente comme telle.
+                Text(fhBeams.contains(where: { $0.target != nil })
+                     ? "Des paraboles point-à-point : elles raccordent ce site au réseau, ne desservent personne, et ne comptent pas dans les secteurs. Le site visé est déduit du fait que les deux paraboles se répondent — le registre ne le publie pas, pas plus que les fréquences."
+                     : "Des paraboles point-à-point : elles raccordent ce site au réseau, ne desservent personne, et ne comptent pas dans les secteurs. Le registre en publie la direction — ni la fréquence, ni le site visé.")
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// « parabole 0,6 m — vers le site 3012724 (SFR), à 4,7 km ». On n'écrit que
+    /// ce qu'on sait : une parabole sans cible ne mentionne pas de cible, et une
+    /// direction sans rien de plus ne rend pas une ligne vide.
+    private func describe(_ beam: AntennaFhLink) -> String {
+        var parts: [String] = []
+        if let dish = beam.dishMeters {
+            let size = dish.formatted(.number.precision(.fractionLength(0...1)))
+            parts.append(String(localized: "parabole \(size) m"))
+        }
+        if let target = beam.target {
+            let distance = SQUnits.distance(kilometers: target.distanceKm)
+            let owner = target.operatorName.isEmpty ? "" : " (\(target.operatorName))"
+            parts.append(String(localized: "vers le site \(target.supId)\(owner), à \(distance)"))
+        }
+        return parts.isEmpty ? String(localized: "direction seule") : parts.joined(separator: " — ")
+    }
+
     @ViewBuilder
     private var footnote: some View {
         HStack(alignment: .top, spacing: 6) {
@@ -290,5 +397,34 @@ struct AntennaSectorGridView: View {
     private static func frequency(in band: String) -> Int? {
         guard let range = band.range(of: #"\d{3,4}"#, options: .regularExpression) else { return nil }
         return Int(band[range])
+    }
+}
+
+/// L'aiguille de la rose, en miniature : trait pointillé, barre au bout. Le même
+/// tracé que `AzimuthFanView`, pour que la légende n'ait rien à expliquer.
+private struct FhNeedleKey: View {
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let y = size.height / 2
+            var needle = Path()
+            needle.move(to: CGPoint(x: 0, y: y))
+            needle.addLine(to: CGPoint(x: size.width - 2, y: y))
+            context.stroke(
+                needle,
+                with: .color(color.opacity(0.75)),
+                style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [3, 2.5])
+            )
+            var dish = Path()
+            dish.move(to: CGPoint(x: size.width - 2, y: 0))
+            dish.addLine(to: CGPoint(x: size.width - 2, y: size.height))
+            context.stroke(
+                dish,
+                with: .color(color.opacity(0.85)),
+                style: StrokeStyle(lineWidth: 1.6, lineCap: .round)
+            )
+        }
+        .accessibilityHidden(true)
     }
 }
