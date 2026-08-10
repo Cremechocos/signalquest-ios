@@ -97,13 +97,13 @@ struct OutageReportSheet: View {
                 severityOption(
                     .down,
                     title: "Plus rien",
-                    detail: "Aucun service, même pas les appels",
+                    detail: "Rien ne passe : ni Internet, ni appels, ni SMS",
                     accent: OutageTint.down
                 )
                 severityOption(
                     .degraded,
                     title: "Dégradé",
-                    detail: "Ça passe, mais très mal",
+                    detail: "Ça passe moins bien que d'habitude",
                     accent: OutageTint.degraded
                 )
             }
@@ -113,8 +113,8 @@ struct OutageReportSheet: View {
     private var servicesSection: some View {
         module("Services touchés") {
             HStack(spacing: SQSpace.sm) {
-                serviceChip("Données", isOn: $affectsData)
-                serviceChip("Appels", isOn: $affectsVoice)
+                serviceChip("Internet", isOn: $affectsData)
+                serviceChip("Voix", isOn: $affectsVoice)
                 serviceChip("SMS", isOn: $affectsSms)
             }
         }
@@ -196,6 +196,14 @@ struct OutageReportSheet: View {
         let selected = severity == value
         return Button {
             severity = value
+            // « Plus rien » dit littéralement que RIEN ne passe : redemander lesquels des trois
+            // services sont touchés serait reposer une question déjà répondue. Les cases restent
+            // modifiables, on ne fait que pré-remplir l'évidence.
+            if value == .down {
+                affectsData = true
+                affectsVoice = true
+                affectsSms = true
+            }
         } label: {
             HStack(spacing: SQSpace.sm) {
                 Image(systemName: selected ? "largecircle.fill.circle" : "circle")

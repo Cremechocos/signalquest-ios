@@ -81,9 +81,9 @@ struct CommunityOutage: Decodable, Identifiable, Equatable {
     /// Services touchés, tels qu'on les lit — pas trois icônes à décoder.
     var affectedServicesLabel: String {
         var parts: [String] = []
-        if affectsData { parts.append(String(localized: "outage.service.data")) }
-        if affectsVoice { parts.append(String(localized: "outage.service.voice")) }
-        if affectsSms { parts.append(String(localized: "outage.service.sms")) }
+        if affectsData { parts.append("Internet") }
+        if affectsVoice { parts.append("Voix") }
+        if affectsSms { parts.append("SMS") }
         return parts.joined(separator: ", ")
     }
 

@@ -198,7 +198,7 @@ struct CommunityOutageCard: View {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.subheadline)
                     .foregroundStyle(SQColor.labelSecondary)
-                Text("Signaler un problème sur ce site")
+                Text("Signaler une panne sur cette antenne")
                     .font(SQFont.body(13.5, .medium))
                     .foregroundStyle(SQColor.label)
                 Spacer(minLength: 0)
