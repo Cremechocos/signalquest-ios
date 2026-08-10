@@ -13,6 +13,19 @@
 		<string>$(SQ_ASSOCIATED_DOMAIN)</string>
 		<string>$(SQ_APPLINKS_DOMAIN)</string>
 	</array>
+	<!-- Catégorie CarPlay accordée par Apple : « Driving Task App ». Elle donne
+	     les listes, fiches, grilles et alertes — PAS la carte plein écran ni le
+	     guidage, qui relèvent de `carplay-maps`, une catégorie distincte et
+	     réservée aux apps de navigation.
+
+	     Le code des deux modes est écrit : `CarPlaySceneDelegate` implémente les
+	     deux méthodes de connexion et bascule sur celle que le système appelle.
+	     Avec cette clé, c'est la racine en liste qui sert
+	     (`CarPlayRootTemplateBuilder.list`). Le jour où `carplay-maps` serait
+	     accordé, il suffirait de remplacer la clé ci-dessous : rien d'autre à
+	     changer. -->
+	<key>com.apple.developer.carplay-driving-task</key>
+	<true/>
 	<key>com.apple.developer.networking.wifi-info</key>
 	<true/>
 	<key>com.apple.security.application-groups</key>

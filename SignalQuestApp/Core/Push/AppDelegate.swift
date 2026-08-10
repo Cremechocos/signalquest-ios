@@ -72,6 +72,31 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
                      didFailToRegisterForRemoteNotificationsWithError error: Error) {
         AppDelegate.sharedPush?.didFailToRegister(error: error)
     }
+
+    /// Demande d'itinéraire venant de Plan.
+    ///
+    /// L'`Info.plist` déclare `MKDirectionsApplicationSupportedModes`, donc
+    /// SignalQuest figure dans la liste des apps d'itinéraire de Plan. Sans ce
+    /// handler, la choisir ouvrirait l'app sur rien — motif de rejet en revue.
+    ///
+    /// La destination est mémorisée dans les récents CarPlay et, si un véhicule
+    /// est branché, poussée vers sa carte : c'est là que le trajet a de l'intérêt
+    /// pour nous, les antennes restant visibles par-dessus la route. Sinon, elle
+    /// ouvre la carte de l'app sur le point demandé.
+    func application(_ app: UIApplication, open url: URL,
+                     options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        guard let destination = DirectionsRequestHandler.destination(from: url) else { return false }
+        CarPlayDestinationStore.record(title: destination.name, coordinate: destination.coordinate)
+        // Passe par le holder plutôt qu'une statique de plus : le graphe est déjà
+        // construit à cet instant (didFinishLaunching précède toujours l'ouverture
+        // d'URL), et c'est le même routeur que la fenêtre SwiftUI observe.
+        let router = AppServicesHolder.services.router
+        router.pendingMapFocus = Coordinates(latitude: destination.coordinate.latitude,
+                                             longitude: destination.coordinate.longitude)
+        router.selectedTab = .map
+        CarPlayDashboardRoute.request(.map)
+        return true
+    }
 }
 
 // MARK: - Firebase Cloud Messaging

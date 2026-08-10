@@ -2,46 +2,52 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Région de développement. SANS cette clé, Foundation retombe sur `en` :
-	     `fr.lproj` ne contient pas de `Localizable.strings` (le français EST la
-	     clé, Xcode omet la table identité), donc une demande de français
-	     traversait jusqu'à `en.lproj` et l'app s'affichait EN ANGLAIS pour un
-	     utilisateur français. Doit rester aligné sur `developmentLanguage`
-	     de `project.yml`. -->
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
-	<!-- Type importé pour les exports NetMonster (.ntm) : sans extension système,
-	     on le déclare conforme à public.plain-text pour qu'il soit proposé par le
-	     sélecteur de fichiers de l'import de logs radio. -->
-	<key>UTImportedTypeDeclarations</key>
+	<key>CFBundleDisplayName</key>
+	<string>$(SQ_DISPLAY_NAME)</string>
+	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
-			<key>UTTypeIdentifier</key>
-			<string>fr.signalquest.ntm</string>
-			<key>UTTypeDescription</key>
-			<string>Export NetMonster</string>
-			<key>UTTypeConformsTo</key>
+			<key>CFBundleTypeName</key>
+			<string>MKDirectionsRequest</string>
+			<key>LSItemContentTypes</key>
 			<array>
-				<string>public.plain-text</string>
+				<string>com.apple.maps.directionsrequest</string>
 			</array>
-			<key>UTTypeTagSpecification</key>
-			<dict>
-				<key>public.filename-extension</key>
-				<array>
-					<string>ntm</string>
-				</array>
-			</dict>
 		</dict>
 	</array>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER).deeplink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(SQ_URL_SCHEME)</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<!-- Épinglage TLS déclaratif (App Transport Security). On épingle la SPKI des
-	     RACINES ISRG (Let's Encrypt) — X1 + X2 en secours — au lieu d'un certificat
-	     feuille ou d'un intermédiaire (R12/R13…), qui tournent fréquemment et
-	     casseraient l'app. signalquest.fr ET speedtest.signalquest.fr chaînent vers
-	     ISRG Root X1. CloudFront (CDN speedtest) n'est PAS épinglé (AC Amazon).
-	     IMPORTANT OPS : si le backend migre d'autorité de certification, mettre à
-	     jour ces empreintes AVANT le déploiement du nouveau certificat. -->
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>MKDirectionsApplicationSupportedModes</key>
+	<array>
+		<string>MKDirectionsModeCar</string>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSPinnedDomains</key>
@@ -64,38 +70,24 @@
 			</dict>
 		</dict>
 	</dict>
-	<key>CFBundleDisplayName</key>
-	<string>$(SQ_DISPLAY_NAME)</string>
-	<key>CFBundleExecutable</key>
-	<string>$(EXECUTABLE_NAME)</string>
-	<key>CFBundleIdentifier</key>
-	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
-	<key>CFBundlePackageType</key>
-	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
-	<key>CFBundleShortVersionString</key>
-	<string>$(MARKETING_VERSION)</string>
-	<key>CFBundleVersion</key>
-	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>LSRequiresIPhoneOS</key>
-	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>SignalQuest utilise la caméra uniquement pendant les appels vidéo que tu démarres ou acceptes.</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>SignalQuest utilise Face ID pour verrouiller l&apos;app et déverrouiller ta messagerie chiffrée.</string>
+	<string>SignalQuest utilise Face ID pour verrouiller l'app et déverrouiller ta messagerie chiffrée.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>SignalQuest utilise ta position, si tu l&apos;autorises, pour placer tes speedtests et contributions sur la carte, suivre un Drive Test (y compris écran verrouillé) et, si tu l&apos;actives, partager ta position en direct avec tes amis.</string>
+	<string>SignalQuest utilise ta position, si tu l'autorises, pour placer tes speedtests et contributions sur la carte, suivre un Drive Test (y compris écran verrouillé) et, si tu l'actives, partager ta position en direct avec tes amis.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>SignalQuest utilise le micro uniquement pendant les appels audio ou vidéo que tu démarres ou acceptes.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>SignalQuest peut importer une photo choisie pour contribuer aux sites antennes.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>SQ_API_BASE_URL</key>
 	<string>$(SQ_API_BASE_URL)</string>
-	<key>SQ_APP_GROUP</key>
-	<string>$(SQ_APP_GROUP)</string>
 	<key>SQ_APP_BASE_URL</key>
 	<string>$(SQ_APP_BASE_URL)</string>
+	<key>SQ_APP_GROUP</key>
+	<string>$(SQ_APP_GROUP)</string>
 	<key>SQ_DEBUG_LOGS</key>
 	<string>$(SQ_DEBUG_LOGS)</string>
 	<key>SQ_ENVIRONMENT</key>
@@ -110,75 +102,39 @@
 		<string>Figtree-Bold.ttf</string>
 		<string>BricolageGrotesque-SemiBold.ttf</string>
 		<string>BricolageGrotesque-Bold.ttf</string>
-		<!-- Polices de la CARTE DE PARTAGE uniquement, jamais de l'interface :
-		     elles existent pour que l'image produite soit identique à celle
-		     d'Android, qui compose en Sora et JetBrains Mono. Ce sont des polices
-		     VARIABLES (axe wght 100-800) : la graisse se pilote par variation, pas
-		     en choisissant un fichier — voir SQShareFonts. -->
 		<string>Sora-Variable.ttf</string>
 		<string>JetBrainsMono-Variable.ttf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
-		<!-- DOIT valoir true pour CarPlay : la scène du véhicule coexiste avec la
-		     fenêtre iPhone, et UIKit refuse de créer une 2e scène quand cette clé
-		     est à false. La clé est GLOBALE au process, pas par rôle — d'où
-		     l'effet de bord sur iPad (TARGETED_DEVICE_FAMILY "1,2" +
-		     UIRequiresFullScreen à false) : le multi-fenêtres s'y active.
-		     `scenePhase` étant par scène alors qu'AppLockController, AppServices
-		     et AppRouter sont uniques au process, voir les garde-fous ajoutés
-		     dans AppServices (comptage des scènes actives). -->
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<true/>
 		<key>UISceneConfigurations</key>
 		<dict>
-			<!-- SEUL le rôle CarPlay est déclaré. On NE déclare PAS
-			     UIWindowSceneSessionRoleApplication : SwiftUI fournit lui-même la
-			     configuration de la fenêtre, et la déclarer ici obligerait à
-			     nommer une classe de délégué de fenêtre — donc à reprendre à la
-			     main un chemin que WindowGroup gère (cf. la note @Sendable en
-			     tête de SignalQuestApp.swift). Vérifié : la fenêtre s'ouvre
-			     normalement et le gate iPad passe sans ce rôle. -->
+			<!-- La scène Dashboard N'EST PAS déclarée : elle relève de
+			     `carplay-maps`, et Apple a accordé « Driving Task ». Déclarer une
+			     scène que le système ne connectera jamais n'apporte rien et
+			     attire l'attention en revue. `CarPlayDashboardSceneDelegate`
+			     reste dans le code, prêt à être redéclaré ici le jour où la
+			     catégorie navigation serait obtenue. -->
 			<key>CPTemplateApplicationSceneSessionRoleApplication</key>
 			<array>
 				<dict>
 					<key>UISceneClassName</key>
 					<string>CPTemplateApplicationScene</string>
-					<!-- Obligatoire : UIKit s'en sert comme clé d'identité de
-					     session. L'omettre est une cause classique de « la scène
-					     CarPlay ne se connecte jamais ». -->
 					<key>UISceneConfigurationName</key>
 					<string>CarPlay</string>
 					<key>UISceneDelegateClassName</key>
 					<string>$(PRODUCT_MODULE_NAME).CarPlaySceneDelegate</string>
 				</dict>
 			</array>
-			<!-- Dashboard : la vignette de carte affichée à côté des widgets du
-			     véhicule. Scène DISTINCTE de la précédente — les deux peuvent
-			     être connectées simultanément — mais couverte par le même
-			     entitlement carplay-maps, donc rien de plus à demander à Apple. -->
-			<key>CPTemplateApplicationDashboardSceneSessionRoleApplication</key>
-			<array>
-				<dict>
-					<key>UISceneClassName</key>
-					<string>CPTemplateApplicationDashboardScene</string>
-					<key>UISceneConfigurationName</key>
-					<string>CarPlay Dashboard</string>
-					<key>UISceneDelegateClassName</key>
-					<string>$(PRODUCT_MODULE_NAME).CarPlayDashboardSceneDelegate</string>
-				</dict>
-			</array>
 		</dict>
 	</dict>
-	<key>NSSupportsLiveActivities</key>
-	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
 		<string>voip</string>
 		<string>remote-notification</string>
-		<!-- Mode rafale continu (drive test) : le suivi de localisation maintient
-		     l'app active écran verrouillé pour enchaîner les speedtests. -->
 		<string>location</string>
 	</array>
 	<key>UILaunchScreen</key>
@@ -201,15 +157,24 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>CFBundleURLTypes</key>
+	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict>
-			<key>CFBundleURLName</key>
-			<string>$(PRODUCT_BUNDLE_IDENTIFIER).deeplink</string>
-			<key>CFBundleURLSchemes</key>
+			<key>UTTypeConformsTo</key>
 			<array>
-				<string>$(SQ_URL_SCHEME)</string>
+				<string>public.plain-text</string>
 			</array>
+			<key>UTTypeDescription</key>
+			<string>Export NetMonster</string>
+			<key>UTTypeIdentifier</key>
+			<string>fr.signalquest.ntm</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>ntm</string>
+				</array>
+			</dict>
 		</dict>
 	</array>
 </dict>

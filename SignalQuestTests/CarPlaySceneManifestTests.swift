@@ -43,26 +43,30 @@ final class CarPlaySceneManifestTests: XCTestCase {
                        "SignalQuest.CarPlaySceneDelegate")
     }
 
-    /// Le Dashboard est une scène distincte, avec sa propre classe.
-    func testDashboardSceneIsDeclared() throws {
-        let scene = try XCTUnwrap(
-            configuration(forRole: "CPTemplateApplicationDashboardSceneSessionRoleApplication")
-        )
-        XCTAssertEqual(scene["UISceneClassName"] as? String, "CPTemplateApplicationDashboardScene")
-        XCTAssertEqual(scene["UISceneDelegateClassName"] as? String,
-                       "SignalQuest.CarPlayDashboardSceneDelegate")
+    /// Le Dashboard N'EST PAS déclaré : il relève de `carplay-maps`, alors
+    /// qu'Apple a accordé la catégorie « Driving Task ». Une scène que le système
+    /// ne connectera jamais n'apporte rien et attire l'attention en revue.
+    ///
+    /// Ce test vaut rappel : le jour où la catégorie navigation serait obtenue,
+    /// c'est lui qui devra être inversé, en même temps que la clé d'entitlement.
+    func testDashboardSceneIsNotDeclaredWithoutTheMapsEntitlement() {
+        XCTAssertNil(configurations["CPTemplateApplicationDashboardSceneSessionRoleApplication"])
     }
+
 
     /// Les classes nommées dans le plist doivent EXISTER sous ce nom exact :
     /// c'est `NSClassFromString` qui les résout au démarrage, donc un renommage
     /// de classe ne casserait rien à la compilation.
     func testDeclaredDelegateClassesResolveAtRuntime() throws {
-        for role in ["CPTemplateApplicationSceneSessionRoleApplication",
-                     "CPTemplateApplicationDashboardSceneSessionRoleApplication"] {
+        // Parcourt les rôles RÉELLEMENT déclarés plutôt qu'une liste en dur :
+        // le Dashboard va et vient selon la catégorie CarPlay accordée, et ce
+        // test doit rester juste dans les deux cas.
+        XCTAssertFalse(configurations.isEmpty, "Aucune scène déclarée : CarPlay ne se connecterait pas")
+        for (role, _) in configurations {
             let scene = try XCTUnwrap(configuration(forRole: role))
             let className = try XCTUnwrap(scene["UISceneDelegateClassName"] as? String)
             XCTAssertNotNil(NSClassFromString(className),
-                            "\(className) est déclarée mais introuvable à l'exécution")
+                            "\(className) est déclarée pour \(role) mais introuvable à l'exécution")
         }
     }
 
