@@ -696,8 +696,18 @@ struct SpeedtestSubmission: Encodable, Equatable {
     let downloadServerHost: String?
     let downloadServerPort: Int?
 
+    /// Version de la méthodologie de mesure, commune aux deux plateformes.
+    ///
+    /// iOS ne l'envoyait pas du tout : filtrer les agrégats dessus aurait donc
+    /// exclu 100 % du corpus iOS, ce qui explique que le champ n'ait jamais été
+    /// exploité côté serveur. À partir de 4, le même numéro garantit la MÊME
+    /// méthodologie ici et sur Android (gigue en écart-type de part et d'autre) —
+    /// c'est ce qui rend un agrégat tous téléphones confondus légitime.
+    /// Contrat lu par `apps/web/lib/speedtest-comparability.ts`.
+    static let currentMethodologyVersion = 4
+
     enum CodingKeys: String, CodingKey {
-        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort
+        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort, methodologyVersion
         case rsrp, rsrq, snr, cellId, pci, enb, gnb, radioSnapshots
         case pingDl, jitterDl, pingUl, jitterUl
     }
@@ -836,6 +846,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encodeIfPresent(downloadServerId, forKey: .downloadServerId)
         try c.encodeIfPresent(downloadServerCode, forKey: .downloadServerCode)
         try c.encodeIfPresent(downloadServerHost, forKey: .downloadServerHost)
+        try c.encode(Self.currentMethodologyVersion, forKey: .methodologyVersion)
         try c.encodeIfPresent(downloadServerPort, forKey: .downloadServerPort)
         try c.encodeNil(forKey: .rsrp)
         try c.encodeNil(forKey: .rsrq)
@@ -1015,10 +1026,36 @@ struct SpeedMetricCalculator {
         return sorted[mid]
     }
 
+    /// Gigue = ÉCART-TYPE des RTT, méthodologie Ookla — identique à Android
+    /// (`SpeedtestMetricsCalculator.kt`). Les deux implémentations doivent rester
+    /// alignées, sinon les gigues des deux plateformes cessent d'être comparables
+    /// et aucun agrégat ne veut plus rien dire.
+    ///
+    /// Cette fonction calculait auparavant la moyenne des écarts consécutifs
+    /// (IPDV, famille RFC 3550). Deux raisons de l'abandonner :
+    ///
+    /// 1. L'IPDV suppose une série RÉGULIÈRE : il mesure |RTT(i) − RTT(i−1)|. Dès
+    ///    qu'un échantillon expire, il faut soit sauter — et comparer alors deux
+    ///    mesures espacées de deux intervalles, ce qui gonfle la gigue — soit
+    ///    interpoler, ce qui la sous-estime. En 4G/5G, 10 à 30 % des échantillons
+    ///    expirent : ce n'est pas un cas limite, c'est le régime normal.
+    ///    L'écart-type, lui, ne dépend ni de l'ordre ni de la cadence.
+    /// 2. L'utilisateur qui compare SignalQuest à Speedtest.net compare à un
+    ///    écart-type. Une gigue systématiquement différente de la référence du
+    ///    marché passe pour un bug, pas pour une méthodologie.
+    ///
+    /// ⚠️ Effet attendu : pour un bruit gaussien, E[|Xᵢ − Xᵢ₋₁|] ≈ 1,13 σ. La gigue
+    /// iOS baisse donc d'environ 13 % en régime calme, davantage en présence de
+    /// pics isolés (un pic compte deux fois dans l'IPDV, une seule dans l'écart-type).
+    /// C'est le correctif, pas une régression.
+    ///
+    /// Écart-type de POPULATION (division par n), comme Android : on décrit la
+    /// série mesurée, on n'estime pas une population plus large.
     static func jitter(_ pings: [Double]) -> Double? {
         guard pings.count > 1 else { return nil }
-        let deltas = zip(pings.dropFirst(), pings).map { abs($0 - $1) }
-        return average(deltas)
+        let mean = pings.reduce(0, +) / Double(pings.count)
+        let variance = pings.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(pings.count)
+        return variance.squareRoot()
     }
 
     static func percentile(_ values: [Double], percentile: Double) -> Double? {

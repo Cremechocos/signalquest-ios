@@ -9,13 +9,18 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(SpeedMetricCalculator.mbps(bytes: 1_000_000, seconds: 1), 8, accuracy: 0.001)
         XCTAssertEqual(SpeedMetricCalculator.average([10, 20, 30]), 20, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(SpeedMetricCalculator.median([10, 30, 20])), 20)
-        XCTAssertEqual(try XCTUnwrap(SpeedMetricCalculator.jitter([10, 14, 11])), 3.5, accuracy: 0.001)
+        // Écart-type de population (moyenne 11,666… ; σ ≈ 1,6997), aligné sur
+        // Android. Cette assertion valait 3,5 tant que la gigue était calculée en
+        // moyenne des écarts consécutifs.
+        XCTAssertEqual(try XCTUnwrap(SpeedMetricCalculator.jitter([10, 14, 11])), 1.699673171197595, accuracy: 0.001)
     }
 
     func testJitterRequiresAtLeastTwoSamples() throws {
         XCTAssertNil(SpeedMetricCalculator.jitter([]))
         XCTAssertNil(SpeedMetricCalculator.jitter([18]))
-        XCTAssertEqual(try XCTUnwrap(SpeedMetricCalculator.jitter([10, 14])), 4, accuracy: 0.001)
+        // Deux échantillons : σ = |écart| / 2, soit 2 et non 4 — l'écart brut
+        // était l'ancienne définition.
+        XCTAssertEqual(try XCTUnwrap(SpeedMetricCalculator.jitter([10, 14])), 2, accuracy: 0.001)
     }
 
     func testPingBudgetNeverExceedsEightAttempts() {
@@ -1079,6 +1084,40 @@ final class SpeedtestTests: XCTestCase {
         let paris = Coordinates(latitude: 48.8566, longitude: 2.3522)
         let resolved = selectIPerfServer(for: .iperfCatalog, location: paris, catalogId: "pop_disparu")
         XCTAssertEqual(resolved.countryCode, "FR", "repli attendu sur un POP proche de Paris")
+    }
+
+    // MARK: Méthodologie commune aux deux plateformes
+
+    /// ⚠️ VECTEUR PARTAGÉ AVEC ANDROID. Le même tableau est vérifié dans
+    /// `SpeedtestJitterMethodologyTest.kt` avec le même résultat attendu : c'est ce
+    /// qui garantit que les gigues des deux apps sont comparables. Toute évolution
+    /// de la formule doit toucher les deux côtés, sinon les agrégats mélangent des
+    /// mesures qui ne veulent pas dire la même chose.
+    func testJitterIsPopulationStandardDeviationLikeAndroid() {
+        // moyenne = 20 ; variance = (100 + 0 + 100) / 3 ; σ = √66,666… ≈ 8,1650
+        let jitter = try? XCTUnwrap(SpeedMetricCalculator.jitter([10, 20, 30]))
+        XCTAssertEqual(jitter ?? 0, 8.16496580927726, accuracy: 1e-9)
+
+        // Série constante : aucune variabilité.
+        XCTAssertEqual(SpeedMetricCalculator.jitter([42, 42, 42, 42]) ?? -1, 0, accuracy: 1e-12)
+
+        // Un seul échantillon ne permet aucune dispersion.
+        XCTAssertNil(SpeedMetricCalculator.jitter([12]))
+        XCTAssertNil(SpeedMetricCalculator.jitter([]))
+    }
+
+    /// L'écart-type ne dépend PAS de l'ordre des échantillons — c'est ce qui le rend
+    /// robuste aux trous, alors que l'ancienne formule (moyenne des écarts
+    /// consécutifs) changeait de résultat selon la place des valeurs manquantes.
+    /// En 4G/5G, 10 à 30 % des échantillons expirent : ce n'est pas un cas limite.
+    func testJitterIsIndependentOfSampleOrder() {
+        let ordered = SpeedMetricCalculator.jitter([10, 20, 30, 40]) ?? 0
+        let shuffled = SpeedMetricCalculator.jitter([40, 10, 30, 20]) ?? 0
+        XCTAssertEqual(ordered, shuffled, accuracy: 1e-12)
+
+        // L'ancienne formule IPDV, elle, donnait 10 sur la série ordonnée et 20 sur
+        // la seconde : deux réseaux identiques auraient reçu deux gigues différentes.
+        XCTAssertNotEqual(ordered, 10, accuracy: 1e-9)
     }
 
     func testConnectionResetIsRetryableIPerfError() {
