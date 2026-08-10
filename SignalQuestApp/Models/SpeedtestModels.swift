@@ -724,7 +724,16 @@ struct SpeedtestSubmission: Encodable, Equatable {
     /// méthodologie ici et sur Android (gigue en écart-type de part et d'autre) —
     /// c'est ce qui rend un agrégat tous téléphones confondus légitime.
     /// Contrat lu par `apps/web/lib/speedtest-comparability.ts`.
-    static let currentMethodologyVersion = 4
+    ///
+    /// **5** — le débit crête passe du « max des fenêtres d'1 s » à la moyenne de
+    /// la meilleure fenêtre glissante couvrant 30 % de la durée, définition de
+    /// nPerf. `downloadMax`/`uploadMax` BAISSENT donc à partir de cette version,
+    /// d'autant plus que le lien est instable (~+14 % d'écart en cellulaire,
+    /// jusqu'à +88 % sur une rafale courte, mesuré en simulation). Sans ce
+    /// numéro, la rupture dans la série historique serait inexplicable et se
+    /// lirait comme une dégradation du réseau. Moyenne, p90 et p95 sont
+    /// INCHANGÉES : seul le max est concerné.
+    static let currentMethodologyVersion = 5
 
     enum CodingKeys: String, CodingKey {
         case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort, methodologyVersion, engine, engineFallbackReason, requestedServerId

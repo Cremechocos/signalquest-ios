@@ -230,6 +230,13 @@ private enum SpeedtestEngineConfig {
     /// Window length used to compute Mbps samples post-grace. Android uses
     /// 1000 ms and reads the same value for the public p90/p95/peak stats.
     static let publicPeakWindowMs: Double = 1_000
+    /// Part de la durée utile couverte par la fenêtre du débit crête (30 %).
+    ///
+    /// Même définition que nPerf : « le débit crête correspond à la moyenne de la
+    /// meilleure fenêtre sur 30 % de la durée du test ». Ne sert QU'AU pic —
+    /// p90/p95 et la série du graphe restent en fenêtres d'1 s, changer leur
+    /// largeur modifierait silencieusement d'autres champs publiés.
+    static let peakWindowRatio: Double = 0.30
     /// Hard cap on parallel streams (download reverse).
     static let hardMaxStreams: Int = 16
     /// Upload : aligné sur le descendant et sur Android, qui monte à 16 depuis
@@ -723,7 +730,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             endMs: max(dlResult.measuredDuration, 0.001) * 1_000
         )
         let dlAverageMbps = dlResult.averageMbps
-        let dlPeakMbps = max(dlStats.peak, dlAverageMbps)
+        let dlPeakMbps = dlSamplesBox.nperfPeakMbps(
+            usefulDurationMs: max(dlResult.measuredDuration, 0.001) * 1_000,
+            flooredAt: dlAverageMbps
+        )
 
         // Série GRAPHE du test entier : fenêtres fines de grâce [0, omit] puis
         // utiles — la frontière (nombre de fenêtres de grâce) part au renderer.
@@ -876,7 +886,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                         ulGraphSeries = ulGraceSeries + ulUsefulSeries
                         ulGraceCount = ulGraceSeries.count
                         ulAverageMbps = ulResult.averageMbps
-                        ulPeakMbps = max(ulStats.peak, ulAverageMbps ?? 0)
+                        ulPeakMbps = ulSamplesBox.nperfPeakMbps(
+                            usefulDurationMs: max(ulResult.measuredDuration, 0.001) * 1_000,
+                            flooredAt: ulAverageMbps ?? 0
+                        )
                         uploadSource = ulResult.serverBytes != nil ? "server-received" : "client-written"
                         didUpload = true
                         break
@@ -1241,7 +1254,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             endMs: max(dlOutcome.duration, 0.001) * 1_000
         ).seriesMbps
         let dlAverageMbps = dlOutcome.averageMbps
-        let dlPeakMbps = max(dlStats.peak, dlAverageMbps)
+        let dlPeakMbps = dlSamplesBox.nperfPeakMbps(
+            usefulDurationMs: max(dlOutcome.duration, 0.001) * 1_000,
+            flooredAt: dlAverageMbps
+        )
 
         // 3. Upload — best effort, le DL seul reste un résultat valide.
         progress?(SpeedtestLiveProgress(phase: .upload, fraction: 0, serverName: serverName))
@@ -1309,7 +1325,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 endMs: max(ulOutcome.duration, 0.001) * 1_000
             ).seriesMbps
             ulAverageMbps = ulOutcome.averageMbps
-            ulPeakMbps = max(ulStats.peak, ulAverageMbps ?? 0)
+            ulPeakMbps = ulSamplesBox.nperfPeakMbps(
+                usefulDurationMs: max(ulOutcome.duration, 0.001) * 1_000,
+                flooredAt: ulAverageMbps ?? 0
+            )
         }
 
         let measurements = EngineMeasurements(
@@ -1579,7 +1598,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             endMs: max(dlOutcome.duration, 0.001) * 1_000
         ).seriesMbps
         let dlAverageMbps = dlOutcome.averageMbps
-        let dlPeakMbps = max(dlStats.peak, dlAverageMbps)
+        let dlPeakMbps = dlSamplesBox.nperfPeakMbps(
+            usefulDurationMs: max(dlOutcome.duration, 0.001) * 1_000,
+            flooredAt: dlAverageMbps
+        )
 
         // 3. Upload — best effort.
         progress?(SpeedtestLiveProgress(phase: .upload, fraction: 0, serverName: serverName))
@@ -1637,7 +1659,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 endMs: max(ulOutcome.duration, 0.001) * 1_000
             ).seriesMbps
             ulAverageMbps = ulOutcome.averageMbps
-            ulPeakMbps = max(ulStats.peak, ulAverageMbps ?? 0)
+            ulPeakMbps = ulSamplesBox.nperfPeakMbps(
+                usefulDurationMs: max(ulOutcome.duration, 0.001) * 1_000,
+                flooredAt: ulAverageMbps ?? 0
+            )
         }
 
         let measurements = EngineMeasurements(
@@ -4273,6 +4298,60 @@ final class SpeedtestSamplesBox: @unchecked Sendable {
         let peak: Double
         let windowCount: Int
         let seriesMbps: [Double]
+    }
+
+    /// Débit crête « nPerf » : moyenne de la MEILLEURE fenêtre glissante couvrant
+    /// `SpeedtestEngineConfig.peakWindowRatio` de la durée utile.
+    ///
+    /// Remplace l'ancien « max des fenêtres d'1 s », qui mesurait autre chose : une
+    /// rafale de 600 ms suffisait à le faire doubler, alors qu'elle ne représente
+    /// pas un débit tenu. Trois conséquences voulues — la valeur baisse sur les
+    /// liens instables (c'est le but), elle devient comparable au débit crête
+    /// annoncé par nPerf, et elle s'élargit avec la durée du test au lieu de rester
+    /// figée à 1 s.
+    ///
+    /// Fenêtres ancrées sur la FIN de chaque échantillon, pas tuilées depuis zéro :
+    /// une tuile fixe coupe en deux une rafale à cheval sur sa frontière et la
+    /// dilue. C'est aussi ce que fait déjà Android, et les deux plateformes doivent
+    /// donner le même nombre sur la même trace.
+    ///
+    /// `flooredAt` garde le filet existant : un pic ne peut pas être sous la
+    /// moyenne du test.
+    func nperfPeakMbps(usefulDurationMs: Double, flooredAt average: Double) -> Double {
+        lock.lock()
+        let snapshot = samples
+        lock.unlock()
+        guard usefulDurationMs > 0, !snapshot.isEmpty else { return average }
+
+        // Plancher à 1 s : sous cette largeur on retomberait dans la sensibilité
+        // aux rafales que cette fenêtre existe précisément pour supprimer (un
+        // drive test de 6 s donnerait 1,8 s, un test écourté beaucoup moins).
+        let windowMs = max(
+            SpeedtestEngineConfig.publicPeakWindowMs,
+            usefulDurationMs * SpeedtestEngineConfig.peakWindowRatio
+        )
+
+        var best = 0.0
+        for candidate in snapshot {
+            let windowEnd = candidate.endMs
+            let windowStart = windowEnd - windowMs
+            guard windowStart >= 0 else { continue }
+            var bytesInWindow = 0
+            for sample in snapshot {
+                let overlapStart = max(sample.startMs, windowStart)
+                let overlapEnd = min(sample.endMs, windowEnd)
+                guard overlapEnd > overlapStart else { continue }
+                let sampleSpan = max(1, sample.endMs - sample.startMs)
+                let ratio = (overlapEnd - overlapStart) / sampleSpan
+                bytesInWindow += Int(Double(sample.bytes) * ratio)
+            }
+            guard bytesInWindow > 0 else { continue }
+            let mbps = boundedMbps(bytes: bytesInWindow, durationMs: windowMs)
+            if mbps > 0, mbps < 10_000, mbps > best { best = mbps }
+        }
+        // Aucune fenêtre pleine (test plus court que la fenêtre) : la moyenne est
+        // alors la meilleure réponse disponible, et non zéro.
+        return max(best, average)
     }
 
     func publicStats(windowMs: Double, graceMs: Double, endMs: Double) -> PublicStats {

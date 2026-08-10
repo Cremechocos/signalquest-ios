@@ -700,7 +700,16 @@ struct SpeedtestView: View {
                                 set: { downloadTargetRaw = $0.rawValue }
                             ),
                             libreSpeedHost: $libreSpeedHost,
-                            iperfServerId: $iperfServerId
+                            iperfServerId: $iperfServerId,
+                            // Dernière position CONNUE, jamais une demande : ouvrir
+                            // le sélecteur ne doit ni déclencher le prompt système
+                            // ni attendre un fix. `nil` = tri par distance masqué.
+                            userLocation: services.location.lastLocation.map {
+                                Coordinates(
+                                    latitude: $0.coordinate.latitude,
+                                    longitude: $0.coordinate.longitude
+                                )
+                            }
                         )
 
                         VStack(alignment: .leading, spacing: SQSpace.sm) {

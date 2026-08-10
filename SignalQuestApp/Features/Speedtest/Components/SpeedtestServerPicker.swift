@@ -9,8 +9,40 @@ struct SpeedtestServerPicker: View {
     @Binding var libreSpeedHost: String
     /// POP iPerf3 choisi dans le catalogue distant (id) ; vide = aucun.
     @Binding var iperfServerId: String
+    /// Dernière position connue, ou `nil`. Volontairement passée par le parent
+    /// plutôt que lue ici : ouvrir un sélecteur ne doit pas déclencher une demande
+    /// de permission ni attendre un fix GPS.
+    var userLocation: Coordinates?
     /// `nil` = tout replié (sauf Auto toujours visible).
     @State private var expandedRegion: String?
+    /// Tri par distance plutôt que par fournisseur. Non persisté : c'est un
+    /// confort de consultation, pas un réglage de mesure.
+    @State private var sortByDistance = false
+
+    /// Vrai quand le tri par distance a un sens. Sans position il est simplement
+    /// indisponible — on retombe sur l'affichage habituel, sans message d'erreur :
+    /// le sélecteur reste utilisable, et le moteur a de toute façon son propre
+    /// repli (POPs FR non-OVH d'abord).
+    var canSortByDistance: Bool { userLocation != nil }
+
+    /// Tous les POPs du plus proche au plus lointain, distance en prime.
+    ///
+    /// ⚠️ Distance GÉOGRAPHIQUE pure, PAS `iperfServersSortedByDistance` : ce
+    /// dernier applique les pénalités du mode Auto (OVH décalé de 1 500 km,
+    /// paliers IPv6 et +90 ms) dont sa propre documentation dit qu'elles ne
+    /// doivent jamais peser sur un choix manuel. Les réutiliser ici afficherait
+    /// des kilomètres qui ne correspondent à rien sur une carte.
+    var serversByDistance: [(server: IPerfPublicServer, km: Double)] {
+        guard let userLocation else { return [] }
+        return activeIPerfServers
+            .map { server in
+                (server, haversineDistanceKm(
+                    from: userLocation,
+                    to: Coordinates(latitude: server.latitude, longitude: server.longitude)
+                ))
+            }
+            .sorted { $0.1 < $1.1 }
+    }
 
     var collapsibleGroups: [(region: String, targets: [SpeedtestDownloadTarget])] {
         SpeedtestDownloadTarget.pickerGroups
@@ -34,12 +66,63 @@ struct SpeedtestServerPicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Auto + Cloudflare (moteurs) — toujours visibles. LibreSpeed a sa
-            // propre section (data-driven + choix manuel du POP).
+            // propre section (data-driven + choix manuel du POP). Ce sont des
+            // moteurs, pas des lieux : ils restent en tête même en tri distance.
             ForEach(SpeedtestDownloadTarget.ungroupedCases.filter { $0 != .libreSpeed }) { target in
                 serverRow(target)
             }
 
-            ForEach(collapsibleGroups, id: \.region) { group in
+            if canSortByDistance { sortToggle }
+
+            if sortByDistance {
+                distanceList
+            } else {
+                groupedSections
+            }
+        }
+        // Animation de hauteur/layout uniquement — fluide dans un ScrollView.
+        .animation(.easeInOut(duration: 0.25), value: expandedRegion)
+        .animation(.easeInOut(duration: 0.25), value: sortByDistance)
+        .onAppear {
+            expandGroup(containing: selection)
+        }
+        .onChange(of: selection) { newValue in
+            expandGroup(containing: newValue)
+        }
+    }
+
+    /// Bascule d'ordre. Absente sans position : proposer un tri qu'on ne peut pas
+    /// calculer serait pire que de ne rien proposer.
+    private var sortToggle: some View {
+        Picker("Ordre", selection: $sortByDistance) {
+            Text("Par fournisseur").tag(false)
+            Text("Par distance").tag(true)
+        }
+        .pickerStyle(.segmented)
+        // Forme à UN paramètre : la variante `(of:initial:_:)` exige iOS 17, et le
+        // reste du fichier vise plus bas.
+        .onChange(of: sortByDistance) { _ in
+            Haptics.selection()
+            // Une section repliée n'a plus de sens dans une liste à plat, et la
+            // retrouver ouverte au retour surprendrait.
+            expandedRegion = nil
+        }
+    }
+
+    /// Liste à plat, du plus proche au plus lointain, tous fournisseurs mêlés —
+    /// c'est justement l'intérêt : en déplacement, on cherche le POP le plus
+    /// proche, pas celui d'un opérateur donné.
+    @ViewBuilder private var distanceList: some View {
+        VStack(spacing: 6) {
+            ForEach(serversByDistance, id: \.server.id) { entry in
+                distanceRow(entry.server, km: entry.km)
+            }
+        }
+        libreSpeedSection
+    }
+
+    @ViewBuilder private var groupedSections: some View {
+        ForEach(collapsibleGroups, id: \.region) { group in
                 let isExpanded = expandedRegion == group.region
                 let selectedInGroup = group.targets.contains(selection)
 
@@ -100,17 +183,8 @@ struct SpeedtestServerPicker: View {
                 }
             }
 
-            catalogSection
-            libreSpeedSection
-        }
-        // Animation de hauteur/layout uniquement — fluide dans un ScrollView.
-        .animation(.easeInOut(duration: 0.25), value: expandedRegion)
-        .onAppear {
-            expandGroup(containing: selection)
-        }
-        .onChange(of: selection) { newValue in
-            expandGroup(containing: newValue)
-        }
+        catalogSection
+        libreSpeedSection
     }
 
     /// Ouvre le groupe du serveur choisi (Auto / Cloudflare n'en ont pas).
@@ -226,6 +300,39 @@ struct SpeedtestServerPicker: View {
                 }
             }
         }
+    }
+
+    /// Ligne du tri par distance : le même POP peut être connu de l'enum (il a
+    /// alors sa cible dédiée) ou venir seulement du catalogue distant. On résout
+    /// les deux ici, sinon choisir un POP OVH depuis cette liste le sélectionnerait
+    /// comme un POP de catalogue et perdrait sa cible d'origine.
+    func distanceRow(_ server: IPerfPublicServer, km: Double) -> some View {
+        let knownTarget = SpeedtestDownloadTarget(rawValue: server.id)
+        let selected = knownTarget.map { selection == $0 }
+            ?? (selection == .iperfCatalog && iperfServerId == server.id)
+        return Button {
+            if let knownTarget {
+                selection = knownTarget
+            } else {
+                selection = .iperfCatalog
+                iperfServerId = server.id
+            }
+            Haptics.selection()
+        } label: {
+            libreSpeedRowLabel(
+                icon: "server.rack",
+                title: server.name,
+                subtitle: "\(distanceText(km)) · \(server.code)",
+                selected: selected
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Sous les 10 km la précision au kilomètre a un sens ; au-delà elle est du
+    /// bruit — la position vient d'un dernier point connu, pas d'un fix frais.
+    func distanceText(_ km: Double) -> String {
+        km < 10 ? String(format: "%.1f km", km) : "\(Int(km.rounded())) km"
     }
 
     func catalogServerRow(_ server: IPerfPublicServer) -> some View {
