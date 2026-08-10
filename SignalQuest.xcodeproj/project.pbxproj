@@ -38,6 +38,7 @@
 		0E2FA15498AD22C352AF080E /* DirectionsRequestHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1613623BA44BAF57928D049E /* DirectionsRequestHandler.swift */; };
 		0E91F86BD082D7967A904E1B /* GamificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DE13CA2784C45B1F0EDF3B2 /* GamificationService.swift */; };
 		0ECBE473F9CE2213A93E7583 /* SQUserBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC5255F7439DB3A81B3C67F6 /* SQUserBadge.swift */; };
+		0EEF1C07C36C03F62FB62C7C /* CommunityOutageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBF10C60A108A1CB37B923B /* CommunityOutageService.swift */; };
 		0F93CA162732A4E9F82EC1AF /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD246E248AC961551013A82C /* Haptics.swift */; };
 		0FC1E05534800C8F2C87ABD4 /* SQFriendMarkerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E75516A87ED197A5BB4AB1 /* SQFriendMarkerView.swift */; };
 		10DD4DD2B9C039C5DDDFA23C /* TerritoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF1CBBB47AF9B0D1E7B04560 /* TerritoryTests.swift */; };
@@ -120,6 +121,7 @@
 		3AE2A1D61D1D7996E56BC9CF /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D755436C239643387D984492 /* LocationService.swift */; };
 		3B35AD691B8C4B53BD19DC6F /* AntennaReportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0616550E274CD9D726FFF1 /* AntennaReportSheet.swift */; };
 		3D1F0588D592CF8DED9BD1EB /* FluidityQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFDF16B243853AE40E37D07C /* FluidityQATests.swift */; };
+		3D3F1BC367322F152B209083 /* SpeedtestPeakWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F67E9701F2DA2ADA20F28E /* SpeedtestPeakWindowTests.swift */; };
 		3F1956951AB95E899EC52726 /* SpeedtestPhase+Display.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93B1CEE997E54F26D8E2E986 /* SpeedtestPhase+Display.swift */; };
 		3F419A8072024B7EE5450BCF /* CarPlayDashboardRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD898C39E347EA8BD1B9BFDE /* CarPlayDashboardRoute.swift */; };
 		3F9F9AA6045113228636CAA6 /* CarPlayDestinationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C62C93752341987146C0AD5 /* CarPlayDestinationTests.swift */; };
@@ -248,6 +250,7 @@
 		82E284C1E43377E17E8E1409 /* CarPlayDestinationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4DB45536846705516AB27E9 /* CarPlayDestinationStore.swift */; };
 		836D76211D8B12F2E56901A8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AD04EAFD67FBCB63533321A0 /* Assets.xcassets */; };
 		848B9C3DC83FC58801772208 /* NearbyOperatorStat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6570A8819FE179AAFE0B2546 /* NearbyOperatorStat.swift */; };
+		867A4E7EC8D952106DE3454A /* CommunityOutageCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB354364AE1F453BC2B1E07A /* CommunityOutageCard.swift */; };
 		86B8A5872A08214CDCDE5633 /* CoordinateGridTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DA0BEDA1A291F4FBD677EF4 /* CoordinateGridTests.swift */; };
 		88DC8CD2D438DEA6784D2D7E /* SpeedtestHistoryRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 981E7B41486B91A9E6788632 /* SpeedtestHistoryRow.swift */; };
 		8A4136A5D87AAEDAB5407344 /* ANFRDemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C94749CE21617DB555FC5D6 /* ANFRDemoData.swift */; };
@@ -352,6 +355,7 @@
 		C5744C022E0AF35A8A69C56D /* SQMapAnnotations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 668760065DE520E85BAF4154 /* SQMapAnnotations.swift */; };
 		C59C5E4EB38578979508E028 /* MessageShareModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD352558B0E98E08EE91AFF6 /* MessageShareModels.swift */; };
 		C5E19EFC623A3289BC5A0677 /* SQNetworkColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2015AC272F9D96F13C28D48 /* SQNetworkColors.swift */; };
+		C6A435D243493EE535CDE5B5 /* CommunityOutage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650DAFD6CE96C9A6C5ADB712 /* CommunityOutage.swift */; };
 		C6E8D77B6E6274C0DE301A38 /* NearestAntennaTemplateBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C1FE525B9AFAD0D19CB5A8F /* NearestAntennaTemplateBuilder.swift */; };
 		C89F0219A38079D2441D50BC /* SpeedtestServerPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD6D6F9AEC13320786BD614D /* SpeedtestServerPicker.swift */; };
 		C8E7712A2C15FF7B8AEC516E /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 8BCDF535985DE44CBDD88A60 /* Localizable.xcstrings */; };
@@ -644,6 +648,7 @@
 		63F121F16DC7FF76A1D7D6ED /* SQMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQMotion.swift; sourceTree = "<group>"; };
 		649AF22D91CC4ADD75073863 /* NetworkPathMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPathMonitor.swift; sourceTree = "<group>"; };
 		650653A7B6FF5FCF914EA06D /* SQMapKitDotsOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQMapKitDotsOverlay.swift; sourceTree = "<group>"; };
+		650DAFD6CE96C9A6C5ADB712 /* CommunityOutage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityOutage.swift; sourceTree = "<group>"; };
 		65484622445B106E95030CE3 /* AntennaReportThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaReportThreadView.swift; sourceTree = "<group>"; };
 		6570A8819FE179AAFE0B2546 /* NearbyOperatorStat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbyOperatorStat.swift; sourceTree = "<group>"; };
 		65CA75BF3F0519CFD6B732AE /* market_registry_fallback.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = market_registry_fallback.json; sourceTree = "<group>"; };
@@ -669,6 +674,7 @@
 		6F8487B690EEC1DAED017BE3 /* DiskCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskCache.swift; sourceTree = "<group>"; };
 		6F96E85885FA5E8B97999EAA /* AuthCookieStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthCookieStore.swift; sourceTree = "<group>"; };
 		70E4B6F01B0F4B916A069D31 /* SpeedtestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestTests.swift; sourceTree = "<group>"; };
+		70F67E9701F2DA2ADA20F28E /* SpeedtestPeakWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestPeakWindowTests.swift; sourceTree = "<group>"; };
 		71E4D5592689833F8992519D /* FhAzimuthsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FhAzimuthsTests.swift; sourceTree = "<group>"; };
 		71F03A270597876371BF433F /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		729C9DEBA4E8FC4DD397E20E /* SpeedtestTriMetric.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestTriMetric.swift; sourceTree = "<group>"; };
@@ -771,6 +777,7 @@
 		A9594367DF3047FDF3B240AB /* MockURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockURLProtocol.swift; sourceTree = "<group>"; };
 		AA6A9E12FB0C1755E79A6216 /* SpeedtestIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestIntents.swift; sourceTree = "<group>"; };
 		AB3FB8DEBAD180B509683C8D /* MapSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapSearchTests.swift; sourceTree = "<group>"; };
+		ABBF10C60A108A1CB37B923B /* CommunityOutageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityOutageService.swift; sourceTree = "<group>"; };
 		AC02787ABEAE06188ADF7D1F /* LeaderboardService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardService.swift; sourceTree = "<group>"; };
 		AC51F8CACA66BE964E15F919 /* APIEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIEndpoint.swift; sourceTree = "<group>"; };
 		ACB33739AFC84C313844322C /* MapExplorerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapExplorerView.swift; sourceTree = "<group>"; };
@@ -909,6 +916,7 @@
 		FA8ECC4FB30FDE6210DF221A /* MessageSchedulingSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageSchedulingSheets.swift; sourceTree = "<group>"; };
 		FAB5FA7CA8B461402BA0DF2A /* RedesignAuditTourQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedesignAuditTourQATests.swift; sourceTree = "<group>"; };
 		FB24C8F6F0931F6D99B18115 /* AntennasService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennasService.swift; sourceTree = "<group>"; };
+		FB354364AE1F453BC2B1E07A /* CommunityOutageCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityOutageCard.swift; sourceTree = "<group>"; };
 		FB6C44B8774426189E2CBF50 /* MessagesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesService.swift; sourceTree = "<group>"; };
 		FBEB88B2CA9EC99EE88C5146 /* OledTourQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OledTourQATests.swift; sourceTree = "<group>"; };
 		FCC9C691A3F3F1874DAD506F /* AntennaMarkerRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaMarkerRenderTests.swift; sourceTree = "<group>"; };
@@ -1015,6 +1023,7 @@
 				8DA025CCAC0DF6A4A8AD5A6E /* AntennaModels.swift */,
 				969394914FD409108A452239 /* AntennaReportModels.swift */,
 				4DBC54E804678243BC1BCC4C /* AuthModels.swift */,
+				650DAFD6CE96C9A6C5ADB712 /* CommunityOutage.swift */,
 				D4B43802B3725DE1A21B9D53 /* FeedPoll.swift */,
 				D89B6EA883CAE3151D38ABEB /* IdentificationModels.swift */,
 				7AE018DD5313EE91ADC34F09 /* JSONValue.swift */,
@@ -1677,6 +1686,7 @@
 				92E156E2B3CA6D911D4A0C30 /* AuthService.swift */,
 				CE9C7190AEB0D08E27839A20 /* CallsService.swift */,
 				26BF4AF46D1515F881E4DF50 /* CommentsService.swift */,
+				ABBF10C60A108A1CB37B923B /* CommunityOutageService.swift */,
 				74C44E54A806F05156B150F1 /* CustomSitesService.swift */,
 				8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */,
 				510C718208A0F0CD33A6405E /* EntitlementsService.swift */,
@@ -1774,6 +1784,7 @@
 				6E309C5B2B935EA2E5944068 /* SignupConsentTests.swift */,
 				BB22F935961B1EAA5F431E59 /* SocialPreferencesTests.swift */,
 				E3E33D670CB07FB413E537F1 /* SpeedtestDetailSheetTests.swift */,
+				70F67E9701F2DA2ADA20F28E /* SpeedtestPeakWindowTests.swift */,
 				879A6D651EB7605DE38CD230 /* SpeedtestShareImageTests.swift */,
 				70E4B6F01B0F4B916A069D31 /* SpeedtestTests.swift */,
 				6BB896FE06E7411B91CC373D /* SpeedtestUploadStreamLadderTests.swift */,
@@ -1827,6 +1838,7 @@
 				1DAA7D338C028E555F8CBAFC /* AntennaSightGeometry.swift */,
 				56C63E44A7E96FCFBDBE3BD8 /* AntennaSightView.swift */,
 				AEC8C52D6E947CD2FC669EFE /* AntennaSupportSilhouette.swift */,
+				FB354364AE1F453BC2B1E07A /* CommunityOutageCard.swift */,
 				D504BC2C0CFB4CA628B1C909 /* CreateSiteFromCellsView.swift */,
 				CB55790C931377A64C3D3477 /* DromRegion.swift */,
 				A7FCE24EAE6C3426959B07BC /* FriendLiveSheet.swift */,
@@ -1937,8 +1949,6 @@
 				9CC8FFBB0F50BF714573C500 /* PBXTargetDependency */,
 			);
 			name = SignalQuestTests;
-			packageProductDependencies = (
-			);
 			productName = SignalQuestTests;
 			productReference = D7454A1BEDAD17CEBB961A3D /* SignalQuestTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -1981,8 +1991,6 @@
 			dependencies = (
 			);
 			name = SignalQuestWidget;
-			packageProductDependencies = (
-			);
 			productName = SignalQuestWidget;
 			productReference = 2A5251F96893CB76BAAC1239 /* SignalQuestWidget.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -1999,8 +2007,6 @@
 				14B3369A992C0846FBDCC8C7 /* PBXTargetDependency */,
 			);
 			name = SignalQuestUITests;
-			packageProductDependencies = (
-			);
 			productName = SignalQuestUITests;
 			productReference = 0BBEF6D66A51142E104DBD6B /* SignalQuestUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -2203,6 +2209,9 @@
 				4F4B31FD10557CF078C9FB72 /* ChooseHandleSheet.swift in Sources */,
 				15D675F950421D2AD863EED6 /* CommentsService.swift in Sources */,
 				7C6A3C2708709AE1A38C1DE6 /* CommentsSheet.swift in Sources */,
+				C6A435D243493EE535CDE5B5 /* CommunityOutage.swift in Sources */,
+				867A4E7EC8D952106DE3454A /* CommunityOutageCard.swift in Sources */,
+				0EEF1C07C36C03F62FB62C7C /* CommunityOutageService.swift in Sources */,
 				E77BFF2BB97F99E5152628A8 /* Comparable+Clamp.swift in Sources */,
 				B39EB7357AB465666E95C55F /* ComposerSheet.swift in Sources */,
 				03F9AFEEE08F4A89518363D5 /* ContinuousSessionAccumulator.swift in Sources */,
@@ -2551,6 +2560,7 @@
 				C47BAA50DD2B3D902FBF08B0 /* SignupConsentTests.swift in Sources */,
 				95216E4A0102A356C727DD52 /* SocialPreferencesTests.swift in Sources */,
 				4865973FD58147AC8822EADD /* SpeedtestDetailSheetTests.swift in Sources */,
+				3D3F1BC367322F152B209083 /* SpeedtestPeakWindowTests.swift in Sources */,
 				6651F3A94F7A12751A676CC2 /* SpeedtestShareImageTests.swift in Sources */,
 				323D3ADBAF7A05EE0C9EFA9B /* SpeedtestTests.swift in Sources */,
 				67B241EC2769C4066723D656 /* SpeedtestUploadStreamLadderTests.swift in Sources */,
@@ -2760,7 +2770,10 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				OTHER_LDFLAGS = "-weak_framework SwiftData";
+				OTHER_LDFLAGS = (
+					"-weak_framework",
+					SwiftData,
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios.beta;
 				PRODUCT_NAME = SignalQuest;
 				SDKROOT = iphoneos;
@@ -2883,7 +2896,10 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				OTHER_LDFLAGS = "-weak_framework SwiftData";
+				OTHER_LDFLAGS = (
+					"-weak_framework",
+					SwiftData,
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios;
 				PRODUCT_NAME = SignalQuest;
 				SDKROOT = iphoneos;
@@ -2942,7 +2958,10 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				OTHER_LDFLAGS = "-weak_framework SwiftData";
+				OTHER_LDFLAGS = (
+					"-weak_framework",
+					SwiftData,
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios;
 				PRODUCT_NAME = SignalQuest;
 				SDKROOT = iphoneos;
