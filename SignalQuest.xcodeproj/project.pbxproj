@@ -388,6 +388,7 @@
 		D96A72F6B5BEC5D882DC76EF /* SentinelleOwnerField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D82B3CC62FAF373BB6EB036 /* SentinelleOwnerField.swift */; };
 		DA3469640194E43FFDC39C39 /* CustomSiteDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3F7311EB7FEBC85F9AD1E6 /* CustomSiteDraftTests.swift */; };
 		DA97C11B6664887E0F4F3C42 /* PostCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA923675E56186A1BD8D5B7F /* PostCardView.swift */; };
+		DAF05F9B6CF6208FCB05B8AC /* OutageReportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A6C64C6C3847E186D24C58D /* OutageReportSheet.swift */; };
 		DB0BAEE35242EC8E2A1F6515 /* VersionPolicyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D9D541BEF00A9C73ECDCC19 /* VersionPolicyService.swift */; };
 		DBBD52313A6831B3403676BC /* GlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF71EBDA3DD738BAEF9242E3 /* GlassCard.swift */; };
 		DBD653BB59B8D01C74592509 /* MessagingE2EEQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D849C59293B6E1D70C5F88A /* MessagingE2EEQATests.swift */; };
@@ -550,6 +551,7 @@
 		29545835569FD2D703C23E6A /* TerritoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerritoriesView.swift; sourceTree = "<group>"; };
 		29DFF718DF6D58771CA26060 /* LivePresenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePresenceService.swift; sourceTree = "<group>"; };
 		2A5251F96893CB76BAAC1239 /* SignalQuestWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SignalQuestWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		2A6C64C6C3847E186D24C58D /* OutageReportSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OutageReportSheet.swift; sourceTree = "<group>"; };
 		2A7E285B40002E79EA8CC1BB /* SpeedtestService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestService.swift; sourceTree = "<group>"; };
 		2B145AC2EAF68345B76749E7 /* SharedSiteOperatorSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedSiteOperatorSheetTests.swift; sourceTree = "<group>"; };
 		2B47BDB4D6F4BC76820FA3D2 /* RemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteImage.swift; sourceTree = "<group>"; };
@@ -1852,6 +1854,7 @@
 				610EE8D2CB67E2741D6E1701 /* PlannedDetailSheet.swift */,
 				3E56653C936C5B86173CE9F8 /* MapKit */,
 				3AAE84DCCA4CD689F68F65BF /* Model */,
+				2A6C64C6C3847E186D24C58D /* OutageReportSheet.swift */,
 			);
 			path = Map;
 			sourceTree = "<group>";
@@ -2463,6 +2466,7 @@
 				58DD4781348DDCCACA2E1CF6 /* WeeklyRecapSheet.swift in Sources */,
 				1E08C8632734607458C0A7DF /* WiFiSSIDProvider.swift in Sources */,
 				19D4A156D2AA675F72CB2A16 /* WidgetSharedStore.swift in Sources */,
+				DAF05F9B6CF6208FCB05B8AC /* OutageReportSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

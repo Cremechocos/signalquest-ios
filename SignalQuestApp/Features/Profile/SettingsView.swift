@@ -310,6 +310,7 @@ struct SettingsView: View {
                 Toggle("Mises à jour ANFR (push)", isOn: bind(\.notifyAnfrUpdatesPush))
                 Toggle("Likes & commentaires (push)", isOn: bind(\.notifyPhotoLikesPush))
                 Toggle("Réponses à mes signalements (e-mail)", isOn: bind(\.notifyAntennaReportsEmail))
+                Toggle("Pannes signalées par la communauté", isOn: bind(\.notifyCommunityOutagesPush))
             }
             .tint(SQColor.brandRed)
             .foregroundStyle(SQColor.label)

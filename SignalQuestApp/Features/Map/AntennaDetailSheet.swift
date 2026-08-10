@@ -86,6 +86,10 @@ struct AntennaDetailSheet: View {
     @State private var viewerPhoto: AntennaPhotoSummary?
     @State private var photoPickerItem: PhotosPickerItem?
     @State private var showReportSheet = false
+    /// Pannes communautaires ouvertes sur ce site, rechargées à chaque changement d'opérateur :
+    /// une panne est scopée à un opérateur, donc basculer de facette change la réponse.
+    @State private var outages: [CommunityOutage] = []
+    @State private var showOutageReport = false
 
     init(
         site: AntennaSite,
@@ -144,12 +148,25 @@ struct AntennaDetailSheet: View {
                 model.details = nil
                 model.error = nil
                 await model.load(id: site.siteId ?? site.id, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
+                await loadOutages()
             }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .fullScreenCover(item: $viewerPhoto) { photo in
             AntennaPhotoViewer(photos: model.details?.photos ?? [photo], initialId: photo.id)
+        }
+        .sheet(isPresented: $showOutageReport) {
+            OutageReportSheet(
+                siteId: site.siteId ?? site.id,
+                siteLabel: site.address ?? site.siteId ?? site.id,
+                marketCode: market,
+                operatorKey: selectedOperator,
+                siteLatitude: site.latitude,
+                siteLongitude: site.longitude,
+                service: services.communityOutages,
+                onSubmitted: { _ in Task { await loadOutages() } }
+            )
         }
         .sheet(isPresented: $showReportSheet) {
             AntennaReportSheet(
@@ -380,7 +397,37 @@ struct AntennaDetailSheet: View {
                 .padding(.vertical, 1)
             }
             contributionBanner
+            // Juste sous l'identité du site, avant toute mesure : une coupure en cours prime sur
+            // la caractérisation du signal. Plus bas, elle serait lue après ce qu'elle invalide.
+            CommunityOutageCard(
+                outages: outages,
+                onReport: { showOutageReport = true },
+                onVote: { outageId, kind in
+                    Task { await voteOnOutage(outageId, kind: kind) }
+                }
+            )
         }
+    }
+
+    /// Se prononcer sur une panne, puis relire : les compteurs affichés doivent suivre le vote.
+    private func voteOnOutage(_ outageId: String, kind: String) async {
+        let here = services.location.lastLocation
+        _ = try? await services.communityOutages.vote(
+            outageId: outageId,
+            kind: kind,
+            latitude: here?.coordinate.latitude,
+            longitude: here?.coordinate.longitude,
+            accuracyMeters: here.flatMap { $0.horizontalAccuracy > 0 ? $0.horizontalAccuracy : nil }
+        )
+        await loadOutages()
+    }
+
+    private func loadOutages() async {
+        outages = (try? await services.communityOutages.outages(
+            forSiteId: site.siteId ?? site.id,
+            marketCode: market,
+            operatorKey: selectedOperator
+        )) ?? []
     }
 
     /// Un site relevé par un membre n'a pas la même autorité qu'un site publié

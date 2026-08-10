@@ -22,6 +22,8 @@ final class AppServices: ObservableObject {
     let terrain: TerrainServicing
     /// Signalements d'antenne (émission, suivi, discussion avec la modération).
     let antennaReports: AntennaReportsServicing
+    /// Signalement communautaire de pannes — cf. `CommunityOutageService`.
+    let communityOutages: CommunityOutageServicing
     /// Création de sites pointés à la main (dont ceux déduits de cellules observées).
     let customSites: CustomSitesServicing
     let anfr: ANFRServicing
@@ -93,6 +95,7 @@ final class AppServices: ObservableObject {
         antennas = AntennasService(api: api)
         terrain = TerrainService(api: api)
         antennaReports = AntennaReportsService(api: api)
+        communityOutages = CommunityOutageService(api: api)
         customSites = CustomSitesService(api: api)
         anfr = ANFRService(api: api)
         let networkOperatorService = NetworkOperatorService(api: api)

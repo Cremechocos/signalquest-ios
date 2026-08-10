@@ -125,6 +125,12 @@ struct NotificationPreferences: Codable {
     // `= nil` : garde le memberwise init synthétisé compatible avec l'appelant
     // existant (SettingsViewModel), qui ne fournit pas ce nouveau champ.
     var notifyAntennaReportsEmail: Bool? = nil
+    /// Pannes signalées par la communauté sur une antenne que j'utilise.
+    ///
+    /// Par défaut ACTIVÉE côté serveur, contrairement aux autres : une coupure sur un site où
+    /// l'on passe tous les jours est exactement le genre d'information qu'on veut sans avoir à
+    /// la demander. `= nil` garde l'init memberwise compatible avec les appelants existants.
+    var notifyCommunityOutagesPush: Bool? = nil
     var callsDoNotDisturb: Bool?
 }
 
