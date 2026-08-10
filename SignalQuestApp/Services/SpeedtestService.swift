@@ -450,7 +450,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     parallelStreams: parallelStreams,
                     startedAt: startedAt,
                     progress: progress,
-                    notice: "Serveur LibreSpeed injoignable — test via Cloudflare"
+                    notice: "Serveur LibreSpeed injoignable — test via Cloudflare",
+                    fallbackReason: "librespeed_failed"
                 )
             }
         }
@@ -490,7 +491,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 parallelStreams: parallelStreams,
                 startedAt: startedAt,
                 progress: progress,
-                notice: "Serveurs iPerf3 injoignables — test via Cloudflare"
+                notice: "Serveurs iPerf3 injoignables — test via Cloudflare",
+                fallbackReason: "no_iperf_pop"
             )
         }
 
@@ -513,16 +515,29 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         // il devient le serveur de test — couverture mondiale automatique.
         // Le seuil garde les serveurs opérateurs prioritaires en France.
         if settings.downloadTarget.migrated == .hybridAuto {
-            let iperfMs = try? await tcpProbe.connectLatencyMs(
-                host: iperfServer.hostname,
-                port: port,
+            // Les deux sondes sont INDÉPENDANTES : les enchaîner faisait payer deux
+            // aller-retours (jusqu'à deux `pingTimeoutSeconds` si les hôtes traînent)
+            // avant que la phase de ping ne démarre — un temps mort bien visible à
+            // l'écran, puisque rien ne bouge encore. Lancées ensemble, on ne paie
+            // plus que la plus lente des deux.
+            // `iperfServer` et `port` sont des `var` (le repli peut les réécrire) :
+            // les envoyer tels quels dans une tâche concurrente fait échouer
+            // l'analyse de régions de Swift 6. On fige des copies immuables — deux
+            // types Sendable, donc rien à partager.
+            let probeHost = iperfServer.hostname
+            let probePort = port
+            async let iperfProbe = tcpProbe.connectLatencyMs(
+                host: probeHost,
+                port: probePort,
                 timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
             )
-            let cloudflareMs = try? await tcpProbe.connectLatencyMs(
+            async let cloudflareProbe = tcpProbe.connectLatencyMs(
                 host: CloudflareSpeedtestConfig.host,
                 port: 443,
                 timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
             )
+            let iperfMs = try? await iperfProbe
+            let cloudflareMs = try? await cloudflareProbe
             if let cloudflareMs, cloudflareMs + CloudflareSpeedtestConfig.autoAdvantageMs < (iperfMs ?? .infinity) {
                 return try await runCloudflareTest(
                     pathStatus: pathStatus,
@@ -531,7 +546,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     parallelStreams: parallelStreams,
                     startedAt: startedAt,
                     progress: progress,
-                    notice: nil
+                    notice: nil,
+                    // Arbitrage de latence, PAS une panne — même code qu'Android,
+                    // sans quoi le taux de bascule des deux plateformes ne se
+                    // compare pas : iOS aurait publié `engine=cloudflare` sans
+                    // jamais dire pourquoi.
+                    fallbackReason: "auto_latency",
+                    requestedServerId: iperfServer.id
                 )
             }
         }
@@ -667,7 +688,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 parallelStreams: parallelStreams,
                 startedAt: startedAt,
                 progress: progress,
-                notice: "\(serverName) indisponible — test via Cloudflare"
+                notice: "\(serverName) indisponible — test via Cloudflare",
+                fallbackReason: "dl_incomplete",
+                requestedServerId: iperfServer.id
             )
         }
         port = dlPort
@@ -687,7 +710,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 parallelStreams: parallelStreams,
                 startedAt: startedAt,
                 progress: progress,
-                notice: "\(serverName) indisponible — test via Cloudflare"
+                notice: "\(serverName) indisponible — test via Cloudflare",
+                fallbackReason: "dl_incomplete",
+                requestedServerId: iperfServer.id
             )
         }
 
@@ -898,6 +923,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             downloadServerCode: iperfServer.code,
             downloadServerHost: iperfServer.hostname,
             downloadServerPort: Int(port),
+            engine: "iperf3",
+            engineFallbackReason: nil,
+            requestedServerId: nil,
             pingProtocol: pingOutcome.protocolName,
             pingMs: pingValue,
             pingMedianMs: pingMedianValue,
@@ -945,6 +973,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         /// et sur quel port, le port-walk le faisant varier — a produit la mesure.
         let downloadServerHost: String?
         let downloadServerPort: Int?
+        /// Moteur ayant RÉELLEMENT produit la mesure, et pourquoi il diffère de la
+        /// cible demandée le cas échéant. Sans eux, un run iPerf3 et un run replié
+        /// sur Cloudflare arrivent indiscernables en base : impossible de mesurer
+        /// le taux de bascule, donc de vérifier qu'on l'a fait baisser.
+        let engine: String
+        let engineFallbackReason: String?
+        let requestedServerId: String?
         let pingProtocol: String
         let pingMs: Double
         let pingMedianMs: Double?
@@ -1050,6 +1085,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             downloadServerCode: m.downloadServerCode,
             downloadServerHost: m.downloadServerHost,
             downloadServerPort: m.downloadServerPort,
+            engine: m.engine,
+            engineFallbackReason: m.engineFallbackReason,
+            requestedServerId: m.requestedServerId,
             createdAt: startedAt,
             downloadSeriesMbps: m.downloadSeriesMbps,
             uploadSeriesMbps: m.uploadSeriesMbps,
@@ -1107,7 +1145,12 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         parallelStreams: Int,
         startedAt: Date,
         progress: SpeedtestProgressHandler?,
-        notice: String?
+        notice: String?,
+        /// Code stable de la raison du repli — le `notice` est destiné à l'écran,
+        /// celui-ci aux agrégats. Voir l'enum côté serveur (`speedtestSchema`).
+        fallbackReason: String? = nil,
+        /// Cible demandée AVANT bascule : `downloadServerId` porte celle obtenue.
+        requestedServerId: String? = nil
     ) async throws -> SpeedtestRunResult {
         let dlStreams = min(max(2, parallelStreams), CloudflareSpeedtestConfig.maxStreams)
         let ulStreams = min(dlStreams, CloudflareSpeedtestConfig.maxUploadStreams)
@@ -1275,6 +1318,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             downloadServerCode: colo ?? "edge",
             downloadServerHost: CloudflareSpeedtestConfig.host,
             downloadServerPort: Int(CloudflareSpeedtestConfig.httpsPort),
+            engine: "cloudflare",
+            engineFallbackReason: fallbackReason,
+            requestedServerId: requestedServerId,
             pingProtocol: "TCP",
             pingMs: pingValue,
             pingMedianMs: pingMedianValue,
@@ -1600,6 +1646,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             downloadServerCode: server.hostname,
             downloadServerHost: server.hostname,
             downloadServerPort: Int(LibreSpeedConfig.httpsPort),
+            engine: "librespeed",
+            engineFallbackReason: nil,
+            requestedServerId: nil,
             pingProtocol: "TCP",
             pingMs: pingValue,
             pingMedianMs: pingMedianValue,

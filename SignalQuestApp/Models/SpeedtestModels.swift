@@ -413,6 +413,13 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     /// quel port (le port-walk le fait varier d'un test à l'autre).
     let downloadServerHost: String?
     let downloadServerPort: Int?
+    /// Moteur ayant RÉELLEMENT produit la mesure (`iperf3`, `cloudflare`,
+    /// `librespeed`), raison du repli le cas échéant, et cible demandée AVANT
+    /// bascule. `downloadServerId` porte le serveur OBTENU : c'est l'écart entre
+    /// les deux qui rend une bascule lisible a posteriori.
+    let engine: String?
+    let engineFallbackReason: String?
+    let requestedServerId: String?
     let createdAt: Date
     let downloadSeriesMbps: [Double]?
     let uploadSeriesMbps: [Double]?
@@ -466,6 +473,9 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         downloadServerCode: String? = nil,
         downloadServerHost: String? = nil,
         downloadServerPort: Int? = nil,
+        engine: String? = nil,
+        engineFallbackReason: String? = nil,
+        requestedServerId: String? = nil,
         createdAt: Date = Date(),
         downloadSeriesMbps: [Double]? = nil,
         uploadSeriesMbps: [Double]? = nil,
@@ -515,6 +525,9 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         self.downloadServerCode = downloadServerCode
         self.downloadServerHost = downloadServerHost
         self.downloadServerPort = downloadServerPort
+        self.engine = engine
+        self.engineFallbackReason = engineFallbackReason
+        self.requestedServerId = requestedServerId
         self.createdAt = createdAt
         self.downloadSeriesMbps = downloadSeriesMbps
         self.uploadSeriesMbps = uploadSeriesMbps
@@ -695,6 +708,13 @@ struct SpeedtestSubmission: Encodable, Equatable {
     let downloadServerCode: String?
     let downloadServerHost: String?
     let downloadServerPort: Int?
+    /// Moteur ayant RÉELLEMENT produit la mesure (`iperf3`, `cloudflare`,
+    /// `librespeed`), raison du repli le cas échéant, et cible demandée AVANT
+    /// bascule. `downloadServerId` porte le serveur OBTENU : c'est l'écart entre
+    /// les deux qui rend une bascule lisible a posteriori.
+    let engine: String?
+    let engineFallbackReason: String?
+    let requestedServerId: String?
 
     /// Version de la méthodologie de mesure, commune aux deux plateformes.
     ///
@@ -707,7 +727,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
     static let currentMethodologyVersion = 4
 
     enum CodingKeys: String, CodingKey {
-        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort, methodologyVersion
+        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort, methodologyVersion, engine, engineFallbackReason, requestedServerId
         case rsrp, rsrq, snr, cellId, pci, enb, gnb, radioSnapshots
         case pingDl, jitterDl, pingUl, jitterUl
     }
@@ -790,7 +810,10 @@ struct SpeedtestSubmission: Encodable, Equatable {
             downloadServerId: result.downloadServerId,
             downloadServerCode: result.downloadServerCode,
             downloadServerHost: result.downloadServerHost,
-            downloadServerPort: result.downloadServerPort
+            downloadServerPort: result.downloadServerPort,
+            engine: result.engine,
+            engineFallbackReason: result.engineFallbackReason,
+            requestedServerId: result.requestedServerId
         )
     }
 
@@ -847,6 +870,9 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encodeIfPresent(downloadServerCode, forKey: .downloadServerCode)
         try c.encodeIfPresent(downloadServerHost, forKey: .downloadServerHost)
         try c.encode(Self.currentMethodologyVersion, forKey: .methodologyVersion)
+        try c.encodeIfPresent(engine, forKey: .engine)
+        try c.encodeIfPresent(engineFallbackReason, forKey: .engineFallbackReason)
+        try c.encodeIfPresent(requestedServerId, forKey: .requestedServerId)
         try c.encodeIfPresent(downloadServerPort, forKey: .downloadServerPort)
         try c.encodeNil(forKey: .rsrp)
         try c.encodeNil(forKey: .rsrq)
