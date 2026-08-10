@@ -7,6 +7,8 @@ struct SpeedtestServerPicker: View {
     @Binding var selection: SpeedtestDownloadTarget
     /// Serveur LibreSpeed choisi manuellement (hostname) ; vide = le plus proche.
     @Binding var libreSpeedHost: String
+    /// POP iPerf3 choisi dans le catalogue distant (id) ; vide = aucun.
+    @Binding var iperfServerId: String
     /// `nil` = tout replié (sauf Auto toujours visible).
     @State private var expandedRegion: String?
 
@@ -14,6 +16,20 @@ struct SpeedtestServerPicker: View {
         SpeedtestDownloadTarget.pickerGroups
     }
     static let libreSpeedRegionKey = "LibreSpeed"
+    static let catalogRegionKey = "Catalogue"
+
+    /// POPs servis par l'API que cette version de l'app ne connaît PAS en dur.
+    ///
+    /// Ceux qu'elle connaît sont déjà dans leur groupe fournisseur ci-dessus ; les
+    /// répéter ferait des doublons. Cette section montre donc exactement ce que le
+    /// catalogue distant apporte — et sans elle, ces POPs ne seraient atteignables
+    /// qu'en mode Auto, jamais choisis explicitement.
+    var catalogOnlyServers: [IPerfPublicServer] {
+        let knownIds = Set(SpeedtestDownloadTarget.allCases.map(\.rawValue))
+        return activeIPerfServers
+            .filter { !knownIds.contains($0.id) }
+            .sorted { $0.name < $1.name }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -84,6 +100,7 @@ struct SpeedtestServerPicker: View {
                 }
             }
 
+            catalogSection
             libreSpeedSection
         }
         // Animation de hauteur/layout uniquement — fluide dans un ScrollView.
@@ -99,6 +116,7 @@ struct SpeedtestServerPicker: View {
     /// Ouvre le groupe du serveur choisi (Auto / Cloudflare n'en ont pas).
     func expandGroup(containing target: SpeedtestDownloadTarget) {
         if target == .libreSpeed { expandedRegion = Self.libreSpeedRegionKey; return }
+        if target == .iperfCatalog { expandedRegion = Self.catalogRegionKey; return }
         let region = target.regionLabel
         guard collapsibleGroups.contains(where: { $0.region == region }) else { return }
         expandedRegion = region
@@ -145,6 +163,89 @@ struct SpeedtestServerPicker: View {
         .buttonStyle(.plain)
         .accessibilityLabel(target.displayName)
         .accessibilityValue(selected ? "sélectionné" : "non sélectionné")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    // MARK: Catalogue — POPs servis par l'API, inconnus de ce binaire
+
+    var catalogCurrentLabel: String {
+        catalogOnlyServers.first { $0.id == iperfServerId }?.name ?? ""
+    }
+
+    @ViewBuilder private var catalogSection: some View {
+        // Rien à montrer tant que l'API n'a rien apporté de nouveau : une section
+        // vide serait du bruit dans un sélecteur déjà long.
+        if !catalogOnlyServers.isEmpty {
+            let isExpanded = expandedRegion == Self.catalogRegionKey
+            let isSelected = selection == .iperfCatalog
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    Haptics.selection()
+                    expandedRegion = isExpanded ? nil : Self.catalogRegionKey
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(SQColor.labelTertiary)
+                            .frame(width: 12)
+                        Image(systemName: "server.rack")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(isSelected ? SQColor.brandRed : SQColor.labelSecondary)
+                        Text("Catalogue")
+                            .font(SQFont.body(14, .semibold))
+                            .foregroundStyle(SQColor.label)
+                        Text("\(catalogOnlyServers.count)")
+                            .font(SQFont.body(11, .semibold))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .padding(.horizontal, 7).padding(.vertical, 2)
+                            .background(SQColor.fill, in: Capsule(style: .continuous))
+                        Spacer(minLength: 6)
+                        if isSelected, !isExpanded, !catalogCurrentLabel.isEmpty {
+                            Text(catalogCurrentLabel)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(SQColor.brandRed)
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(.horizontal, SQSpace.md).padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).fill(SQColor.surfaceMuted))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Catalogue")
+                .accessibilityValue(isExpanded ? "ouvert" : "fermé")
+
+                if isExpanded {
+                    VStack(spacing: 6) {
+                        ForEach(catalogOnlyServers, id: \.id) { server in
+                            catalogServerRow(server)
+                        }
+                    }
+                    .padding(.top, 6)
+                }
+            }
+        }
+    }
+
+    func catalogServerRow(_ server: IPerfPublicServer) -> some View {
+        let selected = selection == .iperfCatalog && iperfServerId == server.id
+        return Button {
+            selection = .iperfCatalog
+            iperfServerId = server.id
+            Haptics.selection()
+        } label: {
+            libreSpeedRowLabel(
+                icon: "server.rack",
+                title: server.name,
+                // `name` porte déjà la ville (« Londres (Clouvider) ») : le
+                // sous-titre ajoute le code POP et le pays, pas une redite.
+                subtitle: "\(server.code) · \(server.countryCode)",
+                selected: selected
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(server.name)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 

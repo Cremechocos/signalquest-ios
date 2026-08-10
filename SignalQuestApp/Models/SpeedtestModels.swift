@@ -67,6 +67,12 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
     // LibreSpeed — moteur HTTPS (garbage.php/empty.php) sur le POP LibreSpeed le
     // plus proche ; licence LGPL propre, aucune contrainte Ookla.
     case libreSpeed = "librespeed_auto"
+    // POP iPerf3 choisi dans le CATALOGUE servi par l'API, désigné par
+    // `SpeedtestRunSettings.iperfServerId`. Sans ce cas, seuls les POPs listés
+    // en dur ci-dessus seraient sélectionnables : un serveur ajouté côté serveur
+    // resterait invisible tant que l'app n'aurait pas été mise à jour.
+    // Symétrique de `.libreSpeed`, qui fonctionne déjà ainsi.
+    case iperfCatalog = "iperf_catalog"
 
     // Legacy cases left for soft migration or parsing safely:
     case cloudflareR2 = "cloudflare_r2"
@@ -193,6 +199,7 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .init7: return "Suisse · Init7"
         case .cloudflare: return "Cloudflare"
         case .libreSpeed: return "LibreSpeed"
+        case .iperfCatalog: return "Catalogue"
         case .cloudflareR2: return "Cloudflare"
         case .awsCloudFront: return "AWS CloudFront"
         case .vpsInternal: return "VPS OVH Gravelines"
@@ -237,6 +244,7 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .init7: return "Init7 · speedtest.init7.net · :5201–5204"
         case .cloudflare: return String(localized: "Edge anycast mondial · HTTPS · DL/UL/ping même serveur")
         case .libreSpeed: return "POP LibreSpeed le plus proche · HTTPS · DL/UL/ping"
+        case .iperfCatalog: return "POP iPerf3 du catalogue · TCP · DL/UL/ping"
         case .cloudflareR2: return "CDN Cloudflare"
         case .awsCloudFront: return "CDN AWS"
         case .vpsInternal: return "VPS SignalQuest"
@@ -262,6 +270,9 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .mojiParis, .clouviderFra, .clouviderAms, .clouviderLon, .clouviderMan, .leasewebFra, .init7:
             return "iPerf3 · France & Europe"
         case .cloudflare, .libreSpeed: return "Mondial"
+        // Section propre, alimentée par l'API : son contenu varie d'un lancement à
+        // l'autre, il ne peut donc pas être rattaché à un groupe figé.
+        case .iperfCatalog: return "Catalogue"
         case .cloudflareR2, .awsCloudFront, .vpsInternal: return "Legacy"
         }
     }
@@ -288,6 +299,7 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .mojiParis, .clouviderFra, .clouviderAms, .clouviderLon, .clouviderMan, .leasewebFra, .init7: return "server.rack"
         case .cloudflare: return "globe"
         case .libreSpeed: return "speedometer"
+        case .iperfCatalog: return "server.rack"
         case .cloudflareR2, .awsCloudFront, .vpsInternal: return "server.rack"
         }
     }
@@ -301,18 +313,32 @@ struct SpeedtestRunSettings: Codable, Equatable {
     /// Serveur LibreSpeed choisi manuellement (hostname du catalogue). `nil` =
     /// le plus proche automatiquement. Ignoré si `downloadTarget != .libreSpeed`.
     var libreSpeedHost: String?
+    /// POP iPerf3 choisi manuellement, par son id de CATALOGUE. Symétrique de
+    /// `libreSpeedHost`, et c'est ce qui permet de sélectionner un serveur que
+    /// l'API a introduit mais que cette version de l'app ne connaît pas en dur.
+    /// Ignoré si `downloadTarget != .iperfCatalog`.
+    var iperfServerId: String?
 
     // Rétro-compat de décodage : `libreSpeedHost` absent des réglages persistés
-    // avant l'ajout du choix manuel LibreSpeed.
+    // avant l'ajout du choix manuel LibreSpeed, `iperfServerId` avant le catalogue
+    // distant. Les deux se décodent donc en optionnel.
     enum CodingKeys: String, CodingKey {
-        case downloadTarget, durationSeconds, streams, reliabilityMode, libreSpeedHost
+        case downloadTarget, durationSeconds, streams, reliabilityMode, libreSpeedHost, iperfServerId
     }
-    init(downloadTarget: SpeedtestDownloadTarget, durationSeconds: Int, streams: Int, reliabilityMode: Bool, libreSpeedHost: String? = nil) {
+    init(
+        downloadTarget: SpeedtestDownloadTarget,
+        durationSeconds: Int,
+        streams: Int,
+        reliabilityMode: Bool,
+        libreSpeedHost: String? = nil,
+        iperfServerId: String? = nil
+    ) {
         self.downloadTarget = downloadTarget
         self.durationSeconds = durationSeconds
         self.streams = streams
         self.reliabilityMode = reliabilityMode
         self.libreSpeedHost = libreSpeedHost
+        self.iperfServerId = iperfServerId
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -321,6 +347,7 @@ struct SpeedtestRunSettings: Codable, Equatable {
         streams = try c.decode(Int.self, forKey: .streams)
         reliabilityMode = try c.decode(Bool.self, forKey: .reliabilityMode)
         libreSpeedHost = try c.decodeIfPresent(String.self, forKey: .libreSpeedHost)
+        iperfServerId = try c.decodeIfPresent(String.self, forKey: .iperfServerId)
     }
 
     static let androidDefault = SpeedtestRunSettings(
@@ -376,11 +403,16 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     /// serveur de mesure. Distinct de `serverName` pour ne plus afficher « AWS »
     /// comme serveur de test.
     let downloadServerName: String?
-    /// Id de cible CDN soumis au backend (cloudflare_r2 / aws_cloudfront /
-    /// vps_internal) + code POP edge réel (x-amz-cf-pop / cf-ray) — télémétrie
-    /// de diagnostic des chemins CDN (parité Android).
+    /// Id de catalogue du serveur de download (`rbx`, `bytel_paris_bbr`,
+    /// `cloudflare_CDG`…) + code POP court. Ces deux valeurs partent en base et
+    /// sont communes à Android : elles doivent rester stables dans le temps.
     let downloadServerId: String?
     let downloadServerCode: String?
+    /// Hôte et port réellement mesurés — l'id n'étant qu'un alias, eux seuls
+    /// permettent de savoir a posteriori quel POP a produit la mesure, et sur
+    /// quel port (le port-walk le fait varier d'un test à l'autre).
+    let downloadServerHost: String?
+    let downloadServerPort: Int?
     let createdAt: Date
     let downloadSeriesMbps: [Double]?
     let uploadSeriesMbps: [Double]?
@@ -432,6 +464,8 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         downloadServerName: String? = nil,
         downloadServerId: String? = nil,
         downloadServerCode: String? = nil,
+        downloadServerHost: String? = nil,
+        downloadServerPort: Int? = nil,
         createdAt: Date = Date(),
         downloadSeriesMbps: [Double]? = nil,
         uploadSeriesMbps: [Double]? = nil,
@@ -479,6 +513,8 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         self.downloadServerName = downloadServerName
         self.downloadServerId = downloadServerId
         self.downloadServerCode = downloadServerCode
+        self.downloadServerHost = downloadServerHost
+        self.downloadServerPort = downloadServerPort
         self.createdAt = createdAt
         self.downloadSeriesMbps = downloadSeriesMbps
         self.uploadSeriesMbps = uploadSeriesMbps
@@ -657,9 +693,11 @@ struct SpeedtestSubmission: Encodable, Equatable {
     let downloadServerName: String?
     let downloadServerId: String?
     let downloadServerCode: String?
+    let downloadServerHost: String?
+    let downloadServerPort: Int?
 
     enum CodingKeys: String, CodingKey {
-        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, server, downloadServerName, downloadServerId, downloadServerCode
+        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort
         case rsrp, rsrq, snr, cellId, pci, enb, gnb, radioSnapshots
         case pingDl, jitterDl, pingUl, jitterUl
     }
@@ -740,7 +778,9 @@ struct SpeedtestSubmission: Encodable, Equatable {
             server: result.serverName,
             downloadServerName: result.downloadServerName ?? result.serverName,
             downloadServerId: result.downloadServerId,
-            downloadServerCode: result.downloadServerCode
+            downloadServerCode: result.downloadServerCode,
+            downloadServerHost: result.downloadServerHost,
+            downloadServerPort: result.downloadServerPort
         )
     }
 
@@ -795,6 +835,8 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encodeIfPresent(downloadServerName, forKey: .downloadServerName)
         try c.encodeIfPresent(downloadServerId, forKey: .downloadServerId)
         try c.encodeIfPresent(downloadServerCode, forKey: .downloadServerCode)
+        try c.encodeIfPresent(downloadServerHost, forKey: .downloadServerHost)
+        try c.encodeIfPresent(downloadServerPort, forKey: .downloadServerPort)
         try c.encodeNil(forKey: .rsrp)
         try c.encodeNil(forKey: .rsrq)
         try c.encodeNil(forKey: .snr)

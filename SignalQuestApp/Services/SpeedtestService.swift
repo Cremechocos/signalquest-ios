@@ -455,7 +455,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             }
         }
 
-        var iperfServer = selectIPerfServer(for: settings.downloadTarget, location: location)
+        var iperfServer = selectIPerfServer(
+            for: settings.downloadTarget,
+            location: location,
+            catalogId: settings.iperfServerId
+        )
         let requestedServer = iperfServer
         var endpoint = await resolveIPerfEndpoint(for: iperfServer)
 
@@ -574,11 +578,18 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         // Ping / jitter en charge pendant le DL — sur un port voisin (pas le port
         // de mesure) pour ne pas RST le démon iPerf3 en cours de test.
         let dlLoadedHost = iperfServer.hostname
-        let dlLoadedPort = iperfSiblingPort(preferred: port, min: iperfServer.portMin, max: iperfServer.portMax)
+        // `nil` = la plage ne permet pas d'éviter le port de données (POP mono-port) :
+        // on renonce à l'échantillon plutôt que de faire tomber le démon en pleine mesure.
+        let dlLoadedPort = iperfLoadedLatencyProbePort(
+            avoiding: [port],
+            min: iperfServer.portMin,
+            max: iperfServer.portMax
+        )
         let dlLoadedOmit = omitSeconds
         let dlLoadedDeadline = Date().addingTimeInterval(Double(omitSeconds + durationSeconds) + 2)
         let dlLoadedProbe = tcpProbe
         let dlLoadedPingsTask = Task.detached(priority: .utility) {
+            guard let dlLoadedPort else { return [Double]() }
             try? await Task.sleep(nanoseconds: UInt64(dlLoadedOmit) * 1_000_000_000)
             guard !Task.isCancelled else { return [Double]() }
             return await SpeedtestService.collectIPerfLoadedPings(
@@ -743,9 +754,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let ulStreamAttempts = SpeedtestEngineConfig.uploadStreamLadder(requested: parallelStreams)
         // Loaded pings sur un 3e port si possible, jamais le port d'upload actif.
         let ulLoadedHost = iperfServer.hostname
+        // Deux ports de données sont occupés à ce stade (celui du DL et celui de l'UL) :
+        // la sonde doit les éviter tous les deux, et renoncer si la plage ne le permet pas.
         let ulLoadedPort = endpoint.openPorts.first(where: { $0 != port && $0 != ulPreferredPort })
-            ?? iperfSiblingPort(
-                preferred: ulPreferredPort,
+            ?? iperfLoadedLatencyProbePort(
+                avoiding: [port, ulPreferredPort],
                 min: iperfServer.portMin,
                 max: iperfServer.portMax
             )
@@ -753,6 +766,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let ulLoadedDeadline = Date().addingTimeInterval(Double(omitSeconds + durationSeconds) + 3)
         let ulLoadedProbe = tcpProbe
         let ulLoadedPingsTask = Task.detached(priority: .utility) {
+            guard let ulLoadedPort else { return [Double]() }
             try? await Task.sleep(nanoseconds: UInt64(ulLoadedOmit) * 1_000_000_000)
             guard !Task.isCancelled else { return [Double]() }
             return await SpeedtestService.collectIPerfLoadedPings(
@@ -874,8 +888,16 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         // 5. Assemblage partagé (commun aux moteurs iPerf3 et Cloudflare).
         let measurements = EngineMeasurements(
             serverName: serverName,
-            downloadServerId: "iperf3_\(iperfServer.hostname):\(port)",
-            downloadServerCode: "\(port)",
+            // L'id de catalogue, pas une chaîne dérivée de l'hôte : c'est lui qui
+            // part en base et il doit être comparable à celui d'Android. La forme
+            // « iperf3_<host>:<port> » publiée jusqu'ici rendait tout regroupement
+            // par POP impossible, et écrasait `downloadServerCode` — censé porter le
+            // code POP (RBX, PAR-BBR) — avec un numéro de port. L'hôte et le port
+            // ont désormais leurs propres champs.
+            downloadServerId: iperfServer.id,
+            downloadServerCode: iperfServer.code,
+            downloadServerHost: iperfServer.hostname,
+            downloadServerPort: Int(port),
             pingProtocol: pingOutcome.protocolName,
             pingMs: pingValue,
             pingMedianMs: pingMedianValue,
@@ -918,6 +940,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let serverName: String
         let downloadServerId: String
         let downloadServerCode: String
+        /// Hôte et port RÉELLEMENT mesurés. `downloadServerId` étant un alias de
+        /// catalogue, sans eux il est impossible de savoir a posteriori quel POP —
+        /// et sur quel port, le port-walk le faisant varier — a produit la mesure.
+        let downloadServerHost: String?
+        let downloadServerPort: Int?
         let pingProtocol: String
         let pingMs: Double
         let pingMedianMs: Double?
@@ -1021,6 +1048,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             downloadServerName: m.serverName,
             downloadServerId: m.downloadServerId,
             downloadServerCode: m.downloadServerCode,
+            downloadServerHost: m.downloadServerHost,
+            downloadServerPort: m.downloadServerPort,
             createdAt: startedAt,
             downloadSeriesMbps: m.downloadSeriesMbps,
             uploadSeriesMbps: m.uploadSeriesMbps,
@@ -1244,6 +1273,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             serverName: serverName,
             downloadServerId: "cloudflare_\(colo ?? "edge")",
             downloadServerCode: colo ?? "edge",
+            downloadServerHost: CloudflareSpeedtestConfig.host,
+            downloadServerPort: Int(CloudflareSpeedtestConfig.httpsPort),
             pingProtocol: "TCP",
             pingMs: pingValue,
             pingMedianMs: pingMedianValue,
@@ -1567,6 +1598,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             serverName: serverName,
             downloadServerId: "librespeed_\(server.countryCode.lowercased())",
             downloadServerCode: server.hostname,
+            downloadServerHost: server.hostname,
+            downloadServerPort: Int(LibreSpeedConfig.httpsPort),
             pingProtocol: "TCP",
             pingMs: pingValue,
             pingMedianMs: pingMedianValue,
@@ -2422,6 +2455,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 }
 
 struct IPerfPublicServer: Sendable, Equatable {
+    /// Identifiant de catalogue, STABLE À VIE : c'est lui qui part en base dans
+    /// `Speedtest.downloadServerId`. Il vaut le `rawValue` de la cible
+    /// correspondante et il est commun à Android — l'hôte, lui, peut changer.
+    let id: String
     let hostname: String
     let name: String
     let latitude: Double
@@ -2432,8 +2469,45 @@ struct IPerfPublicServer: Sendable, Equatable {
     let provider: IPerfServerProvider
     let portMin: UInt16
     let portMax: UInt16
+    /// Port vérifié par handshake iPerf3 réel, point de départ du port-walk.
+    ///
+    /// Le premier port d'une plage est très souvent inutilisable, et un port MUET
+    /// (TCP ouvert, daemon qui ne répond jamais) coûte un timeout complet là où un
+    /// port refusé est instantané. Démarrer sur `portMin` faisait donc payer une
+    /// attente à chaque test — mesuré le 2026-08-10 : Scaleway est muet sur 5200,
+    /// Bouygues refuse 9200 sur la plupart de ses POPs, Clouvider Londres est muet
+    /// de 5200 à 5206.
+    let portPreferred: UInt16
 
-    var defaultPort: UInt16 { portMin }
+    init(
+        id: String,
+        hostname: String,
+        name: String,
+        latitude: Double,
+        longitude: Double,
+        code: String,
+        countryCode: String,
+        provider: IPerfServerProvider,
+        portMin: UInt16,
+        portMax: UInt16,
+        portPreferred: UInt16? = nil
+    ) {
+        self.id = id
+        self.hostname = hostname
+        self.name = name
+        self.latitude = latitude
+        self.longitude = longitude
+        self.code = code
+        self.countryCode = countryCode
+        self.provider = provider
+        self.portMin = portMin
+        self.portMax = portMax
+        // Par défaut le premier port de la plage : on ne surcharge que les POPs dont
+        // la mesure a montré qu'il ne répond pas.
+        self.portPreferred = portPreferred ?? portMin
+    }
+
+    var defaultPort: UInt16 { portPreferred }
 }
 
 enum IPerfServerProvider: String, Sendable {
@@ -2445,9 +2519,35 @@ enum IPerfServerProvider: String, Sendable {
     case clouvider
     case leaseweb
     case init7
+    /// POPs publics sans marque propre, et **repli pour tout fournisseur inconnu**
+    /// servi par l'API : le catalogue distant doit pouvoir introduire un
+    /// fournisseur que ce binaire ne connaît pas encore sans que le POP disparaisse.
+    case community
 }
 
-/// Catalogue des serveurs iPerf3 publics (OVH + Bouygues sains + Scaleway online.net).
+/// Catalogue ACTIF : celui servi par `/api/speedtest/servers` dès qu'il a été chargé,
+/// sinon le catalogue embarqué ci-dessous.
+///
+/// C'est ce qui permet de corriger un POP mort côté serveur sans release App Store.
+/// L'embarqué n'est plus la vérité, seulement la valeur de départ — indispensable
+/// au tout premier lancement, hors ligne, ou si l'API est injoignable.
+private let activeIPerfCatalogLock = OSAllocatedUnfairLock<[IPerfPublicServer]?>(initialState: nil)
+
+var activeIPerfServers: [IPerfPublicServer] {
+    activeIPerfCatalogLock.withLock { $0 } ?? iperfPublicServers
+}
+
+/// Publie un catalogue chargé à distance. `nil` revient à l'embarqué.
+/// Un catalogue vide est ignoré : mieux vaut l'embarqué que plus aucun serveur.
+func setActiveIPerfServers(_ servers: [IPerfPublicServer]?) {
+    activeIPerfCatalogLock.withLock { current in
+        guard let servers else { current = nil; return }
+        guard !servers.isEmpty else { return }
+        current = servers
+    }
+}
+
+/// Catalogue des serveurs iPerf3 publics EMBARQUÉ — valeur de repli.
 /// `poi.cubic.iperf.bytel.fr` est volontairement absent (host non joignable).
 let iperfPublicServers: [IPerfPublicServer] = {
     let ovhMin = SpeedtestEngineConfig.iperf3PortMin
@@ -2459,47 +2559,63 @@ let iperfPublicServers: [IPerfPublicServer] = {
     let parisLat = 48.8566
     let parisLon = 2.3522
     return [
-        // OVH proof (ports 5201–5210)
-        IPerfPublicServer(hostname: "rbx.proof.ovh.net", name: "Roubaix (OVH RBX)", latitude: 50.692, longitude: 3.178, code: "RBX", countryCode: "FR", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
-        IPerfPublicServer(hostname: "sbg.proof.ovh.net", name: "Strasbourg (OVH SBG)", latitude: 48.573, longitude: 7.752, code: "SBG", countryCode: "FR", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
-        IPerfPublicServer(hostname: "gra.proof.ovh.net", name: "Gravelines (OVH GRA)", latitude: 50.986, longitude: 2.124, code: "GRA", countryCode: "FR", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
-        IPerfPublicServer(hostname: "bom.proof.ovh.net", name: "Mumbai (OVH YNM)", latitude: 19.076, longitude: 72.877, code: "YNM", countryCode: "IN", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
+        // OVH proof (ports 5201–5210) — 5201 répond, pas de surcharge nécessaire.
+        IPerfPublicServer(id: "rbx", hostname: "rbx.proof.ovh.net", name: "Roubaix (OVH RBX)", latitude: 50.692, longitude: 3.178, code: "RBX", countryCode: "FR", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
+        IPerfPublicServer(id: "sbg", hostname: "sbg.proof.ovh.net", name: "Strasbourg (OVH SBG)", latitude: 48.573, longitude: 7.752, code: "SBG", countryCode: "FR", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
+        IPerfPublicServer(id: "gra", hostname: "gra.proof.ovh.net", name: "Gravelines (OVH GRA)", latitude: 50.986, longitude: 2.124, code: "GRA", countryCode: "FR", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
+        IPerfPublicServer(id: "bom", hostname: "bom.proof.ovh.net", name: "Mumbai (OVH YNM)", latitude: 19.076, longitude: 72.877, code: "YNM", countryCode: "IN", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
         // ⚠️ `bhs.proof.ovh.ca` (Beauharnois, QC) RETIRÉ : OVH n'y expose plus que
         // 5208/5209, et ces deux daemons acceptent le TCP sans jamais répondre au
         // handshake iPerf3. La sonde de joignabilité ne teste QUE le connect → le
         // POP était élu, le ping TCP excellent, et le DL mourait sur timeout.
-        // Ashburn devient le POP nord-américain du catalogue.
-        IPerfPublicServer(hostname: "proof.ovh.us", name: "Ashburn (OVH US)", latitude: 39.0438, longitude: -77.4874, code: "US", countryCode: "US", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
-        // Bouygues Telecom (ports 9200–9240) — BBR & CUBIC (poi.cubic exclu)
-        IPerfPublicServer(hostname: "paris.bbr.iperf.bytel.fr", name: "Paris BBR (Bouygues)", latitude: parisLat, longitude: parisLon, code: "PAR-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
-        IPerfPublicServer(hostname: "paris.cubic.iperf.bytel.fr", name: "Paris CUBIC (Bouygues)", latitude: parisLat, longitude: parisLon, code: "PAR-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
-        IPerfPublicServer(hostname: "mrs.bbr.iperf.bytel.fr", name: "Marseille BBR (Bouygues)", latitude: 43.2965, longitude: 5.3698, code: "MRS-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
-        IPerfPublicServer(hostname: "mrs.cubic.iperf.bytel.fr", name: "Marseille CUBIC (Bouygues)", latitude: 43.2965, longitude: 5.3698, code: "MRS-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
-        IPerfPublicServer(hostname: "lyo.bbr.iperf.bytel.fr", name: "Lyon BBR (Bouygues)", latitude: 45.7640, longitude: 4.8357, code: "LYO-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
-        IPerfPublicServer(hostname: "lyo.cubic.iperf.bytel.fr", name: "Lyon CUBIC (Bouygues)", latitude: 45.7640, longitude: 4.8357, code: "LYO-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
-        IPerfPublicServer(hostname: "tls.bbr.iperf.bytel.fr", name: "Toulouse BBR (Bouygues)", latitude: 43.6047, longitude: 1.4442, code: "TLS-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
-        IPerfPublicServer(hostname: "tls.cubic.iperf.bytel.fr", name: "Toulouse CUBIC (Bouygues)", latitude: 43.6047, longitude: 1.4442, code: "TLS-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
-        IPerfPublicServer(hostname: "str.bbr.iperf.bytel.fr", name: "Strasbourg BBR (Bouygues)", latitude: 48.5734, longitude: 7.7521, code: "STR-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
-        IPerfPublicServer(hostname: "str.cubic.iperf.bytel.fr", name: "Strasbourg CUBIC (Bouygues)", latitude: 48.5734, longitude: 7.7521, code: "STR-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
-        IPerfPublicServer(hostname: "poi.bbr.iperf.bytel.fr", name: "Poitiers BBR (Bouygues)", latitude: 46.5802, longitude: 0.3404, code: "POI-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
-        IPerfPublicServer(hostname: "ren.bbr.iperf.bytel.fr", name: "Rennes BBR (Bouygues)", latitude: 48.1173, longitude: -1.6778, code: "REN-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
-        IPerfPublicServer(hostname: "ren.cubic.iperf.bytel.fr", name: "Rennes CUBIC (Bouygues)", latitude: 48.1173, longitude: -1.6778, code: "REN-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
-        // Scaleway / online.net (ports 5200–5209 TCP) — filet de secours + IPv6
-        IPerfPublicServer(hostname: "ping.online.net", name: "Paris Scaleway", latitude: parisLat, longitude: parisLon, code: "SCW", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax),
-        IPerfPublicServer(hostname: "ping6.online.net", name: "Paris Scaleway IPv6", latitude: parisLat, longitude: parisLon, code: "SCW6", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax),
-        IPerfPublicServer(hostname: "ping-90ms.online.net", name: "Paris Scaleway +90 ms", latitude: parisLat, longitude: parisLon, code: "SCW90", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax),
-        IPerfPublicServer(hostname: "ping6-90ms.online.net", name: "Paris Scaleway IPv6 +90 ms", latitude: parisLat, longitude: parisLon, code: "SCW690", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax),
+        //
+        // ⚠️ `proof.ovh.us` (Ashburn) RETIRÉ à son tour le 2026-08-10 : timeout sur
+        // TOUTE la plage 5201–5210, vérifié par handshake réel. Une cible retirée du
+        // catalogue retombe proprement sur le POP le plus proche
+        // (`selectIPerfServer` → `findClosestIPerfServer`), la préférence
+        // utilisateur n'a donc pas besoin d'être migrée.
+        // Bouygues Telecom (ports 9200–9240) — BBR & CUBIC (poi.cubic exclu).
+        // 9200 est REFUSÉ sur la quasi-totalité des POPs : chaque portPreferred
+        // ci-dessous est mesuré individuellement.
+        IPerfPublicServer(id: "bytel_paris_bbr", hostname: "paris.bbr.iperf.bytel.fr", name: "Paris BBR (Bouygues)", latitude: parisLat, longitude: parisLon, code: "PAR-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
+        IPerfPublicServer(id: "bytel_paris_cubic", hostname: "paris.cubic.iperf.bytel.fr", name: "Paris CUBIC (Bouygues)", latitude: parisLat, longitude: parisLon, code: "PAR-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
+        IPerfPublicServer(id: "bytel_mrs_bbr", hostname: "mrs.bbr.iperf.bytel.fr", name: "Marseille BBR (Bouygues)", latitude: 43.2965, longitude: 5.3698, code: "MRS-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
+        IPerfPublicServer(id: "bytel_mrs_cubic", hostname: "mrs.cubic.iperf.bytel.fr", name: "Marseille CUBIC (Bouygues)", latitude: 43.2965, longitude: 5.3698, code: "MRS-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9202),
+        IPerfPublicServer(id: "bytel_lyo_bbr", hostname: "lyo.bbr.iperf.bytel.fr", name: "Lyon BBR (Bouygues)", latitude: 45.7640, longitude: 4.8357, code: "LYO-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
+        IPerfPublicServer(id: "bytel_lyo_cubic", hostname: "lyo.cubic.iperf.bytel.fr", name: "Lyon CUBIC (Bouygues)", latitude: 45.7640, longitude: 4.8357, code: "LYO-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
+        IPerfPublicServer(id: "bytel_tls_bbr", hostname: "tls.bbr.iperf.bytel.fr", name: "Toulouse BBR (Bouygues)", latitude: 43.6047, longitude: 1.4442, code: "TLS-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
+        IPerfPublicServer(id: "bytel_tls_cubic", hostname: "tls.cubic.iperf.bytel.fr", name: "Toulouse CUBIC (Bouygues)", latitude: 43.6047, longitude: 1.4442, code: "TLS-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
+        IPerfPublicServer(id: "bytel_str_bbr", hostname: "str.bbr.iperf.bytel.fr", name: "Strasbourg BBR (Bouygues)", latitude: 48.5734, longitude: 7.7521, code: "STR-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9202),
+        IPerfPublicServer(id: "bytel_str_cubic", hostname: "str.cubic.iperf.bytel.fr", name: "Strasbourg CUBIC (Bouygues)", latitude: 48.5734, longitude: 7.7521, code: "STR-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9203),
+        IPerfPublicServer(id: "bytel_poi_bbr", hostname: "poi.bbr.iperf.bytel.fr", name: "Poitiers BBR (Bouygues)", latitude: 46.5802, longitude: 0.3404, code: "POI-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
+        IPerfPublicServer(id: "bytel_ren_bbr", hostname: "ren.bbr.iperf.bytel.fr", name: "Rennes BBR (Bouygues)", latitude: 48.1173, longitude: -1.6778, code: "REN-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
+        IPerfPublicServer(id: "bytel_ren_cubic", hostname: "ren.cubic.iperf.bytel.fr", name: "Rennes CUBIC (Bouygues)", latitude: 48.1173, longitude: -1.6778, code: "REN-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
+        // Scaleway / online.net (ports 5200–5209 TCP) — filet de secours + IPv6.
+        // 5200 est MUET sur toutes les mires : il coûtait un timeout à chaque test.
+        IPerfPublicServer(id: "online_net", hostname: "ping.online.net", name: "Paris Scaleway", latitude: parisLat, longitude: parisLon, code: "SCW", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax, portPreferred: 5201),
+        IPerfPublicServer(id: "online_net6", hostname: "ping6.online.net", name: "Paris Scaleway IPv6", latitude: parisLat, longitude: parisLon, code: "SCW6", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax, portPreferred: 5201),
+        IPerfPublicServer(id: "online_net_90ms", hostname: "ping-90ms.online.net", name: "Paris Scaleway +90 ms", latitude: parisLat, longitude: parisLon, code: "SCW90", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax, portPreferred: 5201),
+        IPerfPublicServer(id: "online_net6_90ms", hostname: "ping6-90ms.online.net", name: "Paris Scaleway IPv6 +90 ms", latitude: parisLat, longitude: parisLon, code: "SCW690", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax, portPreferred: 5201),
         // MilkyWan AS2027 (ports 9200–9240 TCP, BBR, 40 Gbit/s) — vérifié en ligne 2026-07
-        IPerfPublicServer(hostname: "speedtest.milkywan.fr", name: "Croissy-Beaubourg (MilkyWan)", latitude: 48.8412, longitude: 2.6724, code: "CBO", countryCode: "FR", provider: .milkywan, portMin: bytMin, portMax: bytMax),
+        IPerfPublicServer(id: "milkywan_cbo", hostname: "speedtest.milkywan.fr", name: "Croissy-Beaubourg (MilkyWan)", latitude: 48.8412, longitude: 2.6724, code: "CBO", countryCode: "FR", provider: .milkywan, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
         // POP iPerf3 publics FR/EU — handshake iPerf3 réel vérifié (juil. 2026).
         // Serveurs mono-slot : plage de ports complète pour le fallback anti-BUSY.
-        IPerfPublicServer(hostname: "iperf3.moji.fr", name: "Paris (Moji)", latitude: parisLat, longitude: parisLon, code: "MOJI", countryCode: "FR", provider: .moji, portMin: SpeedtestEngineConfig.mojiIperfPortMin, portMax: SpeedtestEngineConfig.mojiIperfPortMax),
-        IPerfPublicServer(hostname: "fra.speedtest.clouvider.net", name: "Francfort (Clouvider)", latitude: 50.1109, longitude: 8.6821, code: "FRA-CLV", countryCode: "DE", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax),
-        IPerfPublicServer(hostname: "ams.speedtest.clouvider.net", name: "Amsterdam (Clouvider)", latitude: 52.3676, longitude: 4.9041, code: "AMS-CLV", countryCode: "NL", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax),
-        IPerfPublicServer(hostname: "lon.speedtest.clouvider.net", name: "Londres (Clouvider)", latitude: 51.5074, longitude: -0.1278, code: "LON-CLV", countryCode: "GB", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax),
-        IPerfPublicServer(hostname: "man.speedtest.clouvider.net", name: "Manchester (Clouvider)", latitude: 53.4808, longitude: -2.2426, code: "MAN-CLV", countryCode: "GB", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax),
-        IPerfPublicServer(hostname: "speedtest.fra1.de.leaseweb.net", name: "Francfort (Leaseweb)", latitude: 50.1109, longitude: 8.6821, code: "FRA-LSW", countryCode: "DE", provider: .leaseweb, portMin: SpeedtestEngineConfig.leasewebIperfPortMin, portMax: SpeedtestEngineConfig.leasewebIperfPortMax),
-        IPerfPublicServer(hostname: "speedtest.init7.net", name: "Winterthour (Init7)", latitude: 47.4989, longitude: 8.7286, code: "INIT7", countryCode: "CH", provider: .init7, portMin: SpeedtestEngineConfig.init7IperfPortMin, portMax: SpeedtestEngineConfig.init7IperfPortMax),
+        IPerfPublicServer(id: "moji_paris", hostname: "iperf3.moji.fr", name: "Paris (Moji)", latitude: parisLat, longitude: parisLon, code: "MOJI", countryCode: "FR", provider: .moji, portMin: SpeedtestEngineConfig.mojiIperfPortMin, portMax: SpeedtestEngineConfig.mojiIperfPortMax),
+        IPerfPublicServer(id: "clouvider_fra", hostname: "fra.speedtest.clouvider.net", name: "Francfort (Clouvider)", latitude: 50.1109, longitude: 8.6821, code: "FRA-CLV", countryCode: "DE", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax),
+        IPerfPublicServer(id: "clouvider_ams", hostname: "ams.speedtest.clouvider.net", name: "Amsterdam (Clouvider)", latitude: 52.3676, longitude: 4.9041, code: "AMS-CLV", countryCode: "NL", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax),
+        // ⚠️ Londres est MUET de 5200 à 5206 : huit sauts avant une réponse. C'est ce
+        // POP qui faisait conclure « serveur mort » et basculer sur Cloudflare.
+        IPerfPublicServer(id: "clouvider_lon", hostname: "lon.speedtest.clouvider.net", name: "Londres (Clouvider)", latitude: 51.5074, longitude: -0.1278, code: "LON-CLV", countryCode: "GB", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax, portPreferred: 5207),
+        IPerfPublicServer(id: "clouvider_man", hostname: "man.speedtest.clouvider.net", name: "Manchester (Clouvider)", latitude: 53.4808, longitude: -2.2426, code: "MAN-CLV", countryCode: "GB", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax),
+        IPerfPublicServer(id: "leaseweb_fra", hostname: "speedtest.fra1.de.leaseweb.net", name: "Francfort (Leaseweb)", latitude: 50.1109, longitude: 8.6821, code: "FRA-LSW", countryCode: "DE", provider: .leaseweb, portMin: SpeedtestEngineConfig.leasewebIperfPortMin, portMax: SpeedtestEngineConfig.leasewebIperfPortMax),
+        IPerfPublicServer(id: "init7_ch", hostname: "speedtest.init7.net", name: "Winterthour (Init7)", latitude: 47.4989, longitude: 8.7286, code: "INIT7", countryCode: "CH", provider: .init7, portMin: SpeedtestEngineConfig.init7IperfPortMin, portMax: SpeedtestEngineConfig.init7IperfPortMax),
+        // Amérique du Nord — le retrait de `proof.ovh.us` (mort) laissait le
+        // catalogue SANS aucun POP nord-américain, alors que le Canada est un marché
+        // du produit : un utilisateur montréalais serait parti mesurer vers
+        // Manchester, à ~5 000 km. Ces deux POPs sont vérifiés par handshake réel
+        // (2026-08-10) et Montréal a désormais un POP dans sa propre ville.
+        IPerfPublicServer(id: "leaseweb_mtl", hostname: "speedtest.mtl2.ca.leaseweb.net", name: "Montréal (Leaseweb)", latitude: 45.5017, longitude: -73.5673, code: "MTL-LSW", countryCode: "CA", provider: .leaseweb, portMin: SpeedtestEngineConfig.leasewebIperfPortMin, portMax: SpeedtestEngineConfig.leasewebIperfPortMax),
+        IPerfPublicServer(id: "clouvider_ash", hostname: "ash.speedtest.clouvider.net", name: "Ashburn (Clouvider)", latitude: 39.0438, longitude: -77.4874, code: "ASH-CLV", countryCode: "US", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax, portPreferred: 5201),
     ]
 }()
 
@@ -2562,7 +2678,7 @@ func iperfServersSortedByDistance(from location: Coordinates?) -> [IPerfPublicSe
             "ping-90ms.online.net",
             "ping6-90ms.online.net",
         ]
-        return iperfPublicServers.sorted { a, b in
+        return activeIPerfServers.sorted { a, b in
             let ia = preferred.firstIndex(of: a.hostname) ?? 99
             let ib = preferred.firstIndex(of: b.hostname) ?? 99
             if ia != ib { return ia < ib }
@@ -2573,7 +2689,7 @@ func iperfServersSortedByDistance(from location: Coordinates?) -> [IPerfPublicSe
     // et les IPv6-only pour éviter de les choisir en Auto sur un réseau IPv4.
     // Une PÉNALITÉ DE DISTANCE (et non un tier dur) écarte OVH quand un POP
     // non-OVH est raisonnablement proche : voir `iperfProviderDistancePenaltyKm`.
-    return iperfPublicServers.sorted { s1, s2 in
+    return activeIPerfServers.sorted { s1, s2 in
         let p1 = iperfAutoPriorityBoost(s1)
         let p2 = iperfAutoPriorityBoost(s2)
         if p1 != p2 { return p1 < p2 }
@@ -2606,10 +2722,29 @@ private func iperfProviderDistancePenaltyKm(_ server: IPerfPublicServer) -> Doub
 }
 
 func findClosestIPerfServer(to location: Coordinates?) -> IPerfPublicServer {
-    iperfServersSortedByDistance(from: location).first ?? iperfPublicServers[0]
+    iperfServersSortedByDistance(from: location).first ?? activeIPerfServers[0]
 }
 
-func selectIPerfServer(for target: SpeedtestDownloadTarget, location: Coordinates?) -> IPerfPublicServer {
+func selectIPerfServer(
+    for target: SpeedtestDownloadTarget,
+    location: Coordinates?,
+    catalogId: String? = nil
+) -> IPerfPublicServer {
+    // 1. POP choisi dans le catalogue distant. Il n'a pas forcément de cas d'enum :
+    //    c'est précisément ce qui permet à l'API d'introduire un serveur sans
+    //    attendre une mise à jour de l'app.
+    if target.migrated == .iperfCatalog,
+       let catalogId,
+       let server = activeIPerfServers.first(where: { $0.id == catalogId }) {
+        return server
+    }
+    // 2. Les ids de catalogue et les rawValues de cible partagent le même espace de
+    //    noms (aligné avec Android) : quand le catalogue connaît la cible demandée,
+    //    c'est LUI qui fait foi — ports corrigés compris — et non la table en dur.
+    if let server = activeIPerfServers.first(where: { $0.id == target.migrated.rawValue }) {
+        return server
+    }
+    // 3. Table historique, pour les cibles qu'aucun catalogue ne décrit encore.
     let host: String?
     switch target.migrated {
     case .rbx: host = "rbx.proof.ovh.net"
@@ -2644,10 +2779,13 @@ func selectIPerfServer(for target: SpeedtestDownloadTarget, location: Coordinate
     case .init7: host = "speedtest.init7.net"
     // .cloudflare n'est pas un serveur iPerf3 : le moteur HTTPS est choisi en
     // amont dans run() ; ici on retombe sur le plus proche par sécurité.
-    case .hybridAuto, .cloudflare, .libreSpeed, .bytelPoiCubic, .bhs, .cloudflareR2, .awsCloudFront, .vpsInternal:
+    // `.iperfCatalog` sans id résolvable atterrit ici : catalogue pas encore chargé,
+    // ou POP disparu depuis que l'utilisateur l'a choisi. On retombe alors sur le
+    // plus proche, comme pour toute cible orpheline.
+    case .hybridAuto, .cloudflare, .libreSpeed, .iperfCatalog, .bytelPoiCubic, .bhs, .cloudflareR2, .awsCloudFront, .vpsInternal:
         host = nil
     }
-    if let host, let server = iperfPublicServers.first(where: { $0.hostname == host }) {
+    if let host, let server = activeIPerfServers.first(where: { $0.hostname == host }) {
         return server
     }
     return findClosestIPerfServer(to: location)
@@ -2742,15 +2880,30 @@ private func resolveIPerfEndpointUncached(for server: IPerfPublicServer) async -
             sample.append(UInt16(p))
         }
         if sample.last != hi { sample.append(hi) }
-        ports = sample
+        // Le port préféré doit TOUJOURS être sondé : sur une plage large il pourrait
+        // tomber entre deux pas d'échantillonnage et être ignoré, alors que c'est le
+        // seul dont on sait qu'il parle iPerf3.
+        if !sample.contains(server.portPreferred) { sample.append(server.portPreferred) }
+        ports = sample.sorted()
     }
     let openPorts = await probeOpenTCPPorts(host: server.hostname, ports: ports, timeoutSeconds: 1.0)
-    if let first = openPorts.first {
-        return IPerfEndpoint(port: first, openPorts: openPorts)
+    guard !openPorts.isEmpty else {
+        // Aucun port ouvert — retourner nil pour permettre au fallback serveur
+        // de tenter un autre hôte au lieu de perdre 30s en port scanning séquentiel.
+        return nil
     }
-    // Aucun port ouvert — retourner nil pour permettre au fallback serveur
-    // de tenter un autre hôte au lieu de perdre 30s en port scanning séquentiel.
-    return nil
+    // ⚠️ Cette sonde ne valide QUE le connect TCP, jamais le handshake iPerf3. Un
+    // port MUET (TCP ouvert, démon qui ne répond jamais) la passe donc sans
+    // encombre. Prendre `openPorts.first` revenait à élire ce port muet, puis à le
+    // figer 10 minutes dans le cache : sur Clouvider Londres, ouvert mais muet de
+    // 5200 à 5206, chaque test de la fenêtre payait le timeout avant de récupérer.
+    //
+    // `portPreferred` est, lui, vérifié par un handshake réel : quand il est ouvert,
+    // il prime. On le remonte aussi en tête de `openPorts`, qui sert ensuite à
+    // choisir le port d'upload.
+    let preferred = openPorts.contains(server.portPreferred) ? server.portPreferred : openPorts[0]
+    let ordered = [preferred] + openPorts.filter { $0 != preferred }
+    return IPerfEndpoint(port: preferred, openPorts: ordered)
 }
 
 private func probeOpenTCPPorts(host: String, ports: [UInt16], timeoutSeconds: TimeInterval) async -> [UInt16] {
@@ -2848,12 +3001,50 @@ func isRetryableIPerfTransportError(_ error: Error) -> Bool {
 }
 
 /// Port voisin public (hors classe service) — tests / helpers.
+///
+/// Sert à choisir un port de DONNÉES de repli (l'upload, qui ne peut pas réutiliser
+/// le port du download). Pour une SONDE de latence, utiliser
+/// `iperfLoadedLatencyProbePort` : elle seule sait renoncer.
 func iperfSiblingPort(preferred: UInt16, min portMin: UInt16, max portMax: UInt16) -> UInt16 {
     let lo = min(portMin, portMax)
     let hi = max(portMin, portMax)
     guard hi > lo else { return preferred }
     if preferred < hi { return preferred &+ 1 }
     return lo
+}
+
+/// Port de SONDE pour la latence sous charge — jamais un port de données actif.
+///
+/// Vise le HAUT de la plage. Le download part du bas et l'upload prend le voisin
+/// immédiat : le haut ne gêne donc ni l'un ni l'autre, et surtout il n'entre pas en
+/// concurrence avec le port-walk. `iperfSiblingPort` visait `actif + 1`,
+/// c'est-à-dire précisément le port que le walk et l'upload allaient réclamer
+/// ensuite — un conflit qu'on s'infligeait à soi-même.
+///
+/// Renvoie `nil` quand la plage ne permet pas d'éviter les ports occupés : on saute
+/// alors l'échantillon plutôt que d'ouvrir une connexion sur le port de données, ce
+/// qui RST le démon iPerf3 en pleine mesure et fausse à la fois la latence ET le
+/// débit. Le cas n'a rien de théorique : plusieurs POPs publics du catalogue
+/// n'exposent qu'un seul port, et l'ancienne fonction y renvoyait le port actif.
+///
+/// Miroir de `computeLoadedLatencyProbePort` côté Android : les deux doivent rester
+/// alignés, faute de quoi les latences chargées des deux plateformes cessent d'être
+/// comparables.
+func iperfLoadedLatencyProbePort(
+    avoiding busyPorts: Set<UInt16>,
+    min portMin: UInt16,
+    max portMax: UInt16
+) -> UInt16? {
+    let lo = min(portMin, portMax)
+    let hi = max(portMin, portMax)
+    guard hi > lo else { return nil }
+    var candidate = hi
+    while candidate >= lo {
+        if !busyPorts.contains(candidate) { return candidate }
+        if candidate == lo { break }
+        candidate -= 1
+    }
+    return nil
 }
 
 private func connectNW(_ connection: NWConnection, queue: DispatchQueue, timeoutSeconds: TimeInterval) async throws {

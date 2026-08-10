@@ -557,20 +557,25 @@ final class SpeedtestTests: XCTestCase {
         let lyo = findClosestIPerfServer(to: lyon)
         XCTAssertTrue(lyo.hostname.contains("lyo") && lyo.hostname.contains("bytel.fr"))
 
-        // Montréal → Ashburn : Beauharnois est RETIRÉ du catalogue (TCP ouvert
-        // sur 5208/5209, handshake iPerf3 muet → ping parfait puis DL mort).
+        // Montréal → Leaseweb Montréal, un POP dans la ville même. Deux POPs OVH
+        // nord-américains ont été retirés pour la MÊME raison — TCP ouvert, daemon
+        // iPerf3 muet ou injoignable : ping parfait, puis download mort sur timeout.
         let montreal = Coordinates(latitude: 45.5017, longitude: -73.5673)
         let closestToMontreal = findClosestIPerfServer(to: montreal)
-        XCTAssertEqual(closestToMontreal.hostname, "proof.ovh.us")
+        XCTAssertEqual(closestToMontreal.hostname, "speedtest.mtl2.ca.leaseweb.net")
         XCTAssertFalse(
             iperfPublicServers.contains { $0.hostname == "bhs.proof.ovh.ca" },
             "Beauharnois accepte le TCP sans parler iPerf3 — ne pas le réintroduire"
         )
+        XCTAssertFalse(
+            iperfPublicServers.contains { $0.hostname == "proof.ovh.us" },
+            "Ashburn OVH timeout sur toute sa plage (vérifié 2026-08-10) — ne pas le réintroduire"
+        )
 
-        // New York → US proof
+        // New York → Ashburn (Clouvider), ~330 km, le POP US du catalogue.
         let nyc = Coordinates(latitude: 40.7128, longitude: -74.0060)
         let us = findClosestIPerfServer(to: nyc)
-        XCTAssertEqual(us.hostname, "proof.ovh.us")
+        XCTAssertEqual(us.hostname, "ash.speedtest.clouvider.net")
 
         // Mumbai → YNM
         let mumbai = Coordinates(latitude: 19.0760, longitude: 72.8777)
@@ -590,9 +595,11 @@ final class SpeedtestTests: XCTestCase {
         )
         // Mais un choix MANUEL d'un serveur OVH reste honoré tel quel.
         XCTAssertEqual(selectIPerfServer(for: .rbx, location: roubaix).hostname, "rbx.proof.ovh.net")
-        // Et hors zone de POP non-OVH (Montréal), OVH reste l'iPerf3 le plus proche.
-        let montreal = Coordinates(latitude: 45.5017, longitude: -73.5673)
-        XCTAssertEqual(findClosestIPerfServer(to: montreal).provider, .ovh)
+        // Et là où OVH est le seul POP à portée, le malus ne doit PAS faire fuir à
+        // l'autre bout du monde : depuis Mumbai, OVH YNM reste le bon choix.
+        // (L'exemple était Montréal jusqu'à ce que le catalogue y gagne un POP local.)
+        let mumbai = Coordinates(latitude: 19.0760, longitude: 72.8777)
+        XCTAssertEqual(findClosestIPerfServer(to: mumbai).provider, .ovh)
     }
 
     func testPublicEuropeIPerf3ServersCatalogAndSelection() {
@@ -673,7 +680,13 @@ final class SpeedtestTests: XCTestCase {
     func testSelectOVHServerManualAndAuto() {
         let paris = Coordinates(latitude: 48.8566, longitude: 2.3522)
         XCTAssertEqual(selectIPerfServer(for: .sbg, location: paris).hostname, "sbg.proof.ovh.net")
-        XCTAssertEqual(selectIPerfServer(for: .us, location: paris).hostname, "proof.ovh.us")
+        // `.us` pointe sur un POP RETIRÉ du catalogue (proof.ovh.us, timeout sur
+        // toute sa plage). Une préférence devenue orpheline ne doit ni planter ni
+        // renvoyer un serveur mort : elle retombe sur le POP le plus proche. C'est ce
+        // repli qui permet de retirer un POP sans migrer les réglages utilisateur.
+        let orphaned = selectIPerfServer(for: .us, location: paris)
+        XCTAssertNotEqual(orphaned.hostname, "proof.ovh.us")
+        XCTAssertEqual(orphaned.countryCode, "FR", "Repli attendu sur un POP proche de Paris")
         XCTAssertEqual(selectIPerfServer(for: .bytelLyoBbr, location: paris).hostname, "lyo.bbr.iperf.bytel.fr")
         XCTAssertEqual(selectIPerfServer(for: .bytelParisCubic, location: paris).portMin, 9_200)
         XCTAssertEqual(selectIPerfServer(for: .bytelParisCubic, location: paris).portMax, 9_240)
@@ -835,6 +848,237 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(iperfSiblingPort(preferred: 5_200, min: 5_200, max: 5_209), 5_201)
         XCTAssertEqual(iperfSiblingPort(preferred: 5_209, min: 5_200, max: 5_209), 5_200)
         XCTAssertEqual(iperfSiblingPort(preferred: 5_201, min: 5_201, max: 5_201), 5_201)
+    }
+
+    /// La sonde de latence chargée vise le HAUT de la plage : le download part du bas
+    /// et l'upload prend le voisin immédiat, donc le haut n'entre en concurrence avec
+    /// aucun des deux — ni avec le port-walk.
+    func testLoadedLatencyProbeTargetsTopOfRange() {
+        XCTAssertEqual(
+            iperfLoadedLatencyProbePort(avoiding: [5_201], min: 5_200, max: 5_209),
+            5_209
+        )
+        // Le haut de plage est déjà pris : on descend d'un cran, jamais sur un actif.
+        XCTAssertEqual(
+            iperfLoadedLatencyProbePort(avoiding: [5_209], min: 5_200, max: 5_209),
+            5_208
+        )
+        // Deux ports de données occupés pendant l'upload.
+        XCTAssertEqual(
+            iperfLoadedLatencyProbePort(avoiding: [5_209, 5_208], min: 5_200, max: 5_209),
+            5_207
+        )
+    }
+
+    /// Le cas qui motive tout le correctif : sur un POP mono-port, l'ancienne
+    /// `iperfSiblingPort` renvoyait LE PORT DE DONNÉES ACTIF — la sonde ouvrait donc
+    /// une connexion dessus et faisait tomber le démon en pleine mesure. Plusieurs
+    /// POPs publics du catalogue n'exposent qu'un seul port : on renonce désormais à
+    /// l'échantillon plutôt que de fausser latence ET débit.
+    func testLoadedLatencyProbeGivesUpRatherThanHittingActivePort() {
+        XCTAssertNil(iperfLoadedLatencyProbePort(avoiding: [5_201], min: 5_201, max: 5_201))
+        // Plage à deux ports, tous deux occupés : rien de libre, on renonce.
+        XCTAssertNil(
+            iperfLoadedLatencyProbePort(avoiding: [5_200, 5_201], min: 5_200, max: 5_201)
+        )
+        // Comparaison directe avec l'ancien comportement, pour mémoire.
+        XCTAssertEqual(iperfSiblingPort(preferred: 5_201, min: 5_201, max: 5_201), 5_201)
+    }
+
+    // MARK: Catalogue iPerf3 servi par l'API
+
+    private func catalogServer(
+        id: String = "pop_test",
+        host: String = "iperf.example.net",
+        provider: String = "clouvider",
+        portMin: Int = 5_200,
+        portMax: Int = 5_209,
+        portPreferred: Int = 5_207
+    ) -> IPerfCatalogPayload.ServerDTO {
+        IPerfCatalogPayload.ServerDTO(
+            id: id, host: host, name: "POP de test", code: "TST",
+            provider: provider, city: "Test", countryCode: "FR",
+            lat: 48.8566, lon: 2.3522,
+            portMin: portMin, portMax: portMax, portPreferred: portPreferred,
+            selectable: true, autoEligible: true
+        )
+    }
+
+    private func catalogPayload(
+        schemaVersion: Int = 1,
+        servers: [IPerfCatalogPayload.ServerDTO]
+    ) -> IPerfCatalogPayload {
+        IPerfCatalogPayload(
+            schemaVersion: schemaVersion, revision: "abc123", ttlSeconds: 21_600,
+            providers: [], servers: servers
+        )
+    }
+
+    func testCatalogValidatorAcceptsWellFormedPayload() {
+        let servers = IPerfCatalogValidator.validate(
+            catalogPayload(servers: [catalogServer()])
+        )
+        XCTAssertEqual(servers?.count, 1)
+        // Le port vérifié par handshake doit survivre au transport : c'est lui qui
+        // évite de démarrer chaque test sur un port muet.
+        XCTAssertEqual(servers?.first?.portPreferred, 5_207)
+        XCTAssertEqual(servers?.first?.id, "pop_test")
+    }
+
+    /// Un fournisseur que ce binaire ne connaît pas ne doit PAS faire disparaître le
+    /// POP : pouvoir en introduire un côté serveur sans release est tout l'intérêt
+    /// du catalogue distant.
+    func testCatalogValidatorKeepsServersFromUnknownProvider() {
+        let servers = IPerfCatalogValidator.validate(
+            catalogPayload(servers: [catalogServer(provider: "un-hebergeur-inedit")])
+        )
+        XCTAssertEqual(servers?.count, 1)
+        XCTAssertEqual(servers?.first?.provider, .community)
+    }
+
+    /// Une version de schéma plus récente est refusée en bloc plutôt que décodée au
+    /// mieux : mieux vaut l'embarqué qu'une lecture approximative d'un format inconnu.
+    func testCatalogValidatorRejectsFutureSchemaVersion() {
+        XCTAssertNil(
+            IPerfCatalogValidator.validate(
+                catalogPayload(schemaVersion: 2, servers: [catalogServer()])
+            )
+        )
+    }
+
+    /// Le payload décrit des hôtes vers lesquels on ouvrira des sockets. Une plage de
+    /// ports démesurée transformerait le port-walk en balayage de ports — ce qui
+    /// ressemble à du scan vu du réseau de l'opérateur. Le rejet est EN BLOC : un
+    /// catalogue à moitié appliqué serait indébogable.
+    func testCatalogValidatorRejectsWholePayloadOnAbsurdPortRange() {
+        let servers = IPerfCatalogValidator.validate(
+            catalogPayload(servers: [
+                catalogServer(id: "sain"),
+                catalogServer(id: "aberrant", portMin: 1, portMax: 65_535, portPreferred: 1),
+            ])
+        )
+        XCTAssertNil(servers, "un seul POP douteux doit invalider tout le catalogue")
+    }
+
+    func testCatalogValidatorRejectsMalformedHosts() {
+        for host in ["iperf.example.net:5201", "http://iperf.example.net", "iperf example.net", ""] {
+            XCTAssertNil(
+                IPerfCatalogValidator.validate(catalogPayload(servers: [catalogServer(host: host)])),
+                "hôte accepté à tort : \(host)"
+            )
+        }
+    }
+
+    func testCatalogValidatorRejectsInconsistentPreferredPort() {
+        // Hors de [portMin, portMax] : le port-walk partirait hors plage.
+        XCTAssertNil(
+            IPerfCatalogValidator.validate(
+                catalogPayload(servers: [catalogServer(portMin: 5_200, portMax: 5_209, portPreferred: 5_300)])
+            )
+        )
+    }
+
+    func testCatalogValidatorRejectsDuplicateIdsAndEmptyCatalog() {
+        // Deux POPs de même id rendraient la préférence utilisateur ambiguë.
+        XCTAssertNil(
+            IPerfCatalogValidator.validate(
+                catalogPayload(servers: [catalogServer(id: "doublon"), catalogServer(id: "doublon")])
+            )
+        )
+        XCTAssertNil(IPerfCatalogValidator.validate(catalogPayload(servers: [])))
+    }
+
+    /// Le catalogue actif retombe sur l'embarqué quand rien n'a été chargé, et un
+    /// catalogue vide ne doit jamais l'écraser — sans quoi l'app se retrouverait
+    /// sans aucun serveur.
+    func testActiveCatalogFallsBackToBundledAndIgnoresEmpty() {
+        setActiveIPerfServers(nil)
+        XCTAssertEqual(activeIPerfServers.count, iperfPublicServers.count)
+
+        setActiveIPerfServers([])
+        XCTAssertEqual(activeIPerfServers.count, iperfPublicServers.count, "un catalogue vide ne doit pas s'appliquer")
+
+        let remote = IPerfCatalogValidator.validate(catalogPayload(servers: [catalogServer()]))
+        setActiveIPerfServers(remote)
+        XCTAssertEqual(activeIPerfServers.count, 1)
+        XCTAssertEqual(activeIPerfServers.first?.id, "pop_test")
+
+        // Ne pas laisser fuir l'état sur les autres tests.
+        setActiveIPerfServers(nil)
+    }
+
+    /// Contrat client/serveur : ce JSON est un extrait EXACT de la réponse de
+    /// production de `GET /api/speedtest/servers` (2026-08-10). Il verrouille deux
+    /// choses : que le modèle décode le format réel, et qu'il tolère les champs
+    /// qu'il ne connaît pas encore (`markets`, `zones`, `linkGbps`…) — le serveur
+    /// doit pouvoir enrichir le payload sans casser les binaires déjà déployés.
+    func testCatalogDecodesRealProductionPayload() throws {
+        let json = """
+        {
+          "schemaVersion": 1,
+          "revision": "bfa6aac78835",
+          "ttlSeconds": 21600,
+          "providers": [{ "key": "bouygues", "label": "Bouygues Telecom", "order": 10 }],
+          "servers": [{
+            "markets": [], "zones": [], "selectable": true, "autoEligible": true,
+            "autoPenaltyKm": 0, "ipVersion": "ipv4", "linkGbps": 10, "syntheticLatencyMs": 0,
+            "id": "clouvider_lon", "host": "lon.speedtest.clouvider.net",
+            "name": "Londres (Clouvider)", "code": "LON-CLV", "provider": "clouvider",
+            "city": "Londres", "countryCode": "GB", "lat": 51.5074, "lon": -0.1278,
+            "portMin": 5200, "portMax": 5209, "portPreferred": 5207
+          }]
+        }
+        """
+        let payload = try JSONDecoder.signalQuest.decode(
+            IPerfCatalogPayload.self, from: Data(json.utf8)
+        )
+        let servers = try XCTUnwrap(IPerfCatalogValidator.validate(payload))
+        XCTAssertEqual(servers.count, 1)
+        let lon = try XCTUnwrap(servers.first)
+        XCTAssertEqual(lon.id, "clouvider_lon")
+        XCTAssertEqual(lon.provider, .clouvider)
+        // Le POP qui motive tout le lot : 5200-5206 sont MUETS, seul 5207 répond.
+        // Sans ce port transporté jusqu'ici, l'app repart sur 5200 et conclut à tort
+        // que le serveur est mort, puis bascule sur Cloudflare.
+        XCTAssertEqual(lon.portPreferred, 5_207)
+        XCTAssertEqual(lon.defaultPort, 5_207)
+        XCTAssertEqual(lon.portMin, 5_200)
+        XCTAssertEqual(lon.portMax, 5_209)
+    }
+
+    /// La propriété qui justifie tout le catalogue distant : un POP servi par l'API
+    /// et ABSENT de l'enum doit être sélectionnable et résolu. Sans elle, ajouter un
+    /// serveur côté serveur n'aurait aucun effet tant que l'app n'est pas mise à jour.
+    func testCatalogOnlyServerIsSelectableWithoutAnEnumCase() {
+        let unknownId = "pop_inedit_2026"
+        XCTAssertNil(
+            SpeedtestDownloadTarget(rawValue: unknownId),
+            "ce test n'a de sens que si l'id est bien INCONNU de l'enum"
+        )
+
+        let remote = IPerfCatalogValidator.validate(
+            catalogPayload(servers: [
+                catalogServer(id: unknownId, host: "pop-inedit.example.net", provider: "un-nouvel-hebergeur"),
+            ])
+        )
+        setActiveIPerfServers(remote)
+        defer { setActiveIPerfServers(nil) }
+
+        let resolved = selectIPerfServer(for: .iperfCatalog, location: nil, catalogId: unknownId)
+        XCTAssertEqual(resolved.id, unknownId)
+        XCTAssertEqual(resolved.hostname, "pop-inedit.example.net")
+        XCTAssertEqual(resolved.provider, .community)
+        XCTAssertEqual(resolved.portPreferred, 5_207)
+    }
+
+    /// Un id qui ne correspond à rien — catalogue pas encore chargé, ou POP retiré
+    /// depuis que l'utilisateur l'a choisi — ne doit ni planter ni renvoyer un
+    /// serveur arbitraire : on retombe sur le plus proche.
+    func testCatalogTargetWithStaleIdFallsBackToClosest() {
+        setActiveIPerfServers(nil)
+        let paris = Coordinates(latitude: 48.8566, longitude: 2.3522)
+        let resolved = selectIPerfServer(for: .iperfCatalog, location: paris, catalogId: "pop_disparu")
+        XCTAssertEqual(resolved.countryCode, "FR", "repli attendu sur un POP proche de Paris")
     }
 
     func testConnectionResetIsRetryableIPerfError() {

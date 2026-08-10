@@ -223,6 +223,7 @@
 		7827FB3BCE2C62729FA1C132 /* ProfileReorgQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9370C0177B2346BC4EBEC5 /* ProfileReorgQATests.swift */; };
 		7834D63E27751200CFE2DCF1 /* MapPhotoViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3943DEC3A15CC630D29F54A /* MapPhotoViewer.swift */; };
 		789E87D0B4E5FA4E5020CADE /* SentinelleTemplateBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAA855D457CD028EBBD0F310 /* SentinelleTemplateBuilder.swift */; };
+		7B2E163A3536AB5845B515FC /* IPerfCatalogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89BA5EE9C0B99DE64018088D /* IPerfCatalogService.swift */; };
 		7B6075C24CC5984782DA63A0 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C94F0842C3E314471448652B /* CarPlaySceneDelegate.swift */; };
 		7C6A3C2708709AE1A38C1DE6 /* CommentsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4841F25C76693497780EE838 /* CommentsSheet.swift */; };
 		7CA5E6F0A4A14654924684BB /* SQShareFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C83749A7788F75706BA83C05 /* SQShareFonts.swift */; };
@@ -714,6 +715,7 @@
 		879A6D651EB7605DE38CD230 /* SpeedtestShareImageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestShareImageTests.swift; sourceTree = "<group>"; };
 		87AE9139473E16EE1FB4FFE7 /* DriveTestDataBudgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveTestDataBudgetTests.swift; sourceTree = "<group>"; };
 		885DAE78D34639CBB592A710 /* ValidationsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationsService.swift; sourceTree = "<group>"; };
+		89BA5EE9C0B99DE64018088D /* IPerfCatalogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPerfCatalogService.swift; sourceTree = "<group>"; };
 		8A4F1A6B2D39931723BEF026 /* NetworkWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkWidget.swift; sourceTree = "<group>"; };
 		8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEService.swift; sourceTree = "<group>"; };
 		8BCDF535985DE44CBDD88A60 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -1678,6 +1680,7 @@
 				7DE13CA2784C45B1F0EDF3B2 /* GamificationService.swift */,
 				94A824085331B8DDD8FD3AEC /* GamificationV2Service.swift */,
 				7C43EF0BBA838F55D6E4EF78 /* IdentifyService.swift */,
+				89BA5EE9C0B99DE64018088D /* IPerfCatalogService.swift */,
 				AC02787ABEAE06188ADF7D1F /* LeaderboardService.swift */,
 				29DFF718DF6D58771CA26060 /* LivePresenceService.swift */,
 				2C51010FA360E6C3806F7179 /* MapSnapshotService.swift */,
@@ -2235,6 +2238,7 @@
 				D8B502074515888EFFA296B9 /* GroupSettingsView.swift in Sources */,
 				0F93CA162732A4E9F82EC1AF /* Haptics.swift in Sources */,
 				45E031C6AB7C6A13B13FCE19 /* ICMPPinger.swift in Sources */,
+				7B2E163A3536AB5845B515FC /* IPerfCatalogService.swift in Sources */,
 				572D48910C58A33FE265B57B /* IdentificationModels.swift in Sources */,
 				7D0BE4AFA8C517809583BFB1 /* IdentifyService.swift in Sources */,
 				B34CAE48D657CA2E1045EDD2 /* JSONValue.swift in Sources */,

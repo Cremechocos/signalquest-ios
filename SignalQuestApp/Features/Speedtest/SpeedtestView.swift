@@ -36,6 +36,10 @@ struct SpeedtestView: View {
     @AppStorage("speedtest_reliability_mode") private var reliabilityMode = true
     /// Serveur LibreSpeed choisi manuellement (hostname). Vide = le plus proche.
     @AppStorage("speedtest_librespeed_host") private var libreSpeedHost = ""
+    /// POP iPerf3 choisi dans le catalogue distant (id de catalogue). Persisté à
+    /// part de la cible, comme `libreSpeedHost` : la cible dit QUEL moteur, celui-ci
+    /// dit LEQUEL de ses serveurs.
+    @AppStorage("speedtest_iperf_server_id") private var iperfServerId = ""
     /// Publication sur la carte communautaire publique. Opt-in explicite, mémorisé
     /// localement, et jamais publié sous VPN. La précision publique dépend ensuite
     /// du réglage global de confidentialité côté serveur.
@@ -279,6 +283,11 @@ struct SpeedtestView: View {
             currentNetworkStatus = services.networkPath.status
             isVPNActive = VPNDetector.isActive()
             await resolveDetectedOperator()
+            // Catalogue des POPs iPerf3 : rafraîchi ICI et pas pendant un test — le
+            // catalogue doit rester figé pour la durée d'une mesure, sinon l'id
+            // publié pourrait ne plus correspondre au serveur réellement mesuré.
+            // Best-effort : une API injoignable laisse le catalogue précédent.
+            await services.iperfCatalog.refreshIfNeeded()
             await services.speedtest.retryPendingSaves()
             history = await services.speedtest.history()
             await runQASpeedtestIfNeeded()
@@ -690,7 +699,8 @@ struct SpeedtestView: View {
                                 get: { downloadTarget },
                                 set: { downloadTargetRaw = $0.rawValue }
                             ),
-                            libreSpeedHost: $libreSpeedHost
+                            libreSpeedHost: $libreSpeedHost,
+                            iperfServerId: $iperfServerId
                         )
 
                         VStack(alignment: .leading, spacing: SQSpace.sm) {
@@ -864,7 +874,8 @@ struct SpeedtestView: View {
             durationSeconds: durationSeconds.clamped(to: 5...30),
             streams: streams.clamped(to: 1...16),
             reliabilityMode: reliabilityMode,
-            libreSpeedHost: libreSpeedHost.isEmpty ? nil : libreSpeedHost
+            libreSpeedHost: libreSpeedHost.isEmpty ? nil : libreSpeedHost,
+            iperfServerId: iperfServerId.isEmpty ? nil : iperfServerId
         )
     }
 

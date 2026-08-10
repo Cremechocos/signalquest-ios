@@ -26,6 +26,9 @@ final class AppServices: ObservableObject {
     let customSites: CustomSitesServicing
     let anfr: ANFRServicing
     let speedtest: SpeedtestService
+    /// Catalogue des POPs iPerf3 servi par l'API : permet de corriger un POP mort
+    /// côté serveur sans release. Rafraîchi à l'ouverture de l'écran Speedtest.
+    let iperfCatalog: IPerfCatalogService
     let networkOperator: NetworkOperatorServicing
     /// Verdict de qualité réseau communautaire (opérateur SIM) — pastille d'accueil.
     let nearbyQuality: NearbyNetworkQualityServicing
@@ -109,6 +112,14 @@ final class AppServices: ObservableObject {
         // pas l'onglet Tester/Drive Test (ROB-07). La file durable est idempotente.
         let speedtestService = speedtest
         Task { await speedtestService.retryPendingSaves() }
+        // Catalogue iPerf3 : on remonte d'abord le dernier connu DU DISQUE, sans
+        // réseau — l'app dispose ainsi du bon catalogue dès le premier test, même
+        // hors ligne. Le rafraîchissement réseau, lui, attend l'ouverture de l'écran
+        // Speedtest : inutile de solliciter l'API au lancement pour un écran que
+        // l'utilisateur n'ouvrira peut-être pas.
+        let catalogService = IPerfCatalogService(api: api)
+        iperfCatalog = catalogService
+        Task { await catalogService.primeFromDisk() }
         validations = ValidationsService(api: api)
         let identifyService = IdentifyService(api: api)
         identify = identifyService
