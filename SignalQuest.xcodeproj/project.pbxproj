@@ -68,6 +68,7 @@
 		1EC17F2A5E383435467A6EB1 /* SQBrand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 342AD252F576AA2664A4C655 /* SQBrand.swift */; };
 		1ED81414650F7C221C124090 /* NewScreensTourQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 262F4840634C90DB85AD2353 /* NewScreensTourQATests.swift */; };
 		1EF63FFE668545D35C37E403 /* MyMeasurementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA556BEE2D1EA6BAA5FB0800 /* MyMeasurementsView.swift */; };
+		1F4D5411DB8357A32431B8EA /* FavoriteAntennasService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FDF7C585867435141642B7B /* FavoriteAntennasService.swift */; };
 		1F8C1DCA6F43C1E6ECF1C518 /* MapKitMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F39D38251CE95547ECFA065 /* MapKitMapView.swift */; };
 		2178A64BBFDCF36192FACCD4 /* AppleDeviceDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F5CFE5CCBA408F62BDCC840 /* AppleDeviceDescriptor.swift */; };
 		223A9CEC6280B585F98FB578 /* AntennaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DA025CCAC0DF6A4A8AD5A6E /* AntennaModels.swift */; };
@@ -293,9 +294,11 @@
 		9C2F2BBCBB13ABC53828F982 /* WeeklyRecap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 632946BE7DBA07E9F73FEC3C /* WeeklyRecap.swift */; };
 		9D6685F0ED4310CB13C92238 /* RadioLogsTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0E1077E22C2EA2D3D667108 /* RadioLogsTokens.swift */; };
 		9D8F7A82FABDCB187B9D4B98 /* MessageModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4882F72DD2907AAAE98D14 /* MessageModels.swift */; };
+		9DBA3AA6E5DA385B19AB89EA /* FavoriteAntenna.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99798E0393F5516B6F61DF29 /* FavoriteAntenna.swift */; };
 		9FBCA5F1A88CB551F515FD7A /* SQShareFontsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DBD2F29F237A7FEA3E4DA8 /* SQShareFontsTests.swift */; };
 		A0B898A30A040EFE2F1D94D4 /* Sora-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7A87DB3713AB0F5246741CCA /* Sora-Variable.ttf */; };
 		A0D5817F9D4A79563D03058F /* MapBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C7F0DAC41E77828173A282 /* MapBackdrop.swift */; };
+		A114E9E9E60D46F06C9415B2 /* FavoriteAntennasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8C62357C2DA7C00CA377A6E /* FavoriteAntennasView.swift */; };
 		A1A44A0CCC7D64304DA39684 /* NetworkPathMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 649AF22D91CC4ADD75073863 /* NetworkPathMonitor.swift */; };
 		A1ABC76C1DC3033D0345F5AC /* RadioLogsFilterSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31424F4F8C76280C3D0AC98B /* RadioLogsFilterSheet.swift */; };
 		A28061C8B19BB2B612B557B8 /* TileCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F9D2F40F28C9CB1247B4F5 /* TileCache.swift */; };
@@ -751,6 +754,7 @@
 		969394914FD409108A452239 /* AntennaReportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaReportModels.swift; sourceTree = "<group>"; };
 		97E995D86EB1D6FE8BFA16CA /* VoiceNoteRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceNoteRecorder.swift; sourceTree = "<group>"; };
 		981E7B41486B91A9E6788632 /* SpeedtestHistoryRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestHistoryRow.swift; sourceTree = "<group>"; };
+		99798E0393F5516B6F61DF29 /* FavoriteAntenna.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FavoriteAntenna.swift; sourceTree = "<group>"; };
 		99AAD8ABBA3C0988CFEC53F8 /* CarPlaySentinelleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySentinelleTests.swift; sourceTree = "<group>"; };
 		9A7ACE7CF4C567524403CDD7 /* AuthTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthTransportTests.swift; sourceTree = "<group>"; };
 		9CA124FDAFD391CBDE51960A /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
@@ -760,6 +764,7 @@
 		9EC5960ABF8C24952322E392 /* PrivacyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyService.swift; sourceTree = "<group>"; };
 		9F5CFE5CCBA408F62BDCC840 /* AppleDeviceDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleDeviceDescriptor.swift; sourceTree = "<group>"; };
 		9F7996D06DFF212012F7841D /* MapAccessibilityQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAccessibilityQATests.swift; sourceTree = "<group>"; };
+		9FDF7C585867435141642B7B /* FavoriteAntennasService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FavoriteAntennasService.swift; sourceTree = "<group>"; };
 		A0012B13A7B2878BF00E6CEB /* SQAntennaGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQAntennaGlyph.swift; sourceTree = "<group>"; };
 		A003CFB7415DD224E468A2D5 /* Territory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Territory.swift; sourceTree = "<group>"; };
 		A01462ACA13AD33221D20FAF /* ShareCardBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardBubble.swift; sourceTree = "<group>"; };
@@ -913,6 +918,7 @@
 		F67298253C20F58314208B87 /* AntennaGlossaryIllustrations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaGlossaryIllustrations.swift; sourceTree = "<group>"; };
 		F7FC8EF017841F78C280399C /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
 		F81FC163DBCA9F8D2907783C /* ContinuousSessionAccumulator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContinuousSessionAccumulator.swift; sourceTree = "<group>"; };
+		F8C62357C2DA7C00CA377A6E /* FavoriteAntennasView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FavoriteAntennasView.swift; sourceTree = "<group>"; };
 		F95EB05B86F26CEFD0F46621 /* SiteRemapSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteRemapSheet.swift; sourceTree = "<group>"; };
 		FA71E3F29A86476A36C8900F /* ScheduledMessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledMessagesView.swift; sourceTree = "<group>"; };
 		FA8ECC4FB30FDE6210DF221A /* MessageSchedulingSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageSchedulingSheets.swift; sourceTree = "<group>"; };
@@ -1051,6 +1057,7 @@
 				1EF500D8FCED373A2FCD5FF8 /* UserPreferencesModels.swift */,
 				3B8BBA72A0A9FF7F8F0F8936 /* ValidationModels.swift */,
 				632946BE7DBA07E9F73FEC3C /* WeeklyRecap.swift */,
+				99798E0393F5516B6F61DF29 /* FavoriteAntenna.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -1720,6 +1727,7 @@
 				2E03EF30DC08FEA39216CD0B /* UserService.swift */,
 				885DAE78D34639CBB592A710 /* ValidationsService.swift */,
 				6D9D541BEF00A9C73ECDCC19 /* VersionPolicyService.swift */,
+				9FDF7C585867435141642B7B /* FavoriteAntennasService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -1855,6 +1863,7 @@
 				3E56653C936C5B86173CE9F8 /* MapKit */,
 				3AAE84DCCA4CD689F68F65BF /* Model */,
 				2A6C64C6C3847E186D24C58D /* OutageReportSheet.swift */,
+				F8C62357C2DA7C00CA377A6E /* FavoriteAntennasView.swift */,
 			);
 			path = Map;
 			sourceTree = "<group>";
@@ -2467,6 +2476,9 @@
 				1E08C8632734607458C0A7DF /* WiFiSSIDProvider.swift in Sources */,
 				19D4A156D2AA675F72CB2A16 /* WidgetSharedStore.swift in Sources */,
 				DAF05F9B6CF6208FCB05B8AC /* OutageReportSheet.swift in Sources */,
+				9DBA3AA6E5DA385B19AB89EA /* FavoriteAntenna.swift in Sources */,
+				1F4D5411DB8357A32431B8EA /* FavoriteAntennasService.swift in Sources */,
+				A114E9E9E60D46F06C9415B2 /* FavoriteAntennasView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

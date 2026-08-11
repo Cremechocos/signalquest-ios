@@ -137,6 +137,20 @@ struct AntennaDetailSheet: View {
             .navigationTitle(headerTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    // À GAUCHE, pas à côté de « Fermer » : suivre et fermer sont deux gestes
+                    // opposés, et les mettre côte à côte fait rater l'un pour l'autre.
+                    FavoriteAntennaButton(
+                        favorites: services.favoriteAntennas,
+                        siteId: site.siteId ?? site.id,
+                        market: market,
+                        operatorName: selectedOperator,
+                        name: site.address,
+                        address: site.address,
+                        latitude: site.latitude,
+                        longitude: site.longitude
+                    )
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fermer") { dismiss() }
                         .tint(SQColor.brandRed)
@@ -149,6 +163,10 @@ struct AntennaDetailSheet: View {
                 model.error = nil
                 await model.load(id: site.siteId ?? site.id, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
                 await loadOutages()
+                // Sans cette lecture, l'étoile s'affiche éteinte sur un site pourtant suivi, et
+                // un appui écrirait une liste incomplète — le service refuse d'ailleurs d'écrire
+                // avant d'avoir chargé.
+                await services.favoriteAntennas.load()
             }
         }
         .presentationDetents([.medium, .large])

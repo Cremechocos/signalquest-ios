@@ -24,6 +24,9 @@ final class AppServices: ObservableObject {
     let antennaReports: AntennaReportsServicing
     /// Signalement communautaire de pannes — cf. `CommunityOutageService`.
     let communityOutages: CommunityOutageServicing
+    /// Antennes suivies. Observable et UNIQUE : le contrat serveur remplace la liste entière,
+    /// donc deux copies et la dernière à écrire effacerait les ajouts de l'autre.
+    let favoriteAntennas: FavoriteAntennasService
     /// Création de sites pointés à la main (dont ceux déduits de cellules observées).
     let customSites: CustomSitesServicing
     let anfr: ANFRServicing
@@ -96,6 +99,7 @@ final class AppServices: ObservableObject {
         terrain = TerrainService(api: api)
         antennaReports = AntennaReportsService(api: api)
         communityOutages = CommunityOutageService(api: api)
+        favoriteAntennas = FavoriteAntennasService(api: api)
         customSites = CustomSitesService(api: api)
         anfr = ANFRService(api: api)
         let networkOperatorService = NetworkOperatorService(api: api)
