@@ -47,6 +47,13 @@ struct FeedItemCard: View {
                 onComment: onComment, onFavorite: onFavorite, onShare: onShare,
                 onAuthorTap: onAuthorTap, onReact: onReact
             )
+        case "outage":
+            OutageCardView(
+                item: item,
+                onTap: onTap, onLike: onLike, onRepost: onRepost,
+                onComment: onComment, onFavorite: onFavorite, onShare: onShare,
+                onAuthorTap: onAuthorTap, onReact: onReact
+            )
         case "rating":
             RatingCardView(
                 item: item,
