@@ -157,12 +157,12 @@ struct LeaderboardsView: View {
                     LeaderboardHeroCard(profile: profile, user: currentUser, gamification: gamification)
                         .sqFadeUp()
                 }
-                filters
+                controls
                 content
             }
             .padding(.horizontal, SQSpace.xl)
             .padding(.top, SQSpace.sm)
-            .padding(.bottom, 96)
+            .padding(.bottom, SQDock.floatingContentInset)
             .sqReadableWidth()
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -173,6 +173,11 @@ struct LeaderboardsView: View {
 
     /// En-tête custom (nav bar système masquée) : bouton retour circulaire 40 pt
     /// + titre Bricolage Bold 24, comme le prototype.
+    ///
+    /// Le switcher « Vitesse | Points » a sa propre ligne (voir `controls`) : à
+    /// côté du titre, il ne restait pas 150 pt pour ses deux libellés sur un
+    /// iPhone standard, et les segments repliaient leur texte (« Vitess/e »,
+    /// « Point/s »).
     private var header: some View {
         HStack(spacing: SQSpace.md) {
             Button {
@@ -193,14 +198,16 @@ struct LeaderboardsView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .allowsTightening(true)
-                // Le titre garde la priorité de largeur : sinon le switcher « Vitesse |
-                // Points » (large) le comprime et « Classements » se tronque (iPhone SE /
-                // Dynamic Type élevé).
-                .layoutPriority(1)
-            Spacer(minLength: SQSpace.sm)
-            // Segment Vitesse | Points compact, intégré au header (gagne une ligne).
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// Bloc de contrôles collé au classement qu'il pilote : segment d'onglet
+    /// pleine largeur, puis la ligne de filtres.
+    private var controls: some View {
+        VStack(spacing: SQSpace.md) {
             LeaderboardTabSwitcher(selection: $model.tab)
-                .layoutPriority(0)
+            filters
         }
     }
 
@@ -314,7 +321,7 @@ struct LeaderboardsView: View {
                 },
                 podiumID: "speed-\(model.speedStamp)",
                 isRefreshing: model.isLoadingSpeed,
-                myRank: model.speedResult.myRank.map { rank in
+                myRank: entries.dropFirst(3).contains(where: isMe) ? nil : model.speedResult.myRank.map { rank in
                     (rank: rank.rank, total: rank.total as Int?, value: rank.entry.map { "\(Int($0.value)) \($0.unit)" })
                 },
                 error: model.speedError
@@ -327,12 +334,7 @@ struct LeaderboardsView: View {
                         valueText: "\(Int(entry.value)) \(entry.unit)",
                         isMe: isMe(entry)
                     ) {
-                        HStack(spacing: SQSpace.xs + 2) {
-                            if let city = entry.city { SQEditorialTag(text: city, color: SQColor.label) }
-                            if let tech = entry.tech { SQEditorialTag(text: tech, color: SQBrand.techColor(tech)) }
-                            if entry.isProbablyIOS { SQEditorialTag(text: "iOS", color: SQColor.brandRed) }
-                            Spacer(minLength: 0)
-                        }
+                        SpeedRowMeta(city: entry.city, tech: entry.tech, isProbablyIOS: entry.isProbablyIOS)
                     }
                     .sqFadeUp()
                 }
@@ -367,7 +369,7 @@ struct LeaderboardsView: View {
                 },
                 podiumID: "points-\(model.pointsStamp)",
                 isRefreshing: model.isLoadingPoints,
-                myRank: model.pointsResult.currentUserRank.map { rank in
+                myRank: entries.dropFirst(3).contains(where: isMe) ? nil : model.pointsResult.currentUserRank.map { rank in
                     (rank: rank, total: nil, value: model.profile?.points.map { "\($0.formatted()) pts" })
                 },
                 error: model.pointsError
@@ -380,15 +382,7 @@ struct LeaderboardsView: View {
                         valueText: "\(entry.score(for: model.period).formatted()) pts",
                         isMe: isMe(entry)
                     ) {
-                        HStack(spacing: SQSpace.sm) {
-                            if let level = entry.level { LevelPill(level: level) }
-                            if let stats = entry.stats {
-                                statCount(icon: "checkmark.seal.fill", count: stats.validations)
-                                statCount(icon: "camera.fill", count: stats.photos)
-                                statCount(icon: "speedometer", count: stats.speedtests)
-                            }
-                            Spacer(minLength: 0)
-                        }
+                        PointsRowMeta(level: entry.level, stats: entry.stats)
                     }
                     .sqFadeUp()
                 }
@@ -398,6 +392,11 @@ struct LeaderboardsView: View {
 
     /// Assemble podium + carte « mon rang » + liste, avec assombrissement léger
     /// pendant un rafraîchissement de filtre.
+    ///
+    /// `myRank` vaut `nil` quand ma propre rangée figure déjà dans la liste : la
+    /// carte tomberait sinon juste au-dessus d'elle, avec le même rang et la même
+    /// valeur (« Mon rang #4 » puis « 4 · Moi »). Le podium ne comptant pas — il
+    /// n'étiquette pas « Moi » —, la carte reste affichée quand je suis top 3.
     private func rankingSection<Rows: View>(
         podiumData: [PodiumEntryData],
         podiumID: String,
@@ -423,21 +422,6 @@ struct LeaderboardsView: View {
         }
         .opacity(isRefreshing ? 0.55 : 1)
         .sqAnimation(SQMotion.fast, value: isRefreshing)
-    }
-
-    private func statCount(icon: String, count: Int?) -> some View {
-        Group {
-            if let count, count > 0 {
-                HStack(spacing: 3) {
-                    Image(systemName: icon)
-                        .font(.system(size: 10, weight: .semibold))
-                    Text(count.formatted())
-                        .font(SQType.micro)
-                        .monospacedDigit()
-                }
-                .foregroundStyle(SQColor.labelSecondary)
-            }
-        }
     }
 
     private func isMe(_ entry: LeaderboardEntry) -> Bool {
@@ -546,6 +530,8 @@ private struct LeaderboardHeroCard: View {
             Text("Niv. \(level)")
                 .font(SQType.micro)
                 .monospacedDigit()
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, SQSpace.sm)
                 .padding(.vertical, 3)
                 .background(SQColor.brandRed, in: Capsule(style: .continuous))
@@ -648,8 +634,12 @@ private struct XPRing: View {
 
 // Segments « Crème » : rangée de capsules Figtree SemiBold 13 — l'onglet actif
 // est une capsule brique pleine (texte crème), les inactifs surface + ombre douce.
-/// Segment compact « Vitesse | Points » : une seule capsule surface avec une
+/// Segment « Vitesse | Points » pleine largeur : une capsule surface avec une
 /// pilule brique qui glisse sous l'option active (matchedGeometryEffect).
+///
+/// Les deux moitiés sont égales (`maxWidth: .infinity`) et leur libellé tient
+/// sur une ligne quoi qu'il arrive — c'est la contrainte qui a motivé la sortie
+/// du switcher hors de l'en-tête.
 private struct LeaderboardTabSwitcher: View {
     @Binding var selection: LeaderboardTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -664,19 +654,27 @@ private struct LeaderboardTabSwitcher: View {
                     Haptics.selection()
                     withAnimation(SQMotion.resolve(SQMotion.emphasized, reduceMotion)) { selection = tab }
                 } label: {
-                    Text(tab.title)
-                        .font(SQFont.body(13, .semibold))
-                        .padding(.horizontal, SQSpace.md)
-                        .padding(.vertical, SQSpace.sm - 1)
-                        .foregroundStyle(isOn ? SQColor.onAccent : SQColor.labelSecondary)
-                        .background {
-                            if isOn {
-                                Capsule(style: .continuous)
-                                    .fill(SQColor.brandRed)
-                                    .matchedGeometryEffect(id: "pill", in: pill)
-                            }
+                    HStack(spacing: 5) {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(tab.title)
+                            .font(SQFont.body(13, .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .allowsTightening(true)
+                    }
+                    .padding(.horizontal, SQSpace.md)
+                    .padding(.vertical, SQSpace.sm)
+                    .frame(maxWidth: .infinity)
+                    .foregroundStyle(isOn ? SQColor.onAccent : SQColor.labelSecondary)
+                    .background {
+                        if isOn {
+                            Capsule(style: .continuous)
+                                .fill(SQColor.brandRed)
+                                .matchedGeometryEffect(id: "pill", in: pill)
                         }
-                        .contentShape(Capsule(style: .continuous))
+                    }
+                    .contentShape(Capsule(style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tab.title)
@@ -918,6 +916,106 @@ private struct SQSoftShadowIf: ViewModifier {
     }
 }
 
+// MARK: - Lignes méta des rangées
+
+/// Étiquettes d'une rangée Vitesse : ville, technologie, provenance iOS.
+///
+/// Le nombre d'étiquettes se dégrade au lieu d'en tronquer une : à trois, la
+/// ville se réduisait à « Na… » alors que laisser tomber le tag « iOS » — la
+/// moins utile des trois — permet d'afficher « Nantes » en entier. L'ordre du
+/// tableau est l'ordre de priorité.
+private struct SpeedRowMeta: View {
+    let city: String?
+    let tech: String?
+    let isProbablyIOS: Bool
+
+    private var tags: [(text: String, color: Color)] {
+        var tags: [(text: String, color: Color)] = []
+        if let city { tags.append((city, SQColor.label)) }
+        if let tech { tags.append((tech, SQBrand.techColor(tech))) }
+        if isProbablyIOS { tags.append(("iOS", SQColor.brandRed)) }
+        return tags
+    }
+
+    var body: some View {
+        let tags = tags
+        ViewThatFits(in: .horizontal) {
+            line(tags)
+            line(Array(tags.dropLast()))
+            line(Array(tags.prefix(1)))
+        }
+    }
+
+    private func line(_ tags: [(text: String, color: Color)]) -> some View {
+        HStack(spacing: SQSpace.xs + 2) {
+            ForEach(Array(tags.enumerated()), id: \.offset) { _, tag in
+                SQEditorialTag(text: tag.text, color: tag.color)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// Pastille de niveau + compteurs d'activité, sur UNE ligne.
+///
+/// Le nombre de compteurs se dégrade (3 → 2 → 1 → 0) au lieu de laisser la
+/// rangée replier ses chiffres : sur un iPhone standard, pastille + 3 compteurs
+/// + nom + score dépassent la largeur disponible, et l'`HStack` coupait alors
+/// « 383 » en trois lignes d'un chiffre. Les compteurs à zéro sont retirés en
+/// amont — un `if` dans l'`HStack` laissait une espace fantôme à leur place.
+private struct PointsRowMeta: View {
+    let level: Int?
+    let stats: PointsLeaderboardStats?
+
+    private var counters: [(icon: String, count: Int)] {
+        guard let stats else { return [] }
+        return [
+            ("checkmark.seal.fill", stats.validations),
+            ("camera.fill", stats.photos),
+            ("speedometer", stats.speedtests)
+        ].compactMap { icon, value -> (icon: String, count: Int)? in
+            guard let value, value > 0 else { return nil }
+            return (icon, value)
+        }
+    }
+
+    var body: some View {
+        let counters = counters
+        ViewThatFits(in: .horizontal) {
+            line(Array(counters.prefix(3)))
+            line(Array(counters.prefix(2)))
+            line(Array(counters.prefix(1)))
+            line([])
+        }
+    }
+
+    private func line(_ counters: [(icon: String, count: Int)]) -> some View {
+        HStack(spacing: SQSpace.sm) {
+            if let level { LevelPill(level: level) }
+            ForEach(Array(counters.enumerated()), id: \.offset) { _, counter in
+                statCount(icon: counter.icon, count: counter.count)
+            }
+            // Sans ce ressort, l'`HStack` centrerait la ligne dans la largeur que
+            // lui propose la rangée au lieu de la coller à gauche du nom.
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func statCount(icon: String, count: Int) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .semibold))
+            Text(count.formatted())
+                .font(SQType.micro)
+                .monospacedDigit()
+                .lineLimit(1)
+        }
+        .foregroundStyle(SQColor.labelSecondary)
+        .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
 // MARK: - Pastille niveau
 
 private struct LevelPill: View {
@@ -927,6 +1025,8 @@ private struct LevelPill: View {
         Text("Niv. \(level)")
             .font(SQType.micro)
             .monospacedDigit()
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, SQSpace.sm)
             .padding(.vertical, 3)
             .background(SQColor.accentSoft, in: Capsule(style: .continuous))
