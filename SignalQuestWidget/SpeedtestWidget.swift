@@ -167,6 +167,20 @@ extension View {
             self.padding(14).background(WidgetBackdrop(tint: tint))
         }
     }
+
+    /// Pour les familles `accessory*` (verrouillage) : iOS 17+ exige l'adoption
+    /// de `containerBackground`, sinon le système affiche « Please adopt
+    /// containerBackground API » à la place du widget. Fond transparent car le
+    /// verrouillage impose de toute façon son propre rendu vibrant. Avant iOS 17
+    /// ces familles s'affichaient déjà sans cet appel, donc `self` suffit.
+    @ViewBuilder
+    func sqAccessoryBackground() -> some View {
+        if #available(iOS 17.0, *) {
+            self.containerBackground(.clear, for: .widget)
+        } else {
+            self
+        }
+    }
 }
 
 // MARK: - Cadran (arc de jauge + chiffre central) — calque du SignatureSpeedDial
@@ -498,6 +512,7 @@ struct SpeedtestWidgetEntryView: View {
                 .lineLimit(1)
         }
         .gaugeStyle(.accessoryCircular)
+        .sqAccessoryBackground()
         .widgetURL(speedtestWidgetURL)
     }
 
@@ -530,6 +545,7 @@ struct SpeedtestWidgetEntryView: View {
                 Label("Aucun test", systemImage: "speedometer").font(.headline)
             }
         }
+        .sqAccessoryBackground()
         .widgetURL(speedtestWidgetURL)
     }
 
@@ -538,6 +554,7 @@ struct SpeedtestWidgetEntryView: View {
             entry.snapshot.map { "\(Int($0.downloadMbps.rounded())) Mbps ↓" } ?? "Speedtest",
             systemImage: "speedometer"
         )
+        .sqAccessoryBackground()
         .widgetURL(speedtestWidgetURL)
     }
 }
