@@ -301,6 +301,12 @@ struct ProfileView: View {
                 }
                 menuSeparator
                 NavigationLink {
+                    CommunityOutagesListView(service: services.communityOutages)
+                } label: {
+                    menuRow(title: "Pannes signalées", icon: "exclamationmark.triangle.fill")
+                }
+                menuSeparator
+                NavigationLink {
                     PhotosView(service: services.photos)
                 } label: {
                     menuRow(title: "Photos", icon: "photo.stack")

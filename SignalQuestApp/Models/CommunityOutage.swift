@@ -137,6 +137,8 @@ struct CommunityOutage: Decodable, Identifiable, Equatable {
 
 struct CommunityOutagesResponse: Decodable, Equatable {
     let outages: [CommunityOutage]
+    /// Seule la liste paginée le renseigne ; les lectures par site n'en ont pas l'usage.
+    let hasMore: Bool?
 }
 
 // MARK: - Écriture
