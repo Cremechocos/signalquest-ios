@@ -726,14 +726,26 @@ final class SpeedtestTests: XCTestCase {
     func testDownloadTargetPickerMetadata() {
         XCTAssertEqual(SpeedtestDownloadTarget.hybridAuto.displayName, "Auto")
         XCTAssertFalse(SpeedtestDownloadTarget.rbx.subtitle.isEmpty)
-        // Auto + 5 OVH sains (Beauharnois retiré) + 13 Bouygues sains + 2 Scaleway
-        // + 1 MilkyWan + 7 POP iPerf3 FR/EU publics + 1 Cloudflare + 1 LibreSpeed.
-        // Les 2 cibles Scaleway « +90 ms » (latence artificielle, debug) ne sont
-        // pas proposées : 31 entrées.
-        XCTAssertEqual(SpeedtestDownloadTarget.selectableCases.count, 31)
-        XCTAssertEqual(SpeedtestDownloadTarget.ovhCases.count, 5)
+        // Auto + 4 OVH sains (Beauharnois ET Ashburn retirés) + 13 Bouygues sains
+        // + 2 Scaleway + 1 MilkyWan + 7 POP iPerf3 FR/EU + 2 Amérique du Nord
+        // + 1 Cloudflare + 1 LibreSpeed. Les 2 cibles Scaleway « +90 ms » (latence
+        // artificielle, debug) ne sont pas proposées : 32 entrées.
+        XCTAssertEqual(SpeedtestDownloadTarget.selectableCases.count, 32)
+        XCTAssertEqual(SpeedtestDownloadTarget.ovhCases.count, 4)
         XCTAssertFalse(SpeedtestDownloadTarget.ovhCases.contains(.bhs))
         XCTAssertEqual(SpeedtestDownloadTarget.bhs.migrated, .hybridAuto)
+        // `proof.ovh.us` ne répond plus sur AUCUN port de sa plage (handshake
+        // vérifié le 2026-08-10). Il restait pourtant proposé, et son case pointait
+        // toujours vers l'hôte mort : un utilisateur iOS pouvait le choisir et
+        // attendre indéfiniment. Android le migrait déjà.
+        XCTAssertFalse(SpeedtestDownloadTarget.ovhCases.contains(.us))
+        XCTAssertEqual(SpeedtestDownloadTarget.us.migrated, .hybridAuto)
+        // Ces deux POPs comblent le trou nord-américain. Ils n'existaient que dans
+        // l'enum Android : iOS les reléguait dans « Catalogue » au lieu de leur
+        // groupe, alors que les deux apps servent le même catalogue.
+        XCTAssertEqual(SpeedtestDownloadTarget.publicAmericaCases.count, 2)
+        XCTAssertEqual(SpeedtestDownloadTarget.clouviderAsh.regionLabel, "iPerf3 · Amérique du Nord")
+        XCTAssertEqual(SpeedtestDownloadTarget.leasewebMtl.regionLabel, "iPerf3 · Amérique du Nord")
         XCTAssertEqual(SpeedtestDownloadTarget.bouyguesCases.count, 13)
         XCTAssertEqual(SpeedtestDownloadTarget.scalewayCases.count, 2)
         XCTAssertEqual(SpeedtestDownloadTarget.milkywanCases.count, 1)

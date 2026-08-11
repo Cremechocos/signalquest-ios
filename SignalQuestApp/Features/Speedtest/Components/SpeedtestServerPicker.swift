@@ -63,6 +63,22 @@ struct SpeedtestServerPicker: View {
             .sorted { $0.name < $1.name }
     }
 
+    /// Les mêmes, groupés par PAYS.
+    ///
+    /// Pas par fournisseur : 29 des 33 POPs apportés par le catalogue portent le
+    /// fournisseur générique `community` et s'entasseraient sous un seul en-tête
+    /// sans information. Par pays, on obtient une quinzaine de groupes équilibrés.
+    /// Le fournisseur reste lisible — il est déjà dans le nom du POP
+    /// (« Montréal (GoCo) ») — donc le pays n'est pas une redite.
+    ///
+    /// Même découpage qu'Android (`SpeedTestScreen.kt`) : les deux apps servent le
+    /// même catalogue, les présenter différemment n'aurait aucune justification.
+    var catalogServersByCountry: [(country: String, servers: [IPerfPublicServer])] {
+        Dictionary(grouping: catalogOnlyServers, by: \.countryCode)
+            .sorted { $0.key < $1.key }
+            .map { (country: $0.key, servers: $0.value) }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Auto + Cloudflare (moteurs) — toujours visibles. LibreSpeed a sa
@@ -291,9 +307,19 @@ struct SpeedtestServerPicker: View {
                 .accessibilityValue(isExpanded ? "ouvert" : "fermé")
 
                 if isExpanded {
-                    VStack(spacing: 6) {
-                        ForEach(catalogOnlyServers, id: \.id) { server in
-                            catalogServerRow(server)
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(catalogServersByCountry, id: \.country) { group in
+                            // Code pays brut : neutre linguistiquement, donc aucune
+                            // chaîne à traduire, et c'est le repère utile quand on
+                            // cherche un POP proche.
+                            Text(group.country)
+                                .font(SQFont.body(11, .semibold))
+                                .foregroundStyle(SQColor.labelTertiary)
+                                .padding(.top, 4)
+                                .accessibilityLabel("Pays : \(group.country)")
+                            ForEach(group.servers, id: \.id) { server in
+                                catalogServerRow(server)
+                            }
                         }
                     }
                     .padding(.top, 6)
@@ -347,7 +373,10 @@ struct SpeedtestServerPicker: View {
                 title: server.name,
                 // `name` porte déjà la ville (« Londres (Clouvider) ») : le
                 // sous-titre ajoute le code POP et le pays, pas une redite.
-                subtitle: "\(server.code) · \(server.countryCode)",
+                // Le pays est passé dans l'en-tête de groupe : le répéter ici
+                // n'apprendrait rien. Reste le code POP, qui distingue deux POPs
+                // d'une même ville (« PAR-BBR » / « PAR-CUBIC »).
+                subtitle: server.code,
                 selected: selected
             )
         }

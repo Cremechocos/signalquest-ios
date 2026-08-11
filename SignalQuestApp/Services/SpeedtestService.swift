@@ -2825,7 +2825,13 @@ func selectIPerfServer(
     case .sbg: host = "sbg.proof.ovh.net"
     case .gra: host = "gra.proof.ovh.net"
     case .bom: host = "bom.proof.ovh.net"
+    // Branche désormais INATTEIGNABLE : `.us` migre vers `.hybridAuto` depuis que
+    // `proof.ovh.us` est mort. Conservée pour l'exhaustivité du switch, qui refuse
+    // qu'on oublie un cas — c'est ce filet qui a rendu visibles les deux POPs
+    // nord-américains manquants ci-dessous.
     case .us: host = "proof.ovh.us"
+    case .clouviderAsh: host = "ash.speedtest.clouvider.net"
+    case .leasewebMtl: host = "speedtest.mtl2.ca.leaseweb.net"
     case .bytelParisBbr: host = "paris.bbr.iperf.bytel.fr"
     case .bytelParisCubic: host = "paris.cubic.iperf.bytel.fr"
     case .bytelMrsBbr: host = "mrs.bbr.iperf.bytel.fr"

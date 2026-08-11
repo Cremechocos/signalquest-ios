@@ -61,6 +61,12 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
     case clouviderLon = "clouvider_lon"    // lon.speedtest.clouvider.net, Londres
     case clouviderMan = "clouvider_man"    // man.speedtest.clouvider.net, Manchester
     case leasewebFra = "leaseweb_fra"      // speedtest.fra1.de.leaseweb.net, Francfort
+    // Ajoutés au catalogue le 2026-08-10 pour combler le trou nord-américain
+    // (`proof.ovh.us` mort, `proof.ovh.ca` retiré), mais oubliés ICI : ils
+    // n'existaient que côté Android, donc iOS les reléguait dans « Catalogue »
+    // au lieu de leur groupe fournisseur. Même catalogue, deux rangements.
+    case clouviderAsh = "clouvider_ash"    // ash.speedtest.clouvider.net, Ashburn
+    case leasewebMtl = "leaseweb_mtl"      // speedtest.mtl2.ca.leaseweb.net, Montréal
     case init7 = "init7_ch"                // speedtest.init7.net, Suisse (FAI premium)
     // Cloudflare — moteur HTTPS anycast (couverture mondiale, DL/UL/ping même edge)
     case cloudflare = "cloudflare_edge"
@@ -89,13 +95,18 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
             + scalewayCases
             + milkywanCases
             + publicEuropeCases
+            + publicAmericaCases
             + cloudflareCases
             + [.libreSpeed]
     }
 
     /// Hosts OVH sains (Beauharnois exclu du sélecteur : TCP ouvert, iPerf3 muet).
     static var ovhCases: [SpeedtestDownloadTarget] {
-        [.rbx, .sbg, .gra, .bom, .us]
+        // `.us` retiré : `proof.ovh.us` (Ashburn) ne répond plus sur AUCUN port de
+        // sa plage, vérifié par handshake le 2026-08-10. Le case reste défini pour
+        // décoder une préférence existante — `migrated` l'envoie sur Auto, comme
+        // Android le fait déjà via LEGACY_MIGRATED_TARGET_IDS.
+        [.rbx, .sbg, .gra, .bom]
     }
 
     /// Hosts Bouygues sains (poi.cubic exclu du sélecteur).
@@ -128,6 +139,12 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         [.mojiParis, .clouviderFra, .clouviderAms, .clouviderLon, .clouviderMan, .leasewebFra, .init7]
     }
 
+    /// POPs nord-américains. Un groupe à part plutôt qu'un ajout à
+    /// `publicEuropeCases`, dont le nom deviendrait faux.
+    static var publicAmericaCases: [SpeedtestDownloadTarget] {
+        [.clouviderAsh, .leasewebMtl]
+    }
+
     static var cloudflareCases: [SpeedtestDownloadTarget] {
         [.cloudflare]
     }
@@ -148,13 +165,14 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
             ("Scaleway", scalewayCases),
             ("MilkyWan", milkywanCases),
             ("iPerf3 · France & Europe", publicEuropeCases),
+            ("iPerf3 · Amérique du Nord", publicAmericaCases),
         ]
     }
 
     /// Migration douce : CDN legacy + host bytel mort → « Auto ».
     var migrated: SpeedtestDownloadTarget {
         switch self {
-        case .cloudflareR2, .awsCloudFront, .vpsInternal, .bytelPoiCubic, .bhs:
+        case .cloudflareR2, .awsCloudFront, .vpsInternal, .bytelPoiCubic, .bhs, .us:
             return .hybridAuto
         default:
             return self
@@ -171,6 +189,8 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .bom: return "Mumbai"
         case .bhs: return "Beauharnois"
         case .us: return "Ashburn"
+        case .clouviderAsh: return "Ashburn (Clouvider)"
+        case .leasewebMtl: return "Montréal"
         case .bytelParisBbr: return "Paris · BBR"
         case .bytelParisCubic: return "Paris · CUBIC"
         case .bytelMrsBbr: return "Marseille · BBR"
@@ -192,6 +212,8 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .milkywan: return "Croissy-Beaubourg"
         case .mojiParis: return "Paris · Moji"
         case .clouviderFra: return "Francfort · Clouvider"
+        case .clouviderAsh: return "Ashburn · Clouvider"
+        case .leasewebMtl: return "Montréal · Leaseweb"
         case .clouviderAms: return "Amsterdam · Clouvider"
         case .clouviderLon: return "Londres · Clouvider"
         case .clouviderMan: return "Manchester · Clouvider"
@@ -237,6 +259,8 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .milkywan: return "MilkyWan · speedtest.milkywan.fr · :9200–9240"
         case .mojiParis: return "Moji · iperf3.moji.fr · :5200–5240"
         case .clouviderFra: return "Clouvider · fra.speedtest.clouvider.net · :5200–5209"
+        case .clouviderAsh: return "Clouvider · ash.speedtest.clouvider.net · :5200–5209"
+        case .leasewebMtl: return "Leaseweb · speedtest.mtl2.ca.leaseweb.net · :5201–5210"
         case .clouviderAms: return "Clouvider · ams.speedtest.clouvider.net · :5200–5209"
         case .clouviderLon: return "Clouvider · lon.speedtest.clouvider.net · :5200–5209"
         case .clouviderMan: return "Clouvider · man.speedtest.clouvider.net · :5200–5209"
@@ -269,6 +293,8 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .milkywan: return "MilkyWan"
         case .mojiParis, .clouviderFra, .clouviderAms, .clouviderLon, .clouviderMan, .leasewebFra, .init7:
             return "iPerf3 · France & Europe"
+        case .clouviderAsh, .leasewebMtl:
+            return "iPerf3 · Amérique du Nord"
         case .cloudflare, .libreSpeed: return "Mondial"
         // Section propre, alimentée par l'API : son contenu varie d'un lancement à
         // l'autre, il ne peut donc pas être rattaché à un groupe figé.
@@ -296,7 +322,8 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .onlineNet, .onlineNet90ms: return "server.rack"
         case .onlineNet6, .onlineNet6_90ms: return "network"
         case .milkywan: return "server.rack"
-        case .mojiParis, .clouviderFra, .clouviderAms, .clouviderLon, .clouviderMan, .leasewebFra, .init7: return "server.rack"
+        case .mojiParis, .clouviderFra, .clouviderAms, .clouviderLon, .clouviderMan, .leasewebFra, .init7,
+             .clouviderAsh, .leasewebMtl: return "server.rack"
         case .cloudflare: return "globe"
         case .libreSpeed: return "speedometer"
         case .iperfCatalog: return "server.rack"
