@@ -386,12 +386,16 @@ struct MapKitMapView: UIViewRepresentable {
                 ?? SQMapKitMarkerView(annotation: annotation, reuseIdentifier: SQMapKitMarkerView.reuseID)
             view.annotation = annotation
             view.canShowCallout = false
+            // `apply` pose déjà l'accessibilité complète (label + value + hint) via
+            // `MapAccessibility`. On ne réécrit surtout pas le label derrière avec
+            // `payload.accessibilityLabel`, comme pour les deux marqueurs ci-dessus
+            // qui, eux, n'ont pas de description : cette réécriture perdait la
+            // NATURE de l'élément (« Antenne », « Panne confirmée »…) et laissait
+            // VoiceOver annoncer un titre nu.
             view.apply(sq.payload)
             // Une vue créée (ou recyclée) alors que la carte est déjà pivotée doit
             // naître à la bonne orientation, pas attendre le prochain geste.
             view.applyMapHeading(map.camera.heading)
-            view.isAccessibilityElement = true
-            view.accessibilityLabel = sq.payload.accessibilityLabel
             return view
         }
 

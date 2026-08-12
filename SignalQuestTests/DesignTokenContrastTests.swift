@@ -242,4 +242,74 @@ final class DesignTokenContrastTests: XCTestCase {
                 + offenders.joined(separator: "\n")
         )
     }
+
+    // MARK: - Palette de gravité des pannes
+
+    /// La gravité qui ÉCRIT n'est pas la gravité qui signale.
+    ///
+    /// `OutageTint.down/degraded/resolved` sont calibrées comme des aplats de marqueur — WCAG
+    /// 1.4.11, 3:1. Posées en texte sur une carte, le rouge échoue dans les deux apparences.
+    /// `downInk` / `degradedInk` / `resolvedInk` existent pour ça ; ce test les tient au seuil AA.
+    func testOutageInksAreReadableOnCardSurfaces() {
+        assertMinimum(UIColor(OutageTint.downInk), named: "OutageTint.downInk", atLeast: 4.5)
+        assertMinimum(UIColor(OutageTint.degradedInk), named: "OutageTint.degradedInk", atLeast: 4.5)
+        assertMinimum(UIColor(OutageTint.resolvedInk), named: "OutageTint.resolvedInk", atLeast: 4.5)
+    }
+
+    /// Chaque encre reste lisible sur le conteneur de SA PROPRE teinte — la pastille à 13 % de la
+    /// tête de ligne et de l'en-tête de feuille. C'est le pire fond qu'elle rencontre : plus la
+    /// teinte est claire, plus elle rapproche le conteneur de l'encre.
+    ///
+    /// Seuil 3:1 et non 4,5 : ces pastilles ne portent qu'un pictogramme, un objet graphique au
+    /// sens de WCAG 1.4.11. Le texte de gravité, lui, est posé sur la surface nue de la carte —
+    /// c'est le test précédent qui le couvre, au seuil AA.
+    func testOutageInksAreReadableOnTheirOwnPastille() {
+        let cases: [(String, Color, Color)] = [
+            ("downInk sur down", OutageTint.downInk, OutageTint.down),
+            ("degradedInk sur degraded", OutageTint.degradedInk, OutageTint.degraded),
+            ("resolvedInk sur resolved", OutageTint.resolvedInk, OutageTint.resolved)
+        ]
+        for (name, ink, tint) in cases {
+            for style in [UIUserInterfaceStyle.light, .dark] {
+                let mode = style == .light ? "clair" : "sombre"
+                let pastille = composite(UIColor(tint).withAlphaComponent(0.13), over: UIColor(SQColor.surface), style)
+                let r = ratio(UIColor(ink), on: pastille, style)
+                XCTAssertGreaterThanOrEqual(
+                    r, 3.0, "\(name) en \(mode) : \(String(format: "%.2f", r)):1"
+                )
+            }
+        }
+    }
+
+    /// L'ambre « dégradé » a quitté #EAB308 pour #B45309 : le jaune-500 tombait à 1,80:1 sur la
+    /// crème — une pastille qu'on ne voyait pas. Ce test fige le plancher 3:1 des objets
+    /// graphiques, celui auquel ces teintes servent : jauge de confirmation, sélecteur de
+    /// gravité, aplat de bouton.
+    ///
+    /// Deux fonds seulement, et pas les trois d'`assertMinimum` : `SurfaceMuted` ne porte JAMAIS
+    /// ces teintes. Mesuré quand même par curiosité, l'ambre y donne 2,77:1 en apparence sombre et
+    /// le vert 2,79 — donc si un écran venait à les y poser, il faudrait leurs encres, pas elles.
+    func testOutageTintsMeetTheGraphicThreshold() {
+        let surfaces: [(String, UIColor)] = [
+            ("SurfaceElevated", UIColor(SQColor.surface)),
+            ("BackgroundPrimary", UIColor(SQColor.bg))
+        ]
+        let tints: [(String, Color)] = [
+            ("OutageTint.down", OutageTint.down),
+            ("OutageTint.degraded", OutageTint.degraded),
+            ("OutageTint.resolved", OutageTint.resolved)
+        ]
+        for (name, tint) in tints {
+            for style in [UIUserInterfaceStyle.light, .dark] {
+                let mode = style == .light ? "clair" : "sombre"
+                for (bgName, bg) in surfaces {
+                    let r = ratio(UIColor(tint), on: bg, style)
+                    XCTAssertGreaterThanOrEqual(
+                        r, 3.0,
+                        "\(name) sur \(bgName) en \(mode) : \(String(format: "%.2f", r)):1"
+                    )
+                }
+            }
+        }
+    }
 }

@@ -33,19 +33,76 @@ enum MapAccessibility {
         }
 
         let title = payload.title.isEmpty ? fallbackTitle(for: payload.kind) : payload.title
-        let label = "\(noun(for: payload.kind)) \(title)"
+        let label = "\(noun(for: payload)) \(title)"
         // `subtitle` et `metric` portent l'information utile (opérateur, techno,
         // débit, distance) : elle va en `value`, que VoiceOver énonce APRÈS le
         // label et que le rotor n'utilise pas pour la recherche.
-        let value = [payload.subtitle, payload.metric]
+        var parts = [payload.subtitle, payload.metric]
             .compactMap { $0?.isEmpty == false ? $0 : nil }
-            .joined(separator: ", ")
+        // Une panne posée sur une antenne n'est qu'un petit badge en diagonale : à
+        // l'œil c'est une pastille de plus, pour VoiceOver ce n'était rien du tout.
+        // Le badge est pourtant la SEULE trace de la panne quand le filtre
+        // « Pannes » est éteint.
+        // Le badge suit le marqueur qui le porte, pas seulement les antennes : un site posé à la
+        // main en porte un aussi, et dans un marché sans référentiel public c'est le seul point
+        // qui puisse en porter.
+        if payload.kind != .communityOutage, let mark = payload.communityOutage {
+            parts.append(outageBadgeAnnouncement(mark))
+        }
+        // Le badge d'incident OPÉRATEUR, avec la source nommée : c'est ce qui le distingue du
+        // précédent, et à l'œil c'est la forme du badge qui le dit — VoiceOver, lui, ne peut le
+        // savoir que si on l'énonce.
+        if payload.kind != .outage, let incident = payload.operatorIncident {
+            parts.append(operatorBadgeAnnouncement(incident))
+        }
+        let value = parts.joined(separator: ", ")
 
         return SQAnnotationDescription(
             label: label,
             value: value.isEmpty ? nil : value,
             hint: hint(for: payload.kind)
         )
+    }
+
+    /// La nature de l'élément, affinée par ce que le marqueur montre réellement.
+    ///
+    /// Une panne confirmée et une panne seulement signalée se distinguent à l'œil
+    /// (pastille pleine contre pastille évidée) : les annoncer toutes deux « Panne
+    /// signalée » effacerait pour VoiceOver la seule nuance que la fonctionnalité
+    /// cherche à établir — qui affirme quoi, et avec quelle corroboration.
+    private static func noun(for payload: MapAnnotationPayload) -> String {
+        if payload.kind == .communityOutage, let mark = payload.communityOutage {
+            return mark.confirmed
+                ? String(localized: "Panne confirmée")
+                : String(localized: "Panne signalée")
+        }
+        return noun(for: payload.kind)
+    }
+
+    /// Ce que le badge de panne ajoute à l'annonce d'une antenne.
+    ///
+    /// Une phrase entière par cas, jamais deux fragments recollés : l'app est
+    /// livrée en cinq langues, et l'ordre « état + gravité » n'y tient pas partout.
+    private static func outageBadgeAnnouncement(_ mark: CommunityOutageMark) -> String {
+        switch (mark.confirmed, mark.severity) {
+        case (true, .down): return String(localized: "Panne confirmée : plus aucun service")
+        case (true, .degraded): return String(localized: "Panne confirmée : service dégradé")
+        case (false, .down): return String(localized: "Panne signalée : plus aucun service")
+        case (false, .degraded): return String(localized: "Panne signalée : service dégradé")
+        }
+    }
+
+    /// Ce que le badge d'incident opérateur ajoute à l'annonce d'un site.
+    ///
+    /// La SOURCE est nommée dans la phrase — « déclaré par l'opérateur ». C'est l'équivalent
+    /// sonore du triangle : sans elle, VoiceOver rendrait indiscernables une déclaration de
+    /// première main et une observation en attente de corroboration.
+    private static func operatorBadgeAnnouncement(_ mark: OperatorIncidentMark) -> String {
+        switch mark.issueType {
+        case "maintenance": return String(localized: "Maintenance déclarée par l'opérateur")
+        case "degraded": return String(localized: "Service dégradé déclaré par l'opérateur")
+        default: return String(localized: "Site hors service déclaré par l'opérateur")
+        }
     }
 
     private static func noun(for kind: MapDisplayItem.Kind) -> String {
@@ -56,6 +113,7 @@ enum MapAccessibility {
         case .validation: return String(localized: "Validation")
         case .session: return String(localized: "Session")
         case .outage: return String(localized: "Incident")
+        case .communityOutage: return String(localized: "Panne signalée")
         case .planned: return String(localized: "Site prévu")
         case .communitySite: return String(localized: "Cellule observée")
         case .customSite: return String(localized: "Site ajouté par un membre")
@@ -72,6 +130,7 @@ enum MapAccessibility {
         case .validation: return String(localized: "validations")
         case .session: return String(localized: "sessions")
         case .outage: return String(localized: "incidents")
+        case .communityOutage: return String(localized: "pannes signalées")
         case .planned: return String(localized: "sites prévus")
         case .communitySite: return String(localized: "cellules observées")
         case .customSite: return String(localized: "sites ajoutés par des membres")
@@ -92,6 +151,7 @@ enum MapAccessibility {
         case .photo: return String(localized: "Ouvre la photo en plein écran")
         case .friend: return String(localized: "Ouvre la fiche de l'ami")
         case .outage: return String(localized: "Ouvre le détail de l'incident")
+        case .communityOutage: return String(localized: "Ouvre le détail de la panne signalée")
         case .planned: return String(localized: "Ouvre le détail du site prévu")
         case .customSite: return String(localized: "Ouvre la fiche du site ajouté")
         case .communitySite, .validation, .session, .speedtest, .coverage: return nil

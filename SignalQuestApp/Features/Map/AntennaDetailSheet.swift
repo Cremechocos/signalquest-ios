@@ -89,7 +89,34 @@ struct AntennaDetailSheet: View {
     /// Pannes communautaires ouvertes sur ce site, rechargées à chaque changement d'opérateur :
     /// une panne est scopée à un opérateur, donc basculer de facette change la réponse.
     @State private var outages: [CommunityOutage] = []
+    /// Incidents que l'OPÉRATEUR déclare lui-même sur ce site. Tenus à part des pannes
+    /// communautaires ci-dessus, et chargés par une route séparée : un flux CSV en erreur ne doit
+    /// pas empêcher la fiche d'afficher ses signalements, ni l'inverse.
+    @State private var operatorIncidents: [SiteOperatorIncident] = []
+    /// Entrée de registre du marché, pour écrire « Orange Caraïbe » là où le flux ne porte que
+    /// « ORANGE_CARAIBE ». `nil` tant que le registre n'a pas répondu — on retombe alors sur la
+    /// clé brute, la seule chose de moins fausse qu'on ait à cet instant.
+    @State private var marketEntry: MarketRegistryEntry?
     @State private var showOutageReport = false
+    /// Panne dont la fermeture attend confirmation. Le geste est irréversible ET collectif : il ne
+    /// part jamais du premier appui, ici comme sur la page « Pannes signalées ».
+    @State private var pendingCloseOutage: CommunityOutage?
+    /// Fermeture en vol, pour que le bouton se remplace par son indicateur.
+    @State private var closingOutageId: String?
+    /// Refus d'une écriture de panne — voix ou fermeture.
+    ///
+    /// Les votes partaient jusqu'ici en `try?` : un refus (« vous êtes trop loin », « cette panne
+    /// vient d'être refermée ») ne laissait AUCUNE trace à l'écran, et le compteur revenait
+    /// simplement inchangé après le rechargement. On ne peut pas offrir la fermeture ici sans
+    /// donner à son refus un endroit où s'écrire.
+    @State private var outageError: String?
+
+    /// Le référentiel auquel appartient CE site — c'est le préfixe de `targetKey` côté serveur.
+    ///
+    /// `custom` pour un site posé à la main, `anfr` sinon. Le figer à `anfr` rendait la panne d'un
+    /// site communautaire introuvable depuis sa propre fiche, et son signalement irrésoluble : or
+    /// dans les 44 marchés sans référentiel public, c'est la SEULE antenne qui existe.
+    private var outageTargetKind: String { isCustomSite ? "custom" : "anfr" }
 
     init(
         site: AntennaSite,
@@ -162,6 +189,7 @@ struct AntennaDetailSheet: View {
                 model.details = nil
                 model.error = nil
                 await model.load(id: site.siteId ?? site.id, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
+                await loadMarketEntry()
                 await loadOutages()
                 // Sans cette lecture, l'étoile s'affiche éteinte sur un site pourtant suivi, et
                 // un appui écrirait une liste incomplète — le service refuse d'ailleurs d'écrire
@@ -174,12 +202,35 @@ struct AntennaDetailSheet: View {
         .fullScreenCover(item: $viewerPhoto) { photo in
             AntennaPhotoViewer(photos: model.details?.photos ?? [photo], initialId: photo.id)
         }
+        // `alert` et non `confirmationDialog`, pour la même raison que la page « Pannes signalées »
+        // et la feuille de panne : les deux issues doivent être NOMMÉES et la phrase de portée
+        // rester lisible, ce qu'un dialogue rendu en popover ne garantit pas.
+        .alert(
+            "Refermer cette panne ?",
+            isPresented: Binding(
+                get: { pendingCloseOutage != nil },
+                set: { if !$0 { pendingCloseOutage = nil } }
+            ),
+            presenting: pendingCloseOutage
+        ) { outage in
+            Button("Refermer", role: .destructive) {
+                pendingCloseOutage = nil
+                Task { await closeOutage(outage) }
+            }
+            Button("Annuler", role: .cancel) { pendingCloseOutage = nil }
+        } message: { _ in
+            Text("Elle disparaîtra de la carte pour tout le monde, tout de suite. On ne peut pas revenir en arrière.")
+        }
         .sheet(isPresented: $showOutageReport) {
             OutageReportSheet(
                 siteId: site.siteId ?? site.id,
+                targetKind: outageTargetKind,
                 siteLabel: site.address ?? site.siteId ?? site.id,
                 marketCode: market,
                 operatorKey: selectedOperator,
+                // Le nom du registre, jamais la clé : la feuille écrivait « BOUYGUES_TELECOM »
+                // là où le marqueur et la carte de fil de la même panne disent « Bouygues Telecom ».
+                operatorLabel: MarketRegistryEntry.operatorLabel(selectedOperator, in: marketEntry),
                 siteLatitude: site.latitude,
                 siteLongitude: site.longitude,
                 service: services.communityOutages,
@@ -417,35 +468,132 @@ struct AntennaDetailSheet: View {
             contributionBanner
             // Juste sous l'identité du site, avant toute mesure : une coupure en cours prime sur
             // la caractérisation du signal. Plus bas, elle serait lue après ce qu'elle invalide.
+            //
+            // L'OPÉRATEUR D'ABORD, la communauté ensuite. C'est l'ordre de l'autorité : une
+            // déclaration de première main précède une observation qui attend d'être corroborée.
+            // Les deux blocs restent distincts et ne se remplacent jamais l'un l'autre — un site
+            // peut très bien porter les deux, et c'est même le cas le plus intéressant.
+            OperatorIncidentCard(
+                incidents: operatorIncidents,
+                operatorLabel: { MarketRegistryEntry.operatorLabel($0, in: marketEntry) }
+            )
             CommunityOutageCard(
                 outages: outages,
                 onReport: { showOutageReport = true },
                 onVote: { outageId, kind in
                     Task { await voteOnOutage(outageId, kind: kind) }
-                }
+                },
+                // Décision produit n° 12 : la fiche antenne est le quatrième chemin vers une panne,
+                // et le seul qui n'offrait pas « La panne est terminée ». C'est pourtant celui par
+                // lequel on revient vérifier son propre signalement une fois sur place.
+                onClose: { pendingCloseOutage = $0 },
+                closingOutageId: closingOutageId
             )
+            if let outageError {
+                Label(outageError, systemImage: "exclamationmark.triangle.fill")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.warning)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(SQSpace.md)
+                    .background(
+                        SQColor.warningSoft,
+                        in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                    )
+            }
         }
     }
 
     /// Se prononcer sur une panne, puis relire : les compteurs affichés doivent suivre le vote.
+    ///
+    /// Le refus est mis en mots par le CLIENT, sur le code applicatif : la phrase du serveur
+    /// n'existe qu'en français.
     private func voteOnOutage(_ outageId: String, kind: String) async {
         let here = services.location.lastLocation
-        _ = try? await services.communityOutages.vote(
-            outageId: outageId,
-            kind: kind,
-            latitude: here?.coordinate.latitude,
-            longitude: here?.coordinate.longitude,
-            accuracyMeters: here.flatMap { $0.horizontalAccuracy > 0 ? $0.horizontalAccuracy : nil }
-        )
+        outageError = nil
+        do {
+            _ = try await services.communityOutages.vote(
+                outageId: outageId,
+                kind: kind,
+                latitude: here?.coordinate.latitude,
+                longitude: here?.coordinate.longitude,
+                accuracyMeters: here.flatMap { $0.horizontalAccuracy > 0 ? $0.horizontalAccuracy : nil }
+            )
+        } catch {
+            // Une annulation n'est pas un refus : elle survient quand la fiche recharge sous nos
+            // pieds (changement d'opérateur), et l'afficher accuserait l'utilisateur d'un échec
+            // qui n'a pas eu lieu.
+            if !error.isCancellation { outageError = OutageWriteError.message(for: error) }
+        }
         await loadOutages()
     }
 
+    /// L'auteur referme sa panne depuis la fiche du site.
+    ///
+    /// On relit ensuite plutôt que d'adopter la panne renvoyée : sans `includeClosed`, la lecture
+    /// par site ne rend que les états VISIBLES (cf. `OUTAGE_VISIBLE_STATES` dans
+    /// `/api/community-outages`), donc la panne refermée en sort d'elle-même et le bloc retombe
+    /// sur son invitation à signaler.
+    private func closeOutage(_ outage: CommunityOutage) async {
+        guard closingOutageId == nil else { return }
+        closingOutageId = outage.id
+        outageError = nil
+        defer { closingOutageId = nil }
+        do {
+            _ = try await services.communityOutages.close(outageId: outage.id)
+        } catch {
+            if !error.isCancellation { outageError = OutageWriteError.message(for: error) }
+        }
+        await loadOutages()
+    }
+
+    /// Les deux lectures EN PARALLÈLE, jamais l'une après l'autre.
+    ///
+    /// Elles n'ont ni la même source (PostgreSQL contre CSV d'opérateurs), ni la même durée, ni
+    /// la même autorité. Les enchaîner ferait attendre les signalements de la communauté qu'un
+    /// fichier d'opérateur veuille bien répondre — et un flux en erreur suffirait à vider un bloc
+    /// que rien ne menaçait. Chacune échoue seule, en silence : un bandeau rouge sur une fiche
+    /// par ailleurs saine coûterait plus qu'il n'informe.
     private func loadOutages() async {
-        outages = (try? await services.communityOutages.outages(
-            forSiteId: site.siteId ?? site.id,
+        let siteId = site.siteId ?? site.id
+        let kind = outageTargetKind
+        let market = market
+        let operatorKey = selectedOperator
+        let latitude = site.latitude
+        let longitude = site.longitude
+        let outageService = services.communityOutages
+        let mapService = services.map
+
+        async let community = try? await outageService.outages(
+            forSiteId: siteId,
+            targetKind: kind,
             marketCode: market,
-            operatorKey: selectedOperator
-        )) ?? []
+            operatorKey: operatorKey
+        )
+        async let operatorSide: SiteOperatorIncidentsResponse? = {
+            // La route exige la position du site : c'est la seule chose qui rapproche vraiment le
+            // référentiel de l'opérateur de celui de l'ANFR (les codes de site ne concordent pas).
+            guard let latitude, let longitude else { return nil }
+            return try? await mapService.operatorIncidents(
+                forSiteId: siteId,
+                market: market,
+                operatorName: operatorKey,
+                latitude: latitude,
+                longitude: longitude,
+                territory: nil
+            )
+        }()
+
+        outages = await community ?? []
+        operatorIncidents = await operatorSide?.incidents ?? []
+    }
+
+    /// Le registre du marché, pour nommer l'opérateur d'un incident.
+    ///
+    /// `registry()` ne lève jamais et sert son cache mémoire dès le deuxième appel : la charger
+    /// ici ne coûte un aller-retour qu'à la toute première fiche ouverte de la session.
+    private func loadMarketEntry() async {
+        guard marketEntry == nil else { return }
+        marketEntry = await services.markets.registry().market(forCode: market)
     }
 
     /// Un site relevé par un membre n'a pas la même autorité qu'un site publié

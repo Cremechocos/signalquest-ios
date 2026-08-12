@@ -8,6 +8,8 @@ protocol MapSnapshotServicing: Sendable {
     func friendsStream(sse: SSEClient) -> AsyncStream<[SocialFriendLive]>
     func plannedSites(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> [PlannedSiteLive]
     func outageSites(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> [OutageSiteLive]
+    /// Les incidents déclarés par les opérateurs pour UN site (fiche antenne).
+    func operatorIncidents(forSiteId siteId: String?, market: String, operatorName: String?, latitude: Double, longitude: Double, territory: String?) async throws -> SiteOperatorIncidentsResponse
     func coveragePoints(bounds: MapBounds, market: String, operatorName: String, technology: String?, bands: Set<Int>) async throws -> [CoverageHeatPoint]
     func publicPhotos(bounds: MapBounds, zoom: Double, market: String, operatorName: String, friendsOnly: Bool) async throws -> [MapPublicPhoto]
     func antennaTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, withAzimuth: Bool, bands: Set<Int>) async throws -> [AndroidAntennaTileResponse]
@@ -141,6 +143,63 @@ final class MapSnapshotService: MapSnapshotServicing {
             as: OutageSitesResponse.self
         )
         return response.sites
+    }
+
+    /// Les incidents qu'un opérateur déclare LUI-MÊME sur un site précis.
+    ///
+    /// Route dédiée, et pas un champ de plus dans la lecture des pannes communautaires : sa
+    /// réponse est la même pour tout le monde donc cacheable (5 min côté serveur), là où
+    /// `myVote`/`canVote`/`canClose` interdisent tout cache à l'autre. Les deux lectures partent
+    /// donc en parallèle depuis la fiche antenne, et chaque bloc s'affiche dès qu'il arrive.
+    ///
+    /// `lat`/`lon` sont OBLIGATOIRES côté serveur : le code de site d'un opérateur n'est pas le
+    /// `sup_id` de l'ANFR, si bien que l'égalité de clé ne se déclenche presque jamais et que
+    /// c'est la distance qui rapproche réellement les deux référentiels.
+    func operatorIncidents(
+        forSiteId siteId: String?,
+        market: String,
+        operatorName: String?,
+        latitude: Double,
+        longitude: Double,
+        territory: String? = nil
+    ) async throws -> SiteOperatorIncidentsResponse {
+        var query = [
+            URLQueryItem(name: "market", value: market),
+            URLQueryItem(name: "lat", value: "\(latitude)"),
+            URLQueryItem(name: "lon", value: "\(longitude)")
+        ]
+        // « ALL » n'est pas un opérateur : le transmettre restreindrait le flux à un opérateur
+        // nommé « ALL », qui n'existe pas. L'omettre rend tous les opérateurs du pylône, ce qui
+        // est le comportement voulu sur un support partagé.
+        if let operatorName, !operatorName.isEmpty, operatorName.uppercased() != "ALL" {
+            query.append(URLQueryItem(name: "operator", value: operatorName))
+        }
+        if let siteId, !siteId.isEmpty {
+            query.append(URLQueryItem(name: "siteKey", value: siteId))
+        }
+        if let territory, !territory.isEmpty {
+            query.append(URLQueryItem(name: "territory", value: territory))
+        }
+        // Le contenu est public, mais la ROUTE ne l'est pas : elle est gardée par
+        // `policy: 'first-party-or-api-key'`, contrairement à `/api/android/map/incidents` juste
+        // au-dessus qui, elle, n'appelle pas du tout `authorizeApiAccess`.
+        //
+        // Or iOS ne porte NI `x-first-party-token` (l'attestation est un mécanisme Android :
+        // `APIClient.clientInfoHeaders` n'émet que `X-Client-Platform`/`Os`/`Model`/`App-Version`),
+        // NI `Origin`/`Referer` (donc `isProbablyTrustedFirstPartyWebRequest` rend `false`), NI
+        // clé d'API. Le cookie de session est le SEUL laissez-passer dont il dispose, via le repli
+        // `allowSessionFallback` d'`authorizeApiAccess`. L'ôter rendait 401 à tout le monde et
+        // vidait définitivement le bloc « Déclaré par l'opérateur » de la fiche antenne.
+        //
+        // Vérifié en production sur la route sœur de MÊME politique, `/api/sites-hs`, appelée
+        // exactement comme le ferait cette app sans cookie : HTTP 401 `API_KEY_REQUIRED`.
+        //
+        // Conséquence assumée : un visiteur non connecté ne voit pas ce bloc. La lever demanderait
+        // de passer la route en `policy: 'public'` côté serveur — décision serveur, pas cliente.
+        return try await api.request(
+            APIEndpoint(path: "/api/network-incidents/site", query: query),
+            as: SiteOperatorIncidentsResponse.self
+        )
     }
 
     func coveragePoints(bounds: MapBounds, market: String, operatorName: String, technology: String?, bands: Set<Int> = []) async throws -> [CoverageHeatPoint] {

@@ -13,6 +13,11 @@ xcuserdata/
 *.xccheckout
 *.moved-aside
 *.xcuserstate
+# Configuration MCP déposée par les outils d'édition DANS le bundle du projet.
+# Locale au poste, et un `git add -A` l'embarquerait au milieu du paquet
+# `.xcodeproj` — l'ignorer vaut mieux que de compter sur la vigilance.
+# (Le `.mcp.json` de la racine, lui, est suivi volontairement.)
+SignalQuest.xcodeproj/.mcp.json
 
 # Swift Package Manager
 .build/

@@ -213,7 +213,8 @@ private struct GuestMapPreview: View {
             MapExplorerView(
                 service: services.map,
                 antennas: services.antennas,
-                markets: services.markets
+                markets: services.markets,
+                communityOutages: services.communityOutages
             )
                 // MapExplorerView masque volontairement sa navigation bar. Une
                 // safe-area dédiée garde donc les sorties invité visibles et

@@ -19,6 +19,15 @@ final class AppRouter: ObservableObject {
     @Published var openUserProfileId: String?
     /// Set to request opening a site sheet on the Map tab (deep link carte).
     @Published var openSiteId: String?
+    /// Panne communautaire dont la feuille doit s'ouvrir sur la carte, posée par la page
+    /// « Pannes signalées ». L'objet ENTIER et non son identifiant : cette page est paginée sans
+    /// tenir compte de l'emprise, donc la carte n'a en général pas chargé la panne demandée et
+    /// n'aurait rien à retrouver.
+    @Published var openCommunityOutage: CommunityOutage?
+    /// Identifiant d'une panne à ouvrir, posé par le tap sur une notification. L'identifiant SEUL
+    /// ici, contrairement au champ ci-dessus : un push ne transporte que des chaînes, c'est donc à
+    /// la carte d'aller chercher la fiche.
+    @Published var openCommunityOutageId: String?
     /// Demande d'ouverture DIRECTE du fil de discussion d'un signalement d'antenne
     /// (tap sur une notification `antenna_report_reply`). Consommé par ProfileView,
     /// racine de l'onglet Profil qui héberge « Mes signalements d'antenne ».
@@ -71,7 +80,7 @@ final class AppRouter: ObservableObject {
     /// off the (non-Sendable) `userInfo` dictionary so only `String?` values cross
     /// the actor boundary. The backend uses Firebase-style payloads, so callers
     /// look identifiers up under both camelCase and snake_case.
-    func handle(type rawType: String?, conversationId: String?, postId: String?, userId: String? = nil, siteId: String? = nil, reportId: String? = nil, targetId: String? = nil) {
+    func handle(type rawType: String?, conversationId: String?, postId: String?, userId: String? = nil, siteId: String? = nil, reportId: String? = nil, targetId: String? = nil, outageId: String? = nil) {
         switch rawType?.lowercased() {
         case "message", "conversation", "call", "dm":
             route(toConversation: conversationId)
@@ -83,6 +92,13 @@ final class AppRouter: ObservableObject {
             route(toAntennaReport: reportId)
         case "site", "antenna", "validation":
             route(toSite: siteId)
+        // Panne communautaire : le fan-out serveur (`lib/outages/fanout.ts`) envoie
+        // `type: "community_outage"`, `outageId` et `siteId: outage.targetId`.
+        // Le cas était déjà servi par le repli plus bas, mais par accident : ce
+        // repli teste `reportId` puis `conversationId` avant `siteId`, et une clé
+        // ajoutée au payload le détournerait sans qu'on s'en aperçoive.
+        case "community_outage":
+            route(toCommunityOutageId: outageId, fallbackSiteId: siteId)
         case "sentinelle":
             route(toSentinelle: targetId)
         default:
@@ -133,6 +149,39 @@ final class AppRouter: ObservableObject {
     func route(toSite id: String?) {
         selectedTab = .map
         if let id { openSiteId = id }
+    }
+
+    /// Une ligne de « Pannes signalées » renvoie à la carte, cadrée sur le site, feuille ouverte.
+    ///
+    /// La feuille de PANNE et non la fiche antenne : « une cible = une destination », et c'est la
+    /// panne qu'on vient de lire dans la liste. Le cadrage passe par `pendingMapFocus` plutôt que
+    /// par `openSiteId` pour deux raisons : une panne peut viser un `targetKind = "geo"`, c'est-à-
+    /// dire un pylône hors référentiel dont aucun `siteId` n'est cherchable ; et la panne porte
+    /// déjà sa position, ce qui évite l'aller-retour de recherche d'antenne.
+    func route(toCommunityOutage outage: CommunityOutage) {
+        selectedTab = .map
+        openCommunityOutage = outage
+        // Une position à (0, 0) est le repli du décodeur, pas un lieu : cadrer dessus enverrait la
+        // carte au large du golfe de Guinée. La feuille, elle, s'ouvre quand même.
+        if outage.latitude != 0 || outage.longitude != 0 {
+            pendingMapFocus = Coordinates(latitude: outage.latitude, longitude: outage.longitude)
+        }
+    }
+
+    /// Tap sur une notification de panne : la feuille de PANNE, pas la fiche antenne.
+    ///
+    /// La notification parle d'une panne précise — « Panne confirmée sur… », « Rétabli sur… » — et
+    /// c'est elle qu'on vient lire ; ouvrir la fiche du site obligerait à la retrouver dedans, et
+    /// une notification de rétablissement n'y figurerait même plus (la fiche ne montre que les
+    /// pannes ouvertes). Sans `outageId` — un payload plus ancien — on retombe sur le site, qui
+    /// reste mieux que rien.
+    func route(toCommunityOutageId id: String?, fallbackSiteId siteId: String?) {
+        guard let id, !id.isEmpty else {
+            route(toSite: siteId)
+            return
+        }
+        selectedTab = .map
+        openCommunityOutageId = id
     }
 
     func route(toAntennaReport id: String?) {

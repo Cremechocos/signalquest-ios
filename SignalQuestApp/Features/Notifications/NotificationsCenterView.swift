@@ -164,7 +164,12 @@ struct NotificationsCenterView: View {
             postId: metaString(meta, "postId", "post_id"),
             userId: metaString(meta, "userId", "user_id", "actorId", "actor_id"),
             siteId: metaString(meta, "siteId", "site_id"),
-            reportId: metaString(meta, "reportId", "report_id")
+            reportId: metaString(meta, "reportId", "report_id"),
+            // Panne communautaire : la metadata en base porte `outageId` (cf. le fan-out
+            // serveur). C'est ce qui envoie sur la FEUILLE de panne plutôt que sur la fiche du
+            // site — et le seul chemin qui atteigne une panne déjà rétablie, qu'aucune liste ne
+            // rend plus.
+            outageId: metaString(meta, "outageId", "outage_id")
         )
     }
 

@@ -112,12 +112,84 @@ final class MapAccessibilityTests: XCTestCase {
     func testEveryKindProducesANonEmptyLabel() {
         let kinds: [MapDisplayItem.Kind] = [
             .friend, .photo, .validation, .session, .coverage,
-            .speedtest, .outage, .planned, .antenna, .communitySite
+            .speedtest, .outage, .communityOutage, .planned, .antenna, .communitySite
         ]
         for kind in kinds {
             let label = MapAccessibility.describe(payload(kind: kind)).label
             XCTAssertFalse(label.trimmingCharacters(in: .whitespaces).isEmpty, "\(kind)")
         }
+    }
+
+    // MARK: - Pannes communautaires
+
+    private func outagePayload(
+        kind: MapDisplayItem.Kind,
+        severity: OutageSeverity = .down,
+        confirmed: Bool
+    ) -> MapAnnotationPayload {
+        var value = payload(kind: kind, title: "Site 3079254", subtitle: "SFR")
+        value.communityOutage = CommunityOutageMark(severity: severity, confirmed: confirmed)
+        return value
+    }
+
+    /// Signalée et confirmée se distinguent à l'œil (pastille évidée contre
+    /// pastille pleine) : les annoncer d'un même mot effacerait pour VoiceOver la
+    /// seule nuance que la fonctionnalité cherche à établir.
+    func testReportedAndConfirmedOutagesAreAnnouncedDifferently() {
+        let reported = MapAccessibility.describe(outagePayload(kind: .communityOutage, confirmed: false))
+        let confirmed = MapAccessibility.describe(outagePayload(kind: .communityOutage, confirmed: true))
+        XCTAssertNotEqual(reported.label, confirmed.label, reported.label)
+        XCTAssertTrue(confirmed.label.hasSuffix("Site 3079254"), confirmed.label)
+    }
+
+    /// Couche « Pannes signalées » éteinte, la panne n'est plus qu'un badge de
+    /// 14 pt en diagonale du point d'antenne : sans annonce, elle n'existe pas
+    /// pour un lecteur d'écran.
+    func testOutageBadgeOnAnAntennaIsAnnounced() throws {
+        let plain = MapAccessibility.describe(payload(kind: .antenna, title: "Site 3079254", subtitle: "SFR"))
+        let flagged = MapAccessibility.describe(outagePayload(kind: .antenna, severity: .degraded, confirmed: false))
+        let value = try XCTUnwrap(flagged.value)
+        XCTAssertNotEqual(value, plain.value, "Le badge doit s'entendre")
+        XCTAssertTrue(value.contains("SFR"), "Le badge ne remplace pas l'info d'antenne : \(value)")
+        // L'antenne reste une antenne : c'est sa fiche que le tap ouvre, et elle
+        // porte déjà le bloc d'arbitrage de la panne.
+        XCTAssertEqual(flagged.label, plain.label)
+        XCTAssertEqual(flagged.hint, plain.hint)
+    }
+
+    /// Une panne « dégradée » et une panne « plus aucun service » n'appellent pas
+    /// la même réaction sur le terrain.
+    func testOutageBadgeAnnouncementCarriesTheSeverity() throws {
+        let down = try XCTUnwrap(
+            MapAccessibility.describe(outagePayload(kind: .antenna, severity: .down, confirmed: true)).value
+        )
+        let degraded = try XCTUnwrap(
+            MapAccessibility.describe(outagePayload(kind: .antenna, severity: .degraded, confirmed: true)).value
+        )
+        XCTAssertNotEqual(down, degraded)
+    }
+
+    // MARK: - Incidents opérateurs
+
+    /// Le badge d'incident opérateur est un TRIANGLE là où le communautaire est un disque : à
+    /// l'œil, la forme dit qui affirme. VoiceOver, lui, ne peut le savoir que si la SOURCE est
+    /// nommée dans la phrase — sans quoi une déclaration de première main et une observation en
+    /// attente de corroboration sonneraient pareil.
+    func testOperatorIncidentBadgeNamesItsSource() throws {
+        var flagged = payload(kind: .antenna, title: "Site 3079254", subtitle: "SFR")
+        flagged.operatorIncident = OperatorIncidentMark(issueType: "down")
+        let plain = MapAccessibility.describe(payload(kind: .antenna, title: "Site 3079254", subtitle: "SFR"))
+        let value = try XCTUnwrap(MapAccessibility.describe(flagged).value)
+        XCTAssertNotEqual(value, plain.value, "Le badge doit s'entendre")
+        XCTAssertTrue(value.contains("SFR"), "Le badge ne remplace pas l'info d'antenne : \(value)")
+
+        var community = payload(kind: .antenna, title: "Site 3079254", subtitle: "SFR")
+        community.communityOutage = CommunityOutageMark(severity: .down, confirmed: true)
+        XCTAssertNotEqual(
+            value,
+            MapAccessibility.describe(community).value,
+            "Opérateur et communauté ne peuvent pas s'annoncer de la même façon"
+        )
     }
 
     /// `SQMapKitAnnotation` n'implémentait ni `title` ni `subtitle`, alors que

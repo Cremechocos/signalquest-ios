@@ -215,4 +215,152 @@ final class NewModelDecodeTests: XCTestCase {
         XCTAssertEqual(stats.totalValidations, 3)
         XCTAssertEqual(stats.totalCoverageSessions, 2)
     }
+
+    // MARK: - Pannes communautaires
+
+    /// Une panne telle que la route de DÉTAIL la rend : adresse dénormalisée, droit de fermeture
+    /// arbitré par le serveur, chronologie chargée.
+    private func outageJSON(timeline: String) -> Data {
+        Data("""
+        {
+            "id": "o1",
+            "targetKind": "anfr",
+            "targetId": "3079254",
+            "marketCode": "FR",
+            "operatorKey": "SFR",
+            "latitude": 45.18,
+            "longitude": 5.72,
+            "siteName": "Site 3079254",
+            "address": "12 rue des Alpes, 38000 Grenoble",
+            "state": "confirmed",
+            "severity": "degraded",
+            "affectsData": true,
+            "affectsVoice": false,
+            "affectsSms": false,
+            "confirmCount": 3,
+            "disputeCount": 0,
+            "confirmationsRemaining": 0,
+            "confirmThreshold": 3,
+            "operatorConfirmed": false,
+            "startedAt": "2026-08-11T09:12:00.000Z",
+            "myVote": "report",
+            "canVote": false,
+            "canClose": true,
+            "timeline": \(timeline)
+        }
+        """.utf8)
+    }
+
+    func testDecodeCommunityOutageAddressAndCanClose() throws {
+        let outage = try JSONDecoder.signalQuest.decode(CommunityOutage.self, from: outageJSON(timeline: "null"))
+        XCTAssertEqual(outage.address, "12 rue des Alpes, 38000 Grenoble")
+        XCTAssertTrue(outage.canClose)
+    }
+
+    /// « Non chargée » et « aucun événement » ne sont pas la même chose : la liste paginée rend
+    /// `timeline: null`, et une panne porte toujours au moins sa création. Confondre les deux
+    /// ferait monter un bloc « Chronologie » vide sur la feuille.
+    func testCommunityOutageDistinguishesUnloadedTimelineFromEmptyOne() throws {
+        let unloaded = try JSONDecoder.signalQuest.decode(CommunityOutage.self, from: outageJSON(timeline: "null"))
+        XCTAssertNil(unloaded.timeline)
+        let empty = try JSONDecoder.signalQuest.decode(CommunityOutage.self, from: outageJSON(timeline: "[]"))
+        XCTAssertEqual(empty.timeline, [])
+    }
+
+    /// Le contrat impose d'IGNORER en silence un genre inconnu : la liste s'allongera côté
+    /// serveur, et les trois clients ne se mettent pas à jour le même jour. Une ligne perdue vaut
+    /// mieux qu'une chronologie entière perdue — ou qu'un `kind` brut affiché à l'écran.
+    func testCommunityOutageTimelineDropsUnknownKindsAndKeepsTheRest() throws {
+        let timeline = """
+        [
+            {"id": "e1", "at": "2026-08-11T09:12:00.000Z", "kind": "reported", "isSelf": true, "services": ["data", "voice"]},
+            {"id": "e2", "at": "2026-08-11T09:20:00.000Z", "kind": "points_awarded", "isSelf": false},
+            {"id": "e3", "at": "2026-08-11T09:40:00.000Z", "kind": "state_confirmed", "isSelf": false}
+        ]
+        """
+        let outage = try JSONDecoder.signalQuest.decode(CommunityOutage.self, from: outageJSON(timeline: timeline))
+        let entries = try XCTUnwrap(outage.timeline)
+        XCTAssertEqual(entries.map(\.kind), [.reported, .stateConfirmed])
+        XCTAssertTrue(entries[0].isSelf)
+        XCTAssertEqual(entries[0].services, ["data", "voice"])
+        // Clé absente et non tableau vide : le contrat la retire quand l'événement ne porte sur
+        // aucun service en particulier.
+        XCTAssertEqual(entries[1].services, [])
+    }
+
+    /// L'échelon « Confirmée par l'opérateur » n'existe pas partout : c'est le serveur qui tient
+    /// la liste des 5 flux (tous français), et le client doit MASQUER l'échelon ailleurs plutôt
+    /// que de l'afficher « en attente ». Le défaut retenu est `false` — un serveur plus ancien
+    /// qui ne rend pas le champ fait donc taire l'échelon, ce qui est la bonne moitié de l'erreur.
+    func testOperatorConfirmationPossibleDefaultsToSilence() throws {
+        let absent = try JSONDecoder.signalQuest.decode(CommunityOutage.self, from: outageJSON(timeline: "null"))
+        XCTAssertFalse(absent.operatorConfirmationPossible)
+        let json = String(decoding: outageJSON(timeline: "null"), as: UTF8.self)
+            .replacingOccurrences(
+                of: "\"operatorConfirmed\": false",
+                with: "\"operatorConfirmed\": false, \"operatorConfirmationPossible\": true"
+            )
+        let present = try JSONDecoder.signalQuest.decode(CommunityOutage.self, from: Data(json.utf8))
+        XCTAssertTrue(present.operatorConfirmationPossible)
+    }
+
+    // MARK: - Incidents opérateurs par site
+
+    /// `supported` et `available` ne disent PAS la même chose, et les confondre ferait afficher
+    /// « aucun incident » là où l'on ne sait rien : `supported: false` = ce marché n'a aucun flux
+    /// d'opérateur, `available: false` = le flux existe mais n'a pas pu être lu.
+    func testDecodeSiteOperatorIncidents() throws {
+        let data = Data("""
+        {
+            "supported": true,
+            "available": true,
+            "market": "FR",
+            "count": 1,
+            "incidents": [
+                {
+                    "incidentKey": "sfr-fr:XY1234",
+                    "sourceId": "sfr-fr",
+                    "market": "FR",
+                    "operator": "SFR",
+                    "codeSiteOp": "XY1234",
+                    "issueType": "degraded",
+                    "latitude": 45.18,
+                    "longitude": 5.72,
+                    "raison": "INT",
+                    "detail": "Coupure d'alimentation",
+                    "startedAt": "2026-08-10",
+                    "expectedEndAt": "2026-08-12",
+                    "commune": "GRENOBLE",
+                    "services": {},
+                    "affectsVoice": false,
+                    "affectsData": true,
+                    "matchMethod": "geo_120m",
+                    "matchDistanceMeters": 47
+                }
+            ]
+        }
+        """.utf8)
+        let response = try JSONDecoder.signalQuest.decode(SiteOperatorIncidentsResponse.self, from: data)
+        XCTAssertTrue(response.supported)
+        XCTAssertTrue(response.available)
+        let incident = try XCTUnwrap(response.incidents.first)
+        XCTAssertEqual(incident.operator, "SFR")
+        XCTAssertEqual(incident.issueType, "degraded")
+        XCTAssertTrue(incident.affectsData)
+        XCTAssertFalse(incident.affectsVoice)
+        // Rapproché par la DISTANCE seule : la fiche doit pouvoir le dire, parce que le code de
+        // site d'un opérateur n'est pas le `sup_id` de l'ANFR et qu'en ville le rapprochement
+        // désigne parfois le pylône voisin.
+        XCTAssertTrue(incident.isGeoMatch)
+        XCTAssertEqual(incident.matchDistanceMeters, 47)
+    }
+
+    /// Les 47 marchés sans flux : le serveur répond `supported: false` sans réveiller le moindre
+    /// chargeur de source. Le client doit lire cette réponse sans la confondre avec un échec.
+    func testDecodeUnsupportedMarketIncidents() throws {
+        let data = Data(#"{"supported": false, "available": false, "market": "CH", "incidents": []}"#.utf8)
+        let response = try JSONDecoder.signalQuest.decode(SiteOperatorIncidentsResponse.self, from: data)
+        XCTAssertFalse(response.supported)
+        XCTAssertTrue(response.incidents.isEmpty)
+    }
 }

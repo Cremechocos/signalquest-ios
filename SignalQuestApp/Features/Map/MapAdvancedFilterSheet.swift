@@ -49,14 +49,20 @@ struct MapAdvancedFilterSheet: View {
     }
 
     /// Couches proposées : un marché communautaire se limite aux couches
-    /// pertinentes (cellules observées + sites ajoutés + speedtests).
+    /// pertinentes (cellules observées + sites ajoutés + pannes + speedtests).
     var layerOptions: [(MapDisplayItem.Kind, String, String)] {
+        // UNE seule puce « Pannes », qui commande les DEUX couches : les incidents
+        // publiés par les opérateurs et les signalements des membres. On cherche
+        // « où ça ne marche pas », pas « qui l'affirme » — la source, elle, se lit
+        // ensuite sur la forme du marqueur et dans la feuille qu'il ouvre.
+        let outages = (MapDisplayItem.Kind.outage, String(localized: "Pannes"), "exclamationmark.triangle")
         if selectedEntry?.isCommunityOnly == true {
             return [
                 (.communitySite, String(localized: "Cellules observées"), "dot.radiowaves.up.forward"),
                 // Sans open data, les sites pointés à la main sont souvent la seule
                 // antenne visible du pays : la couche doit rester proposée ici.
                 (.customSite, String(localized: "Sites ajoutés"), "mappin.and.ellipse"),
+                outages,
                 (.speedtest, String(localized: "Speedtests"), "speedometer")
             ]
         }
@@ -68,15 +74,19 @@ struct MapAdvancedFilterSheet: View {
             (.friend, String(localized: "Amis"), "person.2"),
             (.coverage, String(localized: "Couverture communautaire"), "dot.radiowaves.left.and.right")
         ]
-        // Pannes & Prévisionnels : données ANFR FR/DROM uniquement (le backend ne
-        // répond que pour ces marchés ; ailleurs `load()` ne les charge jamais).
-        // On ne propose donc pas ces puces mortes hors FR/DROM.
+        // Proposée PARTOUT, contrairement aux prévisionnels : les incidents
+        // opérateurs sont bien FR/DROM (ANFR), mais la même puce commande les
+        // signalements des membres, qui ne sortent d'aucun open data. Dans un pays
+        // sans référentiel public, ils sont même la seule panne connaissable.
+        options.append(outages)
+        // Prévisionnels : données ANFR FR/DROM uniquement (le backend ne répond que
+        // pour ces marchés ; ailleurs `load()` ne les charge jamais). On ne propose
+        // donc pas cette puce morte hors FR/DROM.
         if ["FR", "DROM"].contains(catalogMarket.uppercased()) {
-            options.append((.outage, "Pannes", "exclamationmark.triangle"))
-            options.append((.planned, "Prévisionnels", "calendar.badge.clock"))
+            options.append((.planned, String(localized: "Prévisionnels"), "calendar.badge.clock"))
         }
         if selectedEntry?.capabilities.communityLayers == true {
-            options.append((.communitySite, "Cellules observées", "dot.radiowaves.up.forward"))
+            options.append((.communitySite, String(localized: "Cellules observées"), "dot.radiowaves.up.forward"))
         }
         return options
     }
@@ -448,9 +458,6 @@ struct MapAdvancedFilterSheet: View {
     }
 
     func operatorLabel(_ value: String) -> String {
-        if let entry = selectedEntry?.operatorEntry(forKey: value) {
-            return entry.label
-        }
-        return value.uppercased() == "ALL" ? "Tous les opérateurs" : value
+        MarketRegistryEntry.operatorLabel(value, in: selectedEntry)
     }
 }

@@ -301,7 +301,7 @@ struct ProfileView: View {
                 }
                 menuSeparator
                 NavigationLink {
-                    CommunityOutagesListView(service: services.communityOutages)
+                    CommunityOutagesListView(service: services.communityOutages, markets: services.markets)
                 } label: {
                     menuRow(title: "Pannes signalées", icon: "exclamationmark.triangle.fill")
                 }

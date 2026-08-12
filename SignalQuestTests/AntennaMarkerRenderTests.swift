@@ -173,6 +173,221 @@ final class AntennaMarkerRenderTests: XCTestCase {
         XCTAssertEqual(view.countLabel.text, "42")
     }
 
+    // MARK: Pannes communautaires
+
+    private func outagePayload(
+        severity: OutageSeverity,
+        confirmed: Bool
+    ) -> MapAnnotationPayload {
+        MapAnnotationPayload(
+            id: "community-outage-1", kind: .communityOutage, title: "Site 3079254", subtitle: "SFR",
+            coordinate: CLLocationCoordinate2D(latitude: 45.18, longitude: 5.72),
+            metric: nil, backendId: "abc", details: nil, antennaId: nil, clusterCount: nil,
+            azimuths: [], showsAzimuths: false,
+            communityOutage: CommunityOutageMark(severity: severity, confirmed: confirmed)
+        )
+    }
+
+    /// Le défaut trouvé sur Android : le glyphe était peint en crème quelle que
+    /// soit la pastille, donc invisible sur le jaune « dégradé » (~1,8:1). L'encre
+    /// doit suivre le remplissage, pas une constante.
+    ///
+    /// Le témoin d'origine opposait l'ambre au rouge, qui recevaient alors deux
+    /// encres distinctes. L'ambre est depuis passé de #EAB308 à #B45309 (palette de
+    /// gravité réalignée sur Android) : les deux pastilles sont maintenant sombres
+    /// et partagent LÉGITIMEMENT le crème. La propriété qui compte — l'encre se
+    /// calcule contre ce qu'on peint — se vérifie donc sur `ink(on:)` lui-même, un
+    /// aplat clair face à un aplat sombre.
+    func testGlyphInkFollowsTheFillLuminance() throws {
+        let degraded = markerView(outagePayload(severity: .degraded, confirmed: true))
+        let down = markerView(outagePayload(severity: .down, confirmed: true))
+        let onAmber = try XCTUnwrap(degraded.glyphColorForTesting)
+        let onRed = try XCTUnwrap(down.glyphColorForTesting)
+        // Plancher 3:1 de WCAG 1.4.11 : un pictogramme est un objet graphique, pas
+        // du texte. En crème, le jaune d'avant tombait à ~1,8 — sous la moitié.
+        XCTAssertGreaterThan(
+            contrast(onAmber, UIColor(OutageTint.degraded)), 3,
+            "Le glyphe doit rester lisible sur la pastille « dégradé »"
+        )
+        XCTAssertGreaterThan(contrast(onRed, UIColor(OutageTint.down)), 3)
+        // RÉSOLUES avant comparaison : `ink(on:)` rend un `UIColor` dynamique, et
+        // deux instances dynamiques distinctes ne sont jamais égales — l'assertion
+        // aurait passé quoi qu'il arrive.
+        let light = UITraitCollection(userInterfaceStyle: .light)
+        XCTAssertNotEqual(
+            SQMapKitMarkerView.ink(on: .white).resolvedColor(with: light),
+            SQMapKitMarkerView.ink(on: UIColor(OutageTint.down)).resolvedColor(with: light),
+            "Un aplat clair et un aplat sombre ne peuvent pas partager la même encre"
+        )
+    }
+
+    /// Signalée ≠ confirmée : la pastille évidée empêche une voix isolée de se
+    /// lire comme un fait établi.
+    func testReportedOutageIsHollowAndConfirmedIsSolid() throws {
+        let reported = markerView(outagePayload(severity: .down, confirmed: false))
+        let confirmed = markerView(outagePayload(severity: .down, confirmed: true))
+        let tint = try XCTUnwrap(UIColor(OutageTint.down).cgColor.components)
+        XCTAssertNotEqual(try XCTUnwrap(reported.dot.backgroundColor?.cgColor.components), tint)
+        XCTAssertEqual(try XCTUnwrap(reported.dot.layer.borderColor?.components), tint)
+        XCTAssertEqual(try XCTUnwrap(confirmed.dot.backgroundColor?.cgColor.components), tint)
+        XCTAssertNotEqual(try XCTUnwrap(confirmed.dot.layer.borderColor?.components), tint)
+    }
+
+    /// Couche pannes éteinte : la panne n'est qu'un badge sur le point d'antenne,
+    /// qui reste une antenne — même taille, même remplissage opérateur.
+    func testOutageBadgeAnnotatesTheAntennaWithoutRepaintingIt() throws {
+        let plain = markerView(payload())
+        var annotated = payload()
+        annotated.communityOutage = CommunityOutageMark(severity: .degraded, confirmed: false)
+        let view = markerView(annotated)
+        XCTAssertTrue(plain.outageBadgeIsHiddenForTesting)
+        XCTAssertFalse(view.outageBadgeIsHiddenForTesting)
+        XCTAssertEqual(view.dot.frame.width, plain.dot.frame.width)
+        XCTAssertEqual(
+            try XCTUnwrap(view.dot.backgroundColor?.cgColor.components),
+            try XCTUnwrap(plain.dot.backgroundColor?.cgColor.components),
+            "Le badge annote l'antenne, il ne la repeint pas"
+        )
+    }
+
+    // MARK: Incidents opérateurs (parité)
+
+    /// Le trou de la vague 3 : une antenne que l'OPÉRATEUR déclare hors service ne portait
+    /// AUCUNE marque filtre éteint, alors qu'un simple signalement d'utilisateur en portait une.
+    /// C'est l'information la plus fiable qui s'effaçait.
+    func testOperatorIncidentBadgeAnnotatesTheAntenna() throws {
+        let plain = markerView(payload())
+        var annotated = payload()
+        annotated.operatorIncident = OperatorIncidentMark(issueType: "down")
+        let view = markerView(annotated)
+        XCTAssertTrue(plain.operatorBadgeIsHiddenForTesting)
+        XCTAssertFalse(view.operatorBadgeIsHiddenForTesting)
+        XCTAssertEqual(view.dot.frame.width, plain.dot.frame.width)
+        XCTAssertEqual(
+            try XCTUnwrap(view.dot.backgroundColor?.cgColor.components),
+            try XCTUnwrap(plain.dot.backgroundColor?.cgColor.components),
+            "Le badge annote l'antenne, il ne la repeint pas"
+        )
+    }
+
+    /// Le cas qui vaut toute la fonctionnalité : l'opérateur reconnaît ce que la communauté a
+    /// signalé. Les deux badges doivent coexister — et occuper deux diagonales distinctes, sinon
+    /// l'un masque l'autre et l'on croit qu'une seule des deux sources s'exprime.
+    func testBothOutageBadgesCoexistOnDistinctCorners() {
+        var annotated = payload()
+        annotated.communityOutage = CommunityOutageMark(severity: .down, confirmed: true)
+        annotated.operatorIncident = OperatorIncidentMark(issueType: "down")
+        let view = markerView(annotated)
+        XCTAssertFalse(view.outageBadgeIsHiddenForTesting)
+        XCTAssertFalse(view.operatorBadgeIsHiddenForTesting)
+        XCTAssertFalse(
+            view.outageBadgeFrameForTesting.intersects(view.operatorBadgeFrameForTesting),
+            "Les deux badges doivent occuper deux diagonales distinctes"
+        )
+    }
+
+    /// Le badge communautaire n'est PAS réservé aux antennes officielles : dans les 44 marchés
+    /// sans référentiel public, un site posé à la main est le seul point qui puisse en porter un.
+    /// La garde `kind == .antenna` d'avant y faisait disparaître la panne entièrement.
+    func testCommunityBadgeAlsoRidesOnACustomSite() {
+        var custom = MapAnnotationPayload(
+            id: "custom-site-42", kind: .customSite, title: "Pylône du col", subtitle: "BH Telecom",
+            coordinate: CLLocationCoordinate2D(latitude: 43.85, longitude: 18.41),
+            metric: nil, backendId: "42", details: nil, antennaId: nil, clusterCount: nil,
+            azimuths: [], showsAzimuths: false
+        )
+        custom.communityOutage = CommunityOutageMark(severity: .down, confirmed: false)
+        XCTAssertFalse(markerView(custom).outageBadgeIsHiddenForTesting)
+    }
+
+    /// « Une cible = une destination » : les 36 pt de la panne posés sur les 26 pt
+    /// de l'antenne masquaient le point et le rendaient intappable. `centerOffset`
+    /// déplace la vue entière, donc la zone tactile suit le dessin.
+    func testCommunityOutageMarkerStepsAsideFromTheAntennaPoint() {
+        let outage = markerView(outagePayload(severity: .down, confirmed: true))
+        let offset = outage.centerOffset
+        let distance = (offset.x * offset.x + offset.y * offset.y).squareRoot()
+        // Somme des deux rayons : en deçà, les pastilles se chevauchent encore.
+        // La tolérance absorbe le √2 du calcul en diagonale, pas un écart de règle.
+        XCTAssertGreaterThan(distance, 26 / 2 + 36 / 2 - 0.001)
+        XCTAssertGreaterThan(offset.x, 0, "Vers la droite, comme Android")
+        XCTAssertLessThan(offset.y, 0, "Vers le haut, comme Android")
+        XCTAssertEqual(markerView(payload()).centerOffset, .zero,
+                       "L'antenne, elle, reste sur sa coordonnée")
+    }
+
+    /// Un cluster de pannes siège au barycentre d'un groupe et ne désigne aucun
+    /// pylône : l'écarter le détacherait de ce qu'il résume.
+    func testCommunityOutageClusterStaysOnItsCoordinate() {
+        let view = markerView(MapAnnotationPayload(
+            id: "community-outage-cluster-1", kind: .communityOutage, title: "12 pannes signalées",
+            subtitle: "Zoomer pour le détail",
+            coordinate: CLLocationCoordinate2D(latitude: 45.18, longitude: 5.72),
+            metric: "cluster", backendId: nil, details: nil, antennaId: nil,
+            clusterCount: 12, azimuths: [], showsAzimuths: false
+        ))
+        XCTAssertEqual(view.centerOffset, .zero)
+    }
+
+    /// L'encre doit rester DYNAMIQUE : `dot.backgroundColor` reçoit des couleurs à
+    /// deux variantes qu'UIKit re-résout seul au basculement de thème. Une encre
+    /// figée à l'instant d'`apply` resterait celle de l'ancien thème sur un fond
+    /// qui, lui, a changé.
+    func testInkIsRecomputedForEachInterfaceStyle() {
+        // Fond clair en mode sombre, fond sombre en mode clair : deux thèmes,
+        // deux décisions opposées. Une constante ne pourrait pas les tenir.
+        let flipping = UIColor { $0.userInterfaceStyle == .dark ? .white : .black }
+        let ink = SQMapKitMarkerView.ink(on: flipping)
+        let inLight = ink.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+        let inDark = ink.resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark))
+        XCTAssertNotEqual(inLight, inDark, "L'encre ne suit plus le thème")
+        XCTAssertGreaterThan(contrast(inLight, .black), 3, "Encre illisible sur le fond clair")
+        XCTAssertGreaterThan(contrast(inDark, .white), 3, "Encre illisible sur le fond sombre")
+    }
+
+    /// Le décalage doit être remis à zéro sur une vue RECYCLÉE, pas seulement neuve.
+    ///
+    /// Toutes ces pastilles partagent un unique identifiant de recyclage
+    /// (`SQMapKitMarkerView.reuseID`) : MapKit réemploie donc la vue d'un marqueur de panne pour
+    /// un cluster dès qu'on dézoome, ou pour une antenne. Les deux témoins voisins construisent
+    /// chacun leur vue et ne peuvent rien dire de ce cas — le seul qui existe sur la carte.
+    ///
+    /// L'invariant tient aujourd'hui parce que `resize(to:radius:)` remet `centerOffset` à zéro
+    /// et qu'il est appelé sur les DEUX branches d'`apply`. C'est un effet de bord, pas une
+    /// intention écrite : déplacer la pose du décalage avant `resize`, ou retirer cette ligne de
+    /// `resize`, décalerait silencieusement clusters et antennes de 31 pt.
+    func testRecycledViewClearsTheOutageOffset() {
+        let view = markerView(outagePayload(severity: .down, confirmed: true))
+        XCTAssertNotEqual(view.centerOffset, .zero)
+
+        view.apply(MapAnnotationPayload(
+            id: "community-outage-cluster-1", kind: .communityOutage, title: "12 pannes signalées",
+            subtitle: "Zoomer pour le détail",
+            coordinate: CLLocationCoordinate2D(latitude: 45.18, longitude: 5.72),
+            metric: "cluster", backendId: nil, details: nil, antennaId: nil,
+            clusterCount: 12, azimuths: [], showsAzimuths: false
+        ))
+        XCTAssertEqual(view.centerOffset, .zero, "Un cluster réemployé garde le décalage de la panne")
+
+        view.apply(outagePayload(severity: .down, confirmed: true))
+        view.apply(payload())
+        XCTAssertEqual(view.centerOffset, .zero, "Une antenne réemployée garde le décalage de la panne")
+    }
+
+    /// Rapport de contraste WCAG entre deux couleurs opaques.
+    private func contrast(_ a: UIColor, _ b: UIColor) -> CGFloat {
+        func luminance(_ color: UIColor) -> CGFloat {
+            var r: CGFloat = 0, g: CGFloat = 0, bl: CGFloat = 0, al: CGFloat = 0
+            color.getRed(&r, green: &g, blue: &bl, alpha: &al)
+            func linear(_ c: CGFloat) -> CGFloat {
+                c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+            }
+            return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(bl)
+        }
+        let first = luminance(a), second = luminance(b)
+        return (max(first, second) + 0.05) / (min(first, second) + 0.05)
+    }
+
     // MARK: Rotation de carte
 
     /// Les lobes sont dessinés en repère écran : sans contre-rotation, faire

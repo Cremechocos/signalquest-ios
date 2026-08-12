@@ -92,6 +92,18 @@ struct MarketRegistryEntry: Codable, Equatable, Identifiable, Sendable {
         sourceMode.caseInsensitiveCompare("community") == .orderedSame
     }
 
+    /// Le nom d'opérateur tel que le registre du marché l'écrit — « Orange », jamais la clé
+    /// « ORANGE ».
+    ///
+    /// Statique et tolérante au marché absent, pour qu'il n'y ait QU'UN endroit qui décide :
+    /// la carte, ses feuilles et la page « Pannes signalées » affichaient trois choses pour un
+    /// même opérateur, dont la clé brute. `entry` reste optionnel parce que le registre est
+    /// chargé de façon asynchrone — avant sa réponse, la clé est ce qu'on a de moins faux.
+    static func operatorLabel(_ key: String, in entry: MarketRegistryEntry?) -> String {
+        if let label = entry?.operatorEntry(forKey: key)?.label { return label }
+        return key.uppercased() == "ALL" ? String(localized: "Tous les opérateurs") : key
+    }
+
     func operatorEntry(forKey key: String?) -> MarketRegistryOperator? {
         guard let normalized = key?
             .trimmingCharacters(in: .whitespacesAndNewlines)

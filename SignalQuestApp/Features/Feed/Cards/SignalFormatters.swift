@@ -126,6 +126,10 @@ struct CardMetricTile: View {
     let value: String
     var highlight: Bool = false
     var accent: Color = SQColor.brandRed
+    /// Une valeur COMPOSÉE peut demander deux lignes — « Internet, Voix · 4G, 5G » sur la carte de
+    /// panne. Défaut à 1 : une mesure (« 240 Mbps ») tient sur une ligne, et l'autoriser à passer
+    /// à la ligne désalignerait les tuiles voisines de la grille.
+    var valueLineLimit: Int = 1
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -139,7 +143,7 @@ struct CardMetricTile: View {
             Text(value)
                 .font(SQFont.display(15, .bold))
                 .foregroundStyle(highlight ? accent : SQColor.label)
-                .lineLimit(1)
+                .lineLimit(valueLineLimit)
                 .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

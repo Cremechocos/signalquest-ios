@@ -185,8 +185,11 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         let siteId = Self.string(info, "siteId", "site_id")
         let reportId = Self.string(info, "reportId", "report_id")
         let targetId = Self.string(info, "targetId", "target_id")
+        // Panne communautaire : le fan-out serveur envoie `outageId` à côté de `siteId`. Sans
+        // cette extraction, le tap ouvrait la fiche du SITE — la panne, elle, restait à retrouver.
+        let outageId = Self.string(info, "outageId", "outage_id")
         await MainActor.run {
-            self.router.handle(type: type, conversationId: conversationId, postId: postId, userId: userId, siteId: siteId, reportId: reportId, targetId: targetId)
+            self.router.handle(type: type, conversationId: conversationId, postId: postId, userId: userId, siteId: siteId, reportId: reportId, targetId: targetId, outageId: outageId)
             UNUserNotificationCenter.current().setBadgeCountCompat(0)
         }
     }

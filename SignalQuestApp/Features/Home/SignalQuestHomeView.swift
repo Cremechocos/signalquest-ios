@@ -28,6 +28,12 @@ struct SignalQuestHomeView: View {
     /// Horodatage du dernier rafraîchissement réel de « Autour de toi » (throttle
     /// des refetch pouls/mesures à chaque foreground/retour d'onglet — PERF-HOME-01).
     @State private var lastNearbyRefreshAt: Date = .distantPast
+    /// Panne signalée à proximité, la plus grave d'abord. `nil` = rien à signaler.
+    ///
+    /// C'est le seul chemin de découverte qui ne demande rien à personne : sans lui, une panne se
+    /// trouve en ouvrant la carte, en allumant le bon filtre et en visant le bon pylône — soit
+    /// trois gestes que quelqu'un dont le réseau vient de tomber ne fera pas.
+    @State private var nearbyOutage: CommunityOutage?
 
     private let gridColumns = [
         GridItem(.flexible(), spacing: 14),
@@ -45,6 +51,7 @@ struct SignalQuestHomeView: View {
             VStack(alignment: .leading, spacing: SQSpace.lg + 2) {
                 header
                 networkSummary
+                outageBanner
                 actionsGrid
                 nearbySection
                 latestMeasurementSection
@@ -53,6 +60,10 @@ struct SignalQuestHomeView: View {
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
             .sqReadableWidth()
+            // Sans animation sur le conteneur, la transition du bandeau ne serait jamais jouée :
+            // il apparaîtrait d'un coup au milieu de l'écran. `sqAnimation` se tait de lui-même
+            // sous « Réduire les animations ».
+            .sqAnimation(SQMotion.standard, value: nearbyOutage?.id)
         }
         // Directement sur le ScrollView : signalQuestBackground() enveloppe
         // dans un ZStack, et onScrollGeometryChange n'observe que la vue à
@@ -104,6 +115,75 @@ struct SignalQuestHomeView: View {
             .accessibilityLabel("Notifications")
         }
         .accessibilityElement(children: .contain)
+    }
+
+    // MARK: Bandeau « panne à proximité »
+
+    /// Juste sous l'état du réseau, avant les actions : quand le réseau ne marche pas, la
+    /// question suivante est « est-ce moi ou est-ce l'antenne ? », et c'est ce bandeau qui y
+    /// répond. Plus bas, il serait lu après avoir été contourné.
+    ///
+    /// Il PROPOSE, il n'envoie rien : signaler automatiquement ferait de la carte une carte de
+    /// bruit, et « quelqu'un a constaté » ne voudrait plus rien dire.
+    @ViewBuilder
+    private var outageBanner: some View {
+        if let outage = nearbyOutage {
+            let tint = OutageTint.of(outage.severity)
+            Button {
+                Haptics.selection()
+                router.route(toCommunityOutage: outage)
+            } label: {
+                HStack(spacing: SQSpace.md) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        // L'encre, pas la teinte : le pictogramme est posé sur un conteneur de sa
+                        // propre couleur, où la teinte de base tombe sous le 3:1 de WCAG 1.4.11
+                        // en apparence sombre.
+                        .foregroundStyle(OutageTint.inkOf(outage.severity))
+                        .frame(width: 46, height: 46)
+                        .background(tint.opacity(0.13), in: Circle())
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(outageBannerTitle(outage))
+                            .font(SQFont.body(15, .semibold))
+                            .foregroundStyle(SQColor.label)
+                        Text(outageBannerSubtitle(outage))
+                            .font(SQFont.body(13))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(SQColor.labelTertiary)
+                }
+                .padding(SQSpace.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                .sqShadowCard()
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityLabel(Text("\(outageBannerTitle(outage)). \(outageBannerSubtitle(outage))"))
+            .accessibilityHint("Ouvre la panne sur la carte")
+            // L'ARRIVÉE de l'information mérite une transition — c'est un changement, pas un
+            // état. Rien ne bouge ensuite, et `sqAnimation` se tait sous Réduire les animations.
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+    }
+
+    /// « Panne signalée sur ce secteur » — jamais « votre réseau est en panne » : la panne est
+    /// celle d'un opérateur sur un pylône, pas forcément la nôtre.
+    private func outageBannerTitle(_ outage: CommunityOutage) -> String {
+        outage.state == .confirmed
+            ? String(localized: "Panne confirmée près de vous")
+            : String(localized: "Panne signalée près de vous")
+    }
+
+    private func outageBannerSubtitle(_ outage: CommunityOutage) -> String {
+        let place = outage.address ?? outage.siteName ?? outage.targetId
+        let what = outage.severity == .degraded
+            ? String(localized: "Service dégradé")
+            : String(localized: "Plus aucun service")
+        return place.isEmpty ? what : "\(what) · \(place)"
     }
 
     // MARK: Carte état réseau
@@ -640,8 +720,10 @@ struct SignalQuestHomeView: View {
         async let qualityTask: NearbyNetworkQuality? = services.nearbyQuality.verdict(
             latitude: lat, longitude: lng, isCellular: isCellular, simMnc: simMnc, maxAge: maxAge
         )
+        async let outageTask: CommunityOutage? = nearestOutage(around: location)
 
         pulse = await pulseTask
+        nearbyOutage = await outageTask
         let tiles = await tilesTask
         let recent = await recentTask
         // Liste = les plus RÉCENTS (endpoint dédié) ; repli sur les plus proches
@@ -658,6 +740,43 @@ struct SignalQuestHomeView: View {
         }
         networkQuality = await qualityTask
     }
+
+    /// La panne signalée la plus pertinente autour de la position, ou `nil`.
+    ///
+    /// Rayon volontairement plus large que le kilomètre de « Autour de toi » (≈2,5 km) : une
+    /// coupure porte sur une CELLULE, pas sur un pâté de maisons, et on peut très bien être servi
+    /// par un pylône situé à deux kilomètres. Tous opérateurs confondus — on n'affiche pas moins
+    /// que ce que la personne peut constater, et son opérateur réel n'est pas toujours connu
+    /// (Wi-Fi, VPN, double SIM).
+    ///
+    /// Priorité : la plus grave d'abord, puis la mieux établie. Le bandeau n'en montre qu'UNE :
+    /// en empiler trois ferait de l'accueil un tableau de bord d'incidents, ce qu'il n'est pas.
+    /// Best-effort et silencieux : sans réseau ni marché, le bandeau ne s'affiche simplement pas.
+    private func nearestOutage(around location: CLLocation) async -> CommunityOutage? {
+        let latitude = location.coordinate.latitude
+        let longitude = location.coordinate.longitude
+        let market = await services.markets.marketForLocation(latitude: latitude, longitude: longitude)?.code ?? "FR"
+        let halfSpanLat = Self.outageHalfSpanLat
+        let halfSpanLng = halfSpanLat / max(cos(latitude * .pi / 180), 0.01)
+        let bounds = MapBounds(
+            north: latitude + halfSpanLat,
+            south: latitude - halfSpanLat,
+            east: longitude + halfSpanLng,
+            west: longitude - halfSpanLng
+        )
+        let outages = (try? await services.communityOutages.outages(
+            in: bounds, marketCode: market, operatorKey: "ALL"
+        )) ?? []
+        return outages
+            .filter(\.state.isVisible)
+            .max { lhs, rhs in
+                if lhs.severity != rhs.severity { return lhs.severity == .degraded }
+                return (lhs.state == .confirmed ? 1 : 0) < (rhs.state == .confirmed ? 1 : 0)
+            }
+    }
+
+    /// Demi-fenêtre du bandeau de panne, en degrés de latitude : ≈2,5 km.
+    private static let outageHalfSpanLat = 0.0225
 
     /// Tous les speedtests communautaires à ≤ 1 km RÉELS de la position (la maille
     /// des tuiles déborde largement, d'où le filtrage par distance).

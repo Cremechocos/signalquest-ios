@@ -491,6 +491,79 @@ struct OutageSitesResponse: Decodable, Equatable {
     let sites: [OutageSiteLive]
 }
 
+/// Un incident déclaré par un OPÉRATEUR pour un site précis
+/// (`GET /api/network-incidents/site`).
+///
+/// Distinct d'`OutageSiteLive`, qui porte la même matière lue par EMPRISE pour la couche carte :
+/// celui-ci vient de la route par site, la seule qui réponde quand on ouvre une fiche antenne sans
+/// avoir chargé la couche. Il porte en plus ce que `OutageSiteLive` ne peut pas dire — COMMENT
+/// l'incident a été rapproché du pylône (`matchMethod`, `matchDistanceMeters`), parce que le
+/// rapprochement est approximatif par construction et que la fiche doit pouvoir le nuancer.
+///
+/// ⚠️ Jamais fondu avec `CommunityOutage` : un opérateur qui déclare sa propre panne est une
+/// parole de première main ; un signalement d'utilisateur est une observation à corroborer.
+struct SiteOperatorIncident: Decodable, Identifiable, Equatable {
+    /// Même clé que `SiteOutage.operatorIncidentKey` côté serveur : un incident se reconnaît
+    /// d'une lecture à l'autre, ce qui permet de ne pas le compter deux fois.
+    let incidentKey: String
+    let `operator`: String
+    /// « down » | « maintenance » | « degraded ».
+    let issueType: String
+    /// Le libellé de l'opérateur, tel qu'il l'écrit. Jamais retraduit — c'est sa parole.
+    let raison: String?
+    let detail: String?
+    /// Dates telles que le flux les publie : formats hétérogènes d'un opérateur à l'autre, d'où
+    /// le `String` brut que `OutageDetailSheet.formattedDate` sait déjà absorber.
+    let startedAt: String?
+    let expectedEndAt: String?
+    let commune: String?
+    let affectsVoice: Bool
+    let affectsData: Bool
+    /// `site_key` (égalité de code de site) ou `geo_120m` (rapprochement par distance).
+    let matchMethod: String
+    let matchDistanceMeters: Int?
+
+    var id: String { incidentKey }
+
+    /// Rapproché par la seule distance : la fiche doit le DIRE. Le code de site d'un opérateur
+    /// n'est pas le `sup_id` de l'ANFR, si bien qu'en ville un incident peut désigner le pylône
+    /// voisin. Le taire ferait passer une approximation pour une déclaration nominative.
+    var isGeoMatch: Bool { matchMethod == "geo_120m" }
+}
+
+/// Réponse de `GET /api/network-incidents/site`.
+///
+/// `supported` et `available` disent deux choses différentes, et les confondre ferait afficher
+/// « aucun incident » là où l'on ne sait rien : `supported = false` veut dire que le marché n'a
+/// AUCUN flux d'incidents opérateurs (47 marchés sur 49) ; `available = false` veut dire que le
+/// flux existe mais n'a pas pu être lu.
+struct SiteOperatorIncidentsResponse: Decodable, Equatable {
+    let supported: Bool
+    let available: Bool
+    let incidents: [SiteOperatorIncident]
+
+    static let unsupported = SiteOperatorIncidentsResponse(supported: false, available: false, incidents: [])
+
+    init(supported: Bool, available: Bool, incidents: [SiteOperatorIncident]) {
+        self.supported = supported
+        self.available = available
+        self.incidents = incidents
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case supported, available, incidents
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        supported = (try? c.decode(Bool.self, forKey: .supported)) ?? false
+        available = (try? c.decode(Bool.self, forKey: .available)) ?? false
+        // Perdre toute la réponse parce qu'un incident du flux est mal formé effacerait aussi les
+        // incidents valides qui l'accompagnent — même politique tolérante qu'ailleurs.
+        incidents = c.decodeLossyArray([SiteOperatorIncident].self, forKey: .incidents)
+    }
+}
+
 struct CoveragePointsResponse: Decodable, Equatable {
     let points: [CoverageHeatPoint]
 }
@@ -1080,7 +1153,15 @@ struct MapDisplayItem: Identifiable, Equatable {
         case session
         case coverage
         case speedtest
+        /// Incident publié par un OPÉRATEUR (`/api/android/map/incidents`), et
+        /// aussi le FILTRE « Pannes » — le seul, qui commande les deux couches.
         case outage
+        /// Panne signalée par la COMMUNAUTÉ. Genre de MARQUEUR, jamais une case à
+        /// cocher : elle suit le filtre `.outage` comme les incidents opérateurs.
+        /// Distincte quand même, parce que ce qui fait la valeur de la
+        /// fonctionnalité est justement de savoir qui affirme la panne — d'où une
+        /// forme (creuse tant qu'elle n'est pas corroborée) et une feuille à part.
+        case communityOutage
         case planned
         case antenna
         case communitySite

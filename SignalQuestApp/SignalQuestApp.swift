@@ -436,7 +436,7 @@ struct MainTabView: View {
                 .tag(AppRouter.AppTab.home)
 
             NavigationStack {
-                MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets)
+                MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets, communityOutages: services.communityOutages)
 #if DEBUG
                     .navigationDestination(isPresented: .constant(AppEnvironment.opensANFRMap)) {
                         ANFRMapView(service: services.anfr)
@@ -483,7 +483,7 @@ struct MainTabView: View {
                 .tag(AppRouter.AppTab.home)
 
             NavigationStack {
-                MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets)
+                MapExplorerView(service: services.map, antennas: services.antennas, markets: services.markets, communityOutages: services.communityOutages)
                     .toolbar(.hidden, for: .tabBar)
 #if DEBUG
                     .navigationDestination(isPresented: .constant(AppEnvironment.opensANFRMap)) {

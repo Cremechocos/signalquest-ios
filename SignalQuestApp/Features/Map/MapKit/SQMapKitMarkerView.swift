@@ -38,6 +38,16 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     private var ringArcs: [CAShapeLayer] = []
     private let checkBadge = UIImageView()
     private let photoBadge = UIImageView()
+    /// Panne communautaire signalée sur ce site, quand le filtre « Pannes » est
+    /// éteint : l'antenne reste le sujet, la panne n'est qu'un indice posé à côté.
+    private let outageBadge = UIImageView()
+    /// Incident déclaré par l'OPÉRATEUR sur ce site, filtre « Pannes » éteint.
+    ///
+    /// Un badge à part, et pas une variante de couleur du précédent : les deux peuvent coexister
+    /// sur le même pylône, et c'est justement le cas le plus parlant — l'opérateur reconnaît ce
+    /// que la communauté a signalé. Sa forme est un TRIANGLE là où le communautaire est un
+    /// disque, pour qu'on lise QUI affirme sans avoir à ouvrir quoi que ce soit.
+    private let operatorBadge = UIImageView()
 
     /// Diamètre de la pastille d'antenne. Les autres couches (speedtests, pannes,
     /// prévisionnels…) gardent l'ancien diamètre : elles n'ont ni lobes ni badges,
@@ -62,21 +72,63 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     /// voisins — soit exactement l'imprécision que les lobes attachés évitent.
     private var hitRadius: CGFloat = SQMapKitMarkerView.otherDotSize / 2
 
+    /// Décalage du marqueur de panne par rapport au point d'antenne qu'il concerne.
+    ///
+    /// Sans lui, les 36 pt de la panne se posent EXACTEMENT sur les 26 pt de
+    /// l'antenne : le point d'antenne est masqué et devient intappable, alors que
+    /// « une cible = une destination » veut qu'on puisse ouvrir l'une ou l'autre.
+    /// La longueur vaut la somme des deux rayons (13 + 18) : en deçà les pastilles
+    /// se chevauchent encore, au-delà la panne se détacherait du site qu'elle
+    /// désigne. Vers le haut à droite, comme Android (`circleTranslate(16, −16)`).
+    ///
+    /// `centerOffset` déplace la VUE, pas seulement son dessin : la zone tactile
+    /// suit sans réglage supplémentaire, contrairement à MapLibre où le décalage
+    /// est une propriété de couche appliquée au rendu.
+    ///
+    /// ⚠️ Les DISQUES deviennent tangents, mais les zones tactiles (gonflées à 20 et
+    /// 22 pt par `resize`) se recouvrent encore sur une bande d'une dizaine de points
+    /// entre les deux ; c'est la vue au-dessus qui y gagne, et MapKit n'ordonne pas
+    /// deux annotations de même coordonnée. Taper ce qu'on VOIT reste juste : chaque
+    /// centre visible est hors de la zone de l'autre. Les rendre disjointes
+    /// demanderait 42 pt d'écart, où la panne ne se lirait plus comme celle de ce
+    /// pylône-là.
+    private static let communityOutageOffset: CGPoint = {
+        let distance = antennaDotSize / 2 + otherDotSize / 2
+        let axis = distance / CGFloat(2).squareRoot()
+        return CGPoint(x: axis, y: -axis)
+    }()
+
+    /// Le même décalage pour l'incident déclaré par l'OPÉRATEUR, en miroir.
+    ///
+    /// Même raison que ci-dessus, et le trou était le même : posé pile sur le point d'antenne, le
+    /// marqueur d'incident le masquait et le rendait intappable, alors que « une cible = une
+    /// destination » vaut pour les deux sources — c'est même l'information la PLUS fiable qui
+    /// s'effaçait.
+    ///
+    /// Vers le haut à GAUCHE, et non à droite comme le communautaire : les deux couches restent
+    /// distinctes et un site peut très bien porter les deux à la fois (le CSV opérateur confirme
+    /// un signalement, il ne le remplace pas). Superposées, elles se seraient à nouveau masquées
+    /// l'une l'autre — cette fois entre elles.
+    private static let operatorIncidentOffset = CGPoint(
+        x: -communityOutageOffset.x,
+        y: communityOutageOffset.y
+    )
+
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
         backgroundColor = .clear
         // Style « Crème & Terre cuite » : bord crème 2,5 pt + ombre noire 22 %.
-        // Le glyphe/compteur reste crème sur la couleur (opérateur) du marqueur.
+        // Glyphe et compteur prennent l'encre que leur remplissage supporte
+        // (cf. `ink(on:)`), posée à chaque `apply` et re-résolue par UIKit au
+        // basculement clair/sombre.
         dot.layer.borderColor = Self.outlineColor.cgColor
         dot.layer.borderWidth = 2.5
         dot.layer.shadowColor = UIColor.black.cgColor
         dot.layer.shadowOpacity = 0.22
         dot.layer.shadowRadius = 5
         dot.layer.shadowOffset = CGSize(width: 0, height: 3)
-        countLabel.textColor = UIColor(SQColor.onAccent)
         countLabel.font = .systemFont(ofSize: 12, weight: .bold)
         countLabel.textAlignment = .center
-        glyph.tintColor = UIColor(SQColor.onAccent)
         glyph.contentMode = .scaleAspectFit
         lobes.fillColor = nil
         lobes.strokeColor = nil
@@ -94,6 +146,10 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         dot.addSubview(countLabel)
         addSubview(checkBadge)
         addSubview(photoBadge)
+        outageBadge.contentMode = .scaleAspectFit
+        addSubview(outageBadge)
+        operatorBadge.contentMode = .scaleAspectFit
+        addSubview(operatorBadge)
     }
     required init?(coder: NSCoder) { nil }
 
@@ -109,8 +165,10 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             let size: CGFloat = count >= 100 ? 44 : 38
             resize(to: size, radius: size / 2)
             dot.backgroundColor = color
+            dot.layer.borderColor = Self.outlineColor.cgColor
             dot.alpha = 1
             countLabel.frame = dot.bounds
+            countLabel.textColor = Self.ink(on: color)
             countLabel.text = count > 999 ? "999+" : "\(count)"
             countLabel.isHidden = false
             glyph.isHidden = true
@@ -121,12 +179,36 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             ring.path = nil
             checkBadge.isHidden = true
             photoBadge.isHidden = true
+            outageBadge.isHidden = true
+            operatorBadge.isHidden = true
         } else {
             let isAntenna = payload.kind == .antenna
             let size = isAntenna ? Self.antennaDotSize : Self.otherDotSize
             let reach = isAntenna ? payload.azimuthReachPoints : 0
             resize(to: size, radius: max(reach, Self.minRadius))
-            dot.backgroundColor = color
+            // Un marqueur de panne est posé À CÔTÉ du point d'antenne, quelle que
+            // soit la source (cf. `communityOutageOffset` / `operatorIncidentOffset`).
+            // Un cluster, lui, siège au barycentre d'un groupe et ne désigne aucun
+            // pylône : le décaler ne ferait que le détacher de ce qu'il résume.
+            //
+            // APRÈS `resize`, obligatoirement : celui-ci remet `centerOffset` à zéro
+            // — ce qui est aussi ce qui purge le décalage d'une vue RECYCLÉE, toutes
+            // ces pastilles partageant un unique `reuseID`.
+            switch payload.kind {
+            case .communityOutage: centerOffset = Self.communityOutageOffset
+            case .outage: centerOffset = Self.operatorIncidentOffset
+            default: centerOffset = .zero
+            }
+            // Panne seulement signalée : pastille ÉVIDÉE à liseré coloré. Le
+            // remplissage plein est réservé à ce que la communauté a corroboré —
+            // sinon une voix isolée se lirait comme un fait établi. Réservé au
+            // marqueur de panne : sur une antenne, la même donnée n'est qu'un
+            // badge et ne doit rien changer au point lui-même.
+            let outageMark = payload.kind == .communityOutage ? payload.communityOutage : nil
+            let hollow = outageMark.map { !$0.confirmed } ?? false
+            let fill = hollow ? Self.outlineColor : color
+            dot.backgroundColor = fill
+            dot.layer.borderColor = (hollow ? color : Self.outlineColor).cgColor
             dot.alpha = payload.communityObserved ? 0.6 : 1
             countLabel.isHidden = true
             if isAntenna, payload.glyphOverride == nil {
@@ -140,9 +222,13 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
                 glyph.frame = dot.bounds.insetBy(dx: size * 0.24, dy: size * 0.24)
                 glyph.image = UIImage(systemName: Self.glyphName(for: payload))?
                     .withConfiguration(UIImage.SymbolConfiguration(pointSize: 13, weight: .bold))
+                // Sur une pastille évidée, le glyphe reprend la couleur de gravité :
+                // c'est elle qui porte le sens, et le liseré seul ne suffirait pas
+                // à la lire à cette taille.
+                glyph.tintColor = hollow ? color : Self.ink(on: fill)
                 glyph.isHidden = false
             }
-            applyPie(payload, size: size, fallback: color)
+            applyPie(payload, size: size, fallback: fill)
             applyLobes(payload, reach: reach, color: color)
             applyRing(payload, size: size, color: color)
             applyBadges(payload, size: size)
@@ -431,9 +517,16 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         let isAntenna = payload.kind == .antenna
         let showsCheck = isAntenna && payload.hasEnb
         let showsPhoto = isAntenna && payload.contributionPhotos > 0
+        // Le badge de panne n'est PAS réservé aux antennes officielles : un site posé à la main
+        // en porte un aussi, et dans les marchés sans référentiel public c'est le seul point qui
+        // le puisse. Seul le marqueur de panne lui-même s'en exclut — il EST la panne.
+        let outageMark = payload.kind == .communityOutage ? nil : payload.communityOutage
+        let incidentMark = payload.kind == .outage ? nil : payload.operatorIncident
         checkBadge.isHidden = !showsCheck
         photoBadge.isHidden = !showsPhoto
-        guard showsCheck || showsPhoto else { return }
+        outageBadge.isHidden = outageMark == nil
+        operatorBadge.isHidden = incidentMark == nil
+        guard showsCheck || showsPhoto || outageMark != nil || incidentMark != nil else { return }
 
         // Badges posés en diagonale, débordant de la pastille : leur centre est à
         // `rayon + moitié de badge − 3`, soit trois points de chevauchement — assez
@@ -456,6 +549,30 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             photoBadge.image = Self.photoBadgeImage(size: badge)
             photoBadge.frame = CGRect(
                 x: center.x - offset - badge / 2,
+                y: center.y + offset - badge / 2,
+                width: badge,
+                height: badge
+            )
+        }
+        if let outageMark {
+            // En haut à GAUCHE : les deux autres diagonales sont prises (coche eNB
+            // en haut à droite, photos en bas à gauche), et le haut se remarque plus
+            // que le bas — ce qui convient à un incident en cours.
+            outageBadge.image = Self.outageBadgeImage(size: badge, severity: outageMark.severity)
+            outageBadge.frame = CGRect(
+                x: center.x - offset - badge / 2,
+                y: center.y - offset - badge / 2,
+                width: badge,
+                height: badge
+            )
+        }
+        if let incidentMark {
+            // En bas à DROITE : la dernière diagonale libre, et la seule qui laisse les deux
+            // badges de panne coexister sans se recouvrir — ce qui arrive précisément dans le cas
+            // le plus intéressant, quand l'opérateur reconnaît ce que la communauté a signalé.
+            operatorBadge.image = Self.operatorBadgeImage(size: badge, issueType: incidentMark.issueType)
+            operatorBadge.frame = CGRect(
+                x: center.x + offset - badge / 2,
                 y: center.y + offset - badge / 2,
                 width: badge,
                 height: badge
@@ -490,6 +607,13 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     var lobeTransformForTesting: CATransform3D { lobes.transform }
     var checkBadgeIsHiddenForTesting: Bool { checkBadge.isHidden }
     var photoBadgeIsHiddenForTesting: Bool { photoBadge.isHidden }
+    var outageBadgeIsHiddenForTesting: Bool { outageBadge.isHidden }
+    var operatorBadgeIsHiddenForTesting: Bool { operatorBadge.isHidden }
+    /// Les deux badges de panne peuvent coexister : leurs cadres sont ce qui prouve qu'ils ne se
+    /// recouvrent pas, et donc qu'aucune des deux sources n'en masque une autre.
+    var outageBadgeFrameForTesting: CGRect { outageBadge.frame }
+    var operatorBadgeFrameForTesting: CGRect { operatorBadge.frame }
+    var glyphColorForTesting: UIColor? { glyph.tintColor }
 
     static func glyphName(for p: MapAnnotationPayload) -> String {
         if let g = p.glyphOverride { return g }
@@ -500,6 +624,9 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         case .validation: return "checkmark.seal.fill"
         case .session: return "figure.walk"
         case .outage: return "exclamationmark.triangle.fill"
+        // Le triangle est celui de l'opérateur : le point d'exclamation cerclé
+        // dit la même urgence sans laisser croire que c'est la même source.
+        case .communityOutage: return "exclamationmark.circle.fill"
         case .planned: return "calendar.badge.clock"
         case .communitySite: return "dot.radiowaves.up.forward"
         case .customSite: return "mappin.and.ellipse"
@@ -526,6 +653,115 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     /// objets posés sur la carte, pas du texte sur une surface de l'app, et ils
     /// doivent garder le même aspect en clair comme en sombre.
     private static let badgeInkColor = UIColor(red: 0x33 / 255, green: 0x28 / 255, blue: 0x18 / 255, alpha: 1)
+
+    /// L'encre qu'un remplissage donné supporte : crème sur un aplat sombre, encre
+    /// sur un aplat clair.
+    ///
+    /// Le glyphe était peint en `SQColor.onAccent` quelle que soit la pastille. Sur
+    /// le jaune « dégradé » d'alors (#EAB308) ce crème tombait à ~1,8:1 — le
+    /// pictogramme disparaissait purement et simplement, et le même défaut touchait
+    /// le compteur des clusters. Le contraste ne peut pas être choisi une fois pour
+    /// toutes : il se calcule contre ce qu'on peint réellement. Le cas d'origine a
+    /// depuis disparu (l'ambre est passé à #B45309, cf. `OutageTint`) mais la règle
+    /// reste : les couleurs d'opérateurs claires, elles, sont toujours là.
+    ///
+    /// Le résultat est lui-même un `UIColor` DYNAMIQUE, et c'est indispensable :
+    /// `dot.backgroundColor` reçoit souvent une couleur à deux variantes
+    /// (`SQColor.brand*`), qu'UIKit re-résout tout seul au basculement clair/sombre
+    /// sans que la vue soit ré-appliquée. Une encre figée à l'instant d'`apply(_:)`
+    /// resterait alors celle de l'ancien thème sur un fond qui, lui, a changé — le
+    /// glyphe et le compteur de cluster viraient à l'illisible la nuit. Ici la
+    /// DÉCISION se rejoue à chaque résolution, contre le remplissage réellement
+    /// peint : la bascule du jaune reste acquise, en clair comme en sombre.
+    static func ink(on fill: UIColor) -> UIColor {
+        UIColor { traits in
+            let painted = fill.resolvedColor(with: traits)
+            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+            guard painted.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return outlineColor }
+            // Luminance relative WCAG : la moyenne naïve des canaux mettrait le jaune
+            // et le bleu au même niveau, alors qu'ils n'ont rien à voir à l'œil.
+            func linear(_ channel: CGFloat) -> CGFloat {
+                channel <= 0.04045 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
+            }
+            let luminance = 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
+            // Le point d'égalité stricte des deux contrastes est vers 0,21, mais y
+            // placer la bascule ferait passer à l'encre sombre des couleurs qui vont
+            // très bien en crème (brique, rouge #EF4444) pour trois dixièmes de
+            // rapport, et redessinerait le langage des marqueurs. Le seuil est donc le
+            // point où le crème CESSE de tenir 3:1 : le crème a une luminance de
+            // 0,933, donc (0,933 + 0,05) / 3 − 0,05.
+            //
+            // ⚠️ 3:1 est le plancher de WCAG 1.4.11, qui vise les objets graphiques.
+            // Il vaut pour le pictogramme ; il ne vaut PAS pour le compteur de
+            // cluster, qui est du texte de 12 pt gras — donc soumis au 4,5:1 de
+            // WCAG 1.4.3. Sur les remplissages sombres qui frôlent le seuil, le
+            // compteur crème reste en dessous : rouge #EF4444 le donne à 3,52:1.
+            // C'est un manque assumé ici et pas ailleurs, parce que le corriger
+            // demanderait un second seuil pour le texte, donc deux encres possibles
+            // sur une même pastille selon qu'elle porte un chiffre ou un glyphe.
+            //
+            // Mesuré sur les couleurs réellement peintes : le seuil ne fait basculer
+            // que TELUS #00A67E (2,91:1 en crème), Regional #D97706 (2,98) et la
+            // brique/orange sombres #D97A66 (2,84) — soit exactement celles qui
+            // échouaient. Orange #FF6B35, SRR et Zeop basculaient déjà. Tout le reste
+            // (SFR, Bouygues, Free, Bell, Rogers, #EF4444, l'ambre #B45309…) garde
+            // le crème.
+            return luminance > 0.2775 ? badgeInkColor : outlineColor
+        }
+    }
+
+    /// Pastille de panne communautaire accrochée au point d'antenne.
+    ///
+    /// Toujours pleine, même pour une panne non confirmée : à 14 pt, un disque évidé
+    /// n'est plus qu'un anneau illisible. La nuance signalée / confirmée se lit sur
+    /// le marqueur de plein droit et dans la feuille, où il y a la place de le dire.
+    private static func outageBadgeImage(size: CGFloat, severity: OutageSeverity) -> UIImage {
+        let fill = UIColor(OutageTint.of(severity))
+        return cachedImage("outage-\(severity.rawValue)-\(Int(size.rounded()))") {
+            badgeImage(
+                size: size,
+                fill: fill,
+                symbol: "exclamationmark",
+                symbolColor: ink(on: fill)
+            )
+        }
+    }
+
+    /// Badge d'incident DÉCLARÉ PAR L'OPÉRATEUR, accroché au point d'antenne.
+    ///
+    /// Un TRIANGLE, là où le signalement communautaire est un disque. C'est la seule chose qui
+    /// distingue les deux à 14 pt, et c'est la distinction que toute la fonctionnalité cherche à
+    /// établir : la couleur dit la gravité, la forme dit qui l'affirme. Sans glyphe à l'intérieur
+    /// — à cette taille, un pictogramme dans un triangle n'est plus qu'une tache, alors que la
+    /// silhouette, elle, reste lisible.
+    private static func operatorBadgeImage(size: CGFloat, issueType: String) -> UIImage {
+        let fill = UIColor(OperatorIncidentCard.tint(for: issueType))
+        return cachedImage("operator-incident-\(issueType)-\(Int(size.rounded()))") {
+            let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
+            return renderer.image { context in
+                let cg = context.cgContext
+                // Deux triangles concentriques plutôt qu'un tracé bordé : un `stroke` déborde de
+                // moitié hors du chemin et rognerait les pointes au bord de l'image.
+                func triangle(inset: CGFloat) -> UIBezierPath {
+                    let path = UIBezierPath()
+                    let side = size - inset * 2
+                    // Le triangle est recentré verticalement sur son barycentre : posé sur sa
+                    // base, il paraît glisser vers le bas du badge.
+                    let top = inset + side * 0.06
+                    let bottom = inset + side * 0.94
+                    path.move(to: CGPoint(x: size / 2, y: top))
+                    path.addLine(to: CGPoint(x: inset + side, y: bottom))
+                    path.addLine(to: CGPoint(x: inset, y: bottom))
+                    path.close()
+                    return path
+                }
+                cg.setFillColor(outlineColor.cgColor)
+                triangle(inset: 0).fill()
+                cg.setFillColor(fill.cgColor)
+                triangle(inset: 2).fill()
+            }
+        }
+    }
 
     private static func checkBadgeImage(size: CGFloat) -> UIImage {
         cachedImage("check-\(Int(size.rounded()))") {

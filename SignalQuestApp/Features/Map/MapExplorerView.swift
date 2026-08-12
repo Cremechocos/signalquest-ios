@@ -44,6 +44,10 @@ final class MapExplorerViewModel: ObservableObject {
     @Published var customSiteTiles: [AndroidCustomSiteTileResponse] = []
     @Published var plannedSites: [PlannedSiteLive] = []
     @Published var outages: [OutageSiteLive] = []
+    /// Pannes signalées par les membres sous l'emprise courante. Distinctes des
+    /// incidents opérateurs ci-dessus, et chargées dès que des antennes sont à
+    /// l'écran : couche éteinte, elles restent le badge posé sur le point d'antenne.
+    @Published var communityOutages: [CommunityOutage] = []
     @Published var coverageHeat: [CoverageHeatPoint] = []
     /// Photos publiques de tous les membres (couche Photos). Mode « Amis » =
     /// restreint aux amis (rechargé avec friendsOnly).
@@ -106,6 +110,7 @@ final class MapExplorerViewModel: ObservableObject {
     let mapService: MapSnapshotServicing
     let antennasService: AntennasServicing
     let marketsService: MarketRegistryServicing
+    let communityOutageService: CommunityOutageServicing
 
     private var marketDetectionTask: Task<Void, Never>?
     private var noticeTask: Task<Void, Never>?
@@ -124,10 +129,16 @@ final class MapExplorerViewModel: ObservableObject {
     /// court-circuiter recentrage + rechargement, car le `.task` les pilote lui-même.
     private(set) var initialSelectionInProgress = false
 
-    init(map: MapSnapshotServicing, antennas: AntennasServicing, markets: MarketRegistryServicing) {
+    init(
+        map: MapSnapshotServicing,
+        antennas: AntennasServicing,
+        markets: MarketRegistryServicing,
+        communityOutages: CommunityOutageServicing
+    ) {
         self.mapService = map
         self.antennasService = antennas
         self.marketsService = markets
+        self.communityOutageService = communityOutages
     }
 
     // MARK: Registre des marchés
@@ -309,10 +320,7 @@ final class MapExplorerViewModel: ObservableObject {
     }
 
     func operatorLabel(_ key: String) -> String {
-        if let entry = currentMarketEntry?.operatorEntry(forKey: key) {
-            return entry.label
-        }
-        return key.uppercased() == "ALL" ? "Tous les opérateurs" : key
+        MarketRegistryEntry.operatorLabel(key, in: currentMarketEntry)
     }
 
     func operatorAccent(_ key: String) -> Color {
@@ -532,6 +540,7 @@ final class MapExplorerViewModel: ObservableObject {
         // garde les transformations isolées MainActor (Self.antennas…) APRÈS le await.
         let svc = mapService
         let antennasSvc = antennasService
+        let outagesSvc = communityOutageService
         let market = marketFilter
         let op = operatorFilter
         let techs = techFilters
@@ -554,13 +563,38 @@ final class MapExplorerViewModel: ObservableObject {
         // antennes sans les obtenir n'aurait aucun sens.
         let wantsCustomSites = filters.contains(.customSite) || (communityOnly && filters.contains(.antenna))
         let wantsSpeedtest = filters.contains(.speedtest)
+        // Pannes signalées : chargées AUSSI quand le filtre « Pannes » est éteint,
+        // parce qu'elles deviennent alors le badge du point d'antenne. Ne les charger
+        // que filtre allumé reviendrait à masquer l'indice au moment précis où l'on
+        // regarde l'antenne concernée. Aucune garde de marché, contrairement aux
+        // incidents opérateurs : elles ne sortent d'aucun open data.
+        //
+        // La couche « Sites ajoutés » compte autant que les antennes officielles : une panne
+        // s'accroche à un site COMMUNAUTAIRE dans les 44 marchés sans référentiel public, et
+        // éteindre « Antennes » y faisait disparaître le badge du seul point qui pouvait le
+        // porter — la couche n'était donc pas « toujours chargée » comme l'exige le modèle.
+        //
+        // « Cellules observées » ne figure PAS ici, et ce n'est pas un oubli : aucun marqueur de
+        // cette couche ne peut porter de badge de panne. `resolveOutageTarget` résout `custom` et
+        // `community` contre la table `CustomSite` (cf. `apps/web/lib/outages/target.ts`), alors
+        // que ces marqueurs viennent des candidats communautaires — leurs identifiants n'y
+        // existent pas, donc `communityOutageMarksBySite` ne trouverait jamais de clé. La couche
+        // était donc chargée pour rien, à chaque déplacement de carte.
+        let wantsCommunityOutages = filters.contains(.outage)
+            || filters.contains(.antenna)
+            || filters.contains(.customSite)
         // Sites prévisionnels et pannes : FR métropole ET DROM (le backend répond
         // pour FR/DROM). En DROM on déduit le territoire (974, 971…) du centre du
         // viewport pour la résolution opérateur par île, comme le sélecteur web.
         let supportsPlannedOutage = ["FR", "DROM"].contains(market.uppercased())
         let territory = market.uppercased() == "DROM" ? Self.dromTerritory(for: bounds) : nil
         let wantsPlanned = filters.contains(.planned) && supportsPlannedOutage
-        let wantsOutage = filters.contains(.outage) && supportsPlannedOutage
+        // Incidents opérateurs : chargés AUSSI filtre « Pannes » éteint, exactement comme les
+        // signalements communautaires — ils deviennent alors le badge du point d'antenne. Sans
+        // cela, une antenne que l'OPÉRATEUR déclare hors service ne portait aucune marque, là où
+        // un simple signalement d'utilisateur en portait une : c'est l'information la plus fiable
+        // qui s'effaçait. La garde de marché reste, elle : ces flux sont FR/DROM.
+        let wantsOutage = (filters.contains(.outage) || filters.contains(.antenna)) && supportsPlannedOutage
         // Couverture masquée en « Tous » (superposer tous les opérateurs n'a pas de
         // sens) → on ne la télécharge même pas dans ce cas.
         let wantsCoverage = filters.contains(.coverage) && op.uppercased() != "ALL"
@@ -628,6 +662,11 @@ final class MapExplorerViewModel: ObservableObject {
                 return (sites.filter { bounds.contains(lat: $0.lat, lon: $0.lon) }, nil)
             } catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
+        async let communityOutageRaw: (value: [CommunityOutage]?, error: String?) = {
+            guard wantsCommunityOutages else { return ([], nil) }
+            do { return (try await outagesSvc.outages(in: bounds, marketCode: market, operatorKey: op), nil) }
+            catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
+        }()
         async let coverageRaw: (value: (tiles: [AndroidCoverageTileResponse], heat: [CoverageHeatPoint])?, error: String?) = {
             guard wantsCoverage else { return (([], []), nil) }
             let tiles = (try? await svc.coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: covDays, bands: bands, maxAge: nil, focus: focus)) ?? []
@@ -661,6 +700,7 @@ final class MapExplorerViewModel: ObservableObject {
         let speedtest = await speedtestRaw
         let planned = await plannedRaw
         let outage = await outageRaw
+        let communityOutage = await communityOutageRaw
         let coverage = await coverageRaw
         let photos = await photosRaw
 
@@ -715,6 +755,12 @@ final class MapExplorerViewModel: ObservableObject {
 
         if let value = outage.value { outages = value }
         else if let error = outage.error { layerError = layerError ?? error }
+
+        // Pas de `layerError` ici, contrairement aux autres couches : une panne
+        // signalée indisponible n'empêche de lire ni les antennes ni le signal, et
+        // un bandeau rouge sur une carte par ailleurs saine coûterait plus qu'il
+        // n'informe. Même arbitrage que sur Android.
+        if let value = communityOutage.value { communityOutages = value }
 
         if let value = coverage.value {
             coverageTiles = value.tiles
@@ -1037,6 +1083,9 @@ struct MapExplorerView: View {
     @State private var selectedAntenna: AntennaSite?
     @State private var selectedPhoto: MapPhotoTarget?
     @State private var selectedOutage: OutageSiteLive?
+    /// Panne signalée par la communauté ouverte depuis la carte. Distincte de
+    /// `selectedOutage` (incident opérateur) : deux sources, deux feuilles.
+    @State private var selectedCommunityOutage: CommunityOutage?
     @State private var selectedPlanned: PlannedSiteLive?
     @State private var selectedFriend: SocialFriendLive?
     @State private var selectedCustomSite: AndroidCustomSiteMarker?
@@ -1053,8 +1102,11 @@ struct MapExplorerView: View {
 
     init(service: MapSnapshotServicing,
          antennas: AntennasServicing,
-         markets: MarketRegistryServicing) {
-        _model = StateObject(wrappedValue: MapExplorerViewModel(map: service, antennas: antennas, markets: markets))
+         markets: MarketRegistryServicing,
+         communityOutages: CommunityOutageServicing) {
+        _model = StateObject(wrappedValue: MapExplorerViewModel(
+            map: service, antennas: antennas, markets: markets, communityOutages: communityOutages
+        ))
         // QA : `--reset-map` oublie région + marché/opérateur pour rejouer la détection.
         if AppEnvironment.resetsMapOnLaunch {
             MapRegionStore.reset()
@@ -1085,6 +1137,19 @@ struct MapExplorerView: View {
         .sheet(item: $selectedItem) { item in MapItemSheet(item: item) }
         .sheet(item: $selectedOutage) { site in
             OutageDetailSheet(site: site)
+        }
+        .sheet(item: $selectedCommunityOutage) { outage in
+            CommunityOutageDetailSheet(
+                outage: outage,
+                service: services.communityOutages,
+                // Le libellé du registre, comme le marqueur : la feuille montrait la
+                // CLÉ brute (« BOUYGUES_TELECOM »), donc deux noms pour un même
+                // opérateur selon qu'on lisait la carte ou ce qu'elle ouvre.
+                operatorLabel: model.operatorLabel(outage.operatorKey),
+                // Un arbitrage change les compteurs de la carte : sans rechargement,
+                // le marqueur garderait l'état d'avant le vote.
+                onChanged: { Task { await reloadCurrentRegion() } }
+            )
         }
         .sheet(item: $selectedCustomSite) { site in
             customSiteSheet(site)
@@ -1326,7 +1391,45 @@ struct MapExplorerView: View {
         .onChangeCompat(of: router.openSiteId) { _, _ in openSiteFromRouterIfNeeded() }
         // Test de l'historique : cadre la carte sur le lieu de la mesure.
         .onChangeCompat(of: router.pendingMapFocus) { _, _ in focusFromRouterIfNeeded() }
-        .onAppear { focusFromRouterIfNeeded() }
+        // Ligne de « Pannes signalées » : ouvre la feuille de la panne demandée.
+        .onChangeCompat(of: router.openCommunityOutage) { _, _ in openCommunityOutageFromRouterIfNeeded() }
+        // Tap sur une notification de panne : seul l'identifiant a voyagé.
+        .onChangeCompat(of: router.openCommunityOutageId) { _, _ in openCommunityOutageFromNotificationIfNeeded() }
+        .onAppear {
+            focusFromRouterIfNeeded()
+            openCommunityOutageFromRouterIfNeeded()
+            openCommunityOutageFromNotificationIfNeeded()
+        }
+    }
+
+    /// Ouvre la feuille d'une panne désignée depuis la page « Pannes signalées ».
+    ///
+    /// Elle vient de l'objet transporté par le routeur et non de `model.communityOutages` : cette
+    /// page est paginée sans tenir compte de l'emprise, la panne demandée est donc en général
+    /// absente de ce que la carte a chargé. Le cadrage est déjà fait par `pendingMapFocus`, posé
+    /// dans le même geste.
+    private func openCommunityOutageFromRouterIfNeeded() {
+        guard let outage = router.openCommunityOutage else { return }
+        router.openCommunityOutage = nil
+        selectedCommunityOutage = outage
+    }
+
+    /// Ouvre la feuille d'une panne désignée par une NOTIFICATION.
+    ///
+    /// Un push ne transporte que des chaînes : on va donc chercher la fiche, que seule la route de
+    /// détail rend en entier — et qui, elle, accepte aussi les pannes closes. C'est indispensable
+    /// ici : « Rétabli sur… » notifie précisément une panne qu'aucune liste ne rend plus.
+    ///
+    /// Une fois l'objet en main, on repasse par le chemin de la page « Pannes signalées » : cadrage
+    /// et ouverture de feuille restent décidés à un seul endroit. Un échec est silencieux — la
+    /// carte reste sur ce qu'elle affichait, ce qui vaut mieux qu'une alerte pour un tap.
+    private func openCommunityOutageFromNotificationIfNeeded() {
+        guard let outageId = router.openCommunityOutageId else { return }
+        router.openCommunityOutageId = nil
+        Task {
+            guard let outage = try? await services.communityOutages.detail(outageId: outageId) else { return }
+            router.route(toCommunityOutage: outage)
+        }
     }
 
     /// Cadre la carte sur la coordonnée demandée depuis un test de l'historique.
@@ -2090,6 +2193,17 @@ struct MapExplorerView: View {
                     tint: model.operatorFilter.uppercased() == "ALL" ? nil : model.operatorAccent(model.operatorFilter)
                 )
             }
+            // Badges de panne : uniquement quand le filtre « Pannes » est ÉTEINT.
+            // Allumé, la panne a son propre marqueur, et la doubler d'un badge
+            // ferait compter deux fois le même incident. Les DEUX sources sont
+            // traitées pareil — l'opérateur comme la communauté —, avec des formes
+            // distinctes : une antenne déclarée hors service par son opérateur ne
+            // doit pas être la seule à ne porter aucune marque.
+            let showsBadges = !filters.contains(.outage)
+            let outageMarks: [String: CommunityOutageMark] =
+                showsBadges ? communityOutageMarksBySite : [:]
+            let incidentMarks: [String: OperatorIncidentMark] =
+                showsBadges ? operatorIncidentMarksByAntenna : [:]
             let antennaPayloads: [MapAnnotationPayload] = model.antennas.compactMap { site in
                 // La liste `/api/antennas` (mode minimal) ne renvoie PAS les
                 // bandes par site : le filtrage bande est fait CÔTÉ SERVEUR. On ne
@@ -2124,7 +2238,9 @@ struct MapExplorerView: View {
                     operatorTints: operatorTints(for: site),
                     azimuthStyle: model.azimuthStyle,
                     fiveGTintIndices: fiveGTintIndices(for: site),
-                    azimuthBeams: azimuthBeams(for: site)
+                    azimuthBeams: azimuthBeams(for: site),
+                    communityOutage: outageMarks[site.siteId ?? site.id],
+                    operatorIncident: incidentMarks[site.id]
                 )
             }
             payloads += clusteredPayloads(from: antennaPayloads, kind: .antenna, idPrefix: "antenna", minCount: 160, label: { "\($0) antennes" })
@@ -2134,7 +2250,144 @@ struct MapExplorerView: View {
         payloads += photoPayloads
         payloads += plannedPayloads
         payloads += outagePayloads
+        payloads += communityOutagePayloads
         return payloads
+    }
+
+    /// Pannes en cours indexées par identifiant de site, pour accrocher le badge au
+    /// bon point d'antenne.
+    ///
+    /// La clé est `targetId` — l'identifiant du site — et non une proximité
+    /// géographique : une panne est déclarée SUR un site, et un rapprochement par
+    /// distance poserait le badge sur le pylône voisin dès qu'ils sont serrés.
+    /// C'est bien la même clé des deux côtés : `OutageReportSheet` envoie
+    /// `site.siteId ?? site.id` comme `targetId`.
+    private var communityOutageMarksBySite: [String: CommunityOutageMark] {
+        var marks: [String: CommunityOutageMark] = [:]
+        for outage in model.communityOutages where outage.state.isVisible && !outage.targetId.isEmpty {
+            let mark = CommunityOutageMark(severity: outage.severity, confirmed: outage.state == .confirmed)
+            // Un site peut porter deux pannes (deux opérateurs). Le badge unique
+            // affiche alors la plus grave, puis la mieux établie — sinon il
+            // dépendrait de l'ordre de la réponse serveur.
+            if let current = marks[outage.targetId], !Self.outranks(mark, current) { continue }
+            marks[outage.targetId] = mark
+        }
+        return marks
+    }
+
+    private static func outranks(_ candidate: CommunityOutageMark, _ current: CommunityOutageMark) -> Bool {
+        if candidate.severity != current.severity { return candidate.severity == .down }
+        return candidate.confirmed && !current.confirmed
+    }
+
+    /// Rayon en deçà duquel un incident opérateur et un point d'antenne désignent le même pylône.
+    ///
+    /// La même valeur que `INCIDENT_SITE_MATCH_RADIUS_METERS` côté serveur, et pour la même
+    /// raison : `code_site_op` est le code INTERNE de l'opérateur, pas le `sup_id` de l'ANFR, si
+    /// bien que l'égalité de clé ne se déclenche quasiment jamais et que c'est la distance qui
+    /// tranche. Elle se trompe parfois sur un toit urbain — c'est pourquoi le badge se contente
+    /// d'ALERTER, et que la fiche antenne, elle, dit explicitement quand le rattachement s'est
+    /// fait par proximité.
+    private static let operatorIncidentMatchRadiusMeters: Double = 120
+
+    /// Incidents opérateurs rapprochés du point d'antenne qu'ils désignent, indexés par
+    /// identifiant d'antenne.
+    ///
+    /// Rapprochement GÉOGRAPHIQUE, contrairement au signalement communautaire qui, lui, porte
+    /// l'identifiant du site sur lequel il a été déposé. Ce n'est pas une préférence : les deux
+    /// référentiels n'ont aucune clé commune, et joindre sur `siteId` ne rapprocherait rien.
+    ///
+    /// ⚠️ Ce croisement est un PRODUIT de deux listes, et aucune des deux n'est petite :
+    /// `/api/android/map/incidents` ne prend PAS d'emprise — il rend le pays entier, mesuré à
+    /// 1 335 lignes pour `market=FR&operator=ALL` — quand `model.antennas` compte les milliers
+    /// d'antennes du viewport. D'où le pré-filtre en boîte, en DEGRÉS, avant toute trigonométrie :
+    /// c'est exactement ce que fait `selectOperatorIncidentsForSite` côté serveur, et pour la même
+    /// raison. Sans lui, il resterait plusieurs millions de distances haversine à calculer sur le
+    /// MainActor, à chaque reconstruction du cache d'annotations.
+    ///
+    /// Ce calcul ne tourne qu'à cette reconstruction (`refreshMapRender`), pas à chaque rendu.
+    private var operatorIncidentMarksByAntenna: [String: OperatorIncidentMark] {
+        guard !model.outages.isEmpty, !model.antennas.isEmpty else { return [:] }
+        let radius = Self.operatorIncidentMatchRadiusMeters
+        // Dépliés une fois : re-déballer `lat`/`lon` et re-normaliser `issueType` au cœur de la
+        // boucle interne coûterait autant que la distance elle-même.
+        let incidents: [(lat: Double, lon: Double, issueType: String)] = model.outages.compactMap {
+            guard let lat = $0.lat, let lon = $0.lon else { return nil }
+            return (lat, lon, ($0.issueType ?? "down").lowercased())
+        }
+        guard !incidents.isEmpty else { return [:] }
+        // 120 m en degrés de latitude. La longitude se resserre vers les pôles : la borne est
+        // recalculée par antenne, à sa propre latitude.
+        let latDelta = radius / 111_320
+        var marks: [String: OperatorIncidentMark] = [:]
+        for site in model.antennas {
+            guard let lat = site.latitude, let lng = site.longitude else { continue }
+            let lonDelta = latDelta / max(cos(lat * .pi / 180), 0.01)
+            var best: (distance: Double, issueType: String)?
+            for incident in incidents {
+                // Comparaisons de flottants d'abord : elles écartent la quasi-totalité du pays
+                // avant qu'on paie une seule racine carrée.
+                guard abs(incident.lat - lat) <= latDelta, abs(incident.lon - lng) <= lonDelta else { continue }
+                let distance = CLLocation(latitude: lat, longitude: lng)
+                    .distance(from: CLLocation(latitude: incident.lat, longitude: incident.lon))
+                guard distance <= radius else { continue }
+                // Le plus proche gagne : en zone dense, plusieurs supports tombent dans le rayon,
+                // et c'est celui-là que le badge doit désigner. Même arbitrage que le serveur.
+                if let current = best, current.distance <= distance { continue }
+                best = (distance, incident.issueType)
+            }
+            if let best { marks[site.id] = OperatorIncidentMark(issueType: best.issueType) }
+        }
+        return marks
+    }
+
+    /// Pannes signalées, en marqueur de plein droit : le filtre « Pannes » est
+    /// allumé, c'est elles qu'on est venu voir. Même taille que les incidents
+    /// opérateurs, posées À CÔTÉ du point d'antenne (cf. `communityOutageOffset`).
+    ///
+    /// `antennaId` reste nil, délibérément : `selectAnnotation` route sur lui en
+    /// premier, et le renseigner ferait ouvrir la fiche antenne depuis un marqueur
+    /// de panne — une cible, deux destinations.
+    private var communityOutagePayloads: [MapAnnotationPayload] {
+        guard filters.contains(.outage) else { return [] }
+        let individual = model.communityOutages.compactMap { outage -> MapAnnotationPayload? in
+            guard outage.state.isVisible else { return nil }
+            // Le serveur résout la position depuis son référentiel ; une panne dont
+            // il n'a pas su la placer arriverait en (0, 0), au large du Ghana.
+            guard outage.latitude != 0 || outage.longitude != 0 else { return nil }
+            return MapAnnotationPayload(
+                id: "community-outage-\(outage.id)",
+                kind: .communityOutage,
+                title: [outage.siteName, outage.targetId]
+                    .compactMap { $0 }
+                    .first { !$0.isEmpty } ?? String(localized: "Panne signalée"),
+                subtitle: Self.communityOutageSubtitle(
+                    operatorLabel: model.operatorLabel(outage.operatorKey),
+                    outage: outage
+                ),
+                coordinate: CLLocationCoordinate2D(latitude: outage.latitude, longitude: outage.longitude),
+                metric: outage.severity == .degraded
+                    ? String(localized: "Service dégradé")
+                    : String(localized: "Plus aucun service"),
+                backendId: outage.id,
+                details: nil,
+                antennaId: nil,
+                clusterCount: nil,
+                azimuths: [],
+                showsAzimuths: false,
+                communityOutage: CommunityOutageMark(
+                    severity: outage.severity,
+                    confirmed: outage.state == .confirmed
+                )
+            )
+        }
+        return clusteredPayloads(
+            from: individual,
+            kind: .communityOutage,
+            idPrefix: "community-outage",
+            minCount: 30,
+            label: { String(localized: "\($0) pannes signalées") }
+        )
     }
 
     /// Sites prévisionnels : pastille à la couleur de l'opérateur + anneau et
@@ -2185,8 +2438,9 @@ struct MapExplorerView: View {
         return clusteredPayloads(from: individual, kind: .planned, idPrefix: "planned", minCount: 40, label: { "\($0) prévisionnels" })
     }
 
-    /// Sites en panne (HS) : pastille colorée par type d'incident (panne rouge,
-    /// maintenance orange, dégradé jaune) avec le glyphe correspondant, comme Android.
+    /// Sites en panne déclarés par les OPÉRATEURS : pastille à la couleur de la gravité
+    /// (`OperatorIncidentCard.tint` — rouge pour une coupure, ambre pour un dégradé comme pour
+    /// une maintenance) et glyphe de la source (`OperatorIncidentCard.glyph`).
     private var outagePayloads: [MapAnnotationPayload] {
         guard filters.contains(.outage) else { return [] }
         let individual = model.outages.compactMap { site -> MapAnnotationPayload? in
@@ -2216,20 +2470,55 @@ struct MapExplorerView: View {
         return clusteredPayloads(from: individual, kind: .outage, idPrefix: "outage", minCount: 30, label: { "\($0) sites HS" })
     }
 
-    private static func outageColor(for issueType: String) -> Color {
-        switch issueType {
-        case "maintenance": return Color(hex: 0xF97316)
-        case "degraded": return Color(hex: 0xEAB308)
-        default: return Color(hex: 0xEF4444)
-        }
+    /// La gravité d'un incident opérateur, résolue à UN seul endroit.
+    ///
+    /// Cette fonction avait sa propre échelle (orange #F97316, jaune #EAB308, rouge #EF4444), si
+    /// bien qu'un même incident changeait de couleur selon que le filtre « Pannes » était allumé —
+    /// marqueur peint ici — ou éteint — badge peint par `OperatorIncidentCard.tint`. Le jaune du
+    /// mode allumé était en prime celui que les essais sur appareil ont déclaré illisible
+    /// (1,80:1 sur la crème), remplacé partout ailleurs par l'ambre profond `OutageTint.degraded`.
+    ///
+    /// La forme, elle, reste distincte (cf. `outageGlyph`) : c'est elle qui dit QUI affirme, la
+    /// couleur ne répondant qu'à « à quel point ? ».
+    static func outageColor(for issueType: String) -> Color {
+        OperatorIncidentCard.tint(for: issueType)
     }
 
-    private static func outageGlyph(for issueType: String) -> String {
-        switch issueType {
-        case "maintenance": return "wrench.and.screwdriver.fill"
-        case "degraded": return "exclamationmark.circle.fill"
-        default: return "exclamationmark.triangle.fill"
-        }
+    /// Le glyphe d'un incident opérateur, résolu au même endroit que celui de sa carte.
+    ///
+    /// Il rendait `exclamationmark.circle.fill` pour un `degraded` — c'est-à-dire EXACTEMENT le
+    /// glyphe du signalement communautaire (`SQMapKitMarkerView.glyphName`, cas
+    /// `.communityOutage`). Tant que les deux couches avaient des échelles de couleur séparées, le
+    /// jaune contre l'ambre les distinguait encore ; depuis que la couleur est unifiée sur
+    /// `OperatorIncidentCard.tint`, un incident opérateur « dégradé » et une panne communautaire
+    /// « dégradée » confirmée devenaient deux disques ambre au glyphe identique. Or c'est
+    /// précisément la forme qui doit dire QUI affirme, et le flux SFR de production comptait
+    /// 107 incidents `degraded` au moment de la correction — pas un cas d'école.
+    ///
+    /// Délégué à `OperatorIncidentCard.glyph`, comme la couleur juste au-dessus : le triangle (ou
+    /// la clé à molette d'une maintenance) reste à l'opérateur, le point d'exclamation cerclé à la
+    /// communauté, sur la carte comme dans la fiche antenne.
+    static func outageGlyph(for issueType: String) -> String {
+        OperatorIncidentCard.glyph(for: issueType)
+    }
+
+    /// « Orange · Internet, Voix · 4G, 5G » — le sous-titre du marqueur d'une panne signalée.
+    ///
+    /// Les GÉNÉRATIONS y étaient absentes : le marqueur, sa bulle et l'annonce VoiceOver
+    /// (`SQAnnotationDescription`, qui lit ce même `subtitle`) n'énonçaient que les services,
+    /// alors que le formulaire les demande et que la fiche antenne, la feuille et la carte de fil
+    /// les écrivent. La carte est pourtant le premier écran où l'on croise une panne.
+    ///
+    /// `affectedLabel` et non une composition locale : c'est lui qui pose le point médian entre
+    /// services et générations, et qui n'écrit rien quand aucune technologie n'est déclarée — une
+    /// panne d'avant le champ ne doit pas gagner un séparateur orphelin.
+    ///
+    /// Statique, comme `outageGlyph` juste au-dessus, parce qu'un test le tient : c'est la seule
+    /// façon de vérifier ce que le marqueur dit vraiment sans monter la carte entière.
+    static func communityOutageSubtitle(operatorLabel: String, outage: CommunityOutage) -> String {
+        [operatorLabel, outage.affectedLabel]
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
     }
 
     /// Indicateur visuel d'un site prévisionnel selon son croisement ANFR : la
@@ -2359,6 +2648,12 @@ struct MapExplorerView: View {
         // la seule qui puisse répondre à la demande.
         guard filters.contains(.customSite)
             || (model.isCommunityOnlyMarket && filters.contains(.antenna)) else { return [] }
+        // Un site posé à la main porte le badge de panne au même titre qu'une antenne officielle,
+        // et c'est ce qui rend le modèle vrai partout : dans les 44 marchés sans référentiel
+        // public, c'est le SEUL point qui puisse en porter un. La clé est `targetId` — l'id du
+        // `CustomSite` —, celle-là même que `OutageReportSheet` envoie pour `targetKind = custom`.
+        let outageMarks: [String: CommunityOutageMark] =
+            filters.contains(.outage) ? [:] : communityOutageMarksBySite
         var seen = Set<String>()
         let payloads: [MapAnnotationPayload] = model.customSiteTiles.flatMap(\.markers).compactMap { marker in
             guard seen.insert(marker.id).inserted else { return nil }
@@ -2391,7 +2686,8 @@ struct MapExplorerView: View {
                 // libre (« BH Mobile ») retombe sur la résolution tolérante.
                 tint: marker.operatorTint(resolve: { model.operatorAccent($0) }),
                 contributionPhotos: marker.photoCount,
-                hasEnb: marker.isValidated
+                hasEnb: marker.isValidated,
+                communityOutage: outageMarks[marker.id]
             )
         }
         return clusteredPayloads(
@@ -2891,6 +3187,8 @@ struct MapExplorerView: View {
         //  · speedtests → couche dense `speedtestFeatures` (tout afficher, sans cluster)
         //  · couverture → couche dense (dots RSRP type nPerf)
         //  · prévisionnels/pannes → `plannedPayloads`/`outagePayloads` (statut + couleur)
+        //  · pannes signalées → `communityOutagePayloads` (gravité + confirmation),
+        //    portées par le MÊME filtre `.outage` que les incidents opérateurs
         // Ne restent ici que validations / sessions du snapshot. Les amis passent
         // par `friendPayloads` (rendu « Find My » riche, alimenté par le flux live).
         let socialFilters = filters.subtracting([.speedtest, .coverage, .antenna, .photo, .planned, .outage, .friend])
@@ -2966,7 +3264,18 @@ struct MapExplorerView: View {
             selectedPhoto = MapPhotoTarget(id: photoId, thumbnailURL: annotation.thumbnailURL)
             return
         }
-        // Panne (HS) : sheet dédiée détaillée (raison, services impactés, dates).
+        // Panne signalée : feuille dédiée à la panne, jamais la fiche antenne.
+        // Aucune ambiguïté avec le test précédent — un marqueur d'antenne porte un
+        // `antennaId` et est déjà parti, un marqueur de panne n'en porte pas. Et la
+        // garde de filtre vaut ceinture et bretelles : sans elle, un payload survivant
+        // à l'extinction du filtre rouvrirait une feuille qu'on ne peut plus viser.
+        if annotation.kind == .communityOutage, filters.contains(.outage),
+           let outageId = annotation.backendId,
+           let outage = model.communityOutages.first(where: { $0.id == outageId }) {
+            selectedCommunityOutage = outage
+            return
+        }
+        // Panne opérateur (HS) : sheet dédiée détaillée (raison, services impactés, dates).
         if annotation.kind == .outage {
             let outageId = String(annotation.id.dropFirst("outage-".count))
             if let site = model.outages.first(where: { $0.id == outageId }) {
@@ -3141,6 +3450,7 @@ struct MapExplorerView: View {
         case .coverage: return "dot.radiowaves.left.and.right"
         case .speedtest: return "speedometer"
         case .outage: return "exclamationmark.triangle.fill"
+        case .communityOutage: return "exclamationmark.circle.fill"
         case .planned: return "calendar.badge.clock"
         case .antenna: return "antenna.radiowaves.left.and.right"
         case .communitySite: return "dot.radiowaves.up.forward"
@@ -3156,6 +3466,7 @@ struct MapExplorerView: View {
         case .coverage: return SQColor.brandOrange
         case .validation: return SQColor.brandGreen
         case .outage: return .red
+        case .communityOutage: return OutageTint.down
         case .planned: return SQColor.brandBlue
         case .antenna: return SQColor.brandBlue
         case .session: return SQColor.brandOrange

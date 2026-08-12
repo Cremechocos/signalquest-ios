@@ -34,6 +34,39 @@ struct AzimuthBeam: Equatable {
     let tints: [Color]
 }
 
+/// Ce qu'une panne communautaire doit peindre sur la carte.
+///
+/// Porté par le payload, comme `FriendAnnotationInfo` : la `MKAnnotationView` rend l'état sans
+/// rien connaître du modèle ni du service.
+///
+/// Une seule structure pour deux intentions, parce que c'est la même panne : marqueur de plein
+/// droit quand le filtre « Pannes » est allumé, badge accroché au point d'antenne quand il est
+/// éteint. Une panne signalée n'est donc JAMAIS entièrement masquée.
+struct CommunityOutageMark: Equatable {
+    let severity: OutageSeverity
+    /// Corroborée par assez de monde. Une panne seulement signalée est rendue ÉVIDÉE : la
+    /// peindre comme une confirmée ferait passer une voix isolée pour un fait établi.
+    let confirmed: Bool
+
+    /// Couleur sémantique, fixe en clair comme en sombre (cf. `OutageTint`).
+    var tint: Color { OutageTint.of(severity) }
+}
+
+/// Ce qu'un incident DÉCLARÉ PAR UN OPÉRATEUR peint sur le point d'antenne.
+///
+/// Volontairement distinct de `CommunityOutageMark`, alors que les deux ne portent qu'une gravité :
+/// leur fusion aurait rendu impossible ce que toute la fonctionnalité cherche à établir — qui
+/// affirme la panne. Le badge de l'un est un TRIANGLE plein (une déclaration signée), celui de
+/// l'autre un cercle (une observation à corroborer).
+struct OperatorIncidentMark: Equatable {
+    /// « down » | « maintenance » | « degraded », tel que le flux le publie.
+    let issueType: String
+
+    /// Couleur sémantique de la gravité — la même échelle que le communautaire. La couleur
+    /// répond à « à quel point ? », la forme à « qui l'affirme ? ».
+    var tint: Color { OperatorIncidentCard.tint(for: issueType) }
+}
+
 struct MapAnnotationPayload: Identifiable, Equatable {
     let id: String
     let kind: MapDisplayItem.Kind
@@ -90,6 +123,13 @@ struct MapAnnotationPayload: Identifiable, Equatable {
     var azimuthBeams: [AzimuthBeam] = []
     /// Données d'un ami vivant (couche Amis) : pilote le rendu « Find My ».
     var friend: FriendAnnotationInfo? = nil
+    /// Panne communautaire. Sur un marqueur `.communityOutage` elle pilote toute la pastille ;
+    /// sur une antenne, elle n'ajoute qu'un badge — l'antenne reste l'antenne.
+    var communityOutage: CommunityOutageMark? = nil
+    /// Incident déclaré par l'opérateur sur ce point d'antenne. Badge SEULEMENT, et seulement
+    /// filtre « Pannes » éteint : allumé, l'incident a son propre marqueur et le doubler d'un
+    /// badge ferait compter deux fois la même coupure.
+    var operatorIncident: OperatorIncidentMark? = nil
 
     /// Étiquette VoiceOver du marqueur : sans elle, antennes/clusters/speedtests/
     /// amis/photos sont des éléments anonymes non lisibles (A11Y-03/T1-6).
@@ -131,7 +171,9 @@ struct MapAnnotationPayload: Identifiable, Equatable {
         lhs.azimuthStyle == rhs.azimuthStyle &&
         lhs.fiveGTintIndices == rhs.fiveGTintIndices &&
         lhs.azimuthBeams == rhs.azimuthBeams &&
-        lhs.friend == rhs.friend
+        lhs.friend == rhs.friend &&
+        lhs.communityOutage == rhs.communityOutage &&
+        lhs.operatorIncident == rhs.operatorIncident
     }
 }
 
@@ -155,6 +197,7 @@ extension MapAnnotationPayload {
             return coverageColor(rsrp: firstNumber(in: subtitle).map { -abs($0) })
         case .validation: return SQColor.brandGreen
         case .outage: return .red
+        case .communityOutage: return communityOutage?.tint ?? OutageTint.down
         case .planned: return SQColor.brandBlue
         case .session: return SQColor.brandOrange
         case .antenna: return .red
