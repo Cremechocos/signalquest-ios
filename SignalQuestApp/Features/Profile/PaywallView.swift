@@ -137,7 +137,10 @@ struct PaywallView: View {
                 }
                 Spacer()
                 SQEditorialTag(
-                    text: isPremium ? "Le plus complet" : "L’essentiel +",
+                    // « L'essentiel + » promettait des fonctionnalités que Basic
+                    // n'ouvre pas : c'est un palier de soutien, et le nommer
+                    // ainsi est la seule formulation exacte.
+                    text: isPremium ? "Le plus complet" : "Soutien",
                     color: isPremium ? SQColor.onAccent : SQColor.labelSecondary
                 )
             }
@@ -333,22 +336,37 @@ struct PaywallView: View {
         return "Choisir \(tier.displayName)"
     }
 
+    /// Avantages annoncés.
+    ///
+    /// RÈGLE : une ligne ici doit correspondre à un droit RÉELLEMENT gaté côté
+    /// serveur (`packages/core/supporter-features.ts`), jamais à une intention.
+    /// Sur les 84 entrées du catalogue, six seulement sont payantes — le badge
+    /// (`basic`), puis le journal radio, Sentinelle et la durée de story
+    /// (`premium`). Tout le reste est `free` : le comparateur de débits, les
+    /// graphes de signal et les alertes en font partie, et étaient vendus ici
+    /// alors qu'ils sont ouverts à tous. App Review souscrit pour vérifier, et
+    /// un avantage non livrable tombe sous la Guideline 2.3.1.
+    ///
+    /// NE PAS chiffrer un quota ici : le nombre de cibles Sentinelle se règle
+    /// depuis /admin/monetization sans redéployer, donc un nombre en dur
+    /// deviendrait faux sans que personne ne touche à ce fichier.
     private func benefits(for tier: SupporterTier) -> [String] {
         switch tier {
         case .free:
             return []
         case .basic:
+            // Basic n'ouvre AUCUNE fonctionnalité : `supporter.profile.badge`
+            // est son seul droit. Ne rien ajouter ici sans gater d'abord.
             return [
-                "Badge Basic argenté, masquable",
-                "Journal synchronisé entre tes appareils",
-                "Accès anticipé à certains outils communautaires",
+                String(localized: "Badge Basic acier sur ton profil et tes publications"),
+                String(localized: "Ton abonnement finance directement le développement de SignalQuest"),
             ]
         case .premium:
             return [
-                "Analyses détaillées du comparateur",
-                "Tendances et alertes avancées du journal",
-                "Stories personnalisées de 1 à 72 heures",
-                String(localized: "Badge Premium or et rouge, masquable"),
+                String(localized: "Journal radio sauvegardé et synchronisé entre tes appareils"),
+                String(localized: "Sentinelle : surveillance continue de ta connexion (coupures, latence, incidents)"),
+                String(localized: "Durée de vie des stories personnalisable, de 1 h à 72 h au lieu de 24 h"),
+                String(localized: "Badge Premium or sur ton profil et tes publications"),
             ]
         }
     }
