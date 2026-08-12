@@ -230,10 +230,12 @@ final class SentinelleViewModel: ObservableObject {
 
 struct SentinelleView: View {
     @StateObject private var model: SentinelleViewModel
+    @EnvironmentObject private var services: AppServices
     @Environment(\.scenePhase) private var scenePhase
     @State private var showCreate = false
     @State private var showSettings = false
     @State private var showFollow = false
+    @State private var showPremiumPaywall = false
     // Réglages purement locaux : un ordre d'affichage est une préférence de
     // lecture du moment, pas une propriété de la connexion.
     @State private var sort: SentinelleListOrder.Sort = .state
@@ -262,13 +264,7 @@ struct SentinelleView: View {
             if model.isLoading && model.targets.isEmpty {
                 loadingState
             } else if model.accessDenied && model.following.isEmpty {
-                EmptyStateView(
-                    title: "Réservé aux membres Premium",
-                    message: "Sentinelle surveille votre connexion en continu : disponibilité, "
-                        + "latence, perte de paquets et historique daté de chaque coupure.",
-                    systemImage: "crown.fill"
-                )
-                .padding(SQSpace.lg)
+                premiumUpsell
             } else if let errorMessage = model.errorMessage, model.targets.isEmpty {
                 ErrorStateView(title: "Chargement impossible", message: errorMessage) {
                     Task { await model.load() }
@@ -363,6 +359,18 @@ struct SentinelleView: View {
             SentinelleCreateSheet(quota: model.quota, currentIp: { await model.currentIp() }) { label, address, ownerLabel, ownerEmoji in
                 Task { await model.create(label: label, address: address, ownerLabel: ownerLabel, ownerEmoji: ownerEmoji) }
             }
+        }
+        .sheet(isPresented: $showPremiumPaywall, onDismiss: {
+            // Un achat abouti ne rafraîchit pas cet écran tout seul : le droit
+            // vient de changer côté serveur, mais `accessDenied` date du
+            // chargement précédent. Sans ce rechargement, l'abonné reste devant
+            // l'écran qui lui vend ce qu'il vient d'acheter.
+            Task { await model.load() }
+        }) {
+            NavigationStack {
+                PaywallView(store: services.entitlements, entryPoint: .premiumFeature("Sentinelle"))
+            }
+            .presentationDetents([.large])
         }
         .alert(
             "Action impossible",
@@ -512,6 +520,31 @@ struct SentinelleView: View {
                 .foregroundStyle(SQColor.labelSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Refus de DROIT : l'écran doit PROPOSER l'abonnement, pas seulement
+    /// constater le manque — c'est ce que `SentinelleService` annonce depuis le
+    /// début en distinguant le 403 d'une vraie erreur. L'explication était bien
+    /// là, mais sans aucun chemin vers l'offre : Sentinelle est justement le
+    /// principal contenu de Premium, donc l'écran qui la refuse est le meilleur
+    /// endroit pour la vendre.
+    ///
+    /// Le bouton est composé ici plutôt qu'ajouté à `EmptyStateView` : ce
+    /// composant sert une trentaine d'écrans, l'élargir pour un seul appelant
+    /// ferait porter une action optionnelle à tous les autres.
+    private var premiumUpsell: some View {
+        VStack(spacing: SQSpace.lg) {
+            EmptyStateView(
+                title: "Réservé aux membres Premium",
+                message: "Sentinelle surveille votre connexion en continu : disponibilité, "
+                    + "latence, perte de paquets et historique daté de chaque coupure.",
+                systemImage: "crown.fill"
+            )
+            GradientButton("Découvrir Premium", systemImage: "crown.fill") {
+                showPremiumPaywall = true
+            }
+        }
+        .padding(SQSpace.lg)
     }
 }
 
