@@ -55,7 +55,20 @@ struct ICMPPinger: Sendable {
     ///
     /// Lève `socketUnavailable` ou `hostUnresolved` — les deux seuls cas où le repli
     /// TCP doit prendre la main, parce qu'aucun échantillon ne sera jamais produit.
-    func ping(count: Int, intervalMs: Double) async throws -> [Sample] {
+    /// - Parameter onSample: appelé à CHAQUE écho reçu, avec la série complète
+    ///   accumulée jusque-là.
+    ///
+    ///   Sans ce rapport, l'appelant n'obtient rien avant la fin de la série : à
+    ///   9 échantillons espacés de 350 ms, l'écran restait vide plus de 3 secondes
+    ///   puis affichait tout d'un coup. La série est passée ENTIÈRE plutôt qu'un
+    ///   échantillon seul, pour que l'appelant n'ait aucun état mutable à gérer —
+    ///   et parce que la valeur affichée (minimum, gigue) se calcule sur la série,
+    ///   pas sur le dernier écho.
+    func ping(
+        count: Int,
+        intervalMs: Double,
+        onSample: (@Sendable ([Sample]) -> Void)? = nil
+    ) async throws -> [Sample] {
         let resolved = try Self.resolve(host: host)
         let handle = try ICMPSocketHandle(family: resolved.family)
         defer { handle.close() }
@@ -69,6 +82,7 @@ struct ICMPPinger: Sendable {
                 timeout: timeout
             ) {
                 samples.append(sample)
+                onSample?(samples)
             }
             if sequence + 1 < UInt16(count) {
                 try? await Task.sleep(nanoseconds: UInt64(max(0, intervalMs) * 1_000_000))

@@ -2290,10 +2290,25 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         // souvent la mise en route du chemin radio.
         guard let samples = try? await pinger.ping(
             count: target + 1,
-            intervalMs: SpeedtestEngineConfig.pingIntervalMs
+            intervalMs: SpeedtestEngineConfig.pingIntervalMs,
+            onSample: { [weak self] running in
+                // Même `dropFirst()` que le résultat final ci-dessous : le premier
+                // écho paie la mise en route du chemin radio et sera écarté. Afficher
+                // une latence qui ne sera PAS celle retenue serait pire que d'attendre
+                // un tour de plus.
+                let measured = speedtestIcmpMeasuredValues(running)
+                guard !measured.isEmpty else { return }
+                self?.emitPingProgress(
+                    values: Array(measured),
+                    protocolName: "ICMP",
+                    target: target,
+                    serverName: serverName,
+                    progress: progress
+                )
+            }
         ) else { return nil }
 
-        let values = samples.dropFirst().map(\.rttMs).filter { $0 > 0 }
+        let values = speedtestIcmpMeasuredValues(samples)
         guard values.count >= 2 else { return nil }
         emitPingProgress(
             values: Array(values),
@@ -4011,6 +4026,21 @@ func speedtestUploadStreamLadder(requested: Int, hardMax: Int, fallback: Int, la
         ladder.append(rung)
     }
     return ladder
+}
+
+/// Échantillons ICMP RETENUS pour la mesure, à partir de la série brute.
+///
+/// Le premier écho est écarté : il paie la mise en route du chemin radio et sa
+/// valeur est systématiquement gonflée. Les RTT nuls ou négatifs le sont aussi —
+/// ce sont des échos perdus, pas des latences de 0 ms.
+///
+/// Fonction dédiée parce que cette transformation sert DEUX fois : pour la valeur
+/// affichée en direct pendant la mesure, et pour le résultat final. Les écrire
+/// séparément les laisserait diverger, et la divergence serait invisible en test
+/// tout en étant parfaitement visible à l'écran — la latence affichée changerait
+/// au moment où le résultat remplace le direct.
+func speedtestIcmpMeasuredValues(_ samples: [ICMPPinger.Sample]) -> [Double] {
+    samples.dropFirst().map(\.rttMs).filter { $0 > 0 }
 }
 
 func speedtestPingMeasuredSampleTarget(attemptBudget: Int, warmupCount: Int) -> Int {
