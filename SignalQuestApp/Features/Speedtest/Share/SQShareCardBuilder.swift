@@ -1,0 +1,286 @@
+import UIKit
+
+/// Passage d'un résultat de speedtest à la carte de partage — pendant iOS de
+/// `buildShareCardModel` (Android, `SpeedtestShareCardModel.kt`).
+///
+/// Tout ce qui se CALCULE vit ici : nettoyage des séries, downsampling, échelles,
+/// couleurs, formatage. `SQShareCardRenderer` ne fait que DESSINER le modèle et
+/// ne décide de rien — c'est ce partage des rôles qui rend la carte vérifiable
+/// sans produire d'image, et qui garantit qu'iOS et Android affichent les mêmes
+/// nombres au même endroit.
+///
+/// Les constantes ci-dessous sont celles d'Android : les diverger suffirait à
+/// désaligner deux cartes pourtant issues du même test.
+enum SQShareCardBuilder {
+
+    /// Au-delà, un échantillon est un artefact de mesure, pas un débit.
+    private static let seriesClampMbps: Double = 20_000
+
+    /// Repli quand une série a moins de deux points exploitables.
+    private static let fallbackPointCount = 12
+
+    /// Au-delà, les points sont moyennés par buckets.
+    private static let maxPoints = 32
+
+    /// L'échelle Y vaut le max de la série × 4/3 : le pic culmine ainsi à 75 % de
+    /// la hauteur. Sans cette marge, une série quasi constante (upload lissé par
+    /// l'edge) dessine une ligne COLLÉE au bord supérieur du graphe.
+    private static let graphHeadroomFactor: Double = 4.0 / 3.0
+
+    // MARK: - Rendu
+
+    /// Écrit la carte en PNG dans le dossier temporaire et renvoie son URL.
+    ///
+    /// Non isolée, là où `ImageRenderer` contraignait l'ancienne carte SwiftUI au
+    /// main actor : le dessin Core Graphics ne traverse aucune hiérarchie de vues,
+    /// ce qui laisse les tests produire l'image hors du main actor. Appelée depuis
+    /// la vue elle s'exécute tout de même dessus, comme avant — l'en affranchir
+    /// supposerait de rendre le résultat ET le thème `Sendable` (`UIColor` ne
+    /// l'est pas), pour un rendu déjà bien plus rapide que le précédent.
+    static func renderPNG(for result: SpeedtestRunResult, theme: SQShareCardTheme) throws -> URL {
+        let image = SQShareCardRenderer.render(model(for: result, theme: theme))
+        guard let data = image.pngData() else { throw CocoaError(.fileWriteUnknown) }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("signalquest-speedtest-\(result.id.uuidString).png")
+        try data.write(to: url, options: [.atomic])
+        return url
+    }
+
+    // MARK: - Modèle
+
+    static func model(
+        for result: SpeedtestRunResult,
+        theme: SQShareCardTheme,
+        locale: Locale = .autoupdatingCurrent
+    ) -> SQShareCardModel {
+        let downloadGraph = graph(
+            samples: result.downloadSeriesMbps ?? [],
+            average: result.downloadAverageMbps,
+            peak: result.downloadMaxMbps,
+            gaugeMax: SpeedtestGaugeScale.maxSpeed(for: result, upload: false),
+            theme: theme
+        )
+        let uploadAverage = result.uploadAverageMbps ?? 0
+        let uploadGraph = graph(
+            samples: result.uploadSeriesMbps ?? [],
+            average: uploadAverage,
+            peak: result.uploadMaxMbps ?? uploadAverage,
+            gaugeMax: SpeedtestGaugeScale.maxSpeed(for: result, upload: true),
+            theme: theme
+        )
+
+        // Latence héros : min ?: médiane ?: moyenne — convention produit d'Android,
+        // la valeur la plus représentative d'un réseau au repos.
+        let latency = result.pingMinMs ?? result.pingMedianMs ?? result.pingMs ?? 0
+
+        return SQShareCardModel(
+            theme: theme,
+            brand: "SIGNALQUEST",
+            headerNetworkText: headerNetworkText(for: result),
+            dateTimeText: dateText(result.createdAt, locale: locale),
+            download: .init(
+                label: String(localized: "Download"),
+                value: formatMbps(result.downloadAverageMbps, locale: locale),
+                unit: "Mbps",
+                maxValue: formatMbps(result.downloadMaxMbps, locale: locale),
+                labelColor: downloadGraph.accentColor,
+                graph: downloadGraph
+            ),
+            upload: .init(
+                label: String(localized: "Upload"),
+                value: formatMbps(uploadAverage, locale: locale),
+                unit: "Mbps",
+                maxValue: formatMbps(result.uploadMaxMbps ?? uploadAverage, locale: locale),
+                labelColor: uploadGraph.accentColor,
+                graph: uploadGraph
+            ),
+            latencyLabel: String(localized: "Latence"),
+            latencyValueText: "\(Int(latency.rounded()))",
+            latencyUnit: "ms",
+            latencySubText: latencySubText(for: result, locale: locale),
+            latencyColor: theme.latencyColor(ms: latency),
+            underLoadLabel: String(localized: "Sous charge"),
+            underLoadRows: underLoadRows(
+                for: result, download: downloadGraph, upload: uploadGraph, locale: locale
+            ),
+            serverLabel: String(localized: "Serveur"),
+            serverText: (result.serverName ?? result.downloadServerName)?.shareTrimmed,
+            deviceCityText: deviceCityText(for: result),
+            // VIDE, et ce n'est pas un trou à combler : ces lignes portent
+            // l'identité radio (porteuses agrégées, MCC/MNC, bande) qu'Android lit
+            // sur son modem et qu'iOS n'expose pas. Le pied se replie tout seul.
+            radioLines: []
+        )
+    }
+
+    // MARK: - Graphes
+
+    private static func graph(
+        samples: [Double], average: Double, peak: Double,
+        gaugeMax: Double, theme: SQShareCardTheme
+    ) -> SQShareCardModel.Graph {
+        let points = downsample(prepareSeries(samples, average: average, peak: peak))
+        return .init(
+            points: points,
+            localMax: Swift.max(points.max() ?? 1, 1) * graphHeadroomFactor,
+            // La teinte suit le débit MOYEN rapporté au maximum atteignable sur ce
+            // réseau : 300 Mb/s est excellent en 4G et médiocre en 5G.
+            accentColor: theme.qualityColor(ratio: average / Swift.max(gaugeMax, 1))
+        )
+    }
+
+    /// Nettoyage d'une série : on ne garde que des valeurs finies et positives,
+    /// bornées. Sous deux points, la carte trace une ligne PLATE à la moyenne
+    /// plutôt qu'un graphe inventé — le trait dit alors « pas de détail », ce qui
+    /// reste honnête, là où une courbe fabriquée mentirait sur la mesure.
+    private static func prepareSeries(_ samples: [Double], average: Double, peak: Double) -> [Double] {
+        let clean = samples
+            .filter { $0.isFinite && $0 >= 0 }
+            .map { Swift.min($0, seriesClampMbps) }
+        guard clean.count >= 2 else {
+            let safeAverage = average.isFinite ? Swift.max(average, 0) : 0
+            let ceiling = Swift.max(safeAverage, peak.isFinite ? peak : 0, 1)
+            return Array(repeating: Swift.min(safeAverage, ceiling), count: fallbackPointCount)
+        }
+        return clean
+    }
+
+    /// Moyennage par buckets — port verbatim du downsampling d'Android.
+    private static func downsample(_ source: [Double]) -> [Double] {
+        guard source.count > maxPoints else { return source }
+        return (0..<maxPoints).map { bucket in
+            let start = (bucket * source.count) / maxPoints
+            let end = Swift.min(
+                Swift.max(((bucket + 1) * source.count) / maxPoints, start + 1),
+                source.count
+            )
+            let slice = source[start..<end]
+            return slice.reduce(0, +) / Double(slice.count)
+        }
+    }
+
+    // MARK: - Textes
+
+    /// « 5G SA · Orange », « Wi-Fi · Free » — le lien puis qui le fournit.
+    ///
+    /// Le SSID n'y figure JAMAIS : le nom d'un réseau domestique identifie un
+    /// foyer, et cette carte est faite pour être publiée. C'est le FAI qui prend
+    /// sa place — `networkOperatorName` le porte en Wi-Fi, résolu par IP/ASN,
+    /// donc sans rien révéler du réseau local. Même arbitrage que
+    /// `networkShareDisplayName`, et Android suit la même règle.
+    private static func headerNetworkText(for result: SpeedtestRunResult) -> String {
+        var parts: [String] = []
+        switch result.connectionType {
+        case .wifi:
+            parts.append("Wi-Fi")
+        case .wired:
+            parts.append("Ethernet")
+        case .cellular:
+            parts.append(result.cellularTechnology?.displayName ?? String(localized: "Cellulaire"))
+        case .other:
+            // VPN ou lien inconnu : on ne revendique aucune génération.
+            break
+        }
+        if let operatorName = result.networkOperatorName?.shareTrimmed {
+            parts.append(operatorName)
+        }
+        if parts.isEmpty, let fallback = result.networkShareDisplayName.shareTrimmed {
+            parts.append(fallback)
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// « moy. 24 ms · gigue 3,2 ms » — la gigue est omise si elle n'est pas
+    /// exploitable, jamais rendue en « NaN ».
+    private static func latencySubText(for result: SpeedtestRunResult, locale: Locale) -> String {
+        var pieces: [String] = []
+        if let average = result.pingMs, average.isFinite, average >= 0 {
+            pieces.append("\(String(localized: "moy.")) \(Int(average.rounded())) ms")
+        }
+        if let jitter = result.jitterMs, jitter.isFinite, jitter >= 0 {
+            pieces.append("\(String(localized: "gigue")) \(decimal(jitter, locale: locale)) ms")
+        }
+        return pieces.joined(separator: " · ")
+    }
+
+    private static func underLoadRows(
+        for result: SpeedtestRunResult,
+        download: SQShareCardModel.Graph,
+        upload: SQShareCardModel.Graph,
+        locale: Locale
+    ) -> [SQShareCardModel.UnderLoadRow] {
+        func row(
+            _ prefix: String, ping: Double?, jitter: Double?, dotColor: UIColor
+        ) -> SQShareCardModel.UnderLoadRow? {
+            guard let ping, ping.isFinite, ping >= 0 else { return nil }
+            let usableJitter = jitter.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
+            return .init(
+                prefix: prefix,
+                valueText: "\(Int(ping.rounded())) ms",
+                jitText: usableJitter.map { "· jit \(decimal($0, locale: locale))" },
+                dotColor: dotColor
+            )
+        }
+        // Codes universels, non traduits — comme sur Android.
+        return [
+            row("↓ DL", ping: result.pingDlMs, jitter: result.jitterDlMs, dotColor: download.accentColor),
+            row("↑ UL", ping: result.pingUlMs, jitter: result.jitterUlMs, dotColor: upload.accentColor)
+        ].compactMap { $0 }
+    }
+
+    private static func deviceCityText(for result: SpeedtestRunResult) -> String {
+        // `deviceModel` est stocké au format « iPhone 17 Pro (iPhone18,1) » : la
+        // carte n'en garde que le nom commercial, l'identifiant machine relevant
+        // du diagnostic et non de ce qu'on publie.
+        let stored = result.deviceModel?.shareTrimmed ?? AppleDeviceDescriptor.currentShareModelName
+        let device = stored.components(separatedBy: " (").first?
+            .trimmingCharacters(in: .whitespaces) ?? stored
+        return [device, city(for: result)].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    /// La commune du point de mesure : `city` quand le géocodage l'a fournie,
+    /// sinon extraite de l'adresse comme Android. Rien plutôt qu'un « France »
+    /// par défaut : une localisation fausse vaut moins qu'une absence.
+    private static func city(for result: SpeedtestRunResult) -> String {
+        if let city = result.city?.shareTrimmed { return city }
+        guard let address = result.address?.shareTrimmed else { return "" }
+        let parts = address
+            .components(separatedBy: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        // Un segment « 69003 Lyon » porte la commune après le code postal.
+        for part in parts {
+            guard let zip = part.range(of: #"^\d{5}\s+"#, options: .regularExpression) else { continue }
+            let city = part[zip.upperBound...].trimmingCharacters(in: .whitespaces)
+            if !city.isEmpty { return city }
+        }
+        // Sinon le premier segment qui ne soit pas une voie numérotée.
+        if parts.count > 1, parts[0].contains(where: \.isNumber) { return parts[1] }
+        return parts.first ?? ""
+    }
+
+    // MARK: - Formats
+
+    /// « 1240,6 » — TOUJOURS en Mbps, séparateur de la locale. Pas de bascule
+    /// Gbps : « 1240,6 Mbps » est plus précis que « 1,24 Gbps ».
+    private static func formatMbps(_ value: Double, locale: Locale) -> String {
+        decimal(value.isFinite && value >= 0 ? value : 0, locale: locale)
+    }
+
+    private static func decimal(_ value: Double, locale: Locale) -> String {
+        String(format: "%.1f", locale: locale, value)
+    }
+
+    private static func dateText(_ date: Date, locale: Locale) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.dateFormat = "d MMM yyyy · HH:mm"
+        return formatter.string(from: date)
+    }
+}
+
+private extension String {
+    var shareTrimmed: String? {
+        let value = trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+}

@@ -2043,6 +2043,46 @@
     "300 m – 2 km" : {
 
     },
+    "Cellulaire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cellular"
+          }
+        }
+      }
+    },
+    "gigue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "jitter"
+          }
+        }
+      }
+    },
+    "moy." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "avg"
+          }
+        }
+      }
+    },
+    "Sous charge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Under load"
+          }
+        }
+      }
+    },
     "à " : {
       "extractionState" : "stale",
       "localizations" : {
@@ -10195,7 +10235,14 @@
       }
     },
     "Latence" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latency"
+          }
+        }
+      }
     },
     "Latence · IPv4 et IPv6" : {
 

@@ -63,13 +63,57 @@ struct SQShareCardTheme {
                UIColor(hex: 0x84CC16), UIColor(hex: 0x22C55E)]
     }
 
+    /// Centre de bande des cinq teintes sur un remplissage 0…1 — `FILL_POSITIONS`
+    /// d'Android : < 15 % rouge, 15-35 % orange, 35-55 % jaune, 55-80 % vert
+    /// clair, ≥ 80 % vert.
+    private static let fillPositions: [Double] = [0.075, 0.25, 0.45, 0.675, 0.90]
+
+    /// Idem pour la latence, en ms — `PING_POSITIONS_MS` : ≤ 20 vert, 20-40 vert
+    /// clair, 40-80 jaune, 80-150 orange, > 150 rouge.
+    private static let pingPositionsMs: [Double] = [10, 30, 60, 115, 185]
+
     /// Couleur d'une valeur rapportée à un maximum réseau, comme Android : le
-    /// ratio choisit le palier, pas un seuil absolu en Mb/s.
+    /// ratio situe la teinte sur l'échelle, pas un seuil absolu en Mb/s.
+    ///
+    /// L'interpolation est CONTINUE, et non par paliers : Android fait un `lerp`
+    /// entre teintes adjacentes. S'arrêter au palier le plus proche décalait la
+    /// couleur du trait et du chiffre de latence d'un cran entier — la divergence
+    /// la plus voyante quand les deux cartes sont mises côte à côte.
     func qualityColor(ratio: Double) -> UIColor {
-        let palette = speedPalette
-        guard ratio.isFinite else { return palette[0] }
-        let index = Int((ratio.clampedUnit * Double(palette.count - 1)).rounded())
-        return palette[min(max(index, 0), palette.count - 1)]
+        Self.gradient(ratio.clampedUnit, positions: Self.fillPositions, stops: speedPalette)
+    }
+
+    /// Couleur d'une latence en ms — échelle INVERSÉE : une latence basse doit
+    /// tomber sur le vert, donc la palette worst→best est renversée ici.
+    func latencyColor(ms: Double) -> UIColor {
+        Self.gradient(ms.isFinite ? Swift.max(ms, 0) : 0,
+                      positions: Self.pingPositionsMs,
+                      stops: Array(speedPalette.reversed()))
+    }
+
+    /// Dégradé linéaire par morceaux, saturé aux extrêmes — port de `gradient`
+    /// (Android). `positions` est croissant et de même longueur que `stops`.
+    private static func gradient(_ value: Double, positions: [Double], stops: [UIColor]) -> UIColor {
+        guard positions.count == stops.count, positions.count > 1,
+              let first = stops.first, let last = stops.last else { return stops.first ?? .gray }
+        if value <= positions[0] { return first }
+        if value >= positions[positions.count - 1] { return last }
+        for index in 0..<(positions.count - 1)
+        where value >= positions[index] && value <= positions[index + 1] {
+            let span = positions[index + 1] - positions[index]
+            let t = span > 0 ? (value - positions[index]) / span : 0
+            return lerp(stops[index], stops[index + 1], CGFloat(t))
+        }
+        return last
+    }
+
+    private static func lerp(_ a: UIColor, _ b: UIColor, _ t: CGFloat) -> UIColor {
+        var ar: CGFloat = 0, ag: CGFloat = 0, ab: CGFloat = 0, aa: CGFloat = 0
+        var br: CGFloat = 0, bg: CGFloat = 0, bb: CGFloat = 0, ba: CGFloat = 0
+        a.getRed(&ar, green: &ag, blue: &ab, alpha: &aa)
+        b.getRed(&br, green: &bg, blue: &bb, alpha: &ba)
+        return UIColor(red: ar + (br - ar) * t, green: ag + (bg - ag) * t,
+                       blue: ab + (bb - ab) * t, alpha: aa + (ba - aa) * t)
     }
 }
 

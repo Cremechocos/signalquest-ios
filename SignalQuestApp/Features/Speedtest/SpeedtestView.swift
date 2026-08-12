@@ -449,7 +449,7 @@ struct SpeedtestView: View {
 
     /// Assemble image (pré-rendue si dispo) + texte et présente la feuille de
     /// partage immédiatement. Si l'image n'est pas encore prête, on la rend à la
-    /// volée (SpeedtestShareImageRenderer.render est asynchrone), sans bloquer l'UI.
+    /// volée dans une `Task`, sans bloquer l'UI.
     private func presentShare(for result: SpeedtestRunResult) {
         guard !isPreparingShare else { return }
         let text = SpeedtestShareImageRenderer.shareText(for: result)
@@ -462,7 +462,9 @@ struct SpeedtestView: View {
         shareRenderTask?.cancel()
         shareRenderTask = Task {
             do {
-                let url = try await SpeedtestShareImageRenderer.render(result, theme: SpeedtestShareTheme.resolve(colorScheme))
+                let url = try SQShareCardBuilder.renderPNG(
+                    for: result, theme: SQShareCardTheme.current(colorScheme: colorScheme)
+                )
                 await MainActor.run {
                     guard self.result?.id == result.id else {
                         self.sharePreparation = .idle
@@ -488,11 +490,11 @@ struct SpeedtestView: View {
     /// Pré-rend l'image de partage hors du chemin critique du tap, dans le thème
     /// iOS courant.
     private func prerenderShareImage(for result: SpeedtestRunResult) {
-        let theme = SpeedtestShareTheme.resolve(colorScheme)
+        let theme = SQShareCardTheme.current(colorScheme: colorScheme)
         sharePrerenderTask?.cancel()
         sharePrerenderTask = Task {
             do {
-                let url = try await SpeedtestShareImageRenderer.render(result, theme: theme)
+                let url = try SQShareCardBuilder.renderPNG(for: result, theme: theme)
                 await MainActor.run {
                     if self.result?.id == result.id {
                         self.shareURL = url
