@@ -1,5 +1,6 @@
 import Foundation
 import StoreKit
+import os
 
 // MARK: - Product catalog
 
@@ -351,6 +352,7 @@ final class EntitlementsStore: ObservableObject {
     private let serverVerificationEnabled: Bool
     private let synchronizer: AppStoreTransactionSyncing?
     private var updatesTask: Task<Void, Never>?
+    private let logger = Logger(subsystem: "fr.signalquest.ios", category: "Entitlements")
 
     init(
         api: APIClientProtocol,
@@ -503,12 +505,26 @@ final class EntitlementsStore: ObservableObject {
                 guard let identifier = SignalQuestSubscriptionProduct(rawValue: product.id) else { return nil }
                 return (identifier, product)
             })
-            productLoadMessage = products.isEmpty
-                ? "Catalogue App Store non configuré pour cette version."
-                : nil
+            if products.isEmpty {
+                // Un catalogue vide a plusieurs causes indiscernables d'ici :
+                // offres pas encore approuvées par Apple, territoire hors de la
+                // disponibilité retenue dans App Store Connect, ou simplement
+                // aucun compte App Store sur l'appareil. On n'en désigne aucune
+                // plutôt que d'en inventer une — et surtout on ne renvoie pas
+                // l'utilisateur à un défaut de configuration qui n'est pas le
+                // sien : « Catalogue App Store non configuré pour cette version »
+                // était une phrase d'ingénieur affichée à un client.
+                logger.warning("Catalogue App Store vide pour les 4 identifiants d'abonnement.")
+                productLoadMessage = String(localized: "Les abonnements ne sont pas disponibles depuis cet appareil pour le moment.")
+            } else {
+                productLoadMessage = nil
+            }
         } catch {
             products = [:]
-            productLoadMessage = "Catalogue App Store indisponible : \(error.localizedDescription)"
+            // Le détail technique part dans les logs et non à l'écran : le
+            // `localizedDescription` de StoreKit est rédigé pour un développeur.
+            logger.error("Chargement du catalogue App Store échoué : \(error.localizedDescription, privacy: .public)")
+            productLoadMessage = String(localized: "Impossible de contacter l’App Store pour le moment. Réessaie un peu plus tard.")
         }
     }
 
