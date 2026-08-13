@@ -83,6 +83,9 @@ struct RadioLogSiteMapPicker: View {
     /// officiel ? Ça change ce qu'on peut promettre : ces sites ont été placés à la main.
     @State private var isCommunityFallback = false
     @State private var showsCreateSite = false
+    /// Le recadrage sur les anneaux n'a lieu qu'une fois : après, la carte appartient à
+    /// l'utilisateur et la lui reprendre en pleine exploration serait insupportable.
+    @State private var didFrameOnRings = false
     /// Renseigné une fois l'écriture acceptée par le serveur.
     let onIdentified: (String) -> Void
 
@@ -132,6 +135,14 @@ struct RadioLogSiteMapPicker: View {
                         .background(P.accentSoft, in: Capsule(style: .continuous))
                         .accessibilityLabel("Antennes affichées : \(operatorLabel)")
                 }
+            }
+            // Recadrage sur les anneaux, UNE FOIS. La fenêtre de départ tient 3 km autour du
+            // RELEVÉ ; quand le TA annonce 5 km, le site est hors champ et l'écran cherche des
+            // antennes là où il ne peut y en avoir. Les anneaux, eux, savent où regarder.
+            .onChange(of: picker.taRings.count) { count in
+                guard !didFrameOnRings, count >= 1 else { return }
+                didFrameOnRings = true
+                if let framed = Self.regionCovering(picker.taRings) { region = framed }
             }
             .task(id: regionKey) { await loadIfNeeded() }
             // Le site naît AU CENTRE DE LA CARTE, pas sur la position du relevé : les anneaux
@@ -204,6 +215,17 @@ struct RadioLogSiteMapPicker: View {
                     pinLabel(for: pin)
                 }
             }
+        }
+        // ⚠️ SANS CECI, DÉPLACER LA CARTE NE CHARGE RIEN. `Map(initialPosition:)` ne renseigne
+        // que la position de DÉPART : `region` restait donc figée sur la fenêtre initiale, et
+        // comme le chargement est déclenché par `.task(id: regionKey)`, une seule requête
+        // partait — sur une zone de 3 km autour du relevé. L'écran affichait « Aucune antenne
+        // dans cette zone. Déplace la carte. », et déplacer la carte ne changeait rien.
+        //
+        // Le rendu iOS 16 (`legacyMap`) n'a jamais eu ce défaut : il reçoit `$region` en
+        // liaison, donc il la met à jour lui-même.
+        .onMapCameraChange(frequency: .onEnd) { context in
+            region = context.region
         }
         .ignoresSafeArea(edges: .bottom)
     }
@@ -329,6 +351,33 @@ struct RadioLogSiteMapPicker: View {
                 Spacer()
             }
         }
+    }
+
+    /// Fenêtre couvrant les points d'observation ET la zone où le site peut se trouver.
+    ///
+    /// On élargit du rayon MÉDIAN, pas du plus grand : un seul anneau lointain étirerait la
+    /// vue sur des dizaines de kilomètres, où plus rien n'est lisible.
+    private static func regionCovering(_ rings: [TaRingSelection.Ring]) -> MKCoordinateRegion? {
+        guard !rings.isEmpty else { return nil }
+        let lats = rings.map(\.latitude)
+        let lons = rings.map(\.longitude)
+        guard let minLat = lats.min(), let maxLat = lats.max(),
+              let minLon = lons.min(), let maxLon = lons.max() else { return nil }
+
+        let radii = rings.map(\.radiusMeters).sorted()
+        let medianRadius = radii[radii.count / 2]
+        let padLat = medianRadius / 111_320
+        let centerLat = (minLat + maxLat) / 2
+        let padLon = medianRadius / (111_320 * max(cos(centerLat * .pi / 180), 0.2))
+
+        return MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: centerLat, longitude: (minLon + maxLon) / 2),
+            span: MKCoordinateSpan(
+                // Plancher : deux relevés au même endroit donneraient un span nul.
+                latitudeDelta: max(maxLat - minLat + padLat * 2, 0.02),
+                longitudeDelta: max(maxLon - minLon + padLon * 2, 0.02)
+            )
+        )
     }
 
     // MARK: Sites plausibles
@@ -608,9 +657,10 @@ struct RadioLogSiteMapPicker: View {
             }
             visible = merged
             loadedKey = key
-            if visible.isEmpty {
-                loadError = String(localized: "Aucune antenne connue dans cette zone.")
-            }
+            // Une zone vide n'est PAS une erreur : la carte d'information le dit déjà, et
+            // l'écrire ici affichait deux phrases pour le même fait. `loadError` reste réservé
+            // à ce qui a réellement échoué.
+            loadError = nil
         } catch {
             if !error.isCancellation { loadError = error.localizedDescription }
         }
