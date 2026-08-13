@@ -133,6 +133,126 @@ final class TaRingSelectionTests: XCTestCase {
         XCTAssertEqual(TaRingSelection.assess(TaRingSelection.rings(for: readings)), .convergent)
     }
 
+    // MARK: - Garde-fou : les TA qui ne décrivent pas ce site
+    //
+    // Un TA peut être parfaitement mesuré et pourtant faux POUR CETTE CELLULE — les mesures
+    // d'une voisine collées à cette identité. L'anneau est alors un vrai cercle, au mauvais
+    // endroit, et un seul suffit à déplacer le site estimé de plusieurs kilomètres.
+
+    /// Un relevé dont le TA correspond EXACTEMENT à sa distance au site : un anneau honnête.
+    private func honnete(lat: Double, lon: Double, seconds: TimeInterval) -> TaRingSelection.Reading {
+        let dLat = (lat - baseLat) * 111_320
+        let dLon = (lon - baseLon) * 111_320 * cos(baseLat * .pi / 180)
+        let distance = (dLat * dLat + dLon * dLon).squareRoot()
+        return reading(
+            latitude: lat,
+            longitude: lon,
+            timingAdvance: max(1, Int((distance / 78.12).rounded())),
+            accuracyMeters: 10,
+            secondsFromEpoch: seconds
+        )
+    }
+
+    private func cercleAutourDuSite(_ n: Int) -> [TaRingSelection.Reading] {
+        (0..<n).map { i in
+            let angle = 2 * Double.pi * Double(i) / Double(n)
+            return honnete(
+                lat: baseLat + 0.02 * cos(angle),
+                lon: baseLon + 0.02 * sin(angle),
+                seconds: 1_786_000_000 + TimeInterval(i)
+            )
+        }
+    }
+
+    /// À 2 km du site mais annonçant 234 m : l'écart dépasse le plancher de 800 m.
+    private var menteur: TaRingSelection.Reading {
+        reading(
+            latitude: baseLat + 0.018,
+            timingAdvance: 3,
+            accuracyMeters: 10,
+            secondsFromEpoch: 1_786_100_000
+        )
+    }
+
+    func testUnAnneauQuiContreditTousLesAutresEstEcarte() {
+        let pruned = TaRingSelection.pruneOutliers(
+            TaRingSelection.rings(for: cercleAutourDuSite(5) + [menteur])
+        )
+        XCTAssertEqual(pruned.discarded.count, 1)
+        XCTAssertEqual(pruned.discarded.first?.timingAdvance, 3)
+        XCTAssertEqual(pruned.kept.count, 5)
+    }
+
+    func testDesAnneauxTousCoherentsNeSontJamaisElagues() {
+        let pruned = TaRingSelection.pruneOutliers(TaRingSelection.rings(for: cercleAutourDuSite(6)))
+        XCTAssertTrue(pruned.discarded.isEmpty)
+        XCTAssertEqual(pruned.kept.count, 6)
+    }
+
+    /// À trois, retirer un cercle revient à décréter lequel des trois a raison.
+    func testSousQuatreAnneauxOnNeRetireRien() {
+        let pruned = TaRingSelection.pruneOutliers(
+            TaRingSelection.rings(for: cercleAutourDuSite(2) + [menteur])
+        )
+        XCTAssertTrue(pruned.discarded.isEmpty)
+        XCTAssertEqual(pruned.kept.count, 3)
+    }
+
+    /// LE GARDE-FOU DU GARDE-FOU : jeter des mesures jusqu'à ce que le reste s'accorde ne
+    /// révèle rien, cela fabrique une convergence.
+    func testJamaisPlusDuQuartDesAnneauxNEstEcarte() {
+        let menteurs = (0..<4).map { i in
+            reading(
+                latitude: baseLat + 0.018 + Double(i) * 0.001,
+                timingAdvance: 3,
+                accuracyMeters: 10,
+                secondsFromEpoch: 1_786_200_000 + TimeInterval(i)
+            )
+        }
+        let pruned = TaRingSelection.pruneOutliers(
+            TaRingSelection.rings(for: cercleAutourDuSite(8) + menteurs)
+        )
+        XCTAssertLessThanOrEqual(pruned.discarded.count, 3, "au plus 12/4, jamais les 4 gêneurs")
+    }
+
+    func testUnElagageQuiNAmeliorePasEstRefuse() {
+        // Des anneaux dispersés sans site commun : retirer le pire ne les réconcilie pas.
+        let bruit = [
+            reading(latitude: 45.60, longitude: 5.40, timingAdvance: 90, accuracyMeters: 10),
+            reading(latitude: 45.70, longitude: 5.50, timingAdvance: 5, accuracyMeters: 10),
+            reading(latitude: 45.62, longitude: 5.52, timingAdvance: 80, accuracyMeters: 10),
+            reading(latitude: 45.72, longitude: 5.38, timingAdvance: 8, accuracyMeters: 10),
+            reading(latitude: 45.58, longitude: 5.46, timingAdvance: 70, accuracyMeters: 10)
+        ]
+        XCTAssertTrue(TaRingSelection.pruneOutliers(TaRingSelection.rings(for: bruit)).discarded.isEmpty)
+    }
+
+    /// Cas réel du journal (eNB 603261, SFR). Neuf relevés concordent à moins de 90 m ; un
+    /// dixième, à 937 m, porte en fait le TA d'une cellule de l'eNB 603267 relevée à 77 m du
+    /// même point. Sans élagage, ce seul anneau déplaçait le site estimé de 2,8 km.
+    func testLeCas603261RedevientExploitable() {
+        let releves = [
+            reading(latitude: 45.53195, longitude: 5.71489, timingAdvance: 76, accuracyMeters: 1),
+            reading(latitude: 45.54535, longitude: 5.65492, timingAdvance: 24),
+            reading(latitude: 45.53245, longitude: 5.70472, timingAdvance: 67, accuracyMeters: 1),
+            reading(latitude: 45.55152, longitude: 5.63937, timingAdvance: 19, accuracyMeters: 2),
+            reading(latitude: 45.55325, longitude: 5.63254, timingAdvance: 22),
+            reading(latitude: 45.53333, longitude: 5.68784, timingAdvance: 49, accuracyMeters: 5),
+            reading(latitude: 45.53338, longitude: 5.68347, timingAdvance: 12), // l'intrus
+            reading(latitude: 45.55410, longitude: 5.63022, timingAdvance: 25, accuracyMeters: 6),
+            reading(latitude: 45.55439, longitude: 5.62960, timingAdvance: 25)
+        ]
+        let brut = TaRingSelection.rings(for: releves)
+        XCTAssertEqual(TaRingSelection.assess(brut), .divergent, "sans élagage, rien ne se croise")
+
+        let pruned = TaRingSelection.pruneOutliers(brut)
+        XCTAssertTrue(
+            pruned.discarded.contains { $0.timingAdvance == 12 },
+            "l'anneau de 937 m doit être écarté"
+        )
+        XCTAssertEqual(TaRingSelection.assess(pruned.kept), .convergent)
+    }
+
     /// Mêmes points, mais des TA qui ne peuvent pas décrire un site unique : on les montre,
     /// en signalant qu'ils se contredisent.
     func testDesAnneauxIncompatiblesSontDivergents() {

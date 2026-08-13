@@ -45,6 +45,9 @@ final class RadioLogIdentifyPicker: ObservableObject {
     /// Ce que la géométrie permet de dire : des anneaux qui ne se croisent nulle part
     /// apprennent quelque chose, mais ne doivent pas passer pour une localisation.
     @Published private(set) var taAssessment: TaRingSelection.Assessment = .unusable
+    /// Relevés retirés du calcul parce qu'ils contredisaient franchement les autres. Compté
+    /// pour être DIT : un élagage silencieux priverait l'utilisateur du moyen de nous corriger.
+    @Published private(set) var taDiscardedCount: Int = 0
 
     private let service: RadioLogsServicing
     private let identify: IdentifyServicing
@@ -83,9 +86,13 @@ final class RadioLogIdentifyPicker: ObservableObject {
                 observedAt: entry.observedAt
             )
         }
-        let rings = TaRingSelection.rings(for: readings)
-        taRings = rings
-        taAssessment = TaRingSelection.assess(rings)
+        // Élagage : un TA peut être juste et décrire pourtant une AUTRE cellule (les mesures
+        // d'une voisine collées à cette identité). Sur un cas réel, un seul anneau de ce genre
+        // déplaçait le site estimé de 2,8 km. Ce qui est écarté est compté, jamais caché.
+        let pruned = TaRingSelection.pruneOutliers(TaRingSelection.rings(for: readings))
+        taRings = pruned.kept
+        taDiscardedCount = pruned.discarded.count
+        taAssessment = TaRingSelection.assess(pruned.kept)
     }
 
     func load(for site: RadioLogSite) async {

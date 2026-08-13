@@ -93,6 +93,18 @@ enum TaRingSelection {
     /// Un résidu jusqu'à 1,5 × la largeur des couronnes reste explicable par l'incertitude.
     private static let residualToleranceFactor = 1.5
 
+    /// Nombre minimal d'anneaux avant d'oser en écarter un : en dessous, il n'existe pas de
+    /// majorité à laquelle comparer le suspect.
+    private static let minRingsForPruning = 4
+    /// Écart minimal au meilleur centre pour qu'un anneau devienne suspect.
+    private static let outlierFloorMeters = 800.0
+    /// …et multiple de l'écart MÉDIAN qu'il doit dépasser, pour ne pas déshabiller un nœud flou.
+    private static let outlierMedianFactor = 4.0
+    /// Jamais plus d'un quart des anneaux — au-delà, on fabriquerait une convergence.
+    private static let maxDiscardedDivisor = 4
+    /// L'élagage doit faire tomber le résidu à au plus 75 % de sa valeur, sinon on renonce.
+    private static let requiredResidualRatio = 0.75
+
     /// Distance correspondant à un TA, au pas LTE. `nil` hors plage.
     static func distanceMeters(forTimingAdvance ta: Int) -> Double? {
         guard ta >= 0, ta <= lteTaMax else { return nil }
@@ -213,6 +225,17 @@ enum TaRingSelection {
     /// existait un site, à quel point les anneaux se tromperaient-ils ? ». Recherche par
     /// grille descendante depuis le barycentre — un ordre de grandeur suffit, pas une position.
     static func fitResidualMeters(_ rings: [Ring]) -> Double? {
+        fitCenter(rings)?.residualMeters
+    }
+
+    /// Meilleur centre trouvé pour un jeu d'anneaux, et l'écart moyen qui subsiste.
+    private struct Fit {
+        let latitude: Double
+        let longitude: Double
+        let residualMeters: Double
+    }
+
+    private static func fitCenter(_ rings: [Ring]) -> Fit? {
         guard rings.count >= 3 else { return nil }
         var bestLat = rings.map(\.latitude).reduce(0, +) / Double(rings.count)
         var bestLon = rings.map(\.longitude).reduce(0, +) / Double(rings.count)
@@ -239,7 +262,64 @@ enum TaRingSelection {
             bestLon = improvedLon
             span /= 4
         }
-        return best
+        return Fit(latitude: bestLat, longitude: bestLon, residualMeters: best)
+    }
+
+    /// Anneaux conservés, et ceux qu'on a écartés.
+    ///
+    /// Les écartés ne sont pas jetés en silence : l'écran doit pouvoir le dire, sinon le
+    /// garde-fou devient une censure invisible.
+    struct PrunedRings {
+        let kept: [Ring]
+        let discarded: [Ring]
+    }
+
+    /// Écart entre le rayon annoncé par le TA et la distance réelle au centre estimé.
+    private static func deviation(from fit: Fit, ring: Ring) -> Double {
+        let dLat = (ring.latitude - fit.latitude) * metersPerDegreeLat
+        let dLon = (ring.longitude - fit.longitude) * metersPerDegreeLat
+            * cos(((ring.latitude + fit.latitude) / 2) * .pi / 180)
+        return abs((dLat * dLat + dLon * dLon).squareRoot() - ring.radiusMeters)
+    }
+
+    /// Écarte les anneaux qui contredisent franchement tous les autres.
+    ///
+    /// POURQUOI. Un TA peut être juste et pourtant appartenir à une AUTRE cellule : mesuré sur
+    /// un journal réel de 2 155 lignes, 6 % des anneaux étaient géométriquement incompatibles
+    /// avec leurs voisins, et **un seul suffisait à déplacer le site estimé de 2,8 km** (jusqu'à
+    /// 9,5 km sur le pire nœud). Signature du défaut : un TA identique porté au même mètre près
+    /// par deux nœuds différents — les mesures d'une cellule collées à l'identité d'une autre.
+    ///
+    /// Le plafond du quart est le garde-fou du garde-fou : jeter des mesures jusqu'à ce que le
+    /// reste s'accorde ne révèle rien, cela FABRIQUE une convergence.
+    static func pruneOutliers(_ rings: [Ring]) -> PrunedRings {
+        guard rings.count >= minRingsForPruning, let before = fitCenter(rings) else {
+            return PrunedRings(kept: rings, discarded: [])
+        }
+
+        let deviations = rings.map { (ring: $0, value: deviation(from: before, ring: $0)) }
+        let sorted = deviations.map(\.value).sorted()
+        let median = sorted[sorted.count / 2]
+        let threshold = max(outlierFloorMeters, outlierMedianFactor * median)
+
+        let discarded = deviations
+            .filter { $0.value > threshold }
+            .sorted { $0.value > $1.value }
+            .prefix(max(1, rings.count / maxDiscardedDivisor))
+            .map(\.ring)
+        guard !discarded.isEmpty else { return PrunedRings(kept: rings, discarded: []) }
+
+        let discardedIds = Set(discarded.map(\.id))
+        let kept = rings.filter { !discardedIds.contains($0.id) }
+        // Sous trois anneaux il n'y a plus de verdict possible : mieux vaut tout garder et
+        // annoncer une divergence que rendre le nœud muet.
+        guard kept.count >= 3, let after = fitCenter(kept) else {
+            return PrunedRings(kept: rings, discarded: [])
+        }
+        guard after.residualMeters <= before.residualMeters * requiredResidualRatio else {
+            return PrunedRings(kept: rings, discarded: [])
+        }
+        return PrunedRings(kept: kept, discarded: discarded)
     }
 
     /// Verdict en trois états plutôt qu'un booléen : dans un cas il n'y a rien à montrer,
