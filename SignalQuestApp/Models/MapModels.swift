@@ -983,6 +983,70 @@ struct AndroidCommunitySiteMarker: Decodable, Identifiable, Equatable, Sendable 
         firstObservedAt = (try? c.decodeIfPresent(Date.self, forKey: .firstObservedAt)) ?? nil
         medianAccuracyMeters = (try? c.decodeIfPresent(Double.self, forKey: .medianAccuracyMeters)) ?? nil
     }
+
+    /// Initialiseur mémberwise, que Swift ne synthétise pas ici : le type porte un
+    /// `init(from decoder:)` sur mesure. Nécessaire pour fabriquer un marqueur à partir d'un
+    /// relevé du journal quand on crée un site communautaire.
+    init(
+        id: String,
+        candidateKey: String? = nil,
+        candidateKind: String? = nil,
+        marketCode: String? = nil,
+        operatorKey: String? = nil,
+        networkGroupKey: String? = nil,
+        radioNodeType: String? = nil,
+        enb: String? = nil,
+        gnb: String? = nil,
+        cellId: String? = nil,
+        ci: String? = nil,
+        pci: Int? = nil,
+        tac: String? = nil,
+        earfcn: Int? = nil,
+        nrarfcn: Int? = nil,
+        band: Int? = nil,
+        mcc: Int? = nil,
+        mnc: Int? = nil,
+        firstObservedAt: Date? = nil,
+        lat: Double,
+        lng: Double,
+        radiusMeters: Double? = nil,
+        confidenceScore: Double? = nil,
+        confidenceLevel: String? = nil,
+        observationCount: Int? = nil,
+        distinctUserCount: Int? = nil,
+        medianAccuracyMeters: Double? = nil,
+        lastObservedAt: Date? = nil
+    ) {
+        self.id = id
+        self.candidateKey = candidateKey
+        self.candidateKind = candidateKind
+        self.marketCode = marketCode
+        self.operatorKey = operatorKey
+        self.networkGroupKey = networkGroupKey
+        self.radioNodeType = radioNodeType
+        self.enb = enb
+        self.gnb = gnb
+        self.cellId = cellId
+        self.ci = ci
+        self.pci = pci
+        self.tac = tac
+        self.earfcn = earfcn
+        self.nrarfcn = nrarfcn
+        self.band = band
+        self.mcc = mcc
+        self.mnc = mnc
+        self.firstObservedAt = firstObservedAt
+        self.lat = lat
+        self.lng = lng
+        self.radiusMeters = radiusMeters
+        self.confidenceScore = confidenceScore
+        self.confidenceLevel = confidenceLevel
+        self.observationCount = observationCount
+        self.distinctUserCount = distinctUserCount
+        self.medianAccuracyMeters = medianAccuracyMeters
+        self.lastObservedAt = lastObservedAt
+    }
+
 }
 
 /// Sites ajoutés à la main par les membres

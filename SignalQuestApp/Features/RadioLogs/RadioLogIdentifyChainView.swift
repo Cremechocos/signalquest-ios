@@ -18,6 +18,7 @@ struct RadioLogIdentifyChainView: View {
     @State private var skippedIds: Set<String> = []
     @State private var showsMapPicker = false
     private let antennas: AntennasServicing
+    private let customSites: CustomSitesServicing?
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 46.6, longitude: 2.5),
         span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
@@ -29,10 +30,12 @@ struct RadioLogIdentifyChainView: View {
         service: RadioLogsServicing,
         identify: IdentifyServicing,
         antennas: AntennasServicing,
+        customSites: CustomSitesServicing? = nil,
         onIdentified: @escaping (RadioLogSite, String) -> Void
     ) {
         self.sites = sites
         self.antennas = antennas
+        self.customSites = customSites
         self.onIdentified = onIdentified
         _picker = StateObject(
             wrappedValue: RadioLogIdentifyPicker(service: service, identify: identify, antennas: antennas)
@@ -167,7 +170,7 @@ struct RadioLogIdentifyChainView: View {
             recenterOnSelection()
         }
         .sheet(isPresented: $showsMapPicker) {
-            RadioLogSiteMapPicker(site: site, picker: picker, antennas: antennas) { siteId in
+            RadioLogSiteMapPicker(site: site, picker: picker, antennas: antennas, customSites: customSites) { siteId in
                 // Dans la file, on enchaîne : le site suivant est ce qu'on attend.
                 onIdentified(site, siteId)
                 identifiedCount += 1

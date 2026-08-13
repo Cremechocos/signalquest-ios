@@ -21,6 +21,7 @@ struct RadioLogIdentifySheet: View {
     /// contribuer à une base publique, l'écran doit dire QUOI.
     @State private var identifiedSiteId: String?
     private let antennas: AntennasServicing
+    private let customSites: CustomSitesServicing?
     let onIdentified: (String) -> Void
 
     init(
@@ -28,10 +29,12 @@ struct RadioLogIdentifySheet: View {
         service: RadioLogsServicing,
         identify: IdentifyServicing,
         antennas: AntennasServicing,
+        customSites: CustomSitesServicing? = nil,
         onIdentified: @escaping (String) -> Void
     ) {
         self.site = site
         self.antennas = antennas
+        self.customSites = customSites
         self.onIdentified = onIdentified
         _picker = StateObject(
             wrappedValue: RadioLogIdentifyPicker(service: service, identify: identify, antennas: antennas)
@@ -74,7 +77,7 @@ struct RadioLogIdentifySheet: View {
             .toolbar { toolbarContent }
             .task { await picker.load(for: site) }
             .sheet(isPresented: $showsMapPicker) {
-                RadioLogSiteMapPicker(site: site, picker: picker, antennas: antennas) { siteId in
+                RadioLogSiteMapPicker(site: site, picker: picker, antennas: antennas, customSites: customSites) { siteId in
                     // On NE referme PAS : on revient ici pour dire à quel site le
                     // nœud est désormais rattaché. C'est la réponse à la question
                     // que l'écran posait.

@@ -5,6 +5,52 @@ import SwiftUI
 private typealias M = RadioLogsMetrics
 private typealias P = RadioLogsPalette
 
+extension AndroidCommunitySiteMarker {
+    /// Fabrique un marqueur à partir d'un relevé du journal, pour pré-remplir la création d'un
+    /// site communautaire.
+    ///
+    /// Le type porte un `init(from decoder:)` sur mesure, donc Swift ne synthétise aucun
+    /// initialiseur mémberwise — d'où celui-ci. Il ne renseigne QUE ce que le journal sait, et
+    /// laisse le reste vide : inventer des statistiques d'observation ou une cellule précise
+    /// ferait passer une déduction pour une mesure.
+    ///
+    /// La cellule reste volontairement absente : un nœud du journal en porte plusieurs, en
+    /// choisir une serait arbitraire. Le serveur vérifie de toute façon la cohérence sur le
+    /// NŒUD (eNB/gNB), pas sur le secteur.
+    init(fromRadioLog site: RadioLogSite, latitude: Double, longitude: Double, operatorKey: String?) {
+        self.init(
+            id: "radiolog:\(site.id)",
+            candidateKey: nil,
+            candidateKind: "observed_cell",
+            marketCode: nil,
+            operatorKey: operatorKey,
+            networkGroupKey: nil,
+            radioNodeType: site.kind == .gnb ? "gnb" : "enb",
+            enb: site.kind == .enb ? site.node : nil,
+            gnb: site.kind == .gnb ? site.node : nil,
+            cellId: nil,
+            ci: nil,
+            pci: nil,
+            tac: nil,
+            earfcn: site.earfcn,
+            nrarfcn: nil,
+            band: site.band,
+            mcc: site.mcc.flatMap(Int.init),
+            mnc: site.mnc.flatMap(Int.init),
+            firstObservedAt: site.firstSeenAt,
+            lat: latitude,
+            lng: longitude,
+            radiusMeters: nil,
+            confidenceScore: nil,
+            confidenceLevel: nil,
+            observationCount: site.logCount,
+            distinctUserCount: nil,
+            medianAccuracyMeters: nil,
+            lastObservedAt: site.lastSeenAt
+        )
+    }
+}
+
 /// « Choisir une autre antenne sur la carte ».
 ///
 /// Les propositions du serveur couvrent le cas courant, pas tous les cas : un
@@ -16,6 +62,9 @@ struct RadioLogSiteMapPicker: View {
     let site: RadioLogSite
     @ObservedObject var picker: RadioLogIdentifyPicker
     let antennas: AntennasServicing
+    /// Création d'un site communautaire — le seul geste possible quand le référentiel ne
+    /// connaît rien ici. `nil` retire simplement le bouton.
+    var customSites: CustomSitesServicing?
     @Environment(\.dismiss) private var dismiss
 
     @State private var region: MKCoordinateRegion
@@ -33,6 +82,7 @@ struct RadioLogSiteMapPicker: View {
     /// Les candidats affichés viennent-ils de la communauté plutôt que d'un référentiel
     /// officiel ? Ça change ce qu'on peut promettre : ces sites ont été placés à la main.
     @State private var isCommunityFallback = false
+    @State private var showsCreateSite = false
     /// Renseigné une fois l'écriture acceptée par le serveur.
     let onIdentified: (String) -> Void
 
@@ -40,11 +90,13 @@ struct RadioLogSiteMapPicker: View {
         site: RadioLogSite,
         picker: RadioLogIdentifyPicker,
         antennas: AntennasServicing,
+        customSites: CustomSitesServicing? = nil,
         onIdentified: @escaping (String) -> Void
     ) {
         self.site = site
         self.picker = picker
         self.antennas = antennas
+        self.customSites = customSites
         self.onIdentified = onIdentified
         _region = State(
             initialValue: MKCoordinateRegion(
@@ -82,6 +134,30 @@ struct RadioLogSiteMapPicker: View {
                 }
             }
             .task(id: regionKey) { await loadIfNeeded() }
+            // Le site naît AU CENTRE DE LA CARTE, pas sur la position du relevé : les anneaux
+            // sont sous les yeux, l'utilisateur a donc déjà cadré là où ils se croisent.
+            .sheet(isPresented: $showsCreateSite) {
+                if let customSites {
+                    CreateSiteFromCellsView(
+                        cells: [
+                            AndroidCommunitySiteMarker(
+                                fromRadioLog: site,
+                                latitude: region.center.latitude,
+                                longitude: region.center.longitude,
+                                operatorKey: queriedOperatorKeys.first
+                            )
+                        ],
+                        operatorLabel: { $0 },
+                        service: customSites,
+                        onCreated: {
+                            showsCreateSite = false
+                            // Forcer le rechargement : le site tout juste créé doit apparaître
+                            // comme candidat, sinon on l'a posé sans pouvoir s'y rattacher.
+                            loadedKey = nil
+                        }
+                    )
+                }
+            }
             .alert("Identifier ce site ?", isPresented: $showsConfirmation) {
                 Button("Annuler", role: .cancel) {}
                 Button("Identifier") { Task { await confirm() } }
@@ -346,7 +422,9 @@ struct RadioLogSiteMapPicker: View {
                 }
             } else {
                 Text(visible.isEmpty && !isLoading
-                     ? "Aucune antenne dans cette zone. Déplace la carte."
+                     ? (customSites != nil
+                        ? "Aucune antenne connue ici. Crée le site à l'endroit désigné par tes anneaux."
+                        : "Aucune antenne dans cette zone. Déplace la carte.")
                      : "Touche une antenne sur la carte pour la choisir.")
                     .font(SQFont.body(M.siteMetaSize))
                     .foregroundStyle(P.muted)
@@ -388,6 +466,16 @@ struct RadioLogSiteMapPicker: View {
                 RadioLogActionButton(label: "Annuler", ghost: true) { dismiss() }
             }
             .padding(.top, M.ctaTop)
+
+            // Créer le site : la seule issue quand le référentiel ne connaît RIEN ici. Sans ce
+            // geste, l'écran n'avait ni antenne à désigner, ni moyen d'en ajouter une — et les
+            // anneaux TA, qui disent pourtant où elle se trouve, ne servaient à rien.
+            if customSites != nil, visible.isEmpty, !isLoading {
+                RadioLogActionButton(label: "Créer le site ici", ghost: true) {
+                    showsCreateSite = true
+                }
+                .padding(.top, M.ctaGap)
+            }
         }
         .padding(.horizontal, M.cardPaddingH)
         .padding(.vertical, M.cardPaddingV)

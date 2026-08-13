@@ -68,7 +68,8 @@ struct RadioLogsView: View {
                 site: site,
                 service: services.radioLogs,
                 identify: services.identify,
-                antennas: services.antennas
+                antennas: services.antennas,
+                customSites: services.customSites
             ) { siteId in
                 model.markIdentified(site, siteId: siteId)
                 model.toast = String(localized: "Site identifié.")
@@ -79,7 +80,8 @@ struct RadioLogsView: View {
                 sites: queue.sites,
                 service: services.radioLogs,
                 identify: services.identify,
-                antennas: services.antennas
+                antennas: services.antennas,
+                customSites: services.customSites
             ) { site, siteId in
                 model.markIdentified(site, siteId: siteId)
             }
