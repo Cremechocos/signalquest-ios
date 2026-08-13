@@ -25,6 +25,10 @@ struct OutageReportSheet: View {
     let operatorLabel: String
     let siteLatitude: Double?
     let siteLongitude: Double?
+    /// Les bandes et azimuts de CE site, fournis par la fiche qui les a déjà chargés.
+    /// Vides = les deux blocs facultatifs ne s'affichent pas, plutôt qu'une liste générique.
+    var siteBands: [OutageBandOption] = []
+    var siteSectors: [Int] = []
     let service: CommunityOutageServicing
     /// Appelé après un envoi réussi, pour que la fiche recharge ses pannes.
     var onSubmitted: ((OutageWriteResponse) -> Void)?
@@ -40,6 +44,10 @@ struct OutageReportSheet: View {
     @State private var errorMessage: String?
     @State private var distanceMeters: Int?
     @State private var accuracyMeters: Int?
+    /// Ce que le SITE porte : seules ses bandes et ses azimuts sont proposés. Proposer le
+    /// catalogue entier reviendrait à offrir des réponses fausses sur une donnée facultative.
+    private var availableBands: [OutageBandOption] { siteBands }
+    private var availableSectors: [Int] { siteSectors }
 
     /// Deux conditions, et pas une seule : la gravité doit avoir été CHOISIE, et « quelque chose
     /// ne marche pas, mais rien de précis » n'est pas exploitable par la communauté. Les
@@ -62,6 +70,15 @@ struct OutageReportSheet: View {
                     whatSection
                     servicesSection
                     technologiesSection
+                    // Les deux blocs facultatifs n'existent que pour une dégradation : « plus
+                    // rien » veut dire toutes les fréquences et tous les secteurs, et la
+                    // question ne se pose pas. `showsImpactFields` porte la règle, testée.
+                    if draft.showsImpactFields {
+                        if !availableBands.isEmpty { bandsSection }
+                        if !availableSectors.isEmpty { sectorsSection }
+                    }
+                    captureSection
+                    commentSection
                     positionSection
                     if let errorMessage {
                         Text(errorMessage)
@@ -160,6 +177,99 @@ struct OutageReportSheet: View {
                 Text("Si vous le savez. Sinon, laissez vide.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+    }
+
+
+    /// Les bandes du site. Le libellé porte l'identifiant 3GPP ET la fréquence : « B28 » ne parle
+    /// qu'aux experts, « 700 » est ambigu (B28 en 4G, n28 en 5G). Les deux ensemble se lisent.
+    private var bandsSection: some View {
+        module("Fréquences touchées") {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                OutageWrapRow(items: availableBands, id: \.token) { band in
+                    OutageChip(
+                        label: LocalizedStringKey(band.displayLabel),
+                        selected: draft.bands.contains(band.token),
+                        tint: tint
+                    ) { draft.toggle(band: band.token) }
+                }
+                Text("Seules les bandes de ce site sont proposées. Sinon, laissez vide.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+    }
+
+    /// Les secteurs, désignés par leur AZIMUT.
+    ///
+    /// Jamais par un numéro : la numérotation dépend de l'opérateur (SFR compte à partir de 0, les
+    /// trois autres à partir de 1), et un numéro écrit ici serait faux une fois sur quatre.
+    private var sectorsSection: some View {
+        module("Secteurs touchés") {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                OutageSectorRadar(
+                    azimuths: availableSectors,
+                    selected: draft.sectors,
+                    tint: tint
+                )
+                OutageWrapRow(items: availableSectors, id: \.self) { azimuth in
+                    OutageChip(
+                        label: LocalizedStringKey("\(azimuth)°"),
+                        selected: draft.sectors.contains(azimuth),
+                        tint: tint
+                    ) { draft.toggle(sector: azimuth) }
+                }
+                Text("La direction dans laquelle pointe l'antenne. Sinon, laissez vide.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+    }
+
+    /// La capture, explicitement étiquetée PARTIELLE.
+    ///
+    /// iOS ne lit ni le niveau reçu ni l'identifiant de cellule — c'est une limite d'Apple, pas un
+    /// manque à combler. Le dire ici évite qu'une capture iOS et une capture Android se lisent
+    /// comme équivalentes alors qu'elles ne mesurent pas la même chose.
+    private var captureSection: some View {
+        module("Joindre la mesure") {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                Toggle(isOn: $draft.attachRadio) {
+                    Text("Ce que l'iPhone sait du réseau. Votre position n'est jamais publiée.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .tint(SQColor.success)
+                if draft.attachRadio {
+                    Text(OutageRadioCaptureBuilder.previewText(
+                        status: services.networkPath.status,
+                        isOnline: services.networkPath.isOnline
+                    ))
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.label)
+                    Text("Capture partielle — iOS ne donne accès ni au niveau reçu, ni à l'identifiant de cellule.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+        }
+    }
+
+    private var commentSection: some View {
+        module("Précisions") {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                TextField(
+                    "Depuis quand, ce que vous avez essayé…",
+                    text: $draft.comment,
+                    axis: .vertical
+                )
+                .lineLimit(3...6)
+                .font(SQType.body)
+                Text("\(draft.comment.count) / 500")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
     }
@@ -318,7 +428,26 @@ struct OutageReportSheet: View {
             operatorKey: operatorKey,
             latitude: here?.coordinate.latitude,
             longitude: here?.coordinate.longitude,
-            accuracyMeters: here.flatMap { $0.horizontalAccuracy > 0 ? $0.horizontalAccuracy : nil }
+            accuracyMeters: here.flatMap { $0.horizontalAccuracy > 0 ? $0.horizontalAccuracy : nil },
+            // Composée à l'ENVOI et non à l'ouverture : entre les deux, le réseau a pu tomber ou
+            // revenir, et c'est justement ce que la capture décrit. `draft.request` l'écarte
+            // d'elle-même si la personne a décoché.
+            radioContext: OutageRadioCaptureBuilder.make(
+                status: services.networkPath.status,
+                isOnline: services.networkPath.isOnline,
+                position: here.map {
+                    (
+                        latitude: $0.coordinate.latitude,
+                        longitude: $0.coordinate.longitude,
+                        accuracy: $0.horizontalAccuracy > 0 ? $0.horizontalAccuracy : nil
+                    )
+                }
+            ),
+            deviceId: InstallationIdentity().deviceID(),
+            // L'heure du CONSTAT : elle vaut celle de l'envoi ici (iOS n'a pas de file hors
+            // ligne pour les pannes), mais la poser explicitement évite qu'un futur envoi différé
+            // date la panne de sa synchronisation.
+            observedAt: ISO8601DateFormatter().string(from: Date())
         ) else { return }
         submitting = true
         errorMessage = nil

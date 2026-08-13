@@ -41,6 +41,9 @@ struct CommunityOutageDetailSheet: View {
     /// Chronologie dépliée. Une panne très confirmée aligne une voix par personne : la feuille
     /// s'ouvre sur les derniers événements, qui sont ceux qu'on vient chercher.
     @State private var timelineExpanded = false
+    /// Ouvre le fil de la panne. `nil` quand l'appelant ne sait pas naviguer — le bouton
+    /// disparaît alors, plutôt que de mener nulle part.
+    var onOpenThread: ((String) -> Void)?
 
     /// Au-delà, la chronologie se replie. Cinq lignes couvrent la vie d'une panne ordinaire —
     /// signalement, deux ou trois voix, confirmation.
@@ -95,6 +98,12 @@ struct CommunityOutageDetailSheet: View {
                 // depuis la liste mais pas depuis la feuille ouverte par le marqueur ou par une
                 // notification — c'est-à-dire précisément là où il l'apprend.
                 if outage.canClose { closeButton }
+                // LA CONVERSATION, sous l'arbitrage et nettement séparée de lui : voter demande
+                // d'être sur zone et fait bouger l'état de la panne, commenter est ouvert à tous
+                // et ne change rien. Le bouton ne se glisse donc pas parmi ceux d'arbitrage.
+                if let postId = outage.socialPostId, let onOpenThread {
+                    threadButton(postId: postId, action: onOpenThread)
+                }
                 timelineSection
                 infoSection
             }
@@ -124,6 +133,32 @@ struct CommunityOutageDetailSheet: View {
     /// Désactivé aussi pendant un vote : les deux écritures portent sur la même panne, et laisser
     /// partir une fermeture par-dessus une voix en vol ferait revenir la réponse du serveur dans un
     /// ordre imprévisible.
+    /// Ouvre le FIL — c'est-à-dire le post que la panne matérialise déjà.
+    ///
+    /// Un contour, pas un aplat : l'aplat appartient aux gestes qui pèsent sur l'état de la panne.
+    private func threadButton(postId: String, action: @escaping (String) -> Void) -> some View {
+        Button {
+            action(postId)
+        } label: {
+            HStack(spacing: SQSpace.sm) {
+                Image(systemName: "bubble.left.and.bubble.right")
+                Text(
+                    outage.commentCount > 0
+                        ? "Conversation · \(outage.commentCount)"
+                        : "Ouvrir la conversation"
+                )
+                .font(SQType.button)
+            }
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .foregroundStyle(SQColor.label)
+            .background(
+                RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous)
+                    .strokeBorder(SQColor.separator, lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(SQPressButtonStyle())
+    }
+
     private var closeButton: some View {
         OutageCloseButton(closing: closing) { confirmingClose = true }
             .disabled(voting)
@@ -260,6 +295,24 @@ struct CommunityOutageDetailSheet: View {
             infoRow("Opérateur", operatorLabel)
             infoRow("Site", outage.siteName ?? outage.targetId)
             infoRow("Démentis", outage.disputeCount > 0 ? "\(outage.disputeCount)" : nil)
+            // Bandes et secteurs : absents d'une panne totale, où la question n'est pas posée —
+            // `infoRow` masque donc la ligne d'elle-même. Les jetons sont affichés tels quels,
+            // en majuscules : une bande inconnue de cette version doit rester lisible.
+            infoRow(
+                "Fréquences",
+                outage.affectedBands.isEmpty
+                    ? nil
+                    : outage.affectedBands.map { $0.uppercased() }.joined(separator: " · ")
+            )
+            infoRow(
+                "Secteurs",
+                outage.affectedSectors.isEmpty
+                    ? nil
+                    : outage.affectedSectors.map { "\($0)°" }.joined(separator: " · ")
+            )
+            // Le RÉSUMÉ de la capture, jamais la capture : le serveur l'a déjà purgé de toute
+            // position, et c'est lui qui étiquette les captures iOS comme partielles.
+            infoRow("Mesure jointe", outage.radioSummary)
         }
         .padding(.vertical, SQSpace.xs)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))

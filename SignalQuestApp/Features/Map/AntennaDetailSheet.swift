@@ -225,7 +225,12 @@ struct AntennaDetailSheet: View {
             OutageReportSheet(
                 siteId: site.siteId ?? site.id,
                 targetKind: outageTargetKind,
-                siteLabel: site.address ?? site.siteId ?? site.id,
+                // `headerTitle` et non `site.address` : sur un site communautaire, l'adresse
+                // n'arrive qu'avec les détails chargés, et le repli tombait sur l'identifiant
+                // technique. La feuille affichait donc « cmpo873aw0jnx2fll7pthh8ii » là où la
+                // fiche qui l'ouvre écrit « Château d'eau de Vouillé ». Une même antenne doit se
+                // nommer pareil d'un écran à l'autre.
+                siteLabel: headerTitle,
                 marketCode: market,
                 operatorKey: selectedOperator,
                 // Le nom du registre, jamais la clé : la feuille écrivait « BOUYGUES_TELECOM »
@@ -233,6 +238,12 @@ struct AntennaDetailSheet: View {
                 operatorLabel: MarketRegistryEntry.operatorLabel(selectedOperator, in: marketEntry),
                 siteLatitude: site.latitude,
                 siteLongitude: site.longitude,
+                // Les bandes et les azimuts viennent de la fiche DÉJÀ chargée : le formulaire ne
+                // relance aucune requête, et ne propose que ce que ce site porte réellement.
+                // Proposer le catalogue entier offrirait des réponses fausses sur un champ
+                // facultatif — pire qu'une absence de réponse.
+                siteBands: outageBandOptions,
+                siteSectors: reportSectors,
                 service: services.communityOutages,
                 onSubmitted: { _ in Task { await loadOutages() } }
             )
@@ -405,6 +416,33 @@ struct AntennaDetailSheet: View {
     /// le formulaire de signalement.
     private var reportSectors: [Int] {
         Array(Set(displayedAzimuths.map { Int($0.rounded()) })).sorted()
+    }
+
+    /// Les bandes du site, converties au vocabulaire du signalement (`b28`, `n78`).
+    ///
+    /// Dérivées des porteuses quand on les a — elles portent le NUMÉRO de bande et la technologie,
+    /// donc le jeton est non ambigu. Sans elles, on ne propose rien : deviner « 700 » sans savoir
+    /// si c'est B28 ou n28 écrirait une donnée fausse, et ces deux porteuses tombent séparément.
+    private var outageBandOptions: [OutageBandOption] {
+        let carriers = model.details?.core?.radioCarriers ?? []
+        var seen = Set<String>()
+        var options: [OutageBandOption] = []
+        for carrier in carriers {
+            guard let band = carrier.band, band > 0 else { continue }
+            let isNr = (carrier.technology ?? "").uppercased().contains("5G")
+                || (carrier.technology ?? "").uppercased().contains("NR")
+            let token = isNr ? "n\(band)" : "b\(band)"
+            guard !seen.contains(token) else { continue }
+            seen.insert(token)
+            options.append(
+                OutageBandOption(
+                    token: token,
+                    label: carrier.bandLabel ?? (isNr ? "n\(band)" : "B\(band)"),
+                    freqMhz: carrier.txFrequencyMhz.map { Int($0.rounded()) }
+                )
+            )
+        }
+        return options
     }
 
     /// Couleur de l'opérateur affiché (utilisée par l'éventail d'azimuts).

@@ -232,6 +232,18 @@ struct CommunityOutage: Decodable, Identifiable, Equatable {
     /// services. Vide = « je ne sais pas » : le champ est facultatif au formulaire, et toutes les
     /// pannes ouvertes avant son ajout le rendent vide.
     let affectedTechnologies: [String]
+    /// Bandes touchées (`b28`, `n78`) et secteurs touchés (AZIMUTS en degrés).
+    ///
+    /// Toujours vides sur une panne totale — la question n'y est pas posée — et vides aussi pour
+    /// les pannes ouvertes avant l'ajout du champ. Les jetons sont affichés TELS QUELS : une bande
+    /// que cette version de l'app ne connaît pas ne doit pas disparaître de l'écran.
+    let affectedBands: [String]
+    let affectedSectors: [Int]
+    /// Résumé PUBLIC des captures jointes, rédigé par le serveur. Jamais de position dedans.
+    let radioSummary: String?
+    /// Le post qui porte le FIL de la panne, et son nombre de commentaires.
+    let socialPostId: String?
+    let commentCount: Int
 
     let confirmCount: Int
     let disputeCount: Int
@@ -290,6 +302,7 @@ struct CommunityOutage: Decodable, Identifiable, Equatable {
         case latitude, longitude, lat, lng
         case siteName, address, state, severity
         case affectsData, affectsVoice, affectsSms, affectedTechnologies
+        case affectedBands, affectedSectors, radioSummary, socialPostId, commentCount
         case confirmCount, disputeCount, confirmationsRemaining, confirmThreshold
         case operatorConfirmed, operatorConfirmationPossible, operatorRaison, startedAt
         case reporter, myVote, canVote, canClose, timeline
@@ -324,6 +337,14 @@ struct CommunityOutage: Decodable, Identifiable, Equatable {
         affectedTechnologies = OutageTechnologies.sorted(
             c.decodeLossyArray([String].self, forKey: .affectedTechnologies)
         )
+        // Décodage TOLÉRANT, comme les technologies : un serveur antérieur au champ ne rend rien,
+        // et l'absence doit produire un tableau vide, jamais une erreur qui ferait perdre toute
+        // la panne.
+        affectedBands = c.decodeLossyArray([String].self, forKey: .affectedBands)
+        affectedSectors = c.decodeLossyArray([Int].self, forKey: .affectedSectors)
+        radioSummary = try? c.decodeIfPresent(String.self, forKey: .radioSummary)
+        socialPostId = try? c.decodeIfPresent(String.self, forKey: .socialPostId)
+        commentCount = (try? c.decode(Int.self, forKey: .commentCount)) ?? 0
 
         confirmCount = (try? c.decode(Int.self, forKey: .confirmCount)) ?? 0
         disputeCount = (try? c.decode(Int.self, forKey: .disputeCount)) ?? 0
@@ -390,9 +411,79 @@ struct OutageReportRequest: Encodable {
     let affectsSms: Bool
     /// Facultatif : un tableau vide dit « je ne sais pas », et reste un signalement valide.
     let affectedTechnologies: [String]
+    /// Bandes touchées (`b28`, `n78`) et secteurs touchés (AZIMUTS en degrés).
+    ///
+    /// ⚠️ Des azimuts, jamais des numéros de secteur : la numérotation dépend de l'opérateur (SFR
+    /// compte à partir de 0, les trois autres à partir de 1, cf. `SectorNumbering` et la note
+    /// `SECTOR-TELECOM-01`). Un numéro écrit ici serait FAUX pour un opérateur sur quatre.
+    ///
+    /// Toujours vides sur une panne totale : « plus rien » veut dire toutes les fréquences et tous
+    /// les secteurs, la question n'est donc pas posée.
+    let affectedBands: [String]
+    let affectedSectors: [Int]
+    /// Commentaire libre. Le serveur refuse au-delà de 500 caractères (`COMMENT_TOO_LONG`).
+    let comment: String?
+    /// Capture réseau, volontairement PARTIELLE sur iOS — voir `OutageRadioCapture`.
+    let radioContext: OutageRadioCapture?
+    /// Identifiant d'appareil (Keychain), anti-sockpuppet côté serveur.
+    let deviceId: String?
+    /// Heure du CONSTAT quand elle précède l'envoi. Le serveur accepte 12 h d'antériorité.
+    let observedAt: String?
     let latitude: Double?
     let longitude: Double?
     let accuracyMeters: Double?
+}
+
+/**
+ La capture réseau jointe à un signalement, côté iOS.
+
+ ── Ce qu'elle contient, et pourquoi si peu ──
+
+ iOS n'expose NI le niveau reçu, NI l'identifiant de cellule, NI la bande, NI le PCI : ce n'est pas
+ un manque à combler mais une limite d'Apple, actée dans `CLAUDE.md` et `README.md`. Ce qui reste
+ lisible — la génération, l'opérateur, le chemin réseau, une sonde de latence — est réel et suffit
+ à dire « je n'avais plus rien à 15 h 42 ».
+
+ D'où `platform: "ios"`, qui n'est pas décoratif : le serveur en tire un résumé étiqueté « capture
+ partielle — iOS ». Sans lui, une capture iOS et une capture Android s'afficheraient à l'identique
+ alors qu'elles ne mesurent pas la même chose — l'interface mentirait par omission.
+
+ `serving` est toujours absent, pour la même raison : nous n'avons aucune cellule servante à
+ décrire. Le format est celui de `@sq/core/outage-radio-context` (v1), commun aux trois clients.
+ */
+struct OutageRadioCapture: Encodable, Equatable {
+    let v: Int
+    let platform: String
+    let capturedAt: String
+    /// `in_service`, `out_of_service` ou `unknown` — déduit du chemin réseau, pas du modem.
+    let state: String
+    let fallbackTechnology: String?
+    let connection: String?
+    let viaVpn: Bool?
+    let `operator`: OutageRadioOperator?
+    /// Jamais publiée : le serveur ne la met pas dans le résumé public. Elle sert aux
+    /// recoupements et reste lisible par son auteur.
+    let position: OutageRadioPosition?
+    let probe: OutageRadioProbe?
+}
+
+struct OutageRadioOperator: Encodable, Equatable {
+    let name: String?
+    let mcc: Int?
+    let mnc: Int?
+    /// `sim` quand CoreTelephony répond encore, `ip-asn` quand c'est le serveur qui a tranché.
+    let source: String?
+}
+
+struct OutageRadioPosition: Encodable, Equatable {
+    let lat: Double?
+    let lng: Double?
+    let accuracyM: Double?
+}
+
+struct OutageRadioProbe: Encodable, Equatable {
+    let pingMs: Double?
+    let dnsOk: Bool?
 }
 
 /// L'état du FORMULAIRE de signalement, extrait de la vue.
@@ -414,6 +505,20 @@ struct OutageReportDraft: Equatable {
     var affectsVoice = false
     /// Jetons du contrat (`3g`, `4g`, `5g`). Vide = « je ne sais pas », et c'est valide.
     var technologies: Set<String> = []
+    /// Bandes cochées (`b28`, `n78`) et secteurs cochés (azimuts). Facultatifs.
+    ///
+    /// ⚠️ N'ont de sens que pour une DÉGRADATION, et `select(_:)` les vide au passage en « plus
+    /// rien » : masquer les blocs ne suffirait pas, l'envoi porterait alors une panne totale
+    /// restreinte à deux fréquences — l'inverse de ce que la personne vient de déclarer.
+    var bands: Set<String> = []
+    var sectors: Set<Int> = []
+    /// Commentaire libre, borné comme le serveur (500).
+    var comment: String = ""
+    /// Joindre la capture réseau. Cochée par défaut : c'est ce qui date et situe le constat.
+    var attachRadio = true
+
+    /// Les deux blocs facultatifs n'existent que pour une dégradation.
+    var showsImpactFields: Bool { severity == .degraded }
 
     /// ⚠️ Le SMS n'apparaît pas : le formulaire v2 ne le propose plus, donc il n'est jamais
     /// affirmé. Le champ reste au contrat et les pannes qui le portent continuent de l'afficher —
@@ -430,7 +535,19 @@ struct OutageReportDraft: Equatable {
         if value == .down {
             affectsData = true
             affectsVoice = true
+            // On VIDE, on ne masque pas : voir la note sur `bands`. Le corps envoyé doit dire ce
+            // que la personne a réellement déclaré en dernier.
+            bands = []
+            sectors = []
         }
+    }
+
+    mutating func toggle(band token: String) {
+        if bands.contains(token) { bands.remove(token) } else { bands.insert(token) }
+    }
+
+    mutating func toggle(sector azimuth: Int) {
+        if sectors.contains(azimuth) { sectors.remove(azimuth) } else { sectors.insert(azimuth) }
     }
 
     mutating func toggle(technology token: String) {
@@ -452,7 +569,10 @@ struct OutageReportDraft: Equatable {
         operatorKey: String,
         latitude: Double?,
         longitude: Double?,
-        accuracyMeters: Double?
+        accuracyMeters: Double?,
+        radioContext: OutageRadioCapture? = nil,
+        deviceId: String? = nil,
+        observedAt: String? = nil
     ) -> OutageReportRequest? {
         guard let severity, canSubmit else { return nil }
         return OutageReportRequest(
@@ -467,6 +587,16 @@ struct OutageReportDraft: Equatable {
             // ferait dire à la carte de fil quelque chose que personne n'a constaté.
             affectsSms: false,
             affectedTechnologies: OutageTechnologies.sorted(Array(technologies)),
+            // Triés : deux personnes qui cochent les mêmes cases dans un ordre différent doivent
+            // produire le même corps — c'est ce qui rend les journaux et les tests lisibles.
+            affectedBands: bands.sorted(),
+            affectedSectors: sectors.sorted(),
+            comment: comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? nil
+                : String(comment.prefix(500)),
+            radioContext: attachRadio ? radioContext : nil,
+            deviceId: deviceId,
+            observedAt: observedAt,
             latitude: latitude,
             longitude: longitude,
             accuracyMeters: accuracyMeters

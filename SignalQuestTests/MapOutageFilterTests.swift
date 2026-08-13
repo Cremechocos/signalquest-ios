@@ -605,4 +605,112 @@ final class MapOutageFilterTests: XCTestCase {
             )
         }
     }
+
+    // MARK: - Les champs de la v2
+
+    /**
+     LA règle du chantier : « plus rien » veut dire toutes les fréquences et tous les secteurs.
+
+     On VIDE au lieu de masquer. Masquer aurait suffi à l'écran, mais le corps envoyé aurait porté
+     une panne totale restreinte à deux bandes — l'inverse de ce que la personne vient de déclarer,
+     et invisible à la relecture.
+     */
+    func testChoosingTotalOutageClearsBandsAndSectors() {
+        var draft = OutageReportDraft()
+        draft.select(.degraded)
+        draft.toggle(band: "n78")
+        draft.toggle(sector: 60)
+        XCTAssertTrue(draft.showsImpactFields)
+        XCTAssertEqual(draft.bands, ["n78"])
+
+        draft.select(.down)
+        XCTAssertFalse(draft.showsImpactFields)
+        XCTAssertTrue(draft.bands.isEmpty)
+        XCTAssertTrue(draft.sectors.isEmpty)
+    }
+
+    /// Les deux blocs n'existent que pour une dégradation — la vue s'appuie sur cette seule règle.
+    func testImpactFieldsOnlyExistForDegradation() {
+        var draft = OutageReportDraft()
+        XCTAssertFalse(draft.showsImpactFields, "Rien de choisi : aucun champ facultatif")
+        draft.select(.down)
+        XCTAssertFalse(draft.showsImpactFields)
+        draft.select(.degraded)
+        XCTAssertTrue(draft.showsImpactFields)
+    }
+
+    /// Deux personnes qui cochent les mêmes cases dans un ordre différent envoient le même corps.
+    func testBandsAndSectorsAreSortedInTheRequest() throws {
+        var draft = OutageReportDraft()
+        draft.select(.degraded)
+        draft.toggle(band: "n78")
+        draft.toggle(band: "b7")
+        draft.toggle(sector: 180)
+        draft.toggle(sector: 60)
+        let request = try XCTUnwrap(draft.request(
+            targetKind: "anfr", targetId: "123", marketCode: "FR", operatorKey: "ORANGE",
+            latitude: nil, longitude: nil, accuracyMeters: nil
+        ))
+        XCTAssertEqual(request.affectedBands, ["b7", "n78"])
+        XCTAssertEqual(request.affectedSectors, [60, 180])
+    }
+
+    /// Un commentaire fait d'espaces n'est pas un commentaire, et 500 est la borne du serveur.
+    func testCommentIsTrimmedAndBounded() throws {
+        var draft = OutageReportDraft()
+        draft.select(.degraded)
+        draft.comment = "   "
+        let blank = try XCTUnwrap(draft.request(
+            targetKind: "anfr", targetId: "123", marketCode: "FR", operatorKey: "ORANGE",
+            latitude: nil, longitude: nil, accuracyMeters: nil
+        ))
+        XCTAssertNil(blank.comment)
+
+        draft.comment = String(repeating: "x", count: 620)
+        let long = try XCTUnwrap(draft.request(
+            targetKind: "anfr", targetId: "123", marketCode: "FR", operatorKey: "ORANGE",
+            latitude: nil, longitude: nil, accuracyMeters: nil
+        ))
+        XCTAssertEqual(long.comment?.count, 500)
+    }
+
+    /// Décocher la capture ne doit rien envoyer — pas un objet vide.
+    func testDecliningTheCaptureSendsNothing() throws {
+        var draft = OutageReportDraft()
+        draft.select(.degraded)
+        draft.attachRadio = false
+        let capture = OutageRadioCaptureBuilder.make(
+            status: .unknown, isOnline: true, position: nil
+        )
+        let request = try XCTUnwrap(draft.request(
+            targetKind: "anfr", targetId: "123", marketCode: "FR", operatorKey: "ORANGE",
+            latitude: nil, longitude: nil, accuracyMeters: nil, radioContext: capture
+        ))
+        XCTAssertNil(request.radioContext)
+    }
+
+    /**
+     La capture iOS s'annonce pour ce qu'elle est.
+
+     `platform: "ios"` n'est pas décoratif : c'est lui qui fait écrire au serveur « capture
+     partielle — iOS ». Sans lui, une capture iOS et une capture Android s'afficheraient à
+     l'identique alors qu'elles ne mesurent pas la même chose.
+     */
+    func testIOSCaptureDeclaresItsPlatformAndNeverInventsACell() {
+        let capture = OutageRadioCaptureBuilder.make(
+            status: .unknown, isOnline: false, position: nil
+        )
+        XCTAssertEqual(capture.platform, "ios")
+        XCTAssertEqual(capture.state, "out_of_service", "Hors ligne : le constat, pas une supposition")
+    }
+
+    /// Le Wi-Fi ne dit RIEN du réseau mobile : prétendre qu'il fonctionne serait faux.
+    func testWiFiDoesNotClaimTheMobileNetworkWorks() {
+        let onWifi = NetworkPathStatus(
+            connection: .wifi, cellularTechnology: nil, operatorName: nil,
+            operatorMcc: nil, operatorMnc: nil, isExpensive: false, isConstrained: false
+        )
+        let capture = OutageRadioCaptureBuilder.make(status: onWifi, isOnline: true, position: nil)
+        XCTAssertEqual(capture.state, "unknown")
+    }
 }
