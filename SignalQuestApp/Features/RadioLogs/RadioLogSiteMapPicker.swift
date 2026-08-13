@@ -86,7 +86,79 @@ struct RadioLogSiteMapPicker: View {
 
     // MARK: Carte
 
+    /// Carte de choix du site.
+    ///
+    /// ⚠️ DEUX RENDUS, ET CE N'EST PAS UN CAPRICE. Les anneaux TA sont des OVERLAYS, or
+    /// `Map(coordinateRegion:annotationItems:)` — la seule API disponible en iOS 16 — n'en
+    /// accepte aucun. La carte moderne (iOS 17+) les trace ; en dessous, l'écran reste celui
+    /// d'avant, avec ses antennes et sans cercles. Aucun appareil ne perd de fonction.
+    @ViewBuilder
     private var map: some View {
+        if #available(iOS 17.0, *) {
+            modernMap
+        } else {
+            legacyMap
+        }
+    }
+
+    /// Carte iOS 17+ : les antennes ET les anneaux TA.
+    @available(iOS 17.0, *)
+    private var modernMap: some View {
+        Map(initialPosition: .region(region)) {
+            // Les anneaux d'abord : ils sont un fond de raisonnement, les épingles se
+            // lisent par-dessus.
+            ForEach(picker.taRings) { ring in
+                // La COURONNE dit l'incertitude — résolution du TA plus précision GPS. Un
+                // trait seul prétendrait une précision qui n'existe pas.
+                MapCircle(center: ring.coordinate, radius: ring.radiusMeters + ring.toleranceMeters)
+                    .foregroundStyle(taRingTint.opacity(0.06))
+                MapCircle(center: ring.coordinate, radius: ring.radiusMeters)
+                    .foregroundStyle(.clear)
+                    .stroke(taRingTint.opacity(0.85), lineWidth: 1.5)
+            }
+            ForEach(pins) { pin in
+                Annotation("", coordinate: pin.coordinate) {
+                    pinLabel(for: pin)
+                }
+            }
+        }
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    /// Des anneaux qui ne se croisent nulle part APPRENNENT quelque chose — handover, TA
+    /// périmé, deux sites sous un même identifiant — mais ne doivent pas se faire passer
+    /// pour une localisation. D'où deux couleurs, jamais un masquage.
+    private var taRingTint: Color {
+        picker.taAssessment == .divergent ? SQColor.dangerInk : SQColor.accentInk
+    }
+
+    @ViewBuilder
+    private func pinLabel(for pin: PickerPin) -> some View {
+        Button {
+            if pin.isOrigin { return }
+            selected = pin.antenna
+            Haptics.selection()
+        } label: {
+            if pin.isOrigin {
+                Image(systemName: "dot.scope")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(P.ink)
+                    .padding(6)
+                    .background(P.card, in: Circle())
+                    .sqShadowSoft()
+            } else {
+                SQAntennaMarker(
+                    azimuths: pin.azimuths,
+                    isSelected: pin.isSelected,
+                    diameter: pin.isSelected ? 38 : 32
+                )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(pin.isOrigin ? "Position des relevés" : "Antenne \(pin.antenna?.siteId ?? "")")
+    }
+
+    private var legacyMap: some View {
         SQRegionMap(region: $region, items: pins) { pin in
             MapAnnotation(coordinate: pin.coordinate) {
                 Button {

@@ -37,6 +37,14 @@ final class RadioLogIdentifyPicker: ObservableObject {
     @Published var errorMessage: String?
     @Published var selectedId: String?
     @Published private(set) var isSubmitting = false
+    /// Anneaux TA du nœud visé — « depuis ce point, le site est à peu près à cette
+    /// distance ». Leur intersection le désigne, et c'est ce qui permet de trancher entre
+    /// deux antennes voisines. Calculés sur le journal DÉJÀ SYNCHRONISÉ localement : aucun
+    /// appel réseau, les relevés sont là.
+    @Published private(set) var taRings: [TaRingSelection.Ring] = []
+    /// Ce que la géométrie permet de dire : des anneaux qui ne se croisent nulle part
+    /// apprennent quelque chose, mais ne doivent pas passer pour une localisation.
+    @Published private(set) var taAssessment: TaRingSelection.Assessment = .unusable
 
     private let service: RadioLogsServicing
     private let identify: IdentifyServicing
@@ -53,11 +61,40 @@ final class RadioLogIdentifyPicker: ObservableObject {
         self.antennas = antennas
     }
 
+    /// Anneaux du nœud, depuis le cache local du journal.
+    ///
+    /// Le filtre porte sur le NŒUD, pas sur la cellule : ce sont les relevés du même eNB,
+    /// pris d'endroits différents, qui se croisent. Les prendre cellule par cellule
+    /// donnerait des cercles trop peu nombreux pour désigner quoi que ce soit.
+    private func loadTaRings(for site: RadioLogSite) {
+        let entries = service.cachedSnapshot().entries.filter { entry in
+            switch site.kind {
+            case .enb: return entry.enb == site.node
+            case .gnb: return entry.gnb == site.node
+            }
+        }
+        let readings = entries.compactMap { entry -> TaRingSelection.Reading? in
+            guard let latitude = entry.latitude, let longitude = entry.longitude else { return nil }
+            return TaRingSelection.Reading(
+                latitude: latitude,
+                longitude: longitude,
+                timingAdvance: entry.timingAdvance,
+                accuracyMeters: nil,
+                observedAt: entry.observedAt
+            )
+        }
+        let rings = TaRingSelection.rings(for: readings)
+        taRings = rings
+        taAssessment = TaRingSelection.assess(rings)
+    }
+
     func load(for site: RadioLogSite) async {
         guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+
+        loadTaRings(for: site)
 
         guard let latitude = site.latitude, let longitude = site.longitude else {
             // Sans position, ni le serveur ni nous ne pouvons proposer quoi que
