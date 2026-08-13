@@ -15,6 +15,9 @@ protocol RadioLogsServicing: Sendable {
     func syncStream() -> AsyncStream<RadioLogSyncProgress>
     /// Statuts d'identification encore FRAIS, sans réseau.
     func cachedSiteStates() -> [String: RadioLogSiteState]
+    /// Persiste une identification faite par l'utilisateur, pour qu'elle survive au retour sur
+    /// l'écran — le balayage n'en sait rien tant qu'il n'a pas retourné ce site.
+    func markIdentified(siteKey: String, siteId: String)
     /// Balaie le catalogue par fenêtres, en émettant chaque fenêtre résolue.
     func scanStream(sites: [RadioLogSite]) -> AsyncStream<[String: RadioLogSiteState]>
     /// Hypothèse de site pour UN site non identifié — charge complète, position
@@ -267,6 +270,19 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
             unidentifiedTtlMs: unidentifiedTtlMs,
             nowMs: nowMs()
         )
+    }
+
+    /// Inscrit une identification que L'UTILISATEUR vient de faire.
+    ///
+    /// Sans cela, le statut ne vivait qu'en mémoire : le magasin n'était alimenté que par le
+    /// balayage, donc la liste réaffichait « Non identifié » dès qu'elle relisait le cache —
+    /// au retour sur l'écran, au rafraîchissement, au redémarrage. L'utilisateur voyait son
+    /// travail disparaître alors que le serveur l'avait bien accepté.
+    ///
+    /// On n'attend pas la confirmation d'un balayage : l'écriture serveur a déjà réussi (on
+    /// tient son `siteId`), et le prochain scan ne ferait que reconfirmer ce qu'on sait.
+    func markIdentified(siteKey: String, siteId: String) {
+        statusStore.merge([siteKey: .identified(siteId: siteId)], nowMs: nowMs())
     }
 
     /// Balaie les sites par fenêtres concurrentes bornées.

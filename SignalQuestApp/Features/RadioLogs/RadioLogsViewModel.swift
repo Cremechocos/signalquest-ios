@@ -403,6 +403,10 @@ final class RadioLogsViewModel: ObservableObject {
     /// prochain balayage. C'est un fait établi par le serveur, pas une supposition.
     func markIdentified(_ site: RadioLogSite, siteId: String) {
         states[site.id] = .identified(siteId: siteId)
+        // ⚠️ ET DANS LE CACHE, sinon le statut ne vit qu'en mémoire : `states` est rechargé
+        // depuis `cachedSiteStates()` au retour sur l'écran, et le site repassait « Non
+        // identifié » — alors que le serveur avait bien accepté l'écriture.
+        service.markIdentified(siteKey: site.id, siteId: siteId)
         siteNames[site.id] = nil
         rebuild()
         loadSiteName(for: site)

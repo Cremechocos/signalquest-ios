@@ -459,8 +459,36 @@ private struct StubRadioLogsService: RadioLogsServicing {
     func cachedSiteStates() -> [String: RadioLogSiteState] { [:] }
     func scanStream(sites: [RadioLogSite]) -> AsyncStream<[String: RadioLogSiteState]> { AsyncStream { $0.finish() } }
     func hypothesis(for site: RadioLogSite) async -> RadioLogSiteHypothesis? { nil }
+    func markIdentified(siteKey: String, siteId: String) {}
     func purge() async throws {}
     func clearLocalCache() {}
+}
+
+
+extension RadioLogsTests {
+
+    /// UNE IDENTIFICATION DOIT SURVIVRE AU RETOUR SUR L'ÉCRAN.
+    ///
+    /// Le statut ne vivait qu'en mémoire : le magasin n'était alimenté que par le balayage,
+    /// donc la liste réaffichait « Non identifié » dès qu'elle relisait le cache. L'utilisateur
+    /// voyait son travail disparaître alors que le serveur l'avait accepté.
+    func testIdentificationSurvivesACacheReload() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("radiolog-status-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let store = RadioLogSiteStatusStore(fileURL: url)
+        store.merge(["enb:626821": .identified(siteId: "sup-42")], nowMs: 1_786_000_000_000)
+
+        // Relecture par une INSTANCE NEUVE : c'est ce que fait l'écran au retour.
+        let reloaded = RadioLogSiteStatusStore(fileURL: url)
+        let states = reloaded.fresh(
+            identifiedTtlMs: 30 * 24 * 3_600_000,
+            unidentifiedTtlMs: 3_600_000,
+            nowMs: 1_786_000_060_000
+        )
+        XCTAssertEqual(states["enb:626821"], .identified(siteId: "sup-42"))
+    }
 }
 
 private struct StubAntennasService: AntennasServicing {
