@@ -27,6 +27,9 @@ struct RadioLogSiteMapPicker: View {
     /// micro-déplacement de la carte.
     @State private var loadedKey: String?
     @State private var showsConfirmation = false
+    /// Ne montrer que les antennes compatibles avec les anneaux TA. Actif d'emblée : c'est
+    /// l'état utile — sans lui, les cercles se noient sous des dizaines d'épingles.
+    @State private var showOnlyPlausible = true
     /// Renseigné une fois l'écriture acceptée par le serveur.
     let onIdentified: (String) -> Void
 
@@ -55,6 +58,7 @@ struct RadioLogSiteMapPicker: View {
         NavigationStack {
             ZStack(alignment: .bottom) {
                 map
+                plausibleToggle
                 overlayCard
             }
             .background(SQColor.bg.ignoresSafeArea())
@@ -199,6 +203,82 @@ struct RadioLogSiteMapPicker: View {
         let azimuths: [Double]
     }
 
+    /// Bascule « antennes compatibles » / « toutes ».
+    ///
+    /// Le COMPTE est le libellé, parce que c'est lui l'information : « 3 sur 40 » dit d'un
+    /// coup d'œil ce que la géométrie a éliminé. Le bouton n'apparaît que si le filtre a
+    /// quelque chose à dire — un bouton qui ne changerait rien est pire qu'un bouton absent.
+    @ViewBuilder
+    private var plausibleToggle: some View {
+        if let plausible, !plausible.isEmpty {
+            let shown = showOnlyPlausible ? plausible.count : visible.count
+            VStack {
+                HStack {
+                    Spacer()
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { showOnlyPlausible.toggle() }
+                    } label: {
+                        HStack(spacing: SQSpace.xs) {
+                            Image(systemName: showOnlyPlausible
+                                ? "scope"
+                                : "antenna.radiowaves.left.and.right")
+                                .font(SQFont.body(12, .semibold))
+                            Text("\(shown)")
+                                .font(SQFont.body(13, .bold))
+                            Text(showOnlyPlausible
+                                ? (plausible.count > 1 ? "compatibles" : "compatible")
+                                : "antennes")
+                                .font(SQFont.body(12, .medium))
+                        }
+                        .padding(.horizontal, SQSpace.md)
+                        .padding(.vertical, SQSpace.sm)
+                        .foregroundStyle(showOnlyPlausible ? SQColor.bg : P.accentInk)
+                        .background(
+                            showOnlyPlausible ? AnyShapeStyle(P.accentInk) : AnyShapeStyle(P.card),
+                            in: Capsule(style: .continuous)
+                        )
+                        .shadow(color: .black.opacity(0.14), radius: 8, y: 2)
+                    }
+                    // Le libellé complet dit le POURQUOI, que le compte seul ne porte pas.
+                    .accessibilityLabel(showOnlyPlausible
+                        ? "\(plausible.count) antennes compatibles avec vos anneaux TA. Toucher pour afficher les \(visible.count)."
+                        : "\(visible.count) antennes affichées. Toucher pour ne garder que les \(plausible.count) compatibles avec vos anneaux TA.")
+                    .accessibilityAddTraits(showOnlyPlausible ? [.isSelected] : [])
+                    .padding(.trailing, SQSpace.md)
+                    .padding(.top, SQSpace.md)
+                }
+                Spacer()
+            }
+        }
+    }
+
+    // MARK: Sites plausibles
+
+    /// Sites que la géométrie des anneaux retient. `nil` = le filtre s'abstient.
+    ///
+    /// ⚠️ RÉSERVÉ AUX GÉOMÉTRIES QUI CONVERGENT. Quand les cercles ne se croisent nulle part,
+    /// le « meilleur » candidat n'est que le moins mauvais d'un tirage bruité : masquer les
+    /// autres au nom de la géométrie fabriquerait une certitude qui n'existe pas.
+    ///
+    /// Calculé à la demande — quelques milliers de distances plates pour 400 antennes et 24
+    /// anneaux, négligeable devant le rendu de la carte qui parcourt déjà la même liste.
+    private var plausible: [TaPlausibility.Scored<AntennaSite>]? {
+        guard picker.taAssessment == .convergent else { return nil }
+        return TaPlausibility.filterPlausible(visible, rings: picker.taRings) { antenna in
+            guard let latitude = antenna.latitude, let longitude = antenna.longitude else {
+                return nil
+            }
+            return (latitude, longitude)
+        }
+    }
+
+    /// Antennes réellement posées sur la carte, filtre appliqué s'il a quelque chose à dire.
+    private var shownAntennas: [AntennaSite] {
+        guard showOnlyPlausible, let plausible else { return visible }
+        let keep = Set(plausible.map(\.item.id))
+        return visible.filter { keep.contains($0.id) }
+    }
+
     private var pins: [PickerPin] {
         var pins: [PickerPin] = []
         if let latitude = site.latitude, let longitude = site.longitude {
@@ -213,7 +293,7 @@ struct RadioLogSiteMapPicker: View {
                 )
             )
         }
-        for antenna in visible {
+        for antenna in shownAntennas {
             guard let latitude = antenna.latitude, let longitude = antenna.longitude else { continue }
             pins.append(
                 PickerPin(
@@ -277,6 +357,25 @@ struct RadioLogSiteMapPicker: View {
                     .padding(.top, M.siteMetaTop)
             }
 
+            // Ce que la géométrie permet de dire, et ce qu'on a écarté pour le dire. Des
+            // anneaux qui divergent APPRENNENT quelque chose — handover, TA périmé, deux sites
+            // sous un même identifiant — mais ne doivent pas passer pour une localisation. Et
+            // sans la mention des écartés, l'élagage serait une décision invisible.
+            if !picker.taRings.isEmpty {
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+                    Image(systemName: picker.taAssessment == .divergent
+                          ? "exclamationmark.triangle.fill"
+                          : "scope")
+                        .font(SQFont.body(11, .semibold))
+                    Text(taGeometrySummary)
+                        .font(SQFont.body(M.siteMetaSize))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .foregroundStyle(picker.taAssessment == .divergent ? SQColor.warning : P.muted)
+                .padding(.top, M.siteMetaTop)
+                .accessibilityElement(children: .combine)
+            }
+
             HStack(spacing: M.ctaGap) {
                 RadioLogActionButton(label: picker.isSubmitting ? "…" : "Identifier ici") {
                     showsConfirmation = true
@@ -293,6 +392,28 @@ struct RadioLogSiteMapPicker: View {
         .background(P.card, in: RoundedRectangle(cornerRadius: M.cardRadius, style: .continuous))
         .sqShadowCard()
         .padding(SQSpace.md)
+    }
+
+    /// Résumé de ce que les anneaux permettent de conclure — jamais un simple décompte.
+    private var taGeometrySummary: String {
+        let count = picker.taRings.count
+        var text: String
+        switch picker.taAssessment {
+        case .convergent:
+            text = "\(count) anneaux TA — leur intersection désigne le site"
+        case .divergent:
+            text = "\(count) anneaux TA — ils ne se croisent pas : relevés à vérifier"
+        case .unusable:
+            text = count > 1
+                ? "\(count) anneaux TA — trop rapprochés pour désigner un point"
+                : "1 anneau TA — il faut au moins deux passages écartés pour croiser"
+        }
+        if picker.taDiscardedCount > 0 {
+            text += picker.taDiscardedCount > 1
+                ? " · \(picker.taDiscardedCount) relevés écartés"
+                : " · 1 relevé écarté"
+        }
+        return text
     }
 
     private var selectedMeta: String? {
