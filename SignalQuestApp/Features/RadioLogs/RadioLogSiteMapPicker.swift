@@ -30,6 +30,9 @@ struct RadioLogSiteMapPicker: View {
     /// Ne montrer que les antennes compatibles avec les anneaux TA. Actif d'emblée : c'est
     /// l'état utile — sans lui, les cercles se noient sous des dizaines d'épingles.
     @State private var showOnlyPlausible = true
+    /// Les candidats affichés viennent-ils de la communauté plutôt que d'un référentiel
+    /// officiel ? Ça change ce qu'on peut promettre : ces sites ont été placés à la main.
+    @State private var isCommunityFallback = false
     /// Renseigné une fois l'écriture acceptée par le serveur.
     let onIdentified: (String) -> Void
 
@@ -494,6 +497,26 @@ struct RadioLogSiteMapPicker: View {
                 for antenna in batch where antenna.hasValidCoordinate {
                     if seen.insert(antenna.siteId ?? antenna.id).inserted { merged.append(antenna) }
                 }
+            }
+            // REPLI COMMUNAUTAIRE. Dans les 40+ pays sans référentiel officiel, la boucle
+            // ci-dessus ne peut RIEN ramener : le dataset de `/api/antennas` ne couvre que la
+            // France, le Canada, les DROM et les pilotes européens. Là-bas, les antennes sont
+            // les sites créés par la communauté — sans cet appel, l'écran restait vide pour
+            // toujours, et le geste d'identification impossible.
+            //
+            // Déclenché sur le VIDE plutôt que sur une liste de marchés en dur : la règle
+            // reste juste si un pays bascule un jour vers un référentiel officiel, et elle
+            // rend service partout où l'officiel ne connaît rien.
+            if merged.isEmpty {
+                let community = try await antennas.listCommunitySites(
+                    bbox: bbox, market: market, operatorName: queriedOperatorKeys.first
+                )
+                for site in community where site.hasValidCoordinate {
+                    if seen.insert(site.siteId ?? site.id).inserted { merged.append(site) }
+                }
+                isCommunityFallback = !merged.isEmpty
+            } else {
+                isCommunityFallback = false
             }
             visible = merged
             loadedKey = key

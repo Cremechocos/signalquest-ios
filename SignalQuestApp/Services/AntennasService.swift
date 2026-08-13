@@ -26,6 +26,13 @@ protocol AntennasServicing: Sendable {
     func details(id: String, market: String, operatorName: String, anfrCode: String?) async throws -> AntennaDetails
     func search(query: String) async throws -> [AntennaSite]
     func quickSearch(query: String) async throws -> [AntennaSite]
+    /// Sites créés par la communauté dans ce cadrage.
+    ///
+    /// Dans les 40+ pays sans référentiel officiel (Bosnie, États-Unis…), ce sont les SEULES
+    /// antennes connues : `/api/antennas` y rend une liste vide, son dataset ne couvrant que
+    /// la France, le Canada, les DROM et les pilotes européens. Sans cet appel, l'écran
+    /// d'identification y reste définitivement sans candidat.
+    func listCommunitySites(bbox: BoundingBox, market: String, operatorName: String?) async throws -> [AntennaSite]
 }
 
 final class AntennasService: AntennasServicing {
@@ -76,6 +83,21 @@ final class AntennasService: AntennasServicing {
             let key = site.siteId ?? site.id
             return seen.insert(key).inserted
         }
+    }
+
+    func listCommunitySites(bbox: BoundingBox, market: String, operatorName: String?) async throws -> [AntennaSite] {
+        var query = bbox.queryItems
+        // Le marché est OBLIGATOIRE ici, contrairement à `/api/antennas` : sans lui la route
+        // rendrait les sites communautaires du monde entier.
+        query.append(URLQueryItem(name: "market", value: market))
+        if let operatorName, operatorName != "ALL" {
+            query.append(URLQueryItem(name: "operator", value: operatorName))
+        }
+        let response = try await api.request(
+            APIEndpoint(path: "/api/custom-sites", query: query),
+            as: CommunitySitesListResponse.self
+        )
+        return response.sites
     }
 
     /// Une requête `/api/antennas` pour UN opérateur (brique du fan-out parallèle).

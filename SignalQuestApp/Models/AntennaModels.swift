@@ -216,6 +216,24 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
     }
 }
 
+/// Réponse de `/api/custom-sites`.
+///
+/// Les sites communautaires sortent sous la clé `sites`, mais avec les MÊMES champs qu'une
+/// antenne (`sup_id`, `latitude`, `adr_lb_add1`…) : `AntennaSite` les décode tels quels, et
+/// tout l'écran d'identification fonctionne ensuite sans savoir d'où ils viennent.
+struct CommunitySitesListResponse: Decodable {
+    let sites: [AntennaSite]
+
+    enum CodingKeys: String, CodingKey { case sites, antennas, items }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sites = (try? c.decode([AntennaSite].self, forKey: .sites))
+            ?? (try? c.decode([AntennaSite].self, forKey: .antennas))
+            ?? (try? c.decode([AntennaSite].self, forKey: .items))
+            ?? []
+    }
+}
+
 struct AntennasListResponse: Decodable {
     let antennas: [AntennaSite]
 

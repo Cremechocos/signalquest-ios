@@ -473,4 +473,5 @@ private struct StubAntennasService: AntennasServicing {
     func details(id: String, market: String, operatorName: String, anfrCode: String?) async throws -> AntennaDetails { throw APIError.cancelled }
     func search(query: String) async throws -> [AntennaSite] { [] }
     func quickSearch(query: String) async throws -> [AntennaSite] { [] }
+    func listCommunitySites(bbox: BoundingBox, market: String, operatorName: String?) async throws -> [AntennaSite] { [] }
 }
