@@ -210,6 +210,18 @@ struct OutageTimelineEntry: Decodable, Equatable {
 /// dernier. `OutageSiteLive` porte les incidents publiés dans les CSV des opérateurs ; celui-ci
 /// porte ce que des utilisateurs déclarent. Les fusionner ferait perdre la distinction que toute
 /// la fonctionnalité cherche à établir : qui affirme quoi. Android a fait la même séparation.
+
+/**
+ Le résumé public des constats radio d'une panne.
+
+ Sa seule raison d'être : un iPhone ne peut pas mesurer la radio, et n'a donc aucun autre moyen de
+ savoir qu'un site répond de nouveau. Ce sont les téléphones Android qui constatent ; celui-ci lit.
+ */
+struct OutageSightingSummary: Decodable {
+    let count: Int
+    let lastObservedAt: String?
+}
+
 struct CommunityOutage: Decodable, Identifiable, Equatable {
     let id: String
     let targetKind: String
@@ -241,6 +253,21 @@ struct CommunityOutage: Decodable, Identifiable, Equatable {
     let affectedSectors: [Int]
     /// Résumé PUBLIC des captures jointes, rédigé par le serveur. Jamais de position dedans.
     let radioSummary: String?
+    /**
+     Combien de personnes captent à nouveau cette antenne, et depuis quand.
+
+     `nil` quand personne n'a rien constaté — et surtout pas `0`, qui se lirait comme une panne
+     aggravée alors que ça ne veut dire que « aucun appareil Android n'est passé par là ».
+
+     C'est la seule voie par laquelle un iPhone peut savoir qu'un site répond de nouveau : Apple
+     n'expose aucune métrique radio, et cette app ne lira jamais un eNB elle-même. Ce sont les
+     téléphones Android qui constatent ; celui-ci lit.
+
+     Un CONSTAT, jamais un vote : il ne pèse dans aucun décompte et ne referme rien. Capter une
+     cellule ne veut pas dire que le service est rendu.
+     */
+    let sightingCount: Int
+    let lastSightingAt: String?
     /// Le post qui porte le FIL de la panne, et son nombre de commentaires.
     let socialPostId: String?
     let commentCount: Int
@@ -303,6 +330,7 @@ struct CommunityOutage: Decodable, Identifiable, Equatable {
         case siteName, address, state, severity
         case affectsData, affectsVoice, affectsSms, affectedTechnologies
         case affectedBands, affectedSectors, radioSummary, socialPostId, commentCount
+        case sightings
         case confirmCount, disputeCount, confirmationsRemaining, confirmThreshold
         case operatorConfirmed, operatorConfirmationPossible, operatorRaison, startedAt
         case reporter, myVote, canVote, canClose, timeline
@@ -343,6 +371,11 @@ struct CommunityOutage: Decodable, Identifiable, Equatable {
         affectedBands = c.decodeLossyArray([String].self, forKey: .affectedBands)
         affectedSectors = c.decodeLossyArray([Int].self, forKey: .affectedSectors)
         radioSummary = try? c.decodeIfPresent(String.self, forKey: .radioSummary)
+        /* `sightings` est un objet ABSENT tant que personne n'a rien constaté — pas un objet à
+           zéro. On retombe donc sur 0 et `nil`, et c'est l'affichage qui décide de se taire. */
+        let sightings = try? c.decodeIfPresent(OutageSightingSummary.self, forKey: .sightings)
+        sightingCount = sightings?.count ?? 0
+        lastSightingAt = sightings?.lastObservedAt
         socialPostId = try? c.decodeIfPresent(String.self, forKey: .socialPostId)
         commentCount = (try? c.decode(Int.self, forKey: .commentCount)) ?? 0
 

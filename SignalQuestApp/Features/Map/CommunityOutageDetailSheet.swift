@@ -284,10 +284,53 @@ struct CommunityOutageDetailSheet: View {
             // Le RÉSUMÉ de la capture, jamais la capture : le serveur l'a déjà purgé de toute
             // position, et c'est lui qui étiquette les captures iOS comme partielles.
             infoRow("Mesure jointe", outage.radioSummary)
+            /* « Trois personnes captent à nouveau, la dernière il y a 4 min. »
+               La seule voie par laquelle un iPhone peut savoir qu'un site répond de nouveau :
+               Apple n'expose aucune métrique radio, et cette app ne lira jamais un eNB elle-même.
+               Ce sont les téléphones Android qui constatent ; celui-ci lit.
+
+               Un CONSTAT, jamais un vote : la ligne vit ici, parmi les faits, et non parmi les
+               boutons d'arbitrage. Capter une cellule ne veut pas dire que le service est rendu. */
+            infoRow("Captent à nouveau", sightingsLabel)
         }
         .padding(.vertical, SQSpace.xs)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .sqShadowCard()
+    }
+
+
+    /**
+     « 3 personnes · il y a 4 min », ou rien.
+
+     Rien, et surtout pas « 0 personne » : ça se lirait comme une panne aggravée, alors que ça ne
+     veut dire que « aucun appareil Android n'est passé par là ».
+     */
+    private var sightingsLabel: String? {
+        guard outage.sightingCount > 0 else { return nil }
+        let people = outage.sightingCount == 1
+            ? String(localized: "1 personne")
+            : String(localized: "\(outage.sightingCount) personnes")
+        guard let iso = outage.lastSightingAt, let date = parseISODate(iso) else { return people }
+        let ago = RelativeDateTimeFormatter()
+        ago.unitsStyle = .short
+        return "\(people) · \(ago.localizedString(for: date, relativeTo: Date()))"
+    }
+
+
+    /**
+     Une date ISO du serveur, avec ou sans fraction de seconde.
+
+     Deux passes, comme partout ailleurs dans l'app : Postgres rend les timestamps avec les
+     millisecondes, mais pas toujours — et `ISO8601DateFormatter` refuse tout net ce qu'il n'a pas
+     été configuré à attendre.
+     */
+    private func parseISODate(_ raw: String) -> Date? {
+        let withFraction = ISO8601DateFormatter()
+        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = withFraction.date(from: raw) { return date }
+        let plain = ISO8601DateFormatter()
+        plain.formatOptions = [.withInternetDateTime]
+        return plain.date(from: raw)
     }
 
     @ViewBuilder
