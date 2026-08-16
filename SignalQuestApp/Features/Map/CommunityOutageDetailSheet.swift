@@ -41,9 +41,6 @@ struct CommunityOutageDetailSheet: View {
     /// Chronologie dépliée. Une panne très confirmée aligne une voix par personne : la feuille
     /// s'ouvre sur les derniers événements, qui sont ceux qu'on vient chercher.
     @State private var timelineExpanded = false
-    /// Ouvre le fil de la panne. `nil` quand l'appelant ne sait pas naviguer — le bouton
-    /// disparaît alors, plutôt que de mener nulle part.
-    var onOpenThread: ((String) -> Void)?
 
     /// Au-delà, la chronologie se replie. Cinq lignes couvrent la vie d'une panne ordinaire —
     /// signalement, deux ou trois voix, confirmation.
@@ -101,8 +98,8 @@ struct CommunityOutageDetailSheet: View {
                 // LA CONVERSATION, sous l'arbitrage et nettement séparée de lui : voter demande
                 // d'être sur zone et fait bouger l'état de la panne, commenter est ouvert à tous
                 // et ne change rien. Le bouton ne se glisse donc pas parmi ceux d'arbitrage.
-                if let postId = outage.socialPostId, let onOpenThread {
-                    threadButton(postId: postId, action: onOpenThread)
+                if let postId = outage.socialPostId {
+                    OutageThreadSection(postId: postId, commentCount: outage.commentCount)
                 }
                 timelineSection
                 infoSection
@@ -133,32 +130,6 @@ struct CommunityOutageDetailSheet: View {
     /// Désactivé aussi pendant un vote : les deux écritures portent sur la même panne, et laisser
     /// partir une fermeture par-dessus une voix en vol ferait revenir la réponse du serveur dans un
     /// ordre imprévisible.
-    /// Ouvre le FIL — c'est-à-dire le post que la panne matérialise déjà.
-    ///
-    /// Un contour, pas un aplat : l'aplat appartient aux gestes qui pèsent sur l'état de la panne.
-    private func threadButton(postId: String, action: @escaping (String) -> Void) -> some View {
-        Button {
-            action(postId)
-        } label: {
-            HStack(spacing: SQSpace.sm) {
-                Image(systemName: "bubble.left.and.bubble.right")
-                Text(
-                    outage.commentCount > 0
-                        ? "Conversation · \(outage.commentCount)"
-                        : "Ouvrir la conversation"
-                )
-                .font(SQType.button)
-            }
-            .frame(maxWidth: .infinity, minHeight: 50)
-            .foregroundStyle(SQColor.label)
-            .background(
-                RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous)
-                    .strokeBorder(SQColor.separator, lineWidth: 1.5)
-            )
-        }
-        .buttonStyle(SQPressButtonStyle())
-    }
-
     private var closeButton: some View {
         OutageCloseButton(closing: closing) { confirmingClose = true }
             .disabled(voting)

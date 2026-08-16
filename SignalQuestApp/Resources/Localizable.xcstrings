@@ -676,6 +676,9 @@
         }
       }
     },
+    "%lld / 500" : {
+
+    },
     "%lld %@" : {
       "localizations" : {
         "en" : {
@@ -713,6 +716,26 @@
     },
     "%lld accès ont été retirés par le passé." : {
 
+    },
+    "%lld antennes affichées. Toucher pour ne garder que les %lld compatibles avec vos anneaux TA." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld antennes affichées. Toucher pour ne garder que les %2$lld compatibles avec vos anneaux TA."
+          }
+        }
+      }
+    },
+    "%lld antennes compatibles avec vos anneaux TA. Toucher pour afficher les %lld." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld antennes compatibles avec vos anneaux TA. Toucher pour afficher les %2$lld."
+          }
+        }
+      }
     },
     "%lld autre abonné touché" : {
       "localizations" : {
@@ -2042,46 +2065,6 @@
     },
     "300 m – 2 km" : {
 
-    },
-    "Cellulaire" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cellular"
-          }
-        }
-      }
-    },
-    "gigue" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "jitter"
-          }
-        }
-      }
-    },
-    "moy." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "avg"
-          }
-        }
-      }
-    },
-    "Sous charge" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Under load"
-          }
-        }
-      }
     },
     "à " : {
       "extractionState" : "stale",
@@ -3628,6 +3611,9 @@
     "Aucun relevé de chemin sur les dernières heures. Le premier arrive au plus tard un quart d’heure après la mise sous surveillance." : {
 
     },
+    "Aucun réseau — le constat sera daté de maintenant" : {
+
+    },
     "Aucun résultat" : {
       "localizations" : {
         "en" : {
@@ -3727,7 +3713,7 @@
     "Aucune antenne connue à proximité." : {
 
     },
-    "Aucune antenne connue dans cette zone." : {
+    "Aucune antenne connue ici. Crée le site à l'endroit désigné par tes anneaux." : {
 
     },
     "Aucune antenne dans cette zone. Déplace la carte." : {
@@ -4280,6 +4266,9 @@
         }
       }
     },
+    "Badge Basic acier sur ton profil et tes publications" : {
+
+    },
     "Badge Basic argenté, masquable" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -4301,6 +4290,9 @@
           }
         }
       }
+    },
+    "Badge Premium or sur ton profil et tes publications" : {
+
     },
     "Badges" : {
       "localizations" : {
@@ -4508,27 +4500,6 @@
         }
       }
     },
-    "Ça passe moins bien que d'habitude" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "It works worse than usual"
-          }
-        }
-      }
-    },
-    "Ce site n'a pas été reconnu." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This site was not recognised."
-          }
-        }
-      }
-    },
     "C’est ton identifiant unique (@pseudo) pour être mentionné dans le fil et la messagerie ; il s’affiche sur ton profil. Modifiable une fois tous les 30 jours." : {
       "localizations" : {
         "en" : {
@@ -4545,6 +4516,17 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Ça frôle un obstacle à %1$@ — %2$@"
+          }
+        }
+      }
+    },
+    "Ça passe moins bien que d'habitude" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It works worse than usual"
           }
         }
       }
@@ -4584,6 +4566,9 @@
           }
         }
       }
+    },
+    "Capture partielle — iOS ne donne accès ni au niveau reçu, ni à l'identifiant de cellule." : {
+
     },
     "CarPlay" : {
 
@@ -4757,6 +4742,9 @@
         }
       }
     },
+    "Ce que l'iPhone sait du réseau. Votre position n'est jamais publiée." : {
+
+    },
     "Ce que vaut le réseau à cet endroit" : {
 
     },
@@ -4781,6 +4769,16 @@
     },
     "Ce site n'a pas de coordonnées exploitables." : {
 
+    },
+    "Ce site n'a pas été reconnu." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This site was not recognised."
+          }
+        }
+      }
     },
     "Ce site n'expose pas d'azimuts de secteur." : {
       "extractionState" : "stale",
@@ -4843,6 +4841,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cell ID"
+          }
+        }
+      }
+    },
+    "Cellulaire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cellular"
           }
         }
       }
@@ -5601,6 +5609,12 @@
     "Commune" : {
 
     },
+    "compatible" : {
+
+    },
+    "compatibles" : {
+
+    },
     "Complète" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5995,6 +6009,9 @@
           }
         }
       }
+    },
+    "Conversation · %lld" : {
+
     },
     "Conversation chiffrée" : {
       "localizations" : {
@@ -7068,6 +7085,9 @@
     "depuis le %@" : {
 
     },
+    "Depuis quand, ce que vous avez essayé…" : {
+
+    },
     "Depuis votre box, cherchez son adresse %@ publique." : {
 
     },
@@ -7613,6 +7633,9 @@
           }
         }
       }
+    },
+    "Durée de vie des stories personnalisable, de 1 h à 72 h au lieu de 24 h" : {
+
     },
     "Durée du lien" : {
 
@@ -8536,6 +8559,9 @@
     "État des box surveillées" : {
 
     },
+    "État du réseau inconnu" : {
+
+    },
     "État inconnu" : {
 
     },
@@ -8904,6 +8930,9 @@
         }
       }
     },
+    "Fréquences touchées" : {
+
+    },
     "fuseau entièrement libre" : {
 
     },
@@ -8963,6 +8992,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Manage your relationship with %@"
+          }
+        }
+      }
+    },
+    "gigue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "jitter"
           }
         }
       }
@@ -9458,6 +9497,9 @@
         }
       }
     },
+    "Impossible de contacter l’App Store pour le moment. Réessaie un peu plus tard." : {
+
+    },
     "Impossible de créer le reçu de suppression local. Le speedtest invité n’a pas été envoyé. Réessaie." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -9818,6 +9860,9 @@
         }
       }
     },
+    "Joindre la mesure" : {
+
+    },
     "Joindre mon relevé réseau" : {
       "localizations" : {
         "en" : {
@@ -9858,6 +9903,9 @@
         }
       }
     },
+    "Journal radio sauvegardé et synchronisé entre tes appareils" : {
+
+    },
     "Journal radio supprimé." : {
 
     },
@@ -9874,61 +9922,6 @@
     },
     "kilomètres et mètres" : {
 
-    },
-    "L'opérateur liste l'incident dans son fichier." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The carrier lists this outage in its own feed."
-          }
-        }
-      }
-    },
-    "L'opérateur ne l'a pas encore listée." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The operator has not listed it yet."
-          }
-        }
-      }
-    },
-    "La communauté n'a pas retrouvé cette panne." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The community could not confirm this outage."
-          }
-        }
-      }
-    },
-    "La communauté signale le rétablissement" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The community reports it as back up"
-          }
-        }
-      }
-    },
-    "La panne est terminée" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The outage is over"
-          }
-        }
-      }
     },
     "L’achat est en attente de validation par l’App Store." : {
       "extractionState" : "stale",
@@ -9976,6 +9969,28 @@
     "L'inclinaison d'une antenne vers le bas. Les opérateurs l'utilisent pour concentrer l'énergie sur la zone à couvrir plutôt que de l'envoyer à l'horizon, où elle brouillerait les cellules voisines. Le chiffre donné ici est purement géométrique : c'est l'angle qui pointerait exactement sur toi." : {
 
     },
+    "L'opérateur liste l'incident dans son fichier." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The carrier lists this outage in its own feed."
+          }
+        }
+      }
+    },
+    "L'opérateur ne l'a pas encore listée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The operator has not listed it yet."
+          }
+        }
+      }
+    },
     "L'orientation des secteurs n'est pas publiée pour ce site — seules ses bandes le sont." : {
 
     },
@@ -9991,6 +10006,28 @@
     },
     "La box est réputée joignable dès qu’UNE de ses adresses répond : c’est pourquoi ces nombres peuvent rester bons alors qu’une famille est tombée." : {
 
+    },
+    "La communauté n'a pas retrouvé cette panne." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The community could not confirm this outage."
+          }
+        }
+      }
+    },
+    "La communauté signale le rétablissement" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The community reports it as back up"
+          }
+        }
+      }
     },
     "la conversation" : {
       "extractionState" : "stale",
@@ -10018,6 +10055,9 @@
 
     },
     "la dernière heure" : {
+
+    },
+    "La direction dans laquelle pointe l'antenne. Sinon, laissez vide." : {
 
     },
     "La distance à vol d'oiseau entre toi et le pied du support, mesurée sur l'ellipsoïde terrestre. Ce n'est pas la longueur du trajet radio, qui monte jusqu'aux antennes." : {
@@ -10058,6 +10098,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Location is turned off for SignalQuest. Turn it on in Settings to place your measurements on the map. The test still works without it."
+          }
+        }
+      }
+    },
+    "La panne est terminée" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The outage is over"
           }
         }
       }
@@ -10520,6 +10571,9 @@
 
     },
     "Les %lld secteurs portent les mêmes bandes." : {
+
+    },
+    "Les abonnements ne sont pas disponibles depuis cet appareil pour le moment." : {
 
     },
     "Les achats App Store seront ouverts après validation serveur en staging. Aucun débit ne peut être lancé pour le moment." : {
@@ -11965,6 +12019,16 @@
         }
       }
     },
+    "moy." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "avg"
+          }
+        }
+      }
+    },
     "ms" : {
       "localizations" : {
         "en" : {
@@ -12904,6 +12968,9 @@
           }
         }
       }
+    },
+    "Ouvrir la conversation" : {
+
     },
     "Ouvrir la messagerie SignalQuest" : {
       "localizations" : {
@@ -13989,6 +14056,16 @@
         }
       }
     },
+    "Plus d’options" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More options"
+          }
+        }
+      }
+    },
     "Plus de réseau" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13996,16 +14073,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "No network"
-          }
-        }
-      }
-    },
-    "Plus d’options" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "More options"
           }
         }
       }
@@ -14263,6 +14330,9 @@
           }
         }
       }
+    },
+    "Précisions" : {
+
     },
     "Précisions (optionnel)" : {
       "localizations" : {
@@ -16340,104 +16410,6 @@
         }
       }
     },
-    "Sans nouvelle depuis un moment. Elle se refermera seule." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No news for a while. It will close on its own."
-          }
-        }
-      }
-    },
-    "Service dégradé déclaré par l'opérateur" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Degraded service declared by the operator"
-          }
-        }
-      }
-    },
-    "Services touchés" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Affected services"
-          }
-        }
-      }
-    },
-    "Seul l'auteur du signalement peut refermer cette panne." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Only the person who reported it can close this outage."
-          }
-        }
-      }
-    },
-    "Si vous le savez. Sinon, laissez vide." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "If you know. Otherwise leave it empty."
-          }
-        }
-      }
-    },
-    "Signalé par quelqu'un" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reported by someone"
-          }
-        }
-      }
-    },
-    "Signalée par" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reported by"
-          }
-        }
-      }
-    },
-    "Signaler la panne" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Report the outage"
-          }
-        }
-      }
-    },
-    "Signaler une panne sur cette antenne" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Report an outage on this antenna"
-          }
-        }
-      }
-    },
     "S’inscrire avec Apple" : {
       "localizations" : {
         "en" : {
@@ -16490,6 +16462,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "unnamed"
+          }
+        }
+      }
+    },
+    "Sans nouvelle depuis un moment. Elle se refermera seule." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No news for a while. It will close on its own."
           }
         }
       }
@@ -16695,6 +16678,9 @@
         }
       }
     },
+    "Secteurs touchés" : {
+
+    },
     "Sécurité" : {
       "localizations" : {
         "en" : {
@@ -16740,6 +16726,9 @@
       }
     },
     "Sentinelle" : {
+
+    },
+    "Sentinelle : surveillance continue de ta connexion (coupures, latence, incidents)" : {
 
     },
     "Sentinelle l’interrogera chaque minute depuis nos serveurs — téléphone éteint compris." : {
@@ -16824,6 +16813,17 @@
         }
       }
     },
+    "Service dégradé déclaré par l'opérateur" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Degraded service declared by the operator"
+          }
+        }
+      }
+    },
     "Service momentanément indisponible. Réessaie plus tard." : {
       "localizations" : {
         "en" : {
@@ -16835,6 +16835,17 @@
       }
     },
     "Services impactés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affected services"
+          }
+        }
+      }
+    },
+    "Services touchés" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -16950,7 +16961,20 @@
     "Seuil de coupure" : {
 
     },
+    "Seul l'auteur du signalement peut refermer cette panne." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only the person who reported it can close this outage."
+          }
+        }
+      }
+    },
     "seules les bandes basses (700, 800 MHz) portent aussi loin" : {
+
+    },
+    "Seules les bandes de ce site sont proposées. Sinon, laissez vide." : {
 
     },
     "Seuls tes amis y ont accès. Le partage suit le mode que tu choisis juste en dessous." : {
@@ -16971,6 +16995,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "If the address exists, a reset link has been sent to you."
+          }
+        }
+      }
+    },
+    "Si vous le savez. Sinon, laissez vide." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you know. Otherwise leave it empty."
           }
         }
       }
@@ -17005,6 +17040,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "SignalQuest"
+          }
+        }
+      }
+    },
+    "Signalé par quelqu'un" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reported by someone"
+          }
+        }
+      }
+    },
+    "Signalée par" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reported by"
           }
         }
       }
@@ -17061,6 +17118,17 @@
         }
       }
     },
+    "Signaler la panne" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report the outage"
+          }
+        }
+      }
+    },
     "Signaler la photo" : {
       "localizations" : {
         "en" : {
@@ -17077,6 +17145,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Report a problem"
+          }
+        }
+      }
+    },
+    "Signaler une panne sur cette antenne" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report an outage on this antenna"
           }
         }
       }
@@ -17500,6 +17579,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ringing"
+          }
+        }
+      }
+    },
+    "Sous charge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Under load"
           }
         }
       }
@@ -18611,6 +18700,9 @@
           }
         }
       }
+    },
+    "Ton abonnement finance directement le développement de SignalQuest" : {
+
     },
     "Ton altitude" : {
 
@@ -20088,6 +20180,9 @@
 
     },
     "Webhook" : {
+
+    },
+    "Wi-Fi — aucun réseau mobile mesurable" : {
 
     },
     "Y aller" : {
