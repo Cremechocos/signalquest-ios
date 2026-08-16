@@ -713,4 +713,33 @@ final class MapOutageFilterTests: XCTestCase {
         let capture = OutageRadioCaptureBuilder.make(status: onWifi, isOnline: true, position: nil)
         XCTAssertEqual(capture.state, "unknown")
     }
+
+    // MARK: - Le fil, rendu pour de vrai
+
+    /**
+     LE test que ce chantier a appris à écrire.
+
+     La première version du fil était un bouton conditionné à un `onOpenThread` optionnel que
+     personne ne fournissait : il ne s'affichait JAMAIS. Compilation verte, 739 tests verts,
+     fonctionnalité inexistante — seul un essai sur téléphone l'a révélé.
+
+     Celui-ci rend le bloc hors écran et vérifie qu'il PEINT quelque chose. Un composant qui
+     disparaît rend une image uniforme ; celui-ci doit produire du contraste — du texte, un champ,
+     un bouton.
+     */
+    func testThreadSectionActuallyPaintsSomething() throws {
+        let rendered = try pixels(
+            OutageThreadSection(postId: "post_test", commentCount: 0)
+                .environmentObject(AppServices(config: .test)),
+            width: 320,
+            height: 260
+        )
+        // Une vue vide rend un aplat : toutes les composantes identiques. On mesure donc la
+        // DIVERSITÉ des valeurs, pas leur moyenne — un bloc blanc sur blanc la ferait tomber à 1.
+        let distinct = Set(rendered).count
+        XCTAssertGreaterThan(
+            distinct, 8,
+            "Le bloc conversation ne peint presque rien (\(distinct) valeurs distinctes) — il a probablement disparu"
+        )
+    }
 }
