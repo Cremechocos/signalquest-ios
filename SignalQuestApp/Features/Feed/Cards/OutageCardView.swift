@@ -113,6 +113,33 @@ struct OutageCardView: View {
         return line.isEmpty ? "—" : line
     }
 
+
+    /// Les précisions du constat : bandes puis secteurs, telles que la personne les a désignées.
+    ///
+    /// Vide sur une panne totale — « plus rien » veut dire toutes les fréquences, la question n'est
+    /// pas posée — et vide sur les pannes ouvertes avant ce champ, dont la metadata est figée en
+    /// base. La carte se contracte alors d'elle-même, sans rangée vide.
+    ///
+    /// Mêmes jetons, même ordre et même écriture que la carte Android : la même panne doit se lire
+    /// pareil d'un téléphone à l'autre.
+    private var precisions: [String] {
+        var out: [String] = []
+        // En capitales, sans traduction : « N78 » s'écrit pareil dans les cinq langues de l'app, et
+        // un jeton que cette version ne connaît pas s'affiche tel quel plutôt que de disparaître.
+        out += (string("outageBands") ?? "")
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces).uppercased() }
+            .filter { !$0.isEmpty }
+        // Le DEGRÉ, jamais un numéro de secteur : celui-ci dépend de l'opérateur (SFR compte à
+        // partir de 0, les trois autres à partir de 1), et l'afficher ici finirait par le faire
+        // ressaisir — faux pour un opérateur sur quatre.
+        out += (string("outageSectors") ?? "")
+            .split(separator: ",")
+            .compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            .map { "\($0)°" }
+        return out
+    }
+
     /// Le code du site.
     ///
     /// Le numéro de site de l'opérateur d'abord quand on l'a — c'est celui que l'opérateur emploie
@@ -170,6 +197,34 @@ struct OutageCardView: View {
                         value: affected,
                         valueLineLimit: 3
                     )
+                }
+
+                // Les précisions sous la grille, et non dans une quatrième tuile : la grille en
+                // compte trois par rangée, et une quatrième tuile facultative repartirait sur une
+                // rangée à elle avec deux vides à sa droite — creusant un trou à chaque panne
+                // totale, où la question n'est même pas posée.
+                if !precisions.isEmpty {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 52), spacing: SQSpace.xs + 2)],
+                        alignment: .leading,
+                        spacing: SQSpace.xs + 2
+                    ) {
+                        ForEach(precisions, id: \.self) { token in
+                            Text(token)
+                                .font(SQType.caption.weight(.semibold))
+                                .foregroundStyle(ink)
+                                .lineLimit(1)
+                                .padding(.horizontal, SQSpace.sm + 1)
+                                .padding(.vertical, SQSpace.xs + 1)
+                                // Un CONTOUR teinté, jamais un aplat : l'aplat est réservé à
+                                // l'état de la panne, dans le héros. Deux aplats de la même
+                                // couleur mettraient sur le même plan le constat et son détail.
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous)
+                                        .stroke(ink.opacity(0.35), lineWidth: 1)
+                                )
+                        }
+                    }
                 }
 
                 if let footer {

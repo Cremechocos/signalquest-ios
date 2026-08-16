@@ -41,7 +41,10 @@ struct SocialCommentsResponse: Decodable {
     let totalCount: Int?
 
     enum CodingKeys: String, CodingKey {
-        case comments, items, results
+        // `replies` : la route des réponses (`.../comments/{id}/replies`) nomme sa liste
+        // autrement que celle du fil. Sans cette clé, le décodage rendait un tableau VIDE sans
+        // lever d'erreur — un fil de réponses qui se déplie sur rien, et rien pour le dire.
+        case comments, items, results, replies
         case nextCursor, cursor
         case totalCount, total
     }
@@ -49,6 +52,7 @@ struct SocialCommentsResponse: Decodable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         comments = (try? c.decode([SocialComment].self, forKey: .comments))
+            ?? (try? c.decode([SocialComment].self, forKey: .replies))
             ?? (try? c.decode([SocialComment].self, forKey: .items))
             ?? (try? c.decode([SocialComment].self, forKey: .results))
             ?? []

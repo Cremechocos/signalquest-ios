@@ -537,6 +537,7 @@ extension AuthUser {
         role: "user",
         twoFactorEnabled: false,
         notifyMessagesPush: false,
+        notifySocialPush: true,
         notifyMessagesInApp: true,
         callsDoNotDisturb: false,
         appleLinked: false

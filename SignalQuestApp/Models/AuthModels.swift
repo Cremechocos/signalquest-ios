@@ -16,6 +16,10 @@ struct AuthUser: Codable, Identifiable, Equatable {
     let role: String
     let twoFactorEnabled: Bool?
     let notifyMessagesPush: Bool?
+    /// Interactions du fil PUBLIC : commentaires, réponses, mentions, réactions, abonnements.
+    /// Séparé de `notifyMessagesPush`, qui les portait toutes sous un libellé ne parlant que des
+    /// messages privés — 150 des 169 porteurs de jeton les avaient ainsi coupées sans le savoir.
+    let notifySocialPush: Bool?
     let notifyMessagesInApp: Bool?
     let callsDoNotDisturb: Bool?
     /// Vrai si un Apple ID est associé à ce compte (Sign in with Apple).

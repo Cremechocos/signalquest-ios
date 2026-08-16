@@ -17,7 +17,8 @@ final class SettingsViewModel: ObservableObject {
         notifyPhotoLikesEmail: nil, notifyPhotoLikesPush: nil, notifyPhotoLikesInApp: nil,
         notifyPhotoMentionsEmail: nil, notifyPhotoMentionsPush: nil, notifyPhotoMentionsInApp: nil,
         notifyPhotoRepliesEmail: nil, notifyPhotoRepliesPush: nil, notifyPhotoRepliesInApp: nil,
-        notifyMessagesEmail: nil, notifyMessagesPush: nil, notifyMessagesInApp: nil,
+        notifyMessagesEmail: nil, notifyMessagesPush: nil, notifySocialPush: nil,
+        notifyMessagesInApp: nil,
         notifyAnfrUpdatesPush: nil, notifyAnfrUpdatesEmail: nil,
         callsDoNotDisturb: nil
     )
@@ -323,7 +324,11 @@ struct SettingsView: View {
                         }
                     }
                 }
-                Toggle("Messages (push)", isOn: bind(\.notifyMessagesPush))
+                Toggle("Messages privés (push)", isOn: bind(\.notifyMessagesPush))
+                // Le fil PUBLIC, séparé des messages privés : les deux vivaient sous un seul
+                // interrupteur intitulé « Messages », si bien que couper ses messages coupait
+                // aussi commentaires, réponses et mentions.
+                Toggle("Commentaires et réponses", isOn: bind(\.notifySocialPush))
                 Toggle("Messages (in-app)", isOn: bind(\.notifyMessagesInApp))
                 Toggle("Mises à jour ANFR (push)", isOn: bind(\.notifyAnfrUpdatesPush))
                 Toggle("Likes & commentaires (push)", isOn: bind(\.notifyPhotoLikesPush))

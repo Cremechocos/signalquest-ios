@@ -117,6 +117,7 @@ struct NotificationPreferences: Codable {
     var notifyPhotoRepliesInApp: Bool?
     var notifyMessagesEmail: Bool?
     var notifyMessagesPush: Bool?
+    var notifySocialPush: Bool?
     var notifyMessagesInApp: Bool?
     var notifyAnfrUpdatesPush: Bool?
     var notifyAnfrUpdatesEmail: Bool?

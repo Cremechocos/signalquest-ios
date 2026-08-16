@@ -56,7 +56,8 @@ final class AuthSessionTests: XCTestCase {
         AuthUser(
             id: "user-2", email: "second@signalquest.test", name: "Deux", handle: "deux",
             handleChangedAt: nil, avatarUrl: nil, bio: nil, role: "user",
-            twoFactorEnabled: false, notifyMessagesPush: nil, notifyMessagesInApp: nil,
+            twoFactorEnabled: false, notifyMessagesPush: nil, notifySocialPush: nil,
+            notifyMessagesInApp: nil,
             callsDoNotDisturb: nil, appleLinked: nil
         )
     }

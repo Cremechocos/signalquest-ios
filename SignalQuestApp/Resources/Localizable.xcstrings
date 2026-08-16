@@ -1413,6 +1413,9 @@
         }
       }
     },
+    "%lld réponse(s)" : {
+
+    },
     "%lld salve perdue" : {
       "localizations" : {
         "en" : {
@@ -1824,6 +1827,9 @@
 
     },
     "> 10°" : {
+
+    },
+    "👍" : {
 
     },
     "👑" : {
@@ -6010,9 +6016,6 @@
         }
       }
     },
-    "Conversation · %lld" : {
-
-    },
     "Conversation chiffrée" : {
       "localizations" : {
         "en" : {
@@ -8540,6 +8543,9 @@
     "est" : {
 
     },
+    "Et %lld autre(s) commentaire(s)" : {
+
+    },
     "Étape %lld sur %lld" : {
       "localizations" : {
         "fr" : {
@@ -9454,6 +9460,9 @@
         }
       }
     },
+    "Impossible de charger la conversation." : {
+
+    },
     "Impossible de charger la discussion." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -10039,6 +10048,9 @@
           }
         }
       }
+    },
+    "La conversation" : {
+
     },
     "La couverture sera enregistrée sans opérateur, et le secteur de l'antenne la plus proche reste indisponible." : {
       "extractionState" : "manual",
@@ -12786,6 +12798,9 @@
         }
       }
     },
+    "Ouverte à tous. Les commentaires et les réactions ne modifient pas l'état de la panne." : {
+
+    },
     "Ouvre la carte des antennes et mesures." : {
       "localizations" : {
         "en" : {
@@ -12968,9 +12983,6 @@
           }
         }
       }
-    },
-    "Ouvrir la conversation" : {
-
     },
     "Ouvrir la messagerie SignalQuest" : {
       "localizations" : {
@@ -13622,6 +13634,9 @@
           }
         }
       }
+    },
+    "Personne n'a encore commenté." : {
+
     },
     "Personne n'a signalé de panne en ce moment. Bonne nouvelle." : {
       "extractionState" : "manual",
