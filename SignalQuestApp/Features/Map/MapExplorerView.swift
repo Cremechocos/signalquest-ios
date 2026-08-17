@@ -1099,6 +1099,7 @@ struct MapExplorerView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var mapCenter: CLLocationCoordinate2D
     @State private var mapZoom: Double
@@ -1533,6 +1534,7 @@ struct MapExplorerView: View {
             speedtestFeatures: renderedSpeedtestFeatures,
             renderVersion: renderVersion,
             colorScheme: colorScheme,
+            ornamentBottomInset: horizontalSizeClass == .regular ? SQSpace.sm : SQDock.clearance,
             center: $mapCenter,
             zoom: $mapZoom,
             onMoveEnd: { bounds, zoom in
@@ -1600,8 +1602,13 @@ struct MapExplorerView: View {
                     // Chips de couches : composant transverse déjà restylé
                     // (capsules casse normale, actif brique plein).
                     MapFilterBar(filters: $filters)
+                        // Cette barre dense conserve une taille exploitable quand le
+                        // texte système est au maximum. Les libellés restent annoncés
+                        // intégralement par VoiceOver.
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                     if filters.contains(.friend) {
                         friendsStatusPanel
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                             .padding(.horizontal, SQSpace.md)
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }

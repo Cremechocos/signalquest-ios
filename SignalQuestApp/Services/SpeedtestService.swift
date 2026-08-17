@@ -4705,7 +4705,10 @@ final class SpeedtestPendingEntity {
 @available(iOS 17, *)
 actor SwiftDataSpeedtestPendingStore: SpeedtestPendingStoring {
     private let container: ModelContainer
-    private let context: ModelContext
+    /// Créé au premier accès sur l'exécuteur de l'acteur. Le construire dans
+    /// `init` liait le contexte a la main queue lorsque AppServices demarrait,
+    /// puis l'utilisait hors de cette queue dans les methodes de l'acteur.
+    private lazy var context = ModelContext(container)
     private let legacyCache: DiskCache?
     private let legacyKey: String
     private let encoder = JSONEncoder.signalQuest
@@ -4721,7 +4724,6 @@ actor SwiftDataSpeedtestPendingStore: SpeedtestPendingStoring {
             configurations: ModelConfiguration(url: url)
         ) else { return nil }
         self.container = container
-        self.context = ModelContext(container)
     }
 
     func loadAll() async -> [PendingSpeedtestSave] {
