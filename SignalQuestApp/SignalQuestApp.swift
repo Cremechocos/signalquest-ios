@@ -16,6 +16,12 @@ struct SignalQuestApp: App {
     @AppStorage(SQOledPalette.storageKey) private var pureBlack = false
 
     init() {
+        // Le test UI d'onboarding doit pouvoir repartir d'une première
+        // ouverture, même après les autres parcours de la même suite. Ce flag
+        // est éliminé des binaires Release par AppEnvironment.
+        if AppEnvironment.resetsOnboardingOnLaunch {
+            UserDefaults.standard.set(false, forKey: "sq.hasCompletedOnboarding")
+        }
         // Le graphe vient du holder plutôt que d'être construit ici : une scène
         // CarPlay peut se connecter AVANT cette fenêtre (app lancée en
         // arrière-plan au branchement du véhicule) et doit partager exactement
@@ -163,10 +169,9 @@ struct AppRootView: View {
                 await registerPushIfAuthenticated(session.state)
                 // Verrouillage biométrique à l'ouverture (si activé + authentifié).
                 if case .authenticated = session.state { appLock.lockOnActivationIfNeeded() }
-                // Mode « continu » : amorce la diffusion de présence dès le
-                // lancement (le mode « carte ouverte » démarre, lui, à l'ouverture
-                // de la couche Amis — inutile de payer un appel réseau ici).
-                if case .authenticated = session.state, LiveShareModeStore.load() == .foregroundLive {
+                // La présence est indépendante des coordonnées : le mode local
+                // pilote seulement l'ajout de la position au heartbeat.
+                if case .authenticated = session.state {
                     await services.livePresence.refreshSharingSettings()
                 }
             }
@@ -179,8 +184,18 @@ struct AppRootView: View {
                 Task { await registerPushIfAuthenticated(newState) }
                 if case .authenticated = newState {
                     appLock.lockOnActivationIfNeeded()
+                    Task {
+                        await services.livePresence.refreshSharingSettings()
+                        if case .authenticated(let user) = newState {
+                            await services.liveShare.bootstrap(currentUserId: user.id)
+                            await services.sessions.retryPendingCoverageSessions()
+                            await services.speedtest.retryPendingSaves()
+                        }
+                    }
                 } else {
                     appLock.reset()   // jamais verrouillé par-dessus l'écran de login
+                    services.livePresence.stopForSignOut()
+                    services.liveShare.stopForSignOut()
                 }
             }
             .onChangeCompat(of: hasCompletedOnboarding) { _, completed in
@@ -201,6 +216,7 @@ struct AppRootView: View {
                         Task {
                             await services.callManager.retryVoIPTokenRegistrationIfNeeded()
                             await services.callManager.reconcilePendingIncomingCall()
+                            await services.livePresence.refreshSharingSettings()
                         }
                     }
                     services.enterForeground()

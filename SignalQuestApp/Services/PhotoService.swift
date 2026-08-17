@@ -6,6 +6,7 @@ protocol PhotoServicing: Sendable {
     func comments(photoId: String) async throws -> [PhotoComment]
     func addComment(photoId: String, content: String) async throws -> PhotoComment?
     func toggleLike(photoId: String, reaction: String) async throws -> PhotoLikeResponse
+    func updatePhotoOperator(photoId: String, operatorName: String) async throws
     func uploadPhoto(data: Data, siteId: String, description: String?, anfrCode: String?, operatorName: String?, exifMetadata: String?) async throws -> Photo
 }
 
@@ -59,6 +60,17 @@ final class PhotoService: PhotoServicing {
         try await api.requestJSON("/api/photos/\(photoId)/like", body: ["reaction": reaction])
     }
 
+    /// Réattribue une photo à l'un des opérateurs connus du même support.
+    /// Le serveur vérifie l'appartenance au site et recalcule son scope marché.
+    func updatePhotoOperator(photoId: String, operatorName: String) async throws {
+        struct Response: Decodable { let success: Bool? }
+        let _: Response = try await api.requestJSON(
+            "/api/photos/\(photoId)",
+            method: .patch,
+            body: ["operator": operatorName]
+        )
+    }
+
     func uploadPhoto(data: Data, siteId: String, description: String?, anfrCode: String?, operatorName: String?, exifMetadata: String?) async throws -> Photo {
         var fields = ["siteId": siteId]
         if let description, !description.isEmpty { fields["description"] = description }
@@ -78,4 +90,3 @@ final class PhotoService: PhotoServicing {
         )
     }
 }
-

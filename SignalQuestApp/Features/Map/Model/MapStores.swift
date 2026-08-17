@@ -135,17 +135,19 @@ enum MapAzimuthStyleStore {
 /// Internal (pas `private`) : réutilisé par le mode Drive Test pour cibler le bon
 /// marché lors du chargement des antennes proches.
 /// Persistance locale des couches actives de la carte (mémorisées entre navigations /
-/// relances). Défaut : antennes seule — l'utilisateur active le reste à la demande.
+/// relances). Les choix existants restent intacts ; ce défaut ne concerne que les
+/// nouvelles installations.
 enum MapFilterStore {
     static let key = "map.lastFilters.v1"
 
     /// Drapeau de migration : « la couche Sites ajoutés a été proposée une fois ».
     private static let customSiteMigrationKey = "map.lastFilters.customSiteAdded.v1"
 
-    /// Couches par défaut : antennes + sites ajoutés à la main. Ces derniers sont
+    /// Couches par défaut : antennes + sites ajoutés à la main + amis. Ces derniers sont
     /// la SEULE antenne visible dans un pays sans open data — les laisser
-    /// décochés par défaut y donnerait une carte vide.
-    static let defaultFilters: Set<MapDisplayItem.Kind> = [.antenna, .customSite]
+    /// décochés par défaut y donnerait une carte vide. Le calque Amis rend la
+    /// fonctionnalité découvrable ; il ne contourne jamais l'opt-in de partage.
+    static let defaultFilters: Set<MapDisplayItem.Kind> = [.antenna, .customSite, .friend]
 
     static func save(_ filters: Set<MapDisplayItem.Kind>) {
         UserDefaults.standard.set(filters.map(\.rawValue), forKey: key)

@@ -32,12 +32,21 @@ enum AppEnvironment {
         ProcessInfo.processInfo.arguments.contains("--reset-auth")
     }
 
+    /// Réinitialise uniquement le drapeau d'onboarding pour les tests UI qui
+    /// doivent démarrer sur une première ouverture. Ne jamais utiliser ce
+    /// mécanisme hors Debug : il ne doit pas pouvoir modifier le parcours d'un
+    /// utilisateur distribué.
+    static var resetsOnboardingOnLaunch: Bool {
+        ProcessInfo.processInfo.arguments.contains("--reset-onboarding")
+    }
+
     static var startsOnMap: Bool {
         ProcessInfo.processInfo.arguments.contains("--start-map")
     }
     #else
     static var usesDemoData: Bool { false }
     static var resetsAuthOnLaunch: Bool { false }
+    static var resetsOnboardingOnLaunch: Bool { false }
     static var startsOnMap: Bool { false }
     #endif
 

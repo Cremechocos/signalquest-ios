@@ -33,6 +33,13 @@ final class ModelDecodeTests: XCTestCase {
     func testPhotoAndMessageDecode() throws {
         let photo = try JSONDecoder.signalQuest.decode(Photo.self, from: Data(Self.photoJSON.utf8))
         XCTAssertEqual(photo.displayCaption, "Site photo")
+        XCTAssertNil(photo.marketCode, "Les photos historiques restent décodables sans scope opérateur")
+
+        let scopedPhoto = try JSONDecoder.signalQuest.decode(Photo.self, from: Data("""
+        {"id":"p2","siteId":"site-2","description":"Support mutualisé","operator":"VODAFONE","marketCode":"DE","siteOperators":["VODAFONE","TELEKOM"]}
+        """.utf8))
+        XCTAssertEqual(scopedPhoto.marketCode, "DE")
+        XCTAssertEqual(scopedPhoto.siteOperators, ["VODAFONE", "TELEKOM"])
 
         let messages = try JSONDecoder.signalQuest.decode(MessagesPageResponse.self, from: Data(Self.messagesJSON.utf8))
         XCTAssertEqual(messages.messages.first?.content, "Salut")

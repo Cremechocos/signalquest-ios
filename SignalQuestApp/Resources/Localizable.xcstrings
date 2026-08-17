@@ -1223,6 +1223,9 @@
         }
       }
     },
+    "%lld personnes" : {
+
+    },
     "%lld personnes ont constaté la panne." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1412,9 +1415,6 @@
           }
         }
       }
-    },
-    "%lld réponse(s)" : {
-
     },
     "%lld salve perdue" : {
       "localizations" : {
@@ -1675,6 +1675,16 @@
         }
       }
     },
+    "%lld. %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld. %2$@"
+          }
+        }
+      }
+    },
     "%lld. %@, %lld %@, %lld mesures." : {
       "localizations" : {
         "en" : {
@@ -1703,6 +1713,16 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$lld/%2$lld"
+          }
+        }
+      }
+    },
+    "%lld/%lld localisés" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld/%2$lld localisés"
           }
         }
       }
@@ -1790,6 +1810,9 @@
     "+ %@" : {
 
     },
+    "+ %lld autre(s) session(s)" : {
+
+    },
     "+%lld" : {
       "localizations" : {
         "en" : {
@@ -1827,9 +1850,6 @@
 
     },
     "> 10°" : {
-
-    },
-    "👍" : {
 
     },
     "👑" : {
@@ -1906,6 +1926,9 @@
           }
         }
       }
+    },
+    "1 personne" : {
+
     },
     "1 personne a constaté la panne." : {
       "extractionState" : "manual",
@@ -2260,6 +2283,9 @@
         }
       }
     },
+    "Accepter" : {
+
+    },
     "Accès anticipé à certains outils communautaires" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2325,6 +2351,9 @@
           }
         }
       }
+    },
+    "Actif uniquement au premier plan" : {
+
     },
     "Action impossible" : {
 
@@ -2456,6 +2485,9 @@
           }
         }
       }
+    },
+    "Actualisé à %@" : {
+
     },
     "Actualisée en temps réel" : {
       "extractionState" : "stale",
@@ -2610,6 +2642,12 @@
       }
     },
     "Afficher mon identifiant plutôt que mon nom" : {
+
+    },
+    "Afficher tous les amis" : {
+
+    },
+    "Aimer ce commentaire" : {
 
     },
     "Ajoute des amis pour affiner l'audience." : {
@@ -2932,6 +2970,9 @@
         }
       }
     },
+    "Annuler la demande" : {
+
+    },
     "Annuler la demande envoyée à %@" : {
       "localizations" : {
         "en" : {
@@ -2941,6 +2982,9 @@
           }
         }
       }
+    },
+    "Annuler la réponse" : {
+
     },
     "Antenne" : {
       "localizations" : {
@@ -3327,6 +3371,9 @@
         }
       }
     },
+    "Arrêter le partage" : {
+
+    },
     "Association Apple impossible. Réessaie." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -3448,6 +3495,9 @@
           }
         }
       }
+    },
+    "Aucun ami ne partage de position récente." : {
+
     },
     "Aucun appel" : {
       "extractionState" : "stale",
@@ -3658,6 +3708,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "No reports"
+          }
+        }
+      }
+    },
+    "Aucun site connu dans un rayon de 5 km." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No known site within 5 km."
           }
         }
       }
@@ -4110,6 +4171,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Authentication required."
+          }
+        }
+      }
+    },
+    "Autorise la localisation pour comparer les opérateurs." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow location access to compare carriers."
+          }
+        }
+      }
+    },
+    "Autorise la localisation pour voir les sites autour." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow location access to see nearby sites."
           }
         }
       }
@@ -5592,6 +5675,9 @@
         }
       }
     },
+    "Commentaires et réponses" : {
+
+    },
     "Commenter" : {
       "localizations" : {
         "en" : {
@@ -5614,6 +5700,17 @@
     },
     "Commune" : {
 
+    },
+    "Comparer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare"
+          }
+        }
+      }
     },
     "compatible" : {
 
@@ -5859,6 +5956,9 @@
           }
         }
       }
+    },
+    "Connexion à la carte des amis…" : {
+
     },
     "Connexion Apple impossible. Réessaie." : {
       "extractionState" : "stale",
@@ -6680,6 +6780,17 @@
         }
       }
     },
+    "Débit par opérateur" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speed by carrier"
+          }
+        }
+      }
+    },
     "Débit pendant le test" : {
       "localizations" : {
         "en" : {
@@ -6929,6 +7040,9 @@
           }
         }
       }
+    },
+    "Demander" : {
+
     },
     "Demandes envoyées" : {
       "extractionState" : "stale",
@@ -7315,6 +7429,9 @@
           }
         }
       }
+    },
+    "Destinataires" : {
+
     },
     "Destination" : {
 
@@ -7946,6 +8063,9 @@
         }
       }
     },
+    "En attente de la première position…" : {
+
+    },
     "en attente de mesure" : {
 
     },
@@ -8006,6 +8126,9 @@
           }
         }
       }
+    },
+    "En direct" : {
+
     },
     "En France, le secteur est déterminé automatiquement à partir du PCI." : {
       "extractionState" : "stale",
@@ -8877,6 +9000,9 @@
         }
       }
     },
+    "Filtrer sur %@" : {
+
+    },
     "Filtres du fil" : {
       "localizations" : {
         "en" : {
@@ -8982,6 +9108,9 @@
         }
       }
     },
+    "Gérer" : {
+
+    },
     "Gérer dans l’App Store" : {
       "localizations" : {
         "en" : {
@@ -9013,6 +9142,9 @@
       }
     },
     "gNB %@" : {
+
+    },
+    "GPS indisponible, données réseau reçues." : {
 
     },
     "Groupe" : {
@@ -9506,6 +9638,17 @@
         }
       }
     },
+    "Impossible de charger pour le moment." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't load right now."
+          }
+        }
+      }
+    },
     "Impossible de contacter l’App Store pour le moment. Réessaie un peu plus tard." : {
 
     },
@@ -9603,6 +9746,9 @@
         }
       }
     },
+    "Inactif" : {
+
+    },
     "Incident" : {
       "localizations" : {
         "en" : {
@@ -9645,7 +9791,6 @@
       }
     },
     "Indisponible" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9717,6 +9862,9 @@
           }
         }
       }
+    },
+    "iOS partage la position, la technologie et l’opérateur disponibles. Apple n’expose pas les niveaux RSRP/RSRQ à l’app." : {
+
     },
     "iOS speedtest" : {
       "extractionState" : "stale",
@@ -10015,6 +10163,17 @@
     },
     "La box est réputée joignable dès qu’UNE de ses adresses répond : c’est pourquoi ces nombres peuvent rester bons alors qu’une famille est tombée." : {
 
+    },
+    "La communauté n'a pas encore assez mesuré cette zone." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The community hasn't measured this area enough yet."
+          }
+        }
+      }
     },
     "La communauté n'a pas retrouvé cette panne." : {
       "extractionState" : "manual",
@@ -11112,6 +11271,9 @@
         }
       }
     },
+    "Masquer les réponses" : {
+
+    },
     "Mât" : {
 
     },
@@ -11418,6 +11580,9 @@
         }
       }
     },
+    "Message facultatif" : {
+
+    },
     "Message supprimé" : {
       "localizations" : {
         "en" : {
@@ -11490,6 +11655,7 @@
       }
     },
     "Messages (push)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11549,6 +11715,9 @@
           }
         }
       }
+    },
+    "Messages privés (push)" : {
+
     },
     "Messages programmés" : {
       "localizations" : {
@@ -11927,6 +12096,9 @@
         }
       }
     },
+    "Mon statut" : {
+
+    },
     "Montant" : {
 
     },
@@ -12080,6 +12252,9 @@
           }
         }
       }
+    },
+    "Ne plus aimer ce commentaire" : {
+
     },
     "Ne plus suivre" : {
       "localizations" : {
@@ -12403,6 +12578,9 @@
           }
         }
       }
+    },
+    "Nouveau partage" : {
+
     },
     "Nouveau rappel" : {
       "localizations" : {
@@ -13323,6 +13501,9 @@
     "Partage désactivé" : {
 
     },
+    "Partage en direct" : {
+
+    },
     "Partage ton premier speedtest ou post." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -13363,6 +13544,9 @@
           }
         }
       }
+    },
+    "Partager en direct" : {
+
     },
     "Partager la position exacte de mes mesures" : {
       "localizations" : {
@@ -13475,6 +13659,9 @@
           }
         }
       }
+    },
+    "Participant" : {
+
     },
     "Participants" : {
       "localizations" : {
@@ -14113,6 +14300,9 @@
         }
       }
     },
+    "Plusieurs" : {
+
+    },
     "Point de couverture" : {
       "localizations" : {
         "en" : {
@@ -14238,6 +14428,17 @@
     "Position estimée, pas relevée" : {
 
     },
+    "Position inconnue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location unknown"
+          }
+        }
+      }
+    },
     "Position inconnue — le signalement partira si vous avez déjà relevé du signal ici." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14250,7 +14451,6 @@
       }
     },
     "Position indisponible — autorise la localisation dans les réglages." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14264,7 +14464,6 @@
 
     },
     "Position partagée" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14506,6 +14705,19 @@
           }
         }
       }
+    },
+    "Prochain test dans %lld m ou %lld s" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Prochain test dans %1$lld m ou %2$lld s"
+          }
+        }
+      }
+    },
+    "Prochain test dans %lld s" : {
+
     },
     "Profil" : {
       "localizations" : {
@@ -15393,6 +15605,9 @@
         }
       }
     },
+    "Reconnexion…" : {
+
+    },
     "Récupération du journal" : {
 
     },
@@ -15425,6 +15640,9 @@
           }
         }
       }
+    },
+    "Réessayer le flux des amis" : {
+
     },
     "Référence du site" : {
 
@@ -15460,6 +15678,9 @@
           }
         }
       }
+    },
+    "Refuser" : {
+
     },
     "Réglages" : {
       "localizations" : {
@@ -15621,6 +15842,9 @@
     "Repères" : {
 
     },
+    "Repli périodique" : {
+
+    },
     "Répond normalement" : {
 
     },
@@ -15666,6 +15890,9 @@
           }
         }
       }
+    },
+    "Réponse à @%@" : {
+
     },
     "Réponse App Store inconnue. Réessaie plus tard." : {
       "extractionState" : "stale",
@@ -16973,6 +17200,9 @@
         }
       }
     },
+    "Sessions en cours" : {
+
+    },
     "Seuil de coupure" : {
 
     },
@@ -17045,6 +17275,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Avg signal"
+          }
+        }
+      }
+    },
+    "Signal par opérateur" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal by carrier"
           }
         }
       }
@@ -17870,6 +18111,9 @@
         }
       }
     },
+    "Statut personnalisé (facultatif)" : {
+
+    },
     "Statut prévisionnel" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -18296,6 +18540,9 @@
     "Sur %lld tests où un réseau a été détecté." : {
 
     },
+    "Sur iPhone, l’envoi se met en pause si tu verrouilles l’écran ou quittes SignalQuest. Il reprend au retour tant que la session n’a pas été arrêtée." : {
+
+    },
     "Sur l'écran de la voiture, te signale quand tu traverses une zone où le réseau est mauvais. Au maximum une alerte toutes les 10 minutes, jamais deux fois la même zone, et rien pendant une manœuvre annoncée." : {
 
     },
@@ -18516,6 +18763,9 @@
           }
         }
       }
+    },
+    "Temps réel indisponible — repli périodique" : {
+
     },
     "Tendances et alertes avancées du journal" : {
       "extractionState" : "stale",
@@ -19455,6 +19705,9 @@
         }
       }
     },
+    "Une personne" : {
+
+    },
     "Une position arrondie à environ 50 mètres" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19818,6 +20071,12 @@
           }
         }
       }
+    },
+    "Voir %lld réponses" : {
+
+    },
+    "Voir 1 réponse" : {
+
     },
     "Voir ce lieu sur la carte" : {
       "extractionState" : "stale",

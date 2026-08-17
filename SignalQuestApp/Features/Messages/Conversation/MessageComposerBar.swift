@@ -19,6 +19,7 @@ struct MessageComposerBar: View {
     let onPoll: () -> Void
     let onSchedule: (String) -> Void
     let onShareLocation: () -> Void
+    let onLiveShare: () -> Void
     let onPickPhoto: (PhotosPickerItem, String) -> Void
     /// Note vocale enregistrée : fichier m4a et durée mesurée.
     let onVoiceNote: (URL, TimeInterval) -> Void
@@ -60,6 +61,9 @@ struct MessageComposerBar: View {
                 if !isE2EE {
                     Button { onShareLocation() } label: {
                         Label("Partager ma position", systemImage: "location.fill")
+                    }
+                    Button { onLiveShare() } label: {
+                        Label("Partager en direct", systemImage: "dot.radiowaves.left.and.right")
                     }
                 }
                 Divider()

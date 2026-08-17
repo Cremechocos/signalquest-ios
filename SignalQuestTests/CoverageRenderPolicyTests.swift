@@ -5,6 +5,16 @@ import XCTest
 /// par la donnée (points si présents, sinon clusters), caps relevés, seuil de fetch.
 final class CoverageRenderPolicyTests: XCTestCase {
 
+    func testCoverageImportResponseDecodesLegacyMinimalShape() throws {
+        let response = try JSONDecoder.signalQuest.decode(
+            CoverageImportResponse.self,
+            from: Data(#"{"ok":true}"#.utf8)
+        )
+        XCTAssertTrue(response.ok)
+        XCTAssertNil(response.plmnResolved)
+        XCTAssertNil(response.mvnoKey)
+    }
+
     func testRendersPointsWhenPresent() {
         let m = CoverageRenderPolicy.mode(hasPoints: true, hasClusters: false, hasBandFilter: false)
         XCTAssertTrue(m.useRawPoints)
@@ -157,6 +167,7 @@ final class CoverageSessionQueueTests: XCTestCase {
         XCTAssertEqual(try bodySessionId(retryBody), upload.sessionId.uuidString)
         XCTAssertEqual(try bodyShowOnMap(retryBody), false)
         XCTAssertTrue(try CoverageSessionQueue(fileURL: fileURL).allPending().isEmpty)
+        XCTAssertEqual(service.bufferedImportResponseCount, 0)
     }
 
     func testFinalizedSnapshotCannotBeDowngradedByOlderDraft() throws {

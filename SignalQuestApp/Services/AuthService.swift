@@ -1,4 +1,51 @@
 import Foundation
+import CryptoKit
+
+/// Portée locale active des caches et files privées. Les anciennes données sans
+/// propriétaire restent dans leur ancien namespace et ne sont jamais attribuées
+/// automatiquement au compte qui se connecte ensuite.
+enum LocalAccountScope {
+    private static let userKey = "SignalQuest.LocalAccountScope.userId.v1"
+
+    static var currentOwnerScopeId: String {
+        guard let userId = UserDefaults.standard.string(forKey: userKey), !userId.isEmpty else {
+            return "guest"
+        }
+        return "user:\(userId)"
+    }
+
+    static var storageNamespace: String {
+        SHA256.hash(data: Data(currentOwnerScopeId.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    static func activate(userId: String) {
+        UserDefaults.standard.set(userId, forKey: userKey)
+    }
+
+    static func deactivate() {
+        UserDefaults.standard.removeObject(forKey: userKey)
+    }
+}
+
+enum LocalOfflineOwnership {
+    private static func key(kind: String, id: String) -> String {
+        "SignalQuest.OfflineOwner.v1.\(kind).\(id)"
+    }
+
+    static func claim(kind: String, id: String) {
+        UserDefaults.standard.set(LocalAccountScope.currentOwnerScopeId, forKey: key(kind: kind, id: id))
+    }
+
+    static func belongsToCurrentScope(kind: String, id: String) -> Bool {
+        UserDefaults.standard.string(forKey: key(kind: kind, id: id)) == LocalAccountScope.currentOwnerScopeId
+    }
+
+    static func release(kind: String, id: String) {
+        UserDefaults.standard.removeObject(forKey: key(kind: kind, id: id))
+    }
+}
 
 protocol AuthServicing: Sendable {
     func login(email: String, password: String) async throws -> LoginResponse
@@ -182,6 +229,7 @@ final class AuthService: AuthServicing {
         // Erase end-to-end encryption material before clearing the session so a
         // different account on this device can never reuse the keys.
         await e2ee?.wipeLocalKeys()
+        LocalAccountScope.deactivate()
         api.credentials.clearAll()
         try? sessionStore.remove(Self.cachedUserKey)
     }
@@ -189,6 +237,7 @@ final class AuthService: AuthServicing {
     func clearLocalSession() async {
         // Purge locale complète, sans appel réseau (utilisée sur session expirée).
         await e2ee?.wipeLocalKeys()
+        LocalAccountScope.deactivate()
         api.credentials.clearAll()
         try? sessionStore.remove(Self.cachedUserKey)
     }
@@ -200,6 +249,7 @@ final class AuthService: AuthServicing {
     }
 
     func cacheUser(_ user: AuthUser) {
+        LocalAccountScope.activate(userId: user.id)
         guard
             let data = try? JSONEncoder.signalQuest.encode(user),
             let json = String(data: data, encoding: .utf8)
@@ -342,6 +392,8 @@ final class AuthSessionViewModel: ObservableObject {
         // l'UI jusqu'à 30 s sur le réseau. La revalidation corrige l'utilisateur
         // affiché et déconnecte proprement si la session a été révoquée.
         if service.hasStoredCredentials(), let cached = service.cachedUser() {
+            // Active le namespace local avant que les services lisent leurs caches.
+            service.cacheUser(cached)
             state = .authenticated(cached)
             Task { await revalidateSession() }
             return

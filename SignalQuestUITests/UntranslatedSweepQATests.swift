@@ -35,11 +35,13 @@ final class UntranslatedSweepQATests: XCTestCase {
         SignalQuestUITestSupport.launch(
             app,
             arguments: [
-                "--mock-auth", "--qa-demo-friends",
-                // Force la langue du PROCESSUS app : c'est le seul moyen fiable
-                // de la fixer, indépendamment des réglages du simulateur.
-                "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
-            ]
+                "--mock-auth", "--qa-demo-friends"
+            ],
+            // `sqLaunch(locale:)` est l'unique propriétaire des arguments
+            // AppleLanguages/AppleLocale. Les ajouter aussi ici produisait deux
+            // paires contradictoires, puis l'app repartait dans la langue du
+            // simulateur : le test cherchait « Profile » dans une UI française.
+            locale: "en"
         )
 
         // Noms ANGLAIS : `SignalQuestUITestSupport.tabs` est en français et ne

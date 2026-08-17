@@ -31,7 +31,7 @@ protocol RadioLogStoring: Sendable {
 /// Fichier durable, mutations sous verrou et écriture atomique. Même patron que
 /// `CoverageSessionQueue`.
 final class RadioLogStore: RadioLogStoring, @unchecked Sendable {
-    private let fileURL: URL
+    private let explicitFileURL: URL?
     private let fileManager: FileManager
     private let lock = NSLock()
     private let encoder = JSONEncoder.signalQuest
@@ -39,15 +39,19 @@ final class RadioLogStore: RadioLogStoring, @unchecked Sendable {
 
     init(fileURL: URL? = nil, fileManager: FileManager = .default) {
         self.fileManager = fileManager
-        if let fileURL {
-            self.fileURL = fileURL
-        } else {
-            let applicationSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-                ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-            self.fileURL = applicationSupport
-                .appendingPathComponent("SignalQuest", isDirectory: true)
-                .appendingPathComponent("RadioLogJournal.json", isDirectory: false)
-        }
+        self.explicitFileURL = fileURL
+    }
+
+    private var fileURL: URL {
+        if let explicitFileURL { return explicitFileURL }
+        let applicationSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        return applicationSupport
+            .appendingPathComponent("SignalQuest", isDirectory: true)
+            .appendingPathComponent(
+                "RadioLogJournal-\(LocalAccountScope.storageNamespace).json",
+                isDirectory: false
+            )
     }
 
     func load() -> RadioLogSnapshot {
@@ -127,7 +131,7 @@ private struct RadioLogSiteStatusFile: Codable {
 }
 
 final class RadioLogSiteStatusStore: RadioLogSiteStatusStoring, @unchecked Sendable {
-    private let fileURL: URL
+    private let explicitFileURL: URL?
     private let fileManager: FileManager
     private let lock = NSLock()
     private let encoder = JSONEncoder.signalQuest
@@ -137,15 +141,19 @@ final class RadioLogSiteStatusStore: RadioLogSiteStatusStoring, @unchecked Senda
 
     init(fileURL: URL? = nil, fileManager: FileManager = .default) {
         self.fileManager = fileManager
-        if let fileURL {
-            self.fileURL = fileURL
-        } else {
-            let applicationSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-                ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-            self.fileURL = applicationSupport
-                .appendingPathComponent("SignalQuest", isDirectory: true)
-                .appendingPathComponent("RadioLogSiteStatuses.json", isDirectory: false)
-        }
+        self.explicitFileURL = fileURL
+    }
+
+    private var fileURL: URL {
+        if let explicitFileURL { return explicitFileURL }
+        let applicationSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        return applicationSupport
+            .appendingPathComponent("SignalQuest", isDirectory: true)
+            .appendingPathComponent(
+                "RadioLogSiteStatuses-\(LocalAccountScope.storageNamespace).json",
+                isDirectory: false
+            )
     }
 
     func fresh(identifiedTtlMs: Int, unidentifiedTtlMs: Int, nowMs: Int) -> [String: RadioLogSiteState] {

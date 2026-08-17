@@ -12,7 +12,10 @@ import XCTest
 final class OnboardingAnimationQATests: XCTestCase {
     func testTourThroughThirdSlide() throws {
         let app = XCUIApplication()
-        app.launch()
+        // La suite complète partage le même simulateur : partir explicitement
+        // d'un onboarding vierge plutôt que de dépendre de l'ordre des tests.
+        app.launchArguments = ["--reset-auth", "--reset-onboarding"]
+        app.sqLaunch()
 
         // L'alerte système de notifications (Firebase) peut recouvrir l'écran :
         // on la ferme pour dégager la scène.
@@ -52,7 +55,8 @@ final class OnboardingAnimationQATests: XCTestCase {
         // Kill sans terminer : au relancement l'onboarding doit ENCORE être là
         // (avant correctif, le démontage du fullScreenCover écrivait le flag).
         app.terminate()
-        app.launch()
+        app.launchArguments = ["--reset-auth"]
+        app.sqLaunch()
         XCTAssertTrue(
             button("Suivant").waitForExistence(timeout: 15),
             "Onboarding marqué complété par un simple kill de l'app"
@@ -71,7 +75,8 @@ final class OnboardingAnimationQATests: XCTestCase {
 
         // Après complétion explicite, il ne revient plus.
         app.terminate()
-        app.launch()
+        app.launchArguments = ["--reset-auth"]
+        app.sqLaunch()
         XCTAssertFalse(
             button("Suivant").waitForExistence(timeout: 6),
             "L'onboarding revient alors qu'il a été complété"

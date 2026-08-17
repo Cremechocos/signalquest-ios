@@ -72,6 +72,11 @@ struct CoverageSessionUpload: Codable, Equatable, Sendable {
     var mcc: Int? = nil
     var mnc: Int? = nil
     var operatorKey: String? = nil
+    /// Nom brut de l'abonnement/SIM remonté par CoreTelephony. Il peut désigner
+    /// un MVNO et ne doit donc jamais remplacer `operatorKey` ni le PLMN observé.
+    var carrierName: String? = nil
+    var mvnoKey: String? = nil
+    var mvnoName: String? = nil
     var marketCode: String? = nil
     var showOnMap: Bool
     var points: [CoveragePointUpload]
@@ -79,6 +84,20 @@ struct CoverageSessionUpload: Codable, Equatable, Sendable {
     var idempotencyKey: String {
         "coverage-ios-\(sessionId.uuidString.lowercased())"
     }
+}
+
+struct CoverageImportResponse: Decodable, Equatable, Sendable {
+    let ok: Bool
+    let sessionId: String?
+    let totalPoints: Int?
+    let idempotent: Bool?
+    let plmnResolved: Bool?
+    let marketCode: String?
+    let operatorKey: String?
+    let mvnoKey: String?
+    let mvnoName: String?
+    let warning: String?
+    let warningMessage: String?
 }
 
 /// État local, jamais envoyé au backend.
@@ -243,7 +262,7 @@ protocol SessionsServicing: Sendable {
     func finalizeCoverageDraft(_ session: CoverageSessionUpload) throws
     func discardCoverageDraft(sessionId: UUID) throws
     /// Téléverse une session finalisée, en la conservant si la requête échoue.
-    func createCoverageSession(_ session: CoverageSessionUpload) async throws
+    func createCoverageSession(_ session: CoverageSessionUpload) async throws -> CoverageImportResponse?
     /// Reprend les brouillons interrompus et rejoue la file. Ne remonte pas l'erreur
     /// à l'appelant de cycle de vie : les éléments restent sur disque.
     func retryPendingCoverageSessions() async
@@ -258,10 +277,21 @@ extension SessionsServicing {
 }
 
 final class SessionsService: SessionsServicing, @unchecked Sendable {
+    private struct ImportResponseState {
+        var awaitedIDs = Set<UUID>()
+        var responses: [UUID: CoverageImportResponse] = [:]
+    }
     private let api: APIClient
     private let queue: CoverageSessionStoring
     /// Coalesce les drains concurrents (lancement, retour écran, fin de session).
     private let flushState = OSAllocatedUnfairLock<Task<Void, Error>?>(initialState: nil)
+    private let importResponseState = OSAllocatedUnfairLock<ImportResponseState>(initialState: .init())
+
+    /// Visibilité interne pour verrouiller l'absence d'accumulation lors des
+    /// retries de cycle de vie, qui n'attendent aucune réponse à afficher.
+    var bufferedImportResponseCount: Int {
+        importResponseState.withLock { $0.responses.count }
+    }
 
     init(api: APIClient, queueFileURL: URL? = nil) {
         self.api = api
@@ -270,18 +300,28 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
     }
 
     func persistCoverageDraft(_ session: CoverageSessionUpload) throws {
+        LocalOfflineOwnership.claim(kind: "coverage", id: session.sessionId.uuidString)
         try queue.upsert(session, state: .recording)
     }
 
     func finalizeCoverageDraft(_ session: CoverageSessionUpload) throws {
+        LocalOfflineOwnership.claim(kind: "coverage", id: session.sessionId.uuidString)
         try queue.upsert(session, state: .queued)
     }
 
     func discardCoverageDraft(sessionId: UUID) throws {
         try queue.discard(sessionId: sessionId)
+        LocalOfflineOwnership.release(kind: "coverage", id: sessionId.uuidString)
     }
 
-    func createCoverageSession(_ session: CoverageSessionUpload) async throws {
+    func createCoverageSession(_ session: CoverageSessionUpload) async throws -> CoverageImportResponse? {
+        _ = importResponseState.withLock { $0.awaitedIDs.insert(session.sessionId) }
+        defer {
+            importResponseState.withLock {
+                $0.awaitedIDs.remove(session.sessionId)
+                $0.responses.removeValue(forKey: session.sessionId)
+            }
+        }
         // Idempotent côté client : la même valeur remplace le brouillon, elle ne
         // crée jamais une seconde entrée locale.
         try finalizeCoverageDraft(session)
@@ -294,10 +334,13 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
             if (try? queue.contains(sessionId: session.sessionId)) == true {
                 try await flushPendingCoverageSessions()
             }
+            return importResponseState.withLock { $0.responses.removeValue(forKey: session.sessionId) }
         } catch {
             // Une autre entrée de la file peut avoir échoué après que celle demandée
             // a réussi. Dans ce cas, l'appel courant est bien un succès.
-            if (try? queue.contains(sessionId: session.sessionId)) == false { return }
+            if (try? queue.contains(sessionId: session.sessionId)) == false {
+                return importResponseState.withLock { $0.responses.removeValue(forKey: session.sessionId) }
+            }
             throw error
         }
     }
@@ -341,11 +384,15 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
     }
 
     private func submit(_ session: CoverageSessionUpload) async throws {
-        let _: SuccessResponse = try await api.requestJSON(
+        let response: CoverageImportResponse = try await api.requestJSON(
             "/api/coverage/session/import-ios",
             body: session,
             idempotencyKey: session.idempotencyKey
         )
+        importResponseState.withLock {
+            guard $0.awaitedIDs.contains(session.sessionId) else { return }
+            $0.responses[session.sessionId] = response
+        }
     }
 
     private func flushPendingCoverageSessions() async throws {
@@ -366,9 +413,17 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
         let pending = try queue.pendingUploads()
         var firstError: Error?
         for session in pending {
+            guard LocalOfflineOwnership.belongsToCurrentScope(
+                kind: "coverage",
+                id: session.sessionId.uuidString
+            ) else {
+                // Entrée legacy sans propriétaire, ou autre compte : quarantaine.
+                continue
+            }
             do {
                 try await submit(session)
                 try queue.discard(sessionId: session.sessionId)
+                LocalOfflineOwnership.release(kind: "coverage", id: session.sessionId.uuidString)
             } catch {
                 if firstError == nil { firstError = error }
             }

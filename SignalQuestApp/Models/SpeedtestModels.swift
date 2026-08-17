@@ -416,6 +416,11 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     let networkOperatorMnc: Int?
     let marketCode: String?
     let operatorKey: String?
+    /// Nom brut de la SIM. Un MVNO reste ici secondaire au réseau hôte porté
+    /// par `operatorKey`; il ne remplace jamais MCC/MNC.
+    let carrierName: String?
+    let mvnoKey: String?
+    let mvnoName: String?
     let wifiSSID: String?
     let city: String?
     /// Adresse (rue + commune) reverse-géocodée du point de mesure. Envoyée au
@@ -490,6 +495,9 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         networkOperatorMnc: Int? = nil,
         marketCode: String? = nil,
         operatorKey: String? = nil,
+        carrierName: String? = nil,
+        mvnoKey: String? = nil,
+        mvnoName: String? = nil,
         wifiSSID: String? = nil,
         city: String? = nil,
         address: String? = nil,
@@ -542,6 +550,9 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         self.networkOperatorMnc = networkOperatorMnc
         self.marketCode = marketCode
         self.operatorKey = operatorKey
+        self.carrierName = carrierName
+        self.mvnoKey = mvnoKey
+        self.mvnoName = mvnoName
         self.wifiSSID = wifiSSID
         self.city = city
         self.address = address
@@ -589,16 +600,22 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
             return "WiFi"
         case .cellular:
             let technology = cellularTechnology?.displayName
-            switch (networkOperatorName, technology) {
-            case let (.some(operatorName), .some(technology)):
-                return "\(operatorName) \(technology)"
-            case let (.some(operatorName), .none):
-                return operatorName
-            case let (.none, .some(technology)):
-                return technology
-            case (.none, .none):
-                return "Cellulaire"
+            let simName = mvnoName ?? carrierName
+            let operatorDisplay = [networkOperatorName, simName]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .reduce(into: [String]()) { labels, value in
+                    if !labels.contains(where: { $0.caseInsensitiveCompare(value) == .orderedSame }) {
+                        labels.append(value)
+                    }
+                }
+                .enumerated()
+                .map { $0.offset == 0 ? $0.element : "SIM \($0.element)" }
+                .joined(separator: " · ")
+            if let technology {
+                return operatorDisplay.isEmpty ? technology : "\(operatorDisplay) \(technology)"
             }
+            return operatorDisplay.isEmpty ? "Cellulaire" : operatorDisplay
         case .wired, .other:
             return networkDisplayName
         }
@@ -644,6 +661,9 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         networkOperatorMnc: nil,
         marketCode: nil,
         operatorKey: nil,
+        carrierName: nil,
+        mvnoKey: nil,
+        mvnoName: nil,
         wifiSSID: nil,
         city: nil,
         coordinate: nil,
@@ -718,6 +738,9 @@ struct SpeedtestSubmission: Encodable, Equatable {
     let mnc: Int?
     let marketCode: String?
     let operatorKey: String?
+    let carrierName: String?
+    let mvnoKey: String?
+    let mvnoName: String?
     let device: DeviceInfo
     let deviceType: String
     let deviceModel: String
@@ -763,7 +786,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
     static let currentMethodologyVersion = 5
 
     enum CodingKeys: String, CodingKey {
-        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort, methodologyVersion, engine, engineFallbackReason, requestedServerId
+        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, carrierName, mvnoKey, mvnoName, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort, methodologyVersion, engine, engineFallbackReason, requestedServerId
         case rsrp, rsrq, snr, cellId, pci, enb, gnb, radioSnapshots
         case pingDl, jitterDl, pingUl, jitterUl
     }
@@ -829,11 +852,14 @@ struct SpeedtestSubmission: Encodable, Equatable {
             coordinates: shareExactLocation ? result.coordinate : minimizedCoordinates(result.coordinate),
             city: result.city,
             address: result.address,
-            mobileOperator: mobileOperator ?? result.networkOperatorName,
+            mobileOperator: result.carrierName ?? mobileOperator ?? result.networkOperatorName,
             mcc: result.networkOperatorMcc,
             mnc: result.networkOperatorMnc,
             marketCode: result.marketCode,
             operatorKey: result.operatorKey,
+            carrierName: result.carrierName,
+            mvnoKey: result.mvnoKey,
+            mvnoName: result.mvnoName,
             device: DeviceInfo(type: "iPhone", model: deviceModel),
             deviceType: "iPhone",
             deviceModel: deviceModel,
@@ -893,6 +919,9 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encodeIfPresent(mnc, forKey: .mnc)
         try c.encodeIfPresent(marketCode, forKey: .marketCode)
         try c.encodeIfPresent(operatorKey, forKey: .operatorKey)
+        try c.encodeIfPresent(carrierName, forKey: .carrierName)
+        try c.encodeIfPresent(mvnoKey, forKey: .mvnoKey)
+        try c.encodeIfPresent(mvnoName, forKey: .mvnoName)
         try c.encode(device, forKey: .device)
         try c.encode(deviceType, forKey: .deviceType)
         try c.encode(deviceModel, forKey: .deviceModel)
@@ -939,6 +968,20 @@ struct SpeedtestSaveResponse: Codable {
               !nestedID.isEmpty else { return nil }
         return nestedID
     }
+
+    private var responseObject: [String: JSONValue]? {
+        guard case .object(let object) = data else { return nil }
+        return object
+    }
+
+    private func responseString(_ key: String) -> String? {
+        guard case .string(let value) = responseObject?[key], !value.isEmpty else { return nil }
+        return value
+    }
+
+    var resolvedOperatorKey: String? { responseString("operatorKey") }
+    var resolvedMvnoKey: String? { responseString("mvnoKey") }
+    var resolvedMvnoName: String? { responseString("mvnoName") }
 }
 
 struct SpeedtestDetail: Decodable, Identifiable, Equatable {

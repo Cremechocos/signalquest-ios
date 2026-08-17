@@ -43,10 +43,10 @@ targets:
         excludes:
           - Resources/**
           - .claude/**
-          # Glob et non un nom précis : il existe DEUX fichiers d'entitlements
-          # (l'ordinaire et celui qui porte la clé CarPlay, cf. SQ_ENTITLEMENTS
-          # dans Config/*.xcconfig). Sans le glob, XcodeGen ajouterait le second
-          # aux sources compilées de la cible.
+          # Glob et non un nom précis : un second fichier d'entitlements peut
+          # apparaître localement pour tester CarPlay au simulateur (cf.
+          # Config/Local.xcconfig et .gitignore). Sans le glob, XcodeGen
+          # l'ajouterait aux sources compilées de la cible.
           - "*.entitlements"
       - path: SignalQuestApp/Resources/Assets.xcassets
         buildPhase: resources

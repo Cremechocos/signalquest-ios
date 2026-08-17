@@ -221,7 +221,7 @@ final class UserProfileViewModel: ObservableObject {
                     // atténuée de l'hôte, que les seules parts MNO ne couvraient pas.
                     SocialProfileOperatorShare(
                         key: "LEBARA", count: 16, share: 0.08,
-                        hostKey: "BOUYGUES", brandLabel: "Lebara"
+                        hostKey: "SFR", brandLabel: "Lebara"
                     ),
                     // Sous l'ancien plancher de 5 % : présent pour verrouiller sa
                     // suppression, qui masquait des réseaux réellement mesurés.

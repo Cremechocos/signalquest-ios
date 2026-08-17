@@ -13,6 +13,10 @@ struct MapKitMapView: UIViewRepresentable {
     /// caméra a bougé » et d'éviter le hash/compare O(n) des couches à chaque pan.
     let renderVersion: Int
     let colorScheme: ColorScheme
+    /// Espace réservé aux ornements MapKit (logo Apple / mentions légales).
+    /// La carte peut rester plein écran, mais ses mentions ne doivent pas passer
+    /// sous le dock flottant de l'application.
+    let ornamentBottomInset: CGFloat
     @Binding var center: CLLocationCoordinate2D
     @Binding var zoom: Double
     let onMoveEnd: (MapBounds, Double) -> Void
@@ -29,6 +33,7 @@ struct MapKitMapView: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView(frame: .zero)
         map.delegate = context.coordinator
+        applyOrnamentInsets(to: map)
         map.showsUserLocation = true
         // Boussole native désactivée puis re-ajoutée au MILIEU-DROIT : par défaut elle
         // apparaît en haut-droite (carte tournée) et entre en collision avec le bouton
@@ -60,6 +65,7 @@ struct MapKitMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ map: MKMapView, context: Context) {
+        applyOrnamentInsets(to: map)
         context.coordinator.applyBackdrop(backdrop, on: map)
         // PERF-MAP-03 : ne resynchroniser les couches que si les données ont changé.
         // Un simple déplacement caméra (pan/zoom) réévalue `updateUIView` mais ne doit
@@ -71,6 +77,13 @@ struct MapKitMapView: UIViewRepresentable {
             context.coordinator.apply(annotations: annotations, on: map)
         }
         context.coordinator.applyCameraIfNeeded(center: center, zoom: zoom, on: map)
+    }
+
+    private func applyOrnamentInsets(to map: MKMapView) {
+        guard abs(map.layoutMargins.bottom - ornamentBottomInset) > 0.5 else { return }
+        var margins = map.layoutMargins
+        margins.bottom = ornamentBottomInset
+        map.layoutMargins = margins
     }
 
     @MainActor final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {

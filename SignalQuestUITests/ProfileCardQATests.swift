@@ -60,7 +60,7 @@ final class ProfileCardQATests: XCTestCase {
         for legend in [
             "Orange : 52 % des mesures",
             "SFR : 30 % des mesures",
-            "Lebara, sur le réseau Bouygues : 8 % des mesures",
+            "Lebara, sur le réseau SFR : 8 % des mesures",
             "Free : 4 % des mesures"
         ] {
             XCTAssertTrue(
