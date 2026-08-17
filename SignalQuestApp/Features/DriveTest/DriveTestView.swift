@@ -587,6 +587,7 @@ final class DriveTestViewModel: ObservableObject {
             mcc: plmn.mcc,
             mnc: plmn.mnc,
             operatorKey: displayedOperatorKey,
+            carrierName: services.networkPath.status.operatorName,
             marketCode: market,
             showOnMap: coverageShowOnMap,
             // Coordonnées tronquées (~111 m) avant persistance/envoi : la trace
@@ -669,16 +670,21 @@ final class DriveTestViewModel: ObservableObject {
         }
         Task {
             do {
-                try await sessions.createCoverageSession(session)
-                if marketResolved {
-                    statusLabel = String(localized: "Couverture envoyée — \(count) point")
+                let response = try await sessions.createCoverageSession(session)
+                let serverResolvedPLMN = response?.plmnResolved ?? marketResolved
+                if serverResolvedPLMN {
+                    if let mvno = response?.mvnoName, !mvno.isEmpty {
+                        statusLabel = String(localized: "Couverture envoyée — \(count) point · SIM \(mvno)")
+                    } else {
+                        statusLabel = String(localized: "Couverture envoyée — \(count) point")
+                    }
                 } else {
                     statusLabel = String(localized: "Couverture envoyée — pays non identifié")
-                    errorMessage = String(
+                    errorMessage = response?.warningMessage ?? String(
                         localized: "Ce trajet n'a pas pu être rattaché à un pays : il risque de ne pas apparaître sur la carte. Cela arrive quand l'opérateur reste indétectable (WiFi, VPN, ou pays non couvert)."
                     )
                 }
-                Self.log.notice("coverage upload OK : \(count) points, marché résolu=\(marketResolved)")
+                Self.log.notice("coverage upload OK : \(count) points, PLMN résolu=\(serverResolvedPLMN)")
             } catch {
                 errorMessage = Self.uploadFailureMessage(error, subject: "couverture")
                 Self.log.error("coverage upload ÉCHEC : \(error.localizedDescription, privacy: .public)")

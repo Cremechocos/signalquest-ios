@@ -1102,6 +1102,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             networkOperatorMnc: operatorContext.mnc,
             marketCode: operatorContext.marketCode,
             operatorKey: operatorContext.operatorKey,
+            carrierName: pathStatus.operatorName,
+            mvnoKey: nil,
+            mvnoName: nil,
             wifiSSID: wifiSSID,
             city: resolvedPlace.city,
             address: resolvedPlace.address,
@@ -1983,19 +1986,15 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             operatorEntry = market?.operatorEntry(forKey: key)
         }
 
-        // Backfill : MCC depuis le marché ; MNC = MNC principal (1er du registre) de
-        // l'opérateur résolu. Best-effort si l'opérateur a plusieurs MNC (ex. Orange
-        // 208-01/02) : l'operatorKey reste exact, le MNC sert d'indication.
-        let mcc = ctMcc ?? market?.mccs.first
-        let mnc = ctMnc ?? operatorEntry?.mncs.first
-
         return CellularOperatorContext(
             // nil quand inconnu → l'UI retombe proprement sur la techno seule.
             mobileOperator: pathStatus.operatorName
                 ?? trusted?.shortLabel ?? trusted?.label
                 ?? operatorEntry?.shortLabel ?? operatorEntry?.label,
-            mcc: mcc,
-            mnc: mnc,
+            // MCC/MNC décrivent uniquement ce que CoreTelephony a réellement
+            // exposé. Une clé IP/registre ne doit jamais fabriquer un PLMN.
+            mcc: ctMcc,
+            mnc: ctMnc,
             marketCode: market?.marketCode,
             operatorKey: operatorEntry?.key ?? trusted?.operatorKey
         )

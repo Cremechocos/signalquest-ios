@@ -48,6 +48,8 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
     let sessionDescription: String?
     let source: String?
     let operatorKey: String?
+    let mvnoKey: String?
+    let mvnoName: String?
     let startTime: Date?
     let endTime: Date?
     let durationSeconds: Double?
@@ -61,7 +63,7 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
     let showOnMap: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, description, source, operatorKey
+        case id, name, description, source, operatorKey, mvnoKey, mvnoName
         case startTime, startedAt, createdAt, endTime, endedAt, duration
         case totalPoints, pointCount, distance
         case avgSignalStrength, minSignalStrength, maxSignalStrength
@@ -75,6 +77,8 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
         sessionDescription = c.decodeFlexibleString(forKey: .description)
         source = c.decodeFlexibleString(forKey: .source)
         operatorKey = c.decodeFlexibleString(forKey: .operatorKey)
+        mvnoKey = c.decodeFlexibleString(forKey: .mvnoKey)
+        mvnoName = c.decodeFlexibleString(forKey: .mvnoName)
         startTime = (try? c.decodeIfPresent(Date.self, forKey: .startTime))
             ?? (try? c.decodeIfPresent(Date.self, forKey: .startedAt))
             ?? (try? c.decodeIfPresent(Date.self, forKey: .createdAt)) ?? nil
@@ -162,6 +166,8 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
     let tech: String?
     /// Clé canonique du RÉSEAU servant, résolue serveur (« SFR », « BOUYGUES »…).
     let operatorKey: String?
+    let mvnoKey: String?
+    let mvnoName: String?
     /// Nom de la SIM tel qu'envoyé par le client. N'est PAS une clé : ne jamais
     /// l'utiliser là où un `operatorKey` est attendu (filtrage, scope, couleur).
     let simOperator: String?
@@ -170,7 +176,7 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, latitude, lat, longitude, lng
         case signalStrength, rsrp, enb, gnb, pci, cellId
-        case technology, networkType, operatorKey, mobileOperator, timestamp
+        case technology, networkType, operatorKey, mobileOperator, mvnoKey, mvnoName, timestamp
     }
 
     init(from decoder: Decoder) throws {
@@ -191,6 +197,8 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
         // correspond à aucune clé et fausse tout ce qui s'appuie dessus.
         operatorKey = c.decodeFlexibleString(forKey: .operatorKey)
         simOperator = c.decodeFlexibleString(forKey: .mobileOperator)
+        mvnoKey = c.decodeFlexibleString(forKey: .mvnoKey)
+        mvnoName = c.decodeFlexibleString(forKey: .mvnoName)
         timestamp = (try? c.decodeIfPresent(Date.self, forKey: .timestamp)) ?? nil
     }
 
@@ -210,6 +218,8 @@ struct SessionSpeedtest: Decodable, Identifiable, Equatable {
     let jitterMs: Double?
     let mobileOperator: String?
     let operatorKey: String?
+    let mvnoKey: String?
+    let mvnoName: String?
     /// Génération/type de connexion au moment du test (ex. "5G", "4G", "LTE").
     let networkType: String?
     let timestamp: Date?
@@ -218,7 +228,7 @@ struct SessionSpeedtest: Decodable, Identifiable, Equatable {
         case id, latitude, longitude, lat, lng
         case downloadSpeed, averageSpeed, uploadAvg, uploadSpeed
         case ping, pingMin, jitter
-        case mobileOperator, operatorKey, connectionType, networkType, timestamp
+        case mobileOperator, operatorKey, mvnoKey, mvnoName, connectionType, networkType, timestamp
     }
 
     init(from decoder: Decoder) throws {
@@ -238,6 +248,8 @@ struct SessionSpeedtest: Decodable, Identifiable, Equatable {
         jitterMs = (try? c.decodeIfPresent(Double.self, forKey: .jitter)) ?? nil
         mobileOperator = c.decodeFlexibleString(forKey: .mobileOperator)
         operatorKey = c.decodeFlexibleString(forKey: .operatorKey)
+        mvnoKey = c.decodeFlexibleString(forKey: .mvnoKey)
+        mvnoName = c.decodeFlexibleString(forKey: .mvnoName)
         networkType = c.decodeFlexibleString(forKey: .connectionType)
             ?? c.decodeFlexibleString(forKey: .networkType)
         timestamp = (try? c.decodeIfPresent(Date.self, forKey: .timestamp)) ?? nil

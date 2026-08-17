@@ -212,7 +212,11 @@ final class SessionSpeedtestAnnotation: NSObject, MKAnnotation {
     }
     var subtitle: String? {
         var parts: [String] = []
-        if let op = speedtest.mobileOperator, !op.isEmpty { parts.append(op) }
+        if let op = speedtest.operatorKey ?? speedtest.mobileOperator, !op.isEmpty { parts.append(op) }
+        if let mvno = speedtest.mvnoName, !mvno.isEmpty,
+           mvno.caseInsensitiveCompare(speedtest.operatorKey ?? "") != .orderedSame {
+            parts.append("SIM \(mvno)")
+        }
         if let net = speedtest.networkType, !net.isEmpty { parts.append(net) }
         if let ping = speedtest.pingMs { parts.append("\(Int(ping.rounded())) ms") }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")

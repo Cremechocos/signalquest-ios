@@ -194,6 +194,43 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(json["operatorKey"] as? String, "SFR")
     }
 
+    func testMvnoPayloadKeepsHostNetworkAndObservedPlmnSeparate() throws {
+        let result = SpeedtestRunResult(
+            label: "MVNO", downloadMbps: 50, downloadAverageMbps: 48,
+            downloadMaxMbps: 55, durationSeconds: 10, connectionType: .cellular,
+            cellularTechnology: .fourG, networkOperatorName: "Bouygues Telecom",
+            networkOperatorMcc: 208, networkOperatorMnc: 20,
+            marketCode: "FR", operatorKey: "BOUYGUES",
+            carrierName: "Lebara Mobile", mvnoKey: "LEBARA", mvnoName: "Lebara"
+        )
+        let payload = SpeedtestSubmission.iosPayload(from: result, streams: 4, deviceModel: "iPhone")
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder.signalQuest.encode(payload)) as? [String: Any])
+
+        XCTAssertEqual(json["mcc"] as? Int, 208)
+        XCTAssertEqual(json["mnc"] as? Int, 20)
+        XCTAssertEqual(json["operatorKey"] as? String, "BOUYGUES")
+        XCTAssertEqual(json["mobileOperator"] as? String, "Lebara Mobile")
+        XCTAssertEqual(json["carrierName"] as? String, "Lebara Mobile")
+        XCTAssertEqual(json["mvnoKey"] as? String, "LEBARA")
+        XCTAssertEqual(json["mvnoName"] as? String, "Lebara")
+    }
+
+    func testSilentCoreTelephonyDoesNotInventPlmn() throws {
+        let result = SpeedtestRunResult(
+            label: "No PLMN", downloadMbps: 50, downloadAverageMbps: 48,
+            downloadMaxMbps: 55, durationSeconds: 10, connectionType: .cellular,
+            networkOperatorName: "SFR", networkOperatorMcc: nil, networkOperatorMnc: nil,
+            marketCode: "FR", operatorKey: "SFR", carrierName: "Lebara Mobile"
+        )
+        let payload = SpeedtestSubmission.iosPayload(from: result, streams: 4, deviceModel: "iPhone")
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder.signalQuest.encode(payload)) as? [String: Any])
+
+        XCTAssertNil(json["mcc"])
+        XCTAssertNil(json["mnc"])
+        XCTAssertEqual(json["operatorKey"] as? String, "SFR")
+        XCTAssertEqual(json["carrierName"] as? String, "Lebara Mobile")
+    }
+
     func testSpeedtestDetailDecodesBackendShape() throws {
         let data = Data("""
         {
@@ -427,6 +464,16 @@ final class SpeedtestTests: XCTestCase {
 
         XCTAssertEqual(creation.resolvedID, "created-id")
         XCTAssertEqual(replay.resolvedID, "replayed-id")
+    }
+
+    func testSaveResponseParsesResolvedMvnoIdentity() throws {
+        let response = try JSONDecoder.signalQuest.decode(
+            SpeedtestSaveResponse.self,
+            from: Data(#"{"success":true,"data":{"id":"speed-1","operatorKey":"BOUYGUES","mvnoKey":"LEBARA","mvnoName":"Lebara"}}"#.utf8)
+        )
+        XCTAssertEqual(response.resolvedOperatorKey, "BOUYGUES")
+        XCTAssertEqual(response.resolvedMvnoKey, "LEBARA")
+        XCTAssertEqual(response.resolvedMvnoName, "Lebara")
     }
 
     func testGuestDeletionReceiptsPersistAndAreRemovedOnlyExplicitly() {

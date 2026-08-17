@@ -455,6 +455,13 @@ struct SessionDetailView: View {
                         .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
+                    if let mvno = st.mvnoName, !mvno.isEmpty,
+                       mvno.caseInsensitiveCompare(st.operatorKey ?? "") != .orderedSame {
+                        Text("SIM \(mvno)")
+                            .font(SQFont.body(10.5, .semibold, relativeTo: .caption2))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .lineLimit(1)
+                    }
                     if let net = st.networkType, !net.isEmpty {
                         Text(net)
                             .font(SQFont.body(10.5, .semibold, relativeTo: .caption2))
