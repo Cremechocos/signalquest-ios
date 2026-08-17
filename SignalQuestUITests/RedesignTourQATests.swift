@@ -4,14 +4,29 @@ import XCTest
 /// écrans principaux (Accueil, Carte, Tester, Communauté, Messages,
 /// Conversation, Profil, Classements) et attache une capture par écran, pour
 /// comparaison avec les captures du prototype (design_handoff_creme_terracotta).
-/// Auth : token réel via `SQ_AUTH_TOKEN` si fourni, sinon mode démo.
+/// `testRedesignTour` reste un tour visuel en mode démo si aucun token n'est
+/// fourni. `testRedesignTourRealAccount` est fail-fast : il exige que
+/// `TEST_RUNNER_SQ_AUTH_TOKEN` soit transmis au runner sous `SQ_AUTH_TOKEN` et
+/// qu'une conversation réelle soit effectivement ouverte.
 @MainActor
 final class RedesignTourQATests: XCTestCase {
     override func setUp() { continueAfterFailure = true }
 
-    func testRedesignTour() throws {
+    func testRedesignTour() {
+        runTour(requireRealAccount: false)
+    }
+
+    func testRedesignTourRealAccount() {
+        runTour(requireRealAccount: true)
+    }
+
+    private func runTour(requireRealAccount: Bool) {
         let app = XCUIApplication()
         let token = ProcessInfo.processInfo.environment["SQ_AUTH_TOKEN"] ?? ""
+        if requireRealAccount && token.isEmpty {
+            XCTFail("QA compte réel : TEST_RUNNER_SQ_AUTH_TOKEN requis")
+            return
+        }
         if token.isEmpty {
             app.launchArguments += ["--mock-auth"]
         } else {
@@ -53,7 +68,11 @@ final class RedesignTourQATests: XCTestCase {
         tapTab("Communauté", in: app)
         Thread.sleep(forTimeInterval: 2)
         let messages = app.buttons["Messages"].firstMatch
-        if messages.waitForExistence(timeout: 6) {
+        let messagesExist = messages.waitForExistence(timeout: 6)
+        if requireRealAccount {
+            XCTAssertTrue(messagesExist, "Le bouton Messages doit être accessible avec le compte réel")
+        }
+        if messagesExist {
             messages.tap()
             Thread.sleep(forTimeInterval: 3)
             // Ferme la feuille de déverrouillage E2EE AVANT la capture (elle
@@ -75,6 +94,8 @@ final class RedesignTourQATests: XCTestCase {
                 let cancel = app.buttons["Annuler"]
                 if cancel.exists { cancel.tap(); Thread.sleep(forTimeInterval: 1) }
                 snap(app, "09-conversation")
+            } else if requireRealAccount {
+                XCTFail("Aucune conversation réelle n'a été ouverte ; le tour ne doit pas valider des données démo")
             }
         }
 
