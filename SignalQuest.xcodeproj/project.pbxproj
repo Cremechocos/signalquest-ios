@@ -2219,6 +2219,7 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
+				"$(SRCROOT)/SignalQuestApp",
 			);
 			name = "Validate Build Environment";
 			outputFileListPaths = (

@@ -39,6 +39,11 @@ struct Photo: Codable, Identifiable, Equatable {
     let socialPostId: String?
     let approved: Bool?
     let `operator`: String?
+    /// Marché et réseaux réellement portés par le support. Ils permettent à
+    /// l'auteur de corriger l'attribution d'une photo mutualisée sans déplacer
+    /// la photo vers une autre antenne.
+    let marketCode: String?
+    let siteOperators: [String]?
     let commentCount: Int?
     let repostsCount: Int?
     let favoritesCount: Int?
@@ -54,7 +59,7 @@ struct Photo: Codable, Identifiable, Equatable {
     let longitude: Double?
 
     enum CodingKeys: String, CodingKey {
-        case id, siteId, enb, imageUrl, thumbnailUrl, ogImageUrl, uploadedAt, createdAt, description, caption, likes, likeCount, socialPostId, approved, commentCount, repostsCount, favoritesCount, reactions, likedByCurrentUser, isLikedByMe, userReaction, authorId, authorName, authorAvatar, siteAddress, latitude, longitude
+        case id, siteId, enb, imageUrl, thumbnailUrl, ogImageUrl, uploadedAt, createdAt, description, caption, likes, likeCount, socialPostId, approved, commentCount, repostsCount, favoritesCount, reactions, likedByCurrentUser, isLikedByMe, userReaction, authorId, authorName, authorAvatar, siteAddress, latitude, longitude, marketCode, siteOperators
         case `operator` = "operator"
     }
 
@@ -88,4 +93,3 @@ struct PhotoLikeResponse: Codable {
     let likes: Int?
     let reactions: [SocialReactionSummary]?
 }
-

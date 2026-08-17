@@ -129,6 +129,39 @@ final class AuthTransportTests: XCTestCase {
             )
         }
     }
+
+    func testPhotoOperatorUpdateUsesAnAuthenticatedPatch() async throws {
+        let (client, log) = makeClient(token: "jwt-abc")
+        let service = PhotoService(api: client)
+
+        try await service.updatePhotoOperator(photoId: "photo-1", operatorName: "VODAFONE")
+
+        let request = try XCTUnwrap(log.last)
+        XCTAssertEqual(request.httpMethod, "PATCH")
+        XCTAssertEqual(request.url?.path, "/api/photos/photo-1")
+        XCTAssertEqual(request.allHTTPHeaderFields?["Cookie"], "auth_token=jwt-abc")
+        XCTAssertEqual(request.allHTTPHeaderFields?["Content-Type"], "application/json")
+    }
+
+    /// URLSession peut remettre le corps dans un flux avant l'interception par
+    /// `URLProtocol`; on vérifie donc son encodage à la frontière qui le crée.
+    func testPhotoOperatorPatchPayloadIsEncodedInURLRequest() throws {
+        let (client, _) = makeClient(token: "jwt-abc")
+        let body = try JSONEncoder().encode(["operator": "VODAFONE"])
+        let request = try client.makeURLRequest(
+            APIEndpoint(
+                path: "/api/photos/photo-1",
+                method: .patch,
+                headers: ["Content-Type": "application/json"],
+                body: body
+            )
+        )
+
+        let payload = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: try XCTUnwrap(request.httpBody)) as? [String: String]
+        )
+        XCTAssertEqual(payload["operator"], "VODAFONE")
+    }
 }
 
 private final class RequestLog: @unchecked Sendable {

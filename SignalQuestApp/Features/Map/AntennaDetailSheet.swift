@@ -85,6 +85,10 @@ struct AntennaDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewerPhoto: AntennaPhotoSummary?
     @State private var photoPickerItem: PhotosPickerItem?
+    /// L'image est conservée quelques instants le temps de choisir sa facette
+    /// sur un support mutualisé. Aucun upload ne part avant ce choix.
+    @State private var pendingPhotoUploadItem: PhotosPickerItem?
+    @State private var showPhotoOperatorPicker = false
     @State private var showReportSheet = false
     /// Pannes communautaires ouvertes sur ce site, rechargées à chaque changement d'opérateur :
     /// une panne est scopée à un opérateur, donc basculer de facette change la réponse.
@@ -258,17 +262,31 @@ struct AntennaDetailSheet: View {
         }
         .onChangeCompat(of: photoPickerItem) { _, newValue in
             guard let newValue else { return }
-            Task {
-                await model.uploadPhoto(
-                    item: newValue,
-                    photos: services.photos,
-                    siteId: site.siteId ?? site.id,
-                    anfrCode: site.anfrCode,
-                    operatorName: selectedOperator,
-                    market: market
-                )
+            if photoOperatorChoices.count > 1 {
+                pendingPhotoUploadItem = newValue
+                showPhotoOperatorPicker = true
                 photoPickerItem = nil
+            } else {
+                submitPhotoUpload(newValue, operatorName: photoOperatorChoices.first ?? selectedOperator)
             }
+        }
+        .confirmationDialog(
+            "Cette photo concerne quel réseau ?",
+            isPresented: $showPhotoOperatorPicker,
+            titleVisibility: .visible
+        ) {
+            ForEach(photoOperatorChoices, id: \.self) { networkOperator in
+                Button(photoOperatorLabel(networkOperator)) {
+                    guard let item = pendingPhotoUploadItem else { return }
+                    pendingPhotoUploadItem = nil
+                    submitPhotoUpload(item, operatorName: networkOperator)
+                }
+            }
+            Button("Annuler", role: .cancel) {
+                pendingPhotoUploadItem = nil
+            }
+        } message: {
+            Text("Le support est partagé. Choisis le réseau réellement visible sur la photo.")
         }
     }
 
@@ -301,6 +319,31 @@ struct AntennaDetailSheet: View {
             }
         }
         .foregroundStyle(SQColor.label)
+    }
+
+    private var photoOperatorChoices: [String] {
+        Array(Set(site.operators
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() }
+            .filter { !$0.isEmpty && $0 != "ALL" }))
+            .sorted()
+    }
+
+    private func photoOperatorLabel(_ key: String) -> String {
+        MarketRegistryEntry.operatorLabel(key, in: marketEntry)
+    }
+
+    private func submitPhotoUpload(_ item: PhotosPickerItem, operatorName: String) {
+        Task {
+            await model.uploadPhoto(
+                item: item,
+                photos: services.photos,
+                siteId: site.siteId ?? site.id,
+                anfrCode: site.anfrCode,
+                operatorName: operatorName,
+                market: market
+            )
+            photoPickerItem = nil
+        }
     }
 
     /// Deux gestes qu'on veut faire une fois sur place — ou avant d'y aller :

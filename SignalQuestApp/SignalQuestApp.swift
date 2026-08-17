@@ -16,6 +16,12 @@ struct SignalQuestApp: App {
     @AppStorage(SQOledPalette.storageKey) private var pureBlack = false
 
     init() {
+        // Le test UI d'onboarding doit pouvoir repartir d'une première
+        // ouverture, même après les autres parcours de la même suite. Ce flag
+        // est éliminé des binaires Release par AppEnvironment.
+        if AppEnvironment.resetsOnboardingOnLaunch {
+            UserDefaults.standard.set(false, forKey: "sq.hasCompletedOnboarding")
+        }
         // Le graphe vient du holder plutôt que d'être construit ici : une scène
         // CarPlay peut se connecter AVANT cette fenêtre (app lancée en
         // arrière-plan au branchement du véhicule) et doit partager exactement
