@@ -27,6 +27,105 @@
         }
       }
     },
+    "Signal par opérateur" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal by carrier"
+          }
+        }
+      }
+    },
+    "Position inconnue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location unknown"
+          }
+        }
+      }
+    },
+    "La communauté n'a pas encore assez mesuré cette zone." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The community hasn't measured this area enough yet."
+          }
+        }
+      }
+    },
+    "Impossible de charger pour le moment." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't load right now."
+          }
+        }
+      }
+    },
+    "Débit par opérateur" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speed by carrier"
+          }
+        }
+      }
+    },
+    "Comparer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare"
+          }
+        }
+      }
+    },
+    "Autorise la localisation pour voir les sites autour." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow location access to see nearby sites."
+          }
+        }
+      }
+    },
+    "Autorise la localisation pour comparer les opérateurs." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow location access to compare carriers."
+          }
+        }
+      }
+    },
+    "Aucun site connu dans un rayon de 5 km." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No known site within 5 km."
+          }
+        }
+      }
+    },
     "—" : {
       "localizations" : {
         "en" : {

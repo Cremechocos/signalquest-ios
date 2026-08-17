@@ -170,26 +170,98 @@ struct SocialStory: Codable, Identifiable, Equatable {
 
 /// Réponse de `GET /api/social/network-pulse` : agrégat réseau autour d'une
 /// position (RSRP moyen, débit médian, meilleur opérateur de la zone).
+/// Part d'une technologie dans les mesures de la zone.
+struct NetworkPulseTechnology: Decodable, Equatable {
+    let technology: String
+    let sampleCount: Int
+    /// Part [0,1] du total des mesures de couverture.
+    let share: Double
+}
+
+/// Un opérateur du podium de la zone.
+struct NetworkPulseOperator: Decodable, Equatable {
+    let operatorKey: String
+    let label: String
+    let avgRsrpDbm: Int?
+    let medianDownloadMbps: Int?
+    let sampleCount: Int
+}
+
+/// Comparaison aux 30 jours précédant la fenêtre courante.
+struct NetworkPulseTrend: Decodable, Equatable {
+    let baselineMedianDownloadMbps: Int
+    /// Écart en % : positif = mieux que d'habitude.
+    let deltaPercent: Int
+    let baselineSampleCount: Int
+}
+
+struct NetworkPulseReference: Decodable, Equatable {
+    let scope: String
+    let label: String
+    let medianDownloadMbps: Int
+    let sampleCount: Int
+}
+
 struct NetworkPulse: Decodable, Equatable {
     let avgRsrpDbm: Int?
     let medianDownloadMbps: Int?
     let measurementsCount: Int
     let bestOperator: String?
     let radiusMeters: Int?
+    /// Fenêtre agrégée par le serveur. Le contrat courant reste fixé à 7 jours ;
+    /// les zones rares élargissent leur rayon, pas leur ancienneté.
+    let windowDays: Int
+    /// Date de la mesure la plus récente. Source de la fraîcheur affichée.
+    let lastMeasuredAt: Date?
+    let operators: [NetworkPulseOperator]
+    let technologies: [NetworkPulseTechnology]
+    let trend: NetworkPulseTrend?
+    let reference: NetworkPulseReference?
 
     /// Rien à afficher tant qu'aucune mesure n'a été agrégée dans la zone.
     var hasData: Bool { measurementsCount > 0 }
 
-    init(avgRsrpDbm: Int?, medianDownloadMbps: Int?, measurementsCount: Int, bestOperator: String?, radiusMeters: Int?) {
+    /// Le pouls décrit-il vraiment l'instant présent ? Sert à n'animer la pastille
+    /// « live » que lorsqu'elle dit quelque chose de vrai.
+    var isLive: Bool {
+        isLive(at: Date())
+    }
+
+    func isLive(at now: Date) -> Bool {
+        guard windowDays <= 7, let last = lastMeasuredAt else { return false }
+        let age = now.timeIntervalSince(last)
+        return age >= 0 && age < 3 * 3600
+    }
+
+    init(
+        avgRsrpDbm: Int?,
+        medianDownloadMbps: Int?,
+        measurementsCount: Int,
+        bestOperator: String?,
+        radiusMeters: Int?,
+        windowDays: Int = 365,
+        lastMeasuredAt: Date? = nil,
+        operators: [NetworkPulseOperator] = [],
+        technologies: [NetworkPulseTechnology] = [],
+        trend: NetworkPulseTrend? = nil,
+        reference: NetworkPulseReference? = nil
+    ) {
         self.avgRsrpDbm = avgRsrpDbm
         self.medianDownloadMbps = medianDownloadMbps
         self.measurementsCount = measurementsCount
         self.bestOperator = bestOperator
         self.radiusMeters = radiusMeters
+        self.windowDays = windowDays
+        self.lastMeasuredAt = lastMeasuredAt
+        self.operators = operators
+        self.technologies = technologies
+        self.trend = trend
+        self.reference = reference
     }
 
     enum CodingKeys: String, CodingKey {
         case avgRsrpDbm, medianDownloadMbps, measurementsCount, bestOperator, radiusMeters
+        case windowDays, lastMeasuredAt, operators, technologies, trend, reference
     }
 
     init(from decoder: Decoder) throws {
@@ -207,9 +279,34 @@ struct NetworkPulse: Decodable, Equatable {
         // doit pas faire échouer tout le décodage du pouls réseau (ROB-06).
         bestOperator = c.decodeFlexibleString(forKey: .bestOperator)
         radiusMeters = intFlex(.radiusMeters)
+        // Défaut 365 : un serveur qui n'enverrait pas le champ agrège l'année, comme
+        // avant. Mieux vaut annoncer une fenêtre large que laisser croire au direct.
+        windowDays = intFlex(.windowDays) ?? 365
+        // `SQDateParsing` est le décodeur de dates partagé du repo : il essaie ISO
+        // avec puis sans fraction, etc. Pas de formateur ad hoc ici.
+        lastMeasuredAt = ((try? c.decodeIfPresent(String.self, forKey: .lastMeasuredAt)) ?? nil)
+            .flatMap(SQDateParsing.parse)
+        operators = (try? c.decode([NetworkPulseOperator].self, forKey: .operators)) ?? []
+        technologies = (try? c.decode([NetworkPulseTechnology].self, forKey: .technologies)) ?? []
+        trend = try? c.decode(NetworkPulseTrend.self, forKey: .trend)
+        reference = try? c.decode(NetworkPulseReference.self, forKey: .reference)
     }
 
-    static let demo = NetworkPulse(avgRsrpDbm: -85, medianDownloadMbps: 120, measurementsCount: 42, bestOperator: "Orange", radiusMeters: 3000)
+    static let demo = NetworkPulse(
+        avgRsrpDbm: -85, medianDownloadMbps: 120, measurementsCount: 42,
+        bestOperator: "Orange", radiusMeters: 3000, windowDays: 7,
+        lastMeasuredAt: Date().addingTimeInterval(-900),
+        operators: [
+            NetworkPulseOperator(operatorKey: "ORANGE", label: "Orange", avgRsrpDbm: -82, medianDownloadMbps: 145, sampleCount: 120),
+            NetworkPulseOperator(operatorKey: "SFR", label: "SFR", avgRsrpDbm: -88, medianDownloadMbps: 110, sampleCount: 74),
+        ],
+        technologies: [
+            NetworkPulseTechnology(technology: "5G", sampleCount: 120, share: 0.62),
+            NetworkPulseTechnology(technology: "4G", sampleCount: 74, share: 0.38),
+        ],
+        trend: NetworkPulseTrend(baselineMedianDownloadMbps: 105, deltaPercent: 14, baselineSampleCount: 260),
+        reference: NetworkPulseReference(scope: "city", label: "Lyon", medianDownloadMbps: 98, sampleCount: 61)
+    )
 }
 
 struct SocialSignalSummary: Codable, Equatable {

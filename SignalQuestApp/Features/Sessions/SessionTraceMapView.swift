@@ -177,7 +177,7 @@ final class ServingAntennaAnnotation: NSObject, MKAnnotation {
     init(_ antenna: ServingAntenna) { self.antenna = antenna }
 
     var coordinate: CLLocationCoordinate2D { antenna.coordinate }
-    var title: String? { antenna.operatorName ?? antenna.displayName ?? "Antenne" }
+    var title: String? { antenna.operatorDisplayName ?? antenna.displayName ?? "Antenne" }
     var subtitle: String? {
         var parts: [String] = [antenna.status.label]
         if let d = antenna.distanceKm, d > 0 {

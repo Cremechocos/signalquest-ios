@@ -359,7 +359,11 @@ final class SocialFeedService: SocialFeedServicing {
             query.append(URLQueryItem(name: "radius", value: String(radiusMeters)))
         }
         return try await api.request(
-            APIEndpoint(path: "/api/social/network-pulse", query: query),
+            APIEndpoint(
+                path: "/api/social/network-pulse",
+                query: query,
+                headers: ["Cache-Control": "no-cache"]
+            ),
             as: NetworkPulse.self
         )
     }

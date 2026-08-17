@@ -26,6 +26,23 @@ enum LayersGridBuilder {
                      onSentinelle: (() -> Void)? = nil,
                      onSearch: (() -> Void)? = nil,
                      onRecents: (() -> Void)? = nil) -> CPGridTemplate {
+        CPGridTemplate(
+            title: String(localized: "Plus"),
+            gridButtons: buttons(current: current, onToggle: onToggle,
+                                 onSentinelle: onSentinelle, onSearch: onSearch, onRecents: onRecents)
+        )
+    }
+
+    /// Boutons de la grille, extraits de `make` pour pouvoir être RECONSTRUITS.
+    ///
+    /// Sans cela, appuyer sur une couche sauvegardait bien le filtre mais
+    /// laissait le libellé inchangé : le « ✓ » ne bougeait pas, et rien
+    /// n'indiquait que l'appui avait été pris en compte.
+    static func buttons(current: Set<MapDisplayItem.Kind>,
+                        onToggle: @escaping (MapDisplayItem.Kind) -> Void,
+                        onSentinelle: (() -> Void)? = nil,
+                        onSearch: (() -> Void)? = nil,
+                        onRecents: (() -> Void)? = nil) -> [CPGridButton] {
         var buttons = offered.map { kind in
             CPGridButton(
                 titleVariants: [title(for: kind, active: current.contains(kind))],
@@ -55,8 +72,7 @@ enum LayersGridBuilder {
         }
         // Troncature explicite : au-delà du plafond, CarPlay coupe en silence et
         // la dernière entrée disparaîtrait sans que rien ne le signale.
-        return CPGridTemplate(title: String(localized: "Plus"),
-                              gridButtons: Array(buttons.prefix(Int(CPGridTemplateMaximumItems))))
+        return Array(buttons.prefix(Int(CPGridTemplateMaximumItems)))
     }
 
     static func title(for kind: MapDisplayItem.Kind, active: Bool) -> String {

@@ -6,6 +6,8 @@ protocol MapSnapshotServicing: Sendable {
     /// Flux temps réel des amis (position + présence + radio), branché sur le SSE
     /// serveur `/api/social/map/stream`. Se reconnecte automatiquement.
     func friendsStream(sse: SSEClient) -> AsyncStream<[SocialFriendLive]>
+    /// Repli REST minimal si le SSE se termine définitivement.
+    func friendsSnapshot() async throws -> [SocialFriendLive]
     func plannedSites(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> [PlannedSiteLive]
     func outageSites(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> [OutageSiteLive]
     /// Les incidents déclarés par les opérateurs pour UN site (fiche antenne).
@@ -93,7 +95,10 @@ final class MapSnapshotService: MapSnapshotServicing {
                 let decoder = JSONDecoder.signalQuest
                 for await (_, data) in sse.dataStream(
                     path: "/api/social/map/stream",
-                    query: [URLQueryItem(name: "full", value: "false")],
+                    query: [
+                        URLQueryItem(name: "full", value: "false"),
+                        URLQueryItem(name: "only", value: "friends")
+                    ],
                     keep: ["snapshot"]
                 ) {
                     guard let payload = data.data(using: .utf8),
@@ -105,6 +110,21 @@ final class MapSnapshotService: MapSnapshotServicing {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    func friendsSnapshot() async throws -> [SocialFriendLive] {
+        struct FriendsEnvelope: Decodable { let friends: [SocialFriendLive] }
+        let envelope: FriendsEnvelope = try await api.request(
+            APIEndpoint(
+                path: "/api/social/map/snapshot",
+                query: [
+                    URLQueryItem(name: "lightweight", value: "1"),
+                    URLQueryItem(name: "only", value: "friends")
+                ]
+            ),
+            as: FriendsEnvelope.self
+        )
+        return envelope.friends
     }
 
     func plannedSites(market: String, operatorName: String, territory: String? = nil, bands: Set<Int> = []) async throws -> [PlannedSiteLive] {

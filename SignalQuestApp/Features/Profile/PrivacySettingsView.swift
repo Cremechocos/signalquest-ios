@@ -295,6 +295,7 @@ struct PrivacySettingsView: View {
             .listRowBackground(SQColor.surface)
 
             Section("Présence") {
+                PresencePreferenceControls(service: services.livePresence)
                 Picker("Afficher ma dernière activité", selection: $model.lastSeenVisibility) {
                     Text("À mes amis").tag(LastSeenVisibility.friends)
                     Text("À personne").tag(LastSeenVisibility.none)
@@ -413,6 +414,35 @@ struct PrivacySettingsView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(zone.name), masquer mes speedtests")
         .accessibilityValue(zone.hideSpeedtestsOnMap ? "activé" : "désactivé")
+    }
+}
+
+private struct PresencePreferenceControls: View {
+    @ObservedObject var service: LivePresenceService
+
+    var body: some View {
+        Picker(
+            "Mon statut",
+            selection: Binding(
+                get: { service.status },
+                set: { service.setPresence(status: $0, customStatus: service.customStatus) }
+            )
+        ) {
+            ForEach(
+                [SocialPresenceStatus.online, .away, .dnd, .invisible],
+                id: \.self
+            ) { status in
+                Text(status.label).tag(status)
+            }
+        }
+        TextField(
+            "Statut personnalisé (facultatif)",
+            text: Binding(
+                get: { service.customStatus ?? "" },
+                set: { service.setPresence(status: service.status, customStatus: $0) }
+            )
+        )
+        .textInputAutocapitalization(.sentences)
     }
 }
 

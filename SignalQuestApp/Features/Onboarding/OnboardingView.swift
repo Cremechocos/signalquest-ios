@@ -98,7 +98,6 @@ struct OnboardingView: View {
         // Rendu stable voulu : l'écran suit la taille de texte de l'utilisateur
         // jusqu'à xxLarge puis plafonne — jamais les tailles accessibilité
         // géantes qui explosaient la composition (choix produit, juil. 2026).
-        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
     }
 
     // MARK: Header

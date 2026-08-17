@@ -131,9 +131,131 @@ final class FriendsContractTests: XCTestCase {
     }
 }
 
+/// Contrats iOS des routes live-share déjà consommées par Android. Ces tests
+/// verrouillent surtout les noms de champs sensibles (offerShare, PLMN, payload)
+/// et les sous-chemins d'action.
+final class LiveShareContractTests: XCTestCase {
+    private var service: MessagesService!
+
+    override func setUp() {
+        super.setUp()
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        service = MessagesService(
+            api: APIClient(
+                config: .test,
+                credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+                session: URLSession(configuration: config)
+            )
+        )
+    }
+
+    override func tearDown() {
+        MockURLProtocol.requestHandler = nil
+        service = nil
+        super.tearDown()
+    }
+
+    func testCreateLiveShareSendsTargetsAndPLMN() async throws {
+        let box = RequestBox()
+        respond(
+            """
+            {
+              "mode":"broadcast","createdCount":1,"skippedCount":0,
+              "sessions":[{
+                "id":"ls-1","conversationId":"c-1","requesterId":"u-2",
+                "sharerId":"me","status":"active","message":"Route"
+              }]
+            }
+            """,
+            capture: box
+        )
+
+        let response = try await service.createLiveShare(
+            conversationId: "c-1",
+            offerShare: true,
+            message: " Route ",
+            mode: "broadcast",
+            targetUserId: nil,
+            targetUserIds: ["u-3", "u-2", "u-2"],
+            mobileCountryCode: 208,
+            mobileNetworkCode: 10
+        )
+
+        XCTAssertEqual(response.sessions.map(\.id), ["ls-1"])
+        XCTAssertEqual(box.path, "/api/live-share/requests")
+        let body = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: box.body ?? Data()) as? [String: Any]
+        )
+        XCTAssertEqual(body["offerShare"] as? Bool, true)
+        XCTAssertEqual(body["mobileCountryCode"] as? Int, 208)
+        XCTAssertEqual(body["mobileNetworkCode"] as? Int, 10)
+        XCTAssertEqual(body["message"] as? String, "Route")
+        XCTAssertEqual(body["targetUserIds"] as? [String], ["u-2", "u-3"])
+    }
+
+    func testLiveShareListUsesConversationQueryAndDecodesStoredPayload() async throws {
+        let box = RequestBox()
+        respond(
+            #"{"sessions":[{"id":"ls-2","conversationId":"c/2","requesterId":"me","sharerId":"u-2","status":"active","lastPayload":"{\"location\":{\"latitude\":48.85,\"longitude\":2.35},\"radio\":{\"technology\":\"5G NSA\",\"mcc\":208,\"mnc\":10}}","lastUpdateAt":"2026-08-17T10:00:00.000Z"}]}"#,
+            capture: box
+        )
+
+        let sessions = try await service.liveShareSessions(conversationId: "c/2")
+        XCTAssertEqual(box.path, "/api/live-share/sessions")
+        XCTAssertEqual(box.query, "conversationId=c/2")
+        XCTAssertEqual(sessions.first?.decodedPayload?.location?.latitude, 48.85)
+        XCTAssertEqual(sessions.first?.decodedPayload?.radio?.technology, "5G NSA")
+    }
+
+    func testLiveShareUpdateKeepsPayloadEnvelopeAndActionPath() async throws {
+        let box = RequestBox()
+        respond(
+            #"{"session":{"id":"ls-3","conversationId":"c-1","requesterId":"u-2","sharerId":"me","status":"active"}}"#,
+            capture: box
+        )
+        let payload = LiveSharePayload(
+            radio: LiveShareRadio(connectionType: "4G", operatorName: "SFR", mcc: 208, mnc: 10),
+            location: LiveShareLocation(
+                latitude: 48.8,
+                longitude: 2.3,
+                accuracy: 6,
+                altitude: nil,
+                speed: nil,
+                heading: nil
+            ),
+            at: "2026-08-17T10:00:00Z"
+        )
+
+        _ = try await service.updateLiveShare(sessionId: "ls-3", payload: payload)
+        XCTAssertEqual(box.path, "/api/live-share/sessions/ls-3/update")
+        let body = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: box.body ?? Data()) as? [String: Any]
+        )
+        let encodedPayload = try XCTUnwrap(body["payload"] as? [String: Any])
+        XCTAssertEqual((encodedPayload["radio"] as? [String: Any])?["operator"] as? String, "SFR")
+        XCTAssertEqual((encodedPayload["location"] as? [String: Any])?["accuracy"] as? Double, 6)
+    }
+
+    private func respond(_ json: String, capture box: RequestBox) {
+        MockURLProtocol.requestHandler = { request in
+            box.method = request.httpMethod ?? ""
+            box.path = request.url?.path ?? ""
+            box.query = request.url?.query
+            box.body = request.sq_bodyData
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(json.utf8))
+        }
+    }
+}
+
 private final class RequestBox: @unchecked Sendable {
     var method = ""
     var path = ""
+    var query: String?
     var body: Data?
 }
 

@@ -192,7 +192,7 @@ extension CallsServicing {
 final class CallsService: CallsServicing {
     private let api: APIClient
     private let cache: DiskCache
-    private static let historyCacheKey = "history"
+    private var historyCacheKey: String { "history-\(LocalAccountScope.storageNamespace)" }
 
     init(api: APIClient, cache: DiskCache = DiskCache(folderName: "SignalQuestCallsHistory")) {
         self.api = api
@@ -243,26 +243,26 @@ final class CallsService: CallsServicing {
         let calls = r.calls ?? r.items ?? []
         if page == 1 {
             // 1re page mémorisée pour un affichage instantané à la prochaine ouverture.
-            try? await cache.write(calls.map(CachedCallSession.init), for: Self.historyCacheKey)
+            try? await cache.write(calls.map(CachedCallSession.init), for: historyCacheKey)
         }
         return calls
     }
 
     func cachedHistory() async -> [CallSession] {
-        guard let cached = try? await cache.read([CachedCallSession].self, for: Self.historyCacheKey) else { return [] }
+        guard let cached = try? await cache.read([CachedCallSession].self, for: historyCacheKey) else { return [] }
         return cached.map(\.session)
     }
 
     func clearHistory() async throws {
         try await api.request(APIEndpoint(path: "/api/calls/history", method: .delete))
-        await cache.remove(Self.historyCacheKey)
+        await cache.remove(historyCacheKey)
     }
 
     func deleteEntry(callId: String) async throws {
         try await api.request(APIEndpoint(path: "/api/calls/\(callId)", method: .delete))
         // Le cache ne contient que la 1re page : on l'invalide pour éviter de réafficher
         // l'appel supprimé avant le prochain fetch réseau.
-        await cache.remove(Self.historyCacheKey)
+        await cache.remove(historyCacheKey)
     }
 }
 

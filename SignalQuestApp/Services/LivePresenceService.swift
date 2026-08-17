@@ -6,14 +6,12 @@ import os
 /// des amis. Publie périodiquement vers `POST /api/social/presence` (position) et
 /// `POST /api/social/radio-snapshot` (techno/opérateur — iOS n'expose pas le RSRP).
 ///
-/// Le backend gate la position par `shareLiveLocationWithFriends` et purge au-delà
-/// de 180 s ; on double ce garde-fou côté client (on n'envoie pas de coordonnées
-/// quand le partage est coupé) pour l'économie réseau et la vie privée.
+/// La présence (en ligne/absent/DND/invisible) est indépendante de la position.
+/// Le backend gate les coordonnées par `shareLiveLocationWithFriends` et purge au-delà
+/// de 180 s ; le client n'envoie jamais de coordonnées quand le partage est coupé.
 ///
-/// Deux modes (réglage local, cf. `LiveShareMode`) :
-///  · `mapOpenOnly` : publie seulement pendant que la carte des amis est ouverte ;
-///  · `foregroundLive` : publie tant que le partage est actif et l'app au premier
-///    plan, même carte fermée.
+/// Les deux modes `LiveShareMode` pilotent uniquement les coordonnées. Le heartbeat
+/// de présence continue au premier plan même si la carte est fermée.
 ///
 /// Parité Android : intervalle ~15 s, saut si déplacement < 15 m (sauf silence
 /// > 5 min). On s'appuie sur des relevés one-shot `LocationService.currentLocation()`
@@ -30,14 +28,18 @@ final class LivePresenceService: ObservableObject {
     @Published private(set) var mode: LiveShareMode = LiveShareModeStore.load()
     /// Vrai quand la boucle de publication tourne. Alimente l'indicateur « en direct ».
     @Published private(set) var isBroadcasting = false
+    @Published private(set) var status = SocialPresencePreferenceStore.loadStatus()
+    @Published private(set) var customStatus = SocialPresencePreferenceStore.loadCustomStatus()
 
     /// Miroirs locaux des réglages serveur, rechargés via `refreshSharingSettings()`.
     private var shareLocation = false
     private var shareRadio = false
+    private var settingsLoaded = false
     /// Carte des amis actuellement à l'écran (pilote `mapOpenOnly`).
     private var mapVisible = false
 
     private var loopTask: Task<Void, Never>?
+    private var presenceUpdateTask: Task<Void, Never>?
     private var lastSentLocation: CLLocation?
     private var lastSentAt: Date?
     private var hasBroadcasted = false
@@ -82,9 +84,25 @@ final class LivePresenceService: ObservableObject {
     /// au lancement (pour amorcer le mode continu) et après une modification des
     /// réglages de confidentialité.
     func refreshSharingSettings() async {
-        if let settings = try? await privacy.get() {
+        async let fetchedSettings = try? privacy.get()
+        async let fetchedPresence: OwnPresenceEnvelope? = try? api.request(
+            APIEndpoint(path: "/api/user/presence"),
+            as: OwnPresenceEnvelope.self
+        )
+        let (settings, presenceEnvelope) = await (fetchedSettings, fetchedPresence)
+        if let settings {
             shareLocation = settings.shareLiveLocationWithFriends
             shareRadio = settings.shareRadioDataWithFriends
+            settingsLoaded = true
+        }
+        if let presence = presenceEnvelope?.presence {
+            if let serverStatus = presence.status, serverStatus != .offline {
+                status = serverStatus
+            }
+            customStatus = presence.customStatus.map {
+                String($0.trimmingCharacters(in: .whitespacesAndNewlines).prefix(100))
+            }?.nilIfBlank
+            SocialPresencePreferenceStore.save(status: status, customStatus: customStatus)
         }
         reevaluate()
     }
@@ -94,7 +112,33 @@ final class LivePresenceService: ObservableObject {
     func applySharingSettings(shareLocation: Bool, shareRadio: Bool) {
         self.shareLocation = shareLocation
         self.shareRadio = shareRadio
+        settingsLoaded = true
         reevaluate()
+    }
+
+    /// Met à jour le statut propre de l'utilisateur. L'envoi est débouncé pour ne
+    /// pas publier chaque frappe du statut personnalisé.
+    func setPresence(status newStatus: SocialPresenceStatus, customStatus newCustomStatus: String?) {
+        status = newStatus == .offline ? .online : newStatus
+        customStatus = String(
+            (newCustomStatus ?? "").trimmingCharacters(in: .whitespacesAndNewlines).prefix(100)
+        ).nilIfBlank
+        SocialPresencePreferenceStore.save(status: status, customStatus: customStatus)
+        presenceUpdateTask?.cancel()
+        presenceUpdateTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled, let self, self.shouldBroadcast else { return }
+            await self.publishPresence(status: self.status, location: nil)
+        }
+    }
+
+    func stopForSignOut() {
+        settingsLoaded = false
+        shareLocation = false
+        shareRadio = false
+        presenceUpdateTask?.cancel()
+        presenceUpdateTask = nil
+        stopLoop()
     }
 
     /// La carte des amis est apparue (calque « Amis » potentiellement actif).
@@ -134,10 +178,13 @@ final class LivePresenceService: ObservableObject {
         reevaluate()
     }
 
-    /// Vrai quand on doit diffuser : partage actif, app au premier plan, ET
-    /// (mode continu OU carte visible).
+    /// Le heartbeat décrit l'activité du compte, pas le consentement aux coordonnées.
     private var shouldBroadcast: Bool {
-        shareLocation && appIsActive && (mode == .foregroundLive || mapVisible)
+        settingsLoaded && appIsActive
+    }
+
+    private var shouldPublishLocation: Bool {
+        shareLocation && (mode == .foregroundLive || mapVisible)
     }
 
     private func reevaluate() {
@@ -181,24 +228,29 @@ final class LivePresenceService: ObservableObject {
     }
 
     private func publishTick() async {
-        guard shareLocation else { return }
-        let fix = await location.currentLocation(timeoutSeconds: 4)
-        guard let fix else {
-            // Sans position exploitable, on maintient au moins la présence en ligne.
-            await publishPresence(status: .online, location: nil)
-            hasBroadcasted = true
-            return
+        guard shouldBroadcast else { return }
+        let needsFix = shouldPublishLocation || shareRadio
+        let fix = needsFix ? await location.currentLocation(timeoutSeconds: 4) : nil
+        var shouldSendTelemetry = false
+        if let fix {
+            if let last = lastSentLocation, let at = lastSentAt {
+                shouldSendTelemetry = fix.distance(from: last) >= minDistanceMeters
+                    || Date().timeIntervalSince(at) >= maxSilence
+            } else {
+                shouldSendTelemetry = true
+            }
         }
-        if let last = lastSentLocation, let at = lastSentAt {
-            let moved = fix.distance(from: last)
-            let elapsed = Date().timeIntervalSince(at)
-            if moved < minDistanceMeters && elapsed < maxSilence { return }
-        }
-        await publishPresence(status: .online, location: fix)
-        lastSentLocation = fix
-        lastSentAt = Date()
+
+        await publishPresence(
+            status: status,
+            location: shouldPublishLocation && shouldSendTelemetry ? fix : nil
+        )
         hasBroadcasted = true
-        if shareRadio { await publishRadio(at: fix) }
+        if let fix, shouldSendTelemetry {
+            lastSentLocation = fix
+            lastSentAt = Date()
+            if shareRadio { await publishRadio(at: fix) }
+        }
     }
 
     // MARK: - Requêtes
@@ -215,7 +267,7 @@ final class LivePresenceService: ObservableObject {
         }
         let body = PresencePublishRequest(
             status: status.rawValue,
-            customStatus: nil,
+            customStatus: status == .offline ? nil : customStatus,
             location: payloadLocation
         )
         do {
@@ -253,4 +305,22 @@ final class LivePresenceService: ObservableObject {
         // 403 attendu si le partage radio est coupé côté serveur : silencieux.
         try? await api.requestJSON("/api/social/radio-snapshot", body: body)
     }
+}
+
+private struct OwnPresenceEnvelope: Decodable {
+    let presence: OwnPresence?
+}
+
+private struct OwnPresence: Decodable {
+    let status: SocialPresenceStatus?
+    let customStatus: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status = "presenceStatus"
+        case customStatus
+    }
+}
+
+private extension String {
+    var nilIfBlank: String? { isEmpty ? nil : self }
 }

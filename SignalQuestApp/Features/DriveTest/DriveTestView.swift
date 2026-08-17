@@ -98,6 +98,9 @@ final class DriveTestViewModel: ObservableObject {
     /// Drive Test peut engloutir plusieurs gigaoctets, et l'utilisateur ne pouvait
     /// pas le savoir avant de recevoir sa facture.
     @Published private(set) var sessionBytes: Int = 0
+    /// Valeur du compteur global au démarrage de la session. `sessionBytes` en est
+    /// l'écart, ce qui évite de remettre à zéro un compteur partagé par tous les modes.
+    private var dataMeterBaseline: Int = 0
     /// Session arrêtée parce que le plafond de données a été atteint — état
     /// distinct d'un arrêt manuel, pour l'expliquer plutôt que de s'interrompre.
     @Published private(set) var stoppedByDataCap = false
@@ -158,6 +161,10 @@ final class DriveTestViewModel: ObservableObject {
     /// répartit les mesures dans l'espace, ce qui est aussi le bon geste
     /// scientifique pour une carte de couverture.
     static let defaultTestIntervalMeters: Double = 500
+    /// Délai au bout duquel un test part même sans déplacement. C'est LUI qui fait
+    /// avancer la session : la distance ne sert plus qu'à mesurer plus tôt quand on
+    /// roule (cf. `waitUntilNextTestIsDue`).
+    static let maxSecondsBetweenTests = 30
     /// Plafond par défaut : 5 Go. Au-delà, la session s'arrête proprement et le
     /// dit — jamais en silence.
     static let defaultDataCapMegabytes = 5_120
@@ -240,6 +247,9 @@ final class DriveTestViewModel: ObservableObject {
     private var lastSimPLMN: (mcc: Int?, mnc: Int?)?
     /// Abonnement au type de connexion (pause auto en WiFi / reprise en cellulaire).
     private var pathCancellable: AnyCancellable?
+    /// Jeton possédé par ce view model : les autres consommateurs GPS ne peuvent
+    /// ni écraser le Drive Test, ni interrompre sa réception de positions.
+    private var locationObserverToken: UUID?
     /// Entrée de marché courante (couleurs + libellés d'opérateur du sélecteur).
     private var marketEntry: MarketRegistryEntry?
     // Mêmes mécanismes que le speedtest normal : Live Activity + assertion
@@ -256,8 +266,10 @@ final class DriveTestViewModel: ObservableObject {
         Task { await services.sessions.retryPendingCoverageSessions() }
         // Pré-remplit le sélecteur d'opérateur sans attendre une position.
         Task { await prepareOperatorSelector() }
-        services.location.onLocationUpdate = { [weak self] location in
-            self?.apply(coordinate: location.coordinate)
+        if locationObserverToken == nil {
+            locationObserverToken = services.location.addLocationObserver { [weak self] location in
+                self?.apply(coordinate: location.coordinate)
+            }
         }
         // Position initiale (sans déclencher de prompt si pas déjà autorisé).
         guard services.location.authorizationStatus == .authorizedWhenInUse
@@ -282,7 +294,10 @@ final class DriveTestViewModel: ObservableObject {
     func onDisappear(isLeavingScreen: Bool) {
         guard isLeavingScreen else { return }
         stop()
-        services.location.onLocationUpdate = nil
+        if let token = locationObserverToken {
+            services.location.removeLocationObserver(token)
+            locationObserverToken = nil
+        }
     }
 
     func start() {
@@ -303,9 +318,12 @@ final class DriveTestViewModel: ObservableObject {
         accumulator = ContinuousSessionAccumulator()
         summary = nil
         testCount = 0
-        // Le compteur de données est propre à une session : le remettre à zéro ici
-        // et nulle part ailleurs, pour que le plafond porte bien sur CE trajet.
-        SpeedtestDataMeter.shared.reset()
+        // Le compteur `SpeedtestDataMeter` est GLOBAL au processus : tous les moteurs
+        // l'alimentent, y compris les tests lancés depuis l'onglet Speed. Le remettre à
+        // zéro ici effaçait donc le comptage des autres modes. On mémorise plutôt une
+        // référence de départ et on mesure l'écart : le plafond porte bien sur CE
+        // trajet, sans rien écraser chez les autres.
+        dataMeterBaseline = SpeedtestDataMeter.shared.bytes
         sessionBytes = 0
         stoppedByDataCap = false
         coverageTruncated = false
@@ -789,10 +807,13 @@ final class DriveTestViewModel: ObservableObject {
             operatorKey = key
             if entry == nil { entry = payload.markets.first { $0.operatorEntry(forKey: key) != nil } }
         }
-        // 3. Repli opérateur via le MNC de la SIM.
-        if operatorKey == nil, let mnc = plmn.mnc, let entry,
-           let op = entry.selectableOperators.first(where: { $0.mncs.contains(mnc) }) {
-            operatorKey = op.key
+        // 3. Repli opérateur via le PLMN de la SIM.
+        //    Cherchait dans `selectableOperators`, dont le champ `mncs` est toujours
+        //    vide (la table MNC vit dans `radioOperators`) : ce repli ne se déclenchait
+        //    jamais. Même correction que dans SpeedtestService.
+        if operatorKey == nil, let mcc = plmn.mcc, let mnc = plmn.mnc, let entry,
+           let key = entry.radioOperatorKey(mcc: mcc, mnc: mnc) {
+            operatorKey = key
         }
         // 4. Repli : opérateur/marché persistés de la carte (déjà détectés au Lot 1A).
         if operatorKey == nil,
@@ -907,28 +928,61 @@ final class DriveTestViewModel: ObservableObject {
         }
     }
 
-    /// Attend que le prochain test soit dû : distance parcourue depuis le
-    /// précédent, ou demande explicite de l'utilisateur. Renvoie `false` si la
-    /// session est annulée pendant l'attente.
+    /// Attend que le prochain test soit dû. Renvoie `false` si la session est
+    /// annulée pendant l'attente.
     ///
-    /// Le premier test part immédiatement — attendre 500 m avant la moindre mesure
+    /// Le premier test part immédiatement — attendre avant la moindre mesure
     /// donnerait l'impression d'une session qui ne démarre pas.
+    ///
+    /// ⚠️ La distance N'EST PLUS BLOQUANTE. Elle l'était, et c'était la cause du
+    /// « le premier test marche, les suivants ne partent jamais » : à l'arrêt (banc
+    /// d'essai, fenêtre, test de stabilité) on ne parcourt jamais les 500 m requis,
+    /// donc aucun second test ne partait — sans que rien ne l'explique à l'écran.
+    /// Pire, si le fix GPS était perdu après le premier test, le `if let current`
+    /// n'entrait jamais et la boucle tournait indéfiniment SANS même mettre à jour
+    /// le statut : session muette, définitivement.
+    ///
+    /// Le modèle est désormais celui d'Android, qui n'a jamais eu ce problème (ses
+    /// tests programmés sont périodiques) : le temps déclenche, la distance ne fait
+    /// qu'anticiper quand on roule. Un espacement minimal subsiste — sans lui, un
+    /// appareil posé sur un bureau accumulerait des centaines de mesures au même
+    /// point, ce qui pollue la carte de couverture et brûle le forfait.
     private func waitUntilNextTestIsDue() async -> Bool {
+        var secondsWaited = 0
         while !Task.isCancelled {
             if manualTestRequested {
                 manualTestRequested = false
                 return true
             }
+            // Premier test de la session : rien à attendre.
             guard let origin = lastTestCoordinate else { return true }
+
+            // Déclencheur DISTANCE — on roule, on mesure plus tôt.
+            var metersRemaining: Double?
             if let current = services.location.lastLocation?.coordinate ?? userLocation {
                 let moved = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
                     .distance(from: CLLocation(latitude: current.latitude, longitude: current.longitude))
                 if moved >= testIntervalMeters { return true }
-                statusLabel = String(
-                    localized: "Prochain test dans \(Int((testIntervalMeters - moved).rounded())) m"
-                )
+                metersRemaining = (testIntervalMeters - moved).rounded()
             }
+
+            // Déclencheur TEMPS — garantit que la session avance à l'arrêt, et même
+            // sans le moindre point GPS.
+            let secondsRemaining = Self.maxSecondsBetweenTests - secondsWaited
+            if secondsRemaining <= 0 { return true }
+
+            // Toujours dire ce qu'on attend : c'est l'absence de ce retour qui faisait
+            // passer un comportement voulu pour une panne.
+            if let metersRemaining {
+                statusLabel = String(
+                    localized: "Prochain test dans \(Int(metersRemaining)) m ou \(secondsRemaining) s"
+                )
+            } else {
+                statusLabel = String(localized: "Prochain test dans \(secondsRemaining) s")
+            }
+
             try? await Task.sleep(nanoseconds: 1_000_000_000)
+            secondsWaited += 1
         }
         return false
     }
@@ -965,7 +1019,8 @@ final class DriveTestViewModel: ObservableObject {
     }
 
     private func refreshSessionBytes() {
-        sessionBytes = SpeedtestDataMeter.shared.bytes
+        // Écart depuis le début de CETTE session, jamais le total du processus.
+        sessionBytes = max(0, SpeedtestDataMeter.shared.bytes - dataMeterBaseline)
     }
 
     private func dataCapExceeded() -> Bool {

@@ -10,6 +10,24 @@ protocol MessagesServicing: Sendable {
     /// Partage une position (kind LOCATION). Refusé par le backend en conversation
     /// E2EE (allowedKinds) → l'appelant ne le propose qu'en conversation non chiffrée.
     func sendLocation(latitude: Double, longitude: Double, place: String?, in conversation: MessageConversation) async throws -> MessageItem
+    // Partage GPS/radio en direct
+    func liveShareSessions(conversationId: String) async throws -> [LiveShareSession]
+    func activeLiveShareSessions() async throws -> [LiveShareSession]
+    func createLiveShare(
+        conversationId: String,
+        offerShare: Bool,
+        message: String?,
+        mode: String?,
+        targetUserId: String?,
+        targetUserIds: [String],
+        mobileCountryCode: Int?,
+        mobileNetworkCode: Int?
+    ) async throws -> LiveShareCreateResponse
+    func acceptLiveShare(sessionId: String) async throws -> LiveShareSession
+    func declineLiveShare(sessionId: String) async throws -> LiveShareSession
+    func stopLiveShare(sessionId: String) async throws
+    func updateLiveShare(sessionId: String, payload: LiveSharePayload) async throws -> LiveShareSession
+    func liveShareEvents(sessionId: String) -> AsyncStream<LiveShareStreamEvent>
     func sendAttachments(
         _ attachments: [UploadedAttachment],
         caption: String,
@@ -55,6 +73,10 @@ protocol MessagesServicing: Sendable {
     func unsaveMessage(messageId: String) async throws
 }
 
+extension MessagesServicing {
+    func activeLiveShareSessions() async throws -> [LiveShareSession] { [] }
+}
+
 /// Pièce jointe déjà uploadée via `/api/messages/attachments`, prête à être
 /// référencée dans un message (format Android `sendAttachmentMessage`).
 struct UploadedAttachment: Codable, Equatable, Sendable {
@@ -69,9 +91,11 @@ struct UploadedAttachment: Codable, Equatable, Sendable {
 
 final class MessagesService: MessagesServicing {
     private let api: APIClient
+    private let sse: SSEClient
 
-    init(api: APIClient) {
+    init(api: APIClient, sse: SSEClient? = nil) {
         self.api = api
+        self.sse = sse ?? SSEClient(api: api)
     }
 
     func conversations() async throws -> [MessageConversation] {
@@ -180,6 +204,119 @@ final class MessagesService: MessagesServicing {
             body: body
         )
         return response.message
+    }
+
+    // MARK: Partage live
+
+    func liveShareSessions(conversationId: String) async throws -> [LiveShareSession] {
+        try await api.request(
+            APIEndpoint(
+                path: "/api/live-share/sessions",
+                query: [URLQueryItem(name: "conversationId", value: conversationId)]
+            ),
+            as: LiveShareSessionsEnvelope.self
+        ).sessions
+    }
+
+    func activeLiveShareSessions() async throws -> [LiveShareSession] {
+        try await api.request(
+            APIEndpoint(path: "/api/live-share/sessions"),
+            as: LiveShareSessionsEnvelope.self
+        ).sessions
+    }
+
+    func createLiveShare(
+        conversationId: String,
+        offerShare: Bool,
+        message: String?,
+        mode: String?,
+        targetUserId: String?,
+        targetUserIds: [String],
+        mobileCountryCode: Int?,
+        mobileNetworkCode: Int?
+    ) async throws -> LiveShareCreateResponse {
+        let cleanMessage = message?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return try await api.requestJSON(
+            "/api/live-share/requests",
+            body: LiveShareCreateRequest(
+                conversationId: conversationId,
+                offerShare: offerShare,
+                message: cleanMessage?.isEmpty == false ? cleanMessage : nil,
+                mode: mode,
+                targetUserId: targetUserId,
+                targetUserIds: Array(Set(targetUserIds.filter { !$0.isEmpty })).sorted(),
+                mobileCountryCode: mobileCountryCode,
+                mobileNetworkCode: mobileNetworkCode
+            )
+        )
+    }
+
+    func acceptLiveShare(sessionId: String) async throws -> LiveShareSession {
+        let response: LiveShareSessionEnvelope = try await api.requestJSON(
+            "/api/live-share/sessions/\(sessionId)/accept",
+            body: [String: String]()
+        )
+        return response.session
+    }
+
+    func declineLiveShare(sessionId: String) async throws -> LiveShareSession {
+        let response: LiveShareSessionEnvelope = try await api.requestJSON(
+            "/api/live-share/sessions/\(sessionId)/decline",
+            body: [String: String]()
+        )
+        return response.session
+    }
+
+    func stopLiveShare(sessionId: String) async throws {
+        let _: LiveShareSessionEnvelope = try await api.requestJSON(
+            "/api/live-share/sessions/\(sessionId)/stop",
+            body: [String: String]()
+        )
+    }
+
+    func updateLiveShare(sessionId: String, payload: LiveSharePayload) async throws -> LiveShareSession {
+        let response: LiveShareSessionEnvelope = try await api.requestJSON(
+            "/api/live-share/sessions/\(sessionId)/update",
+            body: LiveShareUpdateRequest(payload: payload)
+        )
+        return response.session
+    }
+
+    func liveShareEvents(sessionId: String) -> AsyncStream<LiveShareStreamEvent> {
+        let source = sse.dataStream(
+            path: "/api/live-share/sessions/\(sessionId)/stream",
+            keep: ["status", "update"]
+        )
+        return AsyncStream { continuation in
+            let task = Task {
+                for await item in source {
+                    guard !Task.isCancelled,
+                          let data = item.data.data(using: .utf8) else { continue }
+                    switch item.event {
+                    case "status":
+                        if let decoded = try? JSONDecoder.signalQuest.decode(LiveShareStatusEvent.self, from: data),
+                           !decoded.status.isEmpty {
+                            continuation.yield(.status(decoded.status))
+                        }
+                    case "update":
+                        guard let decoded = try? JSONDecoder.signalQuest.decode(LiveShareUpdateEvent.self, from: data) else {
+                            continue
+                        }
+                        continuation.yield(
+                            .update(
+                                status: decoded.status,
+                                lastUpdateAt: decoded.lastUpdateAt,
+                                payload: decoded.payload
+                            )
+                        )
+                    default:
+                        break
+                    }
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
     }
 
     func sendAttachments(
@@ -685,5 +822,53 @@ private struct PollEncryptedPayload: Encodable {
     struct Option: Encodable {
         let id: String
         let text: String
+    }
+}
+
+private struct LiveShareSessionsEnvelope: Decodable {
+    let sessions: [LiveShareSession]
+}
+
+private struct LiveShareSessionEnvelope: Decodable {
+    let session: LiveShareSession
+}
+
+private struct LiveShareCreateRequest: Encodable {
+    let conversationId: String
+    let offerShare: Bool
+    let message: String?
+    let mode: String?
+    let targetUserId: String?
+    let targetUserIds: [String]
+    let mobileCountryCode: Int?
+    let mobileNetworkCode: Int?
+}
+
+private struct LiveShareUpdateRequest: Encodable {
+    let payload: LiveSharePayload
+}
+
+private struct LiveShareStatusEvent: Decodable {
+    let status: String
+}
+
+private struct LiveShareUpdateEvent: Decodable {
+    let status: String?
+    let lastUpdateAt: Date?
+    let lastPayload: String?
+    let lastLocation: String?
+
+    var payload: LiveSharePayload? {
+        if let lastPayload,
+           let data = lastPayload.data(using: .utf8),
+           let payload = try? JSONDecoder.signalQuest.decode(LiveSharePayload.self, from: data) {
+            return payload
+        }
+        if let lastLocation,
+           let data = lastLocation.data(using: .utf8),
+           let location = try? JSONDecoder.signalQuest.decode(LiveShareLocation.self, from: data) {
+            return LiveSharePayload(radio: nil, location: location, at: nil)
+        }
+        return nil
     }
 }

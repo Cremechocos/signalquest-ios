@@ -1,4 +1,5 @@
 import XCTest
+import CoreLocation
 @testable import SignalQuest
 
 /// La diffusion de présence live s'arrête en arrière-plan — sauf quand
@@ -75,5 +76,26 @@ final class BackgroundLifecycleTests: XCTestCase {
         XCTAssertTrue(location.wantsTracking)
         location.stopTracking()
         XCTAssertFalse(location.wantsTracking)
+    }
+
+    /// Deux fonctions (par exemple Drive Test et CarPlay) doivent recevoir le
+    /// même fix. Retirer l'une ne doit ni écraser ni arrêter l'autre.
+    func testLocationObserversAreIndependent() async {
+        let location = LocationService()
+        let firstReceived = expectation(description: "premier observateur")
+        let secondReceivedTwice = expectation(description: "second observateur")
+        secondReceivedTwice.expectedFulfillmentCount = 2
+
+        let firstToken = location.addLocationObserver { _ in firstReceived.fulfill() }
+        let secondToken = location.addLocationObserver { _ in secondReceivedTwice.fulfill() }
+        let manager = CLLocationManager()
+
+        location.locationManager(manager, didUpdateLocations: [CLLocation(latitude: 48.8566, longitude: 2.3522)])
+        await fulfillment(of: [firstReceived], timeout: 1)
+
+        location.removeLocationObserver(firstToken)
+        location.locationManager(manager, didUpdateLocations: [CLLocation(latitude: 48.8570, longitude: 2.3530)])
+        await fulfillment(of: [secondReceivedTwice], timeout: 1)
+        location.removeLocationObserver(secondToken)
     }
 }

@@ -130,7 +130,16 @@ extension SocialFriendLive {
     /// Vrai quand la dernière position remonte à plus de `maxAge` (défaut 3 min,
     /// = TTL serveur). Un ami « périmé » est rendu estompé sur la carte.
     func hasStaleLocation(maxAge: TimeInterval = 180, now: Date = Date()) -> Bool {
-        guard let updatedAt = location?.updatedAt else { return false }
+        guard location != nil else { return false }
+        guard let updatedAt = location?.updatedAt else { return true }
+        return now.timeIntervalSince(updatedAt) > maxAge
+    }
+
+    /// Au-delà de 15 minutes, une position conservée en cache ne doit plus être
+    /// présentée comme une localisation actuelle, même si le flux est interrompu.
+    func hasExpiredLocation(maxAge: TimeInterval = 15 * 60, now: Date = Date()) -> Bool {
+        guard location != nil else { return false }
+        guard let updatedAt = location?.updatedAt else { return true }
         return now.timeIntervalSince(updatedAt) > maxAge
     }
 }

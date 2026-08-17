@@ -448,7 +448,10 @@ struct SessionDetailView: View {
             Circle().fill(Color(uiColor: SessionSpeedColor.ui(st.downloadMbps))).frame(width: 10, height: 10)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
-                    Text(st.mobileOperator ?? st.operatorKey ?? "Speedtest")
+                    // Le RÉSEAU d'abord : c'est lui qui décrit la mesure. La SIM ne
+                    // sert que de repli quand le réseau n'a pas été résolu (anciennes
+                    // lignes sans operatorKey).
+                    Text(st.operatorKey ?? st.mobileOperator ?? "Speedtest")
                         .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
@@ -511,7 +514,7 @@ struct SessionDetailView: View {
         HStack(spacing: SQSpace.sm) {
             Circle().fill(Self.statusColor(antenna.status)).frame(width: 10, height: 10)
             VStack(alignment: .leading, spacing: 2) {
-                Text(antenna.operatorName ?? antenna.displayName ?? "Antenne")
+                Text(antenna.operatorDisplayName ?? antenna.displayName ?? "Antenne")
                     .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1)
@@ -548,7 +551,7 @@ struct SessionDetailView: View {
                 }
                 .buttonStyle(SQPressButtonStyle())
                 .disabled(model.identifyingId != nil)
-                .accessibilityLabel("Valider l'antenne \(antenna.operatorName ?? antenna.displayName ?? "")")
+                .accessibilityLabel("Valider l'antenne \(antenna.operatorDisplayName ?? antenna.displayName ?? "")")
             }
             if antenna.siteId != nil {
                 Image(systemName: "chevron.right")

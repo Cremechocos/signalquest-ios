@@ -63,6 +63,9 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     // MARK: - Privé
 
     private func start(_ interfaceController: CPInterfaceController, carWindow: CPWindow?) {
+        // CarPlay peut rappeler didConnect lors d'une reconnexion rapide. Un seul
+        // coordinateur doit posséder les observers GPS, tâches et templates.
+        coordinator?.stop()
         // Passe par le holder : la fenêtre iPhone n'existe peut-être pas encore
         // (app lancée en arrière-plan par le véhicule), et il faut malgré tout
         // le MÊME graphe de services qu'elle utilisera ensuite.

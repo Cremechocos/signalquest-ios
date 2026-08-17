@@ -26,6 +26,11 @@ enum NearestAntennaTemplateBuilder {
     struct Actions {
         var showOnMap: (() -> Void)?
         var navigate: (() -> Void)?
+        /// Classement des opérateurs à cet endroit. C'est la question que se
+        /// pose vraiment quelqu'un qui capte mal — « est-ce moi, ou est-ce
+        /// l'endroit ? » — et la seule à laquelle nos données répondent mieux
+        /// que n'importe quelle autre app.
+        var compareOperators: (() -> Void)?
     }
 
     static func make(input: Input, actions: Actions) -> CPInformationTemplate {
@@ -125,6 +130,10 @@ enum NearestAntennaTemplateBuilder {
         if let showOnMap = actions.showOnMap {
             buttons.append(CPTextButton(title: String(localized: "Voir sur la carte"),
                                         textStyle: .normal) { _ in showOnMap() })
+        }
+        if let compareOperators = actions.compareOperators {
+            buttons.append(CPTextButton(title: String(localized: "Comparer"),
+                                        textStyle: .normal) { _ in compareOperators() })
         }
         return Array(buttons.prefix(CarPlayDetailTemplateBuilder.maxActions))
     }

@@ -346,11 +346,15 @@ struct AntennaDetailSheet: View {
     /// par-dessus la route. Passer par Plan dans ce cas ferait basculer l'écran
     /// du véhicule sur une autre app et perdrait tout l'intérêt.
     ///
-    /// Hors CarPlay, comportement inchangé : Plan, avec le nom du site comme
-    /// étiquette pour que la destination y soit reconnaissable.
+    /// Hors CarPlay — ou quand la scène CarPlay ne sait pas guider, faute de la
+    /// catégorie `carplay-maps` — comportement inchangé : Plan, avec le nom du
+    /// site comme étiquette pour que la destination y soit reconnaissable. Plan
+    /// s'affiche de toute façon sur l'écran du véhicule, donc l'utilisateur est
+    /// guidé ; le détourner vers une app qui ne peut pas le faire aboutissait à
+    /// un bouton sans effet.
     private func openRoute(to coordinate: CLLocationCoordinate2D) {
         Haptics.light()
-        if services.isCarPlayConnected {
+        if services.isCarPlayGuidanceAvailable {
             CarPlayDestinationStore.record(title: headerTitle, coordinate: coordinate)
             CarPlayDashboardRoute.request(.map)
             return

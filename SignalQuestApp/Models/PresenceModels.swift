@@ -57,7 +57,9 @@ enum LiveShareMode: String, Codable, Sendable, CaseIterable, Identifiable {
 
 /// Persistance locale du mode de partage (UserDefaults). Défaut : carte-ouverte.
 enum LiveShareModeStore {
-    private static let key = "social_live_mode"
+    private static var key: String {
+        "social_live_mode.\(LocalAccountScope.storageNamespace)"
+    }
 
     static func load() -> LiveShareMode {
         guard let raw = UserDefaults.standard.string(forKey: key),
@@ -70,6 +72,47 @@ enum LiveShareModeStore {
     static func save(_ mode: LiveShareMode) {
         UserDefaults.standard.set(mode.rawValue, forKey: key)
     }
+}
+
+/// Préférence locale de présence, synchronisée best-effort par la boucle live.
+/// Le serveur reste la source de vérité lorsqu'il répond au lancement.
+enum SocialPresencePreferenceStore {
+    private static var statusKey: String {
+        "social_presence_status.\(LocalAccountScope.storageNamespace)"
+    }
+    private static var customStatusKey: String {
+        "social_presence_custom_status.\(LocalAccountScope.storageNamespace)"
+    }
+
+    static func loadStatus() -> SocialPresenceStatus {
+        guard let raw = UserDefaults.standard.string(forKey: statusKey),
+              let status = SocialPresenceStatus(rawValue: raw),
+              status != .offline else {
+            return .online
+        }
+        return status
+    }
+
+    static func loadCustomStatus() -> String? {
+        guard let raw = UserDefaults.standard.string(forKey: customStatusKey) else { return nil }
+        return String(raw.trimmingCharacters(in: .whitespacesAndNewlines).prefix(100)).nilIfBlank
+    }
+
+    static func save(status: SocialPresenceStatus, customStatus: String?) {
+        if status != .offline { UserDefaults.standard.set(status.rawValue, forKey: statusKey) }
+        let normalized = customStatus.map {
+            String($0.trimmingCharacters(in: .whitespacesAndNewlines).prefix(100))
+        }
+        if let normalized, !normalized.isEmpty {
+            UserDefaults.standard.set(normalized, forKey: customStatusKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: customStatusKey)
+        }
+    }
+}
+
+private extension String {
+    var nilIfBlank: String? { isEmpty ? nil : self }
 }
 
 // MARK: - Corps des requêtes d'émission

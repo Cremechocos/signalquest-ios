@@ -270,15 +270,18 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
     }
 
     func persistCoverageDraft(_ session: CoverageSessionUpload) throws {
+        LocalOfflineOwnership.claim(kind: "coverage", id: session.sessionId.uuidString)
         try queue.upsert(session, state: .recording)
     }
 
     func finalizeCoverageDraft(_ session: CoverageSessionUpload) throws {
+        LocalOfflineOwnership.claim(kind: "coverage", id: session.sessionId.uuidString)
         try queue.upsert(session, state: .queued)
     }
 
     func discardCoverageDraft(sessionId: UUID) throws {
         try queue.discard(sessionId: sessionId)
+        LocalOfflineOwnership.release(kind: "coverage", id: sessionId.uuidString)
     }
 
     func createCoverageSession(_ session: CoverageSessionUpload) async throws {
@@ -366,9 +369,17 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
         let pending = try queue.pendingUploads()
         var firstError: Error?
         for session in pending {
+            guard LocalOfflineOwnership.belongsToCurrentScope(
+                kind: "coverage",
+                id: session.sessionId.uuidString
+            ) else {
+                // Entrée legacy sans propriétaire, ou autre compte : quarantaine.
+                continue
+            }
             do {
                 try await submit(session)
                 try queue.discard(sessionId: session.sessionId)
+                LocalOfflineOwnership.release(kind: "coverage", id: session.sessionId.uuidString)
             } catch {
                 if firstError == nil { firstError = error }
             }

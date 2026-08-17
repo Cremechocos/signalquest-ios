@@ -21,12 +21,22 @@ final class SSEClient: Sendable {
 
     init(api: APIClient) {
         self.api = api
-        let configuration = URLSessionConfiguration.default
+        self.session = URLSession(configuration: Self.makeSessionConfiguration())
+    }
+
+    static func makeSessionConfiguration() -> URLSessionConfiguration {
+        // Même frontière que APIClient : aucune persistance de cookies/cache entre
+        // comptes. L'Authorization est portée explicitement par la requête signée.
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         // Un flux SSE reste ouvert indéfiniment : pas de timeout de ressource,
         // mais un timeout de requête généreux pour détecter les connexions mortes.
         configuration.timeoutIntervalForRequest = 90
         configuration.timeoutIntervalForResource = .infinity
-        self.session = URLSession(configuration: configuration)
+        return configuration
     }
 
     /// Flux des noms d'événements SSE pour une conversation. Se reconnecte

@@ -27,12 +27,23 @@ enum MapSearchResult: Identifiable, Equatable {
 
 @MainActor
 final class MapExplorerViewModel: ObservableObject {
+    enum FriendsConnectionState: Equatable {
+        case inactive
+        case connecting
+        case live
+        case fallback
+        case unavailable
+    }
+
     @Published var snapshot: SocialMapSnapshot = .empty
     /// Amis en temps réel (position + présence + radio) alimentés par le SSE
     /// `/api/social/map/stream`. Tenu à part de `snapshot.friends` pour ne pas
     /// entrer en course avec les rechargements bornés de `load()` : le flux n'est
     /// pas géo-borné et fait autorité dès qu'il a répondu.
     @Published var liveFriends: [SocialFriendLive] = []
+    @Published private(set) var friendsConnectionState: FriendsConnectionState = .inactive
+    @Published private(set) var friendsConnectionError: String?
+    @Published private(set) var friendsLastUpdatedAt: Date?
     /// Vrai dès que le flux temps réel a livré au moins un instantané : `load()`
     /// cesse alors d'amorcer `liveFriends` depuis le snapshot borné.
     private var friendsFromStream = false
@@ -799,8 +810,16 @@ final class MapExplorerViewModel: ObservableObject {
 
     /// Applique un instantané du flux temps réel des amis. Fait autorité sur
     /// l'amorçage borné : `load()` cesse ensuite de réécrire `liveFriends`.
-    func applyLiveFriends(_ friends: [SocialFriendLive]) {
+    func beginFriendsStream() {
+        friendsConnectionState = .connecting
+        friendsConnectionError = nil
+    }
+
+    func applyLiveFriends(_ friends: [SocialFriendLive], isFallback: Bool = false) {
         friendsFromStream = true
+        friendsConnectionState = isFallback ? .fallback : .live
+        friendsConnectionError = nil
+        friendsLastUpdatedAt = Date()
         // PERF-MAP-05 : garde de diff — un tick identique (ami immobile, même
         // présence/radio) ne déclenche AUCUN travail de rendu.
         guard friends != liveFriends else { return }
@@ -808,6 +827,24 @@ final class MapExplorerViewModel: ObservableObject {
         // Ne bumpe PAS `dataVersion` (qui reconstruirait TOUTES les couches) : seul
         // `friendsVersion` → la vue ne rafraîchit que la couche amis (PERF-MAP-05).
         friendsVersion &+= 1
+    }
+
+    func friendsStreamDidEnd() {
+        friendsFromStream = false
+        friendsConnectionState = .unavailable
+        friendsConnectionError = String(localized: "Temps réel indisponible — repli périodique")
+    }
+
+    func friendsFallbackDidFail(_ error: Error) {
+        friendsConnectionState = .unavailable
+        friendsConnectionError = error.localizedDescription
+    }
+
+    func deactivateFriendsStream() {
+        friendsFromStream = false
+        friendsConnectionState = .inactive
+        friendsConnectionError = nil
+        friendsLastUpdatedAt = nil
     }
 
     // Idem : identifiants et URLs S3 de production, plus des amis fictifs
@@ -1052,6 +1089,11 @@ final class MapExplorerViewModel: ObservableObject {
 }
 
 struct MapExplorerView: View {
+    private struct FriendsStreamTaskKey: Hashable {
+        let enabled: Bool
+        let generation: Int
+    }
+
     @StateObject private var model: MapExplorerViewModel
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
@@ -1088,6 +1130,9 @@ struct MapExplorerView: View {
     @State private var selectedCommunityOutage: CommunityOutage?
     @State private var selectedPlanned: PlannedSiteLive?
     @State private var selectedFriend: SocialFriendLive?
+    @State private var selectedFriendFilterID: String?
+    @State private var friendsStreamGeneration = 0
+    @State private var friendFreshnessNow = Date()
     @State private var selectedCustomSite: AndroidCustomSiteMarker?
     @State private var selectedObservedCell: AndroidCommunitySiteMarker?
     /// Cellules retenues pour créer un site — non vide = l'écran de création
@@ -1310,23 +1355,52 @@ struct MapExplorerView: View {
             // Notification/deep link antenne reçu avant l'apparition de la carte.
             openSiteFromRouterIfNeeded()
         }
-        // Couche « Amis » active : publie ma présence/position (selon le toggle de
-        // confidentialité + le mode) et consomme le flux temps réel des amis. Le
-        // `.task(id:)` redémarre quand on active/désactive le calque ; il est
-        // annulé (donc le flux se ferme) à la disparition de la carte.
-        .task(id: filters.contains(.friend)) {
+        // Le calque pilote uniquement la CONSOMMATION des amis. La diffusion de
+        // ma propre position « carte ouverte » est liée à l'écran via onAppear.
+        .task(id: FriendsStreamTaskKey(
+            enabled: filters.contains(.friend),
+            generation: friendsStreamGeneration
+        )) {
             guard filters.contains(.friend) else {
-                services.livePresence.mapDidDisappear()
+                model.deactivateFriendsStream()
+                selectedFriendFilterID = nil
                 return
             }
-            services.livePresence.mapDidAppear()
-            await services.livePresence.refreshSharingSettings()
+            model.beginFriendsStream()
             for await friends in services.map.friendsStream(sse: services.sse) {
                 model.applyLiveFriends(friends)
+            }
+            guard !Task.isCancelled else { return }
+            model.friendsStreamDidEnd()
+
+            // Refus définitif ou terminaison du SSE : ne pas figer le dernier état.
+            // Un snapshot minimal reprend la main toutes les 30 s.
+            while !Task.isCancelled, filters.contains(.friend) {
+                do {
+                    let friends = try await services.map.friendsSnapshot()
+                    guard !Task.isCancelled else { return }
+                    model.applyLiveFriends(friends, isFallback: true)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    model.friendsFallbackDidFail(error)
+                }
+                try? await Task.sleep(for: .seconds(30))
+            }
+        }
+        // La fraîcheur progresse sans paquet réseau : estompage à 3 min et retrait
+        // à 15 min restent vrais même pendant une panne du flux.
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { return }
+                friendFreshnessNow = Date()
+                refreshFriendsRender()
             }
         }
         .onDisappear {
             services.livePresence.mapDidDisappear()
+            model.deactivateFriendsStream()
         }
         .onChangeCompat(of: filters) { _, newValue in
             // Mémorise les couches localement (restaurées au prochain affichage / relance).
@@ -1334,6 +1408,9 @@ struct MapExplorerView: View {
             // Affiche/masque une couche immédiatement, sans attendre le rechargement.
             refreshMapRender()
             scheduleLoad(region: lastRegion)
+        }
+        .onChangeCompat(of: selectedFriendFilterID) { _, _ in
+            refreshFriendsRender()
         }
         .onChangeCompat(of: coverageByGeneration) { _, _ in
             // Bascule Signal ↔ Génération : recolore la couche sans recharger le réseau.
@@ -1396,6 +1473,8 @@ struct MapExplorerView: View {
         // Tap sur une notification de panne : seul l'identifiant a voyagé.
         .onChangeCompat(of: router.openCommunityOutageId) { _, _ in openCommunityOutageFromNotificationIfNeeded() }
         .onAppear {
+            services.livePresence.mapDidAppear()
+            Task { await services.livePresence.refreshSharingSettings() }
             focusFromRouterIfNeeded()
             openCommunityOutageFromRouterIfNeeded()
             openCommunityOutageFromNotificationIfNeeded()
@@ -1521,6 +1600,11 @@ struct MapExplorerView: View {
                     // Chips de couches : composant transverse déjà restylé
                     // (capsules casse normale, actif brique plein).
                     MapFilterBar(filters: $filters)
+                    if filters.contains(.friend) {
+                        friendsStatusPanel
+                            .padding(.horizontal, SQSpace.md)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                     // Les contrôles de coloration couverture (bascule + légende) ont
                     // quitté la colonne haute (surchargée) → carte flottante bas-centre
                     // (cf. `coverageControlsOverlay`).
@@ -1566,6 +1650,151 @@ struct MapExplorerView: View {
                 marketSwitchNoticeOverlay
             }
         }
+    }
+
+    private var effectiveFriendFilterID: String? {
+        guard let selectedFriendFilterID,
+              model.liveFriends.contains(where: { $0.id == selectedFriendFilterID })
+        else { return nil }
+        return selectedFriendFilterID
+    }
+
+    private var effectiveFriendsConnectionState: MapExplorerViewModel.FriendsConnectionState {
+        if model.friendsConnectionState == .live,
+           let updatedAt = model.friendsLastUpdatedAt,
+           friendFreshnessNow.timeIntervalSince(updatedAt) > 20 {
+            return .connecting
+        }
+        return model.friendsConnectionState
+    }
+
+    private var friendsConnectionPresentation: (label: String, icon: String, color: Color) {
+        switch effectiveFriendsConnectionState {
+        case .inactive:
+            return (String(localized: "Inactif"), "circle", SQColor.labelTertiary)
+        case .connecting:
+            return (String(localized: "Reconnexion…"), "arrow.triangle.2.circlepath", SQColor.warning)
+        case .live:
+            return (String(localized: "En direct"), "dot.radiowaves.left.and.right", SQColor.success)
+        case .fallback:
+            return (String(localized: "Repli périodique"), "clock.arrow.circlepath", SQColor.warning)
+        case .unavailable:
+            return (String(localized: "Indisponible"), "exclamationmark.triangle.fill", SQColor.danger)
+        }
+    }
+
+    private var friendsWithRecentLocation: [SocialFriendLive] {
+        model.liveFriends.filter { friend in
+            friend.location != nil && !friend.hasExpiredLocation(now: friendFreshnessNow)
+        }
+    }
+
+    private var friendsStatusPanel: some View {
+        let presentation = friendsConnectionPresentation
+        return VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(spacing: SQSpace.sm) {
+                if effectiveFriendsConnectionState == .connecting {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .tint(presentation.color)
+                } else {
+                    Image(systemName: presentation.icon)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(presentation.color)
+                }
+                Text(presentation.label)
+                    .font(SQFont.body(13, .semibold))
+                    .foregroundStyle(SQColor.label)
+                Spacer(minLength: SQSpace.sm)
+                Text("\(friendsWithRecentLocation.count)/\(model.liveFriends.count) localisés")
+                    .font(SQFont.archivo(11, .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                if effectiveFriendsConnectionState == .unavailable {
+                    Button {
+                        friendsStreamGeneration &+= 1
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Réessayer le flux des amis")
+                }
+            }
+
+            if model.liveFriends.isEmpty {
+                Text(effectiveFriendsConnectionState == .connecting
+                     ? String(localized: "Connexion à la carte des amis…")
+                     : String(localized: "Aucun ami ne partage de position récente."))
+                    .font(SQFont.body(12))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: SQSpace.sm) {
+                        friendFilterButton(
+                            title: String(localized: "Tous"),
+                            isSelected: effectiveFriendFilterID == nil,
+                            friend: nil
+                        )
+                        ForEach(model.liveFriends) { friend in
+                            friendFilterButton(
+                                title: friend.name ?? String(localized: "Ami"),
+                                isSelected: effectiveFriendFilterID == friend.id,
+                                friend: friend
+                            )
+                        }
+                    }
+                }
+            }
+
+            if effectiveFriendsConnectionState == .unavailable,
+               let error = model.friendsConnectionError,
+               !error.isEmpty {
+                Text(error)
+                    .font(SQFont.archivo(10.5, .regular))
+                    .foregroundStyle(SQColor.danger)
+                    .lineLimit(2)
+            }
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm)
+        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)) }
+        .sqShadowSoft()
+        .animation(SQMotion.resolve(SQMotion.snappy, reduceMotion), value: effectiveFriendsConnectionState)
+    }
+
+    private func friendFilterButton(
+        title: String,
+        isSelected: Bool,
+        friend: SocialFriendLive?
+    ) -> some View {
+        Button {
+            selectedFriendFilterID = friend?.id
+            if let friend,
+               let location = friend.location,
+               !friend.hasExpiredLocation(now: friendFreshnessNow) {
+                mapCenter = CLLocationCoordinate2D(latitude: location.lat, longitude: location.lng)
+                mapZoom = max(mapZoom, 14)
+            }
+        } label: {
+            HStack(spacing: SQSpace.xs + 1) {
+                if let friend {
+                    SQAvatar(url: friend.avatarUrl, name: friend.name ?? "Ami", size: 24)
+                }
+                Text(title)
+                    .font(SQFont.body(12, .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
+            .padding(.horizontal, SQSpace.sm + 2)
+            .frame(minHeight: 40)
+            .background(isSelected ? SQColor.brandRed : SQColor.surfaceMuted, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(friend == nil ? "Afficher tous les amis" : "Filtrer sur \(title)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     /// Dégagement bas des contrôles flottants de la carte pour la barre de navigation.
@@ -3201,8 +3430,11 @@ struct MapExplorerView: View {
     /// flux temps réel (`model.liveFriends`), pas par le snapshot borné.
     private var friendPayloads: [MapAnnotationPayload] {
         guard filters.contains(.friend) else { return [] }
+        let selectedID = effectiveFriendFilterID
         return model.liveFriends.compactMap { friend in
+            if let selectedID, friend.id != selectedID { return nil }
             guard let location = friend.location else { return nil }
+            guard !friend.hasExpiredLocation(now: friendFreshnessNow) else { return nil }
             let info = FriendAnnotationInfo(
                 userId: friend.id,
                 displayName: friend.name ?? "Ami",
@@ -3213,7 +3445,7 @@ struct MapExplorerView: View {
                 accuracyMeters: location.accuracy.flatMap { $0 > 0 ? $0 : nil },
                 technology: friend.radio?.technology,
                 operatorName: friend.radio?.operator,
-                isStale: friend.hasStaleLocation()
+                isStale: friend.hasStaleLocation(now: friendFreshnessNow)
             )
             let subtitle = friend.radio?.technology
                 ?? friend.presence?.customStatus
@@ -3499,4 +3731,3 @@ struct MapExplorerView: View {
 // MARK: - Carte MapKit (moteur unique)
 
 // MARK: - Style des marqueurs MapKit (couleur / taille / glyphe par type)
-

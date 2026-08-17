@@ -30,6 +30,7 @@ final class CarPlayDashboardSceneDelegate: UIResponder, CPTemplateApplicationDas
         didConnect dashboardController: CPDashboardController,
         to window: UIWindow
     ) {
+        teardown()
         let services = AppServicesHolder.services
         let controller = CarPlayMapController()
         mapController = controller
@@ -92,6 +93,7 @@ final class CarPlayDashboardSceneDelegate: UIResponder, CPTemplateApplicationDas
         }
         mapController = nil
         layers = nil
+        lastLoadedCenter = nil
     }
 
     /// Rechargement plus paresseux que sur l'écran principal (800 m contre 400) :
@@ -104,12 +106,19 @@ final class CarPlayDashboardSceneDelegate: UIResponder, CPTemplateApplicationDas
             guard moved >= 800 else { return }
         }
         lastLoadedCenter = coordinate
-        guard let controller = mapController, let layers else { return }
+        guard let controller = mapController, layers != nil else { return }
+        // Cadre lu MAINTENANT : le calculer dans la tâche obligerait à retenir le
+        // contrôleur le temps de la requête.
+        let bounds = SQMapProjection.bounds(of: controller.mapView.region)
 
         loadTask?.cancel()
-        loadTask = Task { [weak self] in
+        // Captures faibles : `controller` et `layers` étaient retenus FORTEMENT
+        // par la closure, si bien que la `MKMapView` du Dashboard survivait à
+        // `teardown()` jusqu'à la fin de la requête réseau.
+        loadTask = Task { [weak self, weak controller] in
+            guard let layers = self?.layers else { return }
             let loaded = await layers.load(
-                bounds: SQMapProjection.bounds(of: controller.mapView.region),
+                bounds: bounds,
                 zoom: Self.dashboardZoom,
                 // Antennes seules : les couches denses n'ont pas la place de se
                 // lire sur une vignette, et les charger coûterait des données
@@ -118,7 +127,7 @@ final class CarPlayDashboardSceneDelegate: UIResponder, CPTemplateApplicationDas
                 market: MapMarketStore.initialMarketCode(),
                 operatorKey: MapMarketStore.initialOperatorKey()
             )
-            guard !Task.isCancelled, self != nil else { return }
+            guard !Task.isCancelled, let controller else { return }
             controller.apply(payloads: loaded.annotations)
         }
     }

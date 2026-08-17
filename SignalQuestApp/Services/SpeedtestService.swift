@@ -449,6 +449,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 // repli Cloudflare (HTTPS, résultat garanti), comme le chemin iPerf3.
                 // NE PAS gater sur `Task.checkCancellation()` : un échec (même long)
                 // ne doit pas empêcher le repli de produire un résultat.
+                //
+                // MAIS il faut distinguer « le serveur a échoué » de « l'utilisateur a
+                // arrêté, ce qui a fait échouer le serveur ». Une annulation ferme les
+                // sockets et remonte des erreurs qui ne sont PAS des `CancellationError`
+                // (le `catch` ci-dessus ne les attrape donc pas) : sans cette garde, un
+                // appui sur « Arrêter » relançait un run Cloudflare complet.
+                if Task.isCancelled { throw CancellationError() }
                 sqDebugLog("SQ_LIBRESPEED repli Cloudflare : \(error.localizedDescription)")
                 return try await runCloudflareTest(
                     pathStatus: pathStatus,
@@ -687,6 +694,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         } catch {
             // Sauvetage : DL iPerf3 impossible sur toute la plage → moteur
             // Cloudflare (résultat complet plutôt qu'une erreur sèche).
+            // Sauf si l'utilisateur a arrêté : l'annulation ferme les connexions et
+            // remonte ici une erreur qui n'est pas une `CancellationError`.
+            if Task.isCancelled { throw CancellationError() }
             sqDebugLog("[SpeedtestService] DL iPerf3 KO (\(error.localizedDescription)) — bascule Cloudflare")
             return try await runCloudflareTest(
                 pathStatus: pathStatus,
@@ -709,6 +719,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         guard dlResult.measuredBytes > 100_000, dlResult.measuredDuration >= 1.0 else {
             // Même sauvetage : un DL quasi vide (POP saturé) vaut une bascule,
             // pas un échec du test.
+            // Piège : un DL ARRÊTÉ par l'utilisateur est lui aussi « quasi vide ». Sans
+            // cette garde, appuyer sur « Arrêter » pendant le download déclenchait un
+            // run Cloudflare complet — exactement l'inverse de ce qui est demandé.
+            if Task.isCancelled { throw CancellationError() }
             sqDebugLog("[SpeedtestService] DL iPerf3 incomplet (\(dlResult.measuredBytes) octets) — bascule Cloudflare")
             return try await runCloudflareTest(
                 pathStatus: pathStatus,
@@ -1842,6 +1856,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             }
             if isRetryableIPerfTransportError(error) {
                 lastError = error
+                // Le port préféré vient d'échouer : il est mémorisé pour 10 min, et un
+                // démon iPerf3 public est souvent mono-slot. Sans cette invalidation, le
+                // test SUIVANT de la rafale (lancé moins d'une seconde après) rejouait le
+                // même port occupé et retombait sur le repli Cloudflare, à chaque fois.
+                await IPerfEndpointCache.shared.invalidate(hostname)
             } else {
                 throw error
             }
@@ -1947,9 +1966,21 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 operatorEntry = market?.operatorEntry(forKey: key)
             }
         }
-        // Repli : opérateur via le MNC de la SIM (rare sur 16.4+, mais gratuit).
-        if operatorEntry == nil, let mnc = ctMnc {
-            operatorEntry = market?.selectableOperators.first { $0.mncs.contains(mnc) }
+        // Repli : opérateur via le PLMN de la SIM (rare sur 16.4+, mais gratuit).
+        //
+        // ⚠️ Ce repli était du CODE MORT. Il cherchait dans `selectableOperators`,
+        // c'est-à-dire le bloc `operators` du registre — où le champ `mncs` n'existe
+        // pas et vaut donc toujours `[]`. La table MNC→clé vit dans `radioOperators`,
+        // et `radioOperatorKey(mcc:mnc:)` est faite pour ça (elle vérifie en plus que
+        // la clé correspond à un opérateur sélectionnable).
+        //
+        // Conséquence : hors ligne, sous VPN ou backend muet, l'opérateur n'était
+        // JAMAIS retrouvable depuis la SIM alors que la donnée était disponible — et
+        // sous VPN, où `trusted` est volontairement nul, l'app n'affichait plus aucun
+        // opérateur du tout.
+        if operatorEntry == nil, let mcc = ctMcc, let mnc = ctMnc,
+           let key = market?.radioOperatorKey(mcc: mcc, mnc: mnc) {
+            operatorEntry = market?.operatorEntry(forKey: key)
         }
 
         // Backfill : MCC depuis le marché ; MNC = MNC principal (1er du registre) de
@@ -2062,7 +2093,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     }
 
     func history() async -> [SpeedtestRunResult] {
-        (try? await historyCache.read([SpeedtestRunResult].self, for: "history")) ?? []
+        (try? await historyCache.read([SpeedtestRunResult].self, for: historyCacheKey)) ?? []
     }
 
     func retryPendingSaves() async {
@@ -2099,7 +2130,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         var values = await history()
         values.insert(result, at: 0)
         if values.count > 20 { values = Array(values.prefix(20)) }
-        try await historyCache.write(values, for: "history")
+        try await historyCache.write(values, for: historyCacheKey)
         // Partage le dernier résultat avec le widget (App Group), rafraîchit le
         // widget et indexe l'item Spotlight.
         let snapshot = SpeedtestWidgetSnapshot(
@@ -2117,7 +2148,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     }
 
     private func pendingSaves() async -> [PendingSpeedtestSave] {
-        await pendingStore.loadAll()
+        let ownerScopeId = LocalAccountScope.currentOwnerScopeId
+        return await pendingStore.loadAll().filter { $0.ownerScopeId == ownerScopeId }
     }
 
     private func upsertPendingSave(_ pending: PendingSpeedtestSave) async throws {
@@ -2131,6 +2163,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     }
 
     private func submitPendingSave(_ pending: PendingSpeedtestSave) async throws {
+        guard pending.ownerScopeId == LocalAccountScope.currentOwnerScopeId else {
+            // La session a changé entre la lecture et l'envoi : conserver l'entrée
+            // pour son propriétaire, sans l'attribuer au compte désormais actif.
+            throw CancellationError()
+        }
         let payload = SpeedtestSubmission.iosPayload(
             from: pending.result,
             streams: pending.streams,
@@ -2163,7 +2200,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 
     // MARK: - Correspondance id client → id serveur
 
-    private var serverIdMapKey: String { "serverIds" }
+    private var historyCacheKey: String { "history-\(LocalAccountScope.storageNamespace)" }
+    private var serverIdMapKey: String { "serverIds-\(LocalAccountScope.storageNamespace)" }
 
     private func rememberServerId(_ serverId: String, forClientId clientId: String) async {
         var map = (try? await historyCache.read([String: String].self, for: serverIdMapKey)) ?? [:]
@@ -2364,6 +2402,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             warmupCount: SpeedtestEngineConfig.pingWarmupCount
         )
 
+        // ⚠️ Annulation : les `try? await Task.sleep` ci-dessous retournent
+        // INSTANTANÉMENT sur une tâche annulée. Sans les gardes explicites, appuyer
+        // sur « Arrêter » pendant la phase ping ne stoppait pas la boucle — elle
+        // s'emballait au contraire à pleine vitesse, en continuant d'émettre des
+        // ticks de progression qui repeignaient le cadran.
+        if Task.isCancelled { return PingAttemptResult(values: [], attemptsUsed: attemptsUsed) }
+
         // Warm-up (non compté) — un échec n'abandonne pas tout le run iPerf.
         do {
             attemptsUsed += 1
@@ -2378,6 +2423,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 
         try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.pingIntervalMs * 1_000_000))
         for _ in 0..<measuredTarget where attemptsUsed < SpeedtestEngineConfig.pingAttemptBudget {
+            if Task.isCancelled { break }
             do {
                 attemptsUsed += 1
                 let elapsed = try await tcpProbe.connectLatencyMs(
@@ -2408,7 +2454,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         // Salvage : sur réseau perdant, quelques probes rapprochées valent
         // mieux qu'un run entier avorté faute d'échantillons.
         var salvageUsed = 0
-        while values.count < minimumValidSamples, salvageUsed < SpeedtestEngineConfig.pingSalvageAttempts {
+        while values.count < minimumValidSamples,
+              salvageUsed < SpeedtestEngineConfig.pingSalvageAttempts,
+              !Task.isCancelled {
             salvageUsed += 1
             attemptsUsed += 1
             do {
@@ -2940,6 +2988,17 @@ actor IPerfEndpointCache {
     func store(_ endpoint: IPerfEndpoint?, for hostname: String) {
         let ttl = endpoint == nil ? Self.failureTTL : Self.successTTL
         entries[hostname] = Entry(endpoint: endpoint, expiry: Date().addingTimeInterval(ttl))
+    }
+
+    /// Oublie l'endpoint mémorisé pour cet hôte, pour forcer un nouveau sondage.
+    ///
+    /// Nécessaire en rafale : le port retenu est mis en cache 10 min, mais un démon
+    /// iPerf3 public est souvent MONO-SLOT. Le test suivant, lancé moins d'une seconde
+    /// après, rejouait donc le même port encore occupé → `ACCESS_DENIED` → repli
+    /// Cloudflare dégradé, à répétition. C'est ce qui donnait « le premier test donne
+    /// un vrai chiffre, les suivants non ».
+    func invalidate(_ hostname: String) {
+        entries[hostname] = nil
     }
 
     func invalidateAll() {
@@ -4557,6 +4616,9 @@ struct PendingSpeedtestSave: Codable, Equatable, Sendable {
     /// pendant un drive → rattachement serveur. Optionnel pour décoder les files locales
     /// sérialisées avant cet ajout (`nil` = speedtest hors drive).
     let driveSessionId: String?
+    /// Portée capturée à la création. `nil` désigne une ancienne entrée mise en
+    /// quarantaine et jamais attribuée automatiquement au compte courant.
+    var ownerScopeId: String? = LocalAccountScope.currentOwnerScopeId
 }
 
 /// File des sauvegardes speedtest en attente, abstraite pour offrir deux implémentations

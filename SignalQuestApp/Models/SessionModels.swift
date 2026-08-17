@@ -160,7 +160,11 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
     let pci: String?
     let cellId: String?
     let tech: String?
+    /// Clé canonique du RÉSEAU servant, résolue serveur (« SFR », « BOUYGUES »…).
     let operatorKey: String?
+    /// Nom de la SIM tel qu'envoyé par le client. N'est PAS une clé : ne jamais
+    /// l'utiliser là où un `operatorKey` est attendu (filtrage, scope, couleur).
+    let simOperator: String?
     let timestamp: Date?
 
     enum CodingKeys: String, CodingKey {
@@ -181,7 +185,12 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
         pci = c.decodeFlexibleString(forKey: .pci)
         cellId = c.decodeFlexibleString(forKey: .cellId)
         tech = c.decodeFlexibleString(forKey: .technology) ?? c.decodeFlexibleString(forKey: .networkType)
-        operatorKey = c.decodeFlexibleString(forKey: .operatorKey) ?? c.decodeFlexibleString(forKey: .mobileOperator)
+        // Deux champs DISTINCTS. Le repli `operatorKey ?? mobileOperator` écrivait un
+        // nom de SIM dans un champ censé porter une clé canonique — soit exactement le
+        // mélange que ce chantier supprime : un « Lebara » ou un « Orange F » ne
+        // correspond à aucune clé et fausse tout ce qui s'appuie dessus.
+        operatorKey = c.decodeFlexibleString(forKey: .operatorKey)
+        simOperator = c.decodeFlexibleString(forKey: .mobileOperator)
         timestamp = (try? c.decodeIfPresent(Date.self, forKey: .timestamp)) ?? nil
     }
 
@@ -268,7 +277,10 @@ struct ServingAntenna: Identifiable, Equatable {
     let id: String
     let lat: Double
     let lng: Double
+    /// Opérateur principal conservé pour les actions qui exigent un PLMN unique.
     let operatorName: String?
+    /// Tous les opérateurs reconnus sur un site mutualisé, pour l'affichage.
+    let operatorNames: [String]
     let status: ServingStatus
     /// Niveau de confiance backend : "HIGH" | "MEDIUM" | "LOW".
     let confidenceLabel: String?
@@ -285,6 +297,9 @@ struct ServingAntenna: Identifiable, Equatable {
 
     var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: lat, longitude: lng) }
     var hasValidCoordinate: Bool { lat != 0 || lng != 0 }
+    var operatorDisplayName: String? {
+        operatorNames.isEmpty ? operatorName : operatorNames.joined(separator: " + ")
+    }
 
     /// Confiance traduite (HAUTE / MOYENNE / FAIBLE).
     var confidenceFR: String? {
@@ -311,7 +326,14 @@ struct ServingAntenna: Identifiable, Equatable {
         self.lat = lat
         self.lng = lng
         self.siteId = resolvedSiteId
-        self.operatorName = a?.operatorName ?? r.hypothesis?.operatorName ?? a?.operators?.first
+        let resolvedOperatorName = a?.operatorName
+            ?? r.hypothesis?.operatorName
+            ?? r.matchedOperators?.first
+            ?? a?.operators?.first
+        self.operatorName = resolvedOperatorName
+        var seenOperators = Set<String>()
+        self.operatorNames = ((r.matchedOperators ?? []) + (a?.operators ?? []) + [resolvedOperatorName].compactMap { $0 })
+            .filter { !$0.isEmpty && seenOperators.insert($0).inserted }
         self.status = ServingAntenna.resolveStatus(r)
         self.confidenceLabel = r.confidence ?? r.hypothesis?.confidence
         self.distanceKm = r.distance ?? r.hypothesis?.distanceMeters.map { $0 / 1000 }
@@ -372,18 +394,20 @@ struct ServingAntennaResult: Decodable {
     let confidenceReason: [String]?
     let distance: Double?
     let canonicalSiteId: String?
+    let matchedOperators: [String]?
     let antenna: ServingAntennaCore?
     let hypothesis: ServingAntennaHypothesis?
 
     enum CodingKeys: String, CodingKey {
         case found, identified, identificationStatus, source, confidence, confidenceReason
-        case distance, canonicalSiteId, antenna, hypothesis
+        case distance, canonicalSiteId, matchedOperators, antenna, hypothesis
     }
 
     init(from decoder: Decoder) throws {
         guard let c = try? decoder.container(keyedBy: CodingKeys.self) else {
             found = nil; identified = nil; identificationStatus = nil; source = nil
             confidence = nil; confidenceReason = nil; distance = nil; canonicalSiteId = nil
+            matchedOperators = nil
             antenna = nil; hypothesis = nil; return
         }
         found = (try? c.decodeIfPresent(Bool.self, forKey: .found)) ?? nil
@@ -394,6 +418,7 @@ struct ServingAntennaResult: Decodable {
         confidenceReason = try? c.decodeIfPresent([String].self, forKey: .confidenceReason) ?? nil
         distance = (try? c.decodeIfPresent(Double.self, forKey: .distance)) ?? nil
         canonicalSiteId = c.decodeFlexibleString(forKey: .canonicalSiteId)
+        matchedOperators = try? c.decodeIfPresent([String].self, forKey: .matchedOperators) ?? nil
         antenna = try? c.decodeIfPresent(ServingAntennaCore.self, forKey: .antenna) ?? nil
         hypothesis = try? c.decodeIfPresent(ServingAntennaHypothesis.self, forKey: .hypothesis) ?? nil
     }

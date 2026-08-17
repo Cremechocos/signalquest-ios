@@ -90,11 +90,17 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // Passe par le holder plutôt qu'une statique de plus : le graphe est déjà
         // construit à cet instant (didFinishLaunching précède toujours l'ouverture
         // d'URL), et c'est le même routeur que la fenêtre SwiftUI observe.
-        let router = AppServicesHolder.services.router
+        let services = AppServicesHolder.services
+        let router = services.router
         router.pendingMapFocus = Coordinates(latitude: destination.coordinate.latitude,
                                              longitude: destination.coordinate.longitude)
         router.selectedTab = .map
-        CarPlayDashboardRoute.request(.map)
+        // Seulement si le véhicule peut réellement guider : sans `carplay-maps`,
+        // pousser vers la scène CarPlay afficherait une liste d'antennes en
+        // réponse à une demande d'itinéraire.
+        if services.isCarPlayGuidanceAvailable {
+            CarPlayDashboardRoute.request(.map)
+        }
         return true
     }
 }

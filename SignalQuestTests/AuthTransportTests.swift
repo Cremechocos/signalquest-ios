@@ -9,6 +9,29 @@ import XCTest
 /// désormais sa session, sans cookie jar — l'identité ne circule plus que par
 /// l'en-tête posé volontairement.
 final class AuthTransportTests: XCTestCase {
+    func testSSETransportDoesNotPersistCookiesOrCacheAcrossAccounts() {
+        let configuration = SSEClient.makeSessionConfiguration()
+
+        XCTAssertNil(configuration.httpCookieStorage)
+        XCTAssertFalse(configuration.httpShouldSetCookies)
+        XCTAssertNil(configuration.urlCache)
+        XCTAssertEqual(configuration.requestCachePolicy, .reloadIgnoringLocalCacheData)
+    }
+
+    func testLocalAccountNamespacesAndOfflineOwnershipAreIsolated() {
+        LocalAccountScope.deactivate()
+        defer { LocalAccountScope.deactivate() }
+
+        LocalAccountScope.activate(userId: "account-a")
+        let accountANamespace = LocalAccountScope.storageNamespace
+        LocalOfflineOwnership.claim(kind: "coverage", id: "session-1")
+        XCTAssertTrue(LocalOfflineOwnership.belongsToCurrentScope(kind: "coverage", id: "session-1"))
+
+        LocalAccountScope.activate(userId: "account-b")
+        XCTAssertNotEqual(accountANamespace, LocalAccountScope.storageNamespace)
+        XCTAssertFalse(LocalOfflineOwnership.belongsToCurrentScope(kind: "coverage", id: "session-1"))
+    }
+
 
     private func makeClient(token: String?) -> (APIClient, RequestLog) {
         let store = InMemoryTokenStore()
