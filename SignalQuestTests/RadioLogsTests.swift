@@ -124,6 +124,30 @@ final class RadioLogsTests: XCTestCase {
         XCTAssertEqual(nr.techLabel, "5G")
     }
 
+    /// Régression production site 481534 : une mesure NSA peut porter l'ECI de
+    /// l'ancre LTE. Sans gNB réellement observé, iOS conserve l'eNB 12160 et ne
+    /// fabrique jamais gNB 190 avec un découpage NCI supposé.
+    func testNsaLteAnchorDoesNotFabricateGnb190() throws {
+        let anchor = try entry(
+            id: "site-481534",
+            dedupeKey: "cap|site-481534",
+            enb: "12160",
+            gnb: nil,
+            technology: "5G NSA",
+            operatorName: "Bouygues Telecom",
+            mccMnc: "208-20",
+            pci: 323,
+            ci: 3_112_966
+        )
+
+        let sites = RadioLogSiteBuilder.build(from: [anchor])
+
+        XCTAssertEqual(sites.count, 1)
+        XCTAssertEqual(sites.first?.kind, .enb)
+        XCTAssertEqual(sites.first?.node, "12160")
+        XCTAssertFalse(sites.contains { $0.kind == .gnb && $0.node == "190" })
+    }
+
     /// Plusieurs cellules partagent souvent le même PCI (bandes ou secteurs
     /// différents). Les pastilles décrivent le SITE : les répéter contredisait le
     /// « 3 PCI » affiché juste au-dessus — vu tel quel sur un site réel, qui
