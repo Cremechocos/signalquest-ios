@@ -1,5 +1,20 @@
 import UIKit
 
+/// Groupes de métadonnées que l'utilisateur peut retirer avant publication.
+///
+/// Les mesures essentielles (débits, graphes et latence) ne sont jamais
+/// masquées : elles constituent le résultat partagé. Les détails restent inclus
+/// par défaut, conformément au contrat produit, sans rendre aucun d'eux
+/// obligatoire.
+struct SpeedtestShareOptions: Equatable, Hashable, Sendable {
+    var includeNetworkContext = true
+    var includeApproximateLocation = true
+    var includeDevice = true
+    var includeRadioDetails = true
+    var includeServerDetails = true
+    var includeTimestamp = true
+}
+
 /// Passage d'un résultat de speedtest à la carte de partage — pendant iOS de
 /// `buildShareCardModel` (Android, `SpeedtestShareCardModel.kt`).
 ///
@@ -37,11 +52,28 @@ enum SQShareCardBuilder {
     /// la vue elle s'exécute tout de même dessus, comme avant — l'en affranchir
     /// supposerait de rendre le résultat ET le thème `Sendable` (`UIColor` ne
     /// l'est pas), pour un rendu déjà bien plus rapide que le précédent.
-    static func renderPNG(for result: SpeedtestRunResult, theme: SQShareCardTheme) throws -> URL {
-        let image = SQShareCardRenderer.render(model(for: result, theme: theme))
+    static func renderImage(
+        for result: SpeedtestRunResult,
+        theme: SQShareCardTheme,
+        options: SpeedtestShareOptions = .init()
+    ) -> UIImage {
+        SQShareCardRenderer.render(model(for: result, theme: theme, options: options))
+    }
+
+    static func renderPNG(
+        for result: SpeedtestRunResult,
+        theme: SQShareCardTheme,
+        options: SpeedtestShareOptions = .init()
+    ) throws -> URL {
+        try writePNG(renderImage(for: result, theme: theme, options: options))
+    }
+
+    /// Écrit exactement l'image affichée dans l'aperçu. Le nom ne contient ni
+    /// l'identifiant interne du test, ni opérateur, lieu ou horodatage métier.
+    static func writePNG(_ image: UIImage) throws -> URL {
         guard let data = image.pngData() else { throw CocoaError(.fileWriteUnknown) }
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("signalquest-speedtest-\(result.id.uuidString).png")
+            .appendingPathComponent("sq_speedtest_share_\(UUID().uuidString).png")
         try data.write(to: url, options: [.atomic])
         return url
     }
@@ -51,7 +83,8 @@ enum SQShareCardBuilder {
     static func model(
         for result: SpeedtestRunResult,
         theme: SQShareCardTheme,
-        locale: Locale = .autoupdatingCurrent
+        locale: Locale = .autoupdatingCurrent,
+        options: SpeedtestShareOptions = .init()
     ) -> SQShareCardModel {
         let downloadGraph = graph(
             samples: result.downloadSeriesMbps ?? [],
@@ -76,8 +109,8 @@ enum SQShareCardBuilder {
         return SQShareCardModel(
             theme: theme,
             brand: "SIGNALQUEST",
-            headerNetworkText: headerNetworkText(for: result),
-            dateTimeText: dateText(result.createdAt, locale: locale),
+            headerNetworkText: options.includeNetworkContext ? headerNetworkText(for: result) : "",
+            dateTimeText: options.includeTimestamp ? dateText(result.createdAt, locale: locale) : nil,
             download: .init(
                 label: String(localized: "Download"),
                 value: formatMbps(result.downloadAverageMbps, locale: locale),
@@ -104,11 +137,19 @@ enum SQShareCardBuilder {
                 for: result, download: downloadGraph, upload: uploadGraph, locale: locale
             ),
             serverLabel: String(localized: "Serveur"),
-            serverText: (result.serverName ?? result.downloadServerName)?.shareTrimmed,
-            deviceCityText: deviceCityText(for: result),
+            serverText: options.includeServerDetails
+                ? (result.serverName ?? result.downloadServerName)?.shareTrimmed
+                : nil,
+            deviceCityText: deviceCityText(
+                for: result,
+                includeDevice: options.includeDevice,
+                includeLocation: options.includeApproximateLocation
+            ),
             // VIDE, et ce n'est pas un trou à combler : ces lignes portent
             // l'identité radio (porteuses agrégées, MCC/MNC, bande) qu'Android lit
             // sur son modem et qu'iOS n'expose pas. Le pied se replie tout seul.
+            // Le flag reste dans le contrat commun Android/iOS, mais iOS ne
+            // fournit aucune preuve RF du réseau servant à rendre ici.
             radioLines: []
         )
     }
@@ -228,14 +269,23 @@ enum SQShareCardBuilder {
         ].compactMap { $0 }
     }
 
-    private static func deviceCityText(for result: SpeedtestRunResult) -> String {
+    private static func deviceCityText(
+        for result: SpeedtestRunResult,
+        includeDevice: Bool,
+        includeLocation: Bool
+    ) -> String {
         // `deviceModel` est stocké au format « iPhone 17 Pro (iPhone18,1) » : la
         // carte n'en garde que le nom commercial, l'identifiant machine relevant
         // du diagnostic et non de ce qu'on publie.
         let stored = result.deviceModel?.shareTrimmed ?? AppleDeviceDescriptor.currentShareModelName
         let device = stored.components(separatedBy: " (").first?
             .trimmingCharacters(in: .whitespaces) ?? stored
-        return [device, city(for: result)].filter { !$0.isEmpty }.joined(separator: " · ")
+        return [
+            includeDevice ? device : "",
+            includeLocation ? city(for: result) : "",
+        ]
+        .filter { !$0.isEmpty }
+        .joined(separator: " · ")
     }
 
     /// La commune du point de mesure : `city` quand le géocodage l'a fournie,

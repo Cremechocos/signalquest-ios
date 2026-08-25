@@ -22,17 +22,27 @@ enum SpeedtestShareImageRenderer {
     // qui pouvait provoquer un à-coup à l'apparition du résultat (PERF-SHARE-01).
     private static let exportScale: CGFloat = 2
 
-    static func shareText(for result: SpeedtestRunResult) -> String {
+    static func shareText(
+        for result: SpeedtestRunResult,
+        options: SpeedtestShareOptions = .init()
+    ) -> String {
         let download = Int(result.downloadAverageMbps.rounded())
         let upload = result.uploadAverageMbps.map { "\(Int($0.rounded())) Mbps up" } ?? "-- Mbps up"
         let ping = (result.pingMinMs ?? result.pingMs).map { "\(Int($0.rounded())) ms" } ?? "--"
-        let net = result.networkShareDisplayName.trimmedNonEmpty ?? "réseau mobile"
-        let place = result.city?.trimmedNonEmpty
-        let placePart = place.map { " à \($0)" } ?? ""
-        let server = (result.serverName ?? result.downloadServerName)?.trimmedNonEmpty
-        let serverPart = server.map { " via \($0)" } ?? ""
+        var context = ""
+        if options.includeNetworkContext {
+            let net = result.networkShareDisplayName.trimmedNonEmpty ?? "réseau mobile"
+            context += " sur \(net)"
+        }
+        if options.includeApproximateLocation, let place = result.city?.trimmedNonEmpty {
+            context += " à \(place)"
+        }
+        if options.includeServerDetails,
+           let server = (result.serverName ?? result.downloadServerName)?.trimmedNonEmpty {
+            context += " via \(server)"
+        }
         return """
-        \(download) Mbps en download sur \(net)\(placePart)\(serverPart), ping \(ping), \(upload) — mesuré avec SignalQuest.
+        \(download) Mbps en download\(context), ping \(ping), \(upload) — mesuré avec SignalQuest.
         #SignalQuest · signalquest.fr
         """
     }

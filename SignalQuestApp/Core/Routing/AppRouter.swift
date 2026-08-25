@@ -56,7 +56,7 @@ final class AppRouter: ObservableObject {
         // Tous les drapeaux passent par AppEnvironment : en Release ce sont des
         // constantes `false`, donc l'onglet initial est toujours `.home` et
         // aucun argument de lancement ne peut détourner la navigation.
-        if AppEnvironment.runsSpeedtestQA {
+        if AppEnvironment.runsSpeedtestQA || AppEnvironment.showsSpeedtestSharePreviewQA {
             selectedTab = .speed
         } else if AppEnvironment.startsOnMap
                     || AppEnvironment.usesDemoPhotos

@@ -1,21 +1,9 @@
 import SwiftUI
 import UIKit
 import CoreLocation
-import CoreTransferable
-import UniformTypeIdentifiers
 import os
 
 private let speedtestQALogger = Logger(subsystem: "fr.signalquest.ios", category: "SpeedtestQA")
-
-private struct SpeedtestSharePayload: Identifiable {
-    let id = UUID()
-    let items: [Any]
-}
-
-private enum SpeedtestSharePreparation: Equatable {
-    case idle
-    case rendering(UUID)
-}
 
 struct SpeedtestView: View {
     private let guestMode: Bool
@@ -100,13 +88,9 @@ struct SpeedtestView: View {
     /// (sous tunnel, l'opérateur réel n'est pas détectable).
     @State private var isVPNActive = false
     @State private var didRunQASpeedtest = false
-    // Partage : image pré-rendue dès qu'un résultat arrive, puis présentée via
-    // un payload atomique pour éviter les feuilles Apple vides au premier tap.
-    @State private var shareURL: URL?
-    @State private var sharePayload: SpeedtestSharePayload?
-    @State private var sharePreparation: SpeedtestSharePreparation = .idle
-    @State private var shareRenderTask: Task<Void, Never>?
-    @State private var sharePrerenderTask: Task<Void, Never>?
+    // Partage : le résultat ouvre d'abord un aperçu exact. Le PNG et la feuille
+    // système ne sont créés qu'après confirmation des métadonnées publiées.
+    @State private var sharePreviewResult: SpeedtestRunResult?
 
     init(guestMode: Bool = false) {
         self.guestMode = guestMode
@@ -132,11 +116,6 @@ struct SpeedtestView: View {
                 }
             }
         )
-    }
-
-    private var isPreparingShare: Bool {
-        if case .rendering = sharePreparation { return true }
-        return false
     }
 
     /// Opérateur affiché dans le bandeau : priorité au résultat mesuré, puis à
@@ -277,6 +256,7 @@ struct SpeedtestView: View {
         .sqAnimation(.snappy(duration: 0.32), value: phase)
         .sqAnimation(.snappy(duration: 0.28), value: result)
         .task {
+            if await presentSpeedtestSharePreviewQAIfNeeded() { return }
             // Relecture fraîche de CoreTelephony (opérateur/techno) à l'ouverture
             // de la page, plutôt que le dernier statut publié au démarrage.
             services.networkPath.refreshNow()
@@ -303,16 +283,6 @@ struct SpeedtestView: View {
             if newValue == .active, runTask == nil {
                 Task { history = await services.speedtest.history() }
             }
-        }
-        .onChangeCompat(of: colorScheme) { _, _ in
-            // L'image de partage suit le thème iOS : on la re-rend au changement.
-            shareURL = nil
-            sharePrerenderTask?.cancel()
-            if let result { prerenderShareImage(for: result) }
-        }
-        .onDisappear {
-            shareRenderTask?.cancel()
-            sharePrerenderTask?.cancel()
         }
     }
 
@@ -429,93 +399,27 @@ struct SpeedtestView: View {
         .sqShadowSoft()
     }
 
-    // MARK: - Share panel (single-tap)
+    // MARK: - Share panel
 
     @ViewBuilder
     private func sharePanel(for result: SpeedtestRunResult) -> some View {
         GradientButton(
             "Partager le résultat",
             systemImage: "square.and.arrow.up",
-            isBusy: isPreparingShare,
             style: .secondary
         ) {
-            presentShare(for: result)
+            sharePreviewResult = result
         }
-        .sheet(item: $sharePayload) { payload in
-            ShareSheet(items: payload.items)
-                .presentationDetents([.medium, .large])
+        .sheet(item: $sharePreviewResult) { selectedResult in
+            SpeedtestSharePreviewSheet(
+                result: selectedResult,
+                theme: SQShareCardTheme.current(colorScheme: colorScheme)
+            )
         }
-    }
-
-    /// Assemble image (pré-rendue si dispo) + texte et présente la feuille de
-    /// partage immédiatement. Si l'image n'est pas encore prête, on la rend à la
-    /// volée dans une `Task`, sans bloquer l'UI.
-    private func presentShare(for result: SpeedtestRunResult) {
-        guard !isPreparingShare else { return }
-        let text = SpeedtestShareImageRenderer.shareText(for: result)
-        let title = "Speedtest SignalQuest — \(Int(result.downloadAverageMbps.rounded())) Mbps"
-        if let url = shareURL {
-            sharePayload = SpeedtestSharePayload(items: shareItems(fileURL: url, text: text, title: title))
-            return
-        }
-        sharePreparation = .rendering(result.id)
-        shareRenderTask?.cancel()
-        shareRenderTask = Task {
-            do {
-                let url = try SQShareCardBuilder.renderPNG(
-                    for: result, theme: SQShareCardTheme.current(colorScheme: colorScheme)
-                )
-                await MainActor.run {
-                    guard self.result?.id == result.id else {
-                        self.sharePreparation = .idle
-                        return
-                    }
-                    self.sharePreparation = .idle
-                    self.shareURL = url
-                    self.sharePayload = SpeedtestSharePayload(items: self.shareItems(fileURL: url, text: text, title: title))
-                }
-            } catch {
-                await MainActor.run {
-                    guard self.result?.id == result.id else {
-                        self.sharePreparation = .idle
-                        return
-                    }
-                    self.sharePreparation = .idle
-                    self.sharePayload = SpeedtestSharePayload(items: [text])
-                }
-            }
-        }
-    }
-
-    /// Pré-rend l'image de partage hors du chemin critique du tap, dans le thème
-    /// iOS courant.
-    private func prerenderShareImage(for result: SpeedtestRunResult) {
-        let theme = SQShareCardTheme.current(colorScheme: colorScheme)
-        sharePrerenderTask?.cancel()
-        sharePrerenderTask = Task {
-            do {
-                let url = try SQShareCardBuilder.renderPNG(for: result, theme: theme)
-                await MainActor.run {
-                    if self.result?.id == result.id {
-                        self.shareURL = url
-                    }
-                }
-            } catch {
-                sqDebugLog("Failed to prerender share image: \(error)")
-            }
-        }
-    }
-
-    private func shareItems(fileURL: URL, text: String, title: String) -> [Any] {
-        [ImageAndTextShareItem(fileURL: fileURL, text: text, title: title), text]
     }
 
     private func resetShareState() {
-        shareRenderTask?.cancel()
-        sharePrerenderTask?.cancel()
-        shareURL = nil
-        sharePayload = nil
-        sharePreparation = .idle
+        sharePreviewResult = nil
     }
 
     // MARK: - Detail card (preserves UI test labels)
@@ -1014,9 +918,7 @@ struct SpeedtestView: View {
         )
         try Task.checkCancellation()
         result = measured
-        shareURL = nil
-        sharePayload = nil
-        prerenderShareImage(for: measured)
+        sharePreviewResult = nil
         liveProgress = SpeedtestLiveProgress(
             phase: .saving,
             currentMbps: measured.downloadAverageMbps,
@@ -1322,6 +1224,57 @@ struct SpeedtestView: View {
         start()
     }
 
+    @MainActor
+    private func presentSpeedtestSharePreviewQAIfNeeded() async -> Bool {
+        #if DEBUG
+        guard AppEnvironment.showsSpeedtestSharePreviewQA else { return false }
+        let fixture = SpeedtestRunResult(
+            label: "QA partage Speedtest",
+            downloadMbps: 734.8,
+            downloadAverageMbps: 734.8,
+            downloadMaxMbps: 812.4,
+            uploadMbps: 126.4,
+            uploadAverageMbps: 126.4,
+            uploadMaxMbps: 131.0,
+            pingMs: 24,
+            pingMedianMs: 18,
+            pingMinMs: 14,
+            pingMaxMs: 30,
+            jitterMs: 1.4,
+            pingDlMs: 42,
+            jitterDlMs: 6.2,
+            pingUlMs: 57,
+            jitterUlMs: 9.4,
+            pingProtocol: "ICMP",
+            durationSeconds: 14,
+            connectionType: .cellular,
+            cellularTechnology: .fiveGNSA,
+            networkOperatorName: "Bouygues Telecom",
+            networkOperatorMcc: 208,
+            networkOperatorMnc: 20,
+            marketCode: "FR",
+            operatorKey: "bouygues_telecom",
+            city: "Lyon",
+            serverName: "Paris BBR — serveur au nom volontairement long",
+            downloadServerName: "Paris BBR — serveur au nom volontairement long",
+            createdAt: Date(timeIntervalSince1970: 1_780_000_000),
+            downloadSeriesMbps: [120, 280, 510, 720, 770, 748, 734],
+            uploadSeriesMbps: [22, 54, 91, 122, 126, 124],
+            downloadGraceWindowCount: 2,
+            uploadGraceWindowCount: 1,
+            uploadMeasurementSource: "iperf3",
+            deviceModel: "iPhone 17 Pro",
+            osVersion: "iOS 27"
+        )
+        result = fixture
+        await Task.yield()
+        sharePreviewResult = fixture
+        return true
+        #else
+        return false
+        #endif
+    }
+
     private func logQASpeedtestResult(_ result: SpeedtestRunResult) {
         guard AppEnvironment.runsSpeedtestQA else { return }
         let uploadAverage = result.uploadAverageMbps ?? 0
@@ -1391,4 +1344,3 @@ private func ms(_ value: Double?) -> String {
 // MARK: - Server picker (iPerf3 OVH + Bouygues)
 
 // MARK: - Comparable helper
-

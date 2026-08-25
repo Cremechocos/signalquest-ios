@@ -395,12 +395,15 @@ enum SQShareCardRenderer {
             }
         }
 
-        // SERVEUR — aligné à droite, valeur en display.
+        // SERVEUR — aligné à droite, valeur en display. Quand « Sous charge »
+        // existe, sa colonne est réservée jusqu'à x=600 : les noms longs ne
+        // peuvent plus passer dessous ni le recouvrir.
         if let server = model.serverText {
             let rightX = w - padX * s
             drawRightAligned(model.serverLabel.uppercased(), attrs: kickAttrs, rightX: rightX, baseline: kickY)
             let srvAttrs = attributes(SQShareFonts.display(size: 17 * s, weight: 700), t.textPrimary)
-            let maxW = w - 2 * padX * s - 420 * s
+            let serverColumnLeft = (model.underLoadRows.isEmpty ? 470 : 600) * s
+            let maxW = rightX - serverColumnLeft
             drawRightAligned(ellipsize(server, attrs: srvAttrs, maxWidth: maxW), attrs: srvAttrs, rightX: rightX, baseline: (552 - columnShift) * s)
         }
     }
@@ -421,10 +424,11 @@ enum SQShareCardRenderer {
         let lineStep = 20 * s
         let monoAttrs = attributes(SQShareFonts.mono(size: 12 * s, weight: 400), t.textSecondary)
 
-        // Gauche : UNIQUEMENT l'appareil et la ville. Android empile au-dessus des
-        // réserves de mesure ; sur iOS elles alourdissaient une carte qui porte
-        // déjà moins d'information, sans rien apprendre à qui la reçoit.
-        draw(ellipsize(model.deviceCityText, attrs: monoAttrs, maxWidth: w * 0.5),
+        // Gauche : appareil et ville lorsqu'ils sont autorisés. Si les deux sont
+        // masqués, la signature produit garde le pied visuellement utile sans
+        // réintroduire une donnée personnelle.
+        let footerText = model.deviceCityText.isEmpty ? "signalquest.fr" : model.deviceCityText
+        draw(ellipsize(footerText, attrs: monoAttrs, maxWidth: w * 0.5),
              attrs: monoAttrs, x: padX * s, baseline: baseY)
 
         // Droite : jusqu'à deux lignes d'identité radio.
@@ -448,15 +452,23 @@ enum SQShareCardRenderer {
         draw(model.brand, attrs: brandAttrs, x: logoRect.maxX + 13 * s, baseline: brandY)
 
         let rightX = w - padX * s
-        let netAttrs = attributes(SQShareFonts.mono(size: 14 * s, weight: 700), t.textPrimary, kernEm: 0.03)
-        drawRightAligned(
-            ellipsize(model.headerNetworkText.uppercased(), attrs: netAttrs, maxWidth: w * 0.5),
-            attrs: netAttrs, rightX: rightX,
-            baseline: model.dateTimeText != nil ? 58 * s : logoRect.midY + 5 * s
-        )
+        let hasNetwork = !model.headerNetworkText.isEmpty
+        if hasNetwork {
+            let netAttrs = attributes(SQShareFonts.mono(size: 14 * s, weight: 700), t.textPrimary, kernEm: 0.03)
+            drawRightAligned(
+                ellipsize(model.headerNetworkText.uppercased(), attrs: netAttrs, maxWidth: w * 0.5),
+                attrs: netAttrs, rightX: rightX,
+                baseline: model.dateTimeText != nil ? 58 * s : logoRect.midY + 5 * s
+            )
+        }
         if let date = model.dateTimeText {
             let dateAttrs = attributes(SQShareFonts.mono(size: 12.5 * s, weight: 400), t.textSecondary)
-            drawRightAligned(date, attrs: dateAttrs, rightX: rightX, baseline: 78 * s)
+            drawRightAligned(
+                date,
+                attrs: dateAttrs,
+                rightX: rightX,
+                baseline: hasNetwork ? 78 * s : logoRect.midY + 5 * s
+            )
         }
     }
 
