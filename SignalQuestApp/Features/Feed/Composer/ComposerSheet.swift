@@ -250,14 +250,10 @@ final class ComposerViewModel: ObservableObject {
         Haptics.selection()
     }
 
-    /// Encode/redimensionne la photo choisie (≤1600 px) hors du main thread, sur
-    /// le même patron que les autres uploads (messages/photos). Renvoie nil s'il
-    /// n'y a pas de photo.
-    private func preparedImageData() async -> Data? {
-        guard let data = pickedImageData else { return nil }
-        return await Task.detached(priority: .userInitiated) {
-            PhotoUploadPreparation.downscaledJPEG(from: data, maxSide: 1600, quality: 0.84)
-        }.value
+    /// Le service d'upload applique le contrat commun : orientation rendue dans
+    /// les pixels, downscale et suppression EXIF avant tout envoi réseau.
+    private func preparedImageData() -> Data? {
+        pickedImageData
     }
 
     /// Prépare le composer pour une ÉDITION.
@@ -338,9 +334,9 @@ final class ComposerViewModel: ObservableObject {
         defer { isBusy = false }
         do {
             var attachments: [CreatePostAttachment] = []
-            // Encodage + downscale (≤1600 px) HORS du main thread pour ne pas geler
-            // l'UI au tap « Publier » avec une photo pleine résolution (PERF-COMP-01).
-            if let imageData = await preparedImageData() {
+            // Le service ré-encode hors du main thread et ne transmet jamais les
+            // octets originaux de la galerie.
+            if let imageData = preparedImageData() {
                 attachments.append(try await service.uploadImage(data: imageData, mimeType: "image/jpeg"))
             }
             let fallback = attachedSpeedtest != nil ? "Mon dernier speedtest SignalQuest" : "Photo SignalQuest"

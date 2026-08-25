@@ -179,14 +179,19 @@ final class SocialFeedService: SocialFeedServicing {
         return response.post
     }
 
-    func uploadImage(data: Data, mimeType: String = "image/jpeg") async throws -> CreatePostAttachment {
+    func uploadImage(data: Data, mimeType _: String = "image/jpeg") async throws -> CreatePostAttachment {
+        guard let sanitized = await Task.detached(priority: .userInitiated, operation: {
+            SocialImagePrivacy.sanitizedJPEG(from: data, maxSide: 1600, quality: 0.84)
+        }).value else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
         let response: SocialUploadResponse = try await api.uploadMultipart(
             path: "/api/social/uploads",
             fields: ["platform": "ios"],
             fileField: "file",
             fileName: "signalquest-social-\(UUID().uuidString).jpg",
-            mimeType: mimeType,
-            data: data,
+            mimeType: "image/jpeg",
+            data: sanitized,
             as: SocialUploadResponse.self
         )
         return response.upload

@@ -1,4 +1,6 @@
 import XCTest
+import ImageIO
+import UIKit
 @testable import SignalQuest
 
 /// Le serveur décide qu'une story est VIDE en inspectant la présence de
@@ -43,5 +45,65 @@ final class StoryTypedTests: XCTestCase {
             )
             XCTAssertEqual(body.ttlHours, expected, "ttl \(input)")
         }
+    }
+
+    func testSocialImageSanitizerRemovesGPSAndCameraMetadata() throws {
+        let original = try makeJpegWithSensitiveMetadata()
+        let originalProperties = try properties(of: original)
+        XCTAssertNotNil(originalProperties[kCGImagePropertyGPSDictionary])
+
+        let sanitized = try XCTUnwrap(
+            SocialImagePrivacy.sanitizedJPEG(from: original, maxSide: 1600, quality: 0.85)
+        )
+        let sanitizedProperties = try properties(of: sanitized)
+        XCTAssertNil(sanitizedProperties[kCGImagePropertyGPSDictionary])
+        let tiff = sanitizedProperties[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
+        XCTAssertNil(tiff?[kCGImagePropertyTIFFMake])
+        XCTAssertNil(tiff?[kCGImagePropertyTIFFModel])
+        XCTAssertEqual((sanitizedProperties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue, 8)
+        XCTAssertEqual((sanitizedProperties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue, 12)
+    }
+
+    func testSocialImageSanitizerFailsClosedForInvalidInput() {
+        XCTAssertNil(SocialImagePrivacy.sanitizedJPEG(from: Data("not-an-image".utf8)))
+    }
+
+    private func makeJpegWithSensitiveMetadata() throws -> Data {
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 8), format: format)
+        let base = renderer.image { context in
+            UIColor.systemRed.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 12, height: 8))
+        }
+        let jpeg = try XCTUnwrap(base.jpegData(compressionQuality: 0.95))
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(jpeg as CFData, nil))
+        let output = NSMutableData()
+        let destination = try XCTUnwrap(
+            CGImageDestinationCreateWithData(output, "public.jpeg" as CFString, 1, nil)
+        )
+        let metadata: [CFString: Any] = [
+            kCGImagePropertyOrientation: 6,
+            kCGImagePropertyTIFFDictionary: [
+                kCGImagePropertyTIFFMake: "SignalQuest Camera",
+                kCGImagePropertyTIFFModel: "Private Pixel",
+            ] as [CFString: Any],
+            kCGImagePropertyGPSDictionary: [
+                kCGImagePropertyGPSLatitude: 48.85,
+                kCGImagePropertyGPSLatitudeRef: "N",
+                kCGImagePropertyGPSLongitude: 2.35,
+                kCGImagePropertyGPSLongitudeRef: "E",
+            ] as [CFString: Any],
+        ]
+        CGImageDestinationAddImageFromSource(destination, source, 0, metadata as CFDictionary)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        return output as Data
+    }
+
+    private func properties(of data: Data) throws -> [CFString: Any] {
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
+        return try XCTUnwrap(
+            CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        )
     }
 }

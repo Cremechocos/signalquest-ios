@@ -41,7 +41,8 @@ final class StoryComposerViewModel: ObservableObject {
     @Published var showHideEditor = false
     @Published var showCloseFriendsEditor = false
 
-    /// Données JPEG de l'image choisie, prêtes à téléverser.
+    /// Octets choisis, conservés seulement pour l'aperçu. Le service les
+    /// ré-encode sans métadonnées avant tout envoi réseau.
     private var pickedImageData: Data?
     private let service: StoriesServicing
     private let friendsService: FriendsServicing
@@ -65,7 +66,7 @@ final class StoryComposerViewModel: ObservableObject {
             if let data = try await item.loadTransferable(type: Data.self),
                let image = UIImage(data: data) {
                 previewImage = image
-                pickedImageData = image.jpegData(compressionQuality: 0.85) ?? data
+                pickedImageData = data
             }
         } catch {
             errorMessage = error.localizedDescription

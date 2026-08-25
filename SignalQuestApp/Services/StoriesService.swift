@@ -127,13 +127,18 @@ final class StoriesService: StoriesServicing {
     }
 
     func uploadMedia(data: Data) async throws -> StoryUpload {
+        guard let sanitized = await Task.detached(priority: .userInitiated, operation: {
+            SocialImagePrivacy.sanitizedJPEG(from: data, maxSide: 1600, quality: 0.85)
+        }).value else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
         let response: StoryUploadResponse = try await api.uploadMultipart(
             path: "/api/social/uploads",
             fields: [:],
             fileField: "file",
             fileName: "signalquest-story-\(UUID().uuidString).jpg",
             mimeType: "image/jpeg",
-            data: data,
+            data: sanitized,
             as: StoryUploadResponse.self
         )
         return response.upload

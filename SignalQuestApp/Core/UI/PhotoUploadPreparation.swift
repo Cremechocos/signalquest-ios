@@ -86,7 +86,12 @@ enum PhotoUploadPreparation {
         let largest = max(image.size.width, image.size.height)
         let scale = largest > maxSide ? maxSide / largest : 1
         let target = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-        let renderer = UIGraphicsImageRenderer(size: target)
+        // Une taille d'upload est exprimée en pixels, pas en points d'écran.
+        // Le format par défaut reprendrait le scale 2×/3× du simulateur ou de
+        // l'iPhone et pourrait donc tripler les dimensions et la mémoire.
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: target, format: format)
         let resized = renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: target)) }
         return resized.jpegData(compressionQuality: quality)
     }
@@ -105,5 +110,22 @@ enum PhotoUploadPreparation {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         guard let date = formatter.date(from: exif) else { return nil }
         return ISO8601DateFormatter().string(from: date)
+    }
+}
+
+/// Contrat distinct des photos d'antennes : une image sociale est uniquement
+/// ré-encodée. Aucune métadonnée extraite de l'original n'est transmise à
+/// l'API ; une localisation sociale doit venir d'un champ choisi explicitement.
+enum SocialImagePrivacy {
+    static func sanitizedJPEG(
+        from original: Data,
+        maxSide: CGFloat = 1600,
+        quality: CGFloat = 0.85
+    ) -> Data? {
+        PhotoUploadPreparation.downscaledJPEG(
+            from: original,
+            maxSide: maxSide,
+            quality: quality
+        )
     }
 }
