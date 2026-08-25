@@ -22,6 +22,8 @@ struct CreateSiteFromCellsView: View {
     @State private var region: MKCoordinateRegion
     @State private var isSubmitting = false
     @State private var errorMessage: String?
+    @State private var pendingMessage: String?
+    @State private var isQueued = false
     @Environment(\.dismiss) private var dismiss
 
     /// Types acceptés par le backend (`ALLOWED_TYPES`). Envoyer autre chose fait
@@ -81,6 +83,12 @@ struct CreateSiteFromCellsView: View {
                             .foregroundStyle(SQColor.danger)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    if let pendingMessage {
+                        Label(pendingMessage, systemImage: "clock.arrow.circlepath")
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.success)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     submitButton
                 }
                 .padding(SQSpace.lg)
@@ -90,7 +98,8 @@ struct CreateSiteFromCellsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Annuler") { dismiss() }.tint(SQColor.labelSecondary)
+                    Button(isQueued ? "Fermer" : "Annuler") { dismiss() }
+                        .tint(SQColor.labelSecondary)
                 }
             }
         }
@@ -174,31 +183,37 @@ struct CreateSiteFromCellsView: View {
         } label: {
             HStack(spacing: SQSpace.sm) {
                 if isSubmitting { ProgressView().tint(SQColor.onAccent) }
-                Text(isSubmitting ? "Création…" : "Créer le site")
+                Text(isSubmitting ? "Création…" : isQueued ? "En attente d'envoi" : "Créer le site")
                     .font(SQFont.body(15, .semibold))
             }
             .foregroundStyle(SQColor.onAccent)
             .frame(maxWidth: .infinity)
             .padding(.vertical, SQSpace.md)
             .background(
-                draft.isValid && !isSubmitting ? SQColor.brandRed : SQColor.labelTertiary,
+                draft.isValid && !isSubmitting && !isQueued ? SQColor.brandRed : SQColor.labelTertiary,
                 in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
             )
         }
         .buttonStyle(SQPressButtonStyle())
-        .disabled(!draft.isValid || isSubmitting)
+        .disabled(!draft.isValid || isSubmitting || isQueued)
     }
 
     private func submit() async {
-        guard draft.isValid, !isSubmitting else { return }
+        guard draft.isValid, !isSubmitting, !isQueued else { return }
         isSubmitting = true
         errorMessage = nil
+        pendingMessage = nil
         defer { isSubmitting = false }
         do {
-            _ = try await service.create(draft)
+            let result = try await service.create(draft)
             Haptics.success()
-            onCreated()
-            dismiss()
+            if result.isPending {
+                isQueued = true
+                pendingMessage = String(localized: "Proposition enregistrée. Elle sera envoyée automatiquement dès que la connexion le permettra.")
+            } else {
+                onCreated()
+                dismiss()
+            }
         } catch {
             Haptics.error()
             errorMessage = error.localizedDescription

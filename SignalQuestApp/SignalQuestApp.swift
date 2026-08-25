@@ -176,7 +176,12 @@ struct AppRootView: View {
                 // aussi déclencher l'enregistrement push/VoIP — sinon l'utilisateur
                 // ne reçoit ni notifications ni appels tant qu'il ne relance pas
                 // l'app à froid. Les deux appels sont idempotents.
-                Task { await registerPushIfAuthenticated(newState) }
+                Task {
+                    await registerPushIfAuthenticated(newState)
+                    if case .authenticated = newState {
+                        await services.customSites.retryPending()
+                    }
+                }
                 if case .authenticated = newState {
                     appLock.lockOnActivationIfNeeded()
                 } else {
@@ -280,7 +285,10 @@ struct RootView: View {
         // l'utilisateur resterait injoignable jusqu'au prochain passage foreground.
         .onChangeCompat(of: networkPath.isOnline) { _, online in
             guard online, case .authenticated = session.state else { return }
-            Task { await callManager.retryVoIPTokenRegistrationIfNeeded() }
+            Task {
+                await callManager.retryVoIPTokenRegistrationIfNeeded()
+                await services.customSites.retryPending()
+            }
         }
     }
 
