@@ -61,8 +61,16 @@ final class SQShareCardBuilderTests: XCTestCase {
         )
     }
 
-    private func model(_ result: SpeedtestRunResult) -> SQShareCardModel {
-        SQShareCardBuilder.model(for: result, theme: .dark, locale: locale)
+    private func model(
+        _ result: SpeedtestRunResult,
+        options: SpeedtestShareOptions = .init()
+    ) -> SQShareCardModel {
+        SQShareCardBuilder.model(
+            for: result,
+            theme: .dark,
+            locale: locale,
+            options: options
+        )
     }
 
     // MARK: Nombres
@@ -186,6 +194,80 @@ final class SQShareCardBuilderTests: XCTestCase {
         XCTAssertTrue(model(result()).radioLines.isEmpty)
     }
 
+    func testPrivacyOptionsHideOnlyContextualMetadata() {
+        let sample = result()
+        let full = model(sample)
+        let privateCard = model(
+            sample,
+            options: SpeedtestShareOptions(
+                includeNetworkContext: false,
+                includeApproximateLocation: false,
+                includeDevice: false,
+                includeRadioDetails: false,
+                includeServerDetails: false,
+                includeTimestamp: false
+            )
+        )
+
+        XCTAssertEqual(privateCard.headerNetworkText, "")
+        XCTAssertNil(privateCard.dateTimeText)
+        XCTAssertNil(privateCard.serverText)
+        XCTAssertEqual(privateCard.deviceCityText, "")
+        XCTAssertTrue(privateCard.radioLines.isEmpty)
+
+        // Le résultat lui-même reste partageable et ne change jamais avec les
+        // options de confidentialité.
+        XCTAssertEqual(privateCard.download.value, full.download.value)
+        XCTAssertEqual(privateCard.upload.value, full.upload.value)
+        XCTAssertEqual(privateCard.latencyValueText, full.latencyValueText)
+        XCTAssertEqual(privateCard.download.graph.points, full.download.graph.points)
+        XCTAssertEqual(privateCard.upload.graph.points, full.upload.graph.points)
+    }
+
+    func testDeviceAndApproximateLocationCanBeHiddenIndependently() {
+        let sample = result()
+        XCTAssertEqual(
+            model(sample, options: .init(includeApproximateLocation: false)).deviceCityText,
+            "iPhone 17 Pro"
+        )
+        XCTAssertEqual(
+            model(sample, options: .init(includeDevice: false)).deviceCityText,
+            "Lyon"
+        )
+    }
+
+    func testShareTextHonorsPrivacyOptionsAndKeepsCoreResult() {
+        let sample = result()
+        let text = SpeedtestShareImageRenderer.shareText(
+            for: sample,
+            options: SpeedtestShareOptions(
+                includeNetworkContext: false,
+                includeApproximateLocation: false,
+                includeDevice: false,
+                includeRadioDetails: false,
+                includeServerDetails: false,
+                includeTimestamp: false
+            )
+        )
+
+        XCTAssertTrue(text.contains("770 Mbps"))
+        XCTAssertTrue(text.contains("ping 14 ms"))
+        XCTAssertTrue(text.contains("#SignalQuest"))
+        XCTAssertFalse(text.contains("Orange"))
+        XCTAssertFalse(text.contains("Lyon"))
+        XCTAssertFalse(text.contains("Paris BBR"))
+    }
+
+    func testExportFilenameDoesNotExposeInternalResultIdentifier() throws {
+        let sample = result()
+        let url = try SQShareCardBuilder.renderPNG(for: sample, theme: .dark)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        XCTAssertFalse(url.lastPathComponent.contains(sample.id.uuidString))
+        XCTAssertTrue(url.lastPathComponent.hasPrefix("sq_speedtest_share_"))
+        XCTAssertEqual(url.pathExtension, "png")
+    }
+
     // MARK: Couleurs
 
     /// La teinte suit le débit rapporté au maximum ATTEIGNABLE sur ce réseau :
@@ -248,5 +330,32 @@ final class SQShareCardBuilderTests: XCTestCase {
         attachment.name = "carte-partage-wifi"
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    func testRendersPrivacyReducedPreview() throws {
+        try XCTSkipUnless(SQShareFonts.areEmbedded, "Polices absentes — carte en Helvetica")
+        let sample = result(
+            downloadSeries: (0..<40).map { 120 + Double($0) * 18 },
+            uploadSeries: (0..<40).map { 20 + Double($0) * 2.6 }
+        )
+        let options = SpeedtestShareOptions(
+            includeNetworkContext: false,
+            includeApproximateLocation: false,
+            includeDevice: false,
+            includeRadioDetails: false,
+            includeServerDetails: false,
+            includeTimestamp: false
+        )
+        let image = SQShareCardBuilder.renderImage(
+            for: sample,
+            theme: .light,
+            options: options
+        )
+        let attachment = XCTAttachment(image: image)
+        attachment.name = "carte-partage-confidentialite-maximale"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        XCTAssertEqual(image.size.width, 2_160, accuracy: 1)
+        XCTAssertEqual(image.size.height, 1_300, accuracy: 1)
     }
 }

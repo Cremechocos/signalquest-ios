@@ -51,9 +51,17 @@ enum AppEnvironment {
         ProcessInfo.processInfo.arguments.contains("--qa-speedtest-exit") ||
         boolEnvironmentValue("SQ_QA_SPEEDTEST_EXIT")
     }
+
+    /// Ouvre directement la prévisualisation de partage avec une mesure
+    /// déterministe. Cette porte est réservée aux tests UI et disparaît des
+    /// builds de distribution avec le reste du bloc `DEBUG`.
+    static var showsSpeedtestSharePreviewQA: Bool {
+        ProcessInfo.processInfo.arguments.contains("--qa-speedtest-share-preview")
+    }
     #else
     static var runsSpeedtestQA: Bool { false }
     static var exitsAfterSpeedtestQA: Bool { false }
+    static var showsSpeedtestSharePreviewQA: Bool { false }
     #endif
 
     #if DEBUG

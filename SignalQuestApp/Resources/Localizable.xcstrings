@@ -20290,6 +20290,186 @@
           }
         }
       }
+    },
+    "Aperçu de l’image Speedtest à partager" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview of the Speedtest image to share"
+          }
+        }
+      }
+    },
+    "Création de l’aperçu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Creating preview"
+          }
+        }
+      }
+    },
+    "Date et heure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date and time"
+          }
+        }
+      }
+    },
+    "Détails inclus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Included details"
+          }
+        }
+      }
+    },
+    "Impossible de créer l’aperçu." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unable to create the preview."
+          }
+        }
+      }
+    },
+    "Impossible de préparer le partage." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unable to prepare sharing."
+          }
+        }
+      }
+    },
+    "La commune du test, jamais les coordonnées exactes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The test’s town, never the exact coordinates."
+          }
+        }
+      }
+    },
+    "Le modèle commercial, jamais l’identifiant technique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The commercial model name, never the technical identifier."
+          }
+        }
+      }
+    },
+    "Le résultat, les graphes et la latence restent visibles. Désactive les détails que tu ne souhaites pas publier." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The result, graphs and latency remain visible. Turn off any details you do not want to publish."
+          }
+        }
+      }
+    },
+    "Le serveur réellement utilisé par le test." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The server actually used by the test."
+          }
+        }
+      }
+    },
+    "L’horodatage local du test." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The test’s local timestamp."
+          }
+        }
+      }
+    },
+    "Modèle du téléphone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phone model"
+          }
+        }
+      }
+    },
+    "Opérateur et technologie. Le nom du Wi-Fi n’est jamais partagé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operator and technology. The Wi-Fi name is never shared."
+          }
+        }
+      }
+    },
+    "Ouvre la feuille de partage avec l’image affichée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the share sheet with the displayed image."
+          }
+        }
+      }
+    },
+    "Réseau utilisé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network used"
+          }
+        }
+      }
+    },
+    "Serveur de mesure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test server"
+          }
+        }
+      }
+    },
+    "Ville approximative" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approximate city"
+          }
+        }
+      }
+    },
+    "Vérifier le partage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review sharing"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
