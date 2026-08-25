@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Création d'un site pointé à la main.
 ///
@@ -9,11 +10,12 @@ import Foundation
 /// identifiants et on remplace la position.
 protocol CustomSitesServicing: Sendable {
     func create(_ draft: CustomSiteDraft) async throws -> CustomSiteCreationResult
+    func retryPending() async
 }
 
 /// Identité radio d'UN opérateur sur le site. Le backend accepte un tableau :
 /// un même pylône peut porter les cellules de plusieurs opérateurs.
-struct CustomSiteOperatorRadio: Encodable, Equatable, Sendable {
+struct CustomSiteOperatorRadio: Codable, Equatable, Sendable {
     let `operator`: String
     var enb: String?
     var gnb: String?
@@ -28,7 +30,7 @@ struct CustomSiteOperatorRadio: Encodable, Equatable, Sendable {
     var technology: String?
 }
 
-struct CustomSiteDraft: Encodable, Equatable, Sendable {
+struct CustomSiteDraft: Codable, Equatable, Sendable {
     var latitude: Double
     var longitude: Double
     var name: String
@@ -42,6 +44,9 @@ struct CustomSiteDraft: Encodable, Equatable, Sendable {
     /// soi-même sur un brouillon assemblé à la main.
     var hostedOperators: [String]
     var operatorRadios: [CustomSiteOperatorRadio]
+    /// Stable uniquement dans l'enveloppe envoyée. Les brouillons UI et ceux
+    /// conservés sur disque gardent cette valeur à nil.
+    var clientRequestId: String? = nil
 
     /// Bornes du backend, rejouées côté client pour éviter un aller-retour
     /// perdu sur un nom trop court.
@@ -77,6 +82,7 @@ struct CustomSiteDraft: Encodable, Equatable, Sendable {
 struct CustomSiteCreationResult: Decodable, Sendable {
     let id: String?
     let slug: String?
+    let isPending: Bool
 
     enum CodingKeys: String, CodingKey { case id, slug, site }
 
@@ -90,20 +96,102 @@ struct CustomSiteCreationResult: Decodable, Sendable {
             id = c.decodeFlexibleString(forKey: .id)
             slug = c.decodeFlexibleString(forKey: .slug)
         }
+        isPending = false
     }
+
+    private init(id: String?, slug: String?, isPending: Bool) {
+        self.id = id
+        self.slug = slug
+        self.isPending = isPending
+    }
+
+    static let pending = CustomSiteCreationResult(id: nil, slug: nil, isPending: true)
 }
 
-final class CustomSitesService: CustomSitesServicing {
+actor CustomSitesService: CustomSitesServicing {
     private let api: APIClient
-    init(api: APIClient) { self.api = api }
+    private let currentUserId: @Sendable () -> String?
+    private let outbox: CustomSiteOutboxStore
+    private var inFlightRequestIds = Set<String>()
+    private let logger = Logger(subsystem: "fr.signalquest.ios", category: "CustomSiteOutbox")
+
+    init(
+        api: APIClient,
+        currentUserId: @escaping @Sendable () -> String?,
+        outbox: CustomSiteOutboxStore = CustomSiteOutboxStore()
+    ) {
+        self.api = api
+        self.currentUserId = currentUserId
+        self.outbox = outbox
+    }
 
     func create(_ draft: CustomSiteDraft) async throws -> CustomSiteCreationResult {
-        try await api.requestJSON(
+        guard let userId = currentUserId()?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !userId.isEmpty
+        else { throw APIError.missingAuthToken }
+
+        // Le commit chiffré a lieu AVANT la première lecture réseau. Une
+        // terminaison du processus ne peut donc plus faire disparaître le site.
+        let pending = try await outbox.stage(userId: userId, draft: draft)
+        do {
+            return try await submit(pending, userId: userId) ?? .pending
+        } catch {
+            if error.isCancellation { throw error }
+            if CustomSiteOutboxRetryPolicy.isRetryable(error) { return .pending }
+            // Même sur 4xx, ne pas jeter silencieusement le brouillon non acquitté.
+            throw error
+        }
+    }
+
+    func retryPending() async {
+        guard let userId = currentUserId()?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !userId.isEmpty,
+              let pending = try? await outbox.pending(userId: userId)
+        else { return }
+
+        for record in pending {
+            do {
+                _ = try await submit(record, userId: userId)
+            } catch {
+                if error.isCancellation { return }
+                logger.warning("Custom-site replay failed; encrypted record retained")
+                // Une panne réseau commune rendrait les tentatives suivantes
+                // inutiles. Les erreurs terminales restent, elles, isolées.
+                if CustomSiteOutboxRetryPolicy.isRetryable(error) { return }
+            }
+        }
+    }
+
+    private func submit(
+        _ pending: PendingCustomSiteCreation,
+        userId: String
+    ) async throws -> CustomSiteCreationResult? {
+        guard pending.ownerScopeId == CustomSiteOutboxOwner.scope(for: userId) else {
+            throw APIError.missingAuthToken
+        }
+        guard inFlightRequestIds.insert(pending.requestId).inserted else { return nil }
+        defer { inFlightRequestIds.remove(pending.requestId) }
+
+        var payload = pending.draft.normalized()
+        payload.clientRequestId = pending.requestId
+        let result: CustomSiteCreationResult = try await api.requestJSON(
             "/api/android/sites/custom",
             method: .post,
-            body: draft.normalized(),
-            authenticated: true
+            body: payload,
+            authenticated: true,
+            idempotencyKey: pending.requestId
         )
+        guard result.id?.isEmpty == false || result.slug?.isEmpty == false else {
+            throw APIError.decoding("Missing acknowledged custom-site identifier")
+        }
+        do {
+            try await outbox.remove(userId: userId, requestId: pending.requestId)
+        } catch {
+            // Le serveur a réellement accusé la création. Garder la copie locale
+            // provoquera seulement un rejeu idempotent au prochain lancement.
+            logger.error("Unable to clear acknowledged custom-site outbox record")
+        }
+        return result
     }
 }
 

@@ -79,7 +79,8 @@ final class AppServices: ObservableObject {
         let e2eeService = E2EEService(api: api)
         e2ee = e2eeService
         sse = SSEClient(api: api)
-        auth = AuthService(api: api, e2ee: e2eeService)
+        let authService = AuthService(api: api, e2ee: e2eeService)
+        auth = authService
         feed = SocialFeedService(api: api)
         // Nourrit le classement « Pour toi ». Livrer l'onglet sans émettre ces
         // signaux donnerait un classement aveugle : les deux vont ensemble.
@@ -100,7 +101,10 @@ final class AppServices: ObservableObject {
         antennaReports = AntennaReportsService(api: api)
         communityOutages = CommunityOutageService(api: api)
         favoriteAntennas = FavoriteAntennasService(api: api)
-        customSites = CustomSitesService(api: api)
+        customSites = CustomSitesService(
+            api: api,
+            currentUserId: { authService.cachedUser()?.id }
+        )
         anfr = ANFRService(api: api)
         let networkOperatorService = NetworkOperatorService(api: api)
         networkOperator = networkOperatorService
@@ -195,6 +199,9 @@ final class AppServices: ObservableObject {
         }
         bootstrapTask = task
         await task.value
+        if case .authenticated = session.state {
+            await customSites.retryPending()
+        }
     }
 
     // MARK: - Multi-scènes
