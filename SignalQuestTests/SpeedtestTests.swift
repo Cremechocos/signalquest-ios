@@ -608,7 +608,7 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(selectIPerfServer(for: .clouviderFra, location: paris).hostname, "fra.speedtest.clouvider.net")
         XCTAssertEqual(selectIPerfServer(for: .clouviderAms, location: paris).hostname, "ams.speedtest.clouvider.net")
         XCTAssertEqual(selectIPerfServer(for: .leasewebFra, location: paris).hostname, "speedtest.fra1.de.leaseweb.net")
-        XCTAssertEqual(selectIPerfServer(for: .init7, location: paris).hostname, "speedtest.init7.net")
+        XCTAssertNil(selectableIPerfServer(for: .init7, location: paris))
         // Moji : gros pool de ports (mono-slot → anti-collision) + provider dédié.
         let moji = iperfPublicServers.first { $0.hostname == "iperf3.moji.fr" }
         XCTAssertEqual(moji?.portMin, 5_200)
@@ -623,6 +623,13 @@ final class SpeedtestTests: XCTestCase {
         }
         // Ces POP ne sont PAS pénalisés OVH → candidats Auto normaux par distance.
         XCTAssertEqual(findClosestIPerfServer(to: paris).provider != .ovh, true)
+    }
+
+    func testMuteInit7ServerIsKeptForHistoryButQuarantined() throws {
+        let init7 = try XCTUnwrap(iperfPublicServers.first { $0.id == "init7_ch" })
+        XCTAssertFalse(init7.selectable)
+        XCTAssertFalse(init7.autoEligible)
+        XCTAssertFalse(iperfServersSortedByDistance(from: nil).contains { $0.id == init7.id })
     }
 
     func testLibreSpeedCatalogNearestAndURLs() {
@@ -864,6 +871,34 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(iperfSiblingPort(preferred: 5_200, min: 5_200, max: 5_209), 5_201)
         XCTAssertEqual(iperfSiblingPort(preferred: 5_209, min: 5_200, max: 5_209), 5_200)
         XCTAssertEqual(iperfSiblingPort(preferred: 5_201, min: 5_201, max: 5_201), 5_201)
+    }
+
+    func testWidePortDiscoveryPrioritizesRealBouyguesNeighbors() {
+        let discovered = iperfDiscoveryPorts(min: 9_200, max: 9_240, preferred: 9_201)
+        XCTAssertLessThanOrEqual(discovered.count, 18)
+        XCTAssertEqual(discovered.first, 9_200)
+        XCTAssertEqual(discovered.last, 9_240)
+        XCTAssertTrue(discovered.contains(9_202), "9202 était sauté par l'ancien stride")
+        XCTAssertTrue(discovered.contains(9_204), "9204 était sauté par l'ancien stride")
+
+        let siblings = iperfSiblingCandidatePorts(
+            preferred: 9_201,
+            min: 9_200,
+            max: 9_240
+        )
+        XCTAssertFalse(siblings.contains(9_201))
+        XCTAssertLessThanOrEqual(siblings.count, 17)
+        XCTAssertTrue(siblings.contains(9_202))
+        XCTAssertTrue(siblings.contains(9_204))
+    }
+
+    func testFirstIPerfControlStateTimeoutIsShorterThanTransferTimeout() {
+        XCTAssertGreaterThan(iperfFirstControlStateTimeoutSeconds, 0)
+        XCTAssertLessThanOrEqual(iperfFirstControlStateTimeoutSeconds, 3)
+        XCTAssertGreaterThan(
+            iperfSubsequentControlStateTimeoutSeconds,
+            iperfFirstControlStateTimeoutSeconds
+        )
     }
 
     /// La sonde de latence chargée vise le HAUT de la plage : le download part du bas
