@@ -9,6 +9,9 @@ struct SpeedtestServerPicker: View {
     @Binding var libreSpeedHost: String
     /// POP iPerf3 choisi dans le catalogue distant (id) ; vide = aucun.
     @Binding var iperfServerId: String
+    /// Snapshot observable fourni par l'écran après chargement du cache/API.
+    /// Le moteur prendra sa propre copie immuable au lancement du test.
+    var servers: [IPerfPublicServer] = activeIPerfServers
     /// Dernière position connue, ou `nil`. Volontairement passée par le parent
     /// plutôt que lue ici : ouvrir un sélecteur ne doit pas déclencher une demande
     /// de permission ni attendre un fix GPS.
@@ -28,13 +31,13 @@ struct SpeedtestServerPicker: View {
     /// Tous les POPs du plus proche au plus lointain, distance en prime.
     ///
     /// ⚠️ Distance GÉOGRAPHIQUE pure, PAS `iperfServersSortedByDistance` : ce
-    /// dernier applique les pénalités du mode Auto (OVH décalé de 1 500 km,
-    /// paliers IPv6 et +90 ms) dont sa propre documentation dit qu'elles ne
-    /// doivent jamais peser sur un choix manuel. Les réutiliser ici afficherait
-    /// des kilomètres qui ne correspondent à rien sur une carte.
+    /// dernier applique les règles d'éligibilité et les éventuelles pénalités du
+    /// catalogue destinées au mode Auto. Elles ne doivent jamais peser sur un
+    /// choix manuel ni produire des kilomètres fictifs dans cette liste.
     var serversByDistance: [(server: IPerfPublicServer, km: Double)] {
         guard let userLocation else { return [] }
-        return activeIPerfServers
+        return servers
+            .filter(\.selectable)
             .map { server in
                 (server, haversineDistanceKm(
                     from: userLocation,
@@ -45,7 +48,12 @@ struct SpeedtestServerPicker: View {
     }
 
     var collapsibleGroups: [(region: String, targets: [SpeedtestDownloadTarget])] {
-        SpeedtestDownloadTarget.pickerGroups
+        SpeedtestDownloadTarget.pickerGroups.compactMap { group in
+            let targets = group.targets.filter { target in
+                servers.contains { $0.id == target.rawValue && $0.selectable }
+            }
+            return targets.isEmpty ? nil : (region: group.region, targets: targets)
+        }
     }
     static let libreSpeedRegionKey = "LibreSpeed"
     static let catalogRegionKey = "Catalogue"
@@ -58,8 +66,8 @@ struct SpeedtestServerPicker: View {
     /// qu'en mode Auto, jamais choisis explicitement.
     var catalogOnlyServers: [IPerfPublicServer] {
         let knownIds = Set(SpeedtestDownloadTarget.allCases.map(\.rawValue))
-        return activeIPerfServers
-            .filter { !knownIds.contains($0.id) }
+        return servers
+            .filter { $0.selectable && !knownIds.contains($0.id) }
             .sorted { $0.name < $1.name }
     }
 

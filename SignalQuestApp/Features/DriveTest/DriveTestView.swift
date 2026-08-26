@@ -1109,11 +1109,17 @@ final class DriveTestViewModel: ObservableObject {
         let streams = (defaults.object(forKey: "speedtest_streams") as? Int) ?? 16
         let reliability = (defaults.object(forKey: "speedtest_reliability_mode") as? Bool) ?? true
         let target = SpeedtestDownloadTarget(rawValue: defaults.string(forKey: "speedtest_download_target") ?? "") ?? .hybridAuto
+        let libreSpeedHost = defaults.string(forKey: "speedtest_librespeed_host")?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let iperfServerId = defaults.string(forKey: "speedtest_iperf_server_id")?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         return SpeedtestRunSettings(
             downloadTarget: target,
             durationSeconds: min(max(duration, 5), 30),
             streams: min(max(streams, 1), 16),
-            reliabilityMode: reliability
+            reliabilityMode: reliability,
+            libreSpeedHost: libreSpeedHost?.isEmpty == false ? libreSpeedHost : nil,
+            iperfServerId: iperfServerId?.isEmpty == false ? iperfServerId : nil
         )
     }
 

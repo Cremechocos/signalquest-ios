@@ -582,29 +582,23 @@ final class SpeedtestTests: XCTestCase {
         let us = findClosestIPerfServer(to: nyc)
         XCTAssertEqual(us.hostname, "ash.speedtest.clouvider.net")
 
-        // Mumbai → YNM
+        // Mumbai : YNM reste sélectionnable manuellement mais le catalogue de
+        // production l'exclut de l'Auto ; Cloudflare sera comparé aux POPs éligibles.
         let mumbai = Coordinates(latitude: 19.0760, longitude: 72.8777)
         let ynm = findClosestIPerfServer(to: mumbai)
-        XCTAssertEqual(ynm.hostname, "bom.proof.ovh.net")
+        XCTAssertNotEqual(ynm.hostname, "bom.proof.ovh.net")
+        XCTAssertEqual(selectIPerfServer(for: .bom, location: mumbai).hostname, "bom.proof.ovh.net")
     }
 
-    func testAutoDeprioritizesThrottledOVHWhenNonOVHPOPReachable() {
-        // Roubaix : OVH RBX est à ~10 km, mais OVH bride son egress (débit DL
-        // fortement sous-évalué) → en mode Auto on préfère un POP non-OVH
-        // (Bouygues/MilkyWan/Scaleway) malgré la distance supérieure.
+    func testAutoShortlistUsesEligibilityWhileManualChoiceRemainsExact() {
         let roubaix = Coordinates(latitude: 50.6942, longitude: 3.1746)
-        let autoNearRBX = findClosestIPerfServer(to: roubaix)
-        XCTAssertNotEqual(
-            autoNearRBX.provider, .ovh,
-            "Auto ne doit pas retomber sur OVH (throttle egress) près de Roubaix : \(autoNearRBX.hostname)"
-        )
-        // Mais un choix MANUEL d'un serveur OVH reste honoré tel quel.
+        let shortlist = iperfAutoCandidateShortlist(from: roubaix)
+        XCTAssertEqual(shortlist.count, 4)
+        XCTAssertTrue(shortlist.allSatisfy(\.autoEligible))
+        XCTAssertFalse(shortlist.contains { $0.syntheticLatencyMs > 0 })
+        XCTAssertFalse(shortlist.contains { $0.ipVersion == .ipv6 })
+        // Un choix MANUEL d'un serveur OVH reste honoré tel quel.
         XCTAssertEqual(selectIPerfServer(for: .rbx, location: roubaix).hostname, "rbx.proof.ovh.net")
-        // Et là où OVH est le seul POP à portée, le malus ne doit PAS faire fuir à
-        // l'autre bout du monde : depuis Mumbai, OVH YNM reste le bon choix.
-        // (L'exemple était Montréal jusqu'à ce que le catalogue y gagne un POP local.)
-        let mumbai = Coordinates(latitude: 19.0760, longitude: 72.8777)
-        XCTAssertEqual(findClosestIPerfServer(to: mumbai).provider, .ovh)
     }
 
     func testPublicEuropeIPerf3ServersCatalogAndSelection() {
@@ -748,6 +742,8 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(SpeedtestDownloadTarget.leasewebMtl.regionLabel, "iPerf3 · Amérique du Nord")
         XCTAssertEqual(SpeedtestDownloadTarget.bouyguesCases.count, 13)
         XCTAssertEqual(SpeedtestDownloadTarget.scalewayCases.count, 2)
+        XCTAssertEqual(SpeedtestDownloadTarget.onlineNet90ms.migrated, .hybridAuto)
+        XCTAssertEqual(SpeedtestDownloadTarget.onlineNet6_90ms.migrated, .hybridAuto)
         XCTAssertEqual(SpeedtestDownloadTarget.milkywanCases.count, 1)
         XCTAssertEqual(SpeedtestDownloadTarget.publicEuropeCases.count, 7)
         XCTAssertEqual(SpeedtestDownloadTarget.cloudflareCases.count, 1)
@@ -857,8 +853,11 @@ final class SpeedtestTests: XCTestCase {
         }
         XCTAssertEqual(selectIPerfServer(for: .onlineNet, location: nil).hostname, "ping.online.net")
         XCTAssertEqual(selectIPerfServer(for: .onlineNet6, location: nil).hostname, "ping6.online.net")
-        XCTAssertEqual(selectIPerfServer(for: .onlineNet90ms, location: nil).hostname, "ping-90ms.online.net")
-        XCTAssertEqual(selectIPerfServer(for: .onlineNet6_90ms, location: nil).hostname, "ping6-90ms.online.net")
+        let diagnostics = servers.filter { $0.syntheticLatencyMs > 0 }
+        XCTAssertEqual(diagnostics.count, 2)
+        XCTAssertTrue(diagnostics.allSatisfy { !$0.selectable && !$0.autoEligible })
+        XCTAssertNil(selectableIPerfServer(for: .onlineNet90ms, location: nil))
+        XCTAssertNil(selectableIPerfServer(for: .onlineNet6_90ms, location: nil))
     }
 
     func testIperfSiblingPortWrapsWithinRange() {
@@ -910,14 +909,22 @@ final class SpeedtestTests: XCTestCase {
         provider: String = "clouvider",
         portMin: Int = 5_200,
         portMax: Int = 5_209,
-        portPreferred: Int = 5_207
+        portPreferred: Int = 5_207,
+        selectable: Bool? = true,
+        autoEligible: Bool? = true,
+        autoPenaltyKm: Double? = 0,
+        ipVersion: String? = "ipv4",
+        linkGbps: Double? = 10,
+        syntheticLatencyMs: Int? = 0
     ) -> IPerfCatalogPayload.ServerDTO {
         IPerfCatalogPayload.ServerDTO(
             id: id, host: host, name: "POP de test", code: "TST",
             provider: provider, city: "Test", countryCode: "FR",
             lat: 48.8566, lon: 2.3522,
             portMin: portMin, portMax: portMax, portPreferred: portPreferred,
-            selectable: true, autoEligible: true
+            selectable: selectable, autoEligible: autoEligible,
+            autoPenaltyKm: autoPenaltyKm, ipVersion: ipVersion,
+            linkGbps: linkGbps, syntheticLatencyMs: syntheticLatencyMs
         )
     }
 
@@ -940,6 +947,10 @@ final class SpeedtestTests: XCTestCase {
         // évite de démarrer chaque test sur un port muet.
         XCTAssertEqual(servers?.first?.portPreferred, 5_207)
         XCTAssertEqual(servers?.first?.id, "pop_test")
+        XCTAssertEqual(servers?.first?.selectable, true)
+        XCTAssertEqual(servers?.first?.autoEligible, true)
+        XCTAssertEqual(servers?.first?.ipVersion, .ipv4)
+        XCTAssertEqual(servers?.first?.linkGbps, 10)
     }
 
     /// Un fournisseur que ce binaire ne connaît pas ne doit PAS faire disparaître le
@@ -1061,6 +1072,155 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(lon.defaultPort, 5_207)
         XCTAssertEqual(lon.portMin, 5_200)
         XCTAssertEqual(lon.portMax, 5_209)
+        XCTAssertTrue(lon.selectable)
+        XCTAssertTrue(lon.autoEligible)
+        XCTAssertEqual(lon.ipVersion, .ipv4)
+        XCTAssertEqual(lon.linkGbps, 10)
+        XCTAssertEqual(lon.syntheticLatencyMs, 0)
+    }
+
+    func testCatalogFlagsHideDiagnosticsAndExcludeManualOnlyServersFromAuto() throws {
+        let servers = try XCTUnwrap(IPerfCatalogValidator.validate(catalogPayload(servers: [
+            catalogServer(id: "automatic", host: "auto.example.net"),
+            catalogServer(
+                id: "manual_only", host: "manual.example.net",
+                selectable: true, autoEligible: false
+            ),
+            catalogServer(
+                id: "diag_90ms", host: "diag-90ms.example.net",
+                selectable: false, autoEligible: false, syntheticLatencyMs: 90
+            ),
+        ])))
+
+        XCTAssertEqual(servers.first { $0.id == "manual_only" }?.selectable, true)
+        XCTAssertEqual(servers.first { $0.id == "manual_only" }?.autoEligible, false)
+        XCTAssertEqual(servers.first { $0.id == "diag_90ms" }?.syntheticLatencyMs, 90)
+        XCTAssertEqual(
+            iperfServersSortedByDistance(from: nil, servers: servers).map(\.id),
+            ["automatic"]
+        )
+        XCTAssertNil(selectableIPerfServer(
+            for: .iperfCatalog,
+            location: nil,
+            catalogId: "diag_90ms",
+            servers: servers
+        ))
+        XCTAssertEqual(selectableIPerfServer(
+            for: .iperfCatalog,
+            location: nil,
+            catalogId: "manual_only",
+            servers: servers
+        )?.id, "manual_only")
+    }
+
+    func testLegacyCatalogInfersSyntheticAndIPv6Guards() throws {
+        let json = """
+        {
+          "schemaVersion": 1, "revision": "legacy", "providers": [],
+          "servers": [{
+            "id": "online_net6_90ms", "host": "ping6-90ms.online.net",
+            "name": "Diagnostic", "code": "D90", "provider": "scaleway",
+            "city": "Paris", "countryCode": "fr", "lat": 48.8566, "lon": 2.3522,
+            "portMin": 5200, "portMax": 5209, "portPreferred": 5201
+          }]
+        }
+        """
+        let payload = try JSONDecoder.signalQuest.decode(IPerfCatalogPayload.self, from: Data(json.utf8))
+        let server = try XCTUnwrap(IPerfCatalogValidator.validate(payload)?.first)
+        XCTAssertFalse(server.selectable)
+        XCTAssertFalse(server.autoEligible)
+        XCTAssertEqual(server.ipVersion, .ipv6)
+        XCTAssertEqual(server.syntheticLatencyMs, 90)
+        XCTAssertEqual(server.countryCode, "FR")
+    }
+
+    func testCatalogRejectsContradictorySafetyFlags() {
+        XCTAssertNil(IPerfCatalogValidator.validate(catalogPayload(servers: [
+            catalogServer(selectable: false, autoEligible: true),
+        ])))
+        XCTAssertNil(IPerfCatalogValidator.validate(catalogPayload(servers: [
+            catalogServer(
+                id: "diag_90ms", host: "diag-90ms.example.net",
+                selectable: true, autoEligible: false, syntheticLatencyMs: 90
+            ),
+        ])))
+        XCTAssertNil(IPerfCatalogValidator.validate(catalogPayload(servers: [
+            catalogServer(ipVersion: "satellite"),
+        ])))
+    }
+
+    func testAutoCandidateRankingUsesMeasuredLatencyAndStableFallbackOrder() throws {
+        let servers = try XCTUnwrap(IPerfCatalogValidator.validate(catalogPayload(servers: [
+            catalogServer(id: "first", host: "first.example.net"),
+            catalogServer(id: "second", host: "second.example.net"),
+            catalogServer(id: "third", host: "third.example.net"),
+        ])))
+        let ranked = rankIPerfLatencyCandidates([
+            IPerfLatencyCandidate(server: servers[0], latencyMs: nil, sourceOrder: 0),
+            IPerfLatencyCandidate(server: servers[1], latencyMs: 42, sourceOrder: 1),
+            IPerfLatencyCandidate(server: servers[2], latencyMs: 12, sourceOrder: 2),
+        ])
+        XCTAssertEqual(ranked.map { $0.server.id }, ["third", "second", "first"])
+
+        let tied = rankIPerfLatencyCandidates([
+            IPerfLatencyCandidate(server: servers[1], latencyMs: 20, sourceOrder: 1),
+            IPerfLatencyCandidate(server: servers[0], latencyMs: 20, sourceOrder: 0),
+        ])
+        XCTAssertEqual(tied.map { $0.server.id }, ["first", "second"])
+    }
+
+    func testIPerfEndpointCacheIncludesCatalogPortConfiguration() async {
+        let cache = IPerfEndpointCache()
+        let original = IPerfPublicServer(
+            id: "original",
+            hostname: "same-host.example.net",
+            name: "Original",
+            latitude: 0,
+            longitude: 0,
+            code: "ORG",
+            countryCode: "FR",
+            provider: .community,
+            portMin: 5_200,
+            portMax: 5_209,
+            portPreferred: 5_207
+        )
+        let revised = IPerfPublicServer(
+            id: "revised",
+            hostname: original.hostname,
+            name: "Revised",
+            latitude: 0,
+            longitude: 0,
+            code: "REV",
+            countryCode: "FR",
+            provider: .community,
+            portMin: 9_200,
+            portMax: 9_240,
+            portPreferred: 9_201
+        )
+
+        await cache.store(IPerfEndpoint(port: 5_207), for: original)
+
+        let originalHit = await cache.cached(original)
+        let revisedHit = await cache.cached(revised)
+        XCTAssertEqual(originalHit.flatMap { $0 }?.port, 5_207)
+        guard case .none = revisedHit else {
+            XCTFail("une nouvelle plage de ports ne doit jamais réutiliser l'endpoint de l'ancienne révision")
+            return
+        }
+    }
+
+    func testRunSettingsRoundTripPreservesRemoteCatalogServerId() throws {
+        let settings = SpeedtestRunSettings(
+            downloadTarget: .iperfCatalog,
+            durationSeconds: 14,
+            streams: 16,
+            reliabilityMode: true,
+            iperfServerId: "goco_mtl"
+        )
+        let data = try JSONEncoder.signalQuest.encode(settings)
+        let restored = try JSONDecoder.signalQuest.decode(SpeedtestRunSettings.self, from: data)
+        XCTAssertEqual(restored, settings)
+        XCTAssertEqual(restored.iperfServerId, "goco_mtl")
     }
 
     /// La propriété qui justifie tout le catalogue distant : un POP servi par l'API

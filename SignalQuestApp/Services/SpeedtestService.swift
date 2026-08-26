@@ -412,7 +412,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         // plafonne souvent sous le débit réel du lien.
         let parallelStreams = min(max(settings.streams, 4), SpeedtestEngineConfig.hardMaxStreams)
 
-        // 1. Resolve selected server (with fallback to closest if manual choice unreachable)
+        // 1. Résoudre la cible : mesure de plusieurs candidats en Auto, choix exact
+        // en manuel, puis repli explicite si la cible demandée est indisponible.
         progress?(SpeedtestLiveProgress(phase: .ping, fraction: 0, serverName: nil))
 
         // Cible « Cloudflare » : moteur HTTPS anycast directement (pas d'iPerf3).
@@ -463,89 +464,54 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             }
         }
 
-        var iperfServer = selectIPerfServer(
-            for: settings.downloadTarget,
-            location: location,
-            catalogId: settings.iperfServerId
-        )
-        let requestedServer = iperfServer
-        var endpoint = await resolveIPerfEndpoint(for: iperfServer)
-
-        if endpoint == nil && settings.downloadTarget != .hybridAuto {
-            iperfServer = findClosestIPerfServer(to: location)
-            endpoint = await resolveIPerfEndpoint(for: iperfServer)
-        }
-
-        // Dernier filet : essayer chaque serveur public (régions sans iPerf → plus proche).
-        if endpoint == nil {
-            let ordered = iperfServersSortedByDistance(from: location)
-            for candidate in ordered where candidate.hostname != iperfServer.hostname {
-                if let found = await resolveIPerfEndpoint(for: candidate) {
-                    iperfServer = candidate
-                    endpoint = found
-                    break
-                }
+        // Snapshot immuable pour tout le run : un refresh API qui termine pendant
+        // le ping ne peut changer ni l'hôte mesuré ni l'id ensuite publié.
+        let runCatalogSnapshot = activeIPerfServers
+        let migratedTarget = settings.downloadTarget.migrated
+        let isAutomatic = migratedTarget == .hybridAuto
+        let manualRequestedServerId: String? = {
+            guard !isAutomatic else { return nil }
+            if migratedTarget == .iperfCatalog {
+                let value = settings.iperfServerId?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return value?.isEmpty == false ? value : nil
             }
-        }
+            return migratedTarget.rawValue
+        }()
 
-        guard let endpoint else {
-            // Chaîne de secours : tous les iPerf3 injoignables → edge Cloudflare
-            // (HTTPS). L'erreur sèche n'arrive que si l'edge échoue aussi.
-            return try await runCloudflareTest(
-                pathStatus: pathStatus,
+        let resolvedCandidate: ResolvedIPerfCandidate
+        var requestedServerIdForResult: String? = nil
+        var manualFallbackNotice: String? = nil
+
+        if isAutomatic {
+            // Mesurer plusieurs POPs plausibles et Cloudflare en parallèle évite de
+            // confondre proximité géographique et proximité réseau réelle.
+            async let candidateTask = resolveAutoIPerfCandidate(
                 location: location,
-                durationSeconds: durationSeconds,
-                parallelStreams: parallelStreams,
-                startedAt: startedAt,
-                progress: progress,
-                notice: "Serveurs iPerf3 injoignables — test via Cloudflare",
-                fallbackReason: "no_iperf_pop"
-            )
-        }
-
-        var port = endpoint.port
-        let serverName = iperfServer.name
-
-        // Choix manuel écrasé par le fallback : le dire, pas le cacher
-        // (ex. serveur IPv6-only sur un réseau cellulaire IPv4).
-        if settings.downloadTarget.migrated != .hybridAuto, iperfServer.hostname != requestedServer.hostname {
-            progress?(SpeedtestLiveProgress(
-                phase: .ping,
-                fraction: 0,
-                serverName: serverName,
-                notice: "\(requestedServer.name) injoignable — test sur \(serverName)"
-            ))
-        }
-
-        // Mode Auto : si l'edge anycast Cloudflare est NETTEMENT plus proche
-        // que le meilleur iPerf3 du catalogue (voyage hors zones couvertes),
-        // il devient le serveur de test — couverture mondiale automatique.
-        // Le seuil garde les serveurs opérateurs prioritaires en France.
-        if settings.downloadTarget.migrated == .hybridAuto {
-            // Les deux sondes sont INDÉPENDANTES : les enchaîner faisait payer deux
-            // aller-retours (jusqu'à deux `pingTimeoutSeconds` si les hôtes traînent)
-            // avant que la phase de ping ne démarre — un temps mort bien visible à
-            // l'écran, puisque rien ne bouge encore. Lancées ensemble, on ne paie
-            // plus que la plus lente des deux.
-            // `iperfServer` et `port` sont des `var` (le repli peut les réécrire) :
-            // les envoyer tels quels dans une tâche concurrente fait échouer
-            // l'analyse de régions de Swift 6. On fige des copies immuables — deux
-            // types Sendable, donc rien à partager.
-            let probeHost = iperfServer.hostname
-            let probePort = port
-            async let iperfProbe = tcpProbe.connectLatencyMs(
-                host: probeHost,
-                port: probePort,
-                timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
+                servers: runCatalogSnapshot
             )
             async let cloudflareProbe = tcpProbe.connectLatencyMs(
                 host: CloudflareSpeedtestConfig.host,
                 port: 443,
                 timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
             )
-            let iperfMs = try? await iperfProbe
+            let candidate = await candidateTask
             let cloudflareMs = try? await cloudflareProbe
-            if let cloudflareMs, cloudflareMs + CloudflareSpeedtestConfig.autoAdvantageMs < (iperfMs ?? .infinity) {
+
+            guard let candidate else {
+                return try await runCloudflareTest(
+                    pathStatus: pathStatus,
+                    location: location,
+                    durationSeconds: durationSeconds,
+                    parallelStreams: parallelStreams,
+                    startedAt: startedAt,
+                    progress: progress,
+                    notice: "Serveurs iPerf3 injoignables — test via Cloudflare",
+                    fallbackReason: "no_iperf_pop"
+                )
+            }
+            if let cloudflareMs,
+               cloudflareMs + CloudflareSpeedtestConfig.autoAdvantageMs < (candidate.latencyMs ?? .infinity) {
                 return try await runCloudflareTest(
                     pathStatus: pathStatus,
                     location: location,
@@ -554,14 +520,63 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     startedAt: startedAt,
                     progress: progress,
                     notice: nil,
-                    // Arbitrage de latence, PAS une panne — même code qu'Android,
-                    // sans quoi le taux de bascule des deux plateformes ne se
-                    // compare pas : iOS aurait publié `engine=cloudflare` sans
-                    // jamais dire pourquoi.
                     fallbackReason: "auto_latency",
-                    requestedServerId: iperfServer.id
+                    requestedServerId: candidate.server.id
                 )
             }
+            resolvedCandidate = candidate
+        } else {
+            let requestedServer = selectableIPerfServer(
+                for: migratedTarget,
+                location: location,
+                catalogId: settings.iperfServerId,
+                servers: runCatalogSnapshot
+            )
+            if let requestedServer,
+               let requestedEndpoint = await resolveIPerfEndpoint(for: requestedServer) {
+                resolvedCandidate = ResolvedIPerfCandidate(
+                    server: requestedServer,
+                    endpoint: requestedEndpoint,
+                    latencyMs: nil
+                )
+            } else {
+                let fallback = await resolveAutoIPerfCandidate(
+                    location: location,
+                    servers: runCatalogSnapshot,
+                    excludingHostnames: Set(requestedServer.map { [$0.hostname] } ?? [])
+                )
+                guard let fallback else {
+                    return try await runCloudflareTest(
+                        pathStatus: pathStatus,
+                        location: location,
+                        durationSeconds: durationSeconds,
+                        parallelStreams: parallelStreams,
+                        startedAt: startedAt,
+                        progress: progress,
+                        notice: "Serveur iPerf3 sélectionné indisponible — test via Cloudflare",
+                        fallbackReason: "no_iperf_pop",
+                        requestedServerId: manualRequestedServerId
+                    )
+                }
+                resolvedCandidate = fallback
+                requestedServerIdForResult = manualRequestedServerId
+                let requestedLabel = requestedServer?.name ?? "Serveur sélectionné"
+                manualFallbackNotice = "\(requestedLabel) injoignable — test sur \(fallback.server.name)"
+            }
+        }
+
+        let iperfServer = resolvedCandidate.server
+        let endpoint = resolvedCandidate.endpoint
+        var port = endpoint.port
+        let serverName = iperfServer.name
+
+        if let manualFallbackNotice {
+            progress?(SpeedtestLiveProgress(
+                phase: .ping,
+                fraction: 0,
+                serverName: serverName,
+                notice: manualFallbackNotice
+            ))
         }
 
         // 2. Ping TCP pur sur le port iPerf (pas de fallback HTTP : ATS bloquerait
@@ -697,7 +712,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 progress: progress,
                 notice: "\(serverName) indisponible — test via Cloudflare",
                 fallbackReason: "dl_incomplete",
-                requestedServerId: iperfServer.id
+                requestedServerId: requestedServerIdForResult ?? iperfServer.id
             )
         }
         port = dlPort
@@ -719,7 +734,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 progress: progress,
                 notice: "\(serverName) indisponible — test via Cloudflare",
                 fallbackReason: "dl_incomplete",
-                requestedServerId: iperfServer.id
+                requestedServerId: requestedServerIdForResult ?? iperfServer.id
             )
         }
 
@@ -938,7 +953,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             downloadServerPort: Int(port),
             engine: "iperf3",
             engineFallbackReason: nil,
-            requestedServerId: nil,
+            requestedServerId: requestedServerIdForResult,
             pingProtocol: pingOutcome.protocolName,
             pingMs: pingValue,
             pingMedianMs: pingMedianValue,
@@ -973,6 +988,77 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             context: contextTask,
             progress: progress
         )
+    }
+
+    private struct ResolvedIPerfCandidate: Sendable {
+        let server: IPerfPublicServer
+        let endpoint: IPerfEndpoint
+        let latencyMs: Double?
+    }
+
+    /// Sonde au plus quatre POPs plausibles en parallèle, les classe par latence
+    /// réellement observée, puis valide leur plage iPerf3 dans cet ordre.
+    private func resolveAutoIPerfCandidate(
+        location: Coordinates?,
+        servers: [IPerfPublicServer],
+        excludingHostnames: Set<String> = []
+    ) async -> ResolvedIPerfCandidate? {
+        let shortlist = iperfAutoCandidateShortlist(
+            from: location,
+            servers: servers,
+            limit: 4,
+            excludingHostnames: excludingHostnames
+        )
+        guard !shortlist.isEmpty else { return nil }
+
+        let probe = tcpProbe
+        let observations = await withTaskGroup(of: IPerfLatencyCandidate.self) { group in
+            for (index, server) in shortlist.enumerated() {
+                group.addTask {
+                    let latency = try? await probe.connectLatencyMs(
+                        host: server.hostname,
+                        port: server.portPreferred,
+                        timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
+                    )
+                    return IPerfLatencyCandidate(
+                        server: server,
+                        latencyMs: latency,
+                        sourceOrder: index
+                    )
+                }
+            }
+            var values: [IPerfLatencyCandidate] = []
+            values.reserveCapacity(shortlist.count)
+            for await observation in group { values.append(observation) }
+            return values
+        }
+
+        for observation in rankIPerfLatencyCandidates(observations) {
+            guard !Task.isCancelled else { return nil }
+            let server = observation.server
+            guard let endpoint = await resolveIPerfEndpoint(for: server) else { continue }
+            let measuredLatency: Double?
+            if let latency = observation.latencyMs {
+                measuredLatency = latency
+            } else {
+                measuredLatency = try? await probe.connectLatencyMs(
+                    host: server.hostname,
+                    port: endpoint.port,
+                    timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
+                )
+            }
+            let latencyLabel = measuredLatency.map { String(format: "%.1f", $0) } ?? "--"
+            sqDebugLog(
+                "SQ_SPEEDTEST Auto candidat \(server.id): " +
+                    "latence=\(latencyLabel) ms, port=\(endpoint.port)"
+            )
+            return ResolvedIPerfCandidate(
+                server: server,
+                endpoint: endpoint,
+                latencyMs: measuredLatency
+            )
+        }
+        return nil
     }
 
     /// Sorties communes des moteurs de mesure (iPerf3 / Cloudflare),
@@ -2567,6 +2653,17 @@ struct IPerfPublicServer: Sendable, Equatable {
     /// Bouygues refuse 9200 sur la plupart de ses POPs, Clouvider Londres est muet
     /// de 5200 à 5206.
     let portPreferred: UInt16
+    /// Visible dans les choix manuels de l'utilisateur.
+    let selectable: Bool
+    /// Autorisé dans la sélection automatique mesurée.
+    let autoEligible: Bool
+    /// Malus géographique fourni par le catalogue, sans effet sur un choix manuel.
+    let autoPenaltyKm: Double
+    let ipVersion: IPerfIPVersion
+    /// Information de diagnostic uniquement : elle ne décide jamais du vainqueur.
+    let linkGbps: Double?
+    /// Latence artificielle injectée par une mire de test.
+    let syntheticLatencyMs: Int
 
     init(
         id: String,
@@ -2579,7 +2676,13 @@ struct IPerfPublicServer: Sendable, Equatable {
         provider: IPerfServerProvider,
         portMin: UInt16,
         portMax: UInt16,
-        portPreferred: UInt16? = nil
+        portPreferred: UInt16? = nil,
+        selectable: Bool = true,
+        autoEligible: Bool = true,
+        autoPenaltyKm: Double = 0,
+        ipVersion: IPerfIPVersion = .ipv4,
+        linkGbps: Double? = nil,
+        syntheticLatencyMs: Int = 0
     ) {
         self.id = id
         self.hostname = hostname
@@ -2594,9 +2697,21 @@ struct IPerfPublicServer: Sendable, Equatable {
         // Par défaut le premier port de la plage : on ne surcharge que les POPs dont
         // la mesure a montré qu'il ne répond pas.
         self.portPreferred = portPreferred ?? portMin
+        self.selectable = selectable
+        self.autoEligible = autoEligible
+        self.autoPenaltyKm = autoPenaltyKm
+        self.ipVersion = ipVersion
+        self.linkGbps = linkGbps
+        self.syntheticLatencyMs = syntheticLatencyMs
     }
 
     var defaultPort: UInt16 { portPreferred }
+}
+
+enum IPerfIPVersion: String, Sendable {
+    case ipv4
+    case ipv6
+    case dual
 }
 
 enum IPerfServerProvider: String, Sendable {
@@ -2652,7 +2767,7 @@ let iperfPublicServers: [IPerfPublicServer] = {
         IPerfPublicServer(id: "rbx", hostname: "rbx.proof.ovh.net", name: "Roubaix (OVH RBX)", latitude: 50.692, longitude: 3.178, code: "RBX", countryCode: "FR", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
         IPerfPublicServer(id: "sbg", hostname: "sbg.proof.ovh.net", name: "Strasbourg (OVH SBG)", latitude: 48.573, longitude: 7.752, code: "SBG", countryCode: "FR", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
         IPerfPublicServer(id: "gra", hostname: "gra.proof.ovh.net", name: "Gravelines (OVH GRA)", latitude: 50.986, longitude: 2.124, code: "GRA", countryCode: "FR", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
-        IPerfPublicServer(id: "bom", hostname: "bom.proof.ovh.net", name: "Mumbai (OVH YNM)", latitude: 19.076, longitude: 72.877, code: "YNM", countryCode: "IN", provider: .ovh, portMin: ovhMin, portMax: ovhMax),
+        IPerfPublicServer(id: "bom", hostname: "bom.proof.ovh.net", name: "Mumbai (OVH YNM)", latitude: 19.076, longitude: 72.877, code: "YNM", countryCode: "IN", provider: .ovh, portMin: ovhMin, portMax: ovhMax, autoEligible: false),
         // ⚠️ `bhs.proof.ovh.ca` (Beauharnois, QC) RETIRÉ : OVH n'y expose plus que
         // 5208/5209, et ces deux daemons acceptent le TCP sans jamais répondre au
         // handshake iPerf3. La sonde de joignabilité ne teste QUE le connect → le
@@ -2682,9 +2797,9 @@ let iperfPublicServers: [IPerfPublicServer] = {
         // Scaleway / online.net (ports 5200–5209 TCP) — filet de secours + IPv6.
         // 5200 est MUET sur toutes les mires : il coûtait un timeout à chaque test.
         IPerfPublicServer(id: "online_net", hostname: "ping.online.net", name: "Paris Scaleway", latitude: parisLat, longitude: parisLon, code: "SCW", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax, portPreferred: 5201),
-        IPerfPublicServer(id: "online_net6", hostname: "ping6.online.net", name: "Paris Scaleway IPv6", latitude: parisLat, longitude: parisLon, code: "SCW6", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax, portPreferred: 5201),
-        IPerfPublicServer(id: "online_net_90ms", hostname: "ping-90ms.online.net", name: "Paris Scaleway +90 ms", latitude: parisLat, longitude: parisLon, code: "SCW90", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax, portPreferred: 5201),
-        IPerfPublicServer(id: "online_net6_90ms", hostname: "ping6-90ms.online.net", name: "Paris Scaleway IPv6 +90 ms", latitude: parisLat, longitude: parisLon, code: "SCW690", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax, portPreferred: 5201),
+        IPerfPublicServer(id: "online_net6", hostname: "ping6.online.net", name: "Paris Scaleway IPv6", latitude: parisLat, longitude: parisLon, code: "SCW6", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax, portPreferred: 5201, autoEligible: false, ipVersion: .ipv6),
+        IPerfPublicServer(id: "online_net_90ms", hostname: "ping-90ms.online.net", name: "Paris Scaleway +90 ms", latitude: parisLat, longitude: parisLon, code: "SCW90", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax, portPreferred: 5201, selectable: false, autoEligible: false, syntheticLatencyMs: 90),
+        IPerfPublicServer(id: "online_net6_90ms", hostname: "ping6-90ms.online.net", name: "Paris Scaleway IPv6 +90 ms", latitude: parisLat, longitude: parisLon, code: "SCW690", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax, portPreferred: 5201, selectable: false, autoEligible: false, ipVersion: .ipv6, syntheticLatencyMs: 90),
         // MilkyWan AS2027 (ports 9200–9240 TCP, BBR, 40 Gbit/s) — vérifié en ligne 2026-07
         IPerfPublicServer(id: "milkywan_cbo", hostname: "speedtest.milkywan.fr", name: "Croissy-Beaubourg (MilkyWan)", latitude: 48.8412, longitude: 2.6724, code: "CBO", countryCode: "FR", provider: .milkywan, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
         // POP iPerf3 publics FR/EU — handshake iPerf3 réel vérifié (juil. 2026).
@@ -2750,10 +2865,14 @@ func haversineDistanceKm(from c1: Coordinates, to c2: Coordinates) -> Double {
     return 6371.0 * c
 }
 
-func iperfServersSortedByDistance(from location: Coordinates?) -> [IPerfPublicServer] {
+func iperfServersSortedByDistance(
+    from location: Coordinates?,
+    servers: [IPerfPublicServer] = activeIPerfServers
+) -> [IPerfPublicServer] {
+    let automaticServers = servers.filter(\.autoEligible)
     guard let location else {
-        // Sans GPS : POP FR non-OVH d'abord (OVH bride son egress, cf.
-        // `iperfProviderDistancePenaltyKm`) ; OVH ensuite ; IPv6 / +90 ms en bas.
+        // Sans GPS : ordre de repli déterministe. Les POPs non éligibles (IPv6-only,
+        // mires synthétiques, POP désactivé côté serveur) ont déjà été exclus.
         let preferred = [
             "paris.bbr.iperf.bytel.fr",
             "speedtest.milkywan.fr",
@@ -2763,74 +2882,60 @@ func iperfServersSortedByDistance(from location: Coordinates?) -> [IPerfPublicSe
             "gra.proof.ovh.net",
             "rbx.proof.ovh.net",
             "sbg.proof.ovh.net",
-            "ping6.online.net",
-            "ping-90ms.online.net",
-            "ping6-90ms.online.net",
         ]
-        return activeIPerfServers.sorted { a, b in
+        return automaticServers.sorted { a, b in
             let ia = preferred.firstIndex(of: a.hostname) ?? 99
             let ib = preferred.firstIndex(of: b.hostname) ?? 99
             if ia != ib { return ia < ib }
+            if a.autoPenaltyKm != b.autoPenaltyKm { return a.autoPenaltyKm < b.autoPenaltyKm }
             return a.name < b.name
         }
     }
-    // Avec GPS : distance, mais déprioriser les hosts à latence artificielle (+90 ms)
-    // et les IPv6-only pour éviter de les choisir en Auto sur un réseau IPv4.
-    // Une PÉNALITÉ DE DISTANCE (et non un tier dur) écarte OVH quand un POP
-    // non-OVH est raisonnablement proche : voir `iperfProviderDistancePenaltyKm`.
-    return activeIPerfServers.sorted { s1, s2 in
-        let p1 = iperfAutoPriorityBoost(s1)
-        let p2 = iperfAutoPriorityBoost(s2)
-        if p1 != p2 { return p1 < p2 }
-        let d1 = haversineDistanceKm(from: location, to: Coordinates(latitude: s1.latitude, longitude: s1.longitude))
-            + iperfProviderDistancePenaltyKm(s1)
-        let d2 = haversineDistanceKm(from: location, to: Coordinates(latitude: s2.latitude, longitude: s2.longitude))
-            + iperfProviderDistancePenaltyKm(s2)
-        return d1 < d2
-    }
+    // L'index d'origine départage explicitement les égalités : le classement reste
+    // déterministe même pour deux POPs co-localisés.
+    return automaticServers.enumerated().sorted { lhs, rhs in
+        let d1 = haversineDistanceKm(
+            from: location,
+            to: Coordinates(latitude: lhs.element.latitude, longitude: lhs.element.longitude)
+        ) + lhs.element.autoPenaltyKm
+        let d2 = haversineDistanceKm(
+            from: location,
+            to: Coordinates(latitude: rhs.element.latitude, longitude: rhs.element.longitude)
+        ) + rhs.element.autoPenaltyKm
+        return d1 == d2 ? lhs.offset < rhs.offset : d1 < d2
+    }.map(\.element)
 }
 
-/// 0 = prioritaire Auto, 1 = IPv6, 2 = latence artificielle +90 ms.
-private func iperfAutoPriorityBoost(_ server: IPerfPublicServer) -> Int {
-    switch server.hostname {
-    case "ping-90ms.online.net", "ping6-90ms.online.net": return 2
-    case "ping6.online.net": return 1
-    default: return 0
-    }
+func findClosestIPerfServer(
+    to location: Coordinates?,
+    servers: [IPerfPublicServer] = activeIPerfServers
+) -> IPerfPublicServer {
+    iperfServersSortedByDistance(from: location, servers: servers).first
+        ?? iperfPublicServers.first(where: \.autoEligible)
+        ?? iperfPublicServers[0]
 }
 
-/// Pénalité de distance (km) appliquée UNIQUEMENT au tri Auto : les serveurs
-/// OVH `proof` brident fortement leur egress (débit DL très sous-évalué,
-/// asymétrie DL/UL ×10 constatée en test), donc on ne les retient que si aucun
-/// POP non-OVH n'est raisonnablement proche — typiquement un voyage hors Europe
-/// où OVH (Ashburn / Mumbai) est le seul iPerf3 du catalogue à
-/// portée. En France/Europe, un POP Bouygues/MilkyWan/Scaleway passe devant.
-/// N'affecte JAMAIS un choix MANUEL de serveur OVH (via `selectIPerfServer`).
-private func iperfProviderDistancePenaltyKm(_ server: IPerfPublicServer) -> Double {
-    server.provider == .ovh ? 1_500 : 0
-}
-
-func findClosestIPerfServer(to location: Coordinates?) -> IPerfPublicServer {
-    iperfServersSortedByDistance(from: location).first ?? activeIPerfServers[0]
-}
-
-func selectIPerfServer(
+/// Résout uniquement un choix manuel réellement autorisé par le catalogue actif.
+/// `nil` signifie que la cible a disparu ou a été désactivée : l'appelant doit
+/// annoncer son repli, jamais faire croire qu'elle a été honorée.
+func selectableIPerfServer(
     for target: SpeedtestDownloadTarget,
     location: Coordinates?,
-    catalogId: String? = nil
-) -> IPerfPublicServer {
+    catalogId: String? = nil,
+    servers: [IPerfPublicServer] = activeIPerfServers
+) -> IPerfPublicServer? {
     // 1. POP choisi dans le catalogue distant. Il n'a pas forcément de cas d'enum :
     //    c'est précisément ce qui permet à l'API d'introduire un serveur sans
     //    attendre une mise à jour de l'app.
     if target.migrated == .iperfCatalog,
        let catalogId,
-       let server = activeIPerfServers.first(where: { $0.id == catalogId }) {
+       let server = servers.first(where: { $0.id == catalogId && $0.selectable }) {
         return server
     }
     // 2. Les ids de catalogue et les rawValues de cible partagent le même espace de
     //    noms (aligné avec Android) : quand le catalogue connaît la cible demandée,
     //    c'est LUI qui fait foi — ports corrigés compris — et non la table en dur.
-    if let server = activeIPerfServers.first(where: { $0.id == target.migrated.rawValue }) {
+    if let server = servers.first(where: { $0.id == target.migrated.rawValue && $0.selectable }) {
         return server
     }
     // 3. Table historique, pour les cibles qu'aucun catalogue ne décrit encore.
@@ -2873,17 +2978,71 @@ func selectIPerfServer(
     case .leasewebFra: host = "speedtest.fra1.de.leaseweb.net"
     case .init7: host = "speedtest.init7.net"
     // .cloudflare n'est pas un serveur iPerf3 : le moteur HTTPS est choisi en
-    // amont dans run() ; ici on retombe sur le plus proche par sécurité.
-    // `.iperfCatalog` sans id résolvable atterrit ici : catalogue pas encore chargé,
-    // ou POP disparu depuis que l'utilisateur l'a choisi. On retombe alors sur le
-    // plus proche, comme pour toute cible orpheline.
+    // amont dans run(). `.iperfCatalog` sans id résolvable, ou une cible héritée
+    // disparue du catalogue, renvoie `nil` afin que l'appelant annonce le repli.
     case .hybridAuto, .cloudflare, .libreSpeed, .iperfCatalog, .bytelPoiCubic, .bhs, .cloudflareR2, .awsCloudFront, .vpsInternal:
         host = nil
     }
-    if let host, let server = activeIPerfServers.first(where: { $0.hostname == host }) {
+    if let host, let server = servers.first(where: { $0.hostname == host && $0.selectable }) {
         return server
     }
-    return findClosestIPerfServer(to: location)
+    return nil
+}
+
+/// Compatibilité des appelants historiques : cible explicite si elle existe,
+/// sinon premier candidat Auto du snapshot fourni.
+func selectIPerfServer(
+    for target: SpeedtestDownloadTarget,
+    location: Coordinates?,
+    catalogId: String? = nil,
+    servers: [IPerfPublicServer] = activeIPerfServers
+) -> IPerfPublicServer {
+    selectableIPerfServer(
+        for: target,
+        location: location,
+        catalogId: catalogId,
+        servers: servers
+    ) ?? findClosestIPerfServer(to: location, servers: servers)
+}
+
+struct IPerfLatencyCandidate: Sendable, Equatable {
+    let server: IPerfPublicServer
+    let latencyMs: Double?
+    let sourceOrder: Int
+}
+
+/// Les observations réelles passent avant les échecs ; une égalité conserve
+/// l'ordre géographique initial.
+func rankIPerfLatencyCandidates(_ candidates: [IPerfLatencyCandidate]) -> [IPerfLatencyCandidate] {
+    candidates.sorted { lhs, rhs in
+        let l = lhs.latencyMs.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
+        let r = rhs.latencyMs.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
+        switch (l, r) {
+        case let (left?, right?):
+            return left == right ? lhs.sourceOrder < rhs.sourceOrder : left < right
+        case (_?, nil):
+            return true
+        case (nil, _?):
+            return false
+        case (nil, nil):
+            return lhs.sourceOrder < rhs.sourceOrder
+        }
+    }
+}
+
+func iperfAutoCandidateShortlist(
+    from location: Coordinates?,
+    servers: [IPerfPublicServer] = activeIPerfServers,
+    limit: Int = 4,
+    excludingHostnames: Set<String> = []
+) -> [IPerfPublicServer] {
+    guard limit > 0 else { return [] }
+    return Array(
+        iperfServersSortedByDistance(from: location, servers: servers)
+            .lazy
+            .filter { !excludingHostnames.contains($0.hostname) }
+            .prefix(limit)
+    )
 }
 
 struct IPerfEndpoint: Sendable {
@@ -2922,6 +3081,14 @@ actor IPerfEndpointCache {
     private static let successTTL: TimeInterval = 600   // 10 min
     private static let failureTTL: TimeInterval = 900   // 15 min
 
+    /// La configuration de ports fait partie de l'identité de cache. Le catalogue
+    /// distant peut corriger une plage ou un port préféré sans changer le hostname ;
+    /// réutiliser alors l'ancien résultat ferait mesurer (ou déclarer indisponible)
+    /// un endpoint qui n'appartient plus à la révision active.
+    private static func key(for server: IPerfPublicServer) -> String {
+        "\(server.hostname.lowercased())|\(server.portMin)-\(server.portMax)|\(server.portPreferred)"
+    }
+
     /// Le réseau a changé (cellulaire ↔ WiFi, changement d'opérateur, itinérance) :
     /// ce qui était injoignable peut très bien répondre maintenant. Appelé une fois
     /// au début de chaque test plutôt que dispersé dans les appelants.
@@ -2931,15 +3098,19 @@ actor IPerfEndpointCache {
         entries.removeAll()
     }
 
-    func cached(_ hostname: String) -> IPerfEndpoint?? {
-        guard let entry = entries[hostname] else { return nil }
-        guard entry.expiry > Date() else { entries[hostname] = nil; return nil }
+    func cached(_ server: IPerfPublicServer) -> IPerfEndpoint?? {
+        let key = Self.key(for: server)
+        guard let entry = entries[key] else { return nil }
+        guard entry.expiry > Date() else { entries[key] = nil; return nil }
         return .some(entry.endpoint)
     }
 
-    func store(_ endpoint: IPerfEndpoint?, for hostname: String) {
+    func store(_ endpoint: IPerfEndpoint?, for server: IPerfPublicServer) {
         let ttl = endpoint == nil ? Self.failureTTL : Self.successTTL
-        entries[hostname] = Entry(endpoint: endpoint, expiry: Date().addingTimeInterval(ttl))
+        entries[Self.key(for: server)] = Entry(
+            endpoint: endpoint,
+            expiry: Date().addingTimeInterval(ttl)
+        )
     }
 
     func invalidateAll() {
@@ -2948,15 +3119,16 @@ actor IPerfEndpointCache {
     }
 }
 
-/// Probe TCP parallèle de la plage de ports du serveur, mémoïsé par hôte.
+/// Probe TCP parallèle de la plage de ports du serveur, mémoïsé par hôte et
+/// configuration de ports du catalogue.
 /// Les ports « busy » (ACCESS_DENIED) sont gérés ensuite par
 /// `runIPerf3WithPortFallback` au moment du vrai test.
 func resolveIPerfEndpoint(for server: IPerfPublicServer) async -> IPerfEndpoint? {
-    if let hit = await IPerfEndpointCache.shared.cached(server.hostname) {
+    if let hit = await IPerfEndpointCache.shared.cached(server) {
         return hit
     }
     let resolved = await resolveIPerfEndpointUncached(for: server)
-    await IPerfEndpointCache.shared.store(resolved, for: server.hostname)
+    await IPerfEndpointCache.shared.store(resolved, for: server)
     return resolved
 }
 
