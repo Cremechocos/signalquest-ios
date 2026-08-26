@@ -996,8 +996,12 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let latencyMs: Double?
     }
 
-    /// Sonde au plus quatre POPs plausibles en parallèle, les classe par latence
-    /// réellement observée, puis valide leur plage iPerf3 dans cet ordre.
+    private struct ReachableIPerfObservation: Sendable {
+        let candidate: IPerfLatencyCandidate
+        let endpoint: IPerfEndpoint
+    }
+
+    /// Découvre puis mesure le port réellement joignable de quatre POPs au plus.
     private func resolveAutoIPerfCandidate(
         location: Coordinates?,
         servers: [IPerfPublicServer],
@@ -1012,41 +1016,44 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         guard !shortlist.isEmpty else { return nil }
 
         let probe = tcpProbe
-        let observations = await withTaskGroup(of: IPerfLatencyCandidate.self) { group in
+        let reachable = await withTaskGroup(of: ReachableIPerfObservation?.self) { group in
             for (index, server) in shortlist.enumerated() {
                 group.addTask {
+                    guard let endpoint = await resolveIPerfEndpoint(for: server) else {
+                        return nil
+                    }
                     let latency = try? await probe.connectLatencyMs(
                         host: server.hostname,
-                        port: server.portPreferred,
+                        port: endpoint.port,
                         timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
                     )
-                    return IPerfLatencyCandidate(
-                        server: server,
-                        latencyMs: latency,
-                        sourceOrder: index
+                    return ReachableIPerfObservation(
+                        candidate: IPerfLatencyCandidate(
+                            server: server,
+                            latencyMs: latency,
+                            sourceOrder: index
+                        ),
+                        endpoint: endpoint
                     )
                 }
             }
-            var values: [IPerfLatencyCandidate] = []
+            var values: [ReachableIPerfObservation] = []
             values.reserveCapacity(shortlist.count)
-            for await observation in group { values.append(observation) }
+            for await observation in group {
+                if let observation { values.append(observation) }
+            }
             return values
         }
 
-        for observation in rankIPerfLatencyCandidates(observations) {
+        var endpointByServer: [String: IPerfEndpoint] = [:]
+        for observation in reachable {
+            endpointByServer[observation.candidate.server.id] = observation.endpoint
+        }
+        for observation in rankIPerfLatencyCandidates(reachable.map(\.candidate)) {
             guard !Task.isCancelled else { return nil }
             let server = observation.server
-            guard let endpoint = await resolveIPerfEndpoint(for: server) else { continue }
-            let measuredLatency: Double?
-            if let latency = observation.latencyMs {
-                measuredLatency = latency
-            } else {
-                measuredLatency = try? await probe.connectLatencyMs(
-                    host: server.hostname,
-                    port: endpoint.port,
-                    timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
-                )
-            }
+            guard let endpoint = endpointByServer[server.id] else { continue }
+            let measuredLatency = observation.latencyMs
             let latencyLabel = measuredLatency.map { String(format: "%.1f", $0) } ?? "--"
             sqDebugLog(
                 "SQ_SPEEDTEST Auto candidat \(server.id): " +
@@ -1887,19 +1894,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     ) async throws -> (IPerf3Result, UInt16) {
         let lo = min(portMin, portMax)
         let hi = max(portMin, portMax)
-        var siblingPorts = Array(lo...hi).filter { $0 != preferredPort }
-        // Plages larges (Bouygues 9200–9240) : échantillonner les siblings.
-        if siblingPorts.count > 15 {
-            let sampleStride = max(1, siblingPorts.count / 12)
-            var sampled: [UInt16] = []
-            for p in stride(from: Int(lo), through: Int(hi), by: sampleStride) {
-                let port = UInt16(p)
-                if port != preferredPort { sampled.append(port) }
-            }
-            if !sampled.contains(lo), lo != preferredPort { sampled.insert(lo, at: 0) }
-            if !sampled.contains(hi), hi != preferredPort { sampled.append(hi) }
-            siblingPorts = sampled
-        }
+        let siblingPorts = iperfSiblingCandidatePorts(
+            preferred: preferredPort,
+            min: lo,
+            max: hi
+        )
 
         var lastError: Error?
         var attempt = 0
@@ -2783,17 +2782,17 @@ let iperfPublicServers: [IPerfPublicServer] = {
         // ci-dessous est mesuré individuellement.
         IPerfPublicServer(id: "bytel_paris_bbr", hostname: "paris.bbr.iperf.bytel.fr", name: "Paris BBR (Bouygues)", latitude: parisLat, longitude: parisLon, code: "PAR-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
         IPerfPublicServer(id: "bytel_paris_cubic", hostname: "paris.cubic.iperf.bytel.fr", name: "Paris CUBIC (Bouygues)", latitude: parisLat, longitude: parisLon, code: "PAR-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax),
-        IPerfPublicServer(id: "bytel_mrs_bbr", hostname: "mrs.bbr.iperf.bytel.fr", name: "Marseille BBR (Bouygues)", latitude: 43.2965, longitude: 5.3698, code: "MRS-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
-        IPerfPublicServer(id: "bytel_mrs_cubic", hostname: "mrs.cubic.iperf.bytel.fr", name: "Marseille CUBIC (Bouygues)", latitude: 43.2965, longitude: 5.3698, code: "MRS-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9202),
-        IPerfPublicServer(id: "bytel_lyo_bbr", hostname: "lyo.bbr.iperf.bytel.fr", name: "Lyon BBR (Bouygues)", latitude: 45.7640, longitude: 4.8357, code: "LYO-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
-        IPerfPublicServer(id: "bytel_lyo_cubic", hostname: "lyo.cubic.iperf.bytel.fr", name: "Lyon CUBIC (Bouygues)", latitude: 45.7640, longitude: 4.8357, code: "LYO-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
-        IPerfPublicServer(id: "bytel_tls_bbr", hostname: "tls.bbr.iperf.bytel.fr", name: "Toulouse BBR (Bouygues)", latitude: 43.6047, longitude: 1.4442, code: "TLS-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
+        IPerfPublicServer(id: "bytel_mrs_bbr", hostname: "mrs.bbr.iperf.bytel.fr", name: "Marseille BBR (Bouygues)", latitude: 43.2965, longitude: 5.3698, code: "MRS-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9202),
+        IPerfPublicServer(id: "bytel_mrs_cubic", hostname: "mrs.cubic.iperf.bytel.fr", name: "Marseille CUBIC (Bouygues)", latitude: 43.2965, longitude: 5.3698, code: "MRS-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9204),
+        IPerfPublicServer(id: "bytel_lyo_bbr", hostname: "lyo.bbr.iperf.bytel.fr", name: "Lyon BBR (Bouygues)", latitude: 45.7640, longitude: 4.8357, code: "LYO-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9202),
+        IPerfPublicServer(id: "bytel_lyo_cubic", hostname: "lyo.cubic.iperf.bytel.fr", name: "Lyon CUBIC (Bouygues)", latitude: 45.7640, longitude: 4.8357, code: "LYO-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9202),
+        IPerfPublicServer(id: "bytel_tls_bbr", hostname: "tls.bbr.iperf.bytel.fr", name: "Toulouse BBR (Bouygues)", latitude: 43.6047, longitude: 1.4442, code: "TLS-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9204),
         IPerfPublicServer(id: "bytel_tls_cubic", hostname: "tls.cubic.iperf.bytel.fr", name: "Toulouse CUBIC (Bouygues)", latitude: 43.6047, longitude: 1.4442, code: "TLS-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
-        IPerfPublicServer(id: "bytel_str_bbr", hostname: "str.bbr.iperf.bytel.fr", name: "Strasbourg BBR (Bouygues)", latitude: 48.5734, longitude: 7.7521, code: "STR-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9202),
+        IPerfPublicServer(id: "bytel_str_bbr", hostname: "str.bbr.iperf.bytel.fr", name: "Strasbourg BBR (Bouygues)", latitude: 48.5734, longitude: 7.7521, code: "STR-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
         IPerfPublicServer(id: "bytel_str_cubic", hostname: "str.cubic.iperf.bytel.fr", name: "Strasbourg CUBIC (Bouygues)", latitude: 48.5734, longitude: 7.7521, code: "STR-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9203),
-        IPerfPublicServer(id: "bytel_poi_bbr", hostname: "poi.bbr.iperf.bytel.fr", name: "Poitiers BBR (Bouygues)", latitude: 46.5802, longitude: 0.3404, code: "POI-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
-        IPerfPublicServer(id: "bytel_ren_bbr", hostname: "ren.bbr.iperf.bytel.fr", name: "Rennes BBR (Bouygues)", latitude: 48.1173, longitude: -1.6778, code: "REN-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
-        IPerfPublicServer(id: "bytel_ren_cubic", hostname: "ren.cubic.iperf.bytel.fr", name: "Rennes CUBIC (Bouygues)", latitude: 48.1173, longitude: -1.6778, code: "REN-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9201),
+        IPerfPublicServer(id: "bytel_poi_bbr", hostname: "poi.bbr.iperf.bytel.fr", name: "Poitiers BBR (Bouygues)", latitude: 46.5802, longitude: 0.3404, code: "POI-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9202),
+        IPerfPublicServer(id: "bytel_ren_bbr", hostname: "ren.bbr.iperf.bytel.fr", name: "Rennes BBR (Bouygues)", latitude: 48.1173, longitude: -1.6778, code: "REN-BBR", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9202),
+        IPerfPublicServer(id: "bytel_ren_cubic", hostname: "ren.cubic.iperf.bytel.fr", name: "Rennes CUBIC (Bouygues)", latitude: 48.1173, longitude: -1.6778, code: "REN-CUBIC", countryCode: "FR", provider: .bouygues, portMin: bytMin, portMax: bytMax, portPreferred: 9202),
         // Scaleway / online.net (ports 5200–5209 TCP) — filet de secours + IPv6.
         // 5200 est MUET sur toutes les mires : il coûtait un timeout à chaque test.
         IPerfPublicServer(id: "online_net", hostname: "ping.online.net", name: "Paris Scaleway", latitude: parisLat, longitude: parisLon, code: "SCW", countryCode: "FR", provider: .scaleway, portMin: scwMin, portMax: scwMax, portPreferred: 5201),
@@ -2812,7 +2811,9 @@ let iperfPublicServers: [IPerfPublicServer] = {
         IPerfPublicServer(id: "clouvider_lon", hostname: "lon.speedtest.clouvider.net", name: "Londres (Clouvider)", latitude: 51.5074, longitude: -0.1278, code: "LON-CLV", countryCode: "GB", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax, portPreferred: 5207),
         IPerfPublicServer(id: "clouvider_man", hostname: "man.speedtest.clouvider.net", name: "Manchester (Clouvider)", latitude: 53.4808, longitude: -2.2426, code: "MAN-CLV", countryCode: "GB", provider: .clouvider, portMin: SpeedtestEngineConfig.clouviderIperfPortMin, portMax: SpeedtestEngineConfig.clouviderIperfPortMax),
         IPerfPublicServer(id: "leaseweb_fra", hostname: "speedtest.fra1.de.leaseweb.net", name: "Francfort (Leaseweb)", latitude: 50.1109, longitude: 8.6821, code: "FRA-LSW", countryCode: "DE", provider: .leaseweb, portMin: SpeedtestEngineConfig.leasewebIperfPortMin, portMax: SpeedtestEngineConfig.leasewebIperfPortMax),
-        IPerfPublicServer(id: "init7_ch", hostname: "speedtest.init7.net", name: "Winterthour (Init7)", latitude: 47.4989, longitude: 8.7286, code: "INIT7", countryCode: "CH", provider: .init7, portMin: SpeedtestEngineConfig.init7IperfPortMin, portMax: SpeedtestEngineConfig.init7IperfPortMax),
+        // TCP ouvert mais aucun premier état iPerf3 sur 5201–5204 (2026-08-26).
+        // Conserver l'id pour l'historique, sans exposer une cible muette.
+        IPerfPublicServer(id: "init7_ch", hostname: "speedtest.init7.net", name: "Winterthour (Init7)", latitude: 47.4989, longitude: 8.7286, code: "INIT7", countryCode: "CH", provider: .init7, portMin: SpeedtestEngineConfig.init7IperfPortMin, portMax: SpeedtestEngineConfig.init7IperfPortMax, selectable: false, autoEligible: false),
         // Amérique du Nord — le retrait de `proof.ovh.us` (mort) laissait le
         // catalogue SANS aucun POP nord-américain, alors que le Canada est un marché
         // du produit : un utilisateur montréalais serait parti mesurer vers
@@ -3133,26 +3134,11 @@ func resolveIPerfEndpoint(for server: IPerfPublicServer) async -> IPerfEndpoint?
 }
 
 private func resolveIPerfEndpointUncached(for server: IPerfPublicServer) async -> IPerfEndpoint? {
-    let lo = server.portMin
-    let hi = server.portMax
-    let allPorts = Array(lo...hi)
-    // Plages larges : sonder un sous-ensemble + min/max pour rester rapide.
-    let ports: [UInt16]
-    if allPorts.count <= 16 {
-        ports = allPorts
-    } else {
-        let strideN = max(1, allPorts.count / 12)
-        var sample: [UInt16] = [lo]
-        for p in stride(from: Int(lo) + strideN, through: Int(hi), by: strideN) {
-            sample.append(UInt16(p))
-        }
-        if sample.last != hi { sample.append(hi) }
-        // Le port préféré doit TOUJOURS être sondé : sur une plage large il pourrait
-        // tomber entre deux pas d'échantillonnage et être ignoré, alors que c'est le
-        // seul dont on sait qu'il parle iPerf3.
-        if !sample.contains(server.portPreferred) { sample.append(server.portPreferred) }
-        ports = sample.sorted()
-    }
+    let ports = iperfDiscoveryPorts(
+        min: server.portMin,
+        max: server.portMax,
+        preferred: server.portPreferred
+    )
     let openPorts = await probeOpenTCPPorts(host: server.hostname, ports: ports, timeoutSeconds: 1.0)
     guard !openPorts.isEmpty else {
         // Aucun port ouvert — retourner nil pour permettre au fallback serveur
@@ -3171,6 +3157,74 @@ private func resolveIPerfEndpointUncached(for server: IPerfPublicServer) async -
     let preferred = openPorts.contains(server.portPreferred) ? server.portPreferred : openPorts[0]
     let ordered = [preferred] + openPorts.filter { $0 != preferred }
     return IPerfEndpoint(port: preferred, openPorts: ordered)
+}
+
+private let iperfPortSamplingThreshold = 15
+private let iperfPortSampleMax = 18
+private let iperfPortNeighborRadius = 4
+private let iperfPortRangePrefix = 4
+
+/// Ports de découverte bornés. Sur une plage large, le port annoncé et ses
+/// voisins immédiats passent avant quelques bornes et points répartis.
+///
+/// L'ancien stride 9200/9203/9206 sautait 9202 et 9204, seuls ports réellement
+/// actifs sur certains POP Bouygues.
+func iperfDiscoveryPorts(
+    min portMin: UInt16,
+    max portMax: UInt16,
+    preferred: UInt16? = nil
+) -> [UInt16] {
+    let lo = Swift.min(portMin, portMax)
+    let hi = Swift.max(portMin, portMax)
+    let all = Array(lo...hi)
+    guard all.count > iperfPortSamplingThreshold + 1 else { return all }
+    return prioritizedWideIPerfPortSample(min: lo, max: hi, preferred: preferred).sorted()
+}
+
+private func prioritizedWideIPerfPortSample(
+    min portMin: UInt16,
+    max portMax: UInt16,
+    preferred: UInt16?
+) -> [UInt16] {
+    let lo = Int(Swift.min(portMin, portMax))
+    let hi = Int(Swift.max(portMin, portMax))
+    let requested = preferred.map(Int.init)
+    let anchor = requested.flatMap { (lo...hi).contains($0) ? $0 : nil } ?? lo
+    var sample: [UInt16] = []
+    var seen = Set<UInt16>()
+
+    func add(_ candidate: Int) {
+        guard sample.count < iperfPortSampleMax, (lo...hi).contains(candidate) else { return }
+        let port = UInt16(candidate)
+        if seen.insert(port).inserted { sample.append(port) }
+    }
+
+    add(anchor)
+    for offset in 1...iperfPortNeighborRadius {
+        add(anchor - offset)
+        add(anchor + offset)
+    }
+    for port in lo...Swift.min(hi, lo + iperfPortRangePrefix - 1) { add(port) }
+    add(hi)
+
+    let span = hi - lo
+    for index in 1..<iperfPortSampleMax {
+        add(lo + (span * index) / iperfPortSampleMax)
+    }
+    return sample
+}
+
+func iperfSiblingCandidatePorts(
+    preferred: UInt16,
+    min portMin: UInt16,
+    max portMax: UInt16
+) -> [UInt16] {
+    let lo = Swift.min(portMin, portMax)
+    let hi = Swift.max(portMin, portMax)
+    let siblings = Array(lo...hi).filter { $0 != preferred }
+    guard siblings.count > iperfPortSamplingThreshold else { return siblings }
+    return prioritizedWideIPerfPortSample(min: lo, max: hi, preferred: preferred)
+        .filter { $0 != preferred }
 }
 
 private func probeOpenTCPPorts(host: String, ports: [UInt16], timeoutSeconds: TimeInterval) async -> [UInt16] {
@@ -3779,6 +3833,9 @@ final class IPerf3ConnectionBag: @unchecked Sendable {
     }
 }
 
+let iperfFirstControlStateTimeoutSeconds: TimeInterval = 3
+let iperfSubsequentControlStateTimeoutSeconds: TimeInterval = 60
+
 actor IPerf3Runner {
     let hostname: String
     let port: UInt16
@@ -3879,8 +3936,17 @@ actor IPerf3Runner {
         var finishedResult: IPerf3Result?
         var enderStarted = false
 
+        var hasReceivedControlState = false
         while finishedResult == nil {
-            let raw = try await readExactNW(controlConnection, count: 1, timeoutSeconds: 60)
+            let controlStateTimeout = hasReceivedControlState
+                ? iperfSubsequentControlStateTimeoutSeconds
+                : iperfFirstControlStateTimeoutSeconds
+            let raw = try await readExactNW(
+                controlConnection,
+                count: 1,
+                timeoutSeconds: controlStateTimeout
+            )
+            hasReceivedControlState = true
             let signed = Int8(bitPattern: raw[0])
 
             switch signed {
