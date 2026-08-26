@@ -14165,6 +14165,16 @@
         }
       }
     },
+    "Sélection mesurée · iPerf3 ou Cloudflare" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measured selection · iPerf3 or Cloudflare"
+          }
+        }
+      }
+    },
     "POP LibreSpeed le plus proche" : {
       "extractionState" : "stale",
       "localizations" : {

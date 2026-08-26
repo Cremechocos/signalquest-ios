@@ -88,6 +88,9 @@ struct SpeedtestView: View {
     /// (sous tunnel, l'opérateur réel n'est pas détectable).
     @State private var isVPNActive = false
     @State private var didRunQASpeedtest = false
+    /// Copie qui invalide réellement SwiftUI après un rafraîchissement du catalogue.
+    /// Lire directement une globale verrouillée dans le picker ne déclenchait aucun rendu.
+    @State private var iperfCatalogServers = activeIPerfServers
     // Partage : le résultat ouvre d'abord un aperçu exact. Le PNG et la feuille
     // système ne sont créés qu'après confirmation des métadonnées publiées.
     @State private var sharePreviewResult: SpeedtestRunResult?
@@ -268,6 +271,7 @@ struct SpeedtestView: View {
             // publié pourrait ne plus correspondre au serveur réellement mesuré.
             // Best-effort : une API injoignable laisse le catalogue précédent.
             await services.iperfCatalog.refreshIfNeeded()
+            iperfCatalogServers = activeIPerfServers
             await services.speedtest.retryPendingSaves()
             history = await services.speedtest.history()
             await runQASpeedtestIfNeeded()
@@ -607,6 +611,7 @@ struct SpeedtestView: View {
                             ),
                             libreSpeedHost: $libreSpeedHost,
                             iperfServerId: $iperfServerId,
+                            servers: iperfCatalogServers,
                             // Dernière position CONNUE, jamais une demande : ouvrir
                             // le sélecteur ne doit ni déclencher le prompt système
                             // ni attendre un fix. `nil` = tri par distance masqué.

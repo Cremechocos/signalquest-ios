@@ -172,7 +172,8 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
     /// Migration douce : CDN legacy + host bytel mort → « Auto ».
     var migrated: SpeedtestDownloadTarget {
         switch self {
-        case .cloudflareR2, .awsCloudFront, .vpsInternal, .bytelPoiCubic, .bhs, .us:
+        case .cloudflareR2, .awsCloudFront, .vpsInternal, .bytelPoiCubic, .bhs, .us,
+             .onlineNet90ms, .onlineNet6_90ms:
             return .hybridAuto
         default:
             return self
@@ -231,7 +232,7 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
     /// Sous-titre pour le sélecteur (ville / région).
     var subtitle: String {
         switch self {
-        case .hybridAuto: return "POP iPerf3 le plus proche"
+        case .hybridAuto: return String(localized: "Sélection mesurée · iPerf3 ou Cloudflare")
         case .rbx: return "OVH · RBX · France"
         case .sbg: return "OVH · SBG · France"
         case .gra: return "OVH · GRA · France"

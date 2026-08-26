@@ -43,8 +43,14 @@ struct IPerfCatalogPayload: Codable, Sendable {
         let portMin: Int
         let portMax: Int
         let portPreferred: Int
-        let selectable: Bool
-        let autoEligible: Bool
+        /// Champs ajoutés au schema v1 sans casser les anciens caches. Le validateur
+        /// applique des valeurs fail-safe lorsqu'ils sont absents.
+        let selectable: Bool?
+        let autoEligible: Bool?
+        let autoPenaltyKm: Double?
+        let ipVersion: String?
+        let linkGbps: Double?
+        let syntheticLatencyMs: Int?
     }
 }
 
@@ -62,6 +68,9 @@ enum IPerfCatalogValidator {
     static let maxServers = 500
     /// Au-delà, la plage n'est plus un fallback anti-BUSY mais un balayage.
     static let maxPortSpan = 128
+    static let maxSyntheticLatencyMs = 10_000
+    static let maxAutoPenaltyKm = 50_000.0
+    static let maxLinkGbps = 100_000.0
 
     static func validate(_ payload: IPerfCatalogPayload) -> [IPerfPublicServer]? {
         guard payload.schemaVersion == supportedSchemaVersion else { return nil }
@@ -81,8 +90,13 @@ enum IPerfCatalogValidator {
     }
 
     private static func convert(_ dto: IPerfCatalogPayload.ServerDTO) -> IPerfPublicServer? {
+        let id = dto.id.trimmingCharacters(in: .whitespacesAndNewlines)
         let host = dto.host.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !dto.id.isEmpty, !host.isEmpty, host.count <= 253, !dto.name.isEmpty else { return nil }
+        let name = dto.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard id.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$"#, options: .regularExpression) != nil else {
+            return nil
+        }
+        guard !host.isEmpty, host.count <= 253, !name.isEmpty, name.count <= 120 else { return nil }
         // Pas d'URL déguisée en hôte, pas de séparateur de port : `NWEndpoint.Host`
         // accepterait des formes qu'on ne veut pas ouvrir.
         guard !host.contains("/"), !host.contains(" "), !host.contains(":") else { return nil }
@@ -92,20 +106,66 @@ enum IPerfCatalogValidator {
         guard dto.portMax - dto.portMin <= maxPortSpan else { return nil }
         guard dto.portPreferred >= dto.portMin, dto.portPreferred <= dto.portMax else { return nil }
 
+        let inferredSyntheticLatencyMs: Int = {
+            guard dto.syntheticLatencyMs == nil else { return dto.syntheticLatencyMs ?? 0 }
+            return id.localizedCaseInsensitiveContains("90ms") || host.localizedCaseInsensitiveContains("90ms")
+                ? 90
+                : 0
+        }()
+        guard (0...maxSyntheticLatencyMs).contains(inferredSyntheticLatencyMs) else { return nil }
+
+        let inferredIPVersion: IPerfIPVersion =
+            id.localizedCaseInsensitiveContains("net6") || host.lowercased().hasPrefix("ping6")
+                ? .ipv6
+                : .ipv4
+        let ipVersion: IPerfIPVersion
+        if let rawIPVersion = dto.ipVersion {
+            guard let parsed = IPerfIPVersion(rawValue: rawIPVersion.lowercased()) else { return nil }
+            ipVersion = parsed
+        } else {
+            ipVersion = inferredIPVersion
+        }
+
+        let selectable = dto.selectable ?? (inferredSyntheticLatencyMs == 0)
+        let autoEligible = dto.autoEligible ?? (
+            selectable &&
+                inferredSyntheticLatencyMs == 0 &&
+                ipVersion != .ipv6 &&
+                id != "bom"
+        )
+        let autoPenaltyKm = dto.autoPenaltyKm ?? 0
+        guard autoPenaltyKm.isFinite, (0...maxAutoPenaltyKm).contains(autoPenaltyKm) else { return nil }
+        if let linkGbps = dto.linkGbps {
+            guard linkGbps.isFinite, linkGbps > 0, linkGbps <= maxLinkGbps else { return nil }
+        }
+        // Un POP masqué ne peut pas être choisi automatiquement. Les mires à
+        // latence synthétique restent strictement réservées au diagnostic.
+        guard !autoEligible || selectable else { return nil }
+        guard inferredSyntheticLatencyMs == 0 || (!selectable && !autoEligible) else { return nil }
+
+        let countryCode = dto.countryCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard countryCode.range(of: #"^[A-Z]{2}$"#, options: .regularExpression) != nil else { return nil }
+
         return IPerfPublicServer(
-            id: dto.id,
+            id: id,
             hostname: host,
-            name: dto.name,
+            name: name,
             latitude: dto.lat,
             longitude: dto.lon,
             code: String(dto.code.prefix(20)),
-            countryCode: dto.countryCode,
+            countryCode: countryCode,
             // Un fournisseur inconnu de ce binaire ne fait pas disparaître le POP :
             // c'est tout l'intérêt de pouvoir en introduire un côté serveur.
             provider: IPerfServerProvider(rawValue: dto.provider) ?? .community,
             portMin: UInt16(dto.portMin),
             portMax: UInt16(dto.portMax),
-            portPreferred: UInt16(dto.portPreferred)
+            portPreferred: UInt16(dto.portPreferred),
+            selectable: selectable,
+            autoEligible: autoEligible,
+            autoPenaltyKm: autoPenaltyKm,
+            ipVersion: ipVersion,
+            linkGbps: dto.linkGbps,
+            syntheticLatencyMs: inferredSyntheticLatencyMs
         )
     }
 }
