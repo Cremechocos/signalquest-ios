@@ -92,9 +92,10 @@ final class MarketRegistryService: MarketRegistryServicing, @unchecked Sendable 
     func marketForLocation(latitude: Double, longitude: Double) async -> MarketRegistryEntry? {
         guard latitude.isFinite, longitude.isFinite else { return nil }
         let normalizedLongitude = Self.normalizeLongitude(longitude)
-        let containing = locationAreas().areas.filter {
-            $0.contains(latitude: latitude, longitude: normalizedLongitude)
-        }
+        let containing = locationAreas().candidates(
+            latitude: latitude,
+            longitude: normalizedLongitude
+        )
         guard !containing.isEmpty else { return nil }
         let payload = await registry()
         for area in containing {
@@ -127,13 +128,14 @@ final class MarketRegistryService: MarketRegistryServicing, @unchecked Sendable 
     // MARK: Chargements
 
     private static func resolveRegistry(api: APIClient, cache: DiskCache, logger: Logger) async -> Resolved {
+        let bundled = bundledFallback(logger: logger)
         // 1. Réseau, puis mise en cache disque (TTL 24 h).
         do {
             let payload = try await api.request(
                 APIEndpoint(path: "/api/android/markets", authenticated: false),
                 as: MarketRegistryPayload.self
             )
-            if !payload.markets.isEmpty {
+            if payload.canReplaceRadioReference(bundled) {
                 try? await cache.write(payload, for: diskKey)
                 return Resolved(payload: payload, isAuthoritative: true)
             }
@@ -142,11 +144,11 @@ final class MarketRegistryService: MarketRegistryServicing, @unchecked Sendable 
         }
         // 2. Cache disque encore frais.
         if let payload = try? await cache.read(MarketRegistryPayload.self, for: diskKey, maxAge: diskTTL),
-           !payload.markets.isEmpty {
+           payload.canReplaceRadioReference(bundled) {
             return Resolved(payload: payload, isAuthoritative: true)
         }
         // 3. Fallback bundlé — garanti présent dans les ressources.
-        return Resolved(payload: bundledFallback(logger: logger), isAuthoritative: false)
+        return Resolved(payload: bundled, isAuthoritative: false)
     }
 
     private static func bundledFallback(logger: Logger) -> MarketRegistryPayload {
@@ -193,9 +195,11 @@ final class MarketRegistryService: MarketRegistryServicing, @unchecked Sendable 
 
 // MARK: - Aires géographiques (market_location_areas.json)
 
-private struct MarketLocationAreasFile: Decodable, Sendable {
+struct MarketLocationAreasFile: Decodable, Sendable {
     let areas: [MarketLocationArea]
     let franceHysteresis: [MarketLocationArea]
+
+    private static let coastlineToleranceDegrees = 0.08
 
     init(areas: [MarketLocationArea], franceHysteresis: [MarketLocationArea]) {
         self.areas = areas
@@ -211,9 +215,29 @@ private struct MarketLocationAreasFile: Decodable, Sendable {
         areas = c.decodeLossyArray([MarketLocationArea].self, forKey: .areas)
         franceHysteresis = c.decodeLossyArray([MarketLocationArea].self, forKey: .franceHysteresis)
     }
+
+    /// Polygone exact d'abord, puis contour côtier le plus proche dans un rayon
+    /// borné. Le second chemin compense seulement les petites îles omises par la
+    /// simplification Natural Earth (New York/Istanbul, notamment).
+    func candidates(latitude: Double, longitude: Double) -> [MarketLocationArea] {
+        let exact = areas
+            .filter { $0.contains(latitude: latitude, longitude: longitude) }
+            .sorted { $0.boundingArea < $1.boundingArea }
+        if !exact.isEmpty { return exact }
+
+        let nearest = areas.compactMap { area -> (MarketLocationArea, Double)? in
+            guard let distance = area.boundaryDistanceSquared(
+                latitude: latitude,
+                longitude: longitude,
+                maximumDistance: Self.coastlineToleranceDegrees
+            ) else { return nil }
+            return (area, distance)
+        }.min { $0.1 < $1.1 }
+        return nearest.map { [$0.0] } ?? []
+    }
 }
 
-private struct MarketLocationArea: Decodable, Sendable {
+struct MarketLocationArea: Decodable, Sendable {
     let market: String
     let south: Double
     let west: Double
@@ -222,6 +246,10 @@ private struct MarketLocationArea: Decodable, Sendable {
     /// Sommets en `[lat, lng]`, comme Android.
     let polygon: [[Double]]?
 
+    var boundingArea: Double {
+        max(0, north - south) * max(0, east - west)
+    }
+
     /// Portage exact de MarketRegistry.kt : bbox d'abord, puis ray-casting
     /// si un polygone est déclaré.
     func contains(latitude: Double, longitude: Double) -> Bool {
@@ -229,6 +257,51 @@ private struct MarketLocationArea: Decodable, Sendable {
               longitude >= west, longitude <= east else { return false }
         guard let polygon, !polygon.isEmpty else { return true }
         return Self.containsPoint(polygon, latitude: latitude, longitude: longitude)
+    }
+
+    func boundaryDistanceSquared(
+        latitude: Double,
+        longitude: Double,
+        maximumDistance: Double
+    ) -> Double? {
+        guard latitude >= south - maximumDistance,
+              latitude <= north + maximumDistance,
+              longitude >= west - maximumDistance,
+              longitude <= east + maximumDistance else { return nil }
+
+        guard let polygon, !polygon.isEmpty else {
+            let clampedLatitude = min(max(latitude, south), north)
+            let clampedLongitude = min(max(longitude, west), east)
+            let distance = Self.squaredDistance(
+                latitude,
+                longitude,
+                clampedLatitude,
+                clampedLongitude
+            )
+            return distance <= maximumDistance * maximumDistance ? distance : nil
+        }
+
+        var closest = Double.infinity
+        var previous = polygon[polygon.count - 1]
+        for current in polygon {
+            guard current.count >= 2, previous.count >= 2 else {
+                previous = current
+                continue
+            }
+            closest = min(
+                closest,
+                Self.squaredDistanceToSegment(
+                    latitude: latitude,
+                    longitude: longitude,
+                    startLatitude: previous[0],
+                    startLongitude: previous[1],
+                    endLatitude: current[0],
+                    endLongitude: current[1]
+                )
+            )
+            previous = current
+        }
+        return closest <= maximumDistance * maximumDistance ? closest : nil
     }
 
     private static func containsPoint(_ points: [[Double]], latitude: Double, longitude: Double) -> Bool {
@@ -249,5 +322,43 @@ private struct MarketLocationArea: Decodable, Sendable {
             previous = current
         }
         return inside
+    }
+
+    private static func squaredDistanceToSegment(
+        latitude: Double,
+        longitude: Double,
+        startLatitude: Double,
+        startLongitude: Double,
+        endLatitude: Double,
+        endLongitude: Double
+    ) -> Double {
+        let latitudeDelta = endLatitude - startLatitude
+        let longitudeDelta = endLongitude - startLongitude
+        let segmentLengthSquared = latitudeDelta * latitudeDelta + longitudeDelta * longitudeDelta
+        guard segmentLengthSquared > 0 else {
+            return squaredDistance(latitude, longitude, startLatitude, startLongitude)
+        }
+        let projection = (
+            (latitude - startLatitude) * latitudeDelta +
+                (longitude - startLongitude) * longitudeDelta
+        ) / segmentLengthSquared
+        let boundedProjection = min(max(projection, 0), 1)
+        return squaredDistance(
+            latitude,
+            longitude,
+            startLatitude + boundedProjection * latitudeDelta,
+            startLongitude + boundedProjection * longitudeDelta
+        )
+    }
+
+    private static func squaredDistance(
+        _ firstLatitude: Double,
+        _ firstLongitude: Double,
+        _ secondLatitude: Double,
+        _ secondLongitude: Double
+    ) -> Double {
+        let latitudeDelta = firstLatitude - secondLatitude
+        let longitudeDelta = firstLongitude - secondLongitude
+        return latitudeDelta * latitudeDelta + longitudeDelta * longitudeDelta
     }
 }

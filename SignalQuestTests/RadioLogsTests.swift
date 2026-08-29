@@ -491,6 +491,142 @@ private struct StubRadioLogsService: RadioLogsServicing {
 
 extension RadioLogsTests {
 
+    func testSharedExactPlmnFixturesMatchAndroidAndBackend() throws {
+        struct Fixture: Decodable {
+            struct Case: Decodable {
+                struct Expected: Decodable { let plmn: String?; let marketCode: String?; let operatorKey: String? }
+                let id: String
+                let observedPlmn: String
+                let expected: Expected
+            }
+            let cases: [Case]
+        }
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let payload = try JSONDecoder.signalQuest.decode(MarketRegistryPayload.self, from: Data(contentsOf: root.appendingPathComponent("SignalQuestApp/Resources/market_registry_fallback.json")))
+        let fixtures = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: root.appendingPathComponent("SignalQuestTests/Fixtures/runtime-plmn-cases-v1.json")))
+        XCTAssertFalse(fixtures.cases.isEmpty)
+        for entry in fixtures.cases {
+            let market = payload.market(forObservedPlmn: entry.observedPlmn)
+            XCTAssertEqual(market?.marketCode, entry.expected.marketCode, entry.id)
+            XCTAssertEqual(market?.radioOperatorKey(observedPlmn: entry.observedPlmn), entry.expected.operatorKey, entry.id)
+        }
+    }
+
+    func testOldOrIncompleteRegistryCannotReplaceExactBundledRadioProof() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let current = try JSONDecoder.signalQuest.decode(MarketRegistryPayload.self, from: Data(contentsOf: root.appendingPathComponent("SignalQuestApp/Resources/market_registry_fallback.json")))
+        let old = MarketRegistryPayload(schemaVersion: 3, markets: current.markets)
+        let incomplete = MarketRegistryPayload(schemaVersion: 3, contract: current.contract, markets: current.markets)
+        XCTAssertTrue(current.supportsExactPlmnResolution)
+        XCTAssertFalse(old.canReplaceRadioReference(current))
+        XCTAssertFalse(incomplete.canReplaceRadioReference(current))
+        XCTAssertTrue(current.canReplaceRadioReference(current))
+        XCTAssertTrue(current.supportsVersionedMarketContent)
+        let contentHash = try XCTUnwrap(current.contract?.marketContentSha256)
+        XCTAssertEqual(contentHash.count, 64)
+        XCTAssertTrue(current.contract?.registryVersion.hasSuffix(String(contentHash.prefix(12))) == true)
+        XCTAssertEqual(current.market(forCode: "HU")?.operatorEntry(forKey: "DIGI_HU")?.key, "VODAFONE_HU")
+        XCTAssertEqual(current.market(forCode: "HU")?.operatorEntry(forKey: "DIGI_HU")?.label, "One Hungary")
+
+        var tamperedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: root.appendingPathComponent("SignalQuestApp/Resources/market_registry_fallback.json"))) as? [String: Any]
+        )
+        var tamperedContract = try XCTUnwrap(tamperedObject["contract"] as? [String: Any])
+        tamperedContract["marketContentSha256"] = String(repeating: "0", count: 64)
+        tamperedObject["contract"] = tamperedContract
+        let tampered = try JSONDecoder.signalQuest.decode(
+            MarketRegistryPayload.self,
+            from: JSONSerialization.data(withJSONObject: tamperedObject)
+        )
+        XCTAssertFalse(tampered.canReplaceRadioReference(current))
+    }
+
+    func testBundledWorldMarketRegistryMatchesSharedContract() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let registryURL = repositoryRoot
+            .appendingPathComponent("SignalQuestApp/Resources/market_registry_fallback.json")
+        let payload = try JSONDecoder.signalQuest.decode(
+            MarketRegistryPayload.self,
+            from: Data(contentsOf: registryURL)
+        )
+
+        XCTAssertEqual(payload.schemaVersion, 3)
+        XCTAssertEqual(payload.markets.count, 212)
+        XCTAssertEqual(payload.contract?.minimumCompatibleSchemaVersion, 3)
+        XCTAssertEqual(payload.contract?.plmnRegistryVersion, "2026-08-15-ob1346-a62-parser2-names3")
+        XCTAssertEqual(
+            payload.contract?.plmnContentSha256,
+            "ba972a1edc8d9a0a7dbc4161a046724011a92ddd3e1b1a66884a73b93def541e"
+        )
+
+        let france = try XCTUnwrap(payload.market(forCode: "FR"))
+        let bouygues = try XCTUnwrap(france.radioOperators.first { $0.key == "BOUYGUES" })
+        XCTAssertEqual(bouygues.label, "Bouygues Telecom")
+        XCTAssertEqual(bouygues.aliases, ["Bouygues", "Bouygues Telecom", "ByTel", "Bouygtel"])
+        XCTAssertEqual(france.source.status, "compatible")
+        XCTAssertTrue(france.radioCapabilities.officialAntennas)
+        XCTAssertEqual(france.radioMvnos.count, 7)
+        XCTAssertEqual(france.radioMvnos.first(where: { $0.key == "LEBARA" })?.hostOperatorKey, "SFR")
+        XCTAssertEqual(france.radioMvnos.first(where: { $0.key == "LEBARA" })?.plmns.first?.plmn, "20838")
+        XCTAssertNil(france.radioOperatorKey(observedPlmn: "20838"))
+        XCTAssertNil(france.radioOperatorKey(observedPlmn: "20825"))
+        XCTAssertNil(france.radioOperatorKey(observedPlmn: "20822"))
+        XCTAssertEqual(payload.radioMvno(simPlmn: "20838", simOperatorName: nil)?.key, "LEBARA")
+        XCTAssertEqual(payload.radioMvno(simPlmn: "20820", simOperatorName: "Lebara Mobile")?.key, "LEBARA")
+        XCTAssertNil(payload.radioMvno(simPlmn: "20838", simOperatorName: "Lycamobile"))
+        XCTAssertEqual(
+            Set(france.radioMvnos.map(\.key)),
+            Set(["LEBARA", "LYCAMOBILE", "NRJ_MOBILE", "CORIOLIS", "VECTONE", "TRANSATEL", "AIRMOB"])
+        )
+
+        let cayman = try XCTUnwrap(payload.market(forCode: "KY"))
+        XCTAssertEqual(cayman.radioOperatorKey(observedPlmn: "346001"), "LOGIC_346")
+
+        let unitedStates = try XCTUnwrap(payload.market(forCode: "US"))
+        XCTAssertNil(
+            unitedStates.radioOperatorKey(observedPlmn: "310001"),
+            "Un PLMN non référencé doit rester sans attribution opérateur"
+        )
+        XCTAssertEqual(unitedStates.sourceMode, "community")
+        XCTAssertEqual(unitedStates.source.status, "coverage-only")
+
+        for (plmn, marketCode) in [
+            ("302880", "CA"),
+            ("302820", "CA"),
+            ("302520", "CA"),
+            ("22811", "CH"),
+        ] {
+            let market = try XCTUnwrap(payload.market(forObservedPlmn: plmn), plmn)
+            XCTAssertEqual(market.marketCode, marketCode, plmn)
+            XCTAssertNil(market.radioOperatorKey(observedPlmn: plmn), plmn)
+        }
+    }
+
+    func testBundledRadioChannelRegistryMatchesSharedContract() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let registryURL = repositoryRoot
+            .appendingPathComponent("SignalQuestApp/Resources/radio_channel_registry_v1.json")
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: registryURL)) as? [String: Any]
+        )
+        let tables = try XCTUnwrap(object["tables"] as? [String: Any])
+
+        XCTAssertEqual(object["schemaVersion"] as? Int, 1)
+        XCTAssertEqual(object["minimumCompatibleSchemaVersion"] as? Int, 1)
+        XCTAssertEqual(object["registryVersion"] as? String, "3gpp-r17-r18-2026-08-24")
+        XCTAssertEqual((tables["umtsDownlinkUarfcn"] as? [[String: Any]])?.count, 21)
+        XCTAssertEqual((tables["lteDownlinkEarfcn"] as? [[String: Any]])?.count, 67)
+        XCTAssertEqual((tables["nrDownlinkRaster"] as? [[String: Any]])?.count, 63)
+        XCTAssertEqual(
+            object["contentSha256"] as? String,
+            "59ab8b0dc49ef4c06e3f7048acec2b186142a2b9c691841738292e67cfe0b6c7"
+        )
+    }
+
     /// UNE IDENTIFICATION DOIT SURVIVRE AU RETOUR SUR L'ÉCRAN.
     ///
     /// Le statut ne vivait qu'en mémoire : le magasin n'était alimenté que par le balayage,

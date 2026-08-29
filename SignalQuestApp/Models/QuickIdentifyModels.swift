@@ -10,11 +10,39 @@ import Foundation
 
 // MARK: - Résolution opérateur → MCC/MNC + marché (miroir de OperatorNetworkFallback.kt)
 
-/// Table minimale opérateur→(MCC, MNC) pour les exports CSV qui ne portent qu'un NOM
-/// d'opérateur (pas de MCC/MNC). « ZB » (Zone Blanche) est intrinsèquement FR mais
-/// sans opérateur unique → pas de MNC, marché FR. Le backend connaît le code « ZB ».
+/// Compatibilité des anciens exports, sans jamais fabriquer un PLMN depuis un nom
+/// modem seul. « ZB » (Zone Blanche) reste intrinsèquement FR mais sans MNC.
 enum RadioLogOperatorResolver {
-    static func mccMnc(forOperator name: String?) -> (mcc: String, mnc: String)? {
+    struct ServingNetwork {
+        let operatorKey: String?
+        let operatorName: String?
+        let marketCode: String?
+        let countryCode: String?
+    }
+
+    /// Même référentiel exact que les autres clients. Chargé une seule fois ;
+    /// l'agrégateur mémoïse ensuite chaque PLMN distinct du lot.
+    private static let radioReference: MarketRegistryPayload = {
+        guard let url = Bundle.main.url(forResource: "market_registry_fallback", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let registry = try? JSONDecoder.signalQuest.decode(MarketRegistryPayload.self, from: data) else {
+            return .empty
+        }
+        return registry
+    }()
+
+    static func servingNetwork(observedPlmn: String) -> ServingNetwork {
+        let market = radioReference.market(forObservedPlmn: observedPlmn)
+        let key = market?.radioOperatorKey(observedPlmn: observedPlmn)
+        let radioOperator = market?.radioOperators.first { $0.key == key }
+        return ServingNetwork(
+            operatorKey: key, operatorName: radioOperator?.label,
+            marketCode: market?.marketCode, countryCode: market?.countryCode
+        )
+    }
+
+    static func mccMnc(forOperator name: String?, marketCode: String? = nil) -> (mcc: String, mnc: String)? {
+        guard normalizedMarket(marketCode) == "FR" else { return nil }
         switch normalize(name) {
         case "SFR": return ("208", "10")
         case "BOUYGUES", "BYTEL", "BOUYGUES TELECOM": return ("208", "20")
@@ -31,25 +59,45 @@ enum RadioLogOperatorResolver {
     /// les routes carte attendent la clé canonique. Passer le nom brut en
     /// `?operator=` renvoie une liste vide — et l'écran d'identification n'aurait
     /// alors aucune antenne à proposer, sans dire pourquoi.
-    static func operatorKey(forOperator name: String?) -> String? {
-        switch normalize(name) {
+    static func operatorKey(
+        forOperator name: String?,
+        marketCode: String? = nil,
+        mcc: String? = nil
+    ) -> String? {
+        let normalizedName = normalize(name)
+        if normalizedName == "ZB" || normalizedName == "ZONE BLANCHE" { return "ZB" }
+        guard normalizedMarket(marketCode) == "FR" || mcc?.trimmingCharacters(in: .whitespacesAndNewlines) == "208" else {
+            return nil
+        }
+        switch normalizedName {
         case "SFR": return "SFR"
         case "BOUYGUES", "BYTEL", "BOUYGUES TELECOM": return "BOUYGUES"
         case "ORANGE": return "ORANGE"
         case "FREE", "FREE MOBILE": return "FREE"
-        case "ZB", "ZONE BLANCHE": return "ZB"
         default: return nil
         }
     }
 
-    /// Marché du log : FR pour les opérateurs FR et pour « ZB » (Zone Blanche).
-    static func marketCode(forOperator name: String?, mcc: String?) -> String? {
-        if mcc == "208" { return "FR" }
-        switch normalize(name) {
-        case "SFR", "BOUYGUES", "BYTEL", "BOUYGUES TELECOM",
-             "ORANGE", "FREE", "FREE MOBILE", "ZB", "ZONE BLANCHE": return "FR"
-        default: return nil
+    /// Marché du log : MCC observé ou marché stocké en premier. Un nom opérateur
+    /// n'est jamais une preuve de pays ; ZB reste l'unique exception sémantique.
+    static func marketCode(
+        forOperator name: String?,
+        mcc: String?,
+        explicitMarketCode: String? = nil
+    ) -> String? {
+        if let explicit = normalizedMarket(explicitMarketCode) { return explicit }
+        if mcc?.trimmingCharacters(in: .whitespacesAndNewlines) == "208" { return "FR" }
+        let normalizedName = normalize(name)
+        return normalizedName == "ZB" || normalizedName == "ZONE BLANCHE" ? "FR" : nil
+    }
+
+    private static func normalizedMarket(_ value: String?) -> String? {
+        guard let normalized = value?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased(), !normalized.isEmpty else {
+            return nil
         }
+        return normalized
     }
 
     private static func normalize(_ value: String?) -> String {

@@ -58,6 +58,10 @@ targets:
         buildPhase: resources
       - path: SignalQuestApp/Resources/market_location_areas.json
         buildPhase: resources
+      - path: SignalQuestApp/Resources/plmn_assignment_registry.json
+        buildPhase: resources
+      - path: SignalQuestApp/Resources/radio_channel_registry_v1.json
+        buildPhase: resources
       - path: SignalQuestApp/Resources/Localizable.xcstrings
         buildPhase: resources
       # Clés lues par le SYSTÈME (prompts de permission, nom de l'app). Une app
