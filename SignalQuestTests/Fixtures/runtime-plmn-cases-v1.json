@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    { "id": "us-distinct-owner", "observedPlmn": "310480", "rawOperatorName": "Verizon", "expected": { "plmn": "310480", "marketCode": "US", "operatorKey": "IT_E_WIRELESS_310" } },
+    { "id": "us-verizon", "observedPlmn": "311480", "expected": { "plmn": "311480", "marketCode": "US", "operatorKey": "VERIZON_US" } },
+    { "id": "us-leading-zero", "observedPlmn": "310012", "expected": { "plmn": "310012", "marketCode": "US", "operatorKey": "VERIZON_US" } },
+    { "id": "us-different-width", "observedPlmn": "31012", "rawOperatorName": "Verizon", "expected": { "plmn": "31012", "marketCode": null, "operatorKey": null } },
+    { "id": "unreferenced-three-digit-mnc", "observedPlmn": "310001", "rawOperatorName": "AT&T", "expected": { "plmn": "310001", "marketCode": null, "operatorKey": null } },
+    { "id": "bouygues-uppercase", "observedPlmn": "20820", "rawOperatorName": "BOUYGUES", "expected": { "plmn": "20820", "marketCode": "FR", "operatorKey": "BOUYGUES" } },
+    { "id": "bouygues-bytel", "observedPlmn": "20820", "rawOperatorName": "ByTel", "expected": { "plmn": "20820", "marketCode": "FR", "operatorKey": "BOUYGUES" } },
+    { "id": "roaming-serving-network", "observedPlmn": "22201", "rawOperatorName": "TIM", "simPlmn": "20820", "simOperatorName": "Bouygues", "expected": { "plmn": "22201", "marketCode": "IT", "operatorKey": "TIM_IT" } },
+    { "id": "italian-local-sim", "observedPlmn": "22250", "simPlmn": "22250", "expected": { "plmn": "22250", "marketCode": "IT", "operatorKey": "ILIAD_IT" } },
+    { "id": "slovak-swan", "observedPlmn": "23103", "expected": { "plmn": "23103", "marketCode": "SK", "operatorKey": "SWAN_SK" } },
+    { "id": "slovak-o2", "observedPlmn": "23106", "expected": { "plmn": "23106", "marketCode": "SK", "operatorKey": "O2_SK" } },
+    { "id": "bulgarian-vivacom", "observedPlmn": "28403", "expected": { "plmn": "28403", "marketCode": "BG", "operatorKey": "VIVACOM_BG" } },
+    { "id": "drom-orange", "observedPlmn": "64700", "expected": { "plmn": "64700", "marketCode": "DROM", "operatorKey": "ORANGE" } },
+    { "id": "drom-maore", "observedPlmn": "64701", "expected": { "plmn": "64701", "marketCode": "DROM", "operatorKey": "MAORE_MOBILE" } },
+    { "id": "drom-telco-legal-owner", "observedPlmn": "64702", "expected": { "plmn": "64702", "marketCode": "DROM", "operatorKey": "TELCO_OI" } },
+    { "id": "drom-telco-free-brand", "observedPlmn": "64703", "expected": { "plmn": "64703", "marketCode": "DROM", "operatorKey": "TELCO_OI" } },
+    { "id": "drom-free-caribbean", "observedPlmn": "34004", "expected": { "plmn": "34004", "marketCode": "DROM", "operatorKey": "FREE_CARAIBES" } },
+    { "id": "hungary-current-identity", "observedPlmn": "21603", "rawOperatorName": "DIGI", "expected": { "plmn": "21603", "marketCode": "HU", "operatorKey": "VODAFONE_HU" } },
+    { "id": "hungary-canonical-group", "observedPlmn": "21670", "rawOperatorName": "Vodafone", "expected": { "plmn": "21670", "marketCode": "HU", "operatorKey": "VODAFONE_HU" } },
+    { "id": "canadian-shared-network", "observedPlmn": "302880", "simPlmn": "302610", "simOperatorName": "Bell", "expected": { "plmn": "302880", "marketCode": "CA", "operatorKey": null } },
+    { "id": "international-shared-code", "observedPlmn": "90130", "expected": { "plmn": "90130", "marketCode": null, "operatorKey": null } },
+    { "id": "invalid-inserted-text", "observedPlmn": "311bad480", "rawOperatorName": "Verizon", "expected": { "plmn": null, "marketCode": null, "operatorKey": null } },
+    { "id": "invalid-fullwidth-digits", "observedPlmn": "３１１４８０", "expected": { "plmn": null, "marketCode": null, "operatorKey": null } },
+    { "id": "invalid-separated-digits", "observedPlmn": "311-480", "expected": { "plmn": null, "marketCode": null, "operatorKey": null } }
+  ]
+}

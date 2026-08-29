@@ -282,6 +282,8 @@
 		8F7B904F932F0DFB126BFD79 /* VersionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DD37884E4B468579B8A6FA7 /* VersionPolicyTests.swift */; };
 		8F88DA0C3803822213B1695A /* CarPlayAlertPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DECFD3C41415EDFF454C660 /* CarPlayAlertPolicyTests.swift */; };
 		902F95C7CCB9DD4867C917D2 /* market_registry_fallback.json in Resources */ = {isa = PBXBuildFile; fileRef = 65CA75BF3F0519CFD6B732AE /* market_registry_fallback.json */; };
+		907A13C07ECA6E5CD92AEC61 /* plmn_assignment_registry.json in Resources */ = {isa = PBXBuildFile; fileRef = B09D80F46CCEBD936FD7DBC6 /* plmn_assignment_registry.json */; };
+		F82372A9E95087CCE4108332 /* radio_channel_registry_v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 1317F41437063B83C8936128 /* radio_channel_registry_v1.json */; };
 		90B7AE3977363612D175DFCE /* WeeklyRecapRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04E7CFD4D0CDDBC795F7E0B0 /* WeeklyRecapRenderTests.swift */; };
 		90C367ACA63848A6B9C37FB3 /* CarPlayLayerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD97B6AB13757DB3A869DC1 /* CarPlayLayerController.swift */; };
 		90E4AD9B1C5017530A3E09E1 /* SentinelleFollowersCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3F9188D592CBD95A39EFA6 /* SentinelleFollowersCard.swift */; };
@@ -682,6 +684,8 @@
 		65484622445B106E95030CE3 /* AntennaReportThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaReportThreadView.swift; sourceTree = "<group>"; };
 		6570A8819FE179AAFE0B2546 /* NearbyOperatorStat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbyOperatorStat.swift; sourceTree = "<group>"; };
 		65CA75BF3F0519CFD6B732AE /* market_registry_fallback.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = market_registry_fallback.json; sourceTree = "<group>"; };
+		B09D80F46CCEBD936FD7DBC6 /* plmn_assignment_registry.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = plmn_assignment_registry.json; sourceTree = "<group>"; };
+		1317F41437063B83C8936128 /* radio_channel_registry_v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = radio_channel_registry_v1.json; sourceTree = "<group>"; };
 		65EBA6352C0FC36FBB95501E /* CoordinateGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoordinateGrid.swift; sourceTree = "<group>"; };
 		668760065DE520E85BAF4154 /* SQMapAnnotations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQMapAnnotations.swift; sourceTree = "<group>"; };
 		6690D2BFDE61AEB06C68B10A /* CarPlayMapTemplateBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayMapTemplateBuilder.swift; sourceTree = "<group>"; };
@@ -1345,6 +1349,8 @@
 				81FB8B7245C8C64D14F46655 /* Localizable.xcstrings */,
 				5E552A9B78EBBE744667DDC4 /* market_location_areas.json */,
 				65CA75BF3F0519CFD6B732AE /* market_registry_fallback.json */,
+				B09D80F46CCEBD936FD7DBC6 /* plmn_assignment_registry.json */,
+				1317F41437063B83C8936128 /* radio_channel_registry_v1.json */,
 				3208FA15F4116CDD6FB4BF47 /* PrivacyInfo.xcprivacy */,
 				B6B90FAF0243EC4626DC776B /* Fonts */,
 			);
@@ -2169,6 +2175,8 @@
 				A0B898A30A040EFE2F1D94D4 /* Sora-Variable.ttf in Resources */,
 				07A85F71108FD3B2CF2822B5 /* market_location_areas.json in Resources */,
 				902F95C7CCB9DD4867C917D2 /* market_registry_fallback.json in Resources */,
+				907A13C07ECA6E5CD92AEC61 /* plmn_assignment_registry.json in Resources */,
+				F82372A9E95087CCE4108332 /* radio_channel_registry_v1.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

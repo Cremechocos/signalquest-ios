@@ -1,0 +1,1266 @@
+{
+  "schemaVersion": 1,
+  "registryVersion": "3gpp-r17-r18-2026-08-24",
+  "minimumCompatibleSchemaVersion": 1,
+  "positionDate": "2026-08-24",
+  "contentSha256": "59ab8b0dc49ef4c06e3f7048acec2b186142a2b9c691841738292e67cfe0b6c7",
+  "sources": [
+    {
+      "specification": "3GPP TS 45.005",
+      "release": "18.0.0",
+      "table": "2-2",
+      "url": "https://www.etsi.org/deliver/etsi_ts/145000_145099/145005/18.00.00_60/ts_145005v180000p.pdf"
+    },
+    {
+      "specification": "3GPP TS 25.101",
+      "release": "18.0.0",
+      "table": "5.1 and 5.1A",
+      "url": "https://www.etsi.org/deliver/etsi_ts/125100_125199/125101/18.00.00_60/ts_125101v180000p.pdf"
+    },
+    {
+      "specification": "3GPP TS 36.101",
+      "release": "17",
+      "table": "5.7.3-1",
+      "url": "https://www.3gpp.org/ftp/Specs/archive/36_series/36.101"
+    },
+    {
+      "specification": "3GPP TS 38.101-1 and 38.101-2",
+      "release": "18",
+      "table": "5.4.2.3-1",
+      "url": "https://www.3gpp.org/ftp/Specs/archive/38_series/38.101-1"
+    }
+  ],
+  "inferencePolicy": {
+    "modemBandWins": true,
+    "ambiguousChannelReturnsCandidates": true,
+    "gsmDynamicMappingRequiresSystemInformation": true,
+    "restrictedNrAllowListIsNotInferred": true
+  },
+  "tables": {
+    "gsmFixedArfcn": [
+      {
+        "family": "GSM 900",
+        "variants": [
+          "P-GSM 900",
+          "E-GSM 900",
+          "R-GSM 900",
+          "ER-GSM 900"
+        ],
+        "ranges": [
+          [
+            0,
+            124
+          ],
+          [
+            940,
+            1023
+          ]
+        ]
+      },
+      {
+        "family": "GSM 850",
+        "variants": [
+          "GSM 850"
+        ],
+        "ranges": [
+          [
+            128,
+            251
+          ]
+        ]
+      },
+      {
+        "family": "GSM 450",
+        "variants": [
+          "GSM 450"
+        ],
+        "ranges": [
+          [
+            259,
+            293
+          ]
+        ]
+      },
+      {
+        "family": "GSM 480",
+        "variants": [
+          "GSM 480"
+        ],
+        "ranges": [
+          [
+            306,
+            340
+          ]
+        ]
+      },
+      {
+        "family": "DCS 1800",
+        "variants": [
+          "DCS 1800"
+        ],
+        "ranges": [
+          [
+            512,
+            885
+          ]
+        ]
+      },
+      {
+        "family": "PCS 1900",
+        "variants": [
+          "PCS 1900"
+        ],
+        "ranges": [
+          [
+            512,
+            810
+          ]
+        ]
+      }
+    ],
+    "umtsDownlinkUarfcn": [
+      {
+        "band": 1,
+        "first": 10562,
+        "last": 10838,
+        "step": 1,
+        "additional": []
+      },
+      {
+        "band": 2,
+        "first": 9662,
+        "last": 9938,
+        "step": 1,
+        "additional": [
+          412,
+          437,
+          462,
+          487,
+          512,
+          537,
+          562,
+          587,
+          612,
+          637,
+          662,
+          687
+        ]
+      },
+      {
+        "band": 3,
+        "first": 1162,
+        "last": 1513,
+        "step": 1,
+        "additional": []
+      },
+      {
+        "band": 4,
+        "first": 1537,
+        "last": 1738,
+        "step": 1,
+        "additional": [
+          1887,
+          1912,
+          1937,
+          1962,
+          1987,
+          2012,
+          2037,
+          2062,
+          2087
+        ]
+      },
+      {
+        "band": 5,
+        "first": 4357,
+        "last": 4458,
+        "step": 1,
+        "additional": [
+          1007,
+          1012,
+          1032,
+          1037,
+          1062,
+          1087
+        ]
+      },
+      {
+        "band": 6,
+        "first": 4387,
+        "last": 4413,
+        "step": 1,
+        "additional": [
+          1037,
+          1062
+        ]
+      },
+      {
+        "band": 7,
+        "first": 2237,
+        "last": 2563,
+        "step": 1,
+        "additional": [
+          2587,
+          2612,
+          2637,
+          2662,
+          2687,
+          2712,
+          2737,
+          2762,
+          2787,
+          2812,
+          2837,
+          2862,
+          2887,
+          2912
+        ]
+      },
+      {
+        "band": 8,
+        "first": 2937,
+        "last": 3088,
+        "step": 1,
+        "additional": []
+      },
+      {
+        "band": 9,
+        "first": 9237,
+        "last": 9387,
+        "step": 1,
+        "additional": []
+      },
+      {
+        "band": 10,
+        "first": 3112,
+        "last": 3388,
+        "step": 1,
+        "additional": [
+          3412,
+          3437,
+          3462,
+          3487,
+          3512,
+          3537,
+          3562,
+          3587,
+          3612,
+          3637,
+          3662,
+          3687
+        ]
+      },
+      {
+        "band": 11,
+        "first": 3712,
+        "last": 3787,
+        "step": 1,
+        "additional": []
+      },
+      {
+        "band": 12,
+        "first": 3842,
+        "last": 3903,
+        "step": 1,
+        "additional": [
+          3932,
+          3957,
+          3962,
+          3987,
+          3992
+        ]
+      },
+      {
+        "band": 13,
+        "first": 4017,
+        "last": 4043,
+        "step": 1,
+        "additional": [
+          4067,
+          4092
+        ]
+      },
+      {
+        "band": 14,
+        "first": 4117,
+        "last": 4143,
+        "step": 1,
+        "additional": [
+          4167,
+          4192
+        ]
+      },
+      {
+        "band": 19,
+        "first": 712,
+        "last": 763,
+        "step": 1,
+        "additional": [
+          787,
+          812,
+          837
+        ]
+      },
+      {
+        "band": 20,
+        "first": 4512,
+        "last": 4638,
+        "step": 1,
+        "additional": []
+      },
+      {
+        "band": 21,
+        "first": 862,
+        "last": 912,
+        "step": 1,
+        "additional": []
+      },
+      {
+        "band": 22,
+        "first": 4662,
+        "last": 5038,
+        "step": 1,
+        "additional": []
+      },
+      {
+        "band": 25,
+        "first": 5112,
+        "last": 5413,
+        "step": 1,
+        "additional": [
+          5437,
+          5462,
+          5487,
+          5512,
+          5537,
+          5562,
+          5587,
+          5612,
+          5637,
+          5662,
+          5687,
+          5712,
+          5737
+        ]
+      },
+      {
+        "band": 26,
+        "first": 5762,
+        "last": 5913,
+        "step": 1,
+        "additional": [
+          5937,
+          5962,
+          5987,
+          5992,
+          6012,
+          6017,
+          6037,
+          6042,
+          6062,
+          6067,
+          6087
+        ]
+      },
+      {
+        "band": 32,
+        "first": 6617,
+        "last": 6813,
+        "step": 1,
+        "additional": [
+          6837,
+          6862,
+          6887,
+          6912,
+          6937,
+          6962,
+          6987,
+          7012
+        ]
+      }
+    ],
+    "lteDownlinkEarfcn": [
+      {
+        "band": 1,
+        "first": 0,
+        "last": 599,
+        "step": 1
+      },
+      {
+        "band": 2,
+        "first": 600,
+        "last": 1199,
+        "step": 1
+      },
+      {
+        "band": 3,
+        "first": 1200,
+        "last": 1949,
+        "step": 1
+      },
+      {
+        "band": 4,
+        "first": 1950,
+        "last": 2399,
+        "step": 1
+      },
+      {
+        "band": 5,
+        "first": 2400,
+        "last": 2649,
+        "step": 1
+      },
+      {
+        "band": 6,
+        "first": 2650,
+        "last": 2749,
+        "step": 1
+      },
+      {
+        "band": 7,
+        "first": 2750,
+        "last": 3449,
+        "step": 1
+      },
+      {
+        "band": 8,
+        "first": 3450,
+        "last": 3799,
+        "step": 1
+      },
+      {
+        "band": 9,
+        "first": 3800,
+        "last": 4149,
+        "step": 1
+      },
+      {
+        "band": 10,
+        "first": 4150,
+        "last": 4749,
+        "step": 1
+      },
+      {
+        "band": 11,
+        "first": 4750,
+        "last": 4949,
+        "step": 1
+      },
+      {
+        "band": 12,
+        "first": 5010,
+        "last": 5179,
+        "step": 1
+      },
+      {
+        "band": 13,
+        "first": 5180,
+        "last": 5279,
+        "step": 1
+      },
+      {
+        "band": 14,
+        "first": 5280,
+        "last": 5379,
+        "step": 1
+      },
+      {
+        "band": 17,
+        "first": 5730,
+        "last": 5849,
+        "step": 1
+      },
+      {
+        "band": 18,
+        "first": 5850,
+        "last": 5999,
+        "step": 1
+      },
+      {
+        "band": 19,
+        "first": 6000,
+        "last": 6149,
+        "step": 1
+      },
+      {
+        "band": 20,
+        "first": 6150,
+        "last": 6449,
+        "step": 1
+      },
+      {
+        "band": 21,
+        "first": 6450,
+        "last": 6599,
+        "step": 1
+      },
+      {
+        "band": 22,
+        "first": 6600,
+        "last": 7399,
+        "step": 1
+      },
+      {
+        "band": 23,
+        "first": 7500,
+        "last": 7699,
+        "step": 1
+      },
+      {
+        "band": 24,
+        "first": 7700,
+        "last": 8039,
+        "step": 1
+      },
+      {
+        "band": 25,
+        "first": 8040,
+        "last": 8689,
+        "step": 1
+      },
+      {
+        "band": 26,
+        "first": 8690,
+        "last": 9039,
+        "step": 1
+      },
+      {
+        "band": 27,
+        "first": 9040,
+        "last": 9209,
+        "step": 1
+      },
+      {
+        "band": 28,
+        "first": 9210,
+        "last": 9659,
+        "step": 1
+      },
+      {
+        "band": 29,
+        "first": 9660,
+        "last": 9769,
+        "step": 1
+      },
+      {
+        "band": 30,
+        "first": 9770,
+        "last": 9869,
+        "step": 1
+      },
+      {
+        "band": 31,
+        "first": 9870,
+        "last": 9919,
+        "step": 1
+      },
+      {
+        "band": 32,
+        "first": 9920,
+        "last": 10359,
+        "step": 1
+      },
+      {
+        "band": 33,
+        "first": 36000,
+        "last": 36199,
+        "step": 1
+      },
+      {
+        "band": 34,
+        "first": 36200,
+        "last": 36349,
+        "step": 1
+      },
+      {
+        "band": 35,
+        "first": 36350,
+        "last": 36949,
+        "step": 1
+      },
+      {
+        "band": 36,
+        "first": 36950,
+        "last": 37549,
+        "step": 1
+      },
+      {
+        "band": 37,
+        "first": 37550,
+        "last": 37749,
+        "step": 1
+      },
+      {
+        "band": 38,
+        "first": 37750,
+        "last": 38249,
+        "step": 1
+      },
+      {
+        "band": 39,
+        "first": 38250,
+        "last": 38649,
+        "step": 1
+      },
+      {
+        "band": 40,
+        "first": 38650,
+        "last": 39649,
+        "step": 1
+      },
+      {
+        "band": 41,
+        "first": 39650,
+        "last": 41589,
+        "step": 1
+      },
+      {
+        "band": 42,
+        "first": 41590,
+        "last": 43589,
+        "step": 1
+      },
+      {
+        "band": 43,
+        "first": 43590,
+        "last": 45589,
+        "step": 1
+      },
+      {
+        "band": 44,
+        "first": 45590,
+        "last": 46589,
+        "step": 1
+      },
+      {
+        "band": 45,
+        "first": 46590,
+        "last": 46789,
+        "step": 1
+      },
+      {
+        "band": 46,
+        "first": 46790,
+        "last": 54539,
+        "step": 1
+      },
+      {
+        "band": 47,
+        "first": 54540,
+        "last": 55239,
+        "step": 1
+      },
+      {
+        "band": 48,
+        "first": 55240,
+        "last": 56739,
+        "step": 1
+      },
+      {
+        "band": 49,
+        "first": 56740,
+        "last": 58239,
+        "step": 1
+      },
+      {
+        "band": 50,
+        "first": 58240,
+        "last": 59089,
+        "step": 1
+      },
+      {
+        "band": 51,
+        "first": 59090,
+        "last": 59139,
+        "step": 1
+      },
+      {
+        "band": 52,
+        "first": 59140,
+        "last": 60139,
+        "step": 1
+      },
+      {
+        "band": 53,
+        "first": 60140,
+        "last": 60254,
+        "step": 1
+      },
+      {
+        "band": 65,
+        "first": 65536,
+        "last": 66435,
+        "step": 1
+      },
+      {
+        "band": 66,
+        "first": 66436,
+        "last": 67335,
+        "step": 1
+      },
+      {
+        "band": 67,
+        "first": 67336,
+        "last": 67535,
+        "step": 1
+      },
+      {
+        "band": 68,
+        "first": 67536,
+        "last": 67835,
+        "step": 1
+      },
+      {
+        "band": 69,
+        "first": 67836,
+        "last": 68335,
+        "step": 1
+      },
+      {
+        "band": 70,
+        "first": 68336,
+        "last": 68585,
+        "step": 1
+      },
+      {
+        "band": 71,
+        "first": 68586,
+        "last": 68935,
+        "step": 1
+      },
+      {
+        "band": 72,
+        "first": 68936,
+        "last": 68985,
+        "step": 1
+      },
+      {
+        "band": 73,
+        "first": 68986,
+        "last": 69035,
+        "step": 1
+      },
+      {
+        "band": 74,
+        "first": 69036,
+        "last": 69465,
+        "step": 1
+      },
+      {
+        "band": 75,
+        "first": 69466,
+        "last": 70315,
+        "step": 1
+      },
+      {
+        "band": 76,
+        "first": 70316,
+        "last": 70365,
+        "step": 1
+      },
+      {
+        "band": 85,
+        "first": 70366,
+        "last": 70545,
+        "step": 1
+      },
+      {
+        "band": 87,
+        "first": 70546,
+        "last": 70595,
+        "step": 1
+      },
+      {
+        "band": 88,
+        "first": 70596,
+        "last": 70645,
+        "step": 1
+      },
+      {
+        "band": 103,
+        "first": 70646,
+        "last": 70655,
+        "step": 1
+      }
+    ],
+    "nrDownlinkRaster": [
+      {
+        "band": 1,
+        "first": 422000,
+        "last": 434000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 2,
+        "first": 386000,
+        "last": 398000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 3,
+        "first": 361000,
+        "last": 376000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 5,
+        "first": 173800,
+        "last": 178800,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 7,
+        "first": 524000,
+        "last": 538000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 8,
+        "first": 185000,
+        "last": 192000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 12,
+        "first": 145800,
+        "last": 149200,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 13,
+        "first": 149200,
+        "last": 151200,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 14,
+        "first": 151600,
+        "last": 153600,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 18,
+        "first": 172000,
+        "last": 175000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 20,
+        "first": 158200,
+        "last": 164200,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 24,
+        "first": 305000,
+        "last": 311800,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 25,
+        "first": 386000,
+        "last": 399000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 26,
+        "first": 171800,
+        "last": 178800,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 28,
+        "first": 151600,
+        "last": 160600,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 29,
+        "first": 143400,
+        "last": 145600,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 30,
+        "first": 470000,
+        "last": 472000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 31,
+        "first": 92500,
+        "last": 93500,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 34,
+        "first": 402000,
+        "last": 405000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 38,
+        "first": 514000,
+        "last": 524000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 39,
+        "first": 376000,
+        "last": 384000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 40,
+        "first": 460000,
+        "last": 480000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 41,
+        "first": 499200,
+        "last": 537999,
+        "step": 3,
+        "inferable": true
+      },
+      {
+        "band": 46,
+        "first": 743334,
+        "last": 795000,
+        "step": 1,
+        "inferable": false
+      },
+      {
+        "band": 47,
+        "first": 790334,
+        "last": 795000,
+        "step": 1,
+        "inferable": true
+      },
+      {
+        "band": 48,
+        "first": 636667,
+        "last": 646666,
+        "step": 1,
+        "inferable": true
+      },
+      {
+        "band": 50,
+        "first": 286400,
+        "last": 303400,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 51,
+        "first": 285400,
+        "last": 286400,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 53,
+        "first": 496700,
+        "last": 499000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 54,
+        "first": 334000,
+        "last": 335000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 65,
+        "first": 422000,
+        "last": 440000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 66,
+        "first": 422000,
+        "last": 440000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 67,
+        "first": 147600,
+        "last": 151600,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 70,
+        "first": 399000,
+        "last": 404000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 71,
+        "first": 123400,
+        "last": 130400,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 72,
+        "first": 92200,
+        "last": 93200,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 74,
+        "first": 295000,
+        "last": 303600,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 75,
+        "first": 286400,
+        "last": 303400,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 76,
+        "first": 285400,
+        "last": 286400,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 77,
+        "first": 620000,
+        "last": 680000,
+        "step": 1,
+        "inferable": true
+      },
+      {
+        "band": 78,
+        "first": 620000,
+        "last": 653333,
+        "step": 1,
+        "inferable": true
+      },
+      {
+        "band": 79,
+        "first": 693334,
+        "last": 733333,
+        "step": 1,
+        "inferable": true
+      },
+      {
+        "band": 85,
+        "first": 145600,
+        "last": 149200,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 90,
+        "first": 499200,
+        "last": 537999,
+        "step": 3,
+        "inferable": true
+      },
+      {
+        "band": 90,
+        "first": 499200,
+        "last": 538000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 91,
+        "first": 285400,
+        "last": 286400,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 92,
+        "first": 286400,
+        "last": 303400,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 93,
+        "first": 285400,
+        "last": 286400,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 94,
+        "first": 286400,
+        "last": 303400,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 96,
+        "first": 795000,
+        "last": 875000,
+        "step": 1,
+        "inferable": false
+      },
+      {
+        "band": 100,
+        "first": 183880,
+        "last": 185000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 101,
+        "first": 380000,
+        "last": 382000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 102,
+        "first": 795000,
+        "last": 828333,
+        "step": 1,
+        "inferable": false
+      },
+      {
+        "band": 104,
+        "first": 828334,
+        "last": 875000,
+        "step": 1,
+        "inferable": true
+      },
+      {
+        "band": 105,
+        "first": 122400,
+        "last": 130400,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 106,
+        "first": 187000,
+        "last": 188000,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 109,
+        "first": 286400,
+        "last": 303400,
+        "step": 20,
+        "inferable": true
+      },
+      {
+        "band": 257,
+        "first": 2054166,
+        "last": 2104165,
+        "step": 1,
+        "inferable": true
+      },
+      {
+        "band": 258,
+        "first": 2016667,
+        "last": 2070832,
+        "step": 1,
+        "inferable": true
+      },
+      {
+        "band": 259,
+        "first": 2270833,
+        "last": 2337499,
+        "step": 1,
+        "inferable": true
+      },
+      {
+        "band": 260,
+        "first": 2229166,
+        "last": 2279165,
+        "step": 1,
+        "inferable": true
+      },
+      {
+        "band": 261,
+        "first": 2070833,
+        "last": 2084999,
+        "step": 1,
+        "inferable": true
+      },
+      {
+        "band": 262,
+        "first": 2399166,
+        "last": 2415832,
+        "step": 1,
+        "inferable": true
+      }
+    ],
+    "nr263": {
+      "band": 263,
+      "sequences": [
+        {
+          "first": 2564083,
+          "step": 1680,
+          "lastIndex": 137
+        },
+        {
+          "first": 2566603,
+          "step": 6720,
+          "lastIndex": 33
+        },
+        {
+          "first": 2569963,
+          "step": 6720,
+          "lastIndex": 32
+        },
+        {
+          "first": 2576683,
+          "step": 6720,
+          "lastIndex": 30
+        },
+        {
+          "first": 2580043,
+          "step": 6720,
+          "lastIndex": 29
+        }
+      ],
+      "exceptionalChannels": [
+        2585083,
+        2655643,
+        2692603,
+        2764843
+      ]
+    }
+  }
+}
