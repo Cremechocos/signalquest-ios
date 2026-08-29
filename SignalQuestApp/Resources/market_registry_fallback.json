@@ -1,14 +1,14 @@
 {
   "schemaVersion": 3,
   "contract": {
-    "registryVersion": "market-v3-2026-08-15-ob1346-a62-parser2-names3-c385cce4f80a-00baf1689048",
+    "registryVersion": "market-v3-2026-08-15-ob1346-a62-parser2-names3-c385cce4f80a-a3742e5ccc43",
     "minimumCompatibleSchemaVersion": 3,
     "positionDate": "2026-08-15",
     "plmnRegistryVersion": "2026-08-15-ob1346-a62-parser2-names3",
     "plmnContentSha256": "ba972a1edc8d9a0a7dbc4161a046724011a92ddd3e1b1a66884a73b93def541e",
     "plmnResolutionVersion": 1,
     "plmnResolutionSha256": "c385cce4f80ac6734c5ef7d4a6ec31cf404b1c2a80fd36fb387c07138ea0d6b7",
-    "marketContentSha256": "00baf1689048d244c8e8912a22a08773129edb41cebd5cde1196e7cd3834495a"
+    "marketContentSha256": "a3742e5ccc438f939b801b38d7d209a2a97c7dec2213c950ff603862f0b00a4f"
   },
   "registeredPlmnMarkets": {
     "20200": "GR",
@@ -2977,8 +2977,7 @@
           "label": "Orange",
           "shortLabel": "Orange",
           "mncs": [
-            0,
-            1
+            0
           ],
           "plmns": [
             {
@@ -3002,7 +3001,6 @@
           "label": "Free Caraibe",
           "shortLabel": "Free",
           "mncs": [
-            4,
             9
           ],
           "plmns": [
@@ -3052,9 +3050,7 @@
           "key": "OUTREMER_TELECOM",
           "label": "Outremer Telecom",
           "shortLabel": "Outremer",
-          "mncs": [
-            2
-          ],
+          "mncs": [],
           "plmns": [
             {
               "plmn": "34002",
@@ -3093,7 +3089,6 @@
           "label": "Telco OI",
           "shortLabel": "Telco OI",
           "mncs": [
-            2,
             3
           ],
           "plmns": [
@@ -3117,9 +3112,7 @@
           "key": "ZEOP",
           "label": "Zeop",
           "shortLabel": "Zeop",
-          "mncs": [
-            4
-          ],
+          "mncs": [],
           "plmns": [
             {
               "plmn": "64704",
@@ -3136,9 +3129,7 @@
           "key": "MAORE_MOBILE",
           "label": "Maore Mobile",
           "shortLabel": "Maore",
-          "mncs": [
-            1
-          ],
+          "mncs": [],
           "plmns": [
             {
               "plmn": "64701",
@@ -4562,13 +4553,7 @@
             150,
             170,
             180,
-            190,
-            210,
-            260,
-            270,
-            280,
             380,
-            390,
             410,
             670,
             680,
@@ -4714,23 +4699,15 @@
           "label": "T-Mobile",
           "shortLabel": "T-Mobile",
           "mncs": [
-            120,
             160,
-            190,
-            200,
-            210,
             220,
             230,
             240,
             250,
-            260,
-            270,
             310,
             490,
             530,
             660,
-            770,
-            800,
             830,
             870,
             880,
@@ -4885,8 +4862,6 @@
             10,
             12,
             13,
-            110,
-            270,
             271,
             272,
             273,
@@ -4896,7 +4871,6 @@
             277,
             278,
             279,
-            280,
             281,
             282,
             283,
@@ -4907,9 +4881,7 @@
             288,
             289,
             350,
-            390,
             440,
-            480,
             481,
             482,
             483,
@@ -4929,8 +4901,6 @@
             597,
             598,
             599,
-            770,
-            800,
             810,
             820,
             890,
@@ -5272,7 +5242,6 @@
           "label": "DISH Wireless",
           "shortLabel": "DISH",
           "mncs": [
-            200,
             340
           ],
           "kind": "MNO",
@@ -5298,11 +5267,7 @@
           "key": "IT_E_WIRELESS_310",
           "label": "IT&E Wireless",
           "shortLabel": "IT&E",
-          "mncs": [
-            110,
-            120,
-            480
-          ],
+          "mncs": [],
           "kind": "MNO",
           "aliases": [
             "IT&E",
@@ -11273,14 +11238,12 @@
           "mncs": [
             0,
             1,
-            2,
             30,
             31,
             32,
             33,
             34,
             76,
-            77,
             86
           ],
           "plmns": [
@@ -11353,7 +11316,6 @@
           "label": "O2 UK",
           "shortLabel": "O2",
           "mncs": [
-            2,
             10,
             11
           ],
@@ -11387,7 +11349,6 @@
           "shortLabel": "Vodafone",
           "mncs": [
             15,
-            77,
             91
           ],
           "plmns": [
@@ -21170,12 +21131,6 @@
             31,
             40,
             49,
-            52,
-            53,
-            54,
-            55,
-            56,
-            70,
             90,
             92,
             93,
@@ -21310,9 +21265,6 @@
             34,
             38,
             51,
-            53,
-            54,
-            55,
             57,
             58,
             59,
@@ -21486,14 +21438,11 @@
             8,
             9,
             12,
-            15,
             17,
             18,
             23,
             36,
             50,
-            52,
-            67,
             83,
             85
           ],
@@ -21584,16 +21533,12 @@
             7,
             11,
             14,
-            15,
             20,
             22,
             30,
             43,
             46,
-            56,
             60,
-            67,
-            70,
             78,
             82,
             86,
