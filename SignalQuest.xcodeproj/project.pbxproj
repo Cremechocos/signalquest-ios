@@ -21,6 +21,7 @@
 		05EE88A8F44A25554E44E766 /* SentinelleAddressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87D924C6BBFE1B8AAD4790A /* SentinelleAddressView.swift */; };
 		066B6DDEB1907946214C4A5C /* ANFRModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C859D91AFCEFBFEE4E43C47 /* ANFRModels.swift */; };
 		0674D477E2E2124A28ECDA78 /* SpeedtestShareQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6A0DBB96F9423CDD0C043B6 /* SpeedtestShareQATests.swift */; };
+		06A069B6A8253A0BBDBBBF48 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8B6CF56AACB58DF8C8A52D98 /* PrivacyInfo.xcprivacy */; };
 		07937E7527A350188D085CA8 /* RemindersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F629B4E5D61FC9E98885BCD0 /* RemindersView.swift */; };
 		07A85F71108FD3B2CF2822B5 /* market_location_areas.json in Resources */ = {isa = PBXBuildFile; fileRef = 5E552A9B78EBBE744667DDC4 /* market_location_areas.json */; };
 		08C4813D780CB4C1366889E7 /* AntennaSightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56C63E44A7E96FCFBDBE3BD8 /* AntennaSightView.swift */; };
@@ -104,6 +105,7 @@
 		2D7B3DBF75B6EA5D1E059052 /* AntennaMarkerRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCC9C691A3F3F1874DAD506F /* AntennaMarkerRenderTests.swift */; };
 		2EAA4923F615CB18816D9FD3 /* TwoFactorSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BA27C4F6CA354680172A364 /* TwoFactorSetupView.swift */; };
 		2EFC3E650E7CCF5783FA85FB /* SentinelleModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 267A49276A6A6F922F316125 /* SentinelleModels.swift */; };
+		2F1B4FBE2F310019CA690D5F /* SignalQuestNotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 43A90D5D1E2D3F71AFB293F6 /* SignalQuestNotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		2FDBEFA88298D442C4E3CB9A /* TerritoryOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E86C823EC944D48AC73885F /* TerritoryOverlay.swift */; };
 		30311E763161242DA4BEC7EB /* MarketRegistryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57FDE918733D1625D560F628 /* MarketRegistryModels.swift */; };
 		306027019A477AF7E9AFCA0F /* CallsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE9C7190AEB0D08E27839A20 /* CallsService.swift */; };
@@ -211,6 +213,7 @@
 		696D8CC9612CF18EA3CEFE62 /* EntitlementsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 510C718208A0F0CD33A6405E /* EntitlementsService.swift */; };
 		69C6356C453ED3AA2B0CFFEC /* SpeedtestModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39509D5164E7F02622A4D040 /* SpeedtestModels.swift */; };
 		69CCCECACF194424E6D74D3E /* MapBounds+Geometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA954636DB0A4A82D56EFD1 /* MapBounds+Geometry.swift */; };
+		6A343C8DC4FE3027B1A83E62 /* OutageNotificationReceiptSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE041E6C4F611EA60BD37F9C /* OutageNotificationReceiptSender.swift */; };
 		6ACAAE95B6D7025523DE3DB5 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92E156E2B3CA6D911D4A0C30 /* AuthService.swift */; };
 		6B0FD6F8C15034A7A364DFEC /* SentinelleOwnerLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6714ECEA3256C6DAF0E2BCA0 /* SentinelleOwnerLabel.swift */; };
 		6C457F1CED31DCDD42A579C3 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30EFB586826CF2A6A011E18D /* TestSupport.swift */; };
@@ -283,7 +286,6 @@
 		8F88DA0C3803822213B1695A /* CarPlayAlertPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DECFD3C41415EDFF454C660 /* CarPlayAlertPolicyTests.swift */; };
 		902F95C7CCB9DD4867C917D2 /* market_registry_fallback.json in Resources */ = {isa = PBXBuildFile; fileRef = 65CA75BF3F0519CFD6B732AE /* market_registry_fallback.json */; };
 		907A13C07ECA6E5CD92AEC61 /* plmn_assignment_registry.json in Resources */ = {isa = PBXBuildFile; fileRef = B09D80F46CCEBD936FD7DBC6 /* plmn_assignment_registry.json */; };
-		F82372A9E95087CCE4108332 /* radio_channel_registry_v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 1317F41437063B83C8936128 /* radio_channel_registry_v1.json */; };
 		90B7AE3977363612D175DFCE /* WeeklyRecapRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04E7CFD4D0CDDBC795F7E0B0 /* WeeklyRecapRenderTests.swift */; };
 		90C367ACA63848A6B9C37FB3 /* CarPlayLayerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD97B6AB13757DB3A869DC1 /* CarPlayLayerController.swift */; };
 		90E4AD9B1C5017530A3E09E1 /* SentinelleFollowersCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3F9188D592CBD95A39EFA6 /* SentinelleFollowersCard.swift */; };
@@ -352,7 +354,6 @@
 		B6FB2B5B1F6516981E6A8ACF /* RadioLogsSiteCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE0378DBCDC3C95B69153DE /* RadioLogsSiteCard.swift */; };
 		B8A85AD81CA49026682265E0 /* MapStores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 326E848B4ED2FD2F140691BE /* MapStores.swift */; };
 		B9D52362A2FFC61D1DC2E2B0 /* AppStoreSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 057F3D0D16C169E912292708 /* AppStoreSyncTests.swift */; };
-		B9D914603D37DA5EA0321A92 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = C70EBF0567FCA17824A1A272 /* GoogleService-Info.plist */; };
 		BA3FFF639F273E45CBB1D64D /* APIEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC51F8CACA66BE964E15F919 /* APIEndpoint.swift */; };
 		BA8A3EC30454B762CADD63FC /* SQUnits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83C9EF44824936928E504EF7 /* SQUnits.swift */; };
 		BB43E08A6DDF3E6F594B81FF /* AppLockController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3300B0156FFEE46C1CC81882 /* AppLockController.swift */; };
@@ -393,6 +394,7 @@
 		CD5F4C1007589144E693B08C /* AntennaProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55FD59340CD7E3743D7EF4B9 /* AntennaProfileView.swift */; };
 		CE1EF5972BC43FC3B9598D5D /* MapAccessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = D39C1D3B6CAAB2272A0E6B6C /* MapAccessibility.swift */; };
 		CE66573428F3BB839C2DF76B /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53842ADB5CE6AC861978B14B /* PaywallView.swift */; };
+		CF75B90E565F83CD57C5323C /* runtime-plmn-cases-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 766FB16A823E5BAC3F99F9E7 /* runtime-plmn-cases-v1.json */; };
 		CFBA45A0F84A42EAA877DE8A /* FeedTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F7194ED546885B8FCFAFCB /* FeedTab.swift */; };
 		D0A7A2B036271364A7174960 /* CoverageFocusAndFiveGTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE01721AE7EDEE86744D7C7 /* CoverageFocusAndFiveGTests.swift */; };
 		D1212A2119E013814872AB77 /* MessageComposerBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E9816756A77B99C80C56487 /* MessageComposerBar.swift */; };
@@ -419,6 +421,8 @@
 		DDEF72B8D9CD5FA74A298A1E /* SignalQuestHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E5F08C223344D06C67E166E /* SignalQuestHomeView.swift */; };
 		DE7E761954A694D48D39BE98 /* NearbyNetworkQualityDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD92F7CAEF5CE9D9F233D172 /* NearbyNetworkQualityDetailSheet.swift */; };
 		DF096DA80BE358FA48F3E8C4 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71F03A270597876371BF433F /* APIClient.swift */; };
+		DF9D71B9F79972D1DB15456F /* OutageNotificationReceiptContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA37D9C160F3F6937A793448 /* OutageNotificationReceiptContract.swift */; };
+		E0437A9ADD5EBC3A4C80A612 /* OutageNotificationReceiptContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA37D9C160F3F6937A793448 /* OutageNotificationReceiptContract.swift */; };
 		E0941F020DD3319E69F428FE /* SessionTraceMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31D4A2FC853B46DC0196738 /* SessionTraceMapView.swift */; };
 		E0F7A8B5651DD994F470B58F /* AccessibilityAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69209352F6F73BBA03F899CE /* AccessibilityAuditTests.swift */; };
 		E156E1B5171E02B1878DA63A /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F378A97EE08A97DD345A432F /* FeedView.swift */; };
@@ -458,6 +462,7 @@
 		F6D059FF3DD980E86732EA9C /* SocialExplore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D362F9FE8635499EBA4B5AD /* SocialExplore.swift */; };
 		F6EF1D45622D7CC867AF4F04 /* SpeedtestTriMetric.swift in Sources */ = {isa = PBXBuildFile; fileRef = 729C9DEBA4E8FC4DD397E20E /* SpeedtestTriMetric.swift */; };
 		F7CFE8B7F8498A974CD80BEC /* AccountSettingsQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21471D2C10A3FFD059193B78 /* AccountSettingsQATests.swift */; };
+		F82372A9E95087CCE4108332 /* radio_channel_registry_v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 1317F41437063B83C8936128 /* radio_channel_registry_v1.json */; };
 		F87A9373237B5F0AE131AA87 /* RadioLogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D767888C889FD28F3AA8DF /* RadioLogStore.swift */; };
 		F8990AF87CBFD65EE0F0EF56 /* AzimuthBeamGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3C35085148C3D31C62F37F3 /* AzimuthBeamGroupingTests.swift */; };
 		F988AD7664A31CFCFD9E94CA /* AntennaSectorGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3023383A4E568490429AE96 /* AntennaSectorGridView.swift */; };
@@ -467,12 +472,21 @@
 		FC00E6124A3556DA366FD4AE /* MessageRenderCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 375FEBD8DD79973A3821B193 /* MessageRenderCache.swift */; };
 		FC56E7C3FFDFBDBD65E65037 /* SQComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0078226636E735A7665D8A3 /* SQComponents.swift */; };
 		FCA0F934683B2BC6C982C8B8 /* DriveTestDataBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AE9139473E16EE1FB4FFE7 /* DriveTestDataBudgetTests.swift */; };
+		FD138DC8B007C51B00E95A22 /* OutageNotificationReceiptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFE20C5C158D1152BD31B74A /* OutageNotificationReceiptTests.swift */; };
 		FD8C8A4E55F6F7F937636C0E /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C14BE7BE1D4056FB4421D16 /* APIClientTests.swift */; };
 		FE06618978AF041B7C59E003 /* TypingDotsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D3298EDB2E0523439799250 /* TypingDotsView.swift */; };
+		FF3E0D68B4625D1B30F8797F /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 837BE028B595E4102320DD6F /* NotificationService.swift */; };
 		FF540CAB6E6C3889FAE0ED6C /* MapFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F08F6ECE4166CBD8CCC080 /* MapFeatures.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		2041D1163D16112C221F6C56 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AE3E2F829D274533D4E0B556 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 13DE19508C5112844FFA597A;
+			remoteInfo = SignalQuestNotificationService;
+		};
 		24AF22F87BBE171C83B6CBDD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = AE3E2F829D274533D4E0B556 /* Project object */;
@@ -504,6 +518,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				8D6A1FFFCEC4DF3C5D0246A9 /* SignalQuestWidget.appex in Embed Foundation Extensions */,
+				2F1B4FBE2F310019CA690D5F /* SignalQuestNotificationService.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -524,6 +539,7 @@
 		057F3D0D16C169E912292708 /* AppStoreSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreSyncTests.swift; sourceTree = "<group>"; };
 		067D3AF65AE57675EBBE798B /* CrashHardeningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashHardeningTests.swift; sourceTree = "<group>"; };
 		06CBBB2A485EB0E8C6DC23BB /* Figtree-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-Medium.ttf"; sourceTree = "<group>"; };
+		076CFD0CB1CB34BEB0F0E9C3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		0B9B5640F38ED77C1C34D499 /* CoverageRenderPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageRenderPolicyTests.swift; sourceTree = "<group>"; };
 		0BBEF6D66A51142E104DBD6B /* SignalQuestUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SignalQuestUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0CE1FA9C0AE5C296806B4C08 /* SQCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQCompat.swift; sourceTree = "<group>"; };
@@ -537,6 +553,7 @@
 		10228EB5F8E1022D2A64E804 /* StoryTypedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryTypedTests.swift; sourceTree = "<group>"; };
 		102DC9580336DD3FD9659049 /* ForcedUpdateQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForcedUpdateQATests.swift; sourceTree = "<group>"; };
 		109A301B55F7538F8267E4DB /* SocialFeedService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialFeedService.swift; sourceTree = "<group>"; };
+		1317F41437063B83C8936128 /* radio_channel_registry_v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = radio_channel_registry_v1.json; sourceTree = "<group>"; };
 		1483D87FE8E1D946F88F7C05 /* E2EETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EETests.swift; sourceTree = "<group>"; };
 		14E75516A87ED197A5BB4AB1 /* SQFriendMarkerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQFriendMarkerView.swift; sourceTree = "<group>"; };
 		1613623BA44BAF57928D049E /* DirectionsRequestHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectionsRequestHandler.swift; sourceTree = "<group>"; };
@@ -627,6 +644,7 @@
 		430454E901BFB79E1C37A0E2 /* SentinelleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleView.swift; sourceTree = "<group>"; };
 		4346B0324DBC983FC6001FF7 /* RadioLogsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogsTests.swift; sourceTree = "<group>"; };
 		43A01E23F145B917FF35CD53 /* MentionAutocompleteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionAutocompleteTests.swift; sourceTree = "<group>"; };
+		43A90D5D1E2D3F71AFB293F6 /* SignalQuestNotificationService.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SignalQuestNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		43F86F356FE7B0E322F9B79A /* RadioLogIdentifyPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogIdentifyPicker.swift; sourceTree = "<group>"; };
 		448DCE616E7442994EA5AED7 /* SpeedtestCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestCardView.swift; sourceTree = "<group>"; };
 		44C57A60CEC0CC1678EB3A77 /* QuickIdentifyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickIdentifyModels.swift; sourceTree = "<group>"; };
@@ -684,8 +702,6 @@
 		65484622445B106E95030CE3 /* AntennaReportThreadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaReportThreadView.swift; sourceTree = "<group>"; };
 		6570A8819FE179AAFE0B2546 /* NearbyOperatorStat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbyOperatorStat.swift; sourceTree = "<group>"; };
 		65CA75BF3F0519CFD6B732AE /* market_registry_fallback.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = market_registry_fallback.json; sourceTree = "<group>"; };
-		B09D80F46CCEBD936FD7DBC6 /* plmn_assignment_registry.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = plmn_assignment_registry.json; sourceTree = "<group>"; };
-		1317F41437063B83C8936128 /* radio_channel_registry_v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = radio_channel_registry_v1.json; sourceTree = "<group>"; };
 		65EBA6352C0FC36FBB95501E /* CoordinateGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoordinateGrid.swift; sourceTree = "<group>"; };
 		668760065DE520E85BAF4154 /* SQMapAnnotations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQMapAnnotations.swift; sourceTree = "<group>"; };
 		6690D2BFDE61AEB06C68B10A /* CarPlayMapTemplateBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayMapTemplateBuilder.swift; sourceTree = "<group>"; };
@@ -724,6 +740,7 @@
 		761DCC23E9E837925496D61E /* SpeedtestLiveActivityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestLiveActivityController.swift; sourceTree = "<group>"; };
 		763622AD001158FA3157D839 /* PhotoCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCardView.swift; sourceTree = "<group>"; };
 		764597B2F05EB51056FE2ECD /* SQOledPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQOledPalette.swift; sourceTree = "<group>"; };
+		766FB16A823E5BAC3F99F9E7 /* runtime-plmn-cases-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "runtime-plmn-cases-v1.json"; sourceTree = "<group>"; };
 		78913AE6513A3E22DD8F8B87 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		78F38B35680E7C99DE20288D /* ConversationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationModels.swift; sourceTree = "<group>"; };
 		7A46F0D8DF52ED42DAFFC731 /* CallHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallHistoryView.swift; sourceTree = "<group>"; };
@@ -749,6 +766,7 @@
 		8327BBD2C2D10A320833EC79 /* ANFRSiteDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRSiteDetailSheet.swift; sourceTree = "<group>"; };
 		8366DB9AD97C6EFE27467176 /* CallSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallSessionView.swift; sourceTree = "<group>"; };
 		837392435FEEACE677A0F0FF /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
+		837BE028B595E4102320DD6F /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		83991EBA39D411D1F2DE6744 /* NetworkPathDedupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPathDedupTests.swift; sourceTree = "<group>"; };
 		83C9EF44824936928E504EF7 /* SQUnits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQUnits.swift; sourceTree = "<group>"; };
 		846A05DBDA256496DC1A6AFF /* MapFilterCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapFilterCatalog.swift; sourceTree = "<group>"; };
@@ -767,6 +785,7 @@
 		89BA5EE9C0B99DE64018088D /* IPerfCatalogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPerfCatalogService.swift; sourceTree = "<group>"; };
 		8A4F1A6B2D39931723BEF026 /* NetworkWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkWidget.swift; sourceTree = "<group>"; };
 		8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEService.swift; sourceTree = "<group>"; };
+		8B6CF56AACB58DF8C8A52D98 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		8BCDF535985DE44CBDD88A60 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		8C0D9C041D8E61783255A67B /* AntennaCoverageFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaCoverageFocus.swift; sourceTree = "<group>"; };
 		8C1FE525B9AFAD0D19CB5A8F /* NearestAntennaTemplateBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearestAntennaTemplateBuilder.swift; sourceTree = "<group>"; };
@@ -833,6 +852,7 @@
 		B011EC6077C3E8E806D4F94C /* SpeedtestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestView.swift; sourceTree = "<group>"; };
 		B0421A119135C490C2075C09 /* SentinelleCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleCharts.swift; sourceTree = "<group>"; };
 		B070C4F0FF01A239CDF93570 /* CallReliabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallReliabilityTests.swift; sourceTree = "<group>"; };
+		B09D80F46CCEBD936FD7DBC6 /* plmn_assignment_registry.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = plmn_assignment_registry.json; sourceTree = "<group>"; };
 		B0E1077E22C2EA2D3D667108 /* RadioLogsTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogsTokens.swift; sourceTree = "<group>"; };
 		B0F61658994201B4CDE62F4B /* CustomSiteOutboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomSiteOutboxTests.swift; sourceTree = "<group>"; };
 		B1F4DC14B58C08DADF46E158 /* MapFilterStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapFilterStoreTests.swift; sourceTree = "<group>"; };
@@ -850,6 +870,7 @@
 		B65D805E20FB169DD0A865C6 /* TerrainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerrainService.swift; sourceTree = "<group>"; };
 		B87D924C6BBFE1B8AAD4790A /* SentinelleAddressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleAddressView.swift; sourceTree = "<group>"; };
 		B9D1FA2FF05990176A038D4C /* SQMapProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQMapProjection.swift; sourceTree = "<group>"; };
+		BA37D9C160F3F6937A793448 /* OutageNotificationReceiptContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutageNotificationReceiptContract.swift; sourceTree = "<group>"; };
 		BA923675E56186A1BD8D5B7F /* PostCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostCardView.swift; sourceTree = "<group>"; };
 		BAD900A2339E497AAAE14BF6 /* SQCompatMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQCompatMap.swift; sourceTree = "<group>"; };
 		BB08936D0A8B3C5FD7F535B0 /* StoriesBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoriesBar.swift; sourceTree = "<group>"; };
@@ -874,7 +895,6 @@
 		C5B4A61B546243ACDB9EAA06 /* Staging.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Staging.xcconfig; sourceTree = "<group>"; };
 		C6B3B3E33665A0D12EB2183E /* SQEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQEffects.swift; sourceTree = "<group>"; };
 		C6D04C87CE6B4E179FE38964 /* MapAccessibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAccessibilityTests.swift; sourceTree = "<group>"; };
-		C70EBF0567FCA17824A1A272 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		C74751AC2209AF843E92E6E5 /* TaRingSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaRingSelection.swift; sourceTree = "<group>"; };
 		C770C2B428D4F156C88972B0 /* SpeedtestDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestDetailSheet.swift; sourceTree = "<group>"; };
 		C82A89658CFF511C4133BD31 /* NetworkPulseHero.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPulseHero.swift; sourceTree = "<group>"; };
@@ -940,6 +960,7 @@
 		EF1CBBB47AF9B0D1E7B04560 /* TerritoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerritoryTests.swift; sourceTree = "<group>"; };
 		EF6835ADAA41625A09DC3013 /* PollBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollBubble.swift; sourceTree = "<group>"; };
 		EF9C1283557A05B7D11B8231 /* LayersGridBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayersGridBuilder.swift; sourceTree = "<group>"; };
+		EFE20C5C158D1152BD31B74A /* OutageNotificationReceiptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutageNotificationReceiptTests.swift; sourceTree = "<group>"; };
 		F031B14E382FDADDEAEFECE1 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		F1DBE566F150964A2AF9D0EE /* AntennaPhotoQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaPhotoQATests.swift; sourceTree = "<group>"; };
 		F1E8601B1C76C24BA49EBF1C /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
@@ -976,6 +997,7 @@
 		FD5D954E6102D732D621D8E6 /* SessionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionModels.swift; sourceTree = "<group>"; };
 		FD7AF3FD3C9A5C4D2280D2B5 /* SavedMessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedMessagesView.swift; sourceTree = "<group>"; };
 		FD898C39E347EA8BD1B9BFDE /* CarPlayDashboardRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayDashboardRoute.swift; sourceTree = "<group>"; };
+		FE041E6C4F611EA60BD37F9C /* OutageNotificationReceiptSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutageNotificationReceiptSender.swift; sourceTree = "<group>"; };
 		FEC15F91372B4EEA2DEA65E6 /* AppServicesHolder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServicesHolder.swift; sourceTree = "<group>"; };
 		FF6243FADB2D8B644F4E836E /* SpeedtestLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestLiveActivity.swift; sourceTree = "<group>"; };
 		FF6741C3A6C32E6A351617E7 /* DriveTestMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveTestMapView.swift; sourceTree = "<group>"; };
@@ -1231,6 +1253,14 @@
 			path = CarPlay;
 			sourceTree = "<group>";
 		};
+		2C1EF38A26E3E3B4261EAFC0 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				766FB16A823E5BAC3F99F9E7 /* runtime-plmn-cases-v1.json */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
 		2CF9814C78DFAFB55BBAA3EC /* Conversation */ = {
 			isa = PBXGroup;
 			children = (
@@ -1278,7 +1308,6 @@
 			children = (
 				78913AE6513A3E22DD8F8B87 /* AppConfig.swift */,
 				F031B14E382FDADDEAEFECE1 /* AppEnvironment.swift */,
-				C70EBF0567FCA17824A1A272 /* GoogleService-Info.plist */,
 				BBEA8942969B9394C2019221 /* Info.plist */,
 				3B1F180671AE87E17BF1EC7A /* LaunchLoadingView.swift */,
 				F46B89349A48401E7563977C /* SignalQuestApp.swift */,
@@ -1350,8 +1379,8 @@
 				5E552A9B78EBBE744667DDC4 /* market_location_areas.json */,
 				65CA75BF3F0519CFD6B732AE /* market_registry_fallback.json */,
 				B09D80F46CCEBD936FD7DBC6 /* plmn_assignment_registry.json */,
-				1317F41437063B83C8936128 /* radio_channel_registry_v1.json */,
 				3208FA15F4116CDD6FB4BF47 /* PrivacyInfo.xcprivacy */,
+				1317F41437063B83C8936128 /* radio_channel_registry_v1.json */,
 				B6B90FAF0243EC4626DC776B /* Fonts */,
 			);
 			path = Resources;
@@ -1447,6 +1476,7 @@
 			isa = PBXGroup;
 			children = (
 				A6E1EF0479FCED5DDDEC9CBB /* SignalQuest.app */,
+				43A90D5D1E2D3F71AFB293F6 /* SignalQuestNotificationService.appex */,
 				D7454A1BEDAD17CEBB961A3D /* SignalQuestTests.xctest */,
 				0BBEF6D66A51142E104DBD6B /* SignalQuestUITests.xctest */,
 				2A5251F96893CB76BAAC1239 /* SignalQuestWidget.appex */,
@@ -1486,6 +1516,7 @@
 			children = (
 				43D7995ACD1857460BE8E718 /* Config */,
 				3805CFB8F9BFAA7D869DDF08 /* SignalQuestApp */,
+				82263710C9E64162432698CE /* SignalQuestNotificationService */,
 				DFEE52FF944D70A5C57A7E12 /* SignalQuestTests */,
 				7AF292E443FD86F6B602A9E6 /* SignalQuestUITests */,
 				E626C88F57DD69C3C24E4350 /* SignalQuestWidget */,
@@ -1540,6 +1571,17 @@
 				4841F25C76693497780EE838 /* CommentsSheet.swift */,
 			);
 			path = Comments;
+			sourceTree = "<group>";
+		};
+		82263710C9E64162432698CE /* SignalQuestNotificationService */ = {
+			isa = PBXGroup;
+			children = (
+				076CFD0CB1CB34BEB0F0E9C3 /* Info.plist */,
+				837BE028B595E4102320DD6F /* NotificationService.swift */,
+				FE041E6C4F611EA60BD37F9C /* OutageNotificationReceiptSender.swift */,
+				8B6CF56AACB58DF8C8A52D98 /* PrivacyInfo.xcprivacy */,
+			);
+			path = SignalQuestNotificationService;
 			sourceTree = "<group>";
 		};
 		8684458502820A141A481225 /* Reports */ = {
@@ -1652,6 +1694,7 @@
 		BB6D3748B70B451133A8301F /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				BA37D9C160F3F6937A793448 /* OutageNotificationReceiptContract.swift */,
 				5E5547A4163714BB45440475 /* WidgetSharedStore.swift */,
 			);
 			path = Shared;
@@ -1837,6 +1880,7 @@
 				D6FFA250C4BE27D4200678E2 /* ModelDecodeTests.swift */,
 				83991EBA39D411D1F2DE6744 /* NetworkPathDedupTests.swift */,
 				4A30FBE643735E6E375B3948 /* NewModelDecodeTests.swift */,
+				EFE20C5C158D1152BD31B74A /* OutageNotificationReceiptTests.swift */,
 				6152347A6C95B7293AB82BFB /* PluralVariationTests.swift */,
 				0EC633C9F535F07BBC79CB8E /* PollDecodingTests.swift */,
 				4346B0324DBC983FC6001FF7 /* RadioLogsTests.swift */,
@@ -1863,6 +1907,7 @@
 				2DD37884E4B468579B8A6FA7 /* VersionPolicyTests.swift */,
 				BB51DC058DA958E716B621C2 /* VoiceNoteTests.swift */,
 				04E7CFD4D0CDDBC795F7E0B0 /* WeeklyRecapRenderTests.swift */,
+				2C1EF38A26E3E3B4261EAFC0 /* Fixtures */,
 			);
 			path = SignalQuestTests;
 			sourceTree = "<group>";
@@ -2012,11 +2057,30 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		13DE19508C5112844FFA597A /* SignalQuestNotificationService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 35AD71BD4B4F18B694732ADA /* Build configuration list for PBXNativeTarget "SignalQuestNotificationService" */;
+			buildPhases = (
+				CD7F1E747237D2AAC7BF27BD /* Sources */,
+				5C2D513FC39C963DFE30C872 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SignalQuestNotificationService;
+			packageProductDependencies = (
+			);
+			productName = SignalQuestNotificationService;
+			productReference = 43A90D5D1E2D3F71AFB293F6 /* SignalQuestNotificationService.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		27D68F01D65D0B4BB086ADB6 /* SignalQuestTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 7177C6E059156684826C8F26 /* Build configuration list for PBXNativeTarget "SignalQuestTests" */;
 			buildPhases = (
 				8D33EE3F6AF4DC10D61EDCB7 /* Sources */,
+				24EABD3F61403982A374F04C /* Resources */,
 			);
 			buildRules = (
 			);
@@ -2039,12 +2103,14 @@
 				F02B3DC4F972A46E5907DC8D /* Resources */,
 				095C7997E533FDC4D69340AA /* Frameworks */,
 				7C68F404F72BA28EAD35527B /* Embed Foundation Extensions */,
+				D7C86E33D013622410772EE6 /* Embed Firebase Config When Available */,
 				5416E7D8A46C396DA18282B4 /* Upload Crashlytics dSYM */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				F35D680A1CF25344E4E34951 /* PBXTargetDependency */,
+				CF300E65AD6D54EB29C7360E /* PBXTargetDependency */,
 			);
 			name = SignalQuest;
 			packageProductDependencies = (
@@ -2101,6 +2167,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					13DE19508C5112844FFA597A = {
+						DevelopmentTeam = 835X2977R7;
+						ProvisioningStyle = Automatic;
+					};
 					27D68F01D65D0B4BB086ADB6 = {
 						DevelopmentTeam = 835X2977R7;
 						ProvisioningStyle = Automatic;
@@ -2139,6 +2209,7 @@
 			projectRoot = "";
 			targets = (
 				9023B26AAE2BC6AEEBAC8CE6 /* SignalQuest */,
+				13DE19508C5112844FFA597A /* SignalQuestNotificationService */,
 				27D68F01D65D0B4BB086ADB6 /* SignalQuestTests */,
 				F0008CBF468668149A9A5EA6 /* SignalQuestUITests */,
 				CD7D689ABD04AE8BCC254A5A /* SignalQuestWidget */,
@@ -2156,6 +2227,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		24EABD3F61403982A374F04C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CF75B90E565F83CD57C5323C /* runtime-plmn-cases-v1.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5C2D513FC39C963DFE30C872 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				06A069B6A8253A0BBDBBBF48 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F02B3DC4F972A46E5907DC8D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -2167,7 +2254,6 @@
 				14EAB8C4698346A19781589C /* Figtree-Medium.ttf in Resources */,
 				0D300C2A9A425CA8A494389A /* Figtree-Regular.ttf in Resources */,
 				F5183A37CF89DF7712712BE0 /* Figtree-SemiBold.ttf in Resources */,
-				B9D914603D37DA5EA0321A92 /* GoogleService-Info.plist in Resources */,
 				73A4CCE6AB8692CB266C16F2 /* InfoPlist.xcstrings in Resources */,
 				CCCF8B32E6D0D5F519DAC4A0 /* JetBrainsMono-Variable.ttf in Resources */,
 				E827390EFC16EED7902FC752 /* Localizable.xcstrings in Resources */,
@@ -2201,7 +2287,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "#!/bin/sh\n\n# Téléverse les symboles de debug (dSYM) vers Crashlytics après compilation.\n#\n# Sans cette étape, les rapports de crash arrivent NON SYMBOLISÉS : on obtient\n# des adresses mémoire au lieu de noms de fonctions, ce qui les rend\n# inexploitables. C'est l'oubli classique d'une intégration Crashlytics.\n#\n# Le script est volontairement tolérant : il sort en succès (avec un warning\n# visible dans le log de build) plutôt que de casser le build quand les\n# conditions ne sont pas réunies. Un contributeur sans `GoogleService-Info.plist`\n# — le fichier est gitignoré, cf. AppDelegate — doit pouvoir compiler.\n\nset -eu\n\nconfiguration=\"${CONFIGURATION:-}\"\n\nskip() {\n  echo \"warning: upload dSYM Crashlytics ignoré — $*\"\n  exit 0\n}\n\n# Debug produit `dwarf` sans bundle dSYM (cf. DEBUG_INFORMATION_FORMAT) : rien à\n# téléverser, et on évite un appel réseau à chaque compilation locale.\n[ \"$configuration\" != \"Debug\" ] || exit 0\n\nplist=\"${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist\"\n[ -f \"$plist\" ] || skip \"GoogleService-Info.plist absent\"\n\n# Le SDK est résolu par SwiftPM ; son emplacement dérive de BUILD_DIR.\nrun=\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\n[ -x \"$run\" ] || skip \"script Crashlytics introuvable ($run)\"\n\ndsym=\"${DWARF_DSYM_FOLDER_PATH:-}/${DWARF_DSYM_FILE_NAME:-}\"\n[ -d \"$dsym\" ] || skip \"bundle dSYM introuvable ($dsym)\"\n\n\"$run\" -gsp \"$plist\"\necho \"dSYM Crashlytics téléversés ($configuration).\"\n";
+			shellScript = "#!/bin/sh\n\n# Téléverse les symboles de debug (dSYM) vers Crashlytics après compilation.\n#\n# Sans cette étape, les rapports de crash arrivent NON SYMBOLISÉS : on obtient\n# des adresses mémoire au lieu de noms de fonctions, ce qui les rend\n# inexploitables. C'est l'oubli classique d'une intégration Crashlytics.\n#\n# Le script est volontairement tolérant : il sort en succès (avec un warning\n# visible dans le log de build) plutôt que de casser le build quand les\n# conditions ne sont pas réunies. Un contributeur sans `GoogleService-Info.plist`\n# — le fichier est gitignoré, cf. AppDelegate — doit pouvoir compiler.\n\nset -eu\n\nconfiguration=\"${CONFIGURATION:-}\"\nplatform=\"${PLATFORM_NAME:-}\"\n\nskip() {\n  echo \"warning: upload dSYM Crashlytics ignoré — $*\"\n  exit 0\n}\n\n# Debug produit `dwarf` sans bundle dSYM (cf. DEBUG_INFORMATION_FORMAT) : rien à\n# téléverser, et on évite un appel réseau à chaque compilation locale.\n[ \"$configuration\" != \"Debug\" ] || exit 0\n\n# Un dSYM de simulateur ne peut symboliser aucun crash d'un iPhone et pollue le\n# projet Crashlytics. Les builds Release locaux doivent donc rester hors ligne.\ncase \"$platform\" in\n  *simulator*) exit 0 ;;\nesac\n\nplist=\"${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist\"\n[ -f \"$plist\" ] || skip \"GoogleService-Info.plist absent\"\n\n# Le SDK est résolu par SwiftPM ; son emplacement dérive de BUILD_DIR.\nrun=\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\n[ -x \"$run\" ] || skip \"script Crashlytics introuvable ($run)\"\n\ndsym=\"${DWARF_DSYM_FOLDER_PATH:-}/${DWARF_DSYM_FILE_NAME:-}\"\n[ -d \"$dsym\" ] || skip \"bundle dSYM introuvable ($dsym)\"\n\n\"$run\" -gsp \"$plist\"\necho \"dSYM Crashlytics téléversés ($configuration).\"\n";
 		};
 		B222421102940D0D56C87D7C /* Validate Build Environment */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -2221,6 +2307,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "#!/bin/sh\n\n# Fail closed when a Beta points to production or when a distribution build\n# still contains placeholder staging services. Xcode invokes this as a build\n# phase; it can also be called directly with build-setting overrides.\n\nset -eu\n\nconfiguration=\"${CONFIGURATION:-}\"\nenvironment=\"${SQ_ENVIRONMENT:-}\"\nbundle_id=\"${PRODUCT_BUNDLE_IDENTIFIER:-}\"\n\nfail() {\n  echo \"error: SignalQuest environment validation failed: $*\" >&2\n  exit 1\n}\n\nurl_host() {\n  printf '%s' \"$1\" | sed -E 's#^[A-Za-z][A-Za-z0-9+.-]*://([^/:]+).*$#\\1#' | tr '[:upper:]' '[:lower:]'\n}\n\nis_production_host() {\n  case \"$1\" in\n    signalquest.fr|api.signalquest.fr) return 0 ;;\n    *) return 1 ;;\n  esac\n}\n\nvalidate_url() {\n  key=\"$1\"\n  value=\"$2\"\n  [ -n \"$value\" ] || fail \"$key is empty\"\n  host=\"$(url_host \"$value\")\"\n  [ -n \"$host\" ] || fail \"$key is not an absolute URL\"\n\n  if [ \"$environment\" = \"staging\" ]; then\n    is_production_host \"$host\" && fail \"$key points to production ($host)\"\n    case \"$host\" in\n      *.invalid) [ \"${SQ_ALLOW_PLACEHOLDER_STAGING:-NO}\" = \"YES\" ] || fail \"$key still uses placeholder host $host\" ;;\n    esac\n  fi\n}\n\ncase \"$configuration\" in\n  Staging)\n    [ \"$environment\" = \"staging\" ] || fail \"Staging configuration must set SQ_ENVIRONMENT=staging\"\n    [ \"$bundle_id\" = \"fr.signalquest.ios.beta\" ] || fail \"Staging bundle identifier must be fr.signalquest.ios.beta\"\n    ;;\n  Release)\n    [ \"$environment\" = \"production\" ] || fail \"Release configuration must set SQ_ENVIRONMENT=production\"\n    [ \"$bundle_id\" = \"fr.signalquest.ios\" ] || fail \"Release bundle identifier must be fr.signalquest.ios\"\n    ;;\n  Debug)\n    [ \"$environment\" = \"development\" ] || fail \"Debug configuration must set SQ_ENVIRONMENT=development\"\n    ;;\nesac\n\nvalidate_url SQ_APP_BASE_URL \"${SQ_APP_BASE_URL:-}\"\nvalidate_url SQ_API_BASE_URL \"${SQ_API_BASE_URL:-}\"\n\n# --- Garde-fou anti-récidive sur le code QA (SECURITY-04) -------------------\n# Un binaire de distribution ne doit contenir ni jeu de démonstration (URLs S3\n# et identifiants de photos de PRODUCTION, amis fictifs) ni lecture d'argument\n# de lancement hors des accesseurs gardés d'AppEnvironment. Deux invariants,\n# vérifiés sur les sources parce qu'ils sont structurels et donc stables :\n#   1. `ProcessInfo.processInfo.arguments` et le préfixe `--qa-` n'existent que\n#      dans AppEnvironment.swift, où ils sont derrière #if DEBUG ;\n#   2. aucune URL S3 hors d'une région #if DEBUG.\nif [ \"$configuration\" != \"Debug\" ]; then\n  sources=\"${SRCROOT:-.}/SignalQuestApp\"\n\n  # `code_hits` ignore les lignes de commentaire : documenter un drapeau dans un\n  # doc-comment est légitime, seul le code compilé compte.\n  code_hits() {\n    grep -rn \"$1\" \"$sources\" --include='*.swift' 2>/dev/null \\\n      | grep -v '^[^:]*/AppEnvironment\\.swift:' \\\n      | awk -F: '{ line=$0; sub(/^[^:]*:[0-9]+:[[:space:]]*/, \"\", line); if (line !~ /^(\\/\\/|\\*|\\/\\*)/) print $1 \":\" $2 }' \\\n      || true\n  }\n\n  strays=\"$(code_hits 'ProcessInfo\\.processInfo\\.arguments')\"\n  [ -z \"$strays\" ] || fail \"lecture d'arguments de lancement hors AppEnvironment : $(echo \"$strays\" | tr '\\n' ' ')\"\n\n  strays=\"$(code_hits '\"--qa-')\"\n  [ -z \"$strays\" ] || fail \"drapeau --qa- référencé dans du code hors AppEnvironment : $(echo \"$strays\" | tr '\\n' ' ')\"\n\n  # Suit l'imbrication des directives pour ne signaler que ce qui est réellement\n  # compilé en distribution (le corps d'un #else de #if DEBUG en fait partie).\n  leaks=\"$(find \"$sources\" -name '*.swift' -exec awk '\n    /^[[:space:]]*#if[[:space:]]+DEBUG/ { stack[++d]=\"D\"; next }\n    /^[[:space:]]*#if/                  { stack[++d]=\"O\"; next }\n    /^[[:space:]]*#else/                { if (d>0 && stack[d]==\"D\") stack[d]=\"E\"; next }\n    /^[[:space:]]*#endif/               { if (d>0) d--; next }\n    {\n      inDebug=0\n      for (i=1;i<=d;i++) if (stack[i]==\"D\") inDebug=1\n      if (!inDebug && $0 ~ /s3\\.signalquest\\.fr/) print FILENAME \":\" FNR\n    }' {} + 2>/dev/null || true)\"\n  [ -z \"$leaks\" ] || fail \"URL S3 de production hors #if DEBUG : $(echo \"$leaks\" | tr '\\n' ' ')\"\nfi\n\nif [ \"$environment\" = \"staging\" ] && [ -f \"${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist\" ]; then\n  firebase_bundle=\"$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' \"${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist\" 2>/dev/null || true)\"\n  [ \"$firebase_bundle\" = \"$bundle_id\" ] || fail \"Firebase BUNDLE_ID does not match the Beta bundle identifier\"\nfi\n\necho \"SignalQuest environment validation passed ($configuration/$environment).\"\n";
+		};
+		D7C86E33D013622410772EE6 /* Embed Firebase Config When Available */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/SignalQuestApp/GoogleService-Info.plist",
+			);
+			name = "Embed Firebase Config When Available";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "#!/bin/sh\n\n# Le plist Firebase est injecté après le clone par Xcode Cloud et reste absent du\n# dépôt public. Une phase Resources statique rendrait donc tout checkout propre\n# impossible à compiler. Cette phase l'embarque quand il existe et conserve le\n# mode dégradé explicite d'AppDelegate dans le cas contraire.\n\nset -eu\n\nsource_plist=\"${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist\"\nresources_dir=\"${TARGET_BUILD_DIR:-}/${UNLOCALIZED_RESOURCES_FOLDER_PATH:-}\"\n\nif [ -f \"$source_plist\" ]; then\n  mkdir -p \"$resources_dir\"\n  cp \"$source_plist\" \"$resources_dir/GoogleService-Info.plist\"\n  echo \"Firebase config embedded.\"\nelse\n  rm -f \"$resources_dir/GoogleService-Info.plist\"\n  echo \"warning: GoogleService-Info.plist absent; Firebase push and Crashlytics stay disabled.\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -2405,6 +2512,7 @@
 				0DD3B85611F5F819C718E67D /* OutageCardView.swift in Sources */,
 				4AD407D0ECC09A2E4AEB9EEE /* OutageDetailSheet.swift in Sources */,
 				89312E3413AAE9331D2B875D /* OutageImpactControls.swift in Sources */,
+				E0437A9ADD5EBC3A4C80A612 /* OutageNotificationReceiptContract.swift in Sources */,
 				D51CA3CADE6EFF922EB818EC /* OutageRadioCaptureBuilder.swift in Sources */,
 				25E837E1D183E0A1A119E464 /* OutageReportSheet.swift in Sources */,
 				4F4A0A1D8A0F7F304088B1B4 /* OutageThreadSection.swift in Sources */,
@@ -2650,6 +2758,7 @@
 				15606EDE03FC5483778DB980 /* ModelDecodeTests.swift in Sources */,
 				D6CEFBA50FB780C0C6B045ED /* NetworkPathDedupTests.swift in Sources */,
 				8027C2DE7425912942340D4B /* NewModelDecodeTests.swift in Sources */,
+				FD138DC8B007C51B00E95A22 /* OutageNotificationReceiptTests.swift in Sources */,
 				2A2F82E9AFE1A042BD7029F8 /* PluralVariationTests.swift in Sources */,
 				50E49C94546FE494CB10E1F4 /* PollDecodingTests.swift in Sources */,
 				E1B2D16B328B500C0B3E1E1E /* RadioLogsTests.swift in Sources */,
@@ -2693,6 +2802,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CD7F1E747237D2AAC7BF27BD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FF3E0D68B4625D1B30F8797F /* NotificationService.swift in Sources */,
+				DF9D71B9F79972D1DB15456F /* OutageNotificationReceiptContract.swift in Sources */,
+				6A343C8DC4FE3027B1A83E62 /* OutageNotificationReceiptSender.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -2705,6 +2824,11 @@
 			isa = PBXTargetDependency;
 			target = 9023B26AAE2BC6AEEBAC8CE6 /* SignalQuest */;
 			targetProxy = C66E8D3163ABD24F53C4456C /* PBXContainerItemProxy */;
+		};
+		CF300E65AD6D54EB29C7360E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 13DE19508C5112844FFA597A /* SignalQuestNotificationService */;
+			targetProxy = 2041D1163D16112C221F6C56 /* PBXContainerItemProxy */;
 		};
 		F35D680A1CF25344E4E34951 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -2719,7 +2843,7 @@
 			baseConfigurationReference = C5B4A61B546243ACDB9EAA06 /* Staging.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 75;
 				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -2741,7 +2865,7 @@
 			baseConfigurationReference = 53482F595BA7C9973BE76955 /* Debug.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 75;
 				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -2843,6 +2967,27 @@
 			};
 			name = Debug;
 		};
+		5ADE5424B6589F3E3A9418B7 /* Staging */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C5B4A61B546243ACDB9EAA06 /* Staging.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CURRENT_PROJECT_VERSION = 75;
+				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "fr.signalquest.ios.beta.notification-service";
+				PRODUCT_NAME = SignalQuestNotificationService;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Staging;
+		};
 		67090B696006A7721A40EE3C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 53482F595BA7C9973BE76955 /* Debug.xcconfig */;
@@ -2868,7 +3013,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 75;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2889,7 +3034,7 @@
 			baseConfigurationReference = 0412AAD8AE4FABC8AFE66ADE /* Release.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 75;
 				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -2991,7 +3136,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 75;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3043,6 +3188,48 @@
 			};
 			name = Staging;
 		};
+		C6FC47FDDF2C5E5EC218989E /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0412AAD8AE4FABC8AFE66ADE /* Release.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CURRENT_PROJECT_VERSION = 75;
+				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "fr.signalquest.ios.notification-service";
+				PRODUCT_NAME = SignalQuestNotificationService;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D4B6AC90FCC07A7267E375E2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 53482F595BA7C9973BE76955 /* Debug.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CURRENT_PROJECT_VERSION = 75;
+				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "fr.signalquest.ios.notification-service";
+				PRODUCT_NAME = SignalQuestNotificationService;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		E7C33E9907B3DCF88F969303 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 53482F595BA7C9973BE76955 /* Debug.xcconfig */;
@@ -3050,7 +3237,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 75;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3153,6 +3340,16 @@
 				3EDF074135F794207D52150C /* Debug */,
 				85660F9EE7DEC1999D101644 /* Release */,
 				05576890912DC0B149E7B14B /* Staging */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		35AD71BD4B4F18B694732ADA /* Build configuration list for PBXNativeTarget "SignalQuestNotificationService" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D4B6AC90FCC07A7267E375E2 /* Debug */,
+				C6FC47FDDF2C5E5EC218989E /* Release */,
+				5ADE5424B6589F3E3A9418B7 /* Staging */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

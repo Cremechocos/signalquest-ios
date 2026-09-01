@@ -3,6 +3,10 @@ import UIKit
 import UserNotifications
 import os
 
+private struct OutageNotificationReceiptResponse: Decodable {
+    let ok: Bool?
+}
+
 struct InstallationIdentity: Sendable {
     private enum Key {
         static let deviceID = "installation.device-id"
@@ -123,6 +127,31 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
         logger.error("APNs registration failed: \(error.localizedDescription, privacy: .public)")
     }
 
+    @discardableResult
+    func acknowledgeOutageNotification(_ info: [AnyHashable: Any], state: String) async -> Bool {
+        guard let receipt = OutageNotificationReceiptPayload.parse(info, state: state) else {
+            return false
+        }
+        return await acknowledgeOutageNotification(id: receipt.id, payload: receipt.payload)
+    }
+
+    @discardableResult
+    private func acknowledgeOutageNotification(
+        id: String,
+        payload: OutageNotificationReceiptPayload
+    ) async -> Bool {
+        do {
+            let _: OutageNotificationReceiptResponse = try await api.requestJSON(
+                "/api/community-outages/notifications/\(id)/receipt",
+                body: payload
+            )
+            return true
+        } catch {
+            logger.warning("Outage notification receipt failed: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
+    }
+
     /// Called on logout/account deletion so this device stops receiving pushes for
     /// the previous account. Unregisters locally and best-effort revokes the token
     /// server-side, then clears the badge.
@@ -156,8 +185,14 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
 extension PushNotificationService: UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        let info = notification.request.content.userInfo
+        if let receipt = OutageNotificationReceiptPayload.parse(info, state: "received") {
+            Task { [weak self, receipt] in
+                _ = await self?.acknowledgeOutageNotification(id: receipt.id, payload: receipt.payload)
+            }
+        }
         // Show alerts even when foreground.
-        [.banner, .sound, .badge]
+        return [.banner, .sound, .badge]
     }
 
     /// Cible du lien « Réglages de notifications » exposé par iOS grâce à l'option
@@ -192,6 +227,7 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
             self.router.handle(type: type, conversationId: conversationId, postId: postId, userId: userId, siteId: siteId, reportId: reportId, targetId: targetId, outageId: outageId)
             UNUserNotificationCenter.current().setBadgeCountCompat(0)
         }
+        _ = await acknowledgeOutageNotification(info, state: "opened")
     }
 }
 

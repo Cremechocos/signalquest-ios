@@ -105,7 +105,7 @@ targets:
         # SignalQuestWidget — Apple rejette une extension dont la version diffère
         # de l'app hôte.
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "75"
       configs:
         Staging:
           PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.beta
@@ -114,6 +114,13 @@ targets:
         path: ci_scripts/validate_build_environment.sh
         basedOnDependencyAnalysis: false
     postBuildScripts:
+      - name: Embed Firebase Config When Available
+        path: ci_scripts/embed_firebase_config.sh
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(SRCROOT)/SignalQuestApp/GoogleService-Info.plist
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist
       # Sans upload des dSYM, les rapports Crashlytics arrivent non symbolisés
       # (adresses mémoire au lieu de noms de fonctions) et sont inexploitables.
       # Phase de FIN de build (et non postCompile) : les dSYM et l'Info.plist
@@ -140,6 +147,35 @@ targets:
       # Extension widget (embarquée dans l'app).
       - target: SignalQuestWidget
         embed: true
+      # Transforme les pushes de panne en reçus observables même si l'app est tuée.
+      - target: SignalQuestNotificationService
+        embed: true
+  SignalQuestNotificationService:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: SignalQuestNotificationService
+        excludes:
+          - PrivacyInfo.xcprivacy
+      - path: SignalQuestNotificationService/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      - path: SignalQuestApp/Core/Shared/OutageNotificationReceiptContract.swift
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Staging: Config/Staging.xcconfig
+      Release: Config/Release.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.notification-service
+        PRODUCT_NAME: SignalQuestNotificationService
+        INFOPLIST_FILE: SignalQuestNotificationService/Info.plist
+        APPLICATION_EXTENSION_API_ONLY: YES
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "75"
+      configs:
+        Staging:
+          PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.beta.notification-service
   SignalQuestWidget:
     type: app-extension
     platform: iOS
@@ -179,7 +215,7 @@ targets:
         PRODUCT_NAME: SignalQuestWidget
         CODE_SIGN_ENTITLEMENTS: SignalQuestWidget/SignalQuestWidget.entitlements
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "75"
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
       configs:
         Staging:
