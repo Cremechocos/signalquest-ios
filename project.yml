@@ -50,6 +50,9 @@ targets:
           # Config/Local.xcconfig et .gitignore). Sans le glob, XcodeGen
           # l'ajouterait aux sources compilées de la cible.
           - "*.entitlements"
+          # Injecté uniquement par le script optionnel ci-dessous. L'inclure aussi
+          # comme ressource crée deux commandes de copie lors d'une archive.
+          - GoogleService-Info.plist
       - path: SignalQuestApp/Resources/Assets.xcassets
         buildPhase: resources
       - path: SignalQuestApp/Resources/PrivacyInfo.xcprivacy
