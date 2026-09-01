@@ -37,6 +37,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>$(SQ_URL_SCHEME)</string>
+				<string>geo-navigation</string>
 			</array>
 		</dict>
 	</array>

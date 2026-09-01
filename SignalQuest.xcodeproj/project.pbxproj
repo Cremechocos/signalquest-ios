@@ -372,6 +372,7 @@
 		B6FB2B5B1F6516981E6A8ACF /* RadioLogsSiteCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE0378DBCDC3C95B69153DE /* RadioLogsSiteCard.swift */; };
 		B8A85AD81CA49026682265E0 /* MapStores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 326E848B4ED2FD2F140691BE /* MapStores.swift */; };
 		B9D52362A2FFC61D1DC2E2B0 /* AppStoreSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 057F3D0D16C169E912292708 /* AppStoreSyncTests.swift */; };
+		B9D914603D37DA5EA0321A92 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = C70EBF0567FCA17824A1A272 /* GoogleService-Info.plist */; };
 		BA3FFF639F273E45CBB1D64D /* APIEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC51F8CACA66BE964E15F919 /* APIEndpoint.swift */; };
 		BA8A3EC30454B762CADD63FC /* SQUnits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83C9EF44824936928E504EF7 /* SQUnits.swift */; };
 		BB43E08A6DDF3E6F594B81FF /* AppLockController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3300B0156FFEE46C1CC81882 /* AppLockController.swift */; };
@@ -944,6 +945,7 @@
 		C5B4A61B546243ACDB9EAA06 /* Staging.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Staging.xcconfig; sourceTree = "<group>"; };
 		C6B3B3E33665A0D12EB2183E /* SQEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQEffects.swift; sourceTree = "<group>"; };
 		C6D04C87CE6B4E179FE38964 /* MapAccessibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAccessibilityTests.swift; sourceTree = "<group>"; };
+		C70EBF0567FCA17824A1A272 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		C74751AC2209AF843E92E6E5 /* TaRingSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaRingSelection.swift; sourceTree = "<group>"; };
 		C770C2B428D4F156C88972B0 /* SpeedtestDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestDetailSheet.swift; sourceTree = "<group>"; };
 		C82A89658CFF511C4133BD31 /* NetworkPulseHero.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPulseHero.swift; sourceTree = "<group>"; };
@@ -1364,6 +1366,7 @@
 			children = (
 				78913AE6513A3E22DD8F8B87 /* AppConfig.swift */,
 				F031B14E382FDADDEAEFECE1 /* AppEnvironment.swift */,
+				C70EBF0567FCA17824A1A272 /* GoogleService-Info.plist */,
 				BBEA8942969B9394C2019221 /* Info.plist */,
 				3B1F180671AE87E17BF1EC7A /* LaunchLoadingView.swift */,
 				F46B89349A48401E7563977C /* SignalQuestApp.swift */,
@@ -2334,6 +2337,7 @@
 				14EAB8C4698346A19781589C /* Figtree-Medium.ttf in Resources */,
 				0D300C2A9A425CA8A494389A /* Figtree-Regular.ttf in Resources */,
 				F5183A37CF89DF7712712BE0 /* Figtree-SemiBold.ttf in Resources */,
+				B9D914603D37DA5EA0321A92 /* GoogleService-Info.plist in Resources */,
 				73A4CCE6AB8692CB266C16F2 /* InfoPlist.xcstrings in Resources */,
 				CCCF8B32E6D0D5F519DAC4A0 /* JetBrainsMono-Variable.ttf in Resources */,
 				E827390EFC16EED7902FC752 /* Localizable.xcstrings in Resources */,
@@ -2950,7 +2954,7 @@
 			baseConfigurationReference = C5B4A61B546243ACDB9EAA06 /* Staging.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
-				CURRENT_PROJECT_VERSION = 75;
+				CURRENT_PROJECT_VERSION = 140;
 				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -2972,7 +2976,7 @@
 			baseConfigurationReference = 53482F595BA7C9973BE76955 /* Debug.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
-				CURRENT_PROJECT_VERSION = 75;
+				CURRENT_PROJECT_VERSION = 140;
 				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -3080,7 +3084,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestNotificationService/SignalQuestNotificationService.entitlements;
-				CURRENT_PROJECT_VERSION = 75;
+				CURRENT_PROJECT_VERSION = 140;
 				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3121,7 +3125,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 75;
+				CURRENT_PROJECT_VERSION = 140;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3142,7 +3146,7 @@
 			baseConfigurationReference = 0412AAD8AE4FABC8AFE66ADE /* Release.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
-				CURRENT_PROJECT_VERSION = 75;
+				CURRENT_PROJECT_VERSION = 140;
 				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -3244,7 +3248,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 75;
+				CURRENT_PROJECT_VERSION = 140;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3302,7 +3306,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestNotificationService/SignalQuestNotificationService.entitlements;
-				CURRENT_PROJECT_VERSION = 75;
+				CURRENT_PROJECT_VERSION = 140;
 				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3324,7 +3328,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestNotificationService/SignalQuestNotificationService.entitlements;
-				CURRENT_PROJECT_VERSION = 75;
+				CURRENT_PROJECT_VERSION = 140;
 				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3347,7 +3351,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 75;
+				CURRENT_PROJECT_VERSION = 140;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
