@@ -179,8 +179,9 @@ struct SpeedtestServerPicker: View {
                             if selectedInGroup, !isExpanded {
                                 Text(selection.displayName)
                                     .font(.caption.weight(.semibold))
-                                    .foregroundStyle(SQColor.brandRed)
-                                    .lineLimit(1)
+                                    .foregroundStyle(SQColor.accentInk)
+                                    .lineLimit(2)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                         .padding(.horizontal, SQSpace.md)
@@ -239,13 +240,14 @@ struct SpeedtestServerPicker: View {
                 Text(target.displayName)
                     .font(SQFont.body(15, .semibold))
                     .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Spacer(minLength: 8)
 
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(selected ? SQColor.brandRed : SQColor.labelTertiary.opacity(0.5))
+                    .foregroundStyle(selected ? SQColor.brandRed : SQColor.labelSecondary)
             }
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, 11)
@@ -301,8 +303,9 @@ struct SpeedtestServerPicker: View {
                         if isSelected, !isExpanded, !catalogCurrentLabel.isEmpty {
                             Text(catalogCurrentLabel)
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(SQColor.brandRed)
-                                .lineLimit(1)
+                                .foregroundStyle(SQColor.accentInk)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .padding(.horizontal, SQSpace.md).padding(.vertical, 12)
@@ -428,8 +431,9 @@ struct SpeedtestServerPicker: View {
                     if isEngineSelected, !isExpanded {
                         Text(libreSpeedCurrentLabel)
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(SQColor.brandRed)
-                            .lineLimit(1)
+                            .foregroundStyle(SQColor.accentInk)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .padding(.horizontal, SQSpace.md).padding(.vertical, 12)
@@ -497,13 +501,21 @@ struct SpeedtestServerPicker: View {
                     .foregroundStyle(selected ? SQColor.brandRed : SQColor.labelSecondary)
             }
             VStack(alignment: .leading, spacing: 1) {
-                Text(LocalizedStringKey(title)).font(SQFont.body(14, .semibold)).foregroundStyle(SQColor.label).lineLimit(1)
-                Text(subtitle).font(SQType.micro).foregroundStyle(SQColor.labelSecondary).lineLimit(1)
+                Text(LocalizedStringKey(title))
+                    .font(SQFont.body(14, .semibold))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(subtitle)
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
             Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(selected ? SQColor.brandRed : SQColor.labelTertiary.opacity(0.5))
+                .foregroundStyle(selected ? SQColor.brandRed : SQColor.labelSecondary)
         }
         .padding(.horizontal, SQSpace.md).padding(.vertical, 9)
         .background(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)

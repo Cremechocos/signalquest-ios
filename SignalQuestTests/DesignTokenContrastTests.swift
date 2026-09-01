@@ -59,6 +59,30 @@ final class DesignTokenContrastTests: XCTestCase {
         assertMinimum(UIColor(SQColor.labelSecondary), named: "labelSecondary", atLeast: 4.5)
     }
 
+    /// Si Figtree/Bricolage n'est pas encore enregistré, le repli SF doit suivre
+    /// le style Dynamic Type. Les deux seuls replis `.system(size:)` autorisés
+    /// sont ceux des helpers `*Fixed`, réservés aux exports bitmap déterministes.
+    func testScreenFontFallbacksNeverBecomeFixedSize() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repository.appendingPathComponent("SignalQuestApp/Design/SQFont.swift"),
+            encoding: .utf8
+        )
+        let lines = source.components(separatedBy: .newlines)
+        let fixedSystemLines = lines.indices.filter { lines[$0].contains("return .system(size:") }
+
+        XCTAssertEqual(fixedSystemLines.count, 2, "Un repli écran à taille fixe a été réintroduit")
+        for index in fixedSystemLines {
+            let context = lines[max(0, index - 8)...index].joined(separator: "\n")
+            XCTAssertTrue(
+                context.contains("displayFixed") || context.contains("bodyFixed"),
+                "`.system(size:)` n'est permis que dans displayFixed/bodyFixed (ligne \(index + 1))"
+            )
+        }
+        XCTAssertTrue(source.contains(".system(style, design: design, weight: weight)"))
+    }
+
     /// `labelTertiary` échouait dans LES DEUX modes (2,93 en clair, 2,18 en
     /// sombre). Il est désormais réservé aux éléments GRAPHIQUES porteurs de
     /// sens — icônes, traits, points inactifs — pour lesquels WCAG 1.4.11
@@ -148,6 +172,19 @@ final class DesignTokenContrastTests: XCTestCase {
         for style in [UIUserInterfaceStyle.light, .dark] {
             let r = ratio(UIColor(SQColor.onAccent), on: UIColor(SQColor.brandRed), style)
             XCTAssertGreaterThanOrEqual(r, 4.5, "onAccent sur brandRed : \(String(format: "%.2f", r)):1")
+        }
+    }
+
+    /// Le héro Communauté porte plusieurs libellés de 12-13 pt. Leur fond vise
+    /// 6:1 nominal pour garder une marge après anticrénelage, pas seulement 4,5:1
+    /// sur les valeurs théoriques des tokens.
+    func testOnAccentIsReadableOnDenseFeedHero() {
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            let r = ratio(UIColor(SQColor.onAccent), on: UIColor(SQColor.accentTextSurface), style)
+            XCTAssertGreaterThanOrEqual(
+                r, style == .light ? 8.0 : 6.0,
+                "onAccent sur accentTextSurface : \(String(format: "%.2f", r)):1"
+            )
         }
     }
 

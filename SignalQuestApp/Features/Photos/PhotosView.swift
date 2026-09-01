@@ -186,7 +186,7 @@ final class PhotosViewModel: ObservableObject {
         }
     }
 
-    func upload(data: Data, siteId: String, description: String, operatorName: String, exifMetadata: String?) async -> Bool {
+    func upload(data: Data, siteId: String, description: String, operatorName: String?, exifMetadata: String?) async -> Bool {
         do {
             let photo = try await service.uploadPhoto(
                 data: data, siteId: siteId, description: description,
@@ -196,6 +196,23 @@ final class PhotosViewModel: ObservableObject {
             return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func updateOperator(_ photo: Photo, operatorName: String) async -> Bool {
+        let normalized = operatorName.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !normalized.isEmpty, normalized != photo.operator?.uppercased() else { return true }
+        let updated = photo.updatingOperator(normalized)
+        updatePhotoInState(updated)
+        do {
+            try await service.updatePhotoOperator(photoId: photo.id, operatorName: normalized)
+            Haptics.success()
+            return true
+        } catch {
+            updatePhotoInState(photo)
+            errorMessage = error.localizedDescription
+            Haptics.error()
             return false
         }
     }
@@ -282,6 +299,9 @@ struct PhotosView: View {
                             feedService: services.feed,
                             e2ee: services.e2ee
                         )
+                    },
+                    onChangeOperator: { photo, networkOperator in
+                        await model.updateOperator(photo, operatorName: networkOperator)
                     }
                 )
                 .presentationDetents([.large])
@@ -290,7 +310,7 @@ struct PhotosView: View {
             }
         }
         .sheet(isPresented: $showingUpload) {
-            PhotoUploadView(antennas: services.antennas) { data, siteId, desc, op, exif in
+            PhotoUploadView(antennas: services.antennas, markets: services.markets) { data, siteId, desc, op, exif in
                 await model.upload(data: data, siteId: siteId, description: desc, operatorName: op, exifMetadata: exif)
             }
             .presentationDetents([.large])
@@ -491,19 +511,28 @@ struct PhotoDetailView: View {
     let onLike: () -> Void
     let onSend: () -> Void
     let onShareToConversation: (MessageConversation) async -> Bool
+    let onChangeOperator: (Photo, String) async -> Bool
 
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var session: AuthSessionViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showReport = false
     @State private var showShareSheet = false
     @State private var showNativeShare = false
     @State private var showAntennaDetail = false
+    @State private var showOperatorPicker = false
     @FocusState private var commentFocused: Bool
 
     private var isLiked: Bool { photo.isLikedByMe == true || photo.likedByCurrentUser == true }
     private var likeCount: Int { photo.likeCount ?? photo.likes ?? 0 }
     private var commentCount: Int { photo.commentCount ?? comments.count }
     private var opColor: Color { SQBrand.operatorColor(photo.operator) }
+    private var photoMarketCode: String? {
+        let normalized = photo.marketCode?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
+        return normalized?.isEmpty == false ? normalized : nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -531,6 +560,11 @@ struct PhotoDetailView: View {
                             Label("Partager ailleurs…", systemImage: "square.and.arrow.up")
                         }
                         Divider()
+                        if ownsPhoto, operatorChoices.count > 1 {
+                            Button { showOperatorPicker = true } label: {
+                                Label("Modifier le réseau", systemImage: "antenna.radiowaves.left.and.right")
+                            }
+                        }
                         Button(role: .destructive) { showReport = true } label: {
                             Label("Signaler la photo", systemImage: "flag")
                         }
@@ -555,18 +589,53 @@ struct PhotoDetailView: View {
                 }
             }
             .sheet(isPresented: $showAntennaDetail) {
-                if let site = photo.minimalSite {
+                if let site = photo.minimalSite, let marketCode = photoMarketCode {
                     AntennaDetailSheet(
                         site: site,
-                        market: "FR",
+                        market: marketCode,
                         operatorName: photo.operator ?? "ALL",
                         service: services.antennas
                     )
                     .presentationDetents([.medium, .large])
                     .presentationBackgroundCompat(SQColor.bg)
+                } else {
+                    ContentUnavailableCompat(
+                        title: "Détails du site indisponibles",
+                        message: "Cette ancienne photo ne contient pas de marché vérifiable. SignalQuest ne l’attribue pas automatiquement à la France.",
+                        systemImage: "globe.europe.africa"
+                    )
+                    .padding(SQSpace.lg)
+                    .presentationDetents([.medium])
+                    .presentationBackgroundCompat(SQColor.bg)
                 }
             }
+            .confirmationDialog(
+                "Réseau concerné",
+                isPresented: $showOperatorPicker,
+                titleVisibility: .visible
+            ) {
+                ForEach(operatorChoices, id: \.self) { networkOperator in
+                    Button(networkOperator) {
+                        Task { _ = await onChangeOperator(photo, networkOperator) }
+                    }
+                }
+                Button("Annuler", role: .cancel) {}
+            } message: {
+                Text("Cette photo est rattachée à un support mutualisé. Choisis le réseau réellement concerné.")
+            }
         }
+    }
+
+    private var operatorChoices: [String] {
+        Array(Set((photo.siteOperators ?? [])
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() }
+            .filter { !$0.isEmpty }))
+            .sorted()
+    }
+
+    private var ownsPhoto: Bool {
+        guard case let .authenticated(user) = session.state else { return false }
+        return photo.authorId == user.id
     }
 
     // MARK: Hero image
@@ -728,6 +797,12 @@ struct PhotoDetailView: View {
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                         .lineLimit(1)
+                    if photoMarketCode == nil {
+                        Text("Marché non renseigné · attribution automatique désactivée")
+                            .font(SQType.micro)
+                            .foregroundStyle(SQColor.warning)
+                            .lineLimit(2)
+                    }
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
@@ -844,9 +919,10 @@ struct PhotoDetailView: View {
 @MainActor
 struct PhotoUploadView: View {
     let antennas: AntennasServicing
+    let markets: MarketRegistryServicing
     /// Renvoie `true` si l'upload a réussi (la feuille se ferme alors). Le dernier
     /// paramètre est le JSON `exifMetadata` extrait de l'original.
-    var onUpload: (Data, String, String, String, String?) async -> Bool
+    var onUpload: (Data, String, String, String?, String?) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
     @State private var pickerItem: PhotosPickerItem?
@@ -855,6 +931,7 @@ struct PhotoUploadView: View {
     @State private var isUploading = false
     @State private var uploadError: String?
     @State private var selectedSite: AntennaSite?
+    @State private var selectedOperator: String?
     @State private var description = ""
     @State private var showSitePicker = false
 
@@ -948,6 +1025,33 @@ struct PhotoUploadView: View {
                     }
                     .buttonStyle(SQPressButtonStyle())
 
+                    if availableOperators.count > 1 {
+                        VStack(alignment: .leading, spacing: SQSpace.xs) {
+                            Text("Cette photo concerne quel réseau ?")
+                                .font(SQType.subhead)
+                                .foregroundStyle(SQColor.label)
+                            Text("Le support est mutualisé : choisis le réseau visible sur la photo.")
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                            Picker("Réseau concerné", selection: $selectedOperator) {
+                                Text("Choisir un réseau").tag(String?.none)
+                                ForEach(availableOperators, id: \.self) { networkOperator in
+                                    Text(networkOperator).tag(Optional(networkOperator))
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .tint(SQColor.brandRed)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(SQSpace.md)
+                            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                            .accessibilityHint("Choisis l'opérateur réellement concerné par la photo")
+                        }
+                    } else if let networkOperator = availableOperators.first {
+                        Label("Réseau concerné : \(networkOperator)", systemImage: "antenna.radiowaves.left.and.right")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+
                     TextField("Légende", text: $description, axis: .vertical)
                         .font(SQType.body)
                         .foregroundStyle(SQColor.label)
@@ -969,13 +1073,17 @@ struct PhotoUploadView: View {
                                 uploadError = "Image illisible."
                                 return
                             }
-                            let ok = await onUpload(prepared.jpeg, site.siteId ?? site.id, description, site.operators.first ?? "", prepared.exifJSON)
+                            // Aucun réseau connu sur le support : on ne l'invente
+                            // pas. Le serveur conserve alors l'attribution vide ;
+                            // seul un support réellement mutualisé impose le choix.
+                            let networkOperator = selectedOperator ?? availableOperators.first
+                            let ok = await onUpload(prepared.jpeg, site.siteId ?? site.id, description, networkOperator, prepared.exifJSON)
                             isUploading = false
                             if ok { dismiss() } else { uploadError = "Échec de l'envoi. Réessaie." }
                         }
                     }
-                    .disabled(imageData == nil || selectedSite == nil || isUploading)
-                    .opacity(imageData == nil || selectedSite == nil ? 0.5 : 1)
+                    .disabled(uploadDisabled)
+                    .opacity(uploadDisabled ? 0.5 : 1)
 
                     if let uploadError {
                         Label(uploadError, systemImage: "exclamationmark.triangle")
@@ -994,12 +1102,26 @@ struct PhotoUploadView: View {
             }
             .signalQuestBackground()
             .sheet(isPresented: $showSitePicker) {
-                AntennaSitePickerSheet(antennas: antennas) { site in
+                AntennaSitePickerSheet(antennas: antennas, markets: markets) { site in
                     selectedSite = site
+                    selectedOperator = nil
                     showSitePicker = false
                 }
             }
         }
+    }
+
+    private var availableOperators: [String] {
+        Array(Set((selectedSite?.operators ?? [])
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() }
+            .filter { !$0.isEmpty }))
+            .sorted()
+    }
+
+    private var requiresOperatorChoice: Bool { availableOperators.count > 1 }
+
+    private var uploadDisabled: Bool {
+        imageData == nil || selectedSite == nil || (requiresOperatorChoice && selectedOperator == nil) || isUploading
     }
 }
 
@@ -1147,6 +1269,7 @@ struct PhotoShareSheet: View {
 
 struct AntennaSitePickerSheet: View {
     let antennas: AntennasServicing
+    let markets: MarketRegistryServicing
     let onSelect: (AntennaSite) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -1160,6 +1283,8 @@ struct AntennaSitePickerSheet: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var sitesLoadTask: Task<Void, Never>?
+    @State private var marketLabel: String?
+    @State private var isCommunityFallback = false
 
     var body: some View {
         NavigationStack {
@@ -1189,7 +1314,9 @@ struct AntennaSitePickerSheet: View {
                     }
                 }
                 .ignoresSafeArea(edges: .bottom)
-                .onAppear { scheduleSitesLoad(for: region) }
+                // Ne charge pas Paris par défaut : le centre initial est seulement
+                // un cadrage visuel. Le premier fetch suit un déplacement explicite
+                // ou une position autorisée, jamais un marché supposé.
 
                 VStack(spacing: SQSpace.sm) {
                     HStack(spacing: SQSpace.sm) {
@@ -1202,6 +1329,15 @@ struct AntennaSitePickerSheet: View {
                     .padding(.vertical, SQSpace.sm + 2)
                     .background(SQColor.surface, in: Capsule(style: .continuous))
                     .sqShadowSoft()
+
+                    if let marketLabel {
+                        Text(isCommunityFallback ? "\(marketLabel) · sites communautaires" : marketLabel)
+                            .font(SQType.micro)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .padding(.horizontal, SQSpace.md)
+                            .padding(.vertical, SQSpace.xs)
+                            .background(SQColor.surface, in: Capsule(style: .continuous))
+                    }
 
                     if let errorMessage {
                         Text(errorMessage)
@@ -1277,11 +1413,62 @@ struct AntennaSitePickerSheet: View {
         guard let box = visibleBox else { return }
         isLoading = true
         defer { isLoading = false }
+        isCommunityFallback = false
+
+        guard let market = await markets.marketForLocation(
+            latitude: region.center.latitude,
+            longitude: region.center.longitude
+        ) else {
+            sites = []
+            marketLabel = nil
+            errorMessage = "Pays non référencé à cet emplacement. Déplace la carte vers une zone terrestre connue."
+            return
+        }
+        guard !Task.isCancelled else { return }
+        let marketCode = market.marketCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !marketCode.isEmpty else {
+            sites = []
+            marketLabel = nil
+            errorMessage = "Le registre ne fournit pas de code marché fiable pour cette zone."
+            return
+        }
+        marketLabel = market.label
+
         do {
-            sites = try await antennas.list(bbox: box)
+            let operatorKeys = market.selectableOperators
+                .map(\.key)
+                .filter { !$0.isEmpty && $0.uppercased() != "ALL" }
+            var merged: [AntennaSite] = []
+            var seen = Set<String>()
+            for operatorKey in operatorKeys.isEmpty ? ["ALL"] : operatorKeys {
+                guard !Task.isCancelled else { return }
+                let batch = try await antennas.list(
+                    bbox: box,
+                    market: marketCode,
+                    operatorName: operatorKey,
+                    technologies: []
+                )
+                for site in batch {
+                    let key = site.siteId ?? site.id
+                    if seen.insert(key).inserted { merged.append(site) }
+                }
+            }
+            if merged.isEmpty {
+                let community = try await antennas.listCommunitySites(
+                    bbox: box,
+                    market: marketCode,
+                    operatorName: nil
+                )
+                for site in community {
+                    let key = site.siteId ?? site.id
+                    if seen.insert(key).inserted { merged.append(site) }
+                }
+                isCommunityFallback = !merged.isEmpty
+            }
+            sites = merged
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            if !error.isCancellation { errorMessage = error.localizedDescription }
         }
     }
 }
@@ -1319,7 +1506,7 @@ extension Photo {
             description: description, caption: caption,
             likes: count, likeCount: count,
             socialPostId: socialPostId, approved: approved,
-            operator: self.operator,
+            operator: self.operator, marketCode: marketCode, siteOperators: siteOperators,
             commentCount: commentCount, repostsCount: repostsCount,
             favoritesCount: favoritesCount, reactions: reactions,
             likedByCurrentUser: liked, isLikedByMe: liked,
@@ -1337,8 +1524,26 @@ extension Photo {
             description: description, caption: caption,
             likes: likes, likeCount: likeCount,
             socialPostId: socialPostId, approved: approved,
-            operator: self.operator,
+            operator: self.operator, marketCode: marketCode, siteOperators: siteOperators,
             commentCount: count, repostsCount: repostsCount,
+            favoritesCount: favoritesCount, reactions: reactions,
+            likedByCurrentUser: likedByCurrentUser, isLikedByMe: isLikedByMe,
+            userReaction: userReaction,
+            authorId: authorId, authorName: authorName, authorAvatar: authorAvatar,
+            siteAddress: siteAddress, latitude: latitude, longitude: longitude
+        )
+    }
+
+    func updatingOperator(_ operatorName: String) -> Photo {
+        Photo(
+            id: id, siteId: siteId, enb: enb,
+            imageUrl: imageUrl, thumbnailUrl: thumbnailUrl, ogImageUrl: ogImageUrl,
+            uploadedAt: uploadedAt, createdAt: createdAt,
+            description: description, caption: caption,
+            likes: likes, likeCount: likeCount,
+            socialPostId: socialPostId, approved: approved,
+            operator: operatorName, marketCode: marketCode, siteOperators: siteOperators,
+            commentCount: commentCount, repostsCount: repostsCount,
             favoritesCount: favoritesCount, reactions: reactions,
             likedByCurrentUser: likedByCurrentUser, isLikedByMe: isLikedByMe,
             userReaction: userReaction,
@@ -1357,7 +1562,7 @@ extension Photo {
                 caption: "Paris centre",
                 likes: 12, likeCount: 12,
                 socialPostId: nil, approved: true,
-                operator: "Orange",
+                operator: "Orange", marketCode: "FR", siteOperators: ["ORANGE", "SFR"],
                 commentCount: 2, repostsCount: 0, favoritesCount: 4,
                 reactions: [], likedByCurrentUser: false, isLikedByMe: false,
                 userReaction: nil,
@@ -1372,7 +1577,7 @@ extension Photo {
                 caption: "Lyon Presqu'île",
                 likes: 8, likeCount: 8,
                 socialPostId: nil, approved: true,
-                operator: "SFR",
+                operator: "SFR", marketCode: "FR", siteOperators: ["SFR"],
                 commentCount: 1, repostsCount: 0, favoritesCount: 2,
                 reactions: [], likedByCurrentUser: false, isLikedByMe: false,
                 userReaction: nil,
@@ -1387,7 +1592,7 @@ extension Photo {
                 caption: "Marseille Vieux-Port",
                 likes: 5, likeCount: 5,
                 socialPostId: nil, approved: true,
-                operator: "Bouygues",
+                operator: "Bouygues", marketCode: "FR", siteOperators: ["BOUYGUES"],
                 commentCount: 0, repostsCount: 0, favoritesCount: 1,
                 reactions: [], likedByCurrentUser: false, isLikedByMe: false,
                 userReaction: nil,

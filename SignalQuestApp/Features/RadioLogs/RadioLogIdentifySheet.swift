@@ -1,5 +1,6 @@
 import MapKit
 import SwiftUI
+import UIKit
 
 private typealias M = RadioLogsMetrics
 private typealias P = RadioLogsPalette
@@ -20,6 +21,7 @@ struct RadioLogIdentifySheet: View {
     /// alors sur son résultat au lieu de se refermer sèchement. On vient de
     /// contribuer à une base publique, l'écran doit dire QUOI.
     @State private var identifiedSiteId: String?
+    @AccessibilityFocusState private var resultFocused: Bool
     private let antennas: AntennasServicing
     private let customSites: CustomSitesServicing?
     let onIdentified: (String) -> Void
@@ -76,6 +78,13 @@ struct RadioLogIdentifySheet: View {
             .toolbarTitleInlineCompat()
             .toolbar { toolbarContent }
             .task { await picker.load(for: site) }
+            .onChangeCompat(of: identifiedSiteId) { _, siteId in
+                guard siteId != nil else { return }
+                DispatchQueue.main.async {
+                    resultFocused = true
+                    UIAccessibility.post(notification: .announcement, argument: String(localized: "Site identifié"))
+                }
+            }
             .sheet(isPresented: $showsMapPicker) {
                 RadioLogSiteMapPicker(site: site, picker: picker, antennas: antennas, customSites: customSites) { siteId in
                     // On NE referme PAS : on revient ici pour dire à quel site le
@@ -134,6 +143,8 @@ struct RadioLogIdentifySheet: View {
         .background(P.card, in: RoundedRectangle(cornerRadius: M.cardRadius, style: .continuous))
         .sqShadowCard()
         .padding(.top, SQSpace.sm)
+        .accessibilityElement(children: .combine)
+        .accessibilityFocused($resultFocused)
     }
 
     /// L'échappatoire : les propositions du serveur ne couvrent pas tout, et

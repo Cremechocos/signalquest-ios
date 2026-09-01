@@ -98,6 +98,9 @@ final class DriveTestViewModel: ObservableObject {
     /// Drive Test peut engloutir plusieurs gigaoctets, et l'utilisateur ne pouvait
     /// pas le savoir avant de recevoir sa facture.
     @Published private(set) var sessionBytes: Int = 0
+    /// Valeur du compteur global au démarrage de la session. `sessionBytes` en est
+    /// l'écart, ce qui évite de remettre à zéro un compteur partagé par tous les modes.
+    private var dataMeterBaseline: Int = 0
     /// Session arrêtée parce que le plafond de données a été atteint — état
     /// distinct d'un arrêt manuel, pour l'expliquer plutôt que de s'interrompre.
     @Published private(set) var stoppedByDataCap = false
@@ -158,6 +161,10 @@ final class DriveTestViewModel: ObservableObject {
     /// répartit les mesures dans l'espace, ce qui est aussi le bon geste
     /// scientifique pour une carte de couverture.
     static let defaultTestIntervalMeters: Double = 500
+    /// Délai au bout duquel un test part même sans déplacement. C'est LUI qui fait
+    /// avancer la session : la distance ne sert plus qu'à mesurer plus tôt quand on
+    /// roule (cf. `waitUntilNextTestIsDue`).
+    static let maxSecondsBetweenTests = 30
     /// Plafond par défaut : 5 Go. Au-delà, la session s'arrête proprement et le
     /// dit — jamais en silence.
     static let defaultDataCapMegabytes = 5_120
@@ -240,6 +247,9 @@ final class DriveTestViewModel: ObservableObject {
     private var lastSimPLMN: (mcc: Int?, mnc: Int?)?
     /// Abonnement au type de connexion (pause auto en WiFi / reprise en cellulaire).
     private var pathCancellable: AnyCancellable?
+    /// Jeton possédé par ce view model : les autres consommateurs GPS ne peuvent
+    /// ni écraser le Drive Test, ni interrompre sa réception de positions.
+    private var locationObserverToken: UUID?
     /// Entrée de marché courante (couleurs + libellés d'opérateur du sélecteur).
     private var marketEntry: MarketRegistryEntry?
     // Mêmes mécanismes que le speedtest normal : Live Activity + assertion
@@ -256,8 +266,10 @@ final class DriveTestViewModel: ObservableObject {
         Task { await services.sessions.retryPendingCoverageSessions() }
         // Pré-remplit le sélecteur d'opérateur sans attendre une position.
         Task { await prepareOperatorSelector() }
-        services.location.onLocationUpdate = { [weak self] location in
-            self?.apply(coordinate: location.coordinate)
+        if locationObserverToken == nil {
+            locationObserverToken = services.location.addLocationObserver { [weak self] location in
+                self?.apply(coordinate: location.coordinate)
+            }
         }
         // Position initiale (sans déclencher de prompt si pas déjà autorisé).
         guard services.location.authorizationStatus == .authorizedWhenInUse
@@ -282,7 +294,10 @@ final class DriveTestViewModel: ObservableObject {
     func onDisappear(isLeavingScreen: Bool) {
         guard isLeavingScreen else { return }
         stop()
-        services.location.onLocationUpdate = nil
+        if let token = locationObserverToken {
+            services.location.removeLocationObserver(token)
+            locationObserverToken = nil
+        }
     }
 
     func start() {
@@ -303,9 +318,12 @@ final class DriveTestViewModel: ObservableObject {
         accumulator = ContinuousSessionAccumulator()
         summary = nil
         testCount = 0
-        // Le compteur de données est propre à une session : le remettre à zéro ici
-        // et nulle part ailleurs, pour que le plafond porte bien sur CE trajet.
-        SpeedtestDataMeter.shared.reset()
+        // Le compteur `SpeedtestDataMeter` est GLOBAL au processus : tous les moteurs
+        // l'alimentent, y compris les tests lancés depuis l'onglet Speed. Le remettre à
+        // zéro ici effaçait donc le comptage des autres modes. On mémorise plutôt une
+        // référence de départ et on mesure l'écart : le plafond porte bien sur CE
+        // trajet, sans rien écraser chez les autres.
+        dataMeterBaseline = SpeedtestDataMeter.shared.bytes
         sessionBytes = 0
         stoppedByDataCap = false
         coverageTruncated = false
@@ -539,17 +557,38 @@ final class DriveTestViewModel: ObservableObject {
 
     /// Point de couverture PORTANT le débit/latence mesurés, à la position du test.
     private func captureMeasuredCoveragePoint(_ result: SpeedtestRunResult) {
+        let location = services.location.lastLocation
         guard sessionMode.recordsCoverage, !isPausedForWiFi,
-              let coordinate = services.location.lastLocation?.coordinate ?? userLocation else { return }
+              let coordinate = location?.coordinate ?? userLocation else { return }
+        let evidence = result.radioEvidence
+        let cells = evidence.map { CoverageCellEvidenceUpload.cells(from: $0) } ?? []
         appendCoveragePoint(
             CoveragePointUpload(
                 latitude: coordinate.latitude,
                 longitude: coordinate.longitude,
                 timestamp: Self.nowMs(),
                 technology: currentGeneration,
+                accuracy: location.map { max(0, $0.horizontalAccuracy) },
                 downloadMbps: result.downloadAverageMbps,
                 uploadMbps: result.uploadAverageMbps,
-                pingMs: result.pingMinMs ?? result.pingMs
+                pingMs: result.pingMinMs ?? result.pingMs,
+                observedPlmn: evidence?.observedPlmn,
+                enb: evidence?.enb,
+                gnb: evidence?.gnb,
+                cellId: evidence?.localCellId,
+                eci: evidence?.eci,
+                nci: evidence?.nci,
+                pci: evidence?.pci,
+                tac: evidence?.tac,
+                earfcn: evidence?.earfcn,
+                nrarfcn: evidence?.nrarfcn,
+                timingAdvance: evidence?.timingAdvance,
+                timingAdvanceSourceTechnology: evidence?.timingAdvanceSourceTechnology,
+                timingAdvanceSourceCellId: evidence?.timingAdvanceSourceCellId,
+                radioAgeMs: evidence?.radioAgeMs,
+                locationAgeMs: evidence?.locationAgeMs,
+                radioObservedAt: evidence?.radioObservedAt,
+                cells: cells.isEmpty ? nil : cells
             ),
             at: coordinate
         )
@@ -566,15 +605,30 @@ final class DriveTestViewModel: ObservableObject {
             sessionId: sessionId,
             startTime: startedAt,
             endTime: max(startedAt, endTime ?? coveragePoints.last?.timestamp ?? Self.nowMs()),
-            mcc: plmn.mcc,
-            mnc: plmn.mnc,
+            // CoreTelephony expose ici le PLMN SIM, pas le PLMN servant. Le
+            // recopier dans mcc/mnc attribuerait le roaming au reseau d'origine.
+            mcc: nil,
+            mnc: nil,
+            observedPlmn: nil,
+            simPlmn: plmn.plmn,
+            networkIdentitySource: plmn.plmn == nil ? nil : "SIM_ONLY",
+            networkIdentityObservedAt: plmn.plmn == nil ? nil : Date(),
             operatorKey: displayedOperatorKey,
+            carrierName: services.networkPath.status.operatorName,
             marketCode: market,
+            appVersion: Self.coverageAppVersion,
             showOnMap: coverageShowOnMap,
             // Coordonnées tronquées (~111 m) avant persistance/envoi : la trace
             // publiée sur la carte communautaire ne révèle pas le trajet au mètre.
             points: coveragePoints.map { $0.minimizedCoordinates() }
         )
+    }
+
+    private static var coverageAppVersion: String {
+        let version = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let version, !version.isEmpty else { return "unknown" }
+        return version
     }
 
     /// Écrit chaque nouveau point dans le JSON atomique avant toute tentative
@@ -651,16 +705,21 @@ final class DriveTestViewModel: ObservableObject {
         }
         Task {
             do {
-                try await sessions.createCoverageSession(session)
-                if marketResolved {
-                    statusLabel = String(localized: "Couverture envoyée — \(count) point")
+                let response = try await sessions.createCoverageSession(session)
+                let serverResolvedPLMN = response?.plmnResolved ?? marketResolved
+                if serverResolvedPLMN {
+                    if let mvno = response?.mvnoName, !mvno.isEmpty {
+                        statusLabel = String(localized: "Couverture envoyée — \(count) point · SIM \(mvno)")
+                    } else {
+                        statusLabel = String(localized: "Couverture envoyée — \(count) point")
+                    }
                 } else {
                     statusLabel = String(localized: "Couverture envoyée — pays non identifié")
-                    errorMessage = String(
+                    errorMessage = response?.warningMessage ?? String(
                         localized: "Ce trajet n'a pas pu être rattaché à un pays : il risque de ne pas apparaître sur la carte. Cela arrive quand l'opérateur reste indétectable (WiFi, VPN, ou pays non couvert)."
                     )
                 }
-                Self.log.notice("coverage upload OK : \(count) points, marché résolu=\(marketResolved)")
+                Self.log.notice("coverage upload OK : \(count) points, PLMN résolu=\(serverResolvedPLMN)")
             } catch {
                 errorMessage = Self.uploadFailureMessage(error, subject: "couverture")
                 Self.log.error("coverage upload ÉCHEC : \(error.localizedDescription, privacy: .public)")
@@ -789,10 +848,13 @@ final class DriveTestViewModel: ObservableObject {
             operatorKey = key
             if entry == nil { entry = payload.markets.first { $0.operatorEntry(forKey: key) != nil } }
         }
-        // 3. Repli opérateur via le MNC de la SIM.
-        if operatorKey == nil, let mnc = plmn.mnc, let entry,
-           let op = entry.selectableOperators.first(where: { $0.mncs.contains(mnc) }) {
-            operatorKey = op.key
+        // 3. Repli opérateur via le PLMN de la SIM.
+        //    Cherchait dans `selectableOperators`, dont le champ `mncs` est toujours
+        //    vide (la table MNC vit dans `radioOperators`) : ce repli ne se déclenchait
+        //    jamais. Même correction que dans SpeedtestService.
+        if operatorKey == nil, let mcc = plmn.mcc, let mnc = plmn.mnc, let entry,
+           let key = entry.radioOperatorKey(mcc: mcc, mnc: mnc) {
+            operatorKey = key
         }
         // 4. Repli : opérateur/marché persistés de la carte (déjà détectés au Lot 1A).
         if operatorKey == nil,
@@ -907,28 +969,61 @@ final class DriveTestViewModel: ObservableObject {
         }
     }
 
-    /// Attend que le prochain test soit dû : distance parcourue depuis le
-    /// précédent, ou demande explicite de l'utilisateur. Renvoie `false` si la
-    /// session est annulée pendant l'attente.
+    /// Attend que le prochain test soit dû. Renvoie `false` si la session est
+    /// annulée pendant l'attente.
     ///
-    /// Le premier test part immédiatement — attendre 500 m avant la moindre mesure
+    /// Le premier test part immédiatement — attendre avant la moindre mesure
     /// donnerait l'impression d'une session qui ne démarre pas.
+    ///
+    /// ⚠️ La distance N'EST PLUS BLOQUANTE. Elle l'était, et c'était la cause du
+    /// « le premier test marche, les suivants ne partent jamais » : à l'arrêt (banc
+    /// d'essai, fenêtre, test de stabilité) on ne parcourt jamais les 500 m requis,
+    /// donc aucun second test ne partait — sans que rien ne l'explique à l'écran.
+    /// Pire, si le fix GPS était perdu après le premier test, le `if let current`
+    /// n'entrait jamais et la boucle tournait indéfiniment SANS même mettre à jour
+    /// le statut : session muette, définitivement.
+    ///
+    /// Le modèle est désormais celui d'Android, qui n'a jamais eu ce problème (ses
+    /// tests programmés sont périodiques) : le temps déclenche, la distance ne fait
+    /// qu'anticiper quand on roule. Un espacement minimal subsiste — sans lui, un
+    /// appareil posé sur un bureau accumulerait des centaines de mesures au même
+    /// point, ce qui pollue la carte de couverture et brûle le forfait.
     private func waitUntilNextTestIsDue() async -> Bool {
+        var secondsWaited = 0
         while !Task.isCancelled {
             if manualTestRequested {
                 manualTestRequested = false
                 return true
             }
+            // Premier test de la session : rien à attendre.
             guard let origin = lastTestCoordinate else { return true }
+
+            // Déclencheur DISTANCE — on roule, on mesure plus tôt.
+            var metersRemaining: Double?
             if let current = services.location.lastLocation?.coordinate ?? userLocation {
                 let moved = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
                     .distance(from: CLLocation(latitude: current.latitude, longitude: current.longitude))
                 if moved >= testIntervalMeters { return true }
-                statusLabel = String(
-                    localized: "Prochain test dans \(Int((testIntervalMeters - moved).rounded())) m"
-                )
+                metersRemaining = (testIntervalMeters - moved).rounded()
             }
+
+            // Déclencheur TEMPS — garantit que la session avance à l'arrêt, et même
+            // sans le moindre point GPS.
+            let secondsRemaining = Self.maxSecondsBetweenTests - secondsWaited
+            if secondsRemaining <= 0 { return true }
+
+            // Toujours dire ce qu'on attend : c'est l'absence de ce retour qui faisait
+            // passer un comportement voulu pour une panne.
+            if let metersRemaining {
+                statusLabel = String(
+                    localized: "Prochain test dans \(Int(metersRemaining)) m ou \(secondsRemaining) s"
+                )
+            } else {
+                statusLabel = String(localized: "Prochain test dans \(secondsRemaining) s")
+            }
+
             try? await Task.sleep(nanoseconds: 1_000_000_000)
+            secondsWaited += 1
         }
         return false
     }
@@ -965,7 +1060,8 @@ final class DriveTestViewModel: ObservableObject {
     }
 
     private func refreshSessionBytes() {
-        sessionBytes = SpeedtestDataMeter.shared.bytes
+        // Écart depuis le début de CETTE session, jamais le total du processus.
+        sessionBytes = max(0, SpeedtestDataMeter.shared.bytes - dataMeterBaseline)
     }
 
     private func dataCapExceeded() -> Bool {
@@ -1009,8 +1105,16 @@ final class DriveTestViewModel: ObservableObject {
         services.networkPath.refreshNow()
         let status = services.networkPath.status
         isVPNActive = VPNDetector.isActive()
-        let coordinate = services.location.lastLocation?.coordinate ?? userLocation
-        let location = coordinate.map { Coordinates(latitude: $0.latitude, longitude: $0.longitude) }
+        let lastLocation = services.location.lastLocation
+        let coordinate = lastLocation?.coordinate ?? userLocation
+        let location = coordinate.map {
+            Coordinates(
+                latitude: $0.latitude,
+                longitude: $0.longitude,
+                accuracy: lastLocation.map { max(0, $0.horizontalAccuracy) },
+                observedAt: lastLocation?.timestamp
+            )
+        }
         let settings = makeSettings()
         let measured = try await services.speedtest.run(
             pathStatus: status,
@@ -1157,6 +1261,9 @@ struct DriveTestView: View {
     /// Mode du Drive Test, persisté localement. Défaut « Les deux » → la couverture
     /// est enregistrée par défaut (le choix d'un mode couverture vaut consentement).
     @AppStorage(DriveTestMode.storageKey) private var driveTestModeRaw = DriveTestMode.both.rawValue
+    /// Le préflight est une interface d'exception : `nil` quand tout est prêt,
+    /// sinon uniquement les avertissements ou blocages réellement observables.
+    @State private var preflightReport: DriveTestPreflightReport?
     private var driveTestMode: DriveTestMode { DriveTestMode(rawValue: driveTestModeRaw) ?? .both }
 
     init(services: AppServices) {
@@ -1187,6 +1294,17 @@ struct DriveTestView: View {
         .sheet(isPresented: $showDisclosure) {
             DriveTestDisclosureView { showDisclosure = false }
                 .interactiveDismissDisabled()
+        }
+        .sheet(item: $preflightReport) { report in
+            DriveTestPreflightSheet(
+                report: report,
+                onDismiss: { preflightReport = nil },
+                onStartAnyway: {
+                    preflightReport = nil
+                    model.start()
+                },
+                onAction: handlePreflightAction
+            )
         }
         // L'onglet Tester encore sélectionné = on a quitté l'écran (retour) ;
         // un autre onglet = l'écran est seulement masqué, la session continue.
@@ -1225,6 +1343,8 @@ struct DriveTestView: View {
                     .frame(width: 40, height: 40)
                     .background { mapGlassBackground(Circle()) }
                     .sqShadowSoft()
+                    .padding(2)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(SQPressButtonStyle())
             .accessibilityLabel(showMapLegend ? "Masquer la légende" : "Afficher la légende")
@@ -1698,8 +1818,82 @@ struct DriveTestView: View {
                 GradientButton("Arrêter le drive test", systemImage: "stop.fill", style: .accent) { model.stop() }
             }
         } else {
-            GradientButton(startButtonTitle, systemImage: "play.fill") { model.start() }
+            GradientButton(startButtonTitle, systemImage: "play.fill") { requestStart() }
         }
+    }
+
+    private func requestStart() {
+        let report = DriveTestPreflightPolicy.evaluate(makePreflightSnapshot())
+        guard !report.isReady else {
+            model.start()
+            return
+        }
+        preflightReport = report
+    }
+
+    private func makePreflightSnapshot() -> DriveTestPreflightSnapshot {
+        let authorization: DriveTestPreflightSnapshot.LocationAuthorization
+        switch services.location.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
+            authorization = .authorized
+        case .notDetermined:
+            authorization = .notDetermined
+        default:
+            authorization = .denied
+        }
+
+        let location = services.location.lastLocation
+        let locationAge = location.map { max(0, Date().timeIntervalSince($0.timestamp)) }
+        let status = services.networkPath.status
+        let battery = Self.currentBatterySnapshot()
+        return DriveTestPreflightSnapshot(
+            locationAuthorization: authorization,
+            locationAgeSeconds: locationAge,
+            horizontalAccuracyMeters: location?.horizontalAccuracy,
+            availableStorageBytes: Self.availableStorageBytes(),
+            batteryPercent: battery.percent,
+            isCharging: battery.isCharging,
+            isOnline: services.networkPath.isOnline,
+            connection: status.connection,
+            isConstrained: status.isConstrained,
+            recordsCoverage: driveTestMode.recordsCoverage,
+            runsSpeedtest: driveTestMode.runsSpeedtest
+        )
+    }
+
+    private func handlePreflightAction(_ action: DriveTestPreflightIssue.Action) {
+        switch action {
+        case .none:
+            break
+        case .requestLocation:
+            preflightReport = nil
+            services.location.requestWhenInUse()
+        case .openSettings:
+            preflightReport = nil
+            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+            UIApplication.shared.open(url)
+        }
+    }
+
+    private static func availableStorageBytes() -> Int64? {
+        let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+        return try? home.resourceValues(
+            forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+        ).volumeAvailableCapacityForImportantUsage
+    }
+
+    private static func currentBatterySnapshot() -> (percent: Int?, isCharging: Bool) {
+        let device = UIDevice.current
+        let monitoringWasEnabled = device.isBatteryMonitoringEnabled
+        device.isBatteryMonitoringEnabled = true
+        defer {
+            if !monitoringWasEnabled { device.isBatteryMonitoringEnabled = false }
+        }
+        let percent = device.batteryLevel >= 0
+            ? Int((device.batteryLevel * 100).rounded())
+            : nil
+        let isCharging = device.batteryState == .charging || device.batteryState == .full
+        return (percent, isCharging)
     }
 
     private var startButtonTitle: String {

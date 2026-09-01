@@ -7,6 +7,9 @@ final class InMemoryTokenStore: TokenStore, @unchecked Sendable {
     func string(for key: String) throws -> String? { storage[key] }
     func set(_ value: String, for key: String, accessibility: KeychainAccessibility) throws { storage[key] = value }
     func remove(_ key: String) throws { storage[key] = nil }
+    func keys(withPrefix prefix: String) throws -> [String] {
+        storage.keys.filter { $0.hasPrefix(prefix) }.sorted()
+    }
     func removeAll() throws { storage.removeAll() }
 }
 
@@ -170,5 +173,152 @@ final class AuthSessionTests: XCTestCase {
         await waitUntil(timeout: 0.3) { vm.state == .loggedOut }
         // Ne bascule PAS : rien à déconnecter, et surtout aucune boucle de nettoyage.
         XCTAssertEqual(mock.clearLocalSessionCount, 0)
+    }
+}
+
+@MainActor
+final class InboxBadgePresentationStateTests: XCTestCase {
+    func testResetClearsAccountABadgeAndReopensThrottleForAccountB() throws {
+        let sessionA = LocalAccountSession(ownerScopeId: "user:account-a", sessionId: UUID().uuidString)
+        let sessionB = LocalAccountSession(ownerScopeId: "user:account-b", sessionId: UUID().uuidString)
+        var currentSession: LocalAccountSession? = sessionA
+        let state = InboxBadgePresentationState(sessionSnapshot: { currentSession })
+        let firstRefresh = Date(timeIntervalSince1970: 100)
+
+        let ticketA = try XCTUnwrap(state.beginRefresh(force: false, now: firstRefresh))
+        XCTAssertTrue(state.publish(unreadCount: 7, for: ticketA, now: firstRefresh))
+        XCTAssertEqual(state.unreadCount, 7)
+        XCTAssertNil(state.beginRefresh(force: false, now: firstRefresh.addingTimeInterval(1)))
+
+        state.reset()
+        currentSession = sessionB
+
+        XCTAssertEqual(state.unreadCount, 0)
+        XCTAssertNotNil(
+            state.beginRefresh(force: false, now: firstRefresh.addingTimeInterval(1)),
+            "B doit pouvoir charger son badge immédiatement après la déconnexion de A"
+        )
+    }
+
+    func testLateAccountAResponseCannotPublishUnderAccountB() throws {
+        let sessionA = LocalAccountSession(ownerScopeId: "user:account-a", sessionId: UUID().uuidString)
+        let sessionB = LocalAccountSession(ownerScopeId: "user:account-b", sessionId: UUID().uuidString)
+        var currentSession: LocalAccountSession? = sessionA
+        let state = InboxBadgePresentationState(sessionSnapshot: { currentSession })
+        let ticketA = try XCTUnwrap(state.beginRefresh(force: true))
+
+        state.reset()
+        currentSession = sessionB
+
+        XCTAssertFalse(state.publish(unreadCount: 9, for: ticketA))
+        XCTAssertEqual(state.unreadCount, 0)
+    }
+}
+
+@MainActor
+final class PushLogoutSessionBoundaryTests: XCTestCase {
+    override func tearDown() {
+        MockURLProtocol.requestHandler = nil
+        LocalAccountScope.deactivate()
+        super.tearDown()
+    }
+
+    func testPushUnregisterPreservesSnapshotUntilAuthServiceClearsAccountA() async throws {
+        LocalAccountScope.deactivate()
+        let tokenStore = InMemoryTokenStore()
+        let credentials = CredentialStore(tokenStore: tokenStore)
+        try credentials.setAccessToken("token-a")
+        let api = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        let push = PushNotificationService(
+            api: api,
+            router: AppRouter(),
+            identity: InstallationIdentity(store: InMemoryTokenStore())
+        )
+        let auth = AuthService(api: api, e2ee: nil, sessionStore: tokenStore)
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.url?.path, "/api/auth/logout")
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+
+        LocalAccountScope.activate(userId: "account-a")
+        let accountA = try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+
+        await push.unregister()
+        XCTAssertEqual(LocalAccountScope.sessionSnapshot(), accountA)
+
+        try await auth.logout()
+        XCTAssertNil(LocalAccountScope.currentUserId)
+        XCTAssertNil(LocalAccountScope.currentSessionId)
+        XCTAssertNil(credentials.accessToken())
+    }
+
+    func testLateAccountALogoutResponseCannotClearAccountB() async throws {
+        LocalAccountScope.deactivate()
+        let tokenStore = InMemoryTokenStore()
+        let credentials = CredentialStore(tokenStore: tokenStore)
+        try credentials.setAccessToken("token-a")
+        let api = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        let auth = AuthService(api: api, e2ee: nil, sessionStore: tokenStore)
+        let requestStarted = expectation(description: "logout A parti")
+        let releaseResponse = DispatchSemaphore(value: 0)
+        MockURLProtocol.requestHandler = { request in
+            requestStarted.fulfill()
+            _ = releaseResponse.wait(timeout: .now() + 2)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+
+        LocalAccountScope.activate(userId: "account-a")
+        let logoutA = Task { try await auth.logout() }
+        await fulfillment(of: [requestStarted], timeout: 1)
+
+        LocalAccountScope.activate(userId: "account-b")
+        let accountB = try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+        try credentials.setAccessToken("token-b")
+        releaseResponse.signal()
+        try await logoutA.value
+
+        XCTAssertEqual(LocalAccountScope.sessionSnapshot(), accountB)
+        XCTAssertEqual(LocalAccountScope.currentUserId, "account-b")
+        XCTAssertEqual(credentials.accessToken(), "token-b")
+    }
+
+    func testBackgroundDeactivateCannotDeadlockForegroundSessionRead() async {
+        LocalAccountScope.deactivate()
+        LocalAccountScope.activate(userId: "account-lock-order")
+        let observer = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            _ = LocalAccountScope.sessionSnapshot()
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+        let completed = expectation(description: "deactivate terminé")
+
+        Task.detached {
+            LocalAccountScope.deactivate()
+            completed.fulfill()
+        }
+
+        await fulfillment(of: [completed], timeout: 2)
+        XCTAssertNil(LocalAccountScope.sessionSnapshot())
+    }
+
+    private static func mockSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        return URLSession(configuration: configuration)
+    }
+}
+
+@MainActor
+final class AppRouterAccountSwitchQATests: XCTestCase {
+    func testDebugAccountSwitchTabsHaveDeterministicPriority() {
+        XCTAssertEqual(AppRouter.qaInitialTab(profile: true, community: false), .profile)
+        XCTAssertEqual(AppRouter.qaInitialTab(profile: false, community: true), .community)
+        XCTAssertEqual(AppRouter.qaInitialTab(profile: true, community: true), .profile)
+        XCTAssertNil(AppRouter.qaInitialTab(profile: false, community: false))
     }
 }

@@ -1,0 +1,52 @@
+{
+  "ownerNamespace": "user:interop-fixture",
+  "recoveryKeyB64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+  "identityPrivateJwk": {
+    "crv": "P-256",
+    "d": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+    "kty": "EC",
+    "x": "UVw9brnjlrkE0_7Kf1T9zQzB6Ze_N13KUVrQpsO0A18",
+    "y": "RTa-OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q"
+  },
+  "signingPrivateJwk": {
+    "crv": "P-256",
+    "d": "ISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0-P0A",
+    "kty": "EC",
+    "x": "HxQBRr-xslH4T03b4NTNz9d6_ZhKlSDjV5QCH4MSu54",
+    "y": "7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5-KRJxQluR8iSs"
+  },
+  "bundle": {
+    "version": 2,
+    "kdfAlgorithm": "HKDF_SHA256",
+    "kdfParameters": {
+      "hash": "SHA-256",
+      "outputBytes": 32,
+      "identityInfo": "signalquest-e2ee-v2-recovery-identity-v2",
+      "signingInfo": "signalquest-e2ee-v2-recovery-signing-v2"
+    },
+    "wrapAlgorithm": "AES_256_GCM",
+    "recoveryPublicIdentityKeyB64": "BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=",
+    "recoveryPublicSigningKeyB64": "BB8UAUa/sbJR+E9N2+DUzc/Xev2YSpUg41eUAh+DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5+KRJxQluR8iSs=",
+    "identityPrivateKey": {
+      "saltB64": "ERERERERERERERERERERERERERERERERERERERERERE=",
+      "nonceB64": "ISEhISEhISEhISEh",
+      "wrappedPrivateJwkB64": "BTcZRW7GMgtMg5Uwdnf1F8e4GfyxQc1ZJdL2eVbc5XVFBwWV4FkpoUxhNH4Ywcrcldri5f50lWDGJOk9vcQ9p7zzZvnaZsD4Uuo4hJpA6arz8+M5n6H/mcYuk+yfh166sJdETi6ympUGnhJ/VhEizefN+liMuIl2aoknDCeRHXHVtJjbFerZgYXgTSzrl2xzwTQfWAHx/2RRX5it1hjGyHaYLhvKPvieSqOMd4Uo3oLkiVepsvMmPiDYo0ke7/2V",
+      "aadB64": "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCklERU5USVRZ"
+    },
+    "signingPrivateKey": {
+      "saltB64": "EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI=",
+      "nonceB64": "IiIiIiIiIiIiIiIi",
+      "wrappedPrivateJwkB64": "RlbuvF+3fCyD9sax9++iajf7PxSR6HQjAISzqScVeeKfZVkoL2omqg6SLJlFAGO37G8eiH4mvfC2NIgp1zwwrRz/A5GCnozVLFpCDI7YwPV0ggHMICiyKS337gYHDP2+VFVwIFpsSIMlQtqV4TYNHpG5UTxdArmgvzGApHpLL2CUATJj7yBJ2cwK1uKyoqj52EtTeZ6fhv0vcdIt1kUU/umcrutCQEKnHK7GYA24xT0xtprggiJhNMdJCDVk3K6l",
+      "aadB64": "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlClNJR05JTkc="
+    }
+  },
+  "bundleHash": "62b6a8d3cb05f8047c5e8fc2fed76e6bde505188bfc5260138a2a7ae5257bdb3",
+  "challenge": {
+    "challengeId": "challenge_interop_12345",
+    "pendingDeviceId": "device_interop_1234567",
+    "bundleHash": "62b6a8d3cb05f8047c5e8fc2fed76e6bde505188bfc5260138a2a7ae5257bdb3",
+    "challengeB64Url": "MTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTE",
+    "expiresAtMs": 1788000000000
+  },
+  "recoverySignatureB64": "MEQCIEJk6t9rWk0ucAXJJONTWOsD6t4Yfl9h69ezC71NWXjCAiApfwWwXSPD/j/T+3JOqwJtywlQjMdMsfyUgrwJMstMaw=="
+}

@@ -24,6 +24,7 @@ protocol TokenStore: Sendable {
     func string(for key: String) throws -> String?
     func set(_ value: String, for key: String, accessibility: KeychainAccessibility) throws
     func remove(_ key: String) throws
+    func keys(withPrefix prefix: String) throws -> [String]
     /// Removes every item stored under this store's keychain service.
     func removeAll() throws
 }
@@ -34,6 +35,11 @@ extension TokenStore {
     func set(_ value: String, for key: String) throws {
         try set(value, for: key, accessibility: .afterFirstUnlock)
     }
+
+    /// Compatibility for specialized stores that do not expose enumeration.
+    /// Security-sensitive bulk purges must use a store implementation that
+    /// overrides this method and can prove its exact scope.
+    func keys(withPrefix prefix: String) throws -> [String] { [] }
 }
 
 enum KeychainError: Error, LocalizedError, Equatable {
@@ -52,9 +58,11 @@ enum KeychainError: Error, LocalizedError, Equatable {
 
 final class KeychainStore: TokenStore, @unchecked Sendable {
     private let service: String
+    private let accessGroup: String?
 
-    init(service: String = "fr.signalquest.ios") {
+    init(service: String = "fr.signalquest.ios", accessGroup: String? = nil) {
         self.service = service
+        self.accessGroup = accessGroup
     }
 
     func string(for key: String) throws -> String? {
@@ -93,22 +101,47 @@ final class KeychainStore: TokenStore, @unchecked Sendable {
         throw KeychainError.unexpectedStatus(status)
     }
 
+    func keys(withPrefix prefix: String) throws -> [String] {
+        var query = serviceQuery()
+        query[kSecReturnAttributes as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitAll
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound { return [] }
+        guard status == errSecSuccess else { throw KeychainError.unexpectedStatus(status) }
+        let values: [[String: Any]]
+        if let many = item as? [[String: Any]] {
+            values = many
+        } else if let one = item as? [String: Any] {
+            values = [one]
+        } else {
+            throw KeychainError.invalidData
+        }
+        return values.compactMap { $0[kSecAttrAccount as String] as? String }
+            .filter { $0.hasPrefix(prefix) }
+            .sorted()
+    }
+
     func removeAll() throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service
-        ]
+        let query = serviceQuery()
         let status = SecItemDelete(query as CFDictionary)
         if status == errSecSuccess || status == errSecItemNotFound { return }
         throw KeychainError.unexpectedStatus(status)
     }
 
     private func baseQuery(_ key: String) -> [String: Any] {
-        [
+        var query = serviceQuery()
+        query[kSecAttrAccount as String] = key
+        return query
+    }
+
+    private func serviceQuery() -> [String: Any] {
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: key
         ]
+        if let accessGroup { query[kSecAttrAccessGroup as String] = accessGroup }
+        return query
     }
 }
 
@@ -134,10 +167,15 @@ final class InMemoryTokenStore: TokenStore, @unchecked Sendable {
         values.removeValue(forKey: key)
     }
 
+    func keys(withPrefix prefix: String) throws -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return values.keys.filter { $0.hasPrefix(prefix) }.sorted()
+    }
+
     func removeAll() throws {
         lock.lock()
         defer { lock.unlock() }
         values.removeAll()
     }
 }
-

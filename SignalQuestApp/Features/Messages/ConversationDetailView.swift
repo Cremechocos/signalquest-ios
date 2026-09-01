@@ -3,6 +3,7 @@ import PhotosUI
 import UIKit
 import UniformTypeIdentifiers
 import CoreLocation
+import MapKit
 
 struct ConversationDetailView: View {
     let conversation: MessageConversation
@@ -86,6 +87,7 @@ struct ConversationDetailView: View {
     /// portent un TTL de 24 h (le backend pose `expiresAt`).
     @State private var ephemeralEnabled = false
     @State private var isSharingLocation = false
+    @State private var showLiveShare = false
     @State private var showSchedulePicker = false
     @State private var showNewPoll = false
     @State private var reminderTarget: MessageItem?
@@ -114,6 +116,15 @@ struct ConversationDetailView: View {
 
     private var isE2EE: Bool { conversation.e2eeEnabled == true }
     private var canSend: Bool { !isE2EE || isE2EEUnlocked }
+    /// Les médias d'une conversation sont privés même si leur URL ressemble à
+    /// une URL CDN ordinaire. La session est capturée avant chaque rendu afin
+    /// qu'un résultat tardif ne traverse jamais un changement de compte.
+    private var privateImageCacheScope: ImageCacheScope? {
+        guard case .authenticated(let user) = session.state,
+              let localSession = LocalAccountScope.sessionSnapshot(),
+              localSession.ownerScopeId == "user:\(user.id)" else { return nil }
+        return .privateAccount(localSession)
+    }
     /// L'utilisateur peut-il épingler/désépingler (owner/admin) — le backend
     /// renvoie 403 sinon, on masque donc l'action quand le rôle ne le permet pas.
     private var canPin: Bool {
@@ -261,6 +272,16 @@ struct ConversationDetailView: View {
             // Android — auparavant dans l'en-tête, désormais en bas de conversation).
             typingIndicator
                 .padding(.horizontal)
+            if !isE2EE, let currentUserId {
+                LiveShareConversationBar(
+                    coordinator: services.liveShare,
+                    conversation: conversation,
+                    currentUserId: currentUserId,
+                    onManage: { showLiveShare = true }
+                )
+                .padding(.horizontal)
+                .padding(.bottom, SQSpace.xs)
+            }
             composer
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -291,6 +312,15 @@ struct ConversationDetailView: View {
                 // message optimiste.
                 pollsByMessageId[message.id] = poll
                 messages = Self.normalized(messages + [message])
+            }
+        }
+        .sheet(isPresented: $showLiveShare) {
+            if let currentUserId {
+                LiveShareManagementSheet(
+                    coordinator: services.liveShare,
+                    conversation: conversation,
+                    currentUserId: currentUserId
+                )
             }
         }
         .sheet(item: $reminderTarget) { target in
@@ -339,6 +369,12 @@ struct ConversationDetailView: View {
             await markRead()
             await shareKeyIfNeeded()
             await loadPinned()
+            if let currentUserId, !isE2EE {
+                await services.liveShare.load(
+                    conversationId: conversation.id,
+                    currentUserId: currentUserId
+                )
+            }
             startSync()
             startActivePing()
         }
@@ -552,6 +588,7 @@ struct ConversationDetailView: View {
                     showSchedulePicker = true
                 },
                 onShareLocation: { Task { await sendCurrentLocation() } },
+                onLiveShare: { showLiveShare = true },
                 onPickPhoto: { item, caption in Task { await sendAttachment(item: item, caption: caption) } },
                 onVoiceNote: { url, duration in Task { await sendVoiceNote(url: url, duration: duration) } }
             )
@@ -1104,12 +1141,28 @@ struct ConversationDetailView: View {
             ? AnyShape(bubbleShape(mine: mine))
             : AnyShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         return Button {
-            guard let url = attachment.url else { return }
+            guard let url = attachment.url,
+                  case .privateAccount(let accountSession) = privateImageCacheScope else { return }
             Haptics.selection()
-            imageViewerTarget = MessageImageTarget(id: attachment.id ?? url.absoluteString, url: url)
+            imageViewerTarget = MessageImageTarget(
+                id: attachment.id ?? url.absoluteString,
+                url: url,
+                accountSession: accountSession
+            )
         } label: {
-            RemoteImage(url: attachment.url, maxDimension: 240, contentMode: .fill) {
-                Rectangle().fill(SQColor.surfaceMuted).sqShimmer()
+            Group {
+                if let privateImageCacheScope {
+                    RemoteImage(
+                        url: attachment.url,
+                        maxDimension: 240,
+                        contentMode: .fill,
+                        cacheScope: privateImageCacheScope
+                    ) {
+                        Rectangle().fill(SQColor.surfaceMuted).sqShimmer()
+                    }
+                } else {
+                    Rectangle().fill(SQColor.surfaceMuted)
+                }
             }
             .frame(width: size.width, height: size.height)
             .clipShape(shape)
@@ -1424,6 +1477,12 @@ struct ConversationDetailView: View {
             errorMessage = nil
             return
         }
+        // La reprise ne doit jamais retarder l'ouverture de la conversation. Le backend
+        // deduplique par clientRequestId si deux ouvertures reveillent la meme ligne.
+        Task {
+            await service.retryPendingTextMessages()
+            await service.retryPendingAttachments()
+        }
         do {
             let page = try await service.messages(conversationId: conversation.id, cursor: nil)
             messages = Self.normalized(page.messages)
@@ -1692,7 +1751,11 @@ struct ConversationDetailView: View {
 
     private func vote(messageId: String, pollId: String, optionIds: [String]) async {
         do {
-            let updated = try await service.votePoll(pollId: pollId, optionIds: optionIds)
+            let updated = try await service.votePoll(
+                pollId: pollId,
+                optionIds: optionIds,
+                in: conversation
+            )
             pollsByMessageId[messageId] = mergePollTexts(updated, messageId: messageId)
             Haptics.selection()
         } catch {
@@ -1703,7 +1766,7 @@ struct ConversationDetailView: View {
 
     private func closePoll(messageId: String, pollId: String) async {
         do {
-            let updated = try await service.closePoll(pollId: pollId)
+            let updated = try await service.closePoll(pollId: pollId, in: conversation)
             pollsByMessageId[messageId] = mergePollTexts(updated, messageId: messageId)
             Haptics.success()
         } catch {
@@ -1843,8 +1906,8 @@ struct ConversationDetailView: View {
     /// `mimeType` arbitraire, et le backend reconnaît `audio/*` pour déclencher
     /// la transcription de son côté.
     ///
-    /// Le fichier temporaire est supprimé dans TOUS les cas, y compris en échec :
-    /// une note ratée ne doit pas rester dans le cache de l'appareil.
+    /// Le fichier du recorder est supprimé dans tous les cas ; le service en copie d'abord le
+    /// contenu dans son outbox protégée, donc un échec ou kill processus reste reprenable.
     private func sendVoiceNote(url: URL, duration: TimeInterval) async {
         defer { try? FileManager.default.removeItem(at: url) }
         isSending = true
@@ -1857,24 +1920,14 @@ struct ConversationDetailView: View {
                 throw E2EEError.unsupported("Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils.")
             }
             guard let data = try? Data(contentsOf: url), !data.isEmpty else { return }
-            let uploaded = try await service.uploadAttachment(
-                conversationId: conversation.id,
-                data: data,
+            let sent = try await service.sendAttachmentData(
+                data,
                 filename: url.lastPathComponent,
-                mimeType: "audio/m4a"
-            )
-            let attachment = UploadedAttachment(
+                mimeType: "audio/m4a",
                 kind: "AUDIO",
-                url: uploaded.url,
-                fileName: uploaded.fileName ?? url.lastPathComponent,
-                contentType: uploaded.contentType ?? "audio/m4a",
-                size: uploaded.size ?? data.count,
-                width: nil,
-                height: nil
-            )
-            let sent = try await service.sendAttachments(
-                [attachment],
                 caption: "",
+                width: nil,
+                height: nil,
                 in: conversation,
                 replyToId: replyTarget?.id,
                 e2ee: e2ee
@@ -1903,25 +1956,15 @@ struct ConversationDetailView: View {
             }).value else {
                 throw E2EEError.unsupported("Image illisible")
             }
-            let uploaded = try await service.uploadAttachment(
-                conversationId: conversation.id,
-                data: prepared.data,
-                filename: "photo.jpg",
-                mimeType: "image/jpeg"
-            )
-            let attachment = UploadedAttachment(
-                kind: "IMAGE",
-                url: uploaded.url,
-                fileName: uploaded.fileName ?? "photo.jpg",
-                contentType: uploaded.contentType ?? "image/jpeg",
-                size: uploaded.size ?? prepared.data.count,
-                width: uploaded.width ?? prepared.width,
-                height: uploaded.height ?? prepared.height
-            )
             let caption = rawCaption.trimmingCharacters(in: .whitespacesAndNewlines)
-            let sent = try await service.sendAttachments(
-                [attachment],
+            let sent = try await service.sendAttachmentData(
+                prepared.data,
+                filename: "photo.jpg",
+                mimeType: "image/jpeg",
+                kind: "IMAGE",
                 caption: caption,
+                width: prepared.width,
+                height: prepared.height,
                 in: conversation,
                 replyToId: replyTarget?.id,
                 e2ee: e2ee
@@ -1959,9 +2002,17 @@ struct ConversationDetailView: View {
         let alreadyMine = message.reactions.contains { $0.emoji == emoji && $0.userId == currentUserId }
         do {
             if alreadyMine {
-                try await service.removeReaction(messageId: message.id, emoji: emoji)
+                try await service.removeReaction(
+                    messageId: message.id,
+                    emoji: emoji,
+                    in: conversation
+                )
             } else {
-                try await service.react(messageId: message.id, emoji: emoji)
+                try await service.react(
+                    messageId: message.id,
+                    emoji: emoji,
+                    in: conversation
+                )
             }
             await refreshDelta()
         } catch {
@@ -2050,6 +2101,24 @@ struct ConversationDetailView: View {
     }
 
     private func startCall(mode: String) {
+        let verifiedV2: Bool
+        if isE2EE {
+            if case .prepared = E2EEV2CallBridge.prepareRuntimeRequest(conversationId: conversation.id) {
+                verifiedV2 = true
+            } else {
+                verifiedV2 = false
+            }
+        } else {
+            verifiedV2 = true
+        }
+        guard CallLifecyclePolicy.canUseE2EECall(
+            conversationE2EE: isE2EE,
+            verifiedV2: verifiedV2
+        ) else {
+            errorMessage = "Cet appel nécessite E2EE v2 vérifié. Aucun appel non chiffré de bout en bout n’a été lancé."
+            Haptics.error()
+            return
+        }
         guard conversation.participants.count >= 2 else {
             errorMessage = "Aucun autre participant n’est disponible pour cet appel."
             Haptics.error()
@@ -2060,7 +2129,12 @@ struct ConversationDetailView: View {
             Haptics.error()
             return
         }
-        services.callManager.startOutgoingCall(conversationId: conversation.id, mode: mode, displayName: conversationTitle)
+        services.callManager.startOutgoingCall(
+            conversationId: conversation.id,
+            mode: mode,
+            displayName: conversationTitle,
+            requiresE2EE: isE2EE
+        )
     }
 
     private var otherParticipantId: String? {
@@ -2185,3 +2259,497 @@ struct ConversationDetailView: View {
     }
 }
 
+// MARK: - Partage GPS/radio en direct
+
+/// Résumé compact épinglé au-dessus du composer. Il ne montre que les trois
+/// sessions les plus récentes pour ne pas écraser la conversation dans un groupe ;
+/// la sheet de gestion conserve la liste complète.
+private struct LiveShareConversationBar: View {
+    @ObservedObject var coordinator: ConversationLiveShareCoordinator
+    let conversation: MessageConversation
+    let currentUserId: String
+    let onManage: () -> Void
+
+    private var sessions: [LiveShareSession] {
+        coordinator.sessions(for: conversation.id)
+    }
+
+    var body: some View {
+        if !sessions.isEmpty || coordinator.errorMessage != nil {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                HStack(spacing: SQSpace.sm) {
+                    Image(systemName: "dot.radiowaves.left.and.right")
+                        .foregroundStyle(SQColor.brandRed)
+                        .accessibilityHidden(true)
+                    Text("Partage en direct")
+                        .font(SQType.caption.weight(.semibold))
+                        .foregroundStyle(SQColor.label)
+                    Spacer()
+                    Button("Gérer", action: onManage)
+                        .font(SQType.caption.weight(.semibold))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(SQColor.brandRed)
+                }
+
+                ForEach(sessions.prefix(3)) { session in
+                    HStack(spacing: SQSpace.sm) {
+                        Circle()
+                            .fill(session.status == "active" ? SQColor.success : SQColor.brandRed)
+                            .frame(width: 7, height: 7)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(summary(for: session))
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.label)
+                                .lineLimit(1)
+                            if let detail = detail(for: session) {
+                                Text(detail)
+                                    .font(SQType.micro)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        Spacer(minLength: SQSpace.xs)
+                        action(for: session)
+                    }
+                }
+                if sessions.count > 3 {
+                    Text("+ \(sessions.count - 3) autre(s) session(s)")
+                        .font(SQType.micro)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                if let error = coordinator.errorMessage {
+                    Text(error)
+                        .font(SQType.micro)
+                        .foregroundStyle(SQColor.dangerInk)
+                        .lineLimit(2)
+                }
+            }
+            .padding(SQSpace.sm + 2)
+            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                    .stroke(SQColor.separator, lineWidth: 1)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func action(for session: LiveShareSession) -> some View {
+        if session.status == "pending", session.sharerId == currentUserId {
+            Button("Répondre", action: onManage)
+                .font(SQType.micro.weight(.semibold))
+                .buttonStyle(.borderedProminent)
+                .tint(SQColor.brandRed)
+                .controlSize(.small)
+                .frame(minHeight: 44)
+        } else {
+            Button {
+                Task { await coordinator.stop(sessionId: session.id) }
+            } label: {
+                Image(systemName: "stop.circle")
+            }
+            .buttonStyle(.plain)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+            .foregroundStyle(SQColor.brandRed)
+            .disabled(coordinator.isBusy)
+            .accessibilityLabel(session.status == "pending" ? "Annuler la demande" : "Arrêter le partage")
+        }
+    }
+
+    private func summary(for session: LiveShareSession) -> String {
+        if session.status == "pending" {
+            return session.sharerId == currentUserId
+                ? "\(name(for: session.requesterId)) demande votre position"
+                : "Demande envoyée à \(name(for: session.sharerId))"
+        }
+        return session.sharerId == currentUserId
+            ? "Vous partagez avec \(name(for: session.requesterId))"
+            : "\(name(for: session.sharerId)) partage avec vous"
+    }
+
+    private func detail(for session: LiveShareSession) -> String? {
+        guard session.status == "active" else { return "En attente de réponse" }
+        let payload = coordinator.payload(for: session.id)
+        let radio = payload?.radio
+        let parts = [
+            radio?.displayOperatorName,
+            radio?.technology ?? radio?.connectionType,
+            radio?.band.map { "B\($0)" },
+            radio?.rsrp.map { "RSRP \($0) dBm" }
+        ].compactMap { $0 }.filter { !$0.isEmpty }
+        if !parts.isEmpty { return parts.joined(separator: " · ") }
+        return payload?.location == nil ? "En attente de la première position" : "Position actualisée"
+    }
+
+    private func name(for userId: String) -> String {
+        if userId == currentUserId { return "vous" }
+        if let name = conversation.participants.first(where: { $0.userId == userId })?.user.displayName,
+           !name.isEmpty { return name }
+        return "un participant"
+    }
+}
+
+private struct LiveShareManagementSheet: View {
+    @ObservedObject var coordinator: ConversationLiveShareCoordinator
+    let conversation: MessageConversation
+    let currentUserId: String
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var message = ""
+    @State private var mode: String
+    @State private var selectedTargetId: String
+    @State private var selectedBroadcastIds: Set<String>
+
+    init(
+        coordinator: ConversationLiveShareCoordinator,
+        conversation: MessageConversation,
+        currentUserId: String
+    ) {
+        self.coordinator = coordinator
+        self.conversation = conversation
+        self.currentUserId = currentUserId
+        let targets = conversation.participants.filter { $0.userId != currentUserId }
+        _mode = State(initialValue: conversation.isGroup ? "broadcast" : "targeted")
+        _selectedTargetId = State(initialValue: targets.first?.userId ?? "")
+        _selectedBroadcastIds = State(initialValue: Set(targets.map(\.userId)))
+    }
+
+    private var targets: [ConversationParticipant] {
+        conversation.participants.filter { $0.userId != currentUserId }
+    }
+
+    private var sessions: [LiveShareSession] {
+        coordinator.sessions(for: conversation.id)
+    }
+
+    private var canSubmit: Bool {
+        guard !coordinator.isBusy else { return false }
+        guard conversation.isGroup else { return !targets.isEmpty }
+        return mode == "targeted" ? !selectedTargetId.isEmpty : !selectedBroadcastIds.isEmpty
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: SQSpace.lg) {
+                    disclosure
+
+                    if !sessions.isEmpty {
+                        VStack(alignment: .leading, spacing: SQSpace.sm) {
+                            Text("Sessions en cours")
+                                .font(SQType.heading)
+                                .foregroundStyle(SQColor.label)
+                            ForEach(sessions) { session in
+                                LiveShareSessionCard(
+                                    coordinator: coordinator,
+                                    session: session,
+                                    conversation: conversation,
+                                    currentUserId: currentUserId
+                                )
+                            }
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: SQSpace.md) {
+                        Text("Nouveau partage")
+                            .font(SQType.heading)
+                            .foregroundStyle(SQColor.label)
+
+                        if conversation.isGroup {
+                            Picker("Destinataires", selection: $mode) {
+                                Text("Une personne").tag("targeted")
+                                Text("Plusieurs").tag("broadcast")
+                            }
+                            .pickerStyle(.segmented)
+
+                            if mode == "targeted" {
+                                Picker("Participant", selection: $selectedTargetId) {
+                                    ForEach(targets) { participant in
+                                        Text(participant.user.displayName).tag(participant.userId)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                            } else {
+                                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                                    ForEach(targets) { participant in
+                                        Toggle(
+                                            participant.user.displayName,
+                                            isOn: binding(for: participant.userId)
+                                        )
+                                        .tint(SQColor.brandRed)
+                                    }
+                                }
+                            }
+                        }
+
+                        TextField("Message facultatif", text: $message, axis: .vertical)
+                            .lineLimit(1...3)
+                            .textFieldStyle(.roundedBorder)
+
+                        HStack(spacing: SQSpace.sm) {
+                            Button {
+                                create(offerShare: true)
+                            } label: {
+                                Label("Partager", systemImage: "dot.radiowaves.left.and.right")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(SQColor.brandRed)
+
+                            Button {
+                                create(offerShare: false)
+                            } label: {
+                                Text("Demander")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(SQColor.brandRed)
+                        }
+                        .disabled(!canSubmit)
+                    }
+                    .padding(SQSpace.md)
+                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
+                            .stroke(SQColor.separator, lineWidth: 1)
+                    }
+
+                    if let error = coordinator.errorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.dangerInk)
+                    }
+                }
+                .padding()
+            }
+            .signalQuestBackground()
+            .navigationTitle("Partage en direct")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Fermer") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private var disclosure: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Label("Actif uniquement au premier plan", systemImage: "iphone.and.arrow.forward")
+                .font(SQType.caption.weight(.semibold))
+                .foregroundStyle(SQColor.label)
+            Text("Sur iPhone, l’envoi se met en pause si tu verrouilles l’écran ou quittes SignalQuest. Il reprend au retour tant que la session n’a pas été arrêtée.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+            Text("iOS partage la position, la technologie et l’opérateur disponibles. Apple n’expose pas les niveaux RSRP/RSRQ à l’app.")
+                .font(SQType.micro)
+                .foregroundStyle(SQColor.labelTertiary)
+        }
+        .padding(SQSpace.md)
+        .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+    }
+
+    private func binding(for userId: String) -> Binding<Bool> {
+        Binding(
+            get: { selectedBroadcastIds.contains(userId) },
+            set: { selected in
+                if selected { selectedBroadcastIds.insert(userId) }
+                else { selectedBroadcastIds.remove(userId) }
+            }
+        )
+    }
+
+    private func create(offerShare: Bool) {
+        let targetId = conversation.isGroup && mode == "targeted" ? selectedTargetId : nil
+        let targetIds = conversation.isGroup && mode == "broadcast"
+            ? Array(selectedBroadcastIds).sorted()
+            : []
+        Task {
+            await coordinator.create(
+                conversationId: conversation.id,
+                e2eeEnabled: conversation.e2eeEnabled == true,
+                currentUserId: currentUserId,
+                offerShare: offerShare,
+                message: message,
+                mode: conversation.isGroup ? mode : nil,
+                targetUserId: targetId,
+                targetUserIds: targetIds
+            )
+            if coordinator.errorMessage == nil { message = "" }
+        }
+    }
+}
+
+private struct LiveShareSessionCard: View {
+    @ObservedObject var coordinator: ConversationLiveShareCoordinator
+    let session: LiveShareSession
+    let conversation: MessageConversation
+    let currentUserId: String
+
+    private var payload: LiveSharePayload? { coordinator.payload(for: session.id) }
+    private var isIncomingRequest: Bool {
+        session.status == "pending" && session.sharerId == currentUserId
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(SQType.body.weight(.semibold))
+                        .foregroundStyle(SQColor.label)
+                    Text(session.status == "active" ? "En direct" : "En attente")
+                        .font(SQType.micro.weight(.semibold))
+                        .foregroundStyle(session.status == "active" ? SQColor.success : SQColor.brandRed)
+                }
+                Spacer()
+                if coordinator.isBusy { ProgressView().controlSize(.small) }
+            }
+
+            if let message = session.message, !message.isEmpty {
+                Text(message)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+
+            if session.status == "active", let location = payload?.location {
+                LiveShareMapPreview(location: location)
+            } else if session.status == "active" {
+                Text(payload?.radio == nil
+                     ? "En attente de la première position…"
+                     : "GPS indisponible, données réseau reçues.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+
+            if let radioLine {
+                Label(radioLine, systemImage: "antenna.radiowaves.left.and.right")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            if let updated = session.lastUpdateAt {
+                Text("Actualisé à \(updated.formatted(date: .omitted, time: .standard))")
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelTertiary)
+            }
+
+            if isIncomingRequest {
+                HStack(spacing: SQSpace.sm) {
+                    Button("Accepter") {
+                        Task { await coordinator.accept(sessionId: session.id) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(SQColor.brandRed)
+                    Button("Refuser") {
+                        Task { await coordinator.decline(sessionId: session.id) }
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(SQColor.brandRed)
+                }
+                .disabled(coordinator.isBusy)
+            } else {
+                Button(role: .destructive) {
+                    Task { await coordinator.stop(sessionId: session.id) }
+                } label: {
+                    Label(session.status == "pending" ? "Annuler la demande" : "Arrêter", systemImage: "stop.circle")
+                }
+                .buttonStyle(.bordered)
+                .disabled(coordinator.isBusy)
+            }
+        }
+        .padding(SQSpace.md)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
+                .stroke(SQColor.separator, lineWidth: 1)
+        }
+    }
+
+    private var title: String {
+        if session.status == "pending" {
+            return isIncomingRequest
+                ? "\(name(for: session.requesterId)) demande votre partage"
+                : "Demande envoyée à \(name(for: session.sharerId))"
+        }
+        return session.sharerId == currentUserId
+            ? "Vous partagez avec \(name(for: session.requesterId))"
+            : "\(name(for: session.sharerId)) partage avec vous"
+    }
+
+    private var radioLine: String? {
+        guard let radio = payload?.radio else { return nil }
+        let parts = [
+            radio.displayOperatorName,
+            radio.technology ?? radio.connectionType,
+            radio.band.map { "B\($0)" },
+            radio.rsrp.map { "RSRP \($0) dBm" },
+            radio.rsrq.map { "RSRQ \($0) dB" },
+            radio.snr.map { "SINR \($0) dB" }
+        ].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private func name(for userId: String) -> String {
+        if userId == currentUserId { return "vous" }
+        return conversation.participants.first(where: { $0.userId == userId })?.user.displayName
+            ?? (userId == session.requesterId ? session.requester?.name : session.sharer?.name)
+            ?? "un participant"
+    }
+}
+
+private struct LiveShareMapPreview: View {
+    let location: LiveShareLocation
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var region: MKCoordinateRegion
+
+    init(location: LiveShareLocation) {
+        self.location = location
+        _region = State(initialValue: Self.region(for: location))
+    }
+
+    var body: some View {
+        Map(coordinateRegion: $region, annotationItems: [LiveShareMapPoint(location: location)]) { point in
+            MapAnnotation(coordinate: point.coordinate) {
+                Image(systemName: "location.circle.fill")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(SQColor.brandRed, Color.white)
+                    .shadow(radius: 3)
+                    .accessibilityLabel("Position partagée")
+            }
+        }
+        .frame(height: 180)
+        .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .overlay(alignment: .bottomLeading) {
+            Text(String(format: "%.5f, %.5f", location.latitude, location.longitude))
+                .font(SQType.micro.monospacedDigit())
+                .padding(.horizontal, SQSpace.sm)
+                .padding(.vertical, SQSpace.xs)
+                .background(.ultraThinMaterial, in: Capsule())
+                .padding(SQSpace.sm)
+        }
+        .onChangeCompat(of: location) { _, newValue in
+            withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) {
+                region = Self.region(for: newValue)
+            }
+        }
+    }
+
+    private static func region(for location: LiveShareLocation) -> MKCoordinateRegion {
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude),
+            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+        )
+    }
+}
+
+private struct LiveShareMapPoint: Identifiable {
+    let id = "live-share"
+    let coordinate: CLLocationCoordinate2D
+
+    init(location: LiveShareLocation) {
+        coordinate = CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude)
+    }
+}

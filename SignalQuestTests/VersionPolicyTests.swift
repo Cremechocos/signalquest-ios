@@ -144,4 +144,113 @@ final class VersionPolicyTests: XCTestCase {
         XCTAssertFalse(VersionPolicyState.updateRecommended(message: nil, storeURL: nil).blocksApp)
         XCTAssertTrue(VersionPolicyState.updateRequired(message: nil, storeURL: nil).blocksApp)
     }
+
+    func testProtocolPolicyDefaultsToLegacySafeValues() throws {
+        let decoded = try JSONDecoder.signalQuest.decode(AppVersionPolicy.self, from: Data("{}".utf8))
+        XCTAssertEqual(decoded.serverProtocolVersion, 1)
+        XCTAssertEqual(decoded.minWriteProtocol, 1)
+        XCTAssertNil(decoded.legacyWriteDeadline)
+        XCTAssertTrue(decoded.serverCapabilities.isEmpty)
+        XCTAssertEqual(
+            ClientProtocolContract.evaluateWriteStatus(
+                minWriteProtocol: decoded.minWriteProtocol,
+                legacyWriteDeadline: decoded.legacyWriteDeadline
+            ),
+            .current
+        )
+    }
+
+    func testProtocolPolicyHasAnExplicitGraceBoundary() throws {
+        let json = """
+        {
+          "serverProtocolVersion": 2,
+          "minWriteProtocol": 2,
+          "legacyWriteDeadline": "2026-10-01T00:00:00.000Z",
+          "serverCapabilities": ["network_identity_v2", "INVALID VALUE"]
+        }
+        """
+        let decoded = try JSONDecoder.signalQuest.decode(AppVersionPolicy.self, from: Data(json.utf8))
+        let deadline = try XCTUnwrap(decoded.legacyWriteDeadline)
+        XCTAssertEqual(decoded.serverProtocolVersion, 2)
+        XCTAssertEqual(decoded.minWriteProtocol, 2)
+        XCTAssertEqual(decoded.serverCapabilities, ["network_identity_v2"])
+        XCTAssertEqual(
+            ClientProtocolContract.evaluateWriteStatus(
+                minWriteProtocol: 2,
+                legacyWriteDeadline: deadline,
+                now: deadline.addingTimeInterval(-1)
+            ),
+            .legacyGrace
+        )
+        XCTAssertEqual(
+            ClientProtocolContract.evaluateWriteStatus(
+                minWriteProtocol: 2,
+                legacyWriteDeadline: deadline,
+                now: deadline
+            ),
+            .blocked
+        )
+    }
+
+    func testCurrentCapabilitiesDoNotClaimE2EEV2Prematurely() {
+        XCTAssertEqual(ClientProtocolContract.currentProtocolVersion, 1)
+        XCTAssertFalse(ClientProtocolContract.capabilities.contains { $0.contains("e2ee_v2") })
+    }
+
+    func testE2EEV2PreviewAndUnauditedContractsRemainDisabled() {
+        let policy = ClientProtocolPolicy(
+            serverProtocolVersion: 2,
+            minWriteProtocol: 1,
+            legacyWriteDeadline: nil,
+            serverCapabilities: [E2EEV2ActivationPolicy.contractPreviewCapability],
+            writeStatus: .current
+        )
+        XCTAssertEqual(
+            E2EEV2ActivationPolicy.evaluate(policy: policy, securityReviewApproved: false),
+            .disabled(reason: .securityReviewRequired, missingCapabilities: [])
+        )
+        XCTAssertFalse(
+            ClientProtocolContract.capabilities.contains(E2EEV2ActivationPolicy.contractPreviewCapability)
+        )
+    }
+
+    func testE2EEV2RequiresSymmetricReviewedCapabilities() {
+        let required = E2EEV2ActivationPolicy.requiredFullCapabilities
+        let incompletePolicy = ClientProtocolPolicy(
+            serverProtocolVersion: 2,
+            minWriteProtocol: 1,
+            legacyWriteDeadline: nil,
+            serverCapabilities: [E2EEV2ActivationPolicy.deviceIdentityCapability],
+            writeStatus: .current
+        )
+        guard case let .disabled(reason, missing) = E2EEV2ActivationPolicy.evaluate(
+            policy: incompletePolicy,
+            securityReviewApproved: true,
+            requiredCapabilities: required,
+            clientProtocolVersion: 2,
+            clientCapabilities: required
+        ) else {
+            return XCTFail("Une capacité serveur partielle ne doit jamais activer E2EE v2")
+        }
+        XCTAssertEqual(reason, .capabilityMissing)
+        XCTAssertFalse(missing.isEmpty)
+
+        let completePolicy = ClientProtocolPolicy(
+            serverProtocolVersion: 2,
+            minWriteProtocol: 2,
+            legacyWriteDeadline: nil,
+            serverCapabilities: required,
+            writeStatus: .current
+        )
+        XCTAssertEqual(
+            E2EEV2ActivationPolicy.evaluate(
+                policy: completePolicy,
+                securityReviewApproved: true,
+                requiredCapabilities: required,
+                clientProtocolVersion: 2,
+                clientCapabilities: required
+            ),
+            .enabled
+        )
+    }
 }

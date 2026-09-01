@@ -18,28 +18,62 @@ enum AppEnvironment {
         return ["1", "true", "yes", "on"].contains(value ?? "")
     }
 
-    // Drapeaux de lancement réservés à la QA. Gardés derrière #if DEBUG pour qu'un
-    // binaire de distribution ne puisse PAS contourner l'authentification (mode
-    // démo) ni l'état de session via des arguments de lancement (cf. audit
-    // SECURITY-04). En Release, ils valent toujours `false`.
-    #if DEBUG
+    /// Autorise le binaire Release de mesure uniquement dans CoreSimulator.
+    /// Sur appareil physique, `targetEnvironment(simulator)` est éliminé à la
+    /// compilation : aucune variable d'environnement ne peut ouvrir le mode démo.
+    private static var allowsSimulatorPerformanceQA: Bool {
+        #if targetEnvironment(simulator)
+        boolEnvironmentValue("SQ_PERFORMANCE_QA")
+        #else
+        false
+        #endif
+    }
+
+    // Drapeaux de lancement réservés à la QA. Debug les conserve pour les tests
+    // courants ; Release ne les accepte que dans le simulateur de performance
+    // explicitement marqué. Une archive App Store physique reste fail-closed.
     static var usesDemoData: Bool {
-        ProcessInfo.processInfo.arguments.contains("--mock-auth") ||
-        ProcessInfo.processInfo.arguments.contains("--demo-data")
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("--mock-auth") ||
+            ProcessInfo.processInfo.arguments.contains("--demo-data")
+        #else
+        return allowsSimulatorPerformanceQA && (
+            ProcessInfo.processInfo.arguments.contains("--mock-auth") ||
+            ProcessInfo.processInfo.arguments.contains("--demo-data")
+        )
+        #endif
     }
 
     static var resetsAuthOnLaunch: Bool {
-        ProcessInfo.processInfo.arguments.contains("--reset-auth")
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("--reset-auth")
+        #else
+        return allowsSimulatorPerformanceQA &&
+            ProcessInfo.processInfo.arguments.contains("--reset-auth")
+        #endif
+    }
+
+    /// Réinitialise uniquement le drapeau d'onboarding pour les tests UI qui
+    /// doivent démarrer sur une première ouverture. Ne jamais utiliser ce
+    /// mécanisme hors Debug : il ne doit pas pouvoir modifier le parcours d'un
+    /// utilisateur distribué.
+    static var resetsOnboardingOnLaunch: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("--reset-onboarding")
+        #else
+        return allowsSimulatorPerformanceQA &&
+            ProcessInfo.processInfo.arguments.contains("--reset-onboarding")
+        #endif
     }
 
     static var startsOnMap: Bool {
-        ProcessInfo.processInfo.arguments.contains("--start-map")
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("--start-map")
+        #else
+        return allowsSimulatorPerformanceQA &&
+            ProcessInfo.processInfo.arguments.contains("--start-map")
+        #endif
     }
-    #else
-    static var usesDemoData: Bool { false }
-    static var resetsAuthOnLaunch: Bool { false }
-    static var startsOnMap: Bool { false }
-    #endif
 
     #if DEBUG
     static var runsSpeedtestQA: Bool {
@@ -74,14 +108,15 @@ enum AppEnvironment {
     static var injectedAuthToken: String? { nil }
     #endif
 
-    // Drapeaux de mise en scène QA (carte, navigation, temporisations). Mêmes
-    // règles que ci-dessus : en Release ce sont des constantes `false`, donc le
-    // compilateur élimine les branches qui les consomment — et avec elles les
-    // jeux de données de démonstration (identifiants de photos réels, URLs S3,
-    // amis fictifs) qui n'ont rien à faire dans un binaire signé.
-    #if DEBUG
+    // Drapeaux de mise en scène QA (carte, navigation, temporisations). En
+    // Release ils exigent la même garde CoreSimulator explicite.
     private static func hasArgument(_ flag: String) -> Bool {
-        ProcessInfo.processInfo.arguments.contains(flag)
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains(flag)
+        #else
+        return allowsSimulatorPerformanceQA &&
+            ProcessInfo.processInfo.arguments.contains(flag)
+        #endif
     }
 
     static var usesDemoPhotos: Bool { hasArgument("--qa-demo-photos") }
@@ -92,24 +127,14 @@ enum AppEnvironment {
     static var opensPhotoSheet: Bool { hasArgument("--qa-open-photo") }
     static var opensFriendSheet: Bool { hasArgument("--qa-open-friend") }
     static var opensMessagesTab: Bool { hasArgument("--qa-tab-messages") }
+    static var startsOnProfileQA: Bool { hasArgument("--qa-tab-profile") }
+    static var startsOnCommunityQA: Bool { hasArgument("--qa-tab-community") }
     static var opensANFRMap: Bool { hasArgument("--qa-anfr-map") }
     static var opensANFRStats: Bool { hasArgument("--qa-anfr-stats") }
     static var usesLegacyDock: Bool { hasArgument("--qa-legacy-dock") }
     static var delaysLoadForQA: Bool { hasArgument("--qa-slow-load") }
     static var resetsMapOnLaunch: Bool { hasArgument("--reset-map") }
-    #else
-    static var usesDemoPhotos: Bool { false }
-    static var usesDemoFriends: Bool { false }
-    static var walksDemoFriends: Bool { false }
-    static var opensMapLayers: Bool { false }
-    static var opensAntennaSheet: Bool { false }
-    static var opensPhotoSheet: Bool { false }
-    static var opensFriendSheet: Bool { false }
-    static var opensMessagesTab: Bool { false }
-    static var opensANFRMap: Bool { false }
-    static var opensANFRStats: Bool { false }
-    static var usesLegacyDock: Bool { false }
-    static var delaysLoadForQA: Bool { false }
-    static var resetsMapOnLaunch: Bool { false }
-    #endif
+    /// Ouvre uniquement le chemin d'appel E2EE v2 local. Le gate réseau vérifie
+    /// encore séparément que l'API et LiveKit utilisent des origines loopback.
+    static var runsE2EEV2CallQA: Bool { hasArgument("--qa-e2ee-v2-calls") }
 }

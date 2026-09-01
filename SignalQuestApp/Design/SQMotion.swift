@@ -40,19 +40,36 @@ enum SQMotion {
     static func resolve(_ animation: Animation, _ reduceMotion: Bool) -> Animation? {
         reduceMotion ? nil : animation
     }
+
+    /// Construit une boucle uniquement lorsqu'elle peut réellement être rendue.
+    ///
+    /// Contrairement à un simple masquage de la vue animée, ce garde évite même
+    /// l'appel à `repeatForever` lorsque « Réduire les animations » est actif ou
+    /// lorsque la surface concernée n'est plus visible.
+    static func repeating(
+        _ animation: Animation,
+        autoreverses: Bool = true,
+        delay: Double = 0,
+        active: Bool = true,
+        reduceMotion: Bool
+    ) -> Animation? {
+        guard active, !reduceMotion else { return nil }
+        let repeated = animation.repeatForever(autoreverses: autoreverses)
+        return delay > 0 ? repeated.delay(delay) : repeated
+    }
 }
 
 extension View {
     /// Animation that is automatically suppressed when Reduce Motion is enabled.
     /// Prefer this over `.animation(_:value:)` so motion honours accessibility.
-    func sqAnimation<V: Equatable>(_ animation: Animation, value: V) -> some View {
+    func sqAnimation<V: Equatable>(_ animation: Animation?, value: V) -> some View {
         modifier(SQReduceMotionAnimation(animation: animation, value: value))
     }
 }
 
 private struct SQReduceMotionAnimation<V: Equatable>: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let animation: Animation
+    let animation: Animation?
     let value: V
 
     func body(content: Content) -> some View {

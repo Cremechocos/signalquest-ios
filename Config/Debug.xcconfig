@@ -5,16 +5,16 @@ SQ_APS_ENVIRONMENT = development
 SQ_ENVIRONMENT = development
 SQ_DISPLAY_NAME = SignalQuest
 SQ_APP_GROUP = group.fr.signalquest.ios
+SQ_NOTIFICATION_KEYCHAIN_GROUP = fr.signalquest.ios.notifications
 SQ_ASSOCIATED_DOMAIN = webcredentials:signalquest.fr
 // Liens universels : le lien de partage Sentinelle ouvre l'app, pas Safari.
 // Chemins revendiqués côté serveur, dans .well-known/apple-app-site-association.
 SQ_APPLINKS_DOMAIN = applinks:signalquest.fr
 SQ_URL_SCHEME = signalquest
 // Fichier d'entitlements de la cible app (project.yml lit $(SQ_ENTITLEMENTS)).
-// Un seul fichier pour les trois configurations depuis qu'Apple a accordé la
-// catégorie CarPlay « Driving Task » : la clé peut vivre dans le fichier
-// commun, elle est présente dans les profils. L'indirection reste pour pouvoir
-// surcharger localement au besoin (cf. Local.xcconfig plus bas).
+// Le fichier partagé reste limité aux entitlements réellement présents dans les
+// profils de signature. Pour tester CarPlay au simulateur, Local.xcconfig peut
+// pointer vers un fichier d'entitlements local non suivi (voir .gitignore).
 SQ_ENTITLEMENTS = SignalQuestApp/SignalQuest.entitlements
 SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG
 

@@ -189,6 +189,17 @@ struct SentinelleLatencyChart: View {
         // l'écran ne dirait rien de la période à qui ne voit pas la courbe.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilitySummary)
+        // Alternative tabulaire non visuelle : VoiceOver parcourt de vraies
+        // mesures datées au lieu de dépendre du glissement sur la courbe.
+        .accessibilityRepresentation {
+            VStack(alignment: .leading) {
+                Text(accessibilitySummary)
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(Array(series.samples.suffix(50))) { sample in
+                    Text("\(sample.at.formatted(date: .abbreviated, time: .shortened)) : \(SentinelleWording.ms(sample.rttMs))")
+                }
+            }
+        }
     }
 
     /// Le trait de lecture n'existe que sous le doigt.
@@ -303,6 +314,15 @@ struct SentinelleFamilyChart: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(summary(series))
+        .accessibilityRepresentation {
+            VStack(alignment: .leading) {
+                Text(summary(series))
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(accessibilitySamples(series)) { sample in
+                    Text("\(sample.family?.label ?? "Réseau"), \(sample.at.formatted(date: .abbreviated, time: .shortened)) : \(SentinelleWording.ms(sample.rttMs))")
+                }
+            }
+        }
 
         // Les valeurs des deux piles à l'instant lu, côte à côte. C'est la
         // raison d'être de ce graphe : voir l'écart au MÊME moment, pas deux
@@ -359,6 +379,12 @@ struct SentinelleFamilyChart: View {
         guard let date: Date = proxy.value(atX: x - origin) else { return }
         if readAt == nil { Haptics.selection() }
         readAt = date
+    }
+
+    private func accessibilitySamples(
+        _ series: [(SentinelleFamily, SentinelleLatencySeries)]
+    ) -> [SentinelleLatencySample] {
+        Array(series.flatMap { $0.1.samples }.sorted { $0.at < $1.at }.suffix(50))
     }
 
     /// Légende maison : celle de Swift Charts ne connaît ni la typographie ni

@@ -77,8 +77,31 @@ struct NetworkPathStatus: Equatable, Sendable {
     let operatorName: String?
     let operatorMcc: Int?
     let operatorMnc: Int?
+    /// PLMN de la SIM exposé par CoreTelephony. Ce n'est pas une preuve du
+    /// réseau servant en roaming et ne doit jamais être envoyé comme tel.
+    let simPlmn: String?
     let isExpensive: Bool
     let isConstrained: Bool
+
+    init(
+        connection: NetworkConnectionKind,
+        cellularTechnology: CellularRadioTechnology?,
+        operatorName: String?,
+        operatorMcc: Int?,
+        operatorMnc: Int?,
+        simPlmn: String? = nil,
+        isExpensive: Bool,
+        isConstrained: Bool
+    ) {
+        self.connection = connection
+        self.cellularTechnology = cellularTechnology
+        self.operatorName = operatorName
+        self.operatorMcc = operatorMcc
+        self.operatorMnc = operatorMnc
+        self.simPlmn = simPlmn
+        self.isExpensive = isExpensive
+        self.isConstrained = isConstrained
+    }
 
     static let unknown = NetworkPathStatus(
         connection: .other,
@@ -136,7 +159,8 @@ struct NetworkPathStatus: Equatable, Sendable {
         cellularTechnology: CellularRadioTechnology? = nil,
         operatorName: String? = nil,
         operatorMcc: Int? = nil,
-        operatorMnc: Int? = nil
+        operatorMnc: Int? = nil,
+        simPlmn: String? = nil
     ) -> NetworkPathStatus {
         let connection: NetworkConnectionKind
         if snapshot.usesCellular {
@@ -152,12 +176,14 @@ struct NetworkPathStatus: Equatable, Sendable {
         let activeOperatorName = connection == .cellular ? operatorName : nil
         let activeMcc = connection == .cellular ? operatorMcc : nil
         let activeMnc = connection == .cellular ? operatorMnc : nil
+        let activeSimPlmn = connection == .cellular ? simPlmn : nil
         return NetworkPathStatus(
             connection: connection,
             cellularTechnology: activeCellularTechnology,
             operatorName: activeOperatorName,
             operatorMcc: activeMcc,
             operatorMnc: activeMnc,
+            simPlmn: activeSimPlmn,
             isExpensive: snapshot.isExpensive,
             isConstrained: snapshot.isConstrained
         )
@@ -243,7 +269,7 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
     /// réseau actif. Utile pour cibler l'opérateur de la SIM même quand l'app est
     /// sur WiFi (le `status` ne porte le PLMN que si le chemin actif est cellulaire).
     /// Peut être (nil, nil) si iOS masque le code réseau (16.4+).
-    func simPLMN() -> (mcc: Int?, mnc: Int?) {
+    func simPLMN() -> (mcc: Int?, mnc: Int?, plmn: String?) {
         currentCellularPLMN()
     }
 
@@ -251,13 +277,16 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
         if latestPathSnapshot.usesCellular { logCarrierDiagnosticsIfNeeded() }
         let cellularTechnology = latestPathSnapshot.usesCellular ? currentCellularTechnology() : nil
         let operatorName = latestPathSnapshot.usesCellular ? currentCarrierName() : nil
-        let plmn: (mcc: Int?, mnc: Int?) = latestPathSnapshot.usesCellular ? currentCellularPLMN() : (mcc: nil, mnc: nil)
+        let plmn: (mcc: Int?, mnc: Int?, plmn: String?) = latestPathSnapshot.usesCellular
+            ? currentCellularPLMN()
+            : (mcc: nil, mnc: nil, plmn: nil)
         let next = NetworkPathStatus.map(
             latestPathSnapshot,
             cellularTechnology: cellularTechnology,
             operatorName: operatorName,
             operatorMcc: plmn.mcc,
-            operatorMnc: plmn.mnc
+            operatorMnc: plmn.mnc,
+            simPlmn: plmn.plmn
         )
         // `refreshStatus()` est appelé à chaque notification radio
         // (`CTServiceRadioAccessTechnologyDidChange`), très fréquente en
@@ -322,10 +351,10 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
         #endif
     }
 
-    private func currentCellularPLMN() -> (mcc: Int?, mnc: Int?) {
+    private func currentCellularPLMN() -> (mcc: Int?, mnc: Int?, plmn: String?) {
         guard let provider = currentCellularProvider(),
               let plmn = Self.plmn(from: provider) else {
-            return (nil, nil)
+            return (nil, nil, nil)
         }
         return plmn
     }
@@ -356,14 +385,36 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
         return raw
     }
 
-    private static func plmn(from provider: CTCarrier) -> (mcc: Int?, mnc: Int?)? {
-        let mcc = parsePLMNComponent(provider.mobileCountryCode)
-        let mnc = parsePLMNComponent(provider.mobileNetworkCode)
+    private static func plmn(from provider: CTCarrier) -> (mcc: Int?, mnc: Int?, plmn: String?)? {
+        let rawMcc = normalizedPLMNComponent(provider.mobileCountryCode, lengths: [3], allowZero: false)
+        let rawMnc = normalizedPLMNComponent(provider.mobileNetworkCode, lengths: [2, 3], allowZero: true)
+        let mcc = rawMcc.flatMap(Int.init)
+            ?? parsePLMNComponent(provider.mobileCountryCode, allowZero: false)
+        let mnc = rawMnc.flatMap(Int.init)
+            ?? parsePLMNComponent(provider.mobileNetworkCode, allowZero: true)
         guard mcc != nil || mnc != nil else { return nil }
-        return (mcc, mnc)
+        let exactPlmn = rawMcc.flatMap { mcc in rawMnc.map { mnc in mcc + mnc } }
+        return (mcc, mnc, exactPlmn)
     }
 
-    private static func parsePLMNComponent(_ value: String?) -> Int? {
+    private static func normalizedPLMNComponent(
+        _ value: String?,
+        lengths: Set<Int>,
+        allowZero: Bool
+    ) -> String? {
+        guard let raw = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              lengths.contains(raw.count),
+              raw != "--",
+              raw.allSatisfy(\.isNumber),
+              let parsed = Int(raw),
+              parsed != 65535,
+              allowZero ? parsed >= 0 : parsed > 0 else {
+            return nil
+        }
+        return raw
+    }
+
+    private static func parsePLMNComponent(_ value: String?, allowZero: Bool) -> Int? {
         guard let raw = value?.trimmingCharacters(in: .whitespacesAndNewlines),
               !raw.isEmpty,
               raw != "--",
@@ -372,7 +423,7 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
               // 65535 (0xFFFF) est le placeholder renvoyé par iOS 16+ quand le code
               // réseau n'est plus exposé : on ne le propage pas comme MCC/MNC réel.
               parsed != 65535,
-              parsed > 0 else {
+              allowZero ? parsed >= 0 : parsed > 0 else {
             return nil
         }
         return parsed
@@ -406,6 +457,7 @@ extension NetworkPathStatus {
             operatorName: fallback,
             operatorMcc: operatorMcc,
             operatorMnc: operatorMnc,
+            simPlmn: simPlmn,
             isExpensive: isExpensive,
             isConstrained: isConstrained
         )

@@ -8,6 +8,26 @@ import XCTest
 /// serveur ignore.
 final class RadioLogsTests: XCTestCase {
 
+    func testLegacyOperatorAliasNeedsExplicitFrenchEvidence() {
+        XCTAssertNil(RadioLogOperatorResolver.operatorKey(forOperator: "ByTel"))
+        XCTAssertNil(RadioLogOperatorResolver.marketCode(forOperator: "SFR", mcc: nil))
+        XCTAssertNil(RadioLogOperatorResolver.mccMnc(forOperator: "SFR", marketCode: nil))
+
+        XCTAssertEqual(
+            RadioLogOperatorResolver.operatorKey(
+                forOperator: "ByTel",
+                marketCode: "FR"
+            ),
+            "BOUYGUES"
+        )
+        XCTAssertEqual(
+            RadioLogOperatorResolver.mccMnc(forOperator: "SFR", marketCode: "FR")?.mnc,
+            "10"
+        )
+        XCTAssertEqual(RadioLogOperatorResolver.marketCode(forOperator: nil, mcc: "208"), "FR")
+        XCTAssertEqual(RadioLogOperatorResolver.marketCode(forOperator: "ZB", mcc: nil), "FR")
+    }
+
     // MARK: Décodage
 
     /// `ci` est un `BigInt` côté serveur : `JSON.stringify` refuse de le
@@ -31,15 +51,15 @@ final class RadioLogsTests: XCTestCase {
         XCTAssertFalse(page.hasMore)
     }
 
-    /// Un NCI 5G dépasse 2^36 : il doit survivre au décodage sans perte.
+    /// Une NCI sur 36 bits peut dépasser la capacité d'un ECI LTE sur 28 bits.
     func testDecodesLargeNrCellIdentity() throws {
         let json = """
         {"items":[{"id":"c2","dedupeKey":"cap|2","scope":"cap","technology":"NR",
-        "gnb":"9881","ci":"161806340","observedAt":"2026-07-01T10:00:00.000Z",
+        "gnb":"1060426","ci":"17374019585","observedAt":"2026-07-01T10:00:00.000Z",
         "updatedAt":"2026-07-01T10:00:00.000Z"}],"hasMore":false}
         """
         let page = try JSONDecoder.signalQuest.decode(RadioLogPullPage.self, from: Data(json.utf8))
-        XCTAssertEqual(page.items[0].ci, 161_806_340)
+        XCTAssertEqual(page.items[0].ci, 17_374_019_585)
         XCTAssertTrue(page.items[0].isNr)
     }
 
@@ -65,6 +85,511 @@ final class RadioLogsTests: XCTestCase {
         XCTAssertEqual(RadioLogPlmn.split("208001")?.mnc, "001")
         XCTAssertNil(RadioLogPlmn.split(nil))
         XCTAssertNil(RadioLogPlmn.split("  "))
+    }
+
+    func testPlmnSplitRejectsShortMncExtraTokensAndNonAsciiDigits() {
+        for value in ["3101", "310-1", "208/010/99", "abc20810", "208x10", "٢٠٨١٠"] {
+            XCTAssertNil(RadioLogPlmn.split(value), value)
+        }
+        XCTAssertEqual(RadioLogPlmn.split(" 310 / 001 ")?.mnc, "001")
+        XCTAssertNotEqual(RadioLogPlmn.split("310001")?.mnc, RadioLogPlmn.split("31001")?.mnc)
+    }
+
+    func testNumericPlmnComponentsStayAmbiguousThroughTheRealDiskCache() throws {
+        let entry = try decodeEntry(#"""
+        {
+          "dedupeKey":"imp|numeric","scope":"imp","technology":"5G NSA",
+          "mcc":208,"mnc":10,"operator":"SFR","canonicalOperatorKey":"SFR","marketCode":"FR",
+          "ci":"3112966","eciCellId":"6","enb":"12160","gnb":"190"
+        }
+        """#)
+        XCTAssertEqual(entry.observedMcc, "208")
+        XCTAssertEqual(entry.observedMnc, "10")
+        XCTAssertEqual(entry.plmnEvidence, .legacyAmbiguous)
+        XCTAssertNil(entry.servingPlmn)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("radio-provenance-\(UUID()).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        RadioLogStore(fileURL: url).merge(incoming: [entry], cursor: nil, nowMs: 1)
+        let reloaded = try XCTUnwrap(RadioLogStore(fileURL: url).load().entries.first)
+        XCTAssertEqual(reloaded, entry)
+        XCTAssertEqual(reloaded.plmnEvidence, .legacyAmbiguous)
+        XCTAssertEqual(reloaded.ci, 3_112_966)
+        XCTAssertEqual(reloaded.gnb, "190", "Le brut historique reste disponible, sans devenir une preuve")
+        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder.signalQuest.encode(reloaded)) as? [String: Any])
+        XCTAssertEqual(encoded["mcc"] as? Int, 208)
+        XCTAssertEqual(encoded["mnc"] as? Int, 10)
+        XCTAssertNil(encoded["mnc"] as? String, "Le cache ne doit pas renforcer la confiance")
+        let site = try XCTUnwrap(RadioLogSiteBuilder.build(from: [reloaded]).first)
+        XCTAssertEqual(site.kind, .enb)
+        XCTAssertEqual(site.node, "12160")
+        XCTAssertNil(site.mcc)
+        XCTAssertNil(site.mnc)
+        XCTAssertNil(site.operatorName)
+        XCTAssertNil(site.resolvedOperatorKey)
+        XCTAssertNil(site.resolvedMarketCode)
+        XCTAssertNotNil(RadioLogIdentifyPicker.blockingReason(for: site))
+    }
+
+    func testNumericAndShortMncNeverBorrowAReconstructedExactPlmn() throws {
+        for fields in [
+            #""mcc":208,"mnc":1"#,
+            #""mcc":"208","mnc":"1""#,
+            #""observedPlmn":20801"#,
+            #""observedPlmn":"20801","networkIdentityConfidence":"AMBIGUOUS_MNC_WIDTH""#,
+            #""observedPlmn":"20801","networkIdentitySource":"LEGACY_AMBIGUOUS""#
+        ] {
+            let entry = try decodeEntry("{\"dedupeKey\":\"imp|ambiguous\",\"scope\":\"imp\",\"mccMnc\":\"20801\",\(fields)}")
+            XCTAssertEqual(entry.plmnEvidence, .legacyAmbiguous, fields)
+            XCTAssertNil(entry.servingPlmn, fields)
+            let cached = try JSONDecoder.signalQuest.decode(RadioLogEntry.self, from: JSONEncoder.signalQuest.encode(entry))
+            XCTAssertEqual(cached.plmnEvidence, .legacyAmbiguous, fields)
+        }
+    }
+
+    func testNeutralizedServerProjectionKeepsLegacyTokensSourceAndSeparateGroupingKeys() throws {
+        let entries = try ["1", "01"].map { mnc in
+            try decodeEntry("""
+            {"dedupeKey":"imp|legacy-\(mnc)","scope":"imp","technology":"LTE","enb":"42","ci":"10753",
+             "observedPlmn":null,"mccMnc":null,"mcc":null,"mnc":null,
+             "legacyMccMnc":"208/\(mnc)","legacyMcc":"208","legacyMnc":"\(mnc)",
+             "networkIdentitySource":"IMPORT","networkIdentityConfidence":"AMBIGUOUS_MNC_WIDTH"}
+            """)
+        }
+        for entry in entries {
+            let reloaded = try JSONDecoder.signalQuest.decode(RadioLogEntry.self, from: JSONEncoder.signalQuest.encode(entry))
+            XCTAssertEqual(reloaded, entry)
+            XCTAssertEqual(reloaded.legacyMcc, "208")
+            XCTAssertEqual(reloaded.legacyMnc, entry.legacyMnc)
+            XCTAssertEqual(reloaded.legacyMccMnc, entry.legacyMccMnc)
+            XCTAssertEqual(reloaded.networkIdentitySource, "IMPORT")
+            XCTAssertEqual(reloaded.networkIdentityConfidence, "AMBIGUOUS_MNC_WIDTH")
+            XCTAssertEqual(reloaded.plmnEvidence, .legacyAmbiguous)
+            XCTAssertNil(reloaded.servingPlmn)
+        }
+        let sites = RadioLogSiteBuilder.build(from: entries)
+        XCTAssertEqual(sites.count, 2)
+        XCTAssertTrue(sites.allSatisfy { $0.resolvedOperatorKey == nil && $0.resolvedMarketCode == nil })
+    }
+
+    func testExactObservedPlmnWinsOverConflictingLegacyComponentsAndHomeNetwork() throws {
+        let entry = try decodeEntry(#"""
+        {
+          "dedupeKey":"cap|roaming","technology":"LTE","enb":"42",
+          "observedPlmn":"310260","mcc":208,"mnc":15,"mccMnc":"20815",
+          "operator":"Free","canonicalOperatorKey":"FREE","canonicalOperatorName":"Free Mobile",
+          "marketCode":"FR","simPlmn":"20815","simOperatorName":"Free","isRoaming":true
+        }
+        """#)
+        XCTAssertEqual(entry.servingPlmn, "310260")
+        XCTAssertEqual(entry.mcc, "310")
+        XCTAssertEqual(entry.mnc, "260")
+        let site = try XCTUnwrap(RadioLogSiteBuilder.build(from: [entry]).first)
+        XCTAssertEqual(site.resolvedOperatorKey, "TMOBILE_US")
+        XCTAssertEqual(site.operatorName, "T-Mobile")
+        XCTAssertEqual(site.resolvedMarketCode, "US")
+        XCTAssertEqual(site.rawOperatorName, "Free")
+        XCTAssertEqual(site.isRoaming, true)
+    }
+
+    func testSimOnlyAndUnregisteredPlmnNeverSelectTheHomeOperator() throws {
+        let simOnly = try decodeEntry(#"""
+        {
+          "dedupeKey":"cap|sim","technology":"LTE","enb":"42","mccMnc":"20815",
+          "simPlmn":"20815","operator":"Free","marketCode":"FR","networkIdentitySource":"SIM_ONLY"
+        }
+        """#)
+        XCTAssertNil(simOnly.servingPlmn)
+        let unknown = try decodeEntry(#"""
+        {
+          "dedupeKey":"cap|unknown","technology":"LTE","enb":"42","observedPlmn":"310001",
+          "simPlmn":"20815","operator":"Free","canonicalOperatorKey":"FREE","marketCode":"FR"
+        }
+        """#)
+        for entry in [simOnly, unknown] {
+            let site = try XCTUnwrap(RadioLogSiteBuilder.build(from: [entry]).first)
+            XCTAssertNil(site.resolvedOperatorKey)
+            XCTAssertNil(site.operatorName)
+            XCTAssertNotEqual(site.resolvedMarketCode, "FR")
+        }
+    }
+
+    func testAmbiguousAndExactNetworksNeverMergeEvenWithTheSameNodeCiAndPci() throws {
+        let ambiguous = try decodeEntry(#"{"dedupeKey":"imp|amb","mcc":208,"mnc":1,"technology":"LTE","enb":"42","ci":"10753","pci":7}"#)
+        let exact = try decodeEntry(#"{"dedupeKey":"imp|exact","mcc":"208","mnc":"01","technology":"LTE","enb":"42","ci":"10753","pci":7}"#)
+        let threeDigit = try decodeEntry(#"{"dedupeKey":"imp|three","observedPlmn":"310001","technology":"LTE","enb":"42","ci":"10753","pci":7}"#)
+        let twoDigit = try decodeEntry(#"{"dedupeKey":"imp|two","observedPlmn":"31001","technology":"LTE","enb":"42","ci":"10753","pci":7}"#)
+        let sites = RadioLogSiteBuilder.build(from: [ambiguous, exact, threeDigit, twoDigit])
+        XCTAssertEqual(sites.count, 4)
+        XCTAssertEqual(Set(sites.map(\.id)).count, 4)
+        XCTAssertEqual(sites.compactMap(\.mnc).sorted(), ["001", "01", "01"])
+    }
+
+    func testLegacyMixedCacheRetainsExplicitPlmnAndRefreshesOnlyUndecidableTuples() throws {
+        let data = Data(#"""
+        {
+          "entries":[
+            {"dedupeKey":"imp|explicit","observedPlmn":"310001","mcc":"310","mnc":"001","networkIdentitySource":"IMPORT"},
+            {"dedupeKey":"imp|tuple","mcc":"208","mnc":"10","ci":"3112966"},
+            {"dedupeKey":"imp|legacy-full","mccMnc":"208-01"}
+          ],
+          "cursor":{"sinceAt":"2026-07-01T10:00:00.000Z","sinceId":"last"},"lastSyncedAtMs":1234
+        }
+        """#.utf8)
+        let snapshot = try JSONDecoder.signalQuest.decode(RadioLogSnapshot.self, from: data)
+        XCTAssertEqual(snapshot.entries.count, 3)
+        XCTAssertEqual(snapshot.entries[0].servingPlmn, "310001")
+        XCTAssertEqual(snapshot.entries[0].networkIdentitySource, "IMPORT")
+        XCTAssertEqual(snapshot.entries[1].plmnEvidence, .legacyAmbiguous)
+        XCTAssertEqual(snapshot.entries[1].observedMnc, "10")
+        XCTAssertEqual(snapshot.entries[1].ci, 3_112_966)
+        XCTAssertEqual(snapshot.entries[2].servingPlmn, "20801")
+        XCTAssertNil(snapshot.cursor)
+        XCTAssertNil(snapshot.lastSyncedAtMs)
+        let next = try JSONDecoder.signalQuest.decode(RadioLogSnapshot.self, from: JSONEncoder.signalQuest.encode(snapshot))
+        XCTAssertEqual(next.entries, snapshot.entries)
+        XCTAssertEqual(next.entries[1].plmnEvidence, .legacyAmbiguous)
+        let refreshed = try decodeEntry(#"{"dedupeKey":"imp|tuple","mcc":"208","mnc":"010","ci":"3112966"}"#)
+        let merged = RadioLogStore.applying(incoming: [refreshed], to: next.entries)
+        XCTAssertEqual(merged.first { $0.dedupeKey == "imp|tuple" }?.servingPlmn, "208010")
+    }
+
+    func testLegacyCacheWithOnlyExplicitPlmnKeepsItsCursor() throws {
+        let data = Data(#"{"entries":[{"dedupeKey":"cap|exact","observedPlmn":"310001"}],"cursor":{"sinceAt":"2026-07-01T10:00:00.000Z","sinceId":"last"},"lastSyncedAtMs":1234}"#.utf8)
+        let snapshot = try JSONDecoder.signalQuest.decode(RadioLogSnapshot.self, from: data)
+        XCTAssertEqual(snapshot.cursor?.sinceId, "last")
+        XCTAssertEqual(snapshot.lastSyncedAtMs, 1234)
+        XCTAssertEqual(snapshot.entries.first?.servingPlmn, "310001")
+    }
+
+    func testLegacyImportWithLostFormatPreservesPlmnWhileRefreshingOnlyCellEvidence() throws {
+        let data = Data(#"""
+        {
+          "entries":[
+            {"dedupeKey":"imp|lost-format","scope":"imp","technology":"NR","observedPlmn":"20810","ci":"2147483647","gnb":"131071"},
+            {"dedupeKey":"cap|nr","scope":"cap","technology":"NR","observedPlmn":"20810","ci":"2147483647","gnb":"131071"},
+            {"dedupeKey":"imp|known-csv","scope":"imp","technology":"NR","observedPlmn":"20810","ci":"2147483647","gnb":"131071","sourceFileName":"radio.csv"}
+          ],
+          "cursor":{"sinceAt":"2026-07-01T10:00:00.000Z","sinceId":"last"}
+        }
+        """#.utf8)
+        let snapshot = try JSONDecoder.signalQuest.decode(RadioLogSnapshot.self, from: data)
+        XCTAssertTrue(snapshot.entries[0].cellIdentityEvidenceRequiresRefresh)
+        XCTAssertEqual(snapshot.entries[0].servingPlmn, "20810", "La preuve PLMN n'est pas dégradée")
+        XCTAssertEqual(snapshot.entries[0].ci, 2_147_483_647)
+        XCTAssertTrue(RadioLogSiteBuilder.build(from: [snapshot.entries[0]]).isEmpty)
+        for entry in snapshot.entries.dropFirst() {
+            XCTAssertFalse(entry.cellIdentityEvidenceRequiresRefresh)
+            XCTAssertEqual(RadioLogSiteBuilder.build(from: [entry]).first?.kind, .gnb)
+        }
+        XCTAssertNil(snapshot.cursor)
+        let next = try JSONDecoder.signalQuest.decode(RadioLogSnapshot.self, from: JSONEncoder.signalQuest.encode(snapshot))
+        XCTAssertEqual(next.entries, snapshot.entries)
+        XCTAssertTrue(next.entries[0].cellIdentityEvidenceRequiresRefresh)
+    }
+
+    func testSessionNumericComponentsStayAmbiguousAndExplicitPlmnStillWins() throws {
+        for fields in [
+            #""mobileCountryCode":310,"mobileNetworkCode":1"#,
+            #""observedMcc":"310","observedMnc":"1""#,
+            #""observedPlmn":"31001","networkIdentityConfidence":"AMBIGUOUS_MNC_WIDTH""#
+        ] {
+            let point = try JSONDecoder.signalQuest.decode(CoverageSessionPoint.self, from: Data("{\"id\":\"p\",\(fields)}".utf8))
+            XCTAssertEqual(point.plmnEvidence, .legacyAmbiguous)
+            XCTAssertNil(point.servingPlmn)
+        }
+        let point = try JSONDecoder.signalQuest.decode(CoverageSessionPoint.self, from: Data(#"{"id":"p","observedPlmn":"310001","mobileCountryCode":208,"mobileNetworkCode":15}"#.utf8))
+        XCTAssertEqual(point.servingPlmn?.plmn, "310001")
+        XCTAssertNil(point.networkIdentitySource, "Une ancienne session sans provenance reste inconnue")
+    }
+
+    func testImportedNsaEciNeverSelectsHistoricalGnb190OrChangesTheFullCi() async throws {
+        let entry = try decodeEntry(#"""
+        {
+          "dedupeKey":"imp|nsa","scope":"imp","technology":"5G NSA","observedPlmn":"20820",
+          "ci":"3112966","eciCellId":"6","enb":"12160","gnb":"190",
+          "nodeIdentityKind":"GNB_REPORTED","nodeIdentityRaw":"190","networkIdentitySource":"IMPORT"
+        }
+        """#)
+        XCTAssertFalse(entry.isNr)
+        let site = try XCTUnwrap(RadioLogSiteBuilder.build(from: [entry]).first)
+        XCTAssertEqual(site.kind, .enb)
+        XCTAssertEqual(site.node, "12160")
+        XCTAssertEqual(site.cells.first?.ci, 3_112_966)
+        XCTAssertEqual(site.cells.first?.eciCellId, "6")
+        XCTAssertEqual(site.cells.first?.identityLabel, "ECI 3112966")
+        let body = try await encodeIdentifyBody(RadioLogIdentifyPicker.request(for: site, candidate: candidate()))
+        XCTAssertEqual(body["enb"] as? String, "12160")
+        XCTAssertNil(body["gnb"])
+        XCTAssertEqual(body["ci"] as? String, "3112966")
+        XCTAssertEqual(body["cellId"] as? String, "6")
+        XCTAssertEqual(body["networkIdentitySource"] as? String, "IMPORT")
+    }
+
+    func testNsa20810UsesEnb6506AndCarriesLilleEvidenceInsteadOfGnb16383() async throws {
+        let entry = try decodeEntry(#"""
+        {
+          "dedupeKey":"cap|tacos-nsa","scope":"cap","technology":"5G NSA",
+          "observedPlmn":"20810","operator":"SFR","canonicalOperatorKey":"SFR",
+          "ci":"1665538","eciCellId":"2","enb":"6506","gnb":"16383",
+          "pci":253,"band":7,"earfcn":2850,"latitude":50.6292,"longitude":3.0573,
+          "networkIdentitySource":"SERVING_CELL"
+        }
+        """#)
+
+        let site = try XCTUnwrap(RadioLogSiteBuilder.build(from: [entry]).first)
+        XCTAssertEqual(site.kind, .enb)
+        XCTAssertEqual(site.node, "6506")
+        XCTAssertEqual(site.observedPlmn, "20810")
+
+        let item = RadioLogsService.batchItem(for: site)
+        XCTAssertEqual(item.observedPlmn, "20810")
+        XCTAssertEqual(item.enb, "6506")
+        XCTAssertNil(item.gnb, "Le gNB secondaire NSA ne doit pas remplacer l'ancre LTE")
+        XCTAssertEqual(item.pci, "253")
+        XCTAssertEqual(item.cellId, "2")
+        XCTAssertEqual(item.ci, "1665538")
+        XCTAssertEqual(item.lat, 50.6292)
+        XCTAssertEqual(item.lng, 3.0573)
+
+        let query = try await captureHypothesisQuery(for: site)
+        XCTAssertEqual(query["observedPlmn"], "20810")
+        XCTAssertEqual(query["enb"], "6506")
+        XCTAssertNil(query["gnb"])
+        XCTAssertEqual(query["pci"], "253")
+        XCTAssertEqual(query["cellId"], "2")
+        XCTAssertEqual(query["ci"], "1665538")
+        XCTAssertEqual(query["lat"], "50.6292")
+        XCTAssertEqual(query["lng"], "3.0573")
+    }
+
+    func testRealGnb16383AloneOrAmbiguousNeverIdentifiesPaimpolFromLille() throws {
+        let entry = try decodeEntry(#"""
+        {
+          "dedupeKey":"cap|real-gnb-16383","scope":"cap","technology":"5G SA",
+          "observedPlmn":"20810","operator":"SFR","canonicalOperatorKey":"SFR",
+          "ci":"268419077","eciCellId":"5","gnb":"16383","pci":500,
+          "band":1,"earfcn":428000,"latitude":50.6292,"longitude":3.0573,
+          "nodeIdentityKind":"GNB_REPORTED","nodeIdentityRaw":"16383"
+        }
+        """#)
+        let site = try XCTUnwrap(RadioLogSiteBuilder.build(from: [entry]).first)
+        XCTAssertEqual(site.kind, .gnb)
+        XCTAssertEqual(site.node, "16383", "Un vrai gNB 16383 n'est pas blacklisté")
+
+        let item = RadioLogsService.batchItem(for: site)
+        XCTAssertEqual(item.observedPlmn, "20810")
+        XCTAssertEqual(item.gnb, "16383")
+        XCTAssertEqual(item.ci, "268419077")
+        XCTAssertEqual(item.pci, "500")
+        XCTAssertEqual(item.lat, 50.6292)
+
+        let farNodeOnly = try resolution(#"""
+        {"found":true,"siteId":"paimpol","distanceMeters":498146,
+         "matchedRadio":[{"type":"gnb","value":"16383"}]}
+        """#)
+        XCTAssertEqual(RadioLogsService.state(from: farNodeOnly, site: site), .unidentified)
+
+        let ambiguous = try resolution(#"""
+        {"found":false,"ambiguous":true,"sharedNode":true,"resolutionMode":"unresolved",
+         "candidates":[{"siteId":"lille"},{"siteId":"paimpol"}],
+         "matchedRadio":[{"type":"gnb","value":"16383"},{"type":"pci","value":"500"}]}
+        """#)
+        XCTAssertEqual(RadioLogsService.state(from: ambiguous, site: site), .unidentified)
+
+        let localCellProof = try resolution(#"""
+        {"found":true,"siteId":"lille","distanceMeters":350,"sharedNode":true,
+         "matchedRadio":[{"type":"gnb","value":"16383"},{"type":"pci","value":"500"}]}
+        """#)
+        XCTAssertEqual(RadioLogsService.state(from: localCellProof, site: site), .identified(siteId: "lille"))
+
+        let repeatedPciTooFar = try resolution(#"""
+        {"found":true,"siteId":"another-sfr-site","distanceMeters":20000,"sharedNode":true,
+         "matchedRadio":[{"type":"gnb","value":"16383"},{"type":"pci","value":"500"}]}
+        """#)
+        XCTAssertEqual(
+            RadioLogsService.state(from: repeatedPciTooFar, site: site),
+            .unidentified,
+            "Le même PCI à 20 km n'est pas une preuve physique du site"
+        )
+    }
+
+    func testConfirmedNciIsPreservedButUnknownPlmnCannotBorrowItsFourteenBitSplit() throws {
+        for plmn in ["20810", "310001", "208010"] {
+            let entry = try decodeEntry("""
+            {"dedupeKey":"imp|\(plmn)","scope":"imp","technology":"NR","observedPlmn":"\(plmn)",
+             "ci":"17374019585","gnb":"1060426","nodeIdentityKind":"GNB_REPORTED","nodeIdentityRaw":"1060426"}
+            """)
+            let cached = try JSONDecoder.signalQuest.decode(RadioLogEntry.self, from: JSONEncoder.signalQuest.encode(entry))
+            XCTAssertEqual(cached.ci, 17_374_019_585)
+            XCTAssertNil(cached.eciCellId, "Aucun numéro local n'a été observé")
+            let sites = RadioLogSiteBuilder.build(from: [cached])
+            if plmn == "20810" {
+                XCTAssertEqual(sites.first?.node, "1060426")
+                XCTAssertEqual(sites.first?.cells.first?.identityLabel, "NCI 17374019585")
+            } else {
+                XCTAssertTrue(sites.isEmpty, "\(plmn) ne fournit pas la largeur du gNB historique")
+            }
+        }
+    }
+
+    func testContradictoryGnbNeverOverwritesObservedNciOrLocalCell() throws {
+        let entry = try decodeEntry(#"{"dedupeKey":"imp|conflict","technology":"NR","observedPlmn":"20810","ci":"17374019585","gnb":"123456","enb":"12160","eciCellId":"42"}"#)
+        XCTAssertTrue(RadioLogSiteBuilder.build(from: [entry]).isEmpty)
+        let cached = try JSONDecoder.signalQuest.decode(RadioLogEntry.self, from: JSONEncoder.signalQuest.encode(entry))
+        XCTAssertEqual(cached.ci, 17_374_019_585)
+        XCTAssertEqual(cached.gnb, "123456")
+        XCTAssertEqual(cached.eciCellId, "42")
+    }
+
+    func testForeignTenBitLocalEvidenceRemainsSeparateFromFullNci() async throws {
+        let entry = try decodeEntry(#"""
+        {
+          "dedupeKey":"imp|foreign","scope":"imp","technology":"5G SA","observedPlmn":"310260",
+          "ci":"126418986","gnb":"123456","eciCellId":"42",
+          "nodeIdentityKind":"GNB_REPORTED","nodeIdentityRaw":"123456","networkIdentitySource":"IMPORT"
+        }
+        """#)
+        let site = try XCTUnwrap(RadioLogSiteBuilder.build(from: [entry]).first)
+        XCTAssertEqual(site.cells.first?.ci, 126_418_986)
+        XCTAssertEqual(site.cells.first?.eciCellId, "42")
+        XCTAssertEqual(site.cells.first?.identityLabel, "NCI 126418986", "La taille seule ne transforme pas une NCI en ECI")
+        let body = try await encodeIdentifyBody(RadioLogIdentifyPicker.request(for: site, candidate: candidate()))
+        XCTAssertEqual(body["ci"] as? String, "126418986")
+        XCTAssertEqual(body["cellId"] as? String, "42")
+        XCTAssertEqual(body["gnb"] as? String, "123456")
+    }
+
+    func testGnbAndLocalCellRequireExactPlmnAndReportedProvenance() throws {
+        for plmn in ["20810", "310260"] {
+            let entry = try decodeEntry("{\"dedupeKey\":\"imp|\(plmn)\",\"technology\":\"NR\",\"observedPlmn\":\"\(plmn)\",\"gnb\":\"123456\",\"eciCellId\":\"42\"}")
+            let site = try XCTUnwrap(RadioLogSiteBuilder.build(from: [entry]).first)
+            XCTAssertNil(entry.ci)
+            XCTAssertNil(site.cells.first?.ci)
+            XCTAssertEqual(site.cells.first?.eciCellId, "42")
+            XCTAssertNil(RadioLogIdentifyPicker.request(for: site, candidate: candidate()).ci)
+        }
+        let reported = try decodeEntry(#"{"dedupeKey":"imp|reported","technology":"NR","observedPlmn":"20810","gnb":"123456","eciCellId":"42","nodeIdentityKind":"GNB_REPORTED"}"#)
+        let site = try XCTUnwrap(RadioLogSiteBuilder.build(from: [reported]).first)
+        XCTAssertEqual(site.cells.first?.ci, 2_022_703_146)
+        XCTAssertEqual(RadioLogIdentifyPicker.request(for: site, candidate: candidate()).ci, "2022703146")
+    }
+
+    func testZeroAndOutOfRangeFullCiAreNeverReplacedByNodePlusLocal() throws {
+        for ci in ["0", "68719476736", "9223372036854775807"] {
+            let entry = try decodeEntry("{\"dedupeKey\":\"imp|\(ci)\",\"technology\":\"NR\",\"observedPlmn\":\"20810\",\"ci\":\"\(ci)\",\"gnb\":\"123456\",\"eciCellId\":\"42\"}")
+            XCTAssertEqual(entry.ci, Int64(ci))
+            XCTAssertTrue(RadioLogSiteBuilder.build(from: [entry]).isEmpty)
+            let body = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder.signalQuest.encode(entry)) as? [String: Any])
+            XCTAssertEqual(body["ci"] as? String, ci)
+            XCTAssertEqual(body["eciCellId"] as? String, "42")
+        }
+        let maximum = try decodeEntry(#"{"dedupeKey":"imp|max-nci","technology":"NR","observedPlmn":"20810","ci":"68719476735","gnb":"4194303"}"#)
+        let maximumSite = try XCTUnwrap(RadioLogSiteBuilder.build(from: [maximum]).first)
+        XCTAssertEqual(maximumSite.cells.first?.ci, 68_719_476_735)
+        XCTAssertNil(maximumSite.cells.first?.eciCellId, "Le lecteur ne fabrique pas une cellule locale")
+        let localZero = try decodeEntry(#"{"dedupeKey":"imp|local-zero","technology":"NR","observedPlmn":"310260","gnb":"123456","eciCellId":"0"}"#)
+        let site = try XCTUnwrap(RadioLogSiteBuilder.build(from: [localZero]).first)
+        XCTAssertNil(site.cells.first?.ci)
+        XCTAssertEqual(site.cells.first?.eciCellId, "0")
+        XCTAssertEqual(RadioLogIdentifyPicker.request(for: site, candidate: candidate()).cellId, "0")
+    }
+
+    func testNtmSentinelIsFormatScopedAndNeverPromotesAnLteValueToNr() throws {
+        for (technology, fileName, expectedNrNode) in [
+            ("LTE", "radio.csv", false),
+            ("NR", "radio.csv", true),
+            ("NR", "radio.NTM", false)
+        ] {
+            let entry = try decodeEntry("""
+            {"dedupeKey":"imp|\(technology)|\(fileName)","scope":"imp","technology":"\(technology)",
+             "observedPlmn":"20810","ci":"2147483647","gnb":"131071",
+             "logSource":"IMPORT","sourceApp":"NetMonster","sourceFileName":"\(fileName)"}
+            """)
+            let cached = try JSONDecoder.signalQuest.decode(RadioLogEntry.self, from: JSONEncoder.signalQuest.encode(entry))
+            XCTAssertEqual(cached.ci, 2_147_483_647, "La valeur brute est conservée pour son diagnostic")
+            XCTAssertEqual(cached.sourceApp, "NetMonster")
+            XCTAssertEqual(cached.sourceFileName, fileName)
+            XCTAssertEqual(cached.logSource, "IMPORT")
+            XCTAssertEqual(cached.isNtmUnknownCellIdentity, fileName == "radio.NTM")
+            let sites = RadioLogSiteBuilder.build(from: [cached])
+            XCTAssertEqual(sites.first?.kind == .gnb, expectedNrNode)
+            if expectedNrNode { XCTAssertEqual(sites.first?.cells.first?.ci, 2_147_483_647) }
+            else { XCTAssertTrue(sites.isEmpty) }
+        }
+    }
+
+    func testMergingImportAndCaptureDoesNotPromoteTheirSource() throws {
+        let entries = try ["IMPORT", "SERVING_CELL"].map { source in
+            try decodeEntry("{\"dedupeKey\":\"\(source)\",\"technology\":\"LTE\",\"observedPlmn\":\"20810\",\"enb\":\"42\",\"ci\":\"10753\",\"networkIdentitySource\":\"\(source)\"}")
+        }
+        let site = try XCTUnwrap(RadioLogSiteBuilder.build(from: entries).first)
+        XCTAssertEqual(site.cells.count, 1)
+        XCTAssertNil(site.cells.first?.networkIdentitySource)
+        XCTAssertNil(RadioLogIdentifyPicker.request(for: site, candidate: candidate()).networkIdentitySource)
+    }
+
+    func testAmbiguousNetworkIsNeverSentToQuickIdentifyOrMarkedIdentified() async throws {
+        let entry = try decodeEntry(#"{"dedupeKey":"imp|amb","mcc":208,"mnc":1,"technology":"LTE","enb":"42"}"#)
+        let site = try XCTUnwrap(RadioLogSiteBuilder.build(from: [entry]).first)
+        let matched = try resolution(#"{"found":true,"siteId":"wrong-home-site","matchedRadio":[{"type":"enb","value":"42"}]}"#)
+        XCTAssertEqual(RadioLogsService.state(from: matched, site: site), .unchecked)
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        MockURLProtocol.requestHandler = { request in
+            XCTFail("Un PLMN ambigu ne doit déclencher aucune identification : \(request.url?.path ?? "")")
+            throw URLError(.badURL)
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+        let service = RadioLogsService(api: APIClient(config: .test, session: URLSession(configuration: configuration)))
+        for await states in service.scanStream(sites: [site]) { XCTAssertTrue(states.isEmpty) }
+    }
+
+    func testDecodesServingNetworkIdentityWithoutLosingMncZeroes() throws {
+        let json = """
+        {"items":[{
+          "id":"us1","dedupeKey":"cap|us1","scope":"cap","technology":"LTE",
+          "operator":"T-Mobile","rawOperatorName":"TMO US",
+          "canonicalOperatorKey":"T_MOBILE_US","canonicalOperatorName":"T-Mobile US",
+          "observedPlmn":"310001","mcc":"310","mnc":"001",
+          "simPlmn":"20815","simOperatorName":"Free","marketCode":"US","countryCode":"US",
+          "isRoaming":true,"enb":"42",
+          "observedAt":"2026-07-01T10:00:00.000Z","updatedAt":"2026-07-01T10:00:00.000Z"
+        }],"hasMore":false}
+        """
+
+        let entry = try JSONDecoder.signalQuest.decode(RadioLogPullPage.self, from: Data(json.utf8)).items[0]
+
+        XCTAssertEqual(entry.servingPlmn, "310001")
+        XCTAssertEqual(entry.mcc, "310")
+        XCTAssertEqual(entry.mnc, "001")
+        XCTAssertEqual(entry.displayOperatorName, "T-Mobile US")
+        XCTAssertEqual(entry.canonicalOperatorKey, "T_MOBILE_US")
+        XCTAssertEqual(entry.simPlmn, "20815")
+        XCTAssertEqual(entry.isRoaming, true)
+    }
+
+    func testSessionPointKeepsServingPlmnInsteadOfRebuildingItFromOperatorName() throws {
+        let json = """
+        {
+          "id":"p1","latitude":40.7128,"longitude":-74.006,
+          "technology":"LTE","operatorKey":"T_MOBILE_US",
+          "mobileOperator":"Free","observedPlmn":"310001",
+          "observedMcc":"310","observedMnc":"001",
+          "marketCode":"US","countryCode":"US","isRoaming":true,"networkIdentitySource":"IMPORT",
+          "enb":"42"
+        }
+        """
+
+        let point = try JSONDecoder.signalQuest.decode(CoverageSessionPoint.self, from: Data(json.utf8))
+
+        XCTAssertEqual(point.servingPlmn?.plmn, "310001")
+        XCTAssertEqual(point.servingPlmn?.mnc, "001")
+        XCTAssertEqual(point.operatorKey, "T_MOBILE_US")
+        XCTAssertEqual(point.simOperator, "Free")
+        XCTAssertEqual(point.marketCode, "US")
+        XCTAssertEqual(point.isRoaming, true)
+        XCTAssertEqual(point.networkIdentitySource, "IMPORT")
     }
 
     // MARK: Fusion
@@ -200,6 +725,29 @@ final class RadioLogsTests: XCTestCase {
         XCTAssertEqual(RadioLogSiteBuilder.build(from: entries).count, 2)
     }
 
+    func testRawBouyguesAliasesCollapseUnderCanonicalServingPlmn() throws {
+        let entries = [
+            try entry(
+                id: "1", dedupeKey: "cap|1", enb: "42", operatorName: "ByTel",
+                mccMnc: "208-20", observedPlmn: "20820",
+                canonicalOperatorKey: "BOUYGUES", canonicalOperatorName: "Bouygues Telecom"
+            ),
+            try entry(
+                id: "2", dedupeKey: "cap|2", enb: "42", operatorName: "BOUYGUES",
+                mccMnc: "208-20", observedPlmn: "20820",
+                canonicalOperatorKey: "BOUYGUES", canonicalOperatorName: "Bouygues Telecom"
+            )
+        ]
+
+        let sites = RadioLogSiteBuilder.build(from: entries)
+        XCTAssertEqual(sites.count, 1)
+        let site = try XCTUnwrap(sites.first)
+
+        XCTAssertEqual(site.operatorName, "Bouygues Telecom")
+        XCTAssertEqual(site.operatorKey, "BOUYGUES")
+        XCTAssertEqual(site.logCount, 2)
+    }
+
     // MARK: Critère d'identification
 
     /// UN critère : l'eNB/gNB est-il connu du serveur ? Une résolution par
@@ -289,8 +837,11 @@ final class RadioLogsTests: XCTestCase {
         XCTAssertEqual(request.mnc, "10")
 
         let encoded = try await encodeIdentifyBody(request)
-        XCTAssertEqual(encoded["mobileCountryCode"] as? Int, 208)
-        XCTAssertEqual(encoded["mobileNetworkCode"] as? Int, 10)
+        XCTAssertEqual(encoded["mobileCountryCode"] as? String, "208")
+        XCTAssertEqual(encoded["mobileNetworkCode"] as? String, "10")
+        XCTAssertEqual(encoded["observedPlmn"] as? String, "20810")
+        XCTAssertEqual(encoded["operatorKey"] as? String, "SFR")
+        XCTAssertEqual(encoded["marketCode"] as? String, "FR")
         XCTAssertNil(encoded["mcc"], "Le serveur ne lit pas `mcc` — l'envoyer revient à n'envoyer aucun PLMN")
         XCTAssertNil(encoded["mnc"])
         XCTAssertEqual(encoded["siteId"] as? String, "0382700518")
@@ -299,9 +850,33 @@ final class RadioLogsTests: XCTestCase {
         XCTAssertNil(encoded["sectorIndex"], "Le secteur est dérivé par le serveur, sa règle fait autorité")
     }
 
-    /// Sans PLMN dans le log, la table de repli opérateur→PLMN prend le relais —
-    /// plutôt que de partir vers un `MISSING_PLMN` certain.
-    func testIdentifyPayloadFallsBackToOperatorTableForPlmn() throws {
+    /// Un MNC à trois chiffres reste textuellement intact jusque dans la charge
+    /// HTTP : `310001` ne doit jamais devenir l'ambigu `3101`.
+    func testIdentifyPayloadPreservesThreeDigitMncWithLeadingZeroes() async throws {
+        let site = try makeSite(
+            kind: .enb,
+            node: "42",
+            mccMnc: "310001",
+            operatorName: "T-Mobile US"
+        )
+        let candidate = RadioLogCandidate(
+            id: "US", siteId: "US", latitude: 40.7, longitude: -74,
+            operators: [], technologies: ["4G"], address: nil,
+            distanceMeters: nil, confidenceScore: nil, isServerHypothesis: false
+        )
+
+        let encoded = try await encodeIdentifyBody(
+            RadioLogIdentifyPicker.request(for: site, candidate: candidate)
+        )
+
+        XCTAssertEqual(encoded["mobileCountryCode"] as? String, "310")
+        XCTAssertEqual(encoded["mobileNetworkCode"] as? String, "001")
+        XCTAssertEqual(encoded["observedPlmn"] as? String, "310001")
+    }
+
+    /// Un nom d'opérateur n'est pas une preuve de PLMN : l'app ne doit pas
+    /// transformer silencieusement « Orange » en réseau servant 208/01.
+    func testIdentifyPayloadDoesNotInventPlmnFromOperatorName() throws {
         let site = try makeSite(kind: .enb, node: "1", mccMnc: nil, operatorName: "Orange")
         let candidate = RadioLogCandidate(
             id: "S", siteId: "S", latitude: nil, longitude: nil, operators: [],
@@ -309,22 +884,22 @@ final class RadioLogsTests: XCTestCase {
             isServerHypothesis: false
         )
         let request = RadioLogIdentifyPicker.request(for: site, candidate: candidate)
-        XCTAssertEqual(request.mcc, "208")
-        XCTAssertEqual(request.mnc, "1")
+        XCTAssertNil(request.mcc)
+        XCTAssertNil(request.mnc)
+        XCTAssertNotNil(RadioLogIdentifyPicker.blockingReason(for: site))
     }
 
-    /// `ci` part en CHAÎNE : le serveur le relit en `BigInt`, et un NCI 5G
-    /// dépasse la précision d'un nombre JSON.
+    /// `ci` part en CHAÎNE, conformément au contrat `BigInt` du serveur.
     func testIdentifyPayloadSendsCellIdentityAsString() async throws {
-        let site = try makeSite(kind: .gnb, node: "9881", mccMnc: "208-15", operatorName: "FREE", ci: 161_806_340)
+        let site = try makeSite(kind: .gnb, node: "1060426", mccMnc: "208-10", operatorName: "SFR", ci: 17_374_019_585)
         let candidate = RadioLogCandidate(
             id: "S", siteId: "S", latitude: nil, longitude: nil, operators: [],
             technologies: [], address: nil, distanceMeters: nil, confidenceScore: nil,
             isServerHypothesis: false
         )
         let encoded = try await encodeIdentifyBody(RadioLogIdentifyPicker.request(for: site, candidate: candidate))
-        XCTAssertEqual(encoded["ci"] as? String, "161806340")
-        XCTAssertEqual(encoded["gnb"] as? String, "9881")
+        XCTAssertEqual(encoded["ci"] as? String, "17374019585")
+        XCTAssertEqual(encoded["gnb"] as? String, "1060426")
         XCTAssertEqual(encoded["tech"] as? String, "5G")
         XCTAssertNil(encoded["enb"], "Un site 5G n'envoie pas d'eNB")
     }
@@ -356,6 +931,18 @@ final class RadioLogsTests: XCTestCase {
 
     // MARK: Fabriques
 
+    private func decodeEntry(_ json: String) throws -> RadioLogEntry {
+        try JSONDecoder.signalQuest.decode(RadioLogEntry.self, from: Data(json.utf8))
+    }
+
+    private func candidate() -> RadioLogCandidate {
+        RadioLogCandidate(
+            id: "synthetic", siteId: "synthetic", latitude: nil, longitude: nil,
+            operators: [], technologies: [], address: nil, distanceMeters: nil,
+            confidenceScore: nil, isServerHypothesis: false
+        )
+    }
+
     private func entry(
         id: String,
         dedupeKey: String,
@@ -364,6 +951,9 @@ final class RadioLogsTests: XCTestCase {
         technology: String = "LTE",
         operatorName: String? = "SFR",
         mccMnc: String? = "208-10",
+        observedPlmn: String? = nil,
+        canonicalOperatorKey: String? = nil,
+        canonicalOperatorName: String? = nil,
         pci: Int? = nil,
         ci: Int64? = nil,
         latitude: Double? = nil,
@@ -380,6 +970,9 @@ final class RadioLogsTests: XCTestCase {
         ]
         if let operatorName { fields.append("\"operator\":\"\(operatorName)\"") }
         if let mccMnc { fields.append("\"mccMnc\":\"\(mccMnc)\"") }
+        if let observedPlmn { fields.append("\"observedPlmn\":\"\(observedPlmn)\"") }
+        if let canonicalOperatorKey { fields.append("\"canonicalOperatorKey\":\"\(canonicalOperatorKey)\"") }
+        if let canonicalOperatorName { fields.append("\"canonicalOperatorName\":\"\(canonicalOperatorName)\"") }
         if let enb { fields.append("\"enb\":\"\(enb)\"") }
         if let gnb { fields.append("\"gnb\":\"\(gnb)\"") }
         if let pci { fields.append("\"pci\":\(pci)") }
@@ -396,7 +989,7 @@ final class RadioLogsTests: XCTestCase {
         node: String,
         mccMnc: String? = "208-10",
         operatorName: String? = "SFR",
-        ci: Int64? = 160_466_202,
+        ci: Int64? = nil,
         latitude: Double? = 45.5
     ) throws -> RadioLogSite {
         let entry = try entry(
@@ -447,8 +1040,35 @@ final class RadioLogsTests: XCTestCase {
         return try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
     }
 
+    private func captureHypothesisQuery(for site: RadioLogSite) async throws -> [String: String] {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let captured = CapturedURL()
+        MockURLProtocol.requestHandler = { request in
+            captured.url = request.url
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"found":false,"resolutionMode":"unresolved"}"#.utf8))
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+
+        let service = RadioLogsService(
+            api: APIClient(config: .test, session: URLSession(configuration: configuration))
+        )
+        _ = await service.hypothesis(for: site)
+        let url = try XCTUnwrap(captured.url, "Aucune requête quick-identify capturée")
+        return Dictionary(
+            uniqueKeysWithValues: URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .compactMap { item in item.value.map { (item.name, $0) } } ?? []
+        )
+    }
+
     private final class CapturedBody: @unchecked Sendable {
         var data: Data?
+    }
+
+    private final class CapturedURL: @unchecked Sendable {
+        var url: URL?
     }
 
     private static func readAll(_ stream: InputStream) -> Data {
@@ -490,6 +1110,182 @@ private struct StubRadioLogsService: RadioLogsServicing {
 
 
 extension RadioLogsTests {
+
+    func testSharedWorldRadioCorpusKeepsIOSFailClosedForDualSimCaAndTa() throws {
+        struct Fixture: Decodable {
+            struct PlatformRules: Decodable {
+                struct IOS: Decodable {
+                    let mayExposePerSubscriptionRadio: Bool
+                    let unavailableState: String
+                }
+                let ios: IOS
+            }
+            struct Case: Decodable {
+                struct Subscription: Decodable {
+                    let seriesKey: String
+                    let simPlmn: String
+                    let observedPlmn: String?
+                    let isRoaming: Bool
+                    let observable: Bool
+                    let unavailableReason: String?
+                }
+                struct Cell: Decodable {
+                    let seriesKey: String
+                    let role: String
+                    let rat: String
+                    let band: String
+                    let bandwidthMhz: Int
+                    let timingAdvance: Int?
+                    let timingAdvanceSourceTechnology: String?
+                    let numerology: Int?
+                }
+                struct Expected: Decodable {
+                    struct CA: Decodable {
+                        let seriesKey: String
+                        let componentCount: Int
+                        let totalBandwidthMhz: Int
+                        let bands: [String]
+                    }
+                    struct TA: Decodable {
+                        let accepted: Bool
+                        let reason: String?
+                        let sourceTechnology: String?
+                        let distanceModel: String?
+                        let distanceMeters: Int?
+                    }
+                    let observableSeries: [String]
+                    let carrierAggregation: CA?
+                    let timingAdvance: TA?
+                }
+                let id: String
+                let subscriptions: [Subscription]
+                let cells: [Cell]
+                let expected: Expected
+            }
+            let schemaVersion: Int
+            let platformRules: PlatformRules
+            let cases: [Case]
+        }
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let fixtures = try JSONDecoder().decode(
+            Fixture.self,
+            from: Data(contentsOf: root.appendingPathComponent("SignalQuestTests/Fixtures/radio-world-scenarios-v1.json"))
+        )
+        XCTAssertEqual(fixtures.schemaVersion, 1)
+        XCTAssertEqual(fixtures.cases.count, 9)
+        XCTAssertFalse(fixtures.platformRules.ios.mayExposePerSubscriptionRadio)
+        XCTAssertEqual(fixtures.platformRules.ios.unavailableState, "notExposedByPlatform")
+        for scenario in fixtures.cases {
+            XCTAssertEqual(
+                scenario.subscriptions.filter(\.observable).map(\.seriesKey).sorted(),
+                scenario.expected.observableSeries.sorted(),
+                scenario.id
+            )
+            for subscription in scenario.subscriptions where !subscription.observable {
+                XCTAssertNil(subscription.observedPlmn, scenario.id)
+                XCTAssertNotNil(subscription.unavailableReason, scenario.id)
+            }
+            for subscription in scenario.subscriptions where subscription.isRoaming {
+                XCTAssertNotEqual(subscription.observedPlmn, subscription.simPlmn, scenario.id)
+            }
+            if let ca = scenario.expected.carrierAggregation {
+                let components = scenario.cells.filter { $0.seriesKey == ca.seriesKey }
+                XCTAssertEqual(components.count, ca.componentCount, scenario.id)
+                XCTAssertEqual(components.reduce(0) { $0 + $1.bandwidthMhz }, ca.totalBandwidthMhz, scenario.id)
+                XCTAssertEqual(components.map(\.band), ca.bands, scenario.id)
+            }
+            if let ta = scenario.expected.timingAdvance, ta.sourceTechnology == "NR" {
+                XCTAssertTrue(ta.accepted, scenario.id)
+                XCTAssertNil(ta.distanceModel, scenario.id)
+                XCTAssertNil(ta.distanceMeters, scenario.id)
+                XCTAssertTrue(scenario.cells.filter { $0.timingAdvance != nil }
+                    .allSatisfy { $0.rat == "NR" && $0.numerology == nil })
+            }
+            if scenario.expected.timingAdvance?.accepted == false {
+                XCTAssertEqual(scenario.expected.timingAdvance?.reason, "notApplicable", scenario.id)
+                XCTAssertTrue(scenario.cells.filter { $0.timingAdvance != nil }
+                    .allSatisfy { $0.rat == "NR" && $0.role == "SCC" })
+            }
+        }
+        let leadingZero = try XCTUnwrap(fixtures.cases.first { $0.id == "three-digit-mnc-leading-zeros" })
+        XCTAssertEqual(leadingZero.subscriptions.first?.observedPlmn, "310001")
+    }
+
+    func testSharedNciProvenanceCorpusUsesVersionedReportedGnbContract() throws {
+        struct Fixture: Decodable {
+            struct Case: Decodable {
+                let id: String
+                let technology: String
+                let observedPlmn: String
+                let ci: String?
+                let enb: String?
+                let gnb: String?
+                let nodeIdentityKind: String?
+                let cellId: String?
+                let expectedCanonicalCi: String?
+                let expectedDerivedGnb: String?
+                let expectedLocalCellId: String?
+            }
+            let schemaVersion: Int
+            let cases: [Case]
+        }
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let fixtures = try JSONDecoder().decode(
+            Fixture.self,
+            from: Data(contentsOf: root.appendingPathComponent("SignalQuestTests/Fixtures/nci-provenance-v1.json"))
+        )
+        XCTAssertEqual(fixtures.schemaVersion, 2)
+        XCTAssertEqual(fixtures.cases.count, 14)
+        for entry in fixtures.cases {
+            let ci = entry.ci.flatMap(Int64.init)
+            let canonical = RadioCellIdentityNormalizer.canonicalFullCellIdentity(
+                cellId: entry.cellId,
+                ci: ci,
+                enb: entry.enb,
+                gnb: entry.gnb,
+                technology: entry.technology,
+                observedPlmn: entry.observedPlmn,
+                nodeIdentityKind: entry.nodeIdentityKind
+            )
+            XCTAssertEqual(canonical.map(String.init), entry.expectedCanonicalCi, entry.id)
+            XCTAssertEqual(RadioCellIdentityNormalizer.localCellIdentity(
+                cellId: entry.cellId,
+                ci: ci,
+                enb: entry.enb,
+                gnb: entry.gnb,
+                technology: entry.technology,
+                observedPlmn: entry.observedPlmn
+            ), entry.expectedLocalCellId, entry.id)
+            XCTAssertEqual(RadioCellIdentityNormalizer.derivedNrNodeIdentity(
+                ci: ci,
+                technology: entry.technology,
+                observedPlmn: entry.observedPlmn
+            ), entry.expectedDerivedGnb, entry.id)
+        }
+    }
+
+    func testNrReconstructionRejectsLegacyDerivedAndMissingGnbProvenance() {
+        for kind in [nil, "GNB_LEGACY", "GNB_DERIVED"] as [String?] {
+            XCTAssertNil(RadioCellIdentityNormalizer.canonicalFullCellIdentity(
+                cellId: "42",
+                ci: nil,
+                enb: nil,
+                gnb: "123456",
+                technology: "NR",
+                observedPlmn: "20810",
+                nodeIdentityKind: kind
+            ), kind ?? "missing")
+        }
+        XCTAssertEqual(RadioCellIdentityNormalizer.canonicalFullCellIdentity(
+            cellId: "42",
+            ci: nil,
+            enb: nil,
+            gnb: "123456",
+            technology: "NR",
+            observedPlmn: "20810",
+            nodeIdentityKind: "GNB_REPORTED"
+        ), 2_022_703_146)
+    }
 
     func testSharedExactPlmnFixturesMatchAndroidAndBackend() throws {
         struct Fixture: Decodable {
@@ -627,6 +1423,27 @@ extension RadioLogsTests {
         )
     }
 
+    func testBundledWorldLocationAreasResolveGlobalAndCoastalFixtures() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let areasURL = repositoryRoot
+            .appendingPathComponent("SignalQuestApp/Resources/market_location_areas.json")
+        let file = try JSONDecoder().decode(
+            MarketLocationAreasFile.self,
+            from: Data(contentsOf: areasURL)
+        )
+
+        XCTAssertEqual(file.areas.count, 1_335)
+        XCTAssertEqual(Set(file.areas.map(\.market)).count, 212)
+        XCTAssertEqual(file.candidates(latitude: 28.0339, longitude: 1.6596).first?.market, "DZ")
+        XCTAssertEqual(file.candidates(latitude: 31.7917, longitude: -7.0926).first?.market, "MA")
+        XCTAssertEqual(file.candidates(latitude: 42.3154, longitude: 43.3569).first?.market, "GE")
+        XCTAssertEqual(file.candidates(latitude: 40.7128, longitude: -74.0060).first?.market, "US")
+        XCTAssertEqual(file.candidates(latitude: 41.0082, longitude: 28.9784).first?.market, "TR")
+        XCTAssertEqual(file.candidates(latitude: 16.25, longitude: -61.55).first?.market, "DROM")
+    }
+
     /// UNE IDENTIFICATION DOIT SURVIVRE AU RETOUR SUR L'ÉCRAN.
     ///
     /// Le statut ne vivait qu'en mémoire : le magasin n'était alimenté que par le balayage,
@@ -660,6 +1477,6 @@ private struct StubAntennasService: AntennasServicing {
     func details(id: String, market: String, operatorName: String) async throws -> AntennaDetails { throw APIError.cancelled }
     func details(id: String, market: String, operatorName: String, anfrCode: String?) async throws -> AntennaDetails { throw APIError.cancelled }
     func search(query: String) async throws -> [AntennaSite] { [] }
-    func quickSearch(query: String) async throws -> [AntennaSite] { [] }
+    func quickSearch(query: String, market: String, department: String?) async throws -> [AntennaSite] { [] }
     func listCommunitySites(bbox: BoundingBox, market: String, operatorName: String?) async throws -> [AntennaSite] { [] }
 }

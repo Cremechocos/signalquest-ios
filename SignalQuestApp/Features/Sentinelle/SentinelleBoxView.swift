@@ -120,7 +120,7 @@ struct SentinelleBoxView: View {
                             .fixedSize(horizontal: false, vertical: true)
                         if let hostname = target.hostname {
                             Text(hostname)
-                                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                .font(.system(.caption, design: .monospaced, weight: .medium))
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
                     }
@@ -320,7 +320,7 @@ struct SentinelleBoxView: View {
                             .lineLimit(1)
                     }
                     Text(address.address)
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .font(.system(.caption, design: .monospaced, weight: .medium))
                         .foregroundStyle(SQColor.labelSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)

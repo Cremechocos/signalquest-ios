@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<string>en</string>
 	<key>CFBundleDisplayName</key>
 	<string>$(SQ_DISPLAY_NAME)</string>
 	<key>CFBundleDocumentTypes</key>
@@ -92,6 +92,8 @@
 	<string>$(SQ_APP_BASE_URL)</string>
 	<key>SQ_APP_GROUP</key>
 	<string>$(SQ_APP_GROUP)</string>
+	<key>SQ_NOTIFICATION_KEYCHAIN_ACCESS_GROUP</key>
+	<string>$(AppIdentifierPrefix)$(SQ_NOTIFICATION_KEYCHAIN_GROUP)</string>
 	<key>SQ_DEBUG_LOGS</key>
 	<string>$(SQ_DEBUG_LOGS)</string>
 	<key>SQ_ENVIRONMENT</key>

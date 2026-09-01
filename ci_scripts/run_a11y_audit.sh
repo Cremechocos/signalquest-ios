@@ -4,8 +4,8 @@
 # le relevé par écran et par type.
 #
 # À comparer avec docs/ACCESSIBILITY_BASELINE.md : le total ne doit jamais
-# remonter. L'audit est en mode RAPPORT (il n'échoue pas), donc ce script est le
-# seul endroit où la régression devient visible.
+# remonter. Les écrans migrés sont bloquants : le rapport reste imprimé, puis
+# le statut xcodebuild est propagé pour que la CI refuse une régression.
 #
 # Usage :
 #     ./ci_scripts/run_a11y_audit.sh [udid-ou-nom-de-simulateur]
@@ -28,8 +28,11 @@ DEST="${1:-platform=iOS Simulator,name=iPhone 17 Pro}"
 LOG="$(mktemp)"
 trap 'rm -f "$LOG"' EXIT
 
+set +e
 xcodebuild test -scheme SignalQuest -destination "$DEST" \
   -only-testing:SignalQuestUITests/AccessibilityAuditTests > "$LOG" 2>&1
+status=$?
+set -e
 
 if ! grep -q 'SQ_A11Y' "$LOG"; then
   echo "Aucun relevé produit — l'audit n'a pas tourné. Dernières erreurs :" >&2
@@ -46,3 +49,4 @@ grep -oE '\[[^]]+\]' "$LOG" | sort | uniq -c | sort -rn | sed 's/^/  /'
 total="$(grep -cE '^SQ_A11Y   \[' "$LOG")"
 echo "── total : $total ──"
 echo "Baseline de référence : docs/ACCESSIBILITY_BASELINE.md"
+exit "$status"

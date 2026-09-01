@@ -49,8 +49,11 @@ final class RadioLogsTourQATests: XCTestCase {
         // lignes : une pause fixe capturerait une page encore vide et ne prouverait
         // rien. On attend que le compteur cesse d'être à zéro, puis on laisse le
         // balayage poser quelques pastilles.
-        let loaded = waitForSites(app, timeout: 120)
-        Thread.sleep(forTimeInterval: loaded ? 12 : 4)
+        // Sans compte réel, le catalogue de démonstration peut rester vide :
+        // attendre 120 secondes ne teste rien et rallonge inutilement le gate.
+        // Avec un token, en revanche, on garde toute la fenêtre de rattrapage.
+        let loaded = token.isEmpty ? false : waitForSites(app, timeout: 120)
+        Thread.sleep(forTimeInterval: loaded ? 12 : (token.isEmpty ? 1 : 4))
         snap(app, "logs-01-liste")
         // On n'exige des données qu'avec un vrai token. En mode démo, la page est
         // légitimement vide — et l'exiger vide serait tout aussi faux, puisqu'un
@@ -79,7 +82,9 @@ final class RadioLogsTourQATests: XCTestCase {
         // Le balayage doit avoir posé des pastilles avant qu'on capture les
         // filtres : sans ça, « Identifiés · 0 » ne prouve rien — ni que le
         // balayage marche, ni qu'il ne marche pas.
-        let scanned = waitForScan(app, timeout: 180)
+        // Même règle pour le balayage : c'est une assertion de données réelles,
+        // jamais une condition de réussite de la tournée démo.
+        let scanned = token.isEmpty ? false : waitForScan(app, timeout: 180)
         if !token.isEmpty {
             XCTAssertTrue(scanned, "Le balayage n'a posé aucun statut après 180 s")
         }

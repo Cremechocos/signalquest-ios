@@ -5,13 +5,15 @@ SQ_APS_ENVIRONMENT = production
 SQ_ENVIRONMENT = production
 SQ_DISPLAY_NAME = SignalQuest
 SQ_APP_GROUP = group.fr.signalquest.ios
+SQ_NOTIFICATION_KEYCHAIN_GROUP = fr.signalquest.ios.notifications
 SQ_ASSOCIATED_DOMAIN = webcredentials:signalquest.fr
 // Liens universels : le lien de partage Sentinelle ouvre l'app, pas Safari.
 // Chemins revendiqués côté serveur, dans .well-known/apple-app-site-association.
 SQ_APPLINKS_DOMAIN = applinks:signalquest.fr
 SQ_URL_SCHEME = signalquest
 // Fichier d'entitlements de la cible app (project.yml lit $(SQ_ENTITLEMENTS)).
-// Reste SANS la clé CarPlay tant qu'Apple ne l'a pas accordée : elle ferait
-// échouer la signature de l'archive App Store.
+// Reste SANS clé CarPlay tant qu'elle n'est pas présente dans le profil App
+// Store effectivement utilisé pour signer l'archive. Une clé absente du profil
+// ferait échouer la signature, même si la capacité existe dans le code.
 SQ_ENTITLEMENTS = SignalQuestApp/SignalQuest.entitlements
 SWIFT_ACTIVE_COMPILATION_CONDITIONS =

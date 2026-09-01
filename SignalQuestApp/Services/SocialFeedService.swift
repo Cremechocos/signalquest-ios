@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 protocol SocialFeedServicing: Sendable {
@@ -14,6 +15,17 @@ protocol SocialFeedServicing: Sendable {
         poll: CreatePostPoll?
     ) async throws -> UnifiedSocialFeedItem?
     func uploadImage(data: Data, mimeType: String) async throws -> CreatePostAttachment
+    func publishPost(
+        text: String,
+        visibility: String,
+        imageData: Data?,
+        imageMimeType: String,
+        targetType: String?,
+        targetId: String?,
+        extraMetadata: [String: JSONValue]?,
+        poll: CreatePostPoll?
+    ) async throws -> UnifiedSocialFeedItem?
+    func retryPendingPosts() async
     func react(postId: String, emoji: String) async throws -> ReactionResponse
     func favorite(postId: String) async throws -> ReactionResponse
     func repost(postId: String) async throws -> ReactionResponse
@@ -75,6 +87,33 @@ protocol SocialFeedServicing: Sendable {
 }
 
 extension SocialFeedServicing {
+    func retryPendingPosts() async {}
+
+    func publishPost(
+        text: String,
+        visibility: String,
+        imageData: Data?,
+        imageMimeType: String,
+        targetType: String?,
+        targetId: String?,
+        extraMetadata: [String: JSONValue]?,
+        poll: CreatePostPoll?
+    ) async throws -> UnifiedSocialFeedItem? {
+        var attachments: [CreatePostAttachment] = []
+        if let imageData {
+            attachments.append(try await uploadImage(data: imageData, mimeType: imageMimeType))
+        }
+        return try await createPost(
+            text: text,
+            visibility: visibility,
+            attachments: attachments,
+            targetType: targetType,
+            targetId: targetId,
+            extraMetadata: extraMetadata,
+            poll: poll
+        )
+    }
+
     /// Surcharge de compatibilité — post simple sans cible télécom.
     func createPost(
         text: String,
@@ -110,9 +149,11 @@ struct SharePostResponse: Decodable {
 
 final class SocialFeedService: SocialFeedServicing {
     private let api: APIClient
+    private let postOutbox: SocialPostOutboxStore
 
-    init(api: APIClient) {
+    init(api: APIClient, postOutbox: SocialPostOutboxStore = SocialPostOutboxStore()) {
         self.api = api
+        self.postOutbox = postOutbox
     }
 
     /// Le feed unifié renvoie des ids préfixés ("post-…") alors que les routes
@@ -195,6 +236,141 @@ final class SocialFeedService: SocialFeedServicing {
             as: SocialUploadResponse.self
         )
         return response.upload
+    }
+
+    func publishPost(
+        text: String,
+        visibility: String,
+        imageData: Data?,
+        imageMimeType: String,
+        targetType: String?,
+        targetId: String?,
+        extraMetadata: [String: JSONValue]?,
+        poll: CreatePostPoll?
+    ) async throws -> UnifiedSocialFeedItem? {
+        guard let session = LocalAccountScope.sessionSnapshot() else {
+            throw CancellationError()
+        }
+        let requestId = "post:\(UUID().uuidString.lowercased())"
+        var metadata: [String: JSONValue] = ["platform": .string("ios")]
+        if let extraMetadata {
+            for (key, value) in extraMetadata { metadata[key] = value }
+        }
+        let request = CreatePostRequest(
+            text: text,
+            visibility: visibility,
+            targetType: targetType,
+            targetId: targetId,
+            placeLabel: nil,
+            latitude: nil,
+            longitude: nil,
+            metadata: metadata,
+            attachments: nil,
+            attachRadio: false,
+            poll: poll,
+            clientRequestId: requestId
+        )
+        let record = SocialPostOutboxRecord(
+            ownerScopeId: session.ownerScopeId,
+            sessionId: session.sessionId,
+            clientRequestId: requestId,
+            request: request,
+            imageMimeType: imageData == nil ? nil : imageMimeType,
+            imageSha256: imageData.map(Self.sha256Hex),
+            uploadedAttachment: nil,
+            createdAt: Date()
+        )
+        try await postOutbox.stage(record, imageData: imageData, session: session)
+        return try await submitPreparedPost(record, session: session)
+    }
+
+    func retryPendingPosts() async {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return }
+        guard let records = try? await postOutbox.pending(session: session) else { return }
+        for record in records {
+            guard session.isCurrent else { return }
+            do {
+                _ = try await submitPreparedPost(record, session: session)
+            } catch {
+                return
+            }
+        }
+    }
+
+    private func submitPreparedPost(
+        _ staged: SocialPostOutboxRecord,
+        session: LocalAccountSession
+    ) async throws -> UnifiedSocialFeedItem? {
+        guard session.isCurrent,
+              staged.ownerScopeId == session.ownerScopeId,
+              staged.sessionId == session.sessionId else {
+            throw CancellationError()
+        }
+        var record = try await postOutbox.record(
+            session: session,
+            clientRequestId: staged.clientRequestId
+        ) ?? staged
+        var attachment = record.uploadedAttachment
+        if attachment == nil, record.imageSha256 != nil {
+            let source = try await postOutbox.imageData(record, session: session)
+            let response: SocialUploadResponse = try await api.uploadMultipart(
+                path: "/api/social/uploads",
+                fields: [
+                    "platform": "ios",
+                    "clientRequestId": record.clientRequestId,
+                    "attachmentSlot": "image-0",
+                ],
+                fileField: "file",
+                fileName: "signalquest-social-\(record.clientRequestId).jpg",
+                mimeType: record.imageMimeType ?? "image/jpeg",
+                data: source,
+                as: SocialUploadResponse.self
+            )
+            attachment = response.upload
+            try await postOutbox.markUploaded(
+                session: session,
+                clientRequestId: record.clientRequestId,
+                attachment: response.upload
+            )
+            record = SocialPostOutboxRecord(
+                ownerScopeId: record.ownerScopeId,
+                sessionId: record.sessionId,
+                clientRequestId: record.clientRequestId,
+                request: record.request,
+                imageMimeType: record.imageMimeType,
+                imageSha256: record.imageSha256,
+                uploadedAttachment: response.upload,
+                createdAt: record.createdAt
+            )
+        }
+        let request = CreatePostRequest(
+            text: record.request.text,
+            visibility: record.request.visibility,
+            targetType: record.request.targetType,
+            targetId: record.request.targetId,
+            placeLabel: record.request.placeLabel,
+            latitude: record.request.latitude,
+            longitude: record.request.longitude,
+            metadata: record.request.metadata,
+            attachments: attachment.map { [$0] },
+            attachRadio: record.request.attachRadio,
+            poll: record.request.poll,
+            clientRequestId: record.clientRequestId
+        )
+        let response: CreatePostResponse = try await api.requestJSON(
+            "/api/social/v2/posts",
+            body: request,
+            idempotencyKey: record.clientRequestId
+        )
+        try await postOutbox.acknowledge(
+            session: session,
+            clientRequestId: record.clientRequestId
+        )
+        return response.post
+    }
+
+    private static func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     func react(postId: String, emoji: String = "❤️") async throws -> ReactionResponse {
@@ -364,7 +540,11 @@ final class SocialFeedService: SocialFeedServicing {
             query.append(URLQueryItem(name: "radius", value: String(radiusMeters)))
         }
         return try await api.request(
-            APIEndpoint(path: "/api/social/network-pulse", query: query),
+            APIEndpoint(
+                path: "/api/social/network-pulse",
+                query: query,
+                headers: ["Cache-Control": "no-cache"]
+            ),
             as: NetworkPulse.self
         )
     }
@@ -492,5 +672,211 @@ final class SocialFeedService: SocialFeedServicing {
             as: UserSpeedtestsResponse.self
         )
         return response.speedtests.first
+    }
+}
+
+enum SocialPostOutboxError: Error, Equatable {
+    case requestConflict
+    case sessionChanged
+    case imageMissing
+    case imageCorrupted
+    case imageTooLarge
+}
+
+struct SocialPostOutboxRecord: Codable, Equatable, Sendable {
+    let ownerScopeId: String
+    let sessionId: String
+    let clientRequestId: String
+    let request: CreatePostRequest
+    let imageMimeType: String?
+    let imageSha256: String?
+    let uploadedAttachment: CreatePostAttachment?
+    let createdAt: Date
+}
+
+actor SocialPostOutboxStore {
+    private static let maximumImageBytes = 20 * 1_024 * 1_024
+    private let root: URL
+    private let currentSession: MessageTextOutboxStore.CurrentSession
+    private let publisher: MessageTextOutboxStore.Publisher
+    private let encoder = JSONEncoder.signalQuest
+    private let decoder = JSONDecoder.signalQuest
+
+    init(
+        baseDirectory: URL? = nil,
+        currentSession: @escaping MessageTextOutboxStore.CurrentSession = { $0.isCurrent },
+        publisher: @escaping MessageTextOutboxStore.Publisher = { session, write in
+            try LocalAccountScope.publish(for: session, write)
+        }
+    ) {
+        let base = baseDirectory
+            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        root = base.appendingPathComponent("SignalQuestSocialPostOutbox", isDirectory: true)
+        self.currentSession = currentSession
+        self.publisher = publisher
+    }
+
+    func stage(
+        _ record: SocialPostOutboxRecord,
+        imageData: Data?,
+        session: LocalAccountSession
+    ) throws {
+        guard currentSession(session),
+              record.ownerScopeId == session.ownerScopeId,
+              record.sessionId == session.sessionId else {
+            throw SocialPostOutboxError.sessionChanged
+        }
+        if let imageData {
+            guard imageData.count <= Self.maximumImageBytes else { throw SocialPostOutboxError.imageTooLarge }
+            guard Self.sha256Hex(imageData) == record.imageSha256 else {
+                throw SocialPostOutboxError.imageCorrupted
+            }
+        } else if record.imageSha256 != nil {
+            throw SocialPostOutboxError.imageMissing
+        }
+        if let existing = try self.record(session: session, clientRequestId: record.clientRequestId) {
+            guard existing == record else { throw SocialPostOutboxError.requestConflict }
+            if existing.imageSha256 != nil { _ = try self.imageData(existing, session: session) }
+            return
+        }
+
+        let directory = ownerDirectory(session.ownerNamespace)
+        let metadataURL = self.metadataURL(record.clientRequestId, ownerNamespace: session.ownerNamespace)
+        let imageURL = self.imageURL(record.clientRequestId, ownerNamespace: session.ownerNamespace)
+        let metadata = try encoder.encode(record)
+        try publisher(session) {
+            try Self.prepareDirectory(directory)
+            do {
+                if let imageData { try imageData.write(to: imageURL, options: [.atomic]) }
+                try metadata.write(to: metadataURL, options: [.atomic])
+                if imageData != nil { Self.protect(imageURL) }
+                Self.protect(metadataURL)
+            } catch {
+                try? FileManager.default.removeItem(at: imageURL)
+                try? FileManager.default.removeItem(at: metadataURL)
+                throw error
+            }
+        }
+    }
+
+    func pending(session: LocalAccountSession) throws -> [SocialPostOutboxRecord] {
+        guard currentSession(session) else { throw SocialPostOutboxError.sessionChanged }
+        let directory = ownerDirectory(session.ownerNamespace)
+        guard FileManager.default.fileExists(atPath: directory.path) else { return [] }
+        let files = try FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ).filter { $0.pathExtension == "json" }
+        var active: [SocialPostOutboxRecord] = []
+        for url in files {
+            let value = try decoder.decode(SocialPostOutboxRecord.self, from: Data(contentsOf: url))
+            if value.ownerScopeId == session.ownerScopeId && value.sessionId == session.sessionId {
+                active.append(value)
+            } else {
+                try remove(value, session: session)
+            }
+        }
+        return active.sorted {
+            if $0.createdAt == $1.createdAt { return $0.clientRequestId < $1.clientRequestId }
+            return $0.createdAt < $1.createdAt
+        }
+    }
+
+    func record(session: LocalAccountSession, clientRequestId: String) throws -> SocialPostOutboxRecord? {
+        try pending(session: session).first { $0.clientRequestId == clientRequestId }
+    }
+
+    func imageData(_ record: SocialPostOutboxRecord, session: LocalAccountSession) throws -> Data {
+        guard currentSession(session), record.ownerScopeId == session.ownerScopeId,
+              record.sessionId == session.sessionId else { throw SocialPostOutboxError.sessionChanged }
+        guard let expected = record.imageSha256 else { throw SocialPostOutboxError.imageMissing }
+        let url = imageURL(record.clientRequestId, ownerNamespace: session.ownerNamespace)
+        guard FileManager.default.fileExists(atPath: url.path) else { throw SocialPostOutboxError.imageMissing }
+        let data = try Data(contentsOf: url)
+        guard Self.sha256Hex(data) == expected else { throw SocialPostOutboxError.imageCorrupted }
+        return data
+    }
+
+    func markUploaded(
+        session: LocalAccountSession,
+        clientRequestId: String,
+        attachment: CreatePostAttachment
+    ) throws {
+        guard let current = try record(session: session, clientRequestId: clientRequestId) else {
+            throw SocialPostOutboxError.imageMissing
+        }
+        let updated = SocialPostOutboxRecord(
+            ownerScopeId: current.ownerScopeId,
+            sessionId: current.sessionId,
+            clientRequestId: current.clientRequestId,
+            request: current.request,
+            imageMimeType: current.imageMimeType,
+            imageSha256: current.imageSha256,
+            uploadedAttachment: attachment,
+            createdAt: current.createdAt
+        )
+        let url = metadataURL(clientRequestId, ownerNamespace: session.ownerNamespace)
+        let data = try encoder.encode(updated)
+        try publisher(session) {
+            try data.write(to: url, options: [.atomic])
+            Self.protect(url)
+        }
+    }
+
+    func acknowledge(session: LocalAccountSession, clientRequestId: String) throws {
+        guard currentSession(session) else { throw SocialPostOutboxError.sessionChanged }
+        if let value = try record(session: session, clientRequestId: clientRequestId) {
+            try remove(value, session: session)
+        }
+    }
+
+    private func remove(_ record: SocialPostOutboxRecord, session: LocalAccountSession) throws {
+        let metadata = metadataURL(record.clientRequestId, ownerNamespace: session.ownerNamespace)
+        let image = imageURL(record.clientRequestId, ownerNamespace: session.ownerNamespace)
+        try publisher(session) {
+            if FileManager.default.fileExists(atPath: metadata.path) {
+                try FileManager.default.removeItem(at: metadata)
+            }
+            if FileManager.default.fileExists(atPath: image.path) {
+                try FileManager.default.removeItem(at: image)
+            }
+        }
+    }
+
+    private func ownerDirectory(_ namespace: String) -> URL {
+        root.appendingPathComponent(namespace, isDirectory: true)
+    }
+
+    private func metadataURL(_ requestId: String, ownerNamespace: String) -> URL {
+        ownerDirectory(ownerNamespace).appendingPathComponent(Self.fileStem(requestId)).appendingPathExtension("json")
+    }
+
+    private func imageURL(_ requestId: String, ownerNamespace: String) -> URL {
+        ownerDirectory(ownerNamespace).appendingPathComponent(Self.fileStem(requestId)).appendingPathExtension("blob")
+    }
+
+    private static func fileStem(_ requestId: String) -> String {
+        sha256Hex(Data(requestId.utf8))
+    }
+
+    private static func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func prepareDirectory(_ url: URL) throws {
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var mutable = url
+        try? mutable.setResourceValues(values)
+    }
+
+    private static func protect(_ url: URL) {
+        try? FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+            ofItemAtPath: url.path
+        )
     }
 }

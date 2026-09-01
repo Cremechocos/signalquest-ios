@@ -27,12 +27,23 @@ enum MapSearchResult: Identifiable, Equatable {
 
 @MainActor
 final class MapExplorerViewModel: ObservableObject {
+    enum FriendsConnectionState: Equatable {
+        case inactive
+        case connecting
+        case live
+        case fallback
+        case unavailable
+    }
+
     @Published var snapshot: SocialMapSnapshot = .empty
     /// Amis en temps réel (position + présence + radio) alimentés par le SSE
     /// `/api/social/map/stream`. Tenu à part de `snapshot.friends` pour ne pas
     /// entrer en course avec les rechargements bornés de `load()` : le flux n'est
     /// pas géo-borné et fait autorité dès qu'il a répondu.
     @Published var liveFriends: [SocialFriendLive] = []
+    @Published private(set) var friendsConnectionState: FriendsConnectionState = .inactive
+    @Published private(set) var friendsConnectionError: String?
+    @Published private(set) var friendsLastUpdatedAt: Date?
     /// Vrai dès que le flux temps réel a livré au moins un instantané : `load()`
     /// cesse alors d'amorcer `liveFriends` depuis le snapshot borné.
     private var friendsFromStream = false
@@ -290,7 +301,7 @@ final class MapExplorerViewModel: ObservableObject {
     }
 
     var defaultOperatorKeyForCurrentMarket: String {
-        currentMarketEntry.map(Self.defaultOperatorKey(for:)) ?? "SFR"
+        currentMarketEntry.map(Self.defaultOperatorKey(for:)) ?? "ALL"
     }
 
     /// Opérateurs filtrables du marché courant (clés registre + "ALL").
@@ -799,8 +810,16 @@ final class MapExplorerViewModel: ObservableObject {
 
     /// Applique un instantané du flux temps réel des amis. Fait autorité sur
     /// l'amorçage borné : `load()` cesse ensuite de réécrire `liveFriends`.
-    func applyLiveFriends(_ friends: [SocialFriendLive]) {
+    func beginFriendsStream() {
+        friendsConnectionState = .connecting
+        friendsConnectionError = nil
+    }
+
+    func applyLiveFriends(_ friends: [SocialFriendLive], isFallback: Bool = false) {
         friendsFromStream = true
+        friendsConnectionState = isFallback ? .fallback : .live
+        friendsConnectionError = nil
+        friendsLastUpdatedAt = Date()
         // PERF-MAP-05 : garde de diff — un tick identique (ami immobile, même
         // présence/radio) ne déclenche AUCUN travail de rendu.
         guard friends != liveFriends else { return }
@@ -808,6 +827,24 @@ final class MapExplorerViewModel: ObservableObject {
         // Ne bumpe PAS `dataVersion` (qui reconstruirait TOUTES les couches) : seul
         // `friendsVersion` → la vue ne rafraîchit que la couche amis (PERF-MAP-05).
         friendsVersion &+= 1
+    }
+
+    func friendsStreamDidEnd() {
+        friendsFromStream = false
+        friendsConnectionState = .unavailable
+        friendsConnectionError = String(localized: "Temps réel indisponible — repli périodique")
+    }
+
+    func friendsFallbackDidFail(_ error: Error) {
+        friendsConnectionState = .unavailable
+        friendsConnectionError = error.localizedDescription
+    }
+
+    func deactivateFriendsStream() {
+        friendsFromStream = false
+        friendsConnectionState = .inactive
+        friendsConnectionError = nil
+        friendsLastUpdatedAt = nil
     }
 
     // Idem : identifiants et URLs S3 de production, plus des amis fictifs
@@ -901,7 +938,11 @@ final class MapExplorerViewModel: ObservableObject {
     private func performSearch(_ q: String) async {
         isSearching = true
         searchFailed = false
-        async let antennasResult = (try? await antennasService.quickSearch(query: q)) ?? []
+        async let antennasResult = (try? await antennasService.quickSearch(
+            query: q,
+            market: marketFilter,
+            department: currentDromRegion?.department
+        )) ?? []
         async let placesResult = geocodePlaces(q)
         let antennas = await antennasResult
         let places = await placesResult
@@ -1052,14 +1093,27 @@ final class MapExplorerViewModel: ObservableObject {
 }
 
 struct MapExplorerView: View {
+    private struct FriendsStreamTaskKey: Hashable {
+        let enabled: Bool
+        let generation: Int
+    }
+
     @StateObject private var model: MapExplorerViewModel
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var mapCenter: CLLocationCoordinate2D
     @State private var mapZoom: Double
+    /// État de scène, pas une donnée métier : le pin de recherche survit à une
+    /// recréation de cette vue (rotation / restauration SwiftUI), mais n'est
+    /// jamais envoyé à l'API ni enregistré dans le catalogue utilisateur.
+    @SceneStorage("map.searchPin.latitude.v1") private var searchPinLatitude = ""
+    @SceneStorage("map.searchPin.longitude.v1") private var searchPinLongitude = ""
+    @SceneStorage("map.searchPin.title.v1") private var searchPinTitle = ""
+    @SceneStorage("map.searchPin.subtitle.v1") private var searchPinSubtitle = ""
     /// Dernier palier de zoom qui affecte le RENDU des couches (clustering/cônes).
     /// Tant qu'il ne change pas, un changement de `mapZoom` ne reconstruit PAS les
     /// couches (PERF-MAP-01) : entre deux frontières, `annotationPayloads` est identique.
@@ -1088,6 +1142,9 @@ struct MapExplorerView: View {
     @State private var selectedCommunityOutage: CommunityOutage?
     @State private var selectedPlanned: PlannedSiteLive?
     @State private var selectedFriend: SocialFriendLive?
+    @State private var selectedFriendFilterID: String?
+    @State private var friendsStreamGeneration = 0
+    @State private var friendFreshnessNow = Date()
     @State private var selectedCustomSite: AndroidCustomSiteMarker?
     @State private var selectedObservedCell: AndroidCommunitySiteMarker?
     /// Cellules retenues pour créer un site — non vide = l'écran de création
@@ -1310,23 +1367,52 @@ struct MapExplorerView: View {
             // Notification/deep link antenne reçu avant l'apparition de la carte.
             openSiteFromRouterIfNeeded()
         }
-        // Couche « Amis » active : publie ma présence/position (selon le toggle de
-        // confidentialité + le mode) et consomme le flux temps réel des amis. Le
-        // `.task(id:)` redémarre quand on active/désactive le calque ; il est
-        // annulé (donc le flux se ferme) à la disparition de la carte.
-        .task(id: filters.contains(.friend)) {
+        // Le calque pilote uniquement la CONSOMMATION des amis. La diffusion de
+        // ma propre position « carte ouverte » est liée à l'écran via onAppear.
+        .task(id: FriendsStreamTaskKey(
+            enabled: filters.contains(.friend),
+            generation: friendsStreamGeneration
+        )) {
             guard filters.contains(.friend) else {
-                services.livePresence.mapDidDisappear()
+                model.deactivateFriendsStream()
+                selectedFriendFilterID = nil
                 return
             }
-            services.livePresence.mapDidAppear()
-            await services.livePresence.refreshSharingSettings()
+            model.beginFriendsStream()
             for await friends in services.map.friendsStream(sse: services.sse) {
                 model.applyLiveFriends(friends)
+            }
+            guard !Task.isCancelled else { return }
+            model.friendsStreamDidEnd()
+
+            // Refus définitif ou terminaison du SSE : ne pas figer le dernier état.
+            // Un snapshot minimal reprend la main toutes les 30 s.
+            while !Task.isCancelled, filters.contains(.friend) {
+                do {
+                    let friends = try await services.map.friendsSnapshot()
+                    guard !Task.isCancelled else { return }
+                    model.applyLiveFriends(friends, isFallback: true)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    model.friendsFallbackDidFail(error)
+                }
+                try? await Task.sleep(for: .seconds(30))
+            }
+        }
+        // La fraîcheur progresse sans paquet réseau : estompage à 3 min et retrait
+        // à 15 min restent vrais même pendant une panne du flux.
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { return }
+                friendFreshnessNow = Date()
+                refreshFriendsRender()
             }
         }
         .onDisappear {
             services.livePresence.mapDidDisappear()
+            model.deactivateFriendsStream()
         }
         .onChangeCompat(of: filters) { _, newValue in
             // Mémorise les couches localement (restaurées au prochain affichage / relance).
@@ -1334,6 +1420,9 @@ struct MapExplorerView: View {
             // Affiche/masque une couche immédiatement, sans attendre le rechargement.
             refreshMapRender()
             scheduleLoad(region: lastRegion)
+        }
+        .onChangeCompat(of: selectedFriendFilterID) { _, _ in
+            refreshFriendsRender()
         }
         .onChangeCompat(of: coverageByGeneration) { _, _ in
             // Bascule Signal ↔ Génération : recolore la couche sans recharger le réseau.
@@ -1396,6 +1485,8 @@ struct MapExplorerView: View {
         // Tap sur une notification de panne : seul l'identifiant a voyagé.
         .onChangeCompat(of: router.openCommunityOutageId) { _, _ in openCommunityOutageFromNotificationIfNeeded() }
         .onAppear {
+            services.livePresence.mapDidAppear()
+            Task { await services.livePresence.refreshSharingSettings() }
             focusFromRouterIfNeeded()
             openCommunityOutageFromRouterIfNeeded()
             openCommunityOutageFromNotificationIfNeeded()
@@ -1454,6 +1545,7 @@ struct MapExplorerView: View {
             speedtestFeatures: renderedSpeedtestFeatures,
             renderVersion: renderVersion,
             colorScheme: colorScheme,
+            ornamentBottomInset: horizontalSizeClass == .regular ? SQSpace.sm : SQDock.clearance,
             center: $mapCenter,
             zoom: $mapZoom,
             onMoveEnd: { bounds, zoom in
@@ -1521,6 +1613,15 @@ struct MapExplorerView: View {
                     // Chips de couches : composant transverse déjà restylé
                     // (capsules casse normale, actif brique plein).
                     MapFilterBar(filters: $filters)
+                        // Cette barre dense conserve une taille exploitable quand le
+                        // texte système est au maximum. Les libellés restent annoncés
+                        // intégralement par VoiceOver.
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+                    if filters.contains(.friend) {
+                        friendsStatusPanel
+                            .padding(.horizontal, SQSpace.md)
+                            .transition(.move(edge: .top))
+                    }
                     // Les contrôles de coloration couverture (bascule + légende) ont
                     // quitté la colonne haute (surchargée) → carte flottante bas-centre
                     // (cf. `coverageControlsOverlay`).
@@ -1566,6 +1667,158 @@ struct MapExplorerView: View {
                 marketSwitchNoticeOverlay
             }
         }
+    }
+
+    private var effectiveFriendFilterID: String? {
+        guard let selectedFriendFilterID,
+              model.liveFriends.contains(where: { $0.id == selectedFriendFilterID })
+        else { return nil }
+        return selectedFriendFilterID
+    }
+
+    private var effectiveFriendsConnectionState: MapExplorerViewModel.FriendsConnectionState {
+        if model.friendsConnectionState == .live,
+           let updatedAt = model.friendsLastUpdatedAt,
+           friendFreshnessNow.timeIntervalSince(updatedAt) > 20 {
+            return .connecting
+        }
+        return model.friendsConnectionState
+    }
+
+    private var friendsConnectionPresentation: (label: String, icon: String, color: Color) {
+        switch effectiveFriendsConnectionState {
+        case .inactive:
+            return (String(localized: "Inactif"), "circle", SQColor.labelTertiary)
+        case .connecting:
+            return (String(localized: "Reconnexion…"), "arrow.triangle.2.circlepath", SQColor.warning)
+        case .live:
+            return (String(localized: "En direct"), "dot.radiowaves.left.and.right", SQColor.success)
+        case .fallback:
+            return (String(localized: "Repli périodique"), "clock.arrow.circlepath", SQColor.warning)
+        case .unavailable:
+            return (String(localized: "Indisponible"), "exclamationmark.triangle.fill", SQColor.danger)
+        }
+    }
+
+    private var friendsWithRecentLocation: [SocialFriendLive] {
+        model.liveFriends.filter { friend in
+            friend.location != nil && !friend.hasExpiredLocation(now: friendFreshnessNow)
+        }
+    }
+
+    private var friendsStatusPanel: some View {
+        let presentation = friendsConnectionPresentation
+        return VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(spacing: SQSpace.sm) {
+                if effectiveFriendsConnectionState == .connecting {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .tint(presentation.color)
+                        .accessibilityHidden(true)
+                } else {
+                    Image(systemName: presentation.icon)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(presentation.color)
+                }
+                Text(presentation.label)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: SQSpace.sm)
+                Text("\(friendsWithRecentLocation.count)/\(model.liveFriends.count) localisés")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("map.friends.count")
+                if effectiveFriendsConnectionState == .unavailable {
+                    Button {
+                        friendsStreamGeneration &+= 1
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Réessayer le flux des amis")
+                }
+            }
+
+            if model.liveFriends.isEmpty {
+                Text(effectiveFriendsConnectionState == .connecting
+                     ? String(localized: "Connexion à la carte des amis…")
+                     : String(localized: "Aucun ami ne partage de position récente."))
+                    .font(.caption)
+                    .foregroundStyle(SQColor.label)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: SQSpace.sm) {
+                        friendFilterButton(
+                            title: String(localized: "Tous"),
+                            isSelected: effectiveFriendFilterID == nil,
+                            friend: nil
+                        )
+                        ForEach(model.liveFriends) { friend in
+                            friendFilterButton(
+                                title: friend.name ?? String(localized: "Ami"),
+                                isSelected: effectiveFriendFilterID == friend.id,
+                                friend: friend
+                            )
+                        }
+                    }
+                }
+            }
+
+            if effectiveFriendsConnectionState == .unavailable,
+               let error = model.friendsConnectionError,
+               !error.isEmpty {
+                Text(error)
+                    .font(SQFont.archivo(10.5, .regular))
+                    .foregroundStyle(SQColor.danger)
+                    .lineLimit(2)
+            }
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm)
+        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)) }
+        .sqShadowSoft()
+        .animation(SQMotion.resolve(SQMotion.snappy, reduceMotion), value: effectiveFriendsConnectionState)
+    }
+
+    private func friendFilterButton(
+        title: String,
+        isSelected: Bool,
+        friend: SocialFriendLive?
+    ) -> some View {
+        Button {
+            selectedFriendFilterID = friend?.id
+            if let friend,
+               let location = friend.location,
+               !friend.hasExpiredLocation(now: friendFreshnessNow) {
+                mapCenter = CLLocationCoordinate2D(latitude: location.lat, longitude: location.lng)
+                mapZoom = max(mapZoom, 14)
+            }
+        } label: {
+            HStack(spacing: SQSpace.xs + 1) {
+                if let friend {
+                    SQAvatar(url: friend.avatarUrl, name: friend.name ?? "Ami", size: 24)
+                }
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .foregroundStyle(isSelected ? SQColor.accentInk : SQColor.label)
+            .padding(.horizontal, SQSpace.sm + 2)
+            .frame(minHeight: 44)
+            .background(isSelected ? SQColor.accentSoft : SQColor.surfaceMuted, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(friend == nil ? "Afficher tous les amis" : "Filtrer sur \(title)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     /// Dégagement bas des contrôles flottants de la carte pour la barre de navigation.
@@ -1695,7 +1948,7 @@ struct MapExplorerView: View {
             Image(systemName: "building.2.fill")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(SQColor.label)
-                .frame(width: 42, height: 42)
+                .frame(width: 44, height: 44)
                 .background { mapGlassBackground(Circle()) }
                 .sqShadowCard()
         }
@@ -1723,10 +1976,11 @@ struct MapExplorerView: View {
             .frame(width: 18, height: 18)
             .accessibilityHidden(!(model.isLoading || model.isSearching))
             .accessibilityLabel(model.isSearching ? "Recherche en cours" : (model.isLoading ? "Chargement de la carte" : ""))
-            TextField("Rechercher une ville, une adresse, un site…", text: $model.searchQuery)
+            TextField("Rechercher une ville, une adresse, un site…", text: $model.searchQuery, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(SQFont.body(15))
+                .font(.body)
                 .foregroundStyle(SQColor.label)
+                .lineLimit(1...2)
                 .submitLabel(.search)
                 .autocorrectionDisabled()
                 .onSubmit { Task { await model.search() } }
@@ -1736,16 +1990,19 @@ struct MapExplorerView: View {
                 Button {
                     model.searchQuery = ""
                     model.searchResults = []
+                    clearSearchPin()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(SQColor.labelTertiary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Effacer la recherche")
             }
         }
         .padding(.horizontal, SQSpace.md + 2)
-        .frame(height: 42)
+        .frame(minHeight: 44)
         .frame(maxWidth: .infinity)
         .background { mapGlassBackground(Capsule(style: .continuous)) }
         .sqShadowCard()
@@ -1769,12 +2026,17 @@ struct MapExplorerView: View {
                         .background(SQColor.brandRed, in: Circle())
                         .foregroundStyle(SQColor.onAccent)
                         .offset(x: 4, y: -4)
+                        .accessibilityHidden(true)
                 }
             }
             .sqShadowCard()
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel("Calques et filtres")
+        .accessibilityLabel(
+            activeFilterCount > 0
+                ? "Calques et filtres, \(activeFilterCount) actif\(activeFilterCount > 1 ? "s" : "")"
+                : "Calques et filtres"
+        )
     }
 
     /// Sélecteur d'opérateur compact (bas-gauche) : menu des opérateurs du marché
@@ -1799,16 +2061,17 @@ struct MapExplorerView: View {
                     .fill(model.operatorFilter.uppercased() == "ALL" ? SQColor.brandRed : model.operatorAccent(model.operatorFilter))
                     .frame(width: 9, height: 9)
                 Text(model.operatorShortLabel(model.operatorFilter))
-                    .font(SQFont.body(13.5, .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
+                    .foregroundStyle(Color.primary)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(Color.primary)
             }
             .padding(.horizontal, SQSpace.md)
-            .frame(height: 42)
-            .foregroundStyle(SQColor.label)
-            .background { mapGlassBackground(Capsule(style: .continuous)) }
+            .frame(minHeight: 44)
+            .foregroundStyle(Color.primary)
+            .background(SQColor.surface, in: Capsule(style: .continuous))
             .sqShadowCard()
         }
         .accessibilityLabel("Opérateur affiché : \(model.operatorShortLabel(model.operatorFilter))")
@@ -1867,7 +2130,8 @@ struct MapExplorerView: View {
                     Text(focus.summary)
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: SQSpace.sm)
                 Button {
@@ -1903,18 +2167,20 @@ struct MapExplorerView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
             Text(text)
-                .font(SQFont.body(13, .semibold))
-                .foregroundStyle(SQColor.label)
-                .lineLimit(2)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("map.status.text")
         }
         .padding(.horizontal, SQSpace.md + 2)
         .padding(.vertical, SQSpace.sm + 2)
-        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .sqShadowCard()
         // Bornée à 280 (repli 2 lignes pour les erreurs longues) et CENTRÉE dans la
         // colonne bas-centre (alignement centré par défaut du `.frame`) — plus
         // d'alignement `.leading` hérité de l'ancienne position bas-gauche.
-        .frame(maxWidth: 280)
+        .frame(maxWidth: 340)
+        .accessibilityElement(children: .combine)
     }
 
     private var activeFilterCount: Int {
@@ -2003,6 +2269,8 @@ struct MapExplorerView: View {
                 Text(model.searchFailed ? "Recherche indisponible" : "Aucun résultat")
                     .font(SQFont.body(14, .medium))
                     .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer()
             }
             .padding(.horizontal, SQSpace.md + 2)
@@ -2023,12 +2291,12 @@ struct MapExplorerView: View {
                     .foregroundStyle(SQColor.brandRed)
                 Text(site.siteId ?? site.id)
                     .font(SQFont.body(14, .semibold))
-                    .lineLimit(1)
+                    .lineLimit(2)
                 if let address = site.address {
                     Text(address)
                         .font(SQFont.body(13))
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
             case .place(let place):
                 Image(systemName: "mappin.circle.fill")
@@ -2036,12 +2304,12 @@ struct MapExplorerView: View {
                     .foregroundStyle(SQColor.brandRed)
                 Text(place.name)
                     .font(SQFont.body(14, .semibold))
-                    .lineLimit(1)
+                    .lineLimit(2)
                 if let subtitle = place.subtitle {
                     Text(subtitle)
                         .font(SQFont.body(13))
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
             }
             Spacer()
@@ -2057,9 +2325,11 @@ struct MapExplorerView: View {
         dismissSearch()
         switch result {
         case .place(let place):
+            setSearchPin(place)
             mapCenter = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
             mapZoom = 14
         case .antenna(let site):
+            clearSearchPin()
             if site.hasValidCoordinate, let lat = site.latitude, let lng = site.longitude {
                 mapCenter = CLLocationCoordinate2D(latitude: lat, longitude: lng)
                 mapZoom = 15
@@ -2075,6 +2345,53 @@ struct MapExplorerView: View {
         model.isSearching = false
         model.searchFailed = false
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
+    private var searchPinPayload: MapAnnotationPayload? {
+        guard let latitude = Double(searchPinLatitude),
+              let longitude = Double(searchPinLongitude),
+              latitude.isFinite,
+              longitude.isFinite,
+              (-90.0...90.0).contains(latitude),
+              (-180.0...180.0).contains(longitude),
+              latitude != 0 || longitude != 0
+        else { return nil }
+        return MapAnnotationPayload(
+            id: "searched-place-pin",
+            // Le type ne participe pas aux filtres : `isSearchPin` le distingue
+            // de tout site communautaire au rendu et à l'accessibilité.
+            kind: .customSite,
+            title: searchPinTitle.isEmpty ? "Lieu recherché" : searchPinTitle,
+            subtitle: searchPinSubtitle,
+            coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
+            metric: nil,
+            backendId: nil,
+            details: nil,
+            antennaId: nil,
+            clusterCount: nil,
+            azimuths: [],
+            showsAzimuths: false,
+            tint: SQColor.brandRed,
+            glyphOverride: "mappin.circle.fill",
+            isSearchPin: true
+        )
+    }
+
+    private func setSearchPin(_ place: PlaceResult) {
+        searchPinLatitude = String(place.latitude)
+        searchPinLongitude = String(place.longitude)
+        searchPinTitle = place.name
+        searchPinSubtitle = place.subtitle ?? ""
+        refreshMapRender()
+    }
+
+    private func clearSearchPin() {
+        guard !searchPinLatitude.isEmpty || !searchPinLongitude.isEmpty || !searchPinTitle.isEmpty else { return }
+        searchPinLatitude = ""
+        searchPinLongitude = ""
+        searchPinTitle = ""
+        searchPinSubtitle = ""
+        refreshMapRender()
     }
 
     /// Reconstruit le cache des couches lourdes. Appelé uniquement sur changement
@@ -2141,7 +2458,11 @@ struct MapExplorerView: View {
             return
         }
         Task {
-            let results = (try? await services.antennas.search(query: siteId)) ?? []
+            let results = (try? await services.antennas.quickSearch(
+                query: siteId,
+                market: model.marketFilter,
+                department: model.currentDromRegion?.department
+            )) ?? []
             guard let site = results.first(where: { $0.id == siteId || $0.siteId == siteId }) ?? results.first else { return }
             selectedAntenna = site
             if let lat = site.latitude, let lng = site.longitude {
@@ -2251,6 +2572,7 @@ struct MapExplorerView: View {
         payloads += plannedPayloads
         payloads += outagePayloads
         payloads += communityOutagePayloads
+        if let searchPinPayload { payloads.append(searchPinPayload) }
         return payloads
     }
 
@@ -3201,8 +3523,11 @@ struct MapExplorerView: View {
     /// flux temps réel (`model.liveFriends`), pas par le snapshot borné.
     private var friendPayloads: [MapAnnotationPayload] {
         guard filters.contains(.friend) else { return [] }
+        let selectedID = effectiveFriendFilterID
         return model.liveFriends.compactMap { friend in
+            if let selectedID, friend.id != selectedID { return nil }
             guard let location = friend.location else { return nil }
+            guard !friend.hasExpiredLocation(now: friendFreshnessNow) else { return nil }
             let info = FriendAnnotationInfo(
                 userId: friend.id,
                 displayName: friend.name ?? "Ami",
@@ -3213,7 +3538,7 @@ struct MapExplorerView: View {
                 accuracyMeters: location.accuracy.flatMap { $0 > 0 ? $0 : nil },
                 technology: friend.radio?.technology,
                 operatorName: friend.radio?.operator,
-                isStale: friend.hasStaleLocation()
+                isStale: friend.hasStaleLocation(now: friendFreshnessNow)
             )
             let subtitle = friend.radio?.technology
                 ?? friend.presence?.customStatus
@@ -3248,8 +3573,10 @@ struct MapExplorerView: View {
 
     private func selectAnnotation(_ annotation: MapAnnotationPayload) {
         Haptics.light()
+        if annotation.isSearchPin { return }
         if let antennaId = annotation.antennaId,
            let site = model.antennas.first(where: { $0.id == antennaId }) {
+            clearSearchPin()
             selectedAntenna = site
             return
         }
@@ -3302,6 +3629,7 @@ struct MapExplorerView: View {
         // Site ajouté à la main : même fiche terrain que les antennes officielles.
         if annotation.kind == .customSite, let siteId = annotation.backendId,
            let site = model.customSiteTiles.flatMap(\.markers).first(where: { $0.id == siteId }) {
+            clearSearchPin()
             selectedCustomSite = site
             return
         }
@@ -3499,4 +3827,3 @@ struct MapExplorerView: View {
 // MARK: - Carte MapKit (moteur unique)
 
 // MARK: - Style des marqueurs MapKit (couleur / taille / glyphe par type)
-

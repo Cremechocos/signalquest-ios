@@ -1,0 +1,16 @@
+{
+  "fixtureVersion": 1,
+  "ownerNamespace": "fixture-account-01",
+  "recoveryKeyB64": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+  "identityRootKeyB64": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8=",
+  "kdfAlgorithm": "HKDF_SHA256",
+  "kdfInfo": "signalquest-e2ee-v2-recovery-root-v1",
+  "wrapAlgorithm": "AES_256_GCM",
+  "saltB64": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8=",
+  "nonceB64": "cHFyc3R1dnd4eXp7",
+  "aadUtf8": "SQ-E2EE-V2-RECOVERY\n1\nfixture-account-01",
+  "aadB64": "U1EtRTJFRS1WMi1SRUNPVkVSWQoxCmZpeHR1cmUtYWNjb3VudC0wMQ==",
+  "derivedKeyB64": "YJ+FxRrsdwsvAKbpdkvs5+4ZeU8dNUxYtMv2O9sbS4c=",
+  "wrappedIdentityRootKeyB64": "GpvN8dVRUIJ5M1DcfgKKeT8O5nDr1A7DX3zYNyd+fFb7F7MbNxLaurw/jJuteDwn",
+  "recoveryKeyVerifierHash": "1659334510e6e5ff5d3dcf9946808ca69b5389562921f3202c6092af8b0a8c21"
+}

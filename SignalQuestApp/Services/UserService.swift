@@ -182,9 +182,19 @@ protocol UserServicing: Sendable {
     func accountDeletionPreview() async throws -> AccountDeletionPreview
     func requestAccountDeletionEmailCode() async throws -> AccountDeletionEmailChallenge
     func deleteAccount(using proof: AccountDeletionProof) async throws -> AccountDeletionResult
+    func deleteAccount(using proof: AccountDeletionProof, expectedSession: LocalAccountSession) async throws -> AccountDeletionResult
     /// Archive RGPD complète (profil, mesures, contributions, messages…) au format
     /// JSON, telle que renvoyée par le backend `GET /api/export/my-data`.
     func exportPersonalData() async throws -> Data
+}
+
+extension UserServicing {
+    func deleteAccount(using proof: AccountDeletionProof, expectedSession: LocalAccountSession) async throws -> AccountDeletionResult {
+        guard expectedSession.isCurrent else { throw APIError.cancelled }
+        let value = try await deleteAccount(using: proof)
+        guard expectedSession.isCurrent else { throw APIError.cancelled }
+        return value
+    }
 }
 
 final class UserService: UserServicing {
@@ -300,6 +310,29 @@ final class UserService: UserServicing {
                 body: EmailRequest(challengeId: challengeId, emailCode: code, confirmation: confirmation)
             )
         }
+    }
+
+    func deleteAccount(using proof: AccountDeletionProof, expectedSession: LocalAccountSession) async throws -> AccountDeletionResult {
+        guard expectedSession.isCurrent, let token = api.credentials.accessToken(), expectedSession.matchesAuthToken(token) else {
+            throw APIError.missingAuthToken
+        }
+        var payload: [String: String] = ["confirmation": "SUPPRIMER MON COMPTE"]
+        switch proof {
+        case .password(let value): payload["password"] = value
+        case .apple(let value): payload["appleIdentityToken"] = value
+        case .email(let id, let code): payload["challengeId"] = id; payload["emailCode"] = code
+        }
+        let endpoint = APIEndpoint(path: "/api/user/delete-account", method: .delete,
+            headers: ["Content-Type": "application/json"],
+            body: try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+            authenticated: true, skipsAutoRefresh: true)
+        let (data, response) = try await api.performSingleAttempt(endpoint, fixedAuthToken: token, expectedSession: expectedSession)
+        guard (200..<300).contains(response.statusCode) else {
+            let error = try? JSONDecoder.signalQuest.decode(BackendErrorResponse.self, from: data)
+            throw APIError.http(status: response.statusCode, code: error?.code, message: error?.error ?? "",
+                requestId: error?.requestId, retryAfter: nil)
+        }
+        return try JSONDecoder.signalQuest.decode(AccountDeletionResult.self, from: data)
     }
 
     func exportPersonalData() async throws -> Data {

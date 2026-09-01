@@ -25,9 +25,13 @@ struct LaunchLoadingView: View {
                                 .scaleEffect(animating ? 2.05 : 0.92)
                                 .opacity(animating ? 0 : 0.9)
                                 .animation(
-                                    .easeOut(duration: 2.4)
-                                        .repeatForever(autoreverses: false)
-                                        .delay(Double(wave) * 0.8),
+                                    SQMotion.repeating(
+                                        .easeOut(duration: 2.4),
+                                        autoreverses: false,
+                                        delay: Double(wave) * 0.8,
+                                        active: animating,
+                                        reduceMotion: reduceMotion
+                                    ),
                                     value: animating
                                 )
                         }
@@ -41,7 +45,11 @@ struct LaunchLoadingView: View {
                         .sqShadowAccent()
                         .scaleEffect(animating && !reduceMotion ? 1.045 : 1)
                         .animation(
-                            reduceMotion ? nil : .easeInOut(duration: 1.7).repeatForever(autoreverses: true),
+                            SQMotion.repeating(
+                                .easeInOut(duration: 1.7),
+                                active: animating,
+                                reduceMotion: reduceMotion
+                            ),
                             value: animating
                         )
                 }

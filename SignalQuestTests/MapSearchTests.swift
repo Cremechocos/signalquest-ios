@@ -40,4 +40,46 @@ final class MapSearchTests: XCTestCase {
         XCTAssertEqual(merged.count, 5)
         XCTAssertTrue(merged.allSatisfy { if case .antenna = $0 { return true } else { return false } })
     }
+
+    func testQuickSearchSendsExactWorldwideMarket() throws {
+        let items = try AntennasService.quickSearchQueryItems(
+            query: "Bamako",
+            market: " ml ",
+            department: nil
+        )
+        let query = Dictionary(uniqueKeysWithValues: items.compactMap { item in
+            item.value.map { (item.name, $0) }
+        })
+
+        XCTAssertEqual(query["q"], "Bamako")
+        XCTAssertEqual(query["market"], "ML")
+
+        let crossBorder = try AntennasService.quickSearchQueryItems(
+            query: "Genève",
+            market: "ch",
+            department: nil
+        )
+        XCTAssertEqual(crossBorder.first(where: { $0.name == "market" })?.value, "CH")
+
+        let reunion = try AntennasService.quickSearchQueryItems(
+            query: "Saint-Denis",
+            market: "DROM",
+            department: "974"
+        )
+        XCTAssertEqual(reunion.first(where: { $0.name == "department" })?.value, "974")
+    }
+
+    func testQuickSearchRefusesUnknownMarketBeforeNetwork() {
+        XCTAssertThrowsError(
+            try AntennasService.quickSearchQueryItems(
+                query: "Bamako",
+                market: "UNKNOWN",
+                department: nil
+            )
+        ) { error in
+            guard case AntennasServiceError.marketRequired = error else {
+                return XCTFail("Erreur inattendue: \(error)")
+            }
+        }
+    }
 }

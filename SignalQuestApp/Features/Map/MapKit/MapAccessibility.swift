@@ -2,6 +2,18 @@ import Foundation
 import MapKit
 import UIKit
 
+/// Élément virtuel pour les couches Core Graphics de la carte. Contrairement à
+/// une annotation MapKit, un point d'overlay n'a aucune vue UIKit et ne peut
+/// donc pas recevoir VoiceOver sans représentation explicite.
+final class SQMapOverlayAccessibilityElement: UIAccessibilityElement {
+    var activation: (() -> Void)?
+
+    override func accessibilityActivate() -> Bool {
+        activation?()
+        return activation != nil
+    }
+}
+
 /// Ce qu'un lecteur d'écran annonce pour une annotation de carte.
 struct SQAnnotationDescription {
     let label: String
@@ -23,6 +35,14 @@ struct SQAnnotationDescription {
 enum MapAccessibility {
 
     static func describe(_ payload: MapAnnotationPayload) -> SQAnnotationDescription {
+        if payload.isSearchPin {
+            let title = payload.title.isEmpty ? String(localized: "sans nom") : payload.title
+            return SQAnnotationDescription(
+                label: String(localized: "Lieu recherché \(title)"),
+                value: payload.subtitle.isEmpty ? nil : payload.subtitle,
+                hint: String(localized: "Point temporaire de recherche")
+            )
+        }
         // Un cluster n'est pas un lieu : on annonce ce qu'il regroupe.
         if let count = payload.clusterCount, count > 1 {
             return SQAnnotationDescription(

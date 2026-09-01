@@ -45,6 +45,8 @@ struct VoiceNoteRecordingBar: View {
                 Image(systemName: "trash")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(SQColor.dangerInk)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel("Annuler l'enregistrement")
 
@@ -60,6 +62,8 @@ struct VoiceNoteRecordingBar: View {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 28))
                     .foregroundStyle(SQColor.brandRed)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel("Envoyer la note vocale")
         }
@@ -116,8 +120,12 @@ struct VoiceNoteBubble: View {
         // barre par barre n'aurait aucun sens.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Note vocale")
-        .accessibilityValue(VoiceNotePlayer.formatted(duration))
+        .accessibilityValue(VoiceNotePlayer.formatted(player.isPlaying(url) ? player.duration : duration))
         .accessibilityHint(player.isPlaying(url) ? "Toucher pour mettre en pause" : "Toucher pour écouter")
         .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            Haptics.selection()
+            player.toggle(url: url)
+        }
     }
 }

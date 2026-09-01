@@ -32,6 +32,9 @@ final class AppRouter: ObservableObject {
     /// (tap sur une notification `antenna_report_reply`). Consommé par ProfileView,
     /// racine de l'onglet Profil qui héberge « Mes signalements d'antenne ».
     @Published var openAntennaReportId: String?
+    /// Demande E2EE v2 validée issue d'une notification. L'identifiant opaque est
+    /// consommé par ProfileView, puis revérifié côté serveur avant toute approbation.
+    @Published var openE2EEDeviceApprovalId: String?
     /// Box Sentinelle à ouvrir (tap sur une notification de coupure). Consommé
     /// par ProfileView : Sentinelle vit sous l'onglet Profil, dans les réglages.
     /// Sans identifiant, l'écran s'ouvre quand même — sur son accueil.
@@ -56,7 +59,12 @@ final class AppRouter: ObservableObject {
         // Tous les drapeaux passent par AppEnvironment : en Release ce sont des
         // constantes `false`, donc l'onglet initial est toujours `.home` et
         // aucun argument de lancement ne peut détourner la navigation.
-        if AppEnvironment.runsSpeedtestQA || AppEnvironment.showsSpeedtestSharePreviewQA {
+        if let qaTab = Self.qaInitialTab(
+            profile: AppEnvironment.startsOnProfileQA,
+            community: AppEnvironment.startsOnCommunityQA
+        ) {
+            selectedTab = qaTab
+        } else if AppEnvironment.runsSpeedtestQA || AppEnvironment.showsSpeedtestSharePreviewQA {
             selectedTab = .speed
         } else if AppEnvironment.startsOnMap
                     || AppEnvironment.usesDemoPhotos
@@ -76,13 +84,31 @@ final class AppRouter: ObservableObject {
         }
     }
 
+    /// Sélection initiale réservée aux parcours UI Debug. Gardée pure pour que
+    /// la priorité des deux arguments soit testable sans modifier ProcessInfo.
+    static func qaInitialTab(profile: Bool, community: Bool) -> AppTab? {
+        if profile { return .profile }
+        if community { return .community }
+        return nil
+    }
+
     /// Routes from an already-parsed APNs payload. The caller extracts the fields
     /// off the (non-Sendable) `userInfo` dictionary so only `String?` values cross
     /// the actor boundary. The backend uses Firebase-style payloads, so callers
     /// look identifiers up under both camelCase and snake_case.
-    func handle(type rawType: String?, conversationId: String?, postId: String?, userId: String? = nil, siteId: String? = nil, reportId: String? = nil, targetId: String? = nil, outageId: String? = nil) {
+    func handle(
+        type rawType: String?,
+        conversationId: String?,
+        postId: String?,
+        userId: String? = nil,
+        siteId: String? = nil,
+        reportId: String? = nil,
+        targetId: String? = nil,
+        outageId: String? = nil,
+        e2eeDeviceApprovalId: String? = nil
+    ) {
         switch rawType?.lowercased() {
-        case "message", "conversation", "call", "dm":
+        case "message", "conversation", "call", "dm", "e2ee_v2_envelope":
             route(toConversation: conversationId)
         case "post", "reaction", "comment", "like", "favorite", "repost", "mention", "story":
             route(toPost: postId)
@@ -101,6 +127,8 @@ final class AppRouter: ObservableObject {
             route(toCommunityOutageId: outageId, fallbackSiteId: siteId)
         case "sentinelle":
             route(toSentinelle: targetId)
+        case "e2ee_v2_device_approval":
+            route(toE2EEDeviceApproval: e2eeDeviceApprovalId)
         default:
             if reportId != nil {
                 route(toAntennaReport: reportId)
@@ -187,5 +215,11 @@ final class AppRouter: ObservableObject {
     func route(toAntennaReport id: String?) {
         selectedTab = .profile
         if let id { openAntennaReportId = id }
+    }
+
+    func route(toE2EEDeviceApproval id: String?) {
+        guard let id, !id.isEmpty else { return }
+        selectedTab = .profile
+        openE2EEDeviceApprovalId = id
     }
 }

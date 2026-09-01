@@ -1,0 +1,12 @@
+{
+  "fixtureVersion": 1,
+  "method": "POST",
+  "path": "/api/e2ee/v2/devices",
+  "timestampMs": 1787443200123,
+  "nonce": "fixture_nonce_01J7ABCD23456789",
+  "bodyUtf8": "{\"deviceId\":\"fixture_device_01J7ABCD23456789\",\"label\":\"Téléphone QA\"}",
+  "bodySha256B64Url": "3iGfu_ydSct-OGAXcn2CCjHIVJNhdYiPOT3awxKTxyg",
+  "canonicalRequestUtf8": "SQ-E2EE-V2\nPOST\n/api/e2ee/v2/devices\n1787443200123\nfixture_nonce_01J7ABCD23456789\n3iGfu_ydSct-OGAXcn2CCjHIVJNhdYiPOT3awxKTxyg",
+  "publicSigningKeyB64": "BJf/xTkeTqLI8kHNNwEgcQ3CJjR1oBw19QMyUQBuW1r8SqbG1G1B5XmhAZnnj4BCxgYAjKh36DEP1C1FjWEwkQI=",
+  "signatureDerB64": "MEYCIQDGyeBsghoCqVe1kmCncvC+4tyFOfkOs+uXQcF0EXewKgIhAPQrhQu8iokVGBx1NEfko2pQVbdAXD93uFMd8FLEDRTK"
+}

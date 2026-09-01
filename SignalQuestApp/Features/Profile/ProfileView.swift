@@ -13,6 +13,12 @@ struct SentinelleDeepLink: Identifiable {
     var targetId: String? { id.isEmpty ? nil : id }
 }
 
+/// Demande d'approbation E2EE v2 issue d'un push validé localement. Le détail
+/// complet est toujours relu sur le serveur avant d'être présenté à l'utilisateur.
+struct E2EEDeviceApprovalDeepLink: Identifiable {
+    let id: String
+}
+
 /// Profil « Crème & Terre cuite » : en-tête centré (avatar 88 + ombre accent),
 /// carte stats 4 cellules, carte progression (niveau/points), menu en carte
 /// unique rayon 22 et déconnexion en capsule danger. Header custom scrollable
@@ -21,6 +27,7 @@ struct ProfileView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var router: AppRouter
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let user: AuthUser
     @State private var showEdit = false
     @State private var stats: UserStats?
@@ -33,6 +40,8 @@ struct ProfileView: View {
     @State private var deepLinkSentinelle: SentinelleDeepLink?
     /// Box partagée ouverte depuis un lien universel.
     @State private var deepLinkShare: SentinelleDeepLink?
+    /// Nouvel appareil à examiner après un tap sur une notification E2EE v2.
+    @State private var deepLinkE2EEApproval: E2EEDeviceApprovalDeepLink?
 
     var body: some View {
         ScrollView {
@@ -56,12 +65,10 @@ struct ProfileView: View {
                 // Récompenses, Classements, Territoires : juste sous le niveau
                 // et les points auxquels ils se rapportent.
                 progressionTiles
-                    .sqFadeUp()
 
                 GradientButton("Éditer le profil", systemImage: "person.crop.circle", style: .secondary) {
                     showEdit = true
                 }
-                .sqFadeUp()
 
                 // Pas de sqFadeUp sur la carte menu : plus haute que le viewport,
                 // la scrollTransition ne l'amène jamais à l'identité → elle
@@ -109,10 +116,21 @@ struct ProfileView: View {
                 SentinelleView(service: services.sentinelle, initialShareSlug: link.id)
             }
         }
-        .onAppear { consumeAntennaReportDeepLink(); consumeSentinelleDeepLink(); consumeShareDeepLink() }
+        .sheet(item: $deepLinkE2EEApproval) { link in
+            NavigationStack {
+                E2EEV2TrustedDevicesView(api: services.api, initialApprovalId: link.id)
+            }
+        }
+        .onAppear {
+            consumeAntennaReportDeepLink()
+            consumeSentinelleDeepLink()
+            consumeShareDeepLink()
+            consumeE2EEApprovalDeepLink()
+        }
         .onChangeCompat(of: router.openSentinelleShareSlug) { _, _ in consumeShareDeepLink() }
         .onChangeCompat(of: router.openAntennaReportId) { _, _ in consumeAntennaReportDeepLink() }
         .onChangeCompat(of: router.openSentinelle) { _, _ in consumeSentinelleDeepLink() }
+        .onChangeCompat(of: router.openE2EEDeviceApprovalId) { _, _ in consumeE2EEApprovalDeepLink() }
         .task { await loadStats() }
         .refreshable { await loadStats() }
     }
@@ -140,6 +158,12 @@ struct ProfileView: View {
         guard let id = router.openAntennaReportId else { return }
         router.openAntennaReportId = nil
         deepLinkReport = AntennaReportDeepLink(id: id)
+    }
+
+    private func consumeE2EEApprovalDeepLink() {
+        guard let id = router.openE2EEDeviceApprovalId else { return }
+        router.openE2EEDeviceApprovalId = nil
+        deepLinkE2EEApproval = E2EEDeviceApprovalDeepLink(id: id)
     }
 
     // MARK: - En-tête
@@ -176,13 +200,27 @@ struct ProfileView: View {
     // Pas de cellule « Niveau » : la carte de progression juste en dessous
     // porte déjà le niveau + la jauge (doublon signalé).
     private func statsCard(_ stats: UserStats) -> some View {
-        HStack(spacing: 0) {
-            statCell(label: "Points", value: stats.totalPoints.map { $0.formatted() } ?? "—", accent: true)
-            statDivider
-            statCell(label: "Tests", value: stats.totalSpeedtests.map { $0.formatted() } ?? "—")
-            if let validations = stats.totalValidations {
-                statDivider
-                statCell(label: "Valid.", value: validations.formatted())
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: SQSpace.sm) {
+                    statCell(label: "Points", value: stats.totalPoints.map { $0.formatted() } ?? "—", accent: true)
+                    Divider().overlay(SQColor.separator)
+                    statCell(label: "Tests", value: stats.totalSpeedtests.map { $0.formatted() } ?? "—")
+                    if let validations = stats.totalValidations {
+                        Divider().overlay(SQColor.separator)
+                        statCell(label: "Valid.", value: validations.formatted())
+                    }
+                }
+            } else {
+                HStack(spacing: 0) {
+                    statCell(label: "Points", value: stats.totalPoints.map { $0.formatted() } ?? "—", accent: true)
+                    statDivider
+                    statCell(label: "Tests", value: stats.totalSpeedtests.map { $0.formatted() } ?? "—")
+                    if let validations = stats.totalValidations {
+                        statDivider
+                        statCell(label: "Valid.", value: validations.formatted())
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity)
@@ -220,15 +258,29 @@ struct ProfileView: View {
         let inLevel = points % goal
         let progress = min(1, Double(inLevel) / Double(goal))
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
-            HStack {
-                Text("Niveau \(level)")
-                    .font(SQFont.body(12.5, .medium))
-                    .foregroundStyle(SQColor.labelSecondary)
-                Spacer()
-                Text("\(inLevel.formatted()) / \(goal.formatted()) pts")
-                    .font(SQFont.body(12.5, .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(SQColor.labelSecondary)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        Text("Niveau \(level)")
+                            .font(SQFont.body(12.5, .medium))
+                            .foregroundStyle(SQColor.labelSecondary)
+                        Text("\(inLevel.formatted()) / \(goal.formatted()) pts")
+                            .font(SQFont.body(12.5, .medium))
+                            .monospacedDigit()
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                } else {
+                    HStack {
+                        Text("Niveau \(level)")
+                            .font(SQFont.body(12.5, .medium))
+                            .foregroundStyle(SQColor.labelSecondary)
+                        Spacer()
+                        Text("\(inLevel.formatted()) / \(goal.formatted()) pts")
+                            .font(SQFont.body(12.5, .medium))
+                            .monospacedDigit()
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                }
             }
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
@@ -361,16 +413,25 @@ struct ProfileView: View {
     /// affichés au-dessus — les ranger vingt lignes plus bas les coupait de
     /// leur contexte.
     private var progressionTiles: some View {
-        HStack(spacing: SQSpace.md) {
-            progressionTile("Récompenses", icon: "rosette") {
-                GamificationView(service: services.gamification)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: SQSpace.md) { progressionTileContent }
+            } else {
+                HStack(spacing: SQSpace.md) { progressionTileContent }
             }
-            progressionTile("Classements", icon: "trophy.fill") {
-                LeaderboardsView(service: services.leaderboards, gamification: services.gamification, user: user)
-            }
-            progressionTile("Territoires", icon: "square.grid.3x3.fill") {
-                TerritoriesView(service: services.gamification)
-            }
+        }
+    }
+
+    @ViewBuilder
+    private var progressionTileContent: some View {
+        progressionTile("Récompenses", icon: "rosette") {
+            GamificationView(service: services.gamification)
+        }
+        progressionTile("Classements", icon: "trophy.fill") {
+            LeaderboardsView(service: services.leaderboards, gamification: services.gamification, user: user)
+        }
+        progressionTile("Territoires", icon: "square.grid.3x3.fill") {
+            TerritoriesView(service: services.gamification)
         }
     }
 
@@ -385,15 +446,15 @@ struct ProfileView: View {
             VStack(spacing: SQSpace.sm) {
                 Image(systemName: icon)
                     .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(SQColor.brandRed)
+                    .foregroundStyle(SQColor.accentInk)
                     .frame(width: 40, height: 40)
                     .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                     .accessibilityHidden(true)
                 Text(LocalizedStringKey(title))
                     .font(SQFont.body(12.5, .semibold))
                     .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, SQSpace.md)
@@ -409,23 +470,26 @@ struct ProfileView: View {
             .fill(SQColor.separator)
             .frame(height: 1)
             .padding(.leading, 65)
+            .accessibilityHidden(true)
     }
 
     private func menuRow(title: String, icon: String) -> some View {
         HStack(spacing: SQSpace.md + 1) {
             Image(systemName: icon)
                 .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(SQColor.brandRed)
+                .foregroundStyle(Color.primary)
                 .frame(width: 36, height: 36)
                 .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .accessibilityHidden(true)
             Text(LocalizedStringKey(title))
-                .font(SQFont.body(15.5, .medium))
-                .foregroundStyle(SQColor.label)
+                .font(.body.weight(.medium))
+                .foregroundStyle(Color.primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("profile.menu.title")
             Spacer()
             Image(systemName: "chevron.right")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(SQColor.labelTertiary)
+                .foregroundStyle(Color.primary)
                 .accessibilityHidden(true)
         }
         .padding(.horizontal, SQSpace.lg)

@@ -29,5 +29,9 @@
 	</dict>
 	<key>SQ_API_BASE_URL</key>
 	<string>$(SQ_API_BASE_URL)</string>
+	<key>SQ_APP_GROUP</key>
+	<string>$(SQ_APP_GROUP)</string>
+	<key>SQ_NOTIFICATION_KEYCHAIN_ACCESS_GROUP</key>
+	<string>$(AppIdentifierPrefix)$(SQ_NOTIFICATION_KEYCHAIN_GROUP)</string>
 </dict>
 </plist>

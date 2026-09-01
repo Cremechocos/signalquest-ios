@@ -76,8 +76,10 @@ enum SpeedtestShareImageRenderer {
     }
 
     // Conservé pour la dérivation de localisation (tests).
-    static func location(for result: SpeedtestRunResult) -> String {
-        result.city?.trimmedNonEmpty ?? "France"
+    static func location(for result: SpeedtestRunResult) -> String? {
+        // Une ville absente ne prouve ni la France ni aucun autre pays. Laisser la
+        // ligne de contexte sans lieu est plus honnête qu'une attribution inventée.
+        result.city?.trimmedNonEmpty
     }
 }
 
@@ -227,7 +229,7 @@ private struct SpeedtestShareCard: View {
     private var dlGraceCount: Int { max(0, result.downloadGraceWindowCount ?? 0) }
     private var ulGraceCount: Int { max(0, result.uploadGraceWindowCount ?? 0) }
 
-    private var city: String { SpeedtestShareImageRenderer.location(for: result) }
+    private var city: String? { SpeedtestShareImageRenderer.location(for: result) }
     private var serverLabel: String? {
         (result.serverName ?? result.downloadServerName)?.trimmedNonEmpty
     }
@@ -670,8 +672,8 @@ struct SpeedtestShareGraph: View {
             Spacer(minLength: 0)
             Text("0")
         }
-        .font(SQFont.bodyFixed(10, .medium))
-        .foregroundStyle(labelColor.opacity(0.8))
+        .font(SQFont.body(10, .medium, relativeTo: .caption2))
+        .foregroundStyle(labelColor)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)

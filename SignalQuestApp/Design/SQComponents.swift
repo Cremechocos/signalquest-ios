@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import UIKit
 
 struct TechBadge: View {
     let text: String
@@ -11,7 +12,7 @@ struct TechBadge: View {
             .padding(.horizontal, SQSpace.sm + 2)
             .padding(.vertical, SQSpace.xs + 2)
             .background(color.opacity(0.13), in: Capsule(style: .continuous))
-            .foregroundStyle(color)
+            .foregroundStyle(SQColor.label)
     }
 }
 
@@ -68,8 +69,10 @@ struct SQAvatar: View {
 
     private var initials: some View {
         Text(String(name.prefix(1)).uppercased())
-            .font(SQFont.display(max(13, size * 0.38), .semibold))
+            .font(SQFont.display(max(13, size * 0.38), .semibold, relativeTo: .title3))
             .foregroundStyle(SQColor.onAccent)
+            .accessibilityHidden(true)
+            .accessibilityIdentifier("feed.avatar.initial")
     }
 }
 
@@ -91,10 +94,12 @@ struct StoryBubble: View {
                     }
                 }
             Text(story.author.displayName)
-                .font(SQType.caption)
+                .font(.footnote)
                 .foregroundStyle(SQColor.label)
-                .lineLimit(1)
-                .frame(width: 70)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minWidth: 70)
+                .accessibilityIdentifier("feed.story.name")
         }
         .accessibilityElement(children: .combine)
     }
@@ -461,6 +466,7 @@ struct EmptyStateView: View {
     let title: String
     let message: String
     let systemImage: String
+    var messageColor: Color = SQColor.labelSecondary
 
     var body: some View {
         VStack(spacing: SQSpace.md) {
@@ -475,7 +481,7 @@ struct EmptyStateView: View {
                 .foregroundStyle(SQColor.label)
             Text(LocalizedStringKey(message))
                 .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
+                .foregroundStyle(messageColor)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -509,6 +515,7 @@ struct ErrorStateView: View {
                 Text(LocalizedStringKey(title))
                     .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
+                    .accessibilityIdentifier("state.error.title")
                 Text(LocalizedStringKey(message))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
@@ -772,6 +779,248 @@ struct SQSectionHeader<Trailing: View>: View {
                 .foregroundStyle(SQColor.label)
             Spacer()
             trailing()
+        }
+    }
+}
+
+// MARK: - File globale de notifications in-app
+
+enum SQInAppNotificationVariant {
+    case info, success, warning, error
+}
+
+enum SQInAppNotificationPriority: Int {
+    case normal = 0
+    case high = 1
+    case urgent = 2
+}
+
+struct SQInAppNotificationItem: Identifiable {
+    let id: UUID
+    let title: String?
+    let body: String
+    let variant: SQInAppNotificationVariant
+    let duration: Duration
+    let actionLabel: String?
+    let action: (@MainActor () -> Void)?
+    let priority: SQInAppNotificationPriority
+    let canBePreempted: Bool
+
+    init(
+        id: UUID = UUID(),
+        title: String? = nil,
+        body: String,
+        variant: SQInAppNotificationVariant = .info,
+        duration: Duration = .seconds(3),
+        actionLabel: String? = nil,
+        action: (@MainActor () -> Void)? = nil,
+        priority: SQInAppNotificationPriority? = nil,
+        canBePreempted: Bool? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.body = body
+        self.variant = variant
+        self.duration = duration
+        self.actionLabel = actionLabel
+        self.action = action
+        self.priority = priority ?? {
+            switch variant {
+            case .info, .success: return .normal
+            case .warning: return .high
+            case .error: return .urgent
+            }
+        }()
+        // Une erreur garde sa fenêtre de lecture même si d'autres feedbacks arrivent.
+        self.canBePreempted = canBePreempted ?? (variant != .error)
+    }
+}
+
+struct SQQueuedInAppNotification {
+    let sequence: UInt64
+    let item: SQInAppNotificationItem
+}
+
+/// Algorithme pur : priorité décroissante, FIFO à priorité égale et aucune
+/// préemption d'un Undo ou d'une erreur visible.
+struct SQInAppNotificationQueue {
+    private var nextSequence: UInt64 = 0
+    private var pending: [SQQueuedInAppNotification] = []
+    private(set) var current: SQQueuedInAppNotification?
+
+    @discardableResult
+    mutating func offer(_ item: SQInAppNotificationItem) -> Bool {
+        let incoming = SQQueuedInAppNotification(sequence: nextSequence, item: item)
+        nextSequence &+= 1
+        guard let shown = current else {
+            current = incoming
+            return true
+        }
+        if shown.item.canBePreempted, incoming.item.priority.rawValue > shown.item.priority.rawValue {
+            pending.append(shown)
+            current = incoming
+            sortPending()
+            return true
+        }
+        pending.append(incoming)
+        sortPending()
+        return false
+    }
+
+    @discardableResult
+    mutating func dismiss(id: UUID) -> SQQueuedInAppNotification? {
+        guard current?.item.id == id else { return current }
+        current = pending.isEmpty ? nil : pending.removeFirst()
+        return current
+    }
+
+    var pendingItems: [SQInAppNotificationItem] { pending.map(\.item) }
+
+    private mutating func sortPending() {
+        pending.sort {
+            if $0.item.priority != $1.item.priority {
+                return $0.item.priority.rawValue > $1.item.priority.rawValue
+            }
+            return $0.sequence < $1.sequence
+        }
+    }
+}
+
+@MainActor
+final class SQInAppNotificationCenter: ObservableObject {
+    @Published private(set) var current: SQInAppNotificationItem?
+
+    private var queue = SQInAppNotificationQueue()
+    private var timeoutTask: Task<Void, Never>?
+
+    func show(_ item: SQInAppNotificationItem) {
+        if queue.offer(item) { presentCurrent() }
+    }
+
+    func showError(_ body: String, title: String? = nil) {
+        show(SQInAppNotificationItem(title: title, body: body, variant: .error, duration: .seconds(4)))
+    }
+
+    func showUndo(body: String, actionLabel: String, action: @escaping @MainActor () -> Void) {
+        show(
+            SQInAppNotificationItem(
+                body: body,
+                variant: .info,
+                duration: .seconds(5),
+                actionLabel: actionLabel,
+                action: action,
+                priority: .high,
+                canBePreempted: false
+            )
+        )
+    }
+
+    func dismiss(_ id: UUID) {
+        guard current?.id == id else { return }
+        queue.dismiss(id: id)
+        presentCurrent()
+    }
+
+    func performAction(_ id: UUID) {
+        guard let shown = current, shown.id == id else { return }
+        shown.action?()
+        dismiss(id)
+    }
+
+    private func presentCurrent() {
+        timeoutTask?.cancel()
+        current = queue.current?.item
+        guard let shown = current else { return }
+
+        let announcement = [shown.title, shown.body]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: ". ")
+        if !announcement.isEmpty {
+            Task { @MainActor in
+                await Task.yield()
+                UIAccessibility.post(notification: .announcement, argument: announcement)
+            }
+        }
+
+        timeoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: shown.duration)
+            guard !Task.isCancelled else { return }
+            self?.dismiss(shown.id)
+        }
+    }
+}
+
+struct SQInAppNotificationHost: View {
+    @EnvironmentObject private var center: SQInAppNotificationCenter
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Group {
+            if let item = center.current {
+                HStack(spacing: SQSpace.sm) {
+                    Image(systemName: icon(for: item.variant))
+                        .foregroundStyle(tint(for: item.variant))
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        if let title = item.title, !title.isEmpty {
+                            Text(title).font(SQType.caption.weight(.bold))
+                        }
+                        Text(item.body)
+                            .font(SQType.caption.weight(.medium))
+                            .lineLimit(3)
+                    }
+                    .foregroundStyle(SQColor.label)
+                    Spacer(minLength: SQSpace.xs)
+                    if let actionLabel = item.actionLabel, item.action != nil {
+                        Button(actionLabel) { center.performAction(item.id) }
+                            .font(SQType.caption.weight(.bold))
+                            .tint(tint(for: item.variant))
+                            .frame(minHeight: 44)
+                    }
+                    Button {
+                        center.dismiss(item.id)
+                    } label: {
+                        Image(systemName: "xmark")
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Fermer")
+                }
+                .padding(.leading, SQSpace.md)
+                .padding(.trailing, SQSpace.xs)
+                .padding(.vertical, SQSpace.xs)
+                .frame(maxWidth: 520)
+                .background(SQColor.surface, in: Capsule(style: .continuous))
+                .overlay {
+                    Capsule(style: .continuous)
+                        .stroke(tint(for: item.variant).opacity(0.28), lineWidth: 1)
+                }
+                .sqShadowDock()
+                .padding(.horizontal, SQSpace.md)
+                .accessibilityElement(children: .contain)
+                .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+                .id(item.id)
+            }
+        }
+        .animation(reduceMotion ? nil : SQMotion.snappy, value: center.current?.id)
+    }
+
+    private func icon(for variant: SQInAppNotificationVariant) -> String {
+        switch variant {
+        case .info: return "info.circle.fill"
+        case .success: return "checkmark.circle.fill"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .error: return "xmark.octagon.fill"
+        }
+    }
+
+    private func tint(for variant: SQInAppNotificationVariant) -> Color {
+        switch variant {
+        case .info: return SQColor.brandRed
+        case .success: return SQColor.success
+        case .warning: return SQColor.warning
+        case .error: return SQColor.dangerInk
         }
     }
 }

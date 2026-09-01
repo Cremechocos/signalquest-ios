@@ -130,6 +130,10 @@ struct MapAnnotationPayload: Identifiable, Equatable {
     /// filtre « Pannes » éteint : allumé, l'incident a son propre marqueur et le doubler d'un
     /// badge ferait compter deux fois la même coupure.
     var operatorIncident: OperatorIncidentMark? = nil
+    /// Pointeur transitoire posé par une recherche de lieu. Ce n'est ni une
+    /// antenne, ni une donnée métier : il vit uniquement dans l'état de scène de
+    /// la carte et reste donc indépendant des couches et des filtres radio.
+    var isSearchPin: Bool = false
 
     /// Étiquette VoiceOver du marqueur : sans elle, antennes/clusters/speedtests/
     /// amis/photos sont des éléments anonymes non lisibles (A11Y-03/T1-6).
@@ -173,7 +177,8 @@ struct MapAnnotationPayload: Identifiable, Equatable {
         lhs.azimuthBeams == rhs.azimuthBeams &&
         lhs.friend == rhs.friend &&
         lhs.communityOutage == rhs.communityOutage &&
-        lhs.operatorIncident == rhs.operatorIncident
+        lhs.operatorIncident == rhs.operatorIncident &&
+        lhs.isSearchPin == rhs.isSearchPin
     }
 }
 

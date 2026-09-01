@@ -83,10 +83,15 @@ final class SessionDetailViewModel: ObservableObject {
             Haptics.error()
             return
         }
-        // Les points de session ne portent pas de PLMN : on le dérive du nom
-        // d'opérateur. Sans lui, le serveur renvoie `MISSING_PLMN` — il refuse
-        // (à raison) d'attribuer une identification à un opérateur arbitraire.
-        let plmn = RadioLogOperatorResolver.mccMnc(forOperator: antenna.operatorName)
+        // Le PLMN du POINT observé est la seule preuve acceptable. Un nom comme
+        // « Orange » ou « Bouygues » n'est ni mondialement unique, ni une preuve
+        // de réseau servant. Les anciennes sessions sans PLMN restent lisibles,
+        // mais leur identification doit passer par le journal ou un choix manuel.
+        guard let plmn = sample?.servingPlmn else {
+            identifyResult = "PLMN servant absent dans cette session : identifie ce nœud depuis les logs radio ou choisis explicitement son réseau."
+            Haptics.error()
+            return
+        }
         let isNr = (sample?.gnb ?? antenna.gnb) != nil
         do {
             let result = try await service.identify(
@@ -97,9 +102,15 @@ final class SessionDetailViewModel: ObservableObject {
                     pci: (sample?.pci ?? antenna.pci).flatMap(Int.init),
                     cellId: sample?.cellId ?? antenna.cellId,
                     tech: isNr ? "5G" : "4G",
-                    operatorName: antenna.operatorName,
-                    mcc: plmn?.mcc,
-                    mnc: plmn?.mnc,
+                    operatorName: sample?.operatorKey,
+                    operatorKey: sample?.operatorKey,
+                    marketCode: sample?.marketCode,
+                    rawOperatorName: sample?.simOperator,
+                    observedPlmn: plmn.plmn,
+                    mcc: plmn.mcc,
+                    mnc: plmn.mnc,
+                    isRoaming: sample?.isRoaming,
+                    networkIdentitySource: sample?.networkIdentitySource,
                     latitude: coord.latitude,
                     longitude: coord.longitude
                 )
@@ -448,10 +459,20 @@ struct SessionDetailView: View {
             Circle().fill(Color(uiColor: SessionSpeedColor.ui(st.downloadMbps))).frame(width: 10, height: 10)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
-                    Text(st.mobileOperator ?? st.operatorKey ?? "Speedtest")
+                    // Le RÉSEAU d'abord : c'est lui qui décrit la mesure. La SIM ne
+                    // sert que de repli quand le réseau n'a pas été résolu (anciennes
+                    // lignes sans operatorKey).
+                    Text(st.operatorKey ?? st.mobileOperator ?? "Speedtest")
                         .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
+                    if let mvno = st.mvnoName, !mvno.isEmpty,
+                       mvno.caseInsensitiveCompare(st.operatorKey ?? "") != .orderedSame {
+                        Text("SIM \(mvno)")
+                            .font(SQFont.body(10.5, .semibold, relativeTo: .caption2))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .lineLimit(1)
+                    }
                     if let net = st.networkType, !net.isEmpty {
                         Text(net)
                             .font(SQFont.body(10.5, .semibold, relativeTo: .caption2))
@@ -511,7 +532,7 @@ struct SessionDetailView: View {
         HStack(spacing: SQSpace.sm) {
             Circle().fill(Self.statusColor(antenna.status)).frame(width: 10, height: 10)
             VStack(alignment: .leading, spacing: 2) {
-                Text(antenna.operatorName ?? antenna.displayName ?? "Antenne")
+                Text(antenna.operatorDisplayName ?? antenna.displayName ?? "Antenne")
                     .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1)
@@ -548,7 +569,7 @@ struct SessionDetailView: View {
                 }
                 .buttonStyle(SQPressButtonStyle())
                 .disabled(model.identifyingId != nil)
-                .accessibilityLabel("Valider l'antenne \(antenna.operatorName ?? antenna.displayName ?? "")")
+                .accessibilityLabel("Valider l'antenne \(antenna.operatorDisplayName ?? antenna.displayName ?? "")")
             }
             if antenna.siteId != nil {
                 Image(systemName: "chevron.right")
@@ -559,6 +580,11 @@ struct SessionDetailView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
+            if let siteId = antenna.siteId {
+                validationTarget = ValidationTarget(siteId: siteId, operatorName: antenna.operatorName)
+            }
+        }
+        .accessibilityAction(named: Text("Afficher les validations")) {
             if let siteId = antenna.siteId {
                 validationTarget = ValidationTarget(siteId: siteId, operatorName: antenna.operatorName)
             }

@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "description": "Synthetic worldwide radio evidence scenarios. Serving PLMN wins over SIM identity; subscriptions are never duplicated; LTE/NSA TA belongs to its LTE cell; NR distance requires an observed numerology.",
+  "platformRules": {
+    "android": { "mayExposePerSubscriptionRadio": true, "unavailableState": "notExposedByOem" },
+    "ios": { "mayExposePerSubscriptionRadio": false, "unavailableState": "notExposedByPlatform" },
+    "backend": { "acceptsOnlyObservedEvidence": true }
+  },
+  "cases": [
+    {
+      "id": "dual-sim-independent-serving-networks",
+      "category": "dual_sim",
+      "subscriptions": [
+        { "seriesKey": "sub:101", "subscriptionId": 101, "simPlmn": "20810", "observedPlmn": "20810", "isDataSim": true, "isRoaming": false, "observable": true },
+        { "seriesKey": "sub:202", "subscriptionId": 202, "simPlmn": "20815", "observedPlmn": "20815", "isDataSim": false, "isRoaming": false, "observable": true }
+      ],
+      "cells": [
+        { "seriesKey": "sub:101", "role": "PCC", "rat": "LTE", "band": "B7", "arfcn": 2850, "bandwidthMhz": 20, "cellIdentity": "1665538", "rsrp": -88 },
+        { "seriesKey": "sub:202", "role": "PCC", "rat": "NR", "band": "n78", "arfcn": 640000, "bandwidthMhz": 80, "cellIdentity": "268419077", "rsrp": -94 }
+      ],
+      "expected": {
+        "observableSeries": ["sub:101", "sub:202"],
+        "unavailableSeries": [],
+        "servingNetworks": [
+          { "seriesKey": "sub:101", "servingPlmn": "20810", "simPlmn": "20810" },
+          { "seriesKey": "sub:202", "servingPlmn": "20815", "simPlmn": "20815" }
+        ],
+        "carrierAggregation": null,
+        "timingAdvance": null,
+        "forbiddenCopies": [
+          { "fromSeriesKey": "sub:101", "toSeriesKey": "sub:202", "fields": ["cellIdentity", "rsrp", "band"] }
+        ]
+      }
+    },
+    {
+      "id": "dual-sim-secondary-not-observable-by-oem",
+      "category": "dual_sim",
+      "subscriptions": [
+        { "seriesKey": "sub:301", "subscriptionId": 301, "simPlmn": "26202", "observedPlmn": "26202", "isDataSim": true, "isRoaming": false, "observable": true },
+        { "seriesKey": "sub:302", "subscriptionId": 302, "simPlmn": "26201", "observedPlmn": null, "isDataSim": false, "isRoaming": false, "observable": false, "unavailableReason": "ambiguousSubscription" }
+      ],
+      "cells": [
+        { "seriesKey": "sub:301", "role": "PCC", "rat": "LTE", "band": "B3", "arfcn": 1300, "bandwidthMhz": 20, "cellIdentity": "26202001", "rsrp": -91 }
+      ],
+      "expected": {
+        "observableSeries": ["sub:301"],
+        "unavailableSeries": [{ "seriesKey": "sub:302", "reason": "ambiguousSubscription" }],
+        "servingNetworks": [{ "seriesKey": "sub:301", "servingPlmn": "26202", "simPlmn": "26202" }],
+        "carrierAggregation": null,
+        "timingAdvance": null,
+        "forbiddenCopies": [{ "fromSeriesKey": "sub:301", "toSeriesKey": "sub:302", "fields": ["cellIdentity", "rsrp", "observedPlmn"] }]
+      }
+    },
+    {
+      "id": "roaming-visited-network-is-primary",
+      "category": "roaming",
+      "subscriptions": [
+        { "seriesKey": "sub:401", "subscriptionId": 401, "simPlmn": "20810", "observedPlmn": "23415", "isDataSim": true, "isRoaming": true, "observable": true }
+      ],
+      "cells": [
+        { "seriesKey": "sub:401", "role": "PCC", "rat": "LTE", "band": "B20", "arfcn": 6300, "bandwidthMhz": 10, "cellIdentity": "23415001", "rsrp": -96 }
+      ],
+      "expected": {
+        "observableSeries": ["sub:401"],
+        "unavailableSeries": [],
+        "servingNetworks": [{ "seriesKey": "sub:401", "servingPlmn": "23415", "simPlmn": "20810" }],
+        "carrierAggregation": null,
+        "timingAdvance": null,
+        "forbiddenCopies": []
+      }
+    },
+    {
+      "id": "three-digit-mnc-leading-zeros",
+      "category": "identity",
+      "subscriptions": [
+        { "seriesKey": "sub:501", "subscriptionId": 501, "simPlmn": "310001", "observedPlmn": "310001", "isDataSim": true, "isRoaming": false, "observable": true }
+      ],
+      "cells": [],
+      "expected": {
+        "observableSeries": ["sub:501"],
+        "unavailableSeries": [],
+        "servingNetworks": [{ "seriesKey": "sub:501", "servingPlmn": "310001", "simPlmn": "310001" }],
+        "carrierAggregation": null,
+        "timingAdvance": null,
+        "forbiddenCopies": []
+      }
+    },
+    {
+      "id": "lte-three-carrier-aggregation",
+      "category": "carrier_aggregation",
+      "subscriptions": [
+        { "seriesKey": "sub:601", "subscriptionId": 601, "simPlmn": "20820", "observedPlmn": "20820", "isDataSim": true, "isRoaming": false, "observable": true }
+      ],
+      "cells": [
+        { "seriesKey": "sub:601", "role": "PCC", "rat": "LTE", "band": "B3", "arfcn": 1300, "bandwidthMhz": 20, "cellIdentity": "3112966", "rsrp": -84, "timingAdvance": 4, "timingAdvanceSourceTechnology": "LTE", "timingAdvanceSourceCellId": "3112966" },
+        { "seriesKey": "sub:601", "role": "SCC", "rat": "LTE", "band": "B7", "arfcn": 2850, "bandwidthMhz": 20, "cellIdentity": "3112967", "rsrp": -89 },
+        { "seriesKey": "sub:601", "role": "SCC", "rat": "LTE", "band": "B20", "arfcn": 6300, "bandwidthMhz": 10, "cellIdentity": "3112968", "rsrp": -93 }
+      ],
+      "expected": {
+        "observableSeries": ["sub:601"],
+        "unavailableSeries": [],
+        "servingNetworks": [{ "seriesKey": "sub:601", "servingPlmn": "20820", "simPlmn": "20820" }],
+        "carrierAggregation": { "seriesKey": "sub:601", "componentCount": 3, "totalBandwidthMhz": 50, "bands": ["B3", "B7", "B20"] },
+        "timingAdvance": { "accepted": true, "seriesKey": "sub:601", "value": 4, "sourceTechnology": "LTE", "sourceCellId": "3112966", "distanceModel": "LTE_78_12_M", "distanceMeters": 312 },
+        "forbiddenCopies": []
+      }
+    },
+    {
+      "id": "nsa-ta-belongs-to-lte-anchor",
+      "category": "nsa",
+      "subscriptions": [
+        { "seriesKey": "sub:701", "subscriptionId": 701, "simPlmn": "20810", "observedPlmn": "20810", "isDataSim": true, "isRoaming": false, "observable": true }
+      ],
+      "cells": [
+        { "seriesKey": "sub:701", "role": "PCC", "rat": "LTE", "band": "B7", "arfcn": 2850, "bandwidthMhz": 20, "cellIdentity": "1665538", "rsrp": -105, "timingAdvance": 7, "timingAdvanceSourceTechnology": "LTE_ANCHOR", "timingAdvanceSourceCellId": "1665538" },
+        { "seriesKey": "sub:701", "role": "SCC", "rat": "NR", "band": "n78", "arfcn": 640000, "bandwidthMhz": 80, "cellIdentity": "268419077", "rsrp": -111 },
+        { "seriesKey": "sub:701", "role": "SCC", "rat": "NR", "band": "n1", "arfcn": 428000, "bandwidthMhz": 20, "cellIdentity": "268419078", "rsrp": -119 }
+      ],
+      "expected": {
+        "observableSeries": ["sub:701"],
+        "unavailableSeries": [],
+        "servingNetworks": [{ "seriesKey": "sub:701", "servingPlmn": "20810", "simPlmn": "20810" }],
+        "carrierAggregation": { "seriesKey": "sub:701", "componentCount": 3, "totalBandwidthMhz": 120, "bands": ["B7", "n78", "n1"] },
+        "timingAdvance": { "accepted": true, "seriesKey": "sub:701", "value": 7, "sourceTechnology": "LTE_ANCHOR", "sourceCellId": "1665538", "distanceModel": "LTE_78_12_M", "distanceMeters": 547 },
+        "forbiddenCopies": []
+      }
+    },
+    {
+      "id": "nsa-nr-secondary-ta-is-rejected",
+      "category": "nsa",
+      "subscriptions": [
+        { "seriesKey": "sub:801", "subscriptionId": 801, "simPlmn": "23430", "observedPlmn": "23430", "isDataSim": true, "isRoaming": false, "observable": true }
+      ],
+      "cells": [
+        { "seriesKey": "sub:801", "role": "PCC", "rat": "LTE", "band": "B3", "arfcn": 1650, "bandwidthMhz": 20, "cellIdentity": "23430001", "rsrp": -92 },
+        { "seriesKey": "sub:801", "role": "SCC", "rat": "NR", "band": "n78", "arfcn": 641000, "bandwidthMhz": 80, "cellIdentity": "23430999", "rsrp": -101, "timingAdvance": 99, "timingAdvanceSourceTechnology": "NR", "timingAdvanceSourceCellId": "23430999" }
+      ],
+      "expected": {
+        "observableSeries": ["sub:801"],
+        "unavailableSeries": [],
+        "servingNetworks": [{ "seriesKey": "sub:801", "servingPlmn": "23430", "simPlmn": "23430" }],
+        "carrierAggregation": { "seriesKey": "sub:801", "componentCount": 2, "totalBandwidthMhz": 100, "bands": ["B3", "n78"] },
+        "timingAdvance": { "accepted": false, "reason": "notApplicable" },
+        "forbiddenCopies": []
+      }
+    },
+    {
+      "id": "nr-sa-ta-without-numerology-has-no-distance",
+      "category": "nr_sa",
+      "subscriptions": [
+        { "seriesKey": "sub:901", "subscriptionId": 901, "simPlmn": "44010", "observedPlmn": "44010", "isDataSim": true, "isRoaming": false, "observable": true }
+      ],
+      "cells": [
+        { "seriesKey": "sub:901", "role": "PCC", "rat": "NR", "band": "n78", "arfcn": 643334, "bandwidthMhz": 100, "cellIdentity": "68719470001", "rsrp": -87, "timingAdvance": 3, "timingAdvanceSourceTechnology": "NR", "timingAdvanceSourceCellId": "68719470001", "numerology": null }
+      ],
+      "expected": {
+        "observableSeries": ["sub:901"],
+        "unavailableSeries": [],
+        "servingNetworks": [{ "seriesKey": "sub:901", "servingPlmn": "44010", "simPlmn": "44010" }],
+        "carrierAggregation": null,
+        "timingAdvance": { "accepted": true, "seriesKey": "sub:901", "value": 3, "sourceTechnology": "NR", "sourceCellId": "68719470001", "distanceModel": null, "distanceMeters": null },
+        "forbiddenCopies": []
+      }
+    },
+    {
+      "id": "identical-oem-snapshot-is-not-copied-to-second-sim",
+      "category": "dual_sim",
+      "subscriptions": [
+        { "seriesKey": "sub:1001", "subscriptionId": 1001, "simPlmn": "50501", "observedPlmn": "50501", "isDataSim": true, "isRoaming": false, "observable": true, "evidenceFingerprint": "shared-oem-snapshot-1" },
+        { "seriesKey": "sub:1002", "subscriptionId": 1002, "simPlmn": "50502", "observedPlmn": null, "isDataSim": false, "isRoaming": false, "observable": false, "unavailableReason": "ambiguousSubscription", "evidenceFingerprint": "shared-oem-snapshot-1" }
+      ],
+      "cells": [
+        { "seriesKey": "sub:1001", "role": "PCC", "rat": "LTE", "band": "B3", "arfcn": 1300, "bandwidthMhz": 20, "cellIdentity": "50501001", "rsrp": -90 }
+      ],
+      "expected": {
+        "observableSeries": ["sub:1001"],
+        "unavailableSeries": [{ "seriesKey": "sub:1002", "reason": "ambiguousSubscription" }],
+        "servingNetworks": [{ "seriesKey": "sub:1001", "servingPlmn": "50501", "simPlmn": "50501" }],
+        "carrierAggregation": null,
+        "timingAdvance": null,
+        "forbiddenCopies": [{ "fromSeriesKey": "sub:1001", "toSeriesKey": "sub:1002", "fields": ["cellIdentity", "rsrp", "observedPlmn"] }]
+      }
+    }
+  ]
+}

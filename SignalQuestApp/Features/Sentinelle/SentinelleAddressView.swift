@@ -110,7 +110,7 @@ struct SentinelleAddressView: View {
                             .foregroundStyle(SQColor.label)
                             .fixedSize(horizontal: false, vertical: true)
                         Text(address.address)
-                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .font(.system(.caption, design: .monospaced, weight: .medium))
                             .foregroundStyle(SQColor.labelSecondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
@@ -351,7 +351,7 @@ struct SentinelleAddressView: View {
         VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
             HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
                 Text(hop.collapsed > 1 ? "·" : "\(hop.idx)")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced, weight: .semibold))
                     .foregroundStyle(SQColor.labelTertiary)
                     .frame(width: 16, alignment: .trailing)
                 Text(hop.label)

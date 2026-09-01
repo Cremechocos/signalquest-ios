@@ -104,7 +104,7 @@ struct SentinelleWindowPicker: View {
                         Text(value.label)
                             .font(SQFont.body(13, .semibold))
                             .padding(.horizontal, SQSpace.md)
-                            .frame(height: 34)
+                            .frame(minHeight: 44)
                             .background(
                                 isSelected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surfaceMuted),
                                 in: Capsule(style: .continuous)
@@ -198,7 +198,7 @@ struct SentinelleDetectedAddress: View {
                         .font(SQType.body)
                         .foregroundStyle(SQColor.label)
                     Text("Détectée en \(family.label) · \(ip)")
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .font(.system(.caption, design: .monospaced, weight: .medium))
                         .foregroundStyle(SQColor.labelSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -224,7 +224,7 @@ struct SentinelleDetectedAddress: View {
                         .fixedSize(horizontal: false, vertical: true)
                     if let prefix = suggestion.prefix {
                         Text("Préfixe \(prefix.label)\nProposé \(suggestion.suggested)")
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced, weight: .medium))
                             .foregroundStyle(SQColor.labelSecondary)
                     }
                 }

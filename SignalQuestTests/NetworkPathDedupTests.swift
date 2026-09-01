@@ -50,6 +50,10 @@ final class NetworkPathDedupTests: XCTestCase {
             ("operatorMnc", NetworkPathStatus(
                 connection: .cellular, cellularTechnology: .fourG, operatorName: "Orange",
                 operatorMcc: 208, operatorMnc: 10, isExpensive: true, isConstrained: false)),
+            ("simPlmn", NetworkPathStatus(
+                connection: .cellular, cellularTechnology: .fourG, operatorName: "Orange",
+                operatorMcc: 208, operatorMnc: 1, simPlmn: "20801",
+                isExpensive: true, isConstrained: false)),
             ("isExpensive", NetworkPathStatus(
                 connection: .cellular, cellularTechnology: .fourG, operatorName: "Orange",
                 operatorMcc: 208, operatorMnc: 1, isExpensive: false, isConstrained: false)),
@@ -88,5 +92,30 @@ final class NetworkPathDedupTests: XCTestCase {
             operatorMcc: nil, operatorMnc: nil, isExpensive: true, isConstrained: false
         )
         XCTAssertNotEqual(Self.reference, withoutOperator)
+    }
+
+    func testSimPlmnIsCarriedOnlyOnCellularPaths() {
+        let simPlmn = "310001"
+        let cellular = NetworkPathStatus.map(
+            NetworkPathSnapshot(
+                usesWiFi: false, usesCellular: true, usesWired: false,
+                isExpensive: true, isConstrained: false
+            ),
+            operatorMcc: 310,
+            operatorMnc: 1,
+            simPlmn: simPlmn
+        )
+        let wifi = NetworkPathStatus.map(
+            NetworkPathSnapshot(
+                usesWiFi: true, usesCellular: false, usesWired: false,
+                isExpensive: false, isConstrained: false
+            ),
+            operatorMcc: 310,
+            operatorMnc: 1,
+            simPlmn: simPlmn
+        )
+
+        XCTAssertEqual(cellular.simPlmn, simPlmn)
+        XCTAssertNil(wifi.simPlmn)
     }
 }

@@ -5,6 +5,16 @@ import XCTest
 /// par la donnée (points si présents, sinon clusters), caps relevés, seuil de fetch.
 final class CoverageRenderPolicyTests: XCTestCase {
 
+    func testCoverageImportResponseDecodesLegacyMinimalShape() throws {
+        let response = try JSONDecoder.signalQuest.decode(
+            CoverageImportResponse.self,
+            from: Data(#"{"ok":true}"#.utf8)
+        )
+        XCTAssertTrue(response.ok)
+        XCTAssertNil(response.plmnResolved)
+        XCTAssertNil(response.mvnoKey)
+    }
+
     func testRendersPointsWhenPresent() {
         let m = CoverageRenderPolicy.mode(hasPoints: true, hasClusters: false, hasBandFilter: false)
         XCTAssertTrue(m.useRawPoints)
@@ -72,6 +82,120 @@ final class CoverageRenderPolicyTests: XCTestCase {
         XCTAssertEqual(CoverageQualityBand.band(for: -75), .excellent)
         XCTAssertEqual(CoverageQualityBand.band(for: -95), .fair)
         XCTAssertEqual(CoverageQualityBand.band(for: -120), .poor)
+    }
+}
+
+/// Le préflight Drive Test est une interface d'exception : les contrôles sains
+/// restent exécutés mais ne produisent aucune ligne visible.
+final class DriveTestPreflightPolicyTests: XCTestCase {
+    func testNominalSessionStartsWithoutVisiblePreflight() {
+        let report = DriveTestPreflightPolicy.evaluate(snapshot())
+
+        XCTAssertTrue(report.isReady)
+        XCTAssertFalse(report.isBlocked)
+        XCTAssertTrue(report.issues.isEmpty)
+    }
+
+    func testHealthyPermissionsStorageAndBatteryNeverAppear() {
+        let report = DriveTestPreflightPolicy.evaluate(
+            snapshot(connection: .wifi)
+        )
+
+        XCTAssertEqual(report.issues.map(\.id), [.wifi])
+        XCTAssertFalse(report.issues.contains { $0.id == .locationPermission })
+        XCTAssertFalse(report.issues.contains { $0.id == .storage })
+        XCTAssertFalse(report.issues.contains { $0.id == .battery })
+    }
+
+    func testUnknownBatteryAndStorageDoNotBecomeFalseFailures() {
+        let report = DriveTestPreflightPolicy.evaluate(
+            snapshot(availableStorageBytes: nil, batteryPercent: nil)
+        )
+
+        XCTAssertTrue(report.isReady)
+    }
+
+    func testDeniedLocationAndInsufficientStorageBlockStart() {
+        let report = DriveTestPreflightPolicy.evaluate(
+            snapshot(
+                locationAuthorization: .denied,
+                availableStorageBytes: 80_000_000
+            )
+        )
+
+        XCTAssertTrue(report.isBlocked)
+        XCTAssertEqual(report.issues.map(\.id), [.locationPermission, .storage])
+        XCTAssertEqual(report.issues.first?.action, .openSettings)
+    }
+
+    func testUndeterminedLocationRequestsPermissionInsteadOfStarting() {
+        let report = DriveTestPreflightPolicy.evaluate(
+            snapshot(locationAuthorization: .notDetermined)
+        )
+
+        XCTAssertTrue(report.isBlocked)
+        XCTAssertEqual(report.issues.map(\.id), [.locationPermission])
+        XCTAssertEqual(report.issues.first?.action, .requestLocation)
+    }
+
+    func testLowBatteryIsWarningNotBlocker() {
+        let report = DriveTestPreflightPolicy.evaluate(
+            snapshot(batteryPercent: 9)
+        )
+
+        XCTAssertEqual(report.issues.map(\.id), [.battery])
+        XCTAssertFalse(report.isBlocked)
+    }
+
+    func testOfflineSpeedtestOnlyBlocksButCoverageCanStillBeRecorded() {
+        let speedtestOnly = DriveTestPreflightPolicy.evaluate(
+            snapshot(isOnline: false, recordsCoverage: false, runsSpeedtest: true)
+        )
+        let coverageAndSpeedtest = DriveTestPreflightPolicy.evaluate(
+            snapshot(isOnline: false, recordsCoverage: true, runsSpeedtest: true)
+        )
+
+        XCTAssertEqual(speedtestOnly.issues.first?.id, .connectivity)
+        XCTAssertTrue(speedtestOnly.isBlocked)
+        XCTAssertEqual(coverageAndSpeedtest.issues.first?.id, .connectivity)
+        XCTAssertFalse(coverageAndSpeedtest.isBlocked)
+    }
+
+    func testMissingOrStaleGpsFixWarnsWithoutInventingASimProblem() {
+        let report = DriveTestPreflightPolicy.evaluate(
+            snapshot(locationAgeSeconds: nil, horizontalAccuracyMeters: nil)
+        )
+
+        XCTAssertEqual(report.issues.map(\.id), [.gpsFix])
+        XCTAssertFalse(report.isBlocked)
+    }
+
+    private func snapshot(
+        locationAuthorization: DriveTestPreflightSnapshot.LocationAuthorization = .authorized,
+        locationAgeSeconds: TimeInterval? = 2,
+        horizontalAccuracyMeters: Double? = 12,
+        availableStorageBytes: Int64? = 500_000_000,
+        batteryPercent: Int? = 80,
+        isCharging: Bool = false,
+        isOnline: Bool = true,
+        connection: NetworkConnectionKind = .cellular,
+        isConstrained: Bool = false,
+        recordsCoverage: Bool = true,
+        runsSpeedtest: Bool = true
+    ) -> DriveTestPreflightSnapshot {
+        DriveTestPreflightSnapshot(
+            locationAuthorization: locationAuthorization,
+            locationAgeSeconds: locationAgeSeconds,
+            horizontalAccuracyMeters: horizontalAccuracyMeters,
+            availableStorageBytes: availableStorageBytes,
+            batteryPercent: batteryPercent,
+            isCharging: isCharging,
+            isOnline: isOnline,
+            connection: connection,
+            isConstrained: isConstrained,
+            recordsCoverage: recordsCoverage,
+            runsSpeedtest: runsSpeedtest
+        )
     }
 }
 
@@ -157,6 +281,7 @@ final class CoverageSessionQueueTests: XCTestCase {
         XCTAssertEqual(try bodySessionId(retryBody), upload.sessionId.uuidString)
         XCTAssertEqual(try bodyShowOnMap(retryBody), false)
         XCTAssertTrue(try CoverageSessionQueue(fileURL: fileURL).allPending().isEmpty)
+        XCTAssertEqual(service.bufferedImportResponseCount, 0)
     }
 
     func testFinalizedSnapshotCannotBeDowngradedByOlderDraft() throws {

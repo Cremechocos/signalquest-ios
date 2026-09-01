@@ -19,6 +19,37 @@ final class PluralVariationTests: XCTestCase {
         String(localized: key, locale: Locale(identifier: identifier))
     }
 
+    func testAppAndExtensionsUseEnglishFallbackAndKeepFrench() throws {
+        let plugIns = try XCTUnwrap(Bundle.main.builtInPlugInsURL)
+        let widget = try XCTUnwrap(Bundle(url: plugIns.appendingPathComponent("SignalQuestWidget.appex")))
+        let notifications = try XCTUnwrap(Bundle(url: plugIns.appendingPathComponent("SignalQuestNotificationService.appex")))
+        for bundle in [Bundle.main, widget, notifications] {
+            XCTAssertEqual(bundle.developmentLocalization, "en", bundle.bundlePath)
+            for locale in ["fr", "en"] {
+                XCTAssertNotNil(bundle.path(forResource: locale, ofType: "lproj"), "\(locale) absent de \(bundle.bundlePath)")
+            }
+        }
+        for (bundle, key, english, french) in [
+            (Bundle.main, "Aucun site sélectionné.", "No site selected.", "Aucun site sélectionné."),
+            (widget, "Aucun test", "No test", "Aucun test"),
+            (notifications, "Nouveau message chiffré", "New encrypted message", "Nouveau message chiffré"),
+        ] {
+            for (locale, expected) in [("en", english), ("fr", french)] {
+                let localized = try XCTUnwrap(bundle.path(forResource: locale, ofType: "lproj").flatMap(Bundle.init(path:)))
+                XCTAssertEqual(localized.localizedString(forKey: key, value: "MISSING", table: nil), expected)
+            }
+        }
+    }
+
+    func testEnglishPermissionPromptsAreCompiled() throws {
+        let english = try XCTUnwrap(Bundle.main.path(forResource: "en", ofType: "lproj").flatMap(Bundle.init(path:)))
+        for key in ["NSCameraUsageDescription", "NSMicrophoneUsageDescription", "NSLocationWhenInUseUsageDescription", "NSFaceIDUsageDescription", "NSPhotoLibraryUsageDescription"] {
+            let value = english.localizedString(forKey: key, value: "MISSING", table: "InfoPlist")
+            XCTAssertTrue(value.hasPrefix("SignalQuest"), "Traduction anglaise absente : \(key)")
+            XCTAssertFalse(value.contains(" utilise "), "Repli français inattendu : \(key)")
+        }
+    }
+
     /// Le cœur du sujet : zéro se comporte différemment dans les deux langues.
     func testZeroFollowsEachLanguageOwnRule() {
         let frZero = rendered("\(0) réponse", "fr")

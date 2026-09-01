@@ -13,12 +13,16 @@ struct MapKitMapView: UIViewRepresentable {
     /// caméra a bougé » et d'éviter le hash/compare O(n) des couches à chaque pan.
     let renderVersion: Int
     let colorScheme: ColorScheme
+    /// Espace réservé aux ornements MapKit (logo Apple / mentions légales).
+    /// La carte peut rester plein écran, mais ses mentions ne doivent pas passer
+    /// sous le dock flottant de l'application.
+    let ornamentBottomInset: CGFloat
     @Binding var center: CLLocationCoordinate2D
     @Binding var zoom: Double
     let onMoveEnd: (MapBounds, Double) -> Void
     let onSelect: (MapAnnotationPayload) -> Void
     @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
-    var backdrop: MapBackdrop { MapBackdrop(rawValue: backdropRaw) ?? .applePlan }
+    var backdrop: MapBackdrop { MapBackdrop.resolve(backdropRaw) }
 
     static let referenceWidth: CGFloat = 390
 
@@ -29,6 +33,7 @@ struct MapKitMapView: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView(frame: .zero)
         map.delegate = context.coordinator
+        applyOrnamentInsets(to: map)
         map.showsUserLocation = true
         // Boussole native désactivée puis re-ajoutée au MILIEU-DROIT : par défaut elle
         // apparaît en haut-droite (carte tournée) et entre en collision avec le bouton
@@ -52,6 +57,7 @@ struct MapKitMapView: UIViewRepresentable {
         tap.delegate = context.coordinator
         tap.cancelsTouchesInView = false
         map.addGestureRecognizer(tap)
+        context.coordinator.installSpeedtestAccessibility(on: map)
         let region = MKCoordinateRegion(center: center, span: Coordinator.span(forZoom: zoom, width: Self.referenceWidth))
         map.setRegion(region, animated: false)
         context.coordinator.lastAppliedCenter = center
@@ -60,6 +66,7 @@ struct MapKitMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ map: MKMapView, context: Context) {
+        applyOrnamentInsets(to: map)
         context.coordinator.applyBackdrop(backdrop, on: map)
         // PERF-MAP-03 : ne resynchroniser les couches que si les données ont changé.
         // Un simple déplacement caméra (pan/zoom) réévalue `updateUIView` mais ne doit
@@ -71,6 +78,13 @@ struct MapKitMapView: UIViewRepresentable {
             context.coordinator.apply(annotations: annotations, on: map)
         }
         context.coordinator.applyCameraIfNeeded(center: center, zoom: zoom, on: map)
+    }
+
+    private func applyOrnamentInsets(to map: MKMapView) {
+        guard abs(map.layoutMargins.bottom - ornamentBottomInset) > 0.5 else { return }
+        var margins = map.layoutMargins
+        margins.bottom = ornamentBottomInset
+        map.layoutMargins = margins
     }
 
     @MainActor final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
@@ -89,6 +103,7 @@ struct MapKitMapView: UIViewRepresentable {
         var latestSpeedtestFeatures: [SpeedtestFeature] = []
         var coverageOverlay: SQMapKitDotsOverlay?
         var speedtestOverlay: SQMapKitDotsOverlay?
+        weak var speedtestAccessibilityContainer: UIView?
         var appliedBackdrop: MapBackdrop?
         var tileOverlay: MKTileOverlay?
         var lastRenderVersion = -1
@@ -208,13 +223,72 @@ struct MapKitMapView: UIViewRepresentable {
             guard features != latestSpeedtestFeatures else { return }
             latestSpeedtestFeatures = features
             if let old = speedtestOverlay { map.removeOverlay(old); speedtestOverlay = nil }
-            guard !features.isEmpty else { return }
+            guard !features.isEmpty else {
+                updateSpeedtestAccessibility(on: map)
+                return
+            }
             let dots = features.map { f -> SQMapKitDotsOverlay.Dot in
                 .init(point: MKMapPoint(f.coordinate), color: Self.speedColor(f.downloadMbps).withAlphaComponent(0.9).cgColor)
             }
             let overlay = SQMapKitDotsOverlay(dots: dots)
             speedtestOverlay = overlay
             map.addOverlay(overlay, level: .aboveLabels)
+            updateSpeedtestAccessibility(on: map)
+        }
+
+        func installSpeedtestAccessibility(on map: MKMapView) {
+            let container = UIView(frame: map.bounds)
+            container.backgroundColor = .clear
+            container.isUserInteractionEnabled = false
+            container.isAccessibilityElement = false
+            container.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            map.addSubview(container)
+            speedtestAccessibilityContainer = container
+            updateSpeedtestAccessibility(on: map)
+        }
+
+        /// Les points visibles deviennent une liste de boutons VoiceOver sans
+        /// ajouter de marqueur visuel ni modifier le hit-test tactile existant.
+        func updateSpeedtestAccessibility(on map: MKMapView) {
+            guard let container = speedtestAccessibilityContainer else { return }
+            let centerPoint = MKMapPoint(map.centerCoordinate)
+            let visible = latestSpeedtestFeatures
+                .filter { map.visibleMapRect.contains(MKMapPoint($0.coordinate)) }
+                .sorted {
+                    MKMapPoint($0.coordinate).distance(to: centerPoint)
+                        < MKMapPoint($1.coordinate).distance(to: centerPoint)
+                }
+            let exposed = visible.prefix(100)
+            var elements: [UIAccessibilityElement] = []
+            if visible.count > exposed.count {
+                let summary = UIAccessibilityElement(accessibilityContainer: container)
+                summary.accessibilityLabel = String(
+                    localized: "\(exposed.count) mesures de débit proches sur \(visible.count) visibles"
+                )
+                summary.accessibilityHint = String(localized: "Zoomez pour réduire le nombre de mesures")
+                summary.accessibilityTraits = .staticText
+                summary.accessibilityFrameInContainerSpace = CGRect(
+                    x: max(0, container.bounds.midX - 1),
+                    y: max(0, container.bounds.midY - 1),
+                    width: 2,
+                    height: 2
+                )
+                elements.append(summary)
+            }
+            elements.append(contentsOf: exposed.map { feature in
+                let payload = speedtestPayload(from: feature)
+                let description = MapAccessibility.describe(payload)
+                let element = SQMapOverlayAccessibilityElement(accessibilityContainer: container)
+                element.accessibilityLabel = description.label
+                element.accessibilityValue = description.value
+                element.accessibilityHint = description.hint ?? String(localized: "Ouvre le détail du speedtest")
+                element.accessibilityTraits = .button
+                let point = map.convert(feature.coordinate, toPointTo: container)
+                element.accessibilityFrameInContainerSpace = CGRect(x: point.x - 22, y: point.y - 22, width: 44, height: 44)
+                element.activation = { [weak self] in self?.onSelect(payload) }
+                return element
+            })
+            container.accessibilityElements = elements
         }
 
         // MARK: Fond de carte (Apple Plan natif / imagerie Apple / raster MKTileOverlay)
@@ -356,6 +430,7 @@ struct MapKitMapView: UIViewRepresentable {
                 west: r.center.longitude - r.span.longitudeDelta / 2
             )
             onMoveEnd(bounds, z)
+            updateSpeedtestAccessibility(on: map)
         }
 
         func mapView(_ map: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {

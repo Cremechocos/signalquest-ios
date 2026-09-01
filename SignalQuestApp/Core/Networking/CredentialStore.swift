@@ -39,13 +39,16 @@ final class CredentialStore: @unchecked Sendable {
     }
 
     func setAccessToken(_ token: String) throws {
+        let previous = accessToken()
         try tokenStore.set(token, for: Key.accessToken)
         lock.lock(); _cachedAccessToken = token; accessTokenLoaded = true; lock.unlock()
+        if previous != token { E2EEV2NotificationContextEvents.requestRefresh(.credentials) }
     }
 
     func clearAccessToken() {
         try? tokenStore.remove(Key.accessToken)
         lock.lock(); _cachedAccessToken = nil; accessTokenLoaded = true; lock.unlock()
+        E2EEV2NotificationContextEvents.revoke()
     }
 
     // MARK: Refresh token (reserved)
@@ -84,6 +87,7 @@ final class CredentialStore: @unchecked Sendable {
         // Sans cette purge, le cookie survit au logout (le token Keychain est
         // pourtant effacé) et peut ré-authentifier des requêtes.
         Self.purgeAuthCookies()
+        E2EEV2NotificationContextEvents.revoke()
     }
 
     /// Supprime les cookies du domaine signalquest.fr de HTTPCookieStorage.shared.
@@ -104,12 +108,17 @@ final class CredentialStore: @unchecked Sendable {
     /// Captures `auth_token` from any `Set-Cookie` header on the response and
     /// stores it as the access token.
     @discardableResult
-    func captureFromResponse(_ response: URLResponse) -> String? {
+    func captureFromResponse(_ response: URLResponse) throws -> String? {
         guard let http = response as? HTTPURLResponse else { return nil }
-        let headers = http.allHeaderFields
-        let setCookie = (headers["Set-Cookie"] ?? headers["set-cookie"]) as? String
+        // `allHeaderFields` conserve une casse dépendante du transport/runtime
+        // (`Set-Cookie`, `Set-cookie`, etc.). L'accesseur Foundation est le seul
+        // contrat réellement insensible à la casse.
+        let setCookie = http.value(forHTTPHeaderField: "Set-Cookie")
         guard let token = Self.parseAuthToken(from: setCookie) else { return nil }
-        try? setAccessToken(token)
+        // Ne jamais annoncer une session authentifiée si le JWT n'a pas pu être
+        // persisté : la première requête parallèle partirait sans cookie, ferait
+        // 401 et déconnecterait aussitôt l'utilisateur.
+        try setAccessToken(token)
         return token
     }
 

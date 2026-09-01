@@ -9,10 +9,10 @@ final class MapFilterStoreTests: XCTestCase {
     override func setUp() { super.setUp(); MapFilterStore.reset() }
     override func tearDown() { MapFilterStore.reset(); super.tearDown() }
 
-    /// Les sites ajoutés à la main sont la SEULE antenne visible dans un pays sans
-    /// open data : ils font partie du défaut, sinon la carte y est vide.
-    func testDefaultShowsAntennasAndCustomSites() {
-        XCTAssertEqual(MapFilterStore.defaultFilters, [.antenna, .customSite])
+    /// Les sites ajoutés à la main restent visibles dans les pays sans open data,
+    /// et la carte sociale affiche les amis dès son premier lancement.
+    func testDefaultShowsAntennasCustomSitesAndFriends() {
+        XCTAssertEqual(MapFilterStore.defaultFilters, [.antenna, .customSite, .friend])
     }
 
     /// Un jeu enregistré par une version antérieure ne peut pas contenir

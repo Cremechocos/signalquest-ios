@@ -322,6 +322,55 @@ private enum SpeedtestEngineError: LocalizedError {
     }
 }
 
+/// Mémorise localement une indisponibilité temporaire de l'edge Cloudflare.
+///
+/// Une rafale ne doit pas réessayer un edge qui vient de répondre 429 ou de
+/// s'arrêter sans octet : elle privilégie alors un POP iPerf3 pendant une courte
+/// fenêtre. L'état reste volontairement en mémoire (ni préférence, ni donnée
+/// métier) et disparaît au redémarrage de l'application.
+final class CloudflareAutoFallbackPolicy: @unchecked Sendable {
+    static let defaultCooldown: TimeInterval = 90
+
+    private let lock = NSLock()
+    private let cooldown: TimeInterval
+    private let now: () -> Date
+    private var unavailableUntil: Date?
+
+    init(
+        cooldown: TimeInterval = CloudflareAutoFallbackPolicy.defaultCooldown,
+        now: @escaping () -> Date = Date.init
+    ) {
+        self.cooldown = max(0, cooldown)
+        self.now = now
+    }
+
+    func recordTemporaryFailure() {
+        lock.lock()
+        unavailableUntil = now().addingTimeInterval(cooldown)
+        lock.unlock()
+    }
+
+    func shouldAvoidCloudflare() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let unavailableUntil else { return false }
+        guard now() < unavailableUntil else {
+            self.unavailableUntil = nil
+            return false
+        }
+        return true
+    }
+}
+
+/// Erreur typée uniquement le temps de sortir du moteur Cloudflare. Elle évite
+/// de confondre une indisponibilité du fournisseur avec un échec du réseau de
+/// l'utilisateur et permet au mode Auto de changer de serveur une seule fois.
+private struct CloudflareSpeedtestFailure: LocalizedError {
+    let message: String
+
+    var errorDescription: String? { message }
+}
+
 // MARK: - Service implementation
 
 final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
@@ -332,6 +381,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private let pendingStore: SpeedtestPendingStoring
     private let guestReceiptStore: GuestSpeedtestReceiptStore
     private let tcpProbe: SpeedtestTCPProbing
+    private let cloudflareFallbackPolicy: CloudflareAutoFallbackPolicy
     static let pendingSaveKey = "pending-speedtest-saves"
     /// Dossier de la file d'attente durable (partagé entre l'init durable et la migration).
     /// `internal` (pas `private`) : référencé dans une valeur par défaut d'initialiseur.
@@ -352,7 +402,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             fileProtection: .completeUntilFirstUserAuthentication
         ),
         guestReceiptStore: GuestSpeedtestReceiptStore = GuestSpeedtestReceiptStore(),
-        tcpProbe: SpeedtestTCPProbing = NetworkSpeedtestTCPProbe()
+        tcpProbe: SpeedtestTCPProbing = NetworkSpeedtestTCPProbe(),
+        cloudflareFallbackPolicy: CloudflareAutoFallbackPolicy = CloudflareAutoFallbackPolicy()
     ) {
         // Migration unique : les sauvegardes en attente vivaient dans Caches (purgeable).
         // On les remonte vers Application Support avant toute lecture, pour ne pas perdre
@@ -367,6 +418,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         self.pendingStore = SpeedtestPendingStoreFactory.make(durableCache: pendingCache, key: Self.pendingSaveKey)
         self.guestReceiptStore = guestReceiptStore
         self.tcpProbe = tcpProbe
+        self.cloudflareFallbackPolicy = cloudflareFallbackPolicy
     }
 
     /// Migration unique Caches → Application Support pour la file d'attente durable.
@@ -397,6 +449,47 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         location: Coordinates?,
         settings: SpeedtestRunSettings,
         progress: SpeedtestProgressHandler?
+    ) async throws -> SpeedtestRunResult {
+        let forceIPerfForCloudflareFallback =
+            settings.downloadTarget.migrated == .hybridAuto &&
+            cloudflareFallbackPolicy.shouldAvoidCloudflare()
+        do {
+            return try await runAttempt(
+                pathStatus: pathStatus,
+                location: location,
+                settings: settings,
+                progress: progress,
+                forceIPerfForCloudflareFallback: forceIPerfForCloudflareFallback
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as CloudflareSpeedtestFailure {
+            cloudflareFallbackPolicy.recordTemporaryFailure()
+            // Le mode Auto est le seul que l'on réoriente sans demander : un
+            // serveur Cloudflare choisi explicitement reste un choix explicite.
+            guard settings.downloadTarget.migrated == .hybridAuto,
+                  !forceIPerfForCloudflareFallback else {
+                throw error
+            }
+            sqDebugLog("SQ_CLOUDFLARE indisponible — relance Auto via iPerf3")
+            return try await runAttempt(
+                pathStatus: pathStatus,
+                location: location,
+                settings: settings,
+                progress: progress,
+                forceIPerfForCloudflareFallback: true
+            )
+        }
+    }
+
+    /// Un run complet. Le wrapper public peut l'appeler une seconde fois après
+    /// une erreur Cloudflare, mais jamais plus : pas de boucle de repli.
+    private func runAttempt(
+        pathStatus: NetworkPathStatus,
+        location: Coordinates?,
+        settings: SpeedtestRunSettings,
+        progress: SpeedtestProgressHandler?,
+        forceIPerfForCloudflareFallback: Bool
     ) async throws -> SpeedtestRunResult {
         let startedAt = Date()
         // Vide la mémoire des sondages de ports si le réseau n'est plus le même :
@@ -450,6 +543,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 // repli Cloudflare (HTTPS, résultat garanti), comme le chemin iPerf3.
                 // NE PAS gater sur `Task.checkCancellation()` : un échec (même long)
                 // ne doit pas empêcher le repli de produire un résultat.
+                //
+                // MAIS il faut distinguer « le serveur a échoué » de « l'utilisateur a
+                // arrêté, ce qui a fait échouer le serveur ». Une annulation ferme les
+                // sockets et remonte des erreurs qui ne sont PAS des `CancellationError`
+                // (le `catch` ci-dessus ne les attrape donc pas) : sans cette garde, un
+                // appui sur « Arrêter » relançait un run Cloudflare complet.
+                if Task.isCancelled { throw CancellationError() }
                 sqDebugLog("SQ_LIBRESPEED repli Cloudflare : \(error.localizedDescription)")
                 return try await runCloudflareTest(
                     pathStatus: pathStatus,
@@ -490,15 +590,20 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 location: location,
                 servers: runCatalogSnapshot
             )
-            async let cloudflareProbe = tcpProbe.connectLatencyMs(
-                host: CloudflareSpeedtestConfig.host,
-                port: 443,
-                timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
-            )
+            let cloudflareProbe = forceIPerfForCloudflareFallback ? nil : Task<Double?, Never> {
+                try? await tcpProbe.connectLatencyMs(
+                    host: CloudflareSpeedtestConfig.host,
+                    port: 443,
+                    timeoutSeconds: SpeedtestEngineConfig.pingTimeoutSeconds
+                )
+            }
             let candidate = await candidateTask
-            let cloudflareMs = try? await cloudflareProbe
+            let cloudflareMs = await cloudflareProbe?.value
 
             guard let candidate else {
+                if forceIPerfForCloudflareFallback {
+                    throw SpeedtestEngineError.noServerReachable
+                }
                 return try await runCloudflareTest(
                     pathStatus: pathStatus,
                     location: location,
@@ -576,6 +681,14 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 fraction: 0,
                 serverName: serverName,
                 notice: manualFallbackNotice
+            ))
+        }
+        if forceIPerfForCloudflareFallback {
+            progress?(SpeedtestLiveProgress(
+                phase: .ping,
+                fraction: 0,
+                serverName: serverName,
+                notice: "Cloudflare temporairement indisponible — test via \(serverName)"
             ))
         }
 
@@ -702,6 +815,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         } catch {
             // Sauvetage : DL iPerf3 impossible sur toute la plage → moteur
             // Cloudflare (résultat complet plutôt qu'une erreur sèche).
+            // Sauf si l'utilisateur a arrêté : l'annulation ferme les connexions et
+            // remonte ici une erreur qui n'est pas une `CancellationError`.
+            if Task.isCancelled { throw CancellationError() }
+            if forceIPerfForCloudflareFallback { throw error }
             sqDebugLog("[SpeedtestService] DL iPerf3 KO (\(error.localizedDescription)) — bascule Cloudflare")
             return try await runCloudflareTest(
                 pathStatus: pathStatus,
@@ -724,6 +841,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         guard dlResult.measuredBytes > 100_000, dlResult.measuredDuration >= 1.0 else {
             // Même sauvetage : un DL quasi vide (POP saturé) vaut une bascule,
             // pas un échec du test.
+            // Piège : un DL ARRÊTÉ par l'utilisateur est lui aussi « quasi vide ». Sans
+            // cette garde, appuyer sur « Arrêter » pendant le download déclenchait un
+            // run Cloudflare complet — exactement l'inverse de ce qui est demandé.
+            if Task.isCancelled { throw CancellationError() }
+            if forceIPerfForCloudflareFallback {
+                throw SpeedtestEngineError.noServerReachable
+            }
             sqDebugLog("[SpeedtestService] DL iPerf3 incomplet (\(dlResult.measuredBytes) octets) — bascule Cloudflare")
             return try await runCloudflareTest(
                 pathStatus: pathStatus,
@@ -952,8 +1076,12 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             downloadServerHost: iperfServer.hostname,
             downloadServerPort: Int(port),
             engine: "iperf3",
-            engineFallbackReason: nil,
-            requestedServerId: requestedServerIdForResult,
+            engineFallbackReason: forceIPerfForCloudflareFallback
+                ? "cloudflare_temporarily_unavailable"
+                : nil,
+            requestedServerId: forceIPerfForCloudflareFallback
+                ? SpeedtestDownloadTarget.cloudflare.rawValue
+                : requestedServerIdForResult,
             pingProtocol: pingOutcome.protocolName,
             pingMs: pingValue,
             pingMedianMs: pingMedianValue,
@@ -1176,11 +1304,23 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             durationSeconds: duration,
             connectionType: pathStatus.connection,
             cellularTechnology: pathStatus.cellularTechnology,
-            networkOperatorName: operatorContext.mobileOperator ?? pathStatus.operatorName,
+            networkOperatorName: operatorContext.mobileOperator,
             networkOperatorMcc: operatorContext.mcc,
             networkOperatorMnc: operatorContext.mnc,
+            observedPlmn: nil,
+            simPlmn: operatorContext.simPlmn,
+            isRoaming: nil,
+            networkIdentitySource: nil,
+            radioEvidence: SpeedtestRadioEvidence.technologySnapshot(
+                technology: pathStatus.cellularTechnology,
+                observedAt: startedAt,
+                location: location
+            ),
             marketCode: operatorContext.marketCode,
             operatorKey: operatorContext.operatorKey,
+            carrierName: pathStatus.operatorName,
+            mvnoKey: nil,
+            mvnoName: nil,
             wifiSSID: wifiSSID,
             city: resolvedPlace.city,
             address: resolvedPlace.address,
@@ -1245,6 +1385,36 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     /// (ATS OK), utilisé comme cible manuelle, choix Auto hors zone iPerf3,
     /// et filet de secours quand les serveurs iPerf3 sont injoignables.
     private func runCloudflareTest(
+        pathStatus: NetworkPathStatus,
+        location: Coordinates?,
+        durationSeconds: Int,
+        parallelStreams: Int,
+        startedAt: Date,
+        progress: SpeedtestProgressHandler?,
+        notice: String?,
+        fallbackReason: String? = nil,
+        requestedServerId: String? = nil
+    ) async throws -> SpeedtestRunResult {
+        do {
+            return try await runCloudflareTestAttempt(
+                pathStatus: pathStatus,
+                location: location,
+                durationSeconds: durationSeconds,
+                parallelStreams: parallelStreams,
+                startedAt: startedAt,
+                progress: progress,
+                notice: notice,
+                fallbackReason: fallbackReason,
+                requestedServerId: requestedServerId
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw CloudflareSpeedtestFailure(message: error.localizedDescription)
+        }
+    }
+
+    private func runCloudflareTestAttempt(
         pathStatus: NetworkPathStatus,
         location: Coordinates?,
         durationSeconds: Int,
@@ -1927,6 +2097,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             }
             if isRetryableIPerfTransportError(error) {
                 lastError = error
+                // Le port préféré vient d'échouer : il est mémorisé pour 10 min, et un
+                // démon iPerf3 public est souvent mono-slot. Sans cette invalidation, le
+                // test SUIVANT de la rafale (lancé moins d'une seconde après) rejouait le
+                // même port occupé et retombait sur le repli Cloudflare, à chaque fois.
+                await IPerfEndpointCache.shared.invalidate(hostname)
             } else {
                 throw error
             }
@@ -1982,6 +2157,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let mobileOperator: String?
         let mcc: Int?
         let mnc: Int?
+        let simPlmn: String?
         let marketCode: String?
         let operatorKey: String?
 
@@ -1989,6 +2165,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             mobileOperator: nil,
             mcc: nil,
             mnc: nil,
+            simPlmn: nil,
             marketCode: nil,
             operatorKey: nil
         )
@@ -1999,9 +2176,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     /// CoreTelephony (`CTCarrier`) ne renvoie plus MCC/MNC/nom depuis iOS 16.4+
     /// (placeholders `--` / 65535, filtrés en amont → nil). On reconstruit donc le
     /// contexte comme la carte : opérateur via IP/ASN (`/api/speedtest/operator`,
-    /// hors VPN), marché via la localisation, puis backfill MCC/MNC depuis le
-    /// registre. Sous VPN la résolution IP renvoie un opérateur nul : on
-    /// n'enregistre JAMAIS l'opérateur du tunnel.
+    /// hors VPN) et marché via la localisation. Le PLMN CoreTelephony reste une
+    /// information SIM séparée. Sous VPN la résolution IP renvoie un opérateur
+    /// nul : on n'enregistre JAMAIS l'opérateur du tunnel.
     private func resolveCellularOperatorContext(
         pathStatus: NetworkPathStatus,
         location: Coordinates?
@@ -2011,9 +2188,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let ctMnc = pathStatus.operatorMnc
         let registry = await markets.registry()
 
-        // Marché : MCC de la SIM (si encore lisible) → localisation GPS.
-        var market = ctMcc.flatMap { mcc in registry.markets.first { $0.mccs.contains(mcc) } }
-        if market == nil, let location {
+        // Le marché de mesure vient de la position, jamais du PLMN SIM : en
+        // roaming, la SIM décrit le pays d'origine et non le réseau visité.
+        var market: MarketRegistryEntry?
+        if let location {
             market = await markets.marketForLocation(latitude: location.latitude, longitude: location.longitude)
         }
 
@@ -2032,26 +2210,18 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 operatorEntry = market?.operatorEntry(forKey: key)
             }
         }
-        // Repli : opérateur via le MNC de la SIM (rare sur 16.4+, mais gratuit).
-        if operatorEntry == nil, let mnc = ctMnc {
-            operatorEntry = market?.selectableOperators.first { $0.mncs.contains(mnc) }
-        }
-
-        // Backfill : MCC depuis le marché ; MNC = MNC principal (1er du registre) de
-        // l'opérateur résolu. Best-effort si l'opérateur a plusieurs MNC (ex. Orange
-        // 208-01/02) : l'operatorKey reste exact, le MNC sert d'indication.
-        let mcc = ctMcc ?? market?.mccs.first
-        let mnc = ctMnc ?? operatorEntry?.mncs.first
-
         return CellularOperatorContext(
-            // nil quand inconnu → l'UI retombe proprement sur la techno seule.
-            mobileOperator: pathStatus.operatorName
-                ?? trusted?.shortLabel ?? trusted?.label
+            // Le réseau utilisé vient de la résolution IP ; le nom CoreTelephony
+            // reste séparé dans `carrierName` comme information SIM.
+            mobileOperator: trusted?.shortLabel ?? trusted?.label
                 ?? operatorEntry?.shortLabel ?? operatorEntry?.label,
-            mcc: mcc,
-            mnc: mnc,
+            // Ces deux entiers restent dans le résultat local historique, mais
+            // `SpeedtestSubmission` ne les envoie plus comme preuve servante.
+            mcc: ctMcc,
+            mnc: ctMnc,
+            simPlmn: pathStatus.simPlmn,
             marketCode: market?.marketCode,
-            operatorKey: operatorEntry?.key ?? trusted?.operatorKey
+            operatorKey: trusted?.operatorKey ?? operatorEntry?.key
         )
     }
 
@@ -2147,7 +2317,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     }
 
     func history() async -> [SpeedtestRunResult] {
-        (try? await historyCache.read([SpeedtestRunResult].self, for: "history")) ?? []
+        (try? await historyCache.read([SpeedtestRunResult].self, for: historyCacheKey)) ?? []
     }
 
     func retryPendingSaves() async {
@@ -2184,7 +2354,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         var values = await history()
         values.insert(result, at: 0)
         if values.count > 20 { values = Array(values.prefix(20)) }
-        try await historyCache.write(values, for: "history")
+        try await historyCache.write(values, for: historyCacheKey)
         // Partage le dernier résultat avec le widget (App Group), rafraîchit le
         // widget et indexe l'item Spotlight.
         let snapshot = SpeedtestWidgetSnapshot(
@@ -2202,7 +2372,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     }
 
     private func pendingSaves() async -> [PendingSpeedtestSave] {
-        await pendingStore.loadAll()
+        let ownerScopeId = LocalAccountScope.currentOwnerScopeId
+        return await pendingStore.loadAll().filter { $0.ownerScopeId == ownerScopeId }
     }
 
     private func upsertPendingSave(_ pending: PendingSpeedtestSave) async throws {
@@ -2216,6 +2387,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     }
 
     private func submitPendingSave(_ pending: PendingSpeedtestSave) async throws {
+        guard pending.ownerScopeId == LocalAccountScope.currentOwnerScopeId else {
+            // La session a changé entre la lecture et l'envoi : conserver l'entrée
+            // pour son propriétaire, sans l'attribuer au compte désormais actif.
+            throw CancellationError()
+        }
         let payload = SpeedtestSubmission.iosPayload(
             from: pending.result,
             streams: pending.streams,
@@ -2230,6 +2406,12 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             body: payload,
             idempotencyKey: pending.id
         )
+        if let association = response.physicalSiteAssociation {
+            try await rememberPhysicalSiteAssociation(
+                association,
+                keys: [pending.id, response.resolvedID].compactMap { $0 }
+            )
+        }
         if let serverId = response.resolvedID {
             // Mémorisé pour TOUS : sans cet id, un test de l'historique ne peut
             // plus être ciblé (publication a posteriori). Il n'était conservé
@@ -2248,7 +2430,30 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 
     // MARK: - Correspondance id client → id serveur
 
-    private var serverIdMapKey: String { "serverIds" }
+    private var historyCacheKey: String { "history-\(LocalAccountScope.storageNamespace)" }
+    private var serverIdMapKey: String { "serverIds-\(LocalAccountScope.storageNamespace)" }
+    private func physicalSiteAssociationCacheKey(_ id: String) -> String {
+        "physicalSiteAssociation-\(LocalAccountScope.storageNamespace)-\(id)"
+    }
+
+    private func rememberPhysicalSiteAssociation(
+        _ association: SpeedtestPhysicalSiteAssociation,
+        keys: [String]
+    ) async throws {
+        // Une cle par mesure evite le read-modify-write d'un dictionnaire global :
+        // deux POST termines en parallele ne peuvent pas perdre l'association de
+        // l'autre. Le brut radio reste dans le resultat, jamais remplace ici.
+        for key in keys where !key.isEmpty {
+            try await historyCache.write(association, for: physicalSiteAssociationCacheKey(key))
+        }
+    }
+
+    func physicalSiteAssociation(forClientId clientId: UUID) async -> SpeedtestPhysicalSiteAssociation? {
+        try? await historyCache.read(
+            SpeedtestPhysicalSiteAssociation.self,
+            for: physicalSiteAssociationCacheKey(clientId.uuidString)
+        )
+    }
 
     private func rememberServerId(_ serverId: String, forClientId clientId: String) async {
         var map = (try? await historyCache.read([String: String].self, for: serverIdMapKey)) ?? [:]
@@ -2449,6 +2654,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             warmupCount: SpeedtestEngineConfig.pingWarmupCount
         )
 
+        // ⚠️ Annulation : les `try? await Task.sleep` ci-dessous retournent
+        // INSTANTANÉMENT sur une tâche annulée. Sans les gardes explicites, appuyer
+        // sur « Arrêter » pendant la phase ping ne stoppait pas la boucle — elle
+        // s'emballait au contraire à pleine vitesse, en continuant d'émettre des
+        // ticks de progression qui repeignaient le cadran.
+        if Task.isCancelled { return PingAttemptResult(values: [], attemptsUsed: attemptsUsed) }
+
         // Warm-up (non compté) — un échec n'abandonne pas tout le run iPerf.
         do {
             attemptsUsed += 1
@@ -2463,6 +2675,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
 
         try? await Task.sleep(nanoseconds: UInt64(SpeedtestEngineConfig.pingIntervalMs * 1_000_000))
         for _ in 0..<measuredTarget where attemptsUsed < SpeedtestEngineConfig.pingAttemptBudget {
+            if Task.isCancelled { break }
             do {
                 attemptsUsed += 1
                 let elapsed = try await tcpProbe.connectLatencyMs(
@@ -2493,7 +2706,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         // Salvage : sur réseau perdant, quelques probes rapprochées valent
         // mieux qu'un run entier avorté faute d'échantillons.
         var salvageUsed = 0
-        while values.count < minimumValidSamples, salvageUsed < SpeedtestEngineConfig.pingSalvageAttempts {
+        while values.count < minimumValidSamples,
+              salvageUsed < SpeedtestEngineConfig.pingSalvageAttempts,
+              !Task.isCancelled {
             salvageUsed += 1
             attemptsUsed += 1
             do {
@@ -3112,6 +3327,20 @@ actor IPerfEndpointCache {
             endpoint: endpoint,
             expiry: Date().addingTimeInterval(ttl)
         )
+    }
+
+    /// Oublie l'endpoint mémorisé pour cet hôte, pour forcer un nouveau sondage.
+    ///
+    /// Nécessaire en rafale : le port retenu est mis en cache 10 min, mais un démon
+    /// iPerf3 public est souvent MONO-SLOT. Le test suivant, lancé moins d'une seconde
+    /// après, rejouait donc le même port encore occupé → `ACCESS_DENIED` → repli
+    /// Cloudflare dégradé, à répétition. C'est ce qui donnait « le premier test donne
+    /// un vrai chiffre, les suivants non ».
+    func invalidate(_ hostname: String) {
+        let prefix = "\(hostname.lowercased())|"
+        for key in entries.keys.filter({ $0.hasPrefix(prefix) }) {
+            entries[key] = nil
+        }
     }
 
     func invalidateAll() {
@@ -4795,6 +5024,9 @@ struct PendingSpeedtestSave: Codable, Equatable, Sendable {
     /// pendant un drive → rattachement serveur. Optionnel pour décoder les files locales
     /// sérialisées avant cet ajout (`nil` = speedtest hors drive).
     let driveSessionId: String?
+    /// Portée capturée à la création. `nil` désigne une ancienne entrée mise en
+    /// quarantaine et jamais attribuée automatiquement au compte courant.
+    var ownerScopeId: String? = LocalAccountScope.currentOwnerScopeId
 }
 
 /// File des sauvegardes speedtest en attente, abstraite pour offrir deux implémentations
@@ -4881,7 +5113,10 @@ final class SpeedtestPendingEntity {
 @available(iOS 17, *)
 actor SwiftDataSpeedtestPendingStore: SpeedtestPendingStoring {
     private let container: ModelContainer
-    private let context: ModelContext
+    /// Créé au premier accès sur l'exécuteur de l'acteur. Le construire dans
+    /// `init` liait le contexte a la main queue lorsque AppServices demarrait,
+    /// puis l'utilisait hors de cette queue dans les methodes de l'acteur.
+    private lazy var context = ModelContext(container)
     private let legacyCache: DiskCache?
     private let legacyKey: String
     private let encoder = JSONEncoder.signalQuest
@@ -4897,7 +5132,6 @@ actor SwiftDataSpeedtestPendingStore: SpeedtestPendingStoring {
             configurations: ModelConfiguration(url: url)
         ) else { return nil }
         self.container = container
-        self.context = ModelContext(container)
     }
 
     func loadAll() async -> [PendingSpeedtestSave] {

@@ -25,7 +25,7 @@ protocol AntennasServicing: Sendable {
     func details(id: String, market: String, operatorName: String) async throws -> AntennaDetails
     func details(id: String, market: String, operatorName: String, anfrCode: String?) async throws -> AntennaDetails
     func search(query: String) async throws -> [AntennaSite]
-    func quickSearch(query: String) async throws -> [AntennaSite]
+    func quickSearch(query: String, market: String, department: String?) async throws -> [AntennaSite]
     /// Sites créés par la communauté dans ce cadrage.
     ///
     /// Dans les 40+ pays sans référentiel officiel (Bosnie, États-Unis…), ce sont les SEULES
@@ -35,12 +35,27 @@ protocol AntennasServicing: Sendable {
     func listCommunitySites(bbox: BoundingBox, market: String, operatorName: String?) async throws -> [AntennaSite]
 }
 
+enum AntennasServiceError: LocalizedError {
+    case marketRequired
+
+    var errorDescription: String? {
+        switch self {
+        case .marketRequired:
+            return String(localized: "Le pays du site est requis pour charger des antennes fiables.")
+        }
+    }
+}
+
 final class AntennasService: AntennasServicing {
     private let api: APIClient
     init(api: APIClient) { self.api = api }
 
     func list(bbox: BoundingBox) async throws -> [AntennaSite] {
-        try await list(bbox: bbox, market: "FR", operatorName: "ALL", technologies: [])
+        // Un bbox ne prouve jamais un marché à lui seul. L'ancien repli FR pouvait
+        // afficher des sites français dans le sélecteur photo d'un utilisateur à
+        // l'étranger. Les appels runtime doivent désormais fournir le marché issu
+        // du registre mondial (ou expliquer qu'il est inconnu).
+        throw AntennasServiceError.marketRequired
     }
 
     func list(bbox: BoundingBox, market: String, operatorName: String, technologies: Set<String>) async throws -> [AntennaSite] {
@@ -170,7 +185,7 @@ final class AntennasService: AntennasServicing {
     }
 
     func details(id: String) async throws -> AntennaDetails {
-        try await details(id: id, market: "FR", operatorName: "SFR")
+        throw AntennasServiceError.marketRequired
     }
 
     func details(id: String, market: String, operatorName: String) async throws -> AntennaDetails {
@@ -202,10 +217,45 @@ final class AntennasService: AntennasServicing {
         ).antennas
     }
 
-    func quickSearch(query: String) async throws -> [AntennaSite] {
-        try await api.request(
-            APIEndpoint(path: "/api/antennas/quick-search", query: [URLQueryItem(name: "q", value: query)]),
+    func quickSearch(query: String, market: String, department: String?) async throws -> [AntennaSite] {
+        let queryItems = try Self.quickSearchQueryItems(
+            query: query,
+            market: market,
+            department: department
+        )
+        return try await api.request(
+            APIEndpoint(
+                path: "/api/antennas/quick-search",
+                query: queryItems
+            ),
             as: AntennasListResponse.self
         ).antennas
+    }
+
+    static func quickSearchQueryItems(
+        query: String,
+        market: String,
+        department: String?
+    ) throws -> [URLQueryItem] {
+        let normalizedMarket = try requiredMarketCode(market)
+        var items = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "market", value: normalizedMarket)
+        ]
+        let normalizedDepartment = department?.filter(\.isNumber)
+        if normalizedMarket == "DROM",
+           let normalizedDepartment,
+           ["971", "972", "973", "974", "976"].contains(normalizedDepartment) {
+            items.append(URLQueryItem(name: "department", value: normalizedDepartment))
+        }
+        return items
+    }
+
+    static func requiredMarketCode(_ value: String) throws -> String {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !normalized.isEmpty, normalized != "UNKNOWN" else {
+            throw AntennasServiceError.marketRequired
+        }
+        return normalized
     }
 }

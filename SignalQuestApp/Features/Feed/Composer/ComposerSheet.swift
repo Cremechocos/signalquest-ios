@@ -145,25 +145,33 @@ final class ComposerViewModel: ObservableObject {
     }
 
     private func saveDraft() {
-        UserDefaults.standard.set(text, forKey: "ComposerSheet.draftText")
-        UserDefaults.standard.set(visibility.rawValue, forKey: "ComposerSheet.draftVisibility")
+        UserDefaults.standard.set(text, forKey: draftTextKey)
+        UserDefaults.standard.set(visibility.rawValue, forKey: draftVisibilityKey)
     }
 
     private func loadDraft() {
-        if let savedText = UserDefaults.standard.string(forKey: "ComposerSheet.draftText") {
+        if let savedText = UserDefaults.standard.string(forKey: draftTextKey) {
             self.text = savedText
         }
-        if let savedVisibilityRaw = UserDefaults.standard.string(forKey: "ComposerSheet.draftVisibility"),
+        if let savedVisibilityRaw = UserDefaults.standard.string(forKey: draftVisibilityKey),
            let savedVisibility = SocialVisibility(rawValue: savedVisibilityRaw) {
             self.visibility = savedVisibility
         }
     }
 
     func clearDraft() {
-        UserDefaults.standard.removeObject(forKey: "ComposerSheet.draftText")
-        UserDefaults.standard.removeObject(forKey: "ComposerSheet.draftVisibility")
+        UserDefaults.standard.removeObject(forKey: draftTextKey)
+        UserDefaults.standard.removeObject(forKey: draftVisibilityKey)
         self.text = ""
         self.visibility = .friends
+    }
+
+    private var draftTextKey: String {
+        "ComposerSheet.draftText.\(LocalAccountScope.storageNamespace)"
+    }
+
+    private var draftVisibilityKey: String {
+        "ComposerSheet.draftVisibility.\(LocalAccountScope.storageNamespace)"
     }
 
     var characterCount: Int {
@@ -333,18 +341,16 @@ final class ComposerViewModel: ObservableObject {
         isBusy = true
         defer { isBusy = false }
         do {
-            var attachments: [CreatePostAttachment] = []
-            // Le service ré-encode hors du main thread et ne transmet jamais les
-            // octets originaux de la galerie.
-            if let imageData = preparedImageData() {
-                attachments.append(try await service.uploadImage(data: imageData, mimeType: "image/jpeg"))
-            }
+            // Le service ré-encode, réduit et retire les EXIF hors du main thread,
+            // puis conserve le brouillon dans son outbox jusqu'à l'accusé serveur.
+            let imageData = preparedImageData()
             let fallback = attachedSpeedtest != nil ? "Mon dernier speedtest SignalQuest" : "Photo SignalQuest"
             let safeBody = body.isEmpty ? fallback : body
-            _ = try await service.createPost(
+            _ = try await service.publishPost(
                 text: safeBody,
                 visibility: visibility.rawValue,
-                attachments: attachments,
+                imageData: imageData,
+                imageMimeType: "image/jpeg",
                 targetType: attachedSpeedtest != nil ? "speedtest" : nil,
                 targetId: attachedSpeedtest?.id,
                 extraMetadata: attachedSpeedtest.map { ["speedtestId": .string($0.id)] },
@@ -461,6 +467,7 @@ struct ComposerSheet: View {
                                 .font(SQType.body)
                                 .textFieldStyle(.plain)
                                 .focused($isInputFocused)
+                                .accessibilityIdentifier("feed.composer.text")
 
                             if !model.mentionSuggestions.isEmpty {
                                 mentionSuggestions

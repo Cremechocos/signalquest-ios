@@ -14,11 +14,8 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     static let defaultMaxLocationAge: TimeInterval = 60
 
     private let manager: CLLocationManager
-    private var locationContinuation: CheckedContinuation<CLLocation?, Never>?
-    private var authorizationContinuation: CheckedContinuation<CLAuthorizationStatus, Never>?
-    /// Jeton incrémenté à chaque requête one-shot : un timeout ne doit résoudre
-    /// que SA propre continuation, jamais celle d'un appel plus récent (ROB-13).
-    private var locationRequestGeneration = 0
+    private var locationContinuations: [UUID: CheckedContinuation<CLLocation?, Never>] = [:]
+    private var authorizationContinuations: [UUID: CheckedContinuation<CLAuthorizationStatus, Never>] = [:]
     /// Suivi continu demandé (drive test) : permet de (re)démarrer le tracking dès
     /// que l'autorisation est accordée, même si l'utilisateur valide le prompt après.
     /// Suivi continu demandé (rafale / drive test). Exposé en lecture parce que
@@ -26,29 +23,35 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     /// tant qu'il est vrai, couper les boucles réseau d'arrière-plan priverait
     /// l'utilisateur de ce qu'il a explicitement lancé.
     @Published private(set) var wantsTracking = false
-    /// Callback optionnel appelé à chaque position pendant un suivi continu.
-    /// Mis à nil par l'appelant en fin de session (drive test).
-    var onLocationUpdate: (@MainActor (CLLocation) -> Void)?
-
-    /// Abonnés supplémentaires aux positions.
-    ///
-    /// `onLocationUpdate` est un emplacement UNIQUE : le drive test s'y installe
-    /// et le libère en fin de session. Depuis que le guidage CarPlay suit lui
-    /// aussi la position, deux consommateurs peuvent coexister — et l'écraser
-    /// ferait perdre ses fixes à un drive test en cours, sans la moindre erreur.
-    /// Même motif que `headingSubscribers` : on compte les abonnés au lieu de
-    /// supposer qu'il n'y en a qu'un.
+    /// Abonnés aux positions. Chaque consommateur possède son jeton : Drive Test,
+    /// CarPlay et les alertes peuvent ainsi coexister sans s'écraser.
     private var locationObservers: [UUID: @MainActor (CLLocation) -> Void] = [:]
 
+    /// Suivi réclamé explicitement par `startTracking()` (drive test, rafale),
+    /// par opposition au suivi INDUIT par la présence d'abonnés.
+    ///
+    /// Les deux sources doivent être distinguées, sinon chacune coupe l'autre :
+    /// un drive test qui se termine éteindrait le suivi dont CarPlay a encore
+    /// besoin, et inversement.
+    private var explicitTrackingRequested = false
+
+    /// S'abonner suffit à obtenir des positions.
+    ///
+    /// Auparavant, poser un observateur n'enclenchait rien : seul `startTracking()`
+    /// appelait `startUpdatingLocation()`. Un abonné qui ne démarrait pas lui-même
+    /// le suivi n'était donc jamais appelé — c'est ce qui rendait les alertes de
+    /// couverture CarPlay muettes hors guidage.
     @discardableResult
     func addLocationObserver(_ handler: @escaping @MainActor (CLLocation) -> Void) -> UUID {
         let token = UUID()
         locationObservers[token] = handler
+        syncTracking()
         return token
     }
 
     func removeLocationObserver(_ token: UUID) {
-        locationObservers[token] = nil
+        guard locationObservers.removeValue(forKey: token) != nil else { return }
+        syncTracking()
     }
 
     /// Cap de l'appareil en degrés (0 = nord géographique), `nil` tant que
@@ -83,7 +86,26 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     /// `location` de l'Info.plist) maintient l'app active écran verrouillé. À
     /// n'appeler qu'au premier plan, autorisation « Pendant l'utilisation » accordée.
     func startTracking() {
-        wantsTracking = true
+        explicitTrackingRequested = true
+        syncTracking()
+    }
+
+    /// Aligne l'état réel du `CLLocationManager` sur la demande courante.
+    ///
+    /// Point unique de bascule : le suivi démarre dès qu'au moins une source le
+    /// réclame, et ne s'arrête qu'une fois la DERNIÈRE relâchée. Sans ce
+    /// comptage, `startTracking()` laissait le GPS haute précision et
+    /// `allowsBackgroundLocationUpdates` actifs indéfiniment — y compris après
+    /// débranchement du véhicule.
+    private func syncTracking() {
+        let desired = explicitTrackingRequested || !locationObservers.isEmpty
+        guard desired != wantsTracking else { return }
+        wantsTracking = desired
+
+        guard desired else {
+            endTrackingNow()
+            return
+        }
         switch authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:
             beginTrackingNow()
@@ -106,9 +128,19 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         manager.startUpdatingLocation()
     }
 
-    /// Arrête le suivi continu et restaure les réglages one-shot par défaut.
+    /// Relâche la demande explicite de suivi continu.
+    ///
+    /// ⚠️ N'éteint pas forcément le GPS : si des observateurs sont encore posés
+    /// (CarPlay branché, par exemple), le suivi continue pour eux. C'est
+    /// délibéré — couper leurs positions parce qu'un autre écran a terminé
+    /// serait une panne silencieuse.
     func stopTracking() {
-        wantsTracking = false
+        explicitTrackingRequested = false
+        syncTracking()
+    }
+
+    /// Coupe réellement le suivi et restaure les réglages one-shot par défaut.
+    private func endTrackingNow() {
         manager.stopUpdatingLocation()
         if manager.allowsBackgroundLocationUpdates {
             manager.allowsBackgroundLocationUpdates = false
@@ -153,18 +185,14 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
             return lastLocation
         }
         if authorizationStatus == .notDetermined {
-            requestWhenInUse()
             let status = await withCheckedContinuation { continuation in
-                // Ne jamais écraser une continuation en attente sans la résoudre
-                // (sinon l'appelant précédent reste suspendu pour toujours).
-                authorizationContinuation?.resume(returning: authorizationStatus)
-                authorizationContinuation = continuation
+                let requestID = UUID()
+                authorizationContinuations[requestID] = continuation
+                if authorizationContinuations.count == 1 { requestWhenInUse() }
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: min(timeoutSeconds, 6) * 1_000_000_000)
-                    if authorizationContinuation != nil {
-                        authorizationContinuation?.resume(returning: authorizationStatus)
-                        authorizationContinuation = nil
-                    }
+                    authorizationContinuations.removeValue(forKey: requestID)?
+                        .resume(returning: authorizationStatus)
                 }
             }
             authorizationStatus = status
@@ -172,22 +200,14 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
             return nil
         }
-        manager.requestLocation()
-        locationRequestGeneration &+= 1
-        let generation = locationRequestGeneration
         return await withCheckedContinuation { continuation in
-            // Idem : résoudre toute continuation de localisation déjà en attente
-            // avant d'en installer une nouvelle, pour éviter une fuite/blocage.
-            locationContinuation?.resume(returning: lastLocation)
-            locationContinuation = continuation
+            let requestID = UUID()
+            locationContinuations[requestID] = continuation
+            if locationContinuations.count == 1 { manager.requestLocation() }
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: timeoutSeconds * 1_000_000_000)
-                // Ne résoudre que si c'est TOUJOURS notre requête : un appel plus
-                // récent a pu remplacer la continuation entre-temps (ROB-13).
-                if locationRequestGeneration == generation, locationContinuation != nil {
-                    locationContinuation?.resume(returning: lastLocation)
-                    locationContinuation = nil
-                }
+                locationContinuations.removeValue(forKey: requestID)?
+                    .resume(returning: lastLocation)
             }
         }
     }
@@ -200,8 +220,9 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
             if wantsTracking, status == .authorizedWhenInUse || status == .authorizedAlways {
                 beginTrackingNow()
             }
-            authorizationContinuation?.resume(returning: status)
-            authorizationContinuation = nil
+            let continuations = Array(authorizationContinuations.values)
+            authorizationContinuations.removeAll()
+            continuations.forEach { $0.resume(returning: status) }
         }
     }
 
@@ -210,14 +231,14 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
             lastLocation = locations.last
             errorMessage = nil
             if let last = locations.last {
-                onLocationUpdate?(last)
                 // Copie avant itération : un abonné qui se désabonne depuis son
                 // propre handler (arrivée à destination, par exemple) muterait
                 // le dictionnaire en cours de parcours.
                 for observer in Array(locationObservers.values) { observer(last) }
             }
-            locationContinuation?.resume(returning: locations.last)
-            locationContinuation = nil
+            let continuations = Array(locationContinuations.values)
+            locationContinuations.removeAll()
+            continuations.forEach { $0.resume(returning: locations.last) }
         }
     }
 
@@ -243,8 +264,9 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Task { @MainActor in
             errorMessage = error.localizedDescription
-            locationContinuation?.resume(returning: nil)
-            locationContinuation = nil
+            let continuations = Array(locationContinuations.values)
+            locationContinuations.removeAll()
+            continuations.forEach { $0.resume(returning: nil) }
         }
     }
 }

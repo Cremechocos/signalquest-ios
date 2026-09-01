@@ -11,6 +11,7 @@ struct SpeedtestView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     // Défaut « Auto » : préflight hybride iPerf3 (OVH/Bouygues/Scaleway/MilkyWan)
     // + Cloudflare, le plus rapide gagne.
     @AppStorage("speedtest_download_target") private var downloadTargetRaw = SpeedtestDownloadTarget.hybridAuto.rawValue
@@ -73,6 +74,18 @@ struct SpeedtestView: View {
     @State private var isPublishingDetail = false
     @State private var publishFeedback: String?
     @State private var runTask: Task<Void, Never>?
+    /// Identité de la session propriétaire de l'état partagé. Une tâche annulée
+    /// peut terminer après qu'une nouvelle session a démarré ; elle ne doit alors
+    /// ni vider `runTask`, ni arrêter la Live Activity de la nouvelle mesure.
+    @State private var runSessionID: UUID?
+    /// Génération de la mesure en cours. Le puits de progression du moteur est un
+    /// `Task { @MainActor }` NON structuré : il n'hérite pas de l'annulation de
+    /// `runTask`, et les ticks déjà émis s'exécutent donc APRÈS un `stop()`. Sans
+    /// ce jeton, ils réécrivaient `phase`, `liveProgress` et `liveMbps` par-dessus
+    /// l'état « arrêté » — d'où l'aiguille qui continuait de monter alors que le
+    /// bouton était déjà repassé sur « Relancer ». Incrémenté à chaque run ET à
+    /// chaque arrêt : tout tick d'une génération périmée est ignoré.
+    @State private var runGeneration: Int = 0
     @State private var showSettings = false
     @State private var showDriveTest = false
     @State private var showLocationPriming = false
@@ -445,7 +458,7 @@ struct SpeedtestView: View {
                 .fill(SQColor.separator)
                 .frame(height: 1)
 
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: SQSpace.md), GridItem(.flexible(), spacing: SQSpace.md)], spacing: SQSpace.md) {
+            LazyVGrid(columns: resultColumns, spacing: SQSpace.md) {
                 detailItem(label: "Réception moy.", value: speed(result.downloadAverageMbps), highlight: true)
                 detailItem(label: "DL max", value: speed(result.downloadMaxMbps), highlight: true)
                 detailItem(label: "Envoi moy.", value: speed(result.uploadAverageMbps))
@@ -479,13 +492,14 @@ struct SpeedtestView: View {
                     .font(SQFont.display(17, .semibold, relativeTo: .body))
                     .monospacedDigit()
                     .foregroundStyle(highlight ? SQColor.brandRed : SQColor.label)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let trailing {
                     Text(trailing)
                         .font(SQType.micro)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -515,7 +529,7 @@ struct SpeedtestView: View {
             Rectangle()
                 .fill(SQColor.separator)
                 .frame(height: 1)
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: SQSpace.md), GridItem(.flexible(), spacing: SQSpace.md)], spacing: SQSpace.md) {
+            LazyVGrid(columns: resultColumns, spacing: SQSpace.md) {
                 detailItem(label: "Réception moy.", value: speed(s.avgDownload), highlight: true)
                 detailItem(label: "DL max", value: speed(s.maxDownload), highlight: true)
                 detailItem(label: "Envoi moy.", value: speed(s.avgUpload))
@@ -569,17 +583,34 @@ struct SpeedtestView: View {
         options: [(value: Int, label: String)],
         selection: Binding<Int>
     ) -> some View {
-        HStack {
-            Text(title).foregroundStyle(SQColor.label)
-            Spacer()
-            ForEach(options, id: \.value) { option in
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    Text(title).foregroundStyle(SQColor.label)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: SQSpace.sm) { chipButtons(options: options, selection: selection) }
+                    }
+                }
+            } else {
+                HStack {
+                    Text(title).foregroundStyle(SQColor.label)
+                    Spacer()
+                    chipButtons(options: options, selection: selection)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func chipButtons(options: [(value: Int, label: String)], selection: Binding<Int>) -> some View {
+        ForEach(options, id: \.value) { option in
                 Button {
                     selection.wrappedValue = option.value
                     Haptics.selection()
                 } label: {
                     Text(option.label)
                         .font(.caption.weight(.bold))
-                        .frame(minWidth: 44)
+                        .frame(minWidth: 44, minHeight: 44)
                         .padding(.vertical, SQSpace.xs + 3)
                         .background(
                             selection.wrappedValue == option.value ? SQColor.brandRed : SQColor.fill,
@@ -589,7 +620,6 @@ struct SpeedtestView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(selection.wrappedValue == option.value ? [.isSelected] : [])
-            }
         }
     }
 
@@ -659,7 +689,7 @@ struct SpeedtestView: View {
                                     } label: {
                                         Text(value == 1 ? "1" : "×\(value)")
                                             .font(.caption.weight(.bold))
-                                            .frame(minWidth: 38)
+                                            .frame(minWidth: 44, minHeight: 44)
                                             .padding(.vertical, SQSpace.xs + 3)
                                             .background(burstCount == value ? SQColor.brandRed : SQColor.fill, in: Capsule(style: .continuous))
                                             .foregroundStyle(burstCount == value ? SQColor.onAccent : SQColor.label)
@@ -673,7 +703,7 @@ struct SpeedtestView: View {
                                 } label: {
                                     Image(systemName: "infinity")
                                         .font(.caption.weight(.bold))
-                                        .frame(minWidth: 38)
+                                        .frame(minWidth: 44, minHeight: 44)
                                         .padding(.vertical, SQSpace.xs + 3)
                                         .background(burstCount == Self.continuousBurst ? SQColor.brandRed : SQColor.fill, in: Capsule(style: .continuous))
                                         .foregroundStyle(burstCount == Self.continuousBurst ? SQColor.onAccent : SQColor.label)
@@ -737,6 +767,10 @@ struct SpeedtestView: View {
         .presentationDragIndicator(.visible)
     }
 
+    private var resultColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: SQSpace.md), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2)
+    }
+
     // MARK: - History
 
     // Fidèle au prototype : les cartes d'historique suivent directement le
@@ -744,7 +778,12 @@ struct SpeedtestView: View {
     private var historySection: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             if history.isEmpty {
-                EmptyStateView(title: "Aucun test", message: "Lance ton premier speedtest.", systemImage: "clock")
+                EmptyStateView(
+                    title: "Aucun test",
+                    message: "Lance ton premier speedtest.",
+                    systemImage: "clock",
+                    messageColor: SQColor.label
+                )
             } else {
                 VStack(spacing: SQSpace.sm + 2) {
                     ForEach(Array(history.enumerated()), id: \.element.id) { _, item in
@@ -870,7 +909,25 @@ struct SpeedtestView: View {
 
     /// Exécute UNE mesure complète (ping→download→upload→save), pilote la jauge,
     /// la Live Activity (avec index de rafale) et l'historique. Renvoie le résultat.
-    private func executeRun(requestLocation: Bool, runIndex: Int, runTotal: Int) async throws -> SpeedtestRunResult {
+    private func ensureActiveRunSession(_ sessionID: UUID) throws {
+        try Task.checkCancellation()
+        guard runSessionID == sessionID else { throw CancellationError() }
+    }
+
+    private func executeRun(
+        requestLocation: Bool,
+        runIndex: Int,
+        runTotal: Int,
+        sessionID: UUID
+    ) async throws -> SpeedtestRunResult {
+        // Une tâche de rafale annulée pendant la pause peut reprendre juste assez
+        // longtemps pour entrer ici. La session est vérifiée AVANT toute mutation :
+        // elle ne repeint donc jamais l'état remis à zéro par `stop()`.
+        try ensureActiveRunSession(sessionID)
+        // Une génération par mesure — pas par session : en rafale, cela empêche aussi
+        // un tick tardif du test N de repeindre la jauge du test N+1.
+        runGeneration &+= 1
+        let generation = runGeneration
         phase = .ping
         result = nil
         resetShareState()
@@ -888,6 +945,7 @@ struct SpeedtestView: View {
         // cellulaire, FAI en WiFi) : injecté dans le pathStatus pour remonter dans
         // le résultat + l'image de partage.
         await resolveDetectedOperator()
+        try ensureActiveRunSession(sessionID)
         let runStatus = status.merging(operatorName: detectedOperator?.label)
         let settings = runSettings
 
@@ -895,17 +953,25 @@ struct SpeedtestView: View {
         if requestLocation {
             let requestedLocation = await services.location.currentLocation()
             location = requestedLocation.map {
-                Coordinates(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude)
+                Coordinates(
+                    latitude: $0.coordinate.latitude,
+                    longitude: $0.coordinate.longitude,
+                    accuracy: max(0, $0.horizontalAccuracy),
+                    observedAt: $0.timestamp
+                )
             }
         } else {
             location = nil
         }
+        try ensureActiveRunSession(sessionID)
         let measured = try await services.speedtest.run(
             pathStatus: runStatus,
             location: location,
             settings: settings,
             progress: { update in
                 Task { @MainActor in
+                    // Tick d'une mesure déjà arrêtée ou remplacée : on le laisse tomber.
+                    guard generation == runGeneration, runSessionID == sessionID else { return }
                     phase = update.phase
                     let merged = mergeProgress(current: liveProgress, new: update)
                     liveProgress = merged
@@ -921,7 +987,7 @@ struct SpeedtestView: View {
                 }
             }
         )
-        try Task.checkCancellation()
+        try ensureActiveRunSession(sessionID)
         result = measured
         sharePreviewResult = nil
         liveProgress = SpeedtestLiveProgress(
@@ -943,10 +1009,15 @@ struct SpeedtestView: View {
                 publishToMap: mapPublicationEnabled && !isVPNActive,
                 shareExactLocation: exactLocationEnabled && !isVPNActive
             )
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
+            try ensureActiveRunSession(sessionID)
             errorMessage = error.localizedDescription
         }
+        try ensureActiveRunSession(sessionID)
         history = await services.speedtest.history()
+        try ensureActiveRunSession(sessionID)
         phase = .finished
         liveProgress = SpeedtestLiveProgress(
             phase: .finished,
@@ -1001,9 +1072,17 @@ struct SpeedtestView: View {
         sessionIsContinuous = false
         background.begin(name: "speedtest")
         liveActivity.start(serverName: "SignalQuest", network: services.networkPath.status.displayName)
+        let sessionID = UUID()
+        runSessionID = sessionID
         runTask = Task {
             do {
-                let measured = try await executeRun(requestLocation: requestLocation, runIndex: 1, runTotal: 1)
+                let measured = try await executeRun(
+                    requestLocation: requestLocation,
+                    runIndex: 1,
+                    runTotal: 1,
+                    sessionID: sessionID
+                )
+                guard runSessionID == sessionID else { return }
                 logQASpeedtestResult(measured)
                 liveActivity.end(
                     downloadMbps: measured.downloadAverageMbps,
@@ -1012,17 +1091,21 @@ struct SpeedtestView: View {
                 )
                 Haptics.success()
             } catch is CancellationError {
+                guard runSessionID == sessionID else { return }
                 liveActivity.cancel()
                 handleCancellation()
             } catch {
+                guard runSessionID == sessionID else { return }
                 liveActivity.cancel()
                 runErrorMessage = error.localizedDescription
                 phase = .failed(error.localizedDescription)
                 liveProgress = SpeedtestLiveProgress(phase: .failed(error.localizedDescription))
                 Haptics.warning()
             }
+            guard runSessionID == sessionID else { return }
             background.end()
             runTask = nil
+            runSessionID = nil
             runStartConnection = nil
             runStartNetworkDisplayName = nil
             networkAbortMessage = nil
@@ -1043,21 +1126,32 @@ struct SpeedtestView: View {
         burstProgress = (1, total)
         background.begin(name: "speedtest-burst")
         liveActivity.start(serverName: "SignalQuest", network: services.networkPath.status.displayName, runIndex: 1, runTotal: total)
+        let sessionID = UUID()
+        runSessionID = sessionID
         runTask = Task {
             var results: [SpeedtestRunResult] = []
             var truncatedAt: Int?
             loop: for index in 1...total {
+                guard !Task.isCancelled, runSessionID == sessionID else { return }
                 burstProgress = (index, total)
                 do {
                     // Géolocaliser CHAQUE test de la rafale (pas seulement le 1er) :
                     // sinon les tests 2..N étaient enregistrés/publiés sans position
                     // (TEL-06). currentLocation renvoie le fix récent en cache (peu coûteux).
-                    let measured = try await executeRun(requestLocation: requestLocation, runIndex: index, runTotal: total)
+                    let measured = try await executeRun(
+                        requestLocation: requestLocation,
+                        runIndex: index,
+                        runTotal: total,
+                        sessionID: sessionID
+                    )
+                    guard runSessionID == sessionID else { return }
                     results.append(measured)
                 } catch is CancellationError {
+                    guard runSessionID == sessionID else { return }
                     truncatedAt = max(0, index - 1)
                     break loop
                 } catch {
+                    guard runSessionID == sessionID else { return }
                     // Un test raté n'interrompt pas la rafale : on note et on continue.
                     errorMessage = error.localizedDescription
                     Haptics.warning()
@@ -1069,12 +1163,19 @@ struct SpeedtestView: View {
                     }
 
                     if scenePhase == .active {
-                        try? await Task.sleep(nanoseconds: 700_000_000)
+                        do {
+                            try await Task.sleep(nanoseconds: 700_000_000)
+                        } catch is CancellationError {
+                            return
+                        } catch {
+                            return
+                        }
                     } else {
                         background.renew(name: "speedtest-burst")
                     }
                 }
             }
+            guard runSessionID == sessionID else { return }
             let summary = SpeedtestBurstSummary(results: results, truncatedAt: truncatedAt)
             if Task.isCancelled {
                 if !results.isEmpty { burstSummary = summary }
@@ -1094,6 +1195,7 @@ struct SpeedtestView: View {
             background.end()
             burstProgress = nil
             runTask = nil
+            runSessionID = nil
             runStartConnection = nil
             runStartNetworkDisplayName = nil
             networkAbortMessage = nil
@@ -1117,6 +1219,8 @@ struct SpeedtestView: View {
         if requestLocation { services.location.startTracking() }
         UIApplication.shared.isIdleTimerDisabled = true
         liveActivity.start(serverName: "SignalQuest", network: services.networkPath.status.displayName, runIndex: 1, runTotal: 0)
+        let sessionID = UUID()
+        runSessionID = sessionID
         runTask = Task {
             var accumulator = ContinuousSessionAccumulator()
             var index = 0
@@ -1125,12 +1229,20 @@ struct SpeedtestView: View {
                 burstProgress = (index, 0)
                 do {
                     // Drive test : on re-géolocalise à CHAQUE test (pas seulement le 1er).
-                    let measured = try await executeRun(requestLocation: requestLocation, runIndex: index, runTotal: 0)
+                    let measured = try await executeRun(
+                        requestLocation: requestLocation,
+                        runIndex: index,
+                        runTotal: 0,
+                        sessionID: sessionID
+                    )
+                    guard runSessionID == sessionID else { return }
                     accumulator.add(measured)
                     burstSummary = accumulator.summary(truncatedAt: nil)
                 } catch is CancellationError {
+                    guard runSessionID == sessionID else { return }
                     break loop
                 } catch {
+                    guard runSessionID == sessionID else { return }
                     // Un test raté n'interrompt pas la session : on note et on continue.
                     errorMessage = error.localizedDescription
                     Haptics.warning()
@@ -1143,6 +1255,7 @@ struct SpeedtestView: View {
                     background.renew(name: "speedtest-continuous")
                 }
             }
+            guard runSessionID == sessionID else { return }
             if accumulator.count > 0 {
                 burstSummary = accumulator.summary(truncatedAt: nil)
             }
@@ -1154,6 +1267,7 @@ struct SpeedtestView: View {
             background.end()
             burstProgress = nil
             runTask = nil
+            runSessionID = nil
             runStartConnection = nil
             runStartNetworkDisplayName = nil
             networkAbortMessage = nil
@@ -1183,13 +1297,33 @@ struct SpeedtestView: View {
     }
 
     private func stop() {
+        runSessionID = nil
         runTask?.cancel()
         runTask = nil
+        // Invalide les ticks déjà en vol AVANT de repeindre l'état : sans cela, le
+        // premier tick arrivé après ce point réécrivait tout ce qu'on remet à zéro
+        // juste en dessous.
+        runGeneration &+= 1
         runStartConnection = nil
         runStartNetworkDisplayName = nil
         networkAbortMessage = nil
         phase = .idle
         liveProgress = SpeedtestLiveProgress(phase: .idle)
+        // La jauge lit `liveMbps` : sans remise à zéro, elle restait figée sur la
+        // dernière valeur mesurée au lieu de retomber.
+        liveMbps = 0
+        burstProgress = nil
+        if sessionIsContinuous {
+            services.location.stopTracking()
+            UIApplication.shared.isIdleTimerDisabled = false
+            sessionIsContinuous = false
+        }
+        // `stop()` n'éteignait ni la Live Activity ni la tâche de fond : elles ne
+        // s'arrêtaient qu'au `catch is CancellationError` du moteur, c'est-à-dire
+        // après que tout le pipeline se soit déroulé. Entre les deux, l'Île
+        // dynamique continuait d'afficher des valeurs qui montaient.
+        liveActivity.cancel()
+        background.end()
     }
 
     private func handleNetworkStatusUpdate(_ newStatus: NetworkPathStatus) {
@@ -1210,12 +1344,23 @@ struct SpeedtestView: View {
         let message = "Speedtest arrêté : changement de réseau détecté (\(previousNetwork) -> \(newNetwork)). Relance le test pour mesurer une connexion stable."
         networkAbortMessage = message
         errorMessage = message
+        runSessionID = nil
+        runGeneration &+= 1
         runTask?.cancel()
         runTask = nil
         runStartConnection = nil
         runStartNetworkDisplayName = nil
         phase = .failed(message)
         liveProgress = SpeedtestLiveProgress(phase: .failed(message))
+        liveMbps = 0
+        burstProgress = nil
+        if sessionIsContinuous {
+            services.location.stopTracking()
+            UIApplication.shared.isIdleTimerDisabled = false
+            sessionIsContinuous = false
+        }
+        liveActivity.cancel()
+        background.end()
         Haptics.warning()
     }
 

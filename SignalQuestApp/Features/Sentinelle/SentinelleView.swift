@@ -576,7 +576,7 @@ struct SentinelleBoxCard: View {
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                         Text(subtitle)
-                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .font(.system(.caption, design: .monospaced, weight: .medium))
                             .foregroundStyle(SQColor.labelSecondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)

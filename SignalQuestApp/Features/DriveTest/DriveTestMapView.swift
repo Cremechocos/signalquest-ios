@@ -27,7 +27,7 @@ struct DriveTestMapView: UIViewRepresentable {
     var onSelectSpeedtest: (DriveSpeedtestPoint) -> Void = { _ in }
 
     @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
-    private var backdrop: MapBackdrop { MapBackdrop(rawValue: backdropRaw) ?? .applePlan }
+    private var backdrop: MapBackdrop { MapBackdrop.resolve(backdropRaw) }
 
     func makeCoordinator() -> Coordinator { Coordinator(onSelectSite: onSelectSite, onSelectSpeedtest: onSelectSpeedtest) }
 

@@ -348,13 +348,17 @@ struct AntennaSightCard: View {
                 .foregroundStyle(isRefreshing ? SQColor.labelTertiary : tint)
                 .rotationEffect(.degrees(isRefreshing ? 360 : 0))
                 .animation(
-                    isRefreshing && !reduceMotion
-                        ? .linear(duration: 1).repeatForever(autoreverses: false)
-                        : .default,
+                    SQMotion.repeating(
+                        .linear(duration: 1),
+                        autoreverses: false,
+                        active: isRefreshing,
+                        reduceMotion: reduceMotion
+                    ),
                     value: isRefreshing
                 )
                 .frame(width: 34, height: 34)
                 .background(SQColor.surfaceMuted, in: Circle())
+                .padding(5)
                 .contentShape(Circle())
         }
         .buttonStyle(SQPressButtonStyle())

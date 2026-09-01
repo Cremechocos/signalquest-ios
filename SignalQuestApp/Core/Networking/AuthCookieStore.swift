@@ -19,8 +19,8 @@ final class AuthCookieStore: @unchecked Sendable {
     func clear() { credentials.clearAll() }
 
     @discardableResult
-    func captureAuthToken(from response: URLResponse) -> String? {
-        credentials.captureFromResponse(response)
+    func captureAuthToken(from response: URLResponse) throws -> String? {
+        try credentials.captureFromResponse(response)
     }
 
     static func parseAuthToken(from setCookie: String?) -> String? {

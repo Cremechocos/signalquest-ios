@@ -47,6 +47,25 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     /// ouverture/déverrouillage (SEC-06).
     func application(_ application: UIApplication,
                      didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
+        guard AppDelegate.sharedPush?.acceptsPush(userInfo) == true else {
+            return .noData
+        }
+        // The service extension owns this alert; never post a second local notification.
+        if E2EEV2NotificationDeliveryPolicy.usesServiceExtension(userInfo) {
+            return .noData
+        }
+        if let receipt = OutageNotificationReceiptPayload.parse(userInfo, state: "received"),
+           let push = AppDelegate.sharedPush {
+            return await push.acknowledgeOutageNotification(
+                id: receipt.id,
+                payload: receipt.payload
+            ) ? .newData : .noData
+        }
+        if (userInfo["type"] as? String) == "e2ee_v2_envelope",
+           let envelopeId = userInfo["envelopeId"] as? String,
+           let push = AppDelegate.sharedPush {
+            return await push.handleE2eeV2Envelope(envelopeId) ? .newData : .noData
+        }
         guard (userInfo["type"] as? String) == "e2ee_sync",
               let conversationId = (userInfo["conversationId"] as? String)
                   ?? (userInfo["conversation_id"] as? String),
@@ -90,11 +109,17 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // Passe par le holder plutôt qu'une statique de plus : le graphe est déjà
         // construit à cet instant (didFinishLaunching précède toujours l'ouverture
         // d'URL), et c'est le même routeur que la fenêtre SwiftUI observe.
-        let router = AppServicesHolder.services.router
+        let services = AppServicesHolder.services
+        let router = services.router
         router.pendingMapFocus = Coordinates(latitude: destination.coordinate.latitude,
                                              longitude: destination.coordinate.longitude)
         router.selectedTab = .map
-        CarPlayDashboardRoute.request(.map)
+        // Seulement si le véhicule peut réellement guider : sans `carplay-maps`,
+        // pousser vers la scène CarPlay afficherait une liste d'antennes en
+        // réponse à une demande d'itinéraire.
+        if services.isCarPlayGuidanceAvailable {
+            CarPlayDashboardRoute.request(.map)
+        }
         return true
     }
 }

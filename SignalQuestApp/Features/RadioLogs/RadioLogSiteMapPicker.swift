@@ -609,7 +609,11 @@ struct RadioLogSiteMapPicker: View {
         loadError = nil
         defer { isLoading = false }
 
-        let market = RadioLogOperatorResolver.marketCode(forOperator: site.operatorName, mcc: site.mcc) ?? "FR"
+        guard let market = site.resolvedMarketCode else {
+            visible = []
+            loadError = String(localized: "Pays du relevé inconnu : impossible de charger une carte d’antennes fiable.")
+            return
+        }
         let bbox = BoundingBox(
             north: region.center.latitude + region.span.latitudeDelta / 2,
             south: region.center.latitude - region.span.latitudeDelta / 2,
@@ -679,7 +683,7 @@ struct RadioLogSiteMapPicker: View {
     /// le seul opérateur du log masquerait donc précisément l'antenne cherchée :
     /// on interroge les deux.
     private var queriedOperatorKeys: [String] {
-        let key = RadioLogOperatorResolver.operatorKey(forOperator: site.operatorName)
+        let key = site.resolvedOperatorKey
         switch key {
         case "ZB": return ["ZB"]
         case let resolved?: return [resolved, "ZB"]

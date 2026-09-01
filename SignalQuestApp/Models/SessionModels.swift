@@ -48,6 +48,8 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
     let sessionDescription: String?
     let source: String?
     let operatorKey: String?
+    let mvnoKey: String?
+    let mvnoName: String?
     let startTime: Date?
     let endTime: Date?
     let durationSeconds: Double?
@@ -61,7 +63,7 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
     let showOnMap: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, description, source, operatorKey
+        case id, name, description, source, operatorKey, mvnoKey, mvnoName
         case startTime, startedAt, createdAt, endTime, endedAt, duration
         case totalPoints, pointCount, distance
         case avgSignalStrength, minSignalStrength, maxSignalStrength
@@ -75,6 +77,8 @@ struct CoverageSession: Decodable, Identifiable, Equatable {
         sessionDescription = c.decodeFlexibleString(forKey: .description)
         source = c.decodeFlexibleString(forKey: .source)
         operatorKey = c.decodeFlexibleString(forKey: .operatorKey)
+        mvnoKey = c.decodeFlexibleString(forKey: .mvnoKey)
+        mvnoName = c.decodeFlexibleString(forKey: .mvnoName)
         startTime = (try? c.decodeIfPresent(Date.self, forKey: .startTime))
             ?? (try? c.decodeIfPresent(Date.self, forKey: .startedAt))
             ?? (try? c.decodeIfPresent(Date.self, forKey: .createdAt)) ?? nil
@@ -160,13 +164,34 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
     let pci: String?
     let cellId: String?
     let tech: String?
+    /// Clé canonique du RÉSEAU servant, résolue serveur (« SFR », « BOUYGUES »…).
     let operatorKey: String?
+    /// Preuve réseau du point, distincte du nom de SIM. Les chaînes préservent
+    /// les MNC à trois chiffres avec zéro initial (`310001`).
+    private let observedPlmnValue: JSONValue?
+    private let observedMccValue: JSONValue?
+    private let observedMncValue: JSONValue?
+    var observedPlmn: String? { RadioLogPlmn.rawText(observedPlmnValue) }
+    var observedMcc: String? { RadioLogPlmn.rawText(observedMccValue) }
+    var observedMnc: String? { RadioLogPlmn.rawText(observedMncValue) }
+    let networkIdentitySource: String?
+    let networkIdentityConfidence: String?
+    let marketCode: String?
+    let countryCode: String?
+    let isRoaming: Bool?
+    let mvnoKey: String?
+    let mvnoName: String?
+    /// Nom de la SIM tel qu'envoyé par le client. N'est PAS une clé : ne jamais
+    /// l'utiliser là où un `operatorKey` est attendu (filtrage, scope, couleur).
+    let simOperator: String?
     let timestamp: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, latitude, lat, longitude, lng
         case signalStrength, rsrp, enb, gnb, pci, cellId
-        case technology, networkType, operatorKey, mobileOperator, timestamp
+        case technology, networkType, operatorKey, mobileOperator, mvnoKey, mvnoName, timestamp
+        case observedPlmn, observedMcc, observedMnc, mobileCountryCode, mobileNetworkCode
+        case marketCode, countryCode, isRoaming, networkIdentitySource, networkIdentityConfidence
     }
 
     init(from decoder: Decoder) throws {
@@ -181,12 +206,39 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
         pci = c.decodeFlexibleString(forKey: .pci)
         cellId = c.decodeFlexibleString(forKey: .cellId)
         tech = c.decodeFlexibleString(forKey: .technology) ?? c.decodeFlexibleString(forKey: .networkType)
-        operatorKey = c.decodeFlexibleString(forKey: .operatorKey) ?? c.decodeFlexibleString(forKey: .mobileOperator)
+        // Deux champs DISTINCTS. Le repli `operatorKey ?? mobileOperator` écrivait un
+        // nom de SIM dans un champ censé porter une clé canonique — soit exactement le
+        // mélange que ce chantier supprime : un « Lebara » ou un « Orange F » ne
+        // correspond à aucune clé et fausse tout ce qui s'appuie dessus.
+        operatorKey = c.decodeFlexibleString(forKey: .operatorKey)
+        observedPlmnValue = try? c.decodeIfPresent(JSONValue.self, forKey: .observedPlmn)
+        observedMccValue = (try? c.decodeIfPresent(JSONValue.self, forKey: .observedMcc))
+            ?? (try? c.decodeIfPresent(JSONValue.self, forKey: .mobileCountryCode))
+        observedMncValue = (try? c.decodeIfPresent(JSONValue.self, forKey: .observedMnc))
+            ?? (try? c.decodeIfPresent(JSONValue.self, forKey: .mobileNetworkCode))
+        networkIdentitySource = c.decodeFlexibleString(forKey: .networkIdentitySource)
+        networkIdentityConfidence = c.decodeFlexibleString(forKey: .networkIdentityConfidence)
+        marketCode = c.decodeFlexibleString(forKey: .marketCode)
+        countryCode = c.decodeFlexibleString(forKey: .countryCode)
+        isRoaming = try? c.decodeIfPresent(Bool.self, forKey: .isRoaming)
+        simOperator = c.decodeFlexibleString(forKey: .mobileOperator)
+        mvnoKey = c.decodeFlexibleString(forKey: .mvnoKey)
+        mvnoName = c.decodeFlexibleString(forKey: .mvnoName)
         timestamp = (try? c.decodeIfPresent(Date.self, forKey: .timestamp)) ?? nil
     }
 
     var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: lat, longitude: lng) }
     var hasValidCoordinate: Bool { lat != 0 || lng != 0 }
+
+    var plmnEvidence: RadioLogPlmnEvidence {
+        if [networkIdentitySource, networkIdentityConfidence].contains(where: {
+            $0?.uppercased().contains("AMBIGUOUS") == true
+        }) { return .legacyAmbiguous }
+        if networkIdentitySource?.uppercased() == "SIM_ONLY" { return .missing }
+        return RadioLogPlmn.resolve(observedPlmn: observedPlmnValue, mcc: observedMccValue, mnc: observedMncValue)
+    }
+
+    var servingPlmn: (mcc: String, mnc: String, plmn: String)? { plmnEvidence.components }
 }
 
 /// Speedtest rattaché à une session Drive Test — renvoyé par le backend SOUS
@@ -201,6 +253,8 @@ struct SessionSpeedtest: Decodable, Identifiable, Equatable {
     let jitterMs: Double?
     let mobileOperator: String?
     let operatorKey: String?
+    let mvnoKey: String?
+    let mvnoName: String?
     /// Génération/type de connexion au moment du test (ex. "5G", "4G", "LTE").
     let networkType: String?
     let timestamp: Date?
@@ -209,7 +263,7 @@ struct SessionSpeedtest: Decodable, Identifiable, Equatable {
         case id, latitude, longitude, lat, lng
         case downloadSpeed, averageSpeed, uploadAvg, uploadSpeed
         case ping, pingMin, jitter
-        case mobileOperator, operatorKey, connectionType, networkType, timestamp
+        case mobileOperator, operatorKey, mvnoKey, mvnoName, connectionType, networkType, timestamp
     }
 
     init(from decoder: Decoder) throws {
@@ -229,6 +283,8 @@ struct SessionSpeedtest: Decodable, Identifiable, Equatable {
         jitterMs = (try? c.decodeIfPresent(Double.self, forKey: .jitter)) ?? nil
         mobileOperator = c.decodeFlexibleString(forKey: .mobileOperator)
         operatorKey = c.decodeFlexibleString(forKey: .operatorKey)
+        mvnoKey = c.decodeFlexibleString(forKey: .mvnoKey)
+        mvnoName = c.decodeFlexibleString(forKey: .mvnoName)
         networkType = c.decodeFlexibleString(forKey: .connectionType)
             ?? c.decodeFlexibleString(forKey: .networkType)
         timestamp = (try? c.decodeIfPresent(Date.self, forKey: .timestamp)) ?? nil
@@ -268,7 +324,10 @@ struct ServingAntenna: Identifiable, Equatable {
     let id: String
     let lat: Double
     let lng: Double
+    /// Opérateur principal conservé pour les actions qui exigent un PLMN unique.
     let operatorName: String?
+    /// Tous les opérateurs reconnus sur un site mutualisé, pour l'affichage.
+    let operatorNames: [String]
     let status: ServingStatus
     /// Niveau de confiance backend : "HIGH" | "MEDIUM" | "LOW".
     let confidenceLabel: String?
@@ -285,6 +344,9 @@ struct ServingAntenna: Identifiable, Equatable {
 
     var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: lat, longitude: lng) }
     var hasValidCoordinate: Bool { lat != 0 || lng != 0 }
+    var operatorDisplayName: String? {
+        operatorNames.isEmpty ? operatorName : operatorNames.joined(separator: " + ")
+    }
 
     /// Confiance traduite (HAUTE / MOYENNE / FAIBLE).
     var confidenceFR: String? {
@@ -311,7 +373,14 @@ struct ServingAntenna: Identifiable, Equatable {
         self.lat = lat
         self.lng = lng
         self.siteId = resolvedSiteId
-        self.operatorName = a?.operatorName ?? r.hypothesis?.operatorName ?? a?.operators?.first
+        let resolvedOperatorName = a?.operatorName
+            ?? r.hypothesis?.operatorName
+            ?? r.matchedOperators?.first
+            ?? a?.operators?.first
+        self.operatorName = resolvedOperatorName
+        var seenOperators = Set<String>()
+        self.operatorNames = ((r.matchedOperators ?? []) + (a?.operators ?? []) + [resolvedOperatorName].compactMap { $0 })
+            .filter { !$0.isEmpty && seenOperators.insert($0).inserted }
         self.status = ServingAntenna.resolveStatus(r)
         self.confidenceLabel = r.confidence ?? r.hypothesis?.confidence
         self.distanceKm = r.distance ?? r.hypothesis?.distanceMeters.map { $0 / 1000 }
@@ -372,18 +441,20 @@ struct ServingAntennaResult: Decodable {
     let confidenceReason: [String]?
     let distance: Double?
     let canonicalSiteId: String?
+    let matchedOperators: [String]?
     let antenna: ServingAntennaCore?
     let hypothesis: ServingAntennaHypothesis?
 
     enum CodingKeys: String, CodingKey {
         case found, identified, identificationStatus, source, confidence, confidenceReason
-        case distance, canonicalSiteId, antenna, hypothesis
+        case distance, canonicalSiteId, matchedOperators, antenna, hypothesis
     }
 
     init(from decoder: Decoder) throws {
         guard let c = try? decoder.container(keyedBy: CodingKeys.self) else {
             found = nil; identified = nil; identificationStatus = nil; source = nil
             confidence = nil; confidenceReason = nil; distance = nil; canonicalSiteId = nil
+            matchedOperators = nil
             antenna = nil; hypothesis = nil; return
         }
         found = (try? c.decodeIfPresent(Bool.self, forKey: .found)) ?? nil
@@ -394,6 +465,7 @@ struct ServingAntennaResult: Decodable {
         confidenceReason = try? c.decodeIfPresent([String].self, forKey: .confidenceReason) ?? nil
         distance = (try? c.decodeIfPresent(Double.self, forKey: .distance)) ?? nil
         canonicalSiteId = c.decodeFlexibleString(forKey: .canonicalSiteId)
+        matchedOperators = try? c.decodeIfPresent([String].self, forKey: .matchedOperators) ?? nil
         antenna = try? c.decodeIfPresent(ServingAntennaCore.self, forKey: .antenna) ?? nil
         hypothesis = try? c.decodeIfPresent(ServingAntennaHypothesis.self, forKey: .hypothesis) ?? nil
     }

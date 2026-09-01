@@ -36,6 +36,7 @@ struct GradientButton: View {
     let systemImage: String?
     let isBusy: Bool
     let style: Style
+    let allowsMultiline: Bool
     let action: () -> Void
 
     init(
@@ -43,12 +44,14 @@ struct GradientButton: View {
         systemImage: String? = nil,
         isBusy: Bool = false,
         style: Style = .primary,
+        allowsMultiline: Bool = false,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.systemImage = systemImage
         self.isBusy = isBusy
         self.style = style
+        self.allowsMultiline = allowsMultiline
         self.action = action
     }
 
@@ -81,9 +84,13 @@ struct GradientButton: View {
                 }
                 Text(LocalizedStringKey(title))
                     .font(SQType.button)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
+                    .lineLimit(allowsMultiline ? nil : 1)
+                    .minimumScaleFactor(allowsMultiline ? 1 : 0.82)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: allowsMultiline)
             }
+            .padding(.horizontal, allowsMultiline ? SQSpace.lg : 0)
+            .padding(.vertical, allowsMultiline ? SQSpace.sm : 0)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 56)
             .foregroundStyle(foreground)

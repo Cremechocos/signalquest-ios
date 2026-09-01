@@ -30,6 +30,17 @@ enum SQFont {
         }
     }
 
+    /// Repli système qui conserve Dynamic Type. Un `.system(size:)` paraît
+    /// correct à la taille par défaut mais reste figé si la police embarquée
+    /// n'est pas encore enregistrée (notamment au démarrage des tests UI).
+    private static func systemFallback(
+        relativeTo style: Font.TextStyle,
+        weight: Font.Weight,
+        design: Font.Design = .default
+    ) -> Font {
+        .system(style, design: design, weight: weight)
+    }
+
     // MARK: Display / chiffres — Bricolage Grotesque
 
     private static func bricolageName(_ weight: Font.Weight) -> String {
@@ -41,8 +52,9 @@ enum SQFont {
 
     /// Titre display (Bricolage Grotesque). Suit Dynamic Type via un style inféré.
     static func display(_ size: CGFloat, _ weight: Font.Weight = .bold) -> Font {
-        guard bricolageAvailable else { return .system(size: size, weight: .bold, design: .default) }
-        return .custom(bricolageName(weight), size: size, relativeTo: inferredStyle(forSize: size))
+        let style = inferredStyle(forSize: size)
+        guard bricolageAvailable else { return systemFallback(relativeTo: style, weight: weight) }
+        return .custom(bricolageName(weight), size: size, relativeTo: style)
     }
 
     /// Titre display à taille STRICTEMENT fixe (pour les rendus déterministes :
@@ -54,7 +66,7 @@ enum SQFont {
 
     /// Titre display relatif à un style (suit Dynamic Type).
     static func display(_ size: CGFloat, _ weight: Font.Weight = .bold, relativeTo style: Font.TextStyle) -> Font {
-        guard bricolageAvailable else { return .system(size: size, weight: .bold) }
+        guard bricolageAvailable else { return systemFallback(relativeTo: style, weight: weight) }
         return .custom(bricolageName(weight), size: size, relativeTo: style)
     }
 
@@ -70,20 +82,22 @@ enum SQFont {
     }
 
     static func archivo(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {
-        guard figtreeAvailable else { return .system(size: size, weight: weight) }
-        return .custom(figtreeName(weight), size: size, relativeTo: inferredStyle(forSize: size))
+        let style = inferredStyle(forSize: size)
+        guard figtreeAvailable else { return systemFallback(relativeTo: style, weight: weight) }
+        return .custom(figtreeName(weight), size: size, relativeTo: style)
     }
 
     static func archivo(_ size: CGFloat, _ weight: Font.Weight = .semibold, relativeTo style: Font.TextStyle) -> Font {
-        guard figtreeAvailable else { return .system(size: size, weight: weight) }
+        guard figtreeAvailable else { return systemFallback(relativeTo: style, weight: weight) }
         return .custom(figtreeName(weight), size: size, relativeTo: style)
     }
 
     // MARK: Corps — Figtree
 
     static func body(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        guard figtreeAvailable else { return .system(size: size, weight: weight) }
-        return .custom(figtreeName(weight), size: size, relativeTo: inferredStyle(forSize: size))
+        let style = inferredStyle(forSize: size)
+        guard figtreeAvailable else { return systemFallback(relativeTo: style, weight: weight) }
+        return .custom(figtreeName(weight), size: size, relativeTo: style)
     }
 
     /// Variante corps à taille strictement fixe (rendus déterministes).
@@ -93,7 +107,7 @@ enum SQFont {
     }
 
     static func body(_ size: CGFloat, _ weight: Font.Weight = .regular, relativeTo style: Font.TextStyle) -> Font {
-        guard figtreeAvailable else { return .system(size: size, weight: weight) }
+        guard figtreeAvailable else { return systemFallback(relativeTo: style, weight: weight) }
         return .custom(figtreeName(weight), size: size, relativeTo: style)
     }
 

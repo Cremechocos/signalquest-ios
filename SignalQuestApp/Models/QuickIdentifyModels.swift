@@ -18,6 +18,7 @@ enum RadioLogOperatorResolver {
         let operatorName: String?
         let marketCode: String?
         let countryCode: String?
+        let hasConfirmedNrLocalWidth: Bool
     }
 
     /// Même référentiel exact que les autres clients. Chargé une seule fois ;
@@ -35,9 +36,14 @@ enum RadioLogOperatorResolver {
         let market = radioReference.market(forObservedPlmn: observedPlmn)
         let key = market?.radioOperatorKey(observedPlmn: observedPlmn)
         let radioOperator = market?.radioOperators.first { $0.key == key }
+        let networkKey = "\(market?.marketCode ?? ""):\(key ?? "")"
+        // Fixtures terrain partagées avec CellIdentityNormalizer (Android) et
+        // confirmedNciNodeDerivationStrategy (API), jamais depuis un MCC seul.
+        let confirmed = ["FR:ORANGE", "FR:SFR", "FR:BOUYGUES", "FR:FREE", "LU:ORANGE_LU"]
         return ServingNetwork(
             operatorKey: key, operatorName: radioOperator?.label,
-            marketCode: market?.marketCode, countryCode: market?.countryCode
+            marketCode: market?.marketCode, countryCode: market?.countryCode,
+            hasConfirmedNrLocalWidth: confirmed.contains(networkKey)
         )
     }
 
@@ -114,6 +120,8 @@ struct QuickIdentifyBatchItem: Encodable, Sendable {
     let id: String
     let `operator`: String?
     let market: String?
+    /// PLMN servant exact ; ne jamais le reconstruire depuis le nom opérateur.
+    let observedPlmn: String?
     let mcc: String?
     let mnc: String?
     let enb: String?
@@ -163,11 +171,15 @@ struct QuickIdentifyResolution: Decodable, Sendable {
     let source: String?
     /// Vrai quand le serveur signale lui-même qu'il ne fait que proposer.
     let requiresUserConfirmation: Bool?
+    /// Nœud logique porté par plusieurs sites et non départagé.
+    let ambiguous: Bool?
+    let sharedNode: Bool?
     let hypothesis: QuickIdentifyHypothesis?
 
     enum CodingKeys: String, CodingKey {
         case found, siteId, canonicalSiteId, market, operatorMatched, distanceMeters
-        case matchedRadio, matchedRadioTypes, resolutionMode, source, requiresUserConfirmation, hypothesis
+        case matchedRadio, matchedRadioTypes, resolutionMode, source, requiresUserConfirmation
+        case ambiguous, sharedNode, hypothesis
     }
 
     init(from decoder: Decoder) throws {
@@ -185,11 +197,19 @@ struct QuickIdentifyResolution: Decodable, Sendable {
         resolutionMode = c.decodeFlexibleString(forKey: .resolutionMode)
         source = c.decodeFlexibleString(forKey: .source)
         requiresUserConfirmation = try? c.decodeIfPresent(Bool.self, forKey: .requiresUserConfirmation)
+        ambiguous = try? c.decodeIfPresent(Bool.self, forKey: .ambiguous)
+        sharedNode = try? c.decodeIfPresent(Bool.self, forKey: .sharedNode)
         hypothesis = try? c.decodeIfPresent(QuickIdentifyHypothesis.self, forKey: .hypothesis)
     }
 
     /// Types d'identifiants reconnus, normalisés en minuscules.
     var matchedTypes: Set<String> { Set(matchedRadio.map { $0.type.lowercased() }) }
+
+    var isAmbiguousOrUnresolved: Bool {
+        if ambiguous == true { return true }
+        guard let mode = resolutionMode?.lowercased() else { return false }
+        return mode.contains("ambiguous") || mode.contains("unresolved")
+    }
 }
 
 struct QuickIdentifyMatchedRadio: Decodable, Sendable {
