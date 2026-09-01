@@ -190,6 +190,14 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
 
     // MARK: URL building
 
+    static func appVersionLabel(shortVersion: String?, build: String?) -> String? {
+        guard let version = shortVersion?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !version.isEmpty else { return nil }
+        guard let build = build?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !build.isEmpty else { return version }
+        return "\(version) (\(build))"
+    }
+
     /// En-têtes d'identité client (X-Client-*) joints à chaque requête 1re partie,
     /// pour que le registre des sessions affiche « iPhone15,3 · iOS 18 » au lieu de
     /// « Navigateur ». Calculés une seule fois (valeurs constantes). On évite UIKit
@@ -204,8 +212,10 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         if let model = hardwareModelIdentifier(), !model.isEmpty {
             headers["X-Client-Model"] = model
         }
-        if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
-           !version.isEmpty {
+        if let version = appVersionLabel(
+            shortVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+            build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        ) {
             headers["X-Client-App-Version"] = version
         }
         return headers

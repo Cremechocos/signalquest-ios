@@ -14,6 +14,7 @@
 set -eu
 
 configuration="${CONFIGURATION:-}"
+platform="${PLATFORM_NAME:-}"
 
 skip() {
   echo "warning: upload dSYM Crashlytics ignoré — $*"
@@ -23,6 +24,12 @@ skip() {
 # Debug produit `dwarf` sans bundle dSYM (cf. DEBUG_INFORMATION_FORMAT) : rien à
 # téléverser, et on évite un appel réseau à chaque compilation locale.
 [ "$configuration" != "Debug" ] || exit 0
+
+# Un dSYM de simulateur ne peut symboliser aucun crash d'un iPhone et pollue le
+# projet Crashlytics. Les builds Release locaux doivent donc rester hors ligne.
+case "$platform" in
+  *simulator*) exit 0 ;;
+esac
 
 plist="${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist"
 [ -f "$plist" ] || skip "GoogleService-Info.plist absent"
