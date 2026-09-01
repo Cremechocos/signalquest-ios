@@ -20,6 +20,7 @@ struct SignatureSpeedDial: View {
     @State private var pulsing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var isLatency: Bool { unit == "ms" }
 
@@ -92,6 +93,31 @@ struct SignatureSpeedDial: View {
     }
 
     var body: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: SQSpace.md) {
+                    dialArtwork
+                        .frame(width: diameter, height: diameter)
+                    readout
+                        .frame(maxWidth: .infinity)
+                }
+            } else {
+                ZStack {
+                    dialArtwork
+                    readout
+                        .padding(.horizontal, SQSpace.xxl)
+                }
+                .frame(width: diameter, height: diameter)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityText)
+        // Le cadran change en continu pendant la mesure : VoiceOver doit relire la
+        // valeur au lieu de la lire une seule fois (A11Y-11).
+        .accessibilityAddTraits(.updatesFrequently)
+    }
+
+    private var dialArtwork: some View {
         ZStack {
             scaleTicks
 
@@ -124,36 +150,33 @@ struct SignatureSpeedDial: View {
                 .sqShadowSoft()
                 .frame(width: (arcRadius - lineWidth / 2 - 6) * 2, height: (arcRadius - lineWidth / 2 - 6) * 2)
 
-            VStack(spacing: 1) {
+        }
+    }
+
+    private var readout: some View {
+        VStack(spacing: 2) {
                 Text(phaseTitle)
                     .font(SQFont.body(12, .semibold))
                     .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                Text(formattedValue)
-                    .font(SQFont.display(58, .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(SQColor.label)
-                    .contentTransition(.numericText())
-                    .minimumScaleFactor(0.55)
-                    .lineLimit(1)
-                Text(unit)
-                    .font(SQFont.body(14, .medium))
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+                    Text(formattedValue)
+                        .font(SQFont.display(dynamicTypeSize.isAccessibilitySize ? 38 : 58, .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.label)
+                        .contentTransition(.numericText())
+                    Text(unit)
+                        .font(SQFont.body(14, .medium))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
                 if isRunning {
                     runningBadge
                 } else if let completionLabel {
                     dialBadge(completionLabel, color: SQColor.success, background: SQColor.successSoft)
                 }
             }
-            .padding(.horizontal, SQSpace.xxl)
-        }
-        .frame(width: diameter, height: diameter)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityText)
-        // Le cadran change en continu pendant la mesure : VoiceOver doit relire la
-        // valeur au lieu de la lire une seule fois (A11Y-11).
-        .accessibilityAddTraits(.updatesFrequently)
+            .multilineTextAlignment(.center)
     }
 
     /// Graduations + libellés de décade : rendent l'échelle log lisible.
@@ -172,7 +195,9 @@ struct SignatureSpeedDial: View {
                     let position = point(fraction: tick.fraction, radius: labelRadius)
                     Text(LocalizedStringKey(label))
                         .font(SQFont.body(10, .semibold))
-                        .foregroundStyle(reached ? SQColor.labelSecondary : SQColor.labelSecondary)
+                        // Les graduations font 10 pt : l'encre secondaire
+                        // mesurée à ~4,6:1 perdait sa marge avec l'anticrénelage.
+                        .foregroundStyle(SQColor.label)
                         .monospacedDigit()
                         .offset(x: position.x, y: position.y)
                 }
@@ -208,7 +233,11 @@ struct SignatureSpeedDial: View {
                 .frame(width: 5, height: 5)
                 .opacity(pulsing && !reduceMotion ? 0.25 : 1)
                 .animation(
-                    reduceMotion ? nil : .easeInOut(duration: 0.7).repeatForever(autoreverses: true),
+                    SQMotion.repeating(
+                        .easeInOut(duration: 0.7),
+                        active: pulsing,
+                        reduceMotion: reduceMotion
+                    ),
                     value: pulsing
                 )
             Text("en cours")

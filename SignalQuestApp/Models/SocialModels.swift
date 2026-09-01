@@ -130,7 +130,7 @@ struct SocialPostAttachment: Codable, Identifiable, Equatable {
     let metadata: [String: JSONValue]?
 }
 
-struct CreatePostAttachment: Codable, Equatable {
+struct CreatePostAttachment: Codable, Equatable, Sendable {
     let kind: String
     let url: URL?
     let thumbnailUrl: URL?
@@ -479,7 +479,7 @@ struct UnifiedSocialFeedItem: Codable, Identifiable, Equatable {
 }
 
 /// Sondage à créer avec une publication.
-struct CreatePostPoll: Codable, Equatable {
+struct CreatePostPoll: Codable, Equatable, Sendable {
     let question: String?
     let options: [String]
     let allowMultiple: Bool
@@ -509,7 +509,7 @@ struct CreatePostPoll: Codable, Equatable {
     }
 }
 
-struct CreatePostRequest: Codable {
+struct CreatePostRequest: Codable, Equatable, Sendable {
     let text: String
     let visibility: String
     let targetType: String?
@@ -523,6 +523,7 @@ struct CreatePostRequest: Codable {
     /// Sondage attaché. Le serveur impose 2 à 4 options, chacune 1 à 80
     /// caractères, et une question facultative de 160 au plus.
     let poll: CreatePostPoll?
+    var clientRequestId: String? = nil
 }
 
 struct CreatePostResponse: Codable {

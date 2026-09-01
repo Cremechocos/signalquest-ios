@@ -147,6 +147,7 @@ final class CommunityOutageService: CommunityOutageServicing {
             path: "/api/community-outages/\(outageId)/vote",
             body: OutageVoteRequest(
                 kind: kind,
+                deviceId: InstallationIdentity().deviceID(),
                 latitude: latitude,
                 longitude: longitude,
                 accuracyMeters: accuracyMeters
@@ -225,6 +226,8 @@ enum OutageWriteError {
             return String(localized: "Vous ne pouvez pas confirmer votre propre signalement.")
         case "ALREADY_REPORTED", "DUPLICATE_REPORT":
             return String(localized: "Vous avez déjà signalé cette panne.")
+        case "OPERATOR_INCIDENT_ACTIVE":
+            return String(localized: "L’opérateur a déjà déclaré cet incident. Il est affiché sur la carte, sans doublon communautaire.")
         case "OPEN_CONFLICT":
             return String(localized: "Une panne est déjà ouverte sur ce site pour cet opérateur.")
         case "NOT_ELIGIBLE":
@@ -233,12 +236,14 @@ enum OutageWriteError {
             return String(localized: "Activez la localisation pour signaler une panne ici.")
         case "UNKNOWN_SITE", "INVALID_TARGET_KIND":
             return String(localized: "Ce site n'a pas été reconnu.")
-        case "MISSING_SCOPE", "INVALID_OPERATOR":
+        case "MISSING_SCOPE", "INVALID_OPERATOR", "MARKET_OPERATOR_MISMATCH":
             return String(localized: "Impossible de rattacher ce signalement à un opérateur.")
         case "COMMENT_TOO_LONG":
             return String(localized: "Le commentaire est trop long.")
         case "PAYLOAD_TOO_LARGE":
             return String(localized: "Les mesures jointes sont trop volumineuses.")
+        case "INVALID_DEVICE_ID":
+            return String(localized: "SignalQuest n’a pas pu vérifier cette installation. Relancez l’application puis réessayez.")
         default:
             return nil
         }

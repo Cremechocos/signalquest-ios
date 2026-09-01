@@ -26,11 +26,20 @@ final class SiteRemapViewModel: ObservableObject {
     }
 
     var operatorName: String { item.operatorName ?? "ALL" }
-    var market: String { item.marketCode ?? "FR" }
+    var market: String? {
+        let value = item.marketCode?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
+        return value.isEmpty ? nil : value
+    }
 
     /// Centre initial : coordonnées du site actuel (même mauvais, le bon est proche),
-    /// sinon position de l'utilisateur, sinon centre France.
+    /// sinon position de l'utilisateur, sinon centre mondial neutre.
     func prepareCenter() async {
+        guard let market else {
+            errorMessage = "Le marché de cette identification n'est pas renseigné. Aucun pays ne sera déduit automatiquement."
+            initialCenter = (await location.currentLocation(timeoutSeconds: 4))?.coordinate
+                ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
+            return
+        }
         if let details = try? await antennas.details(id: item.siteId, market: market, operatorName: operatorName),
            let core = details.core, core.lat != 0 || core.lng != 0 {
             initialCenter = CLLocationCoordinate2D(latitude: core.lat, longitude: core.lng)
@@ -39,7 +48,7 @@ final class SiteRemapViewModel: ObservableObject {
         if let loc = await location.currentLocation(timeoutSeconds: 4) {
             initialCenter = loc.coordinate
         } else {
-            initialCenter = CLLocationCoordinate2D(latitude: 46.6, longitude: 2.4)
+            initialCenter = CLLocationCoordinate2D(latitude: 0, longitude: 0)
         }
     }
 
@@ -48,6 +57,11 @@ final class SiteRemapViewModel: ObservableObject {
         loadTask = Task {
             isLoading = true
             defer { isLoading = false }
+            guard let market else {
+                sites = []
+                errorMessage = "Le marché doit être connu avant de rechercher un site."
+                return
+            }
             let list = (try? await antennas.list(bbox: bbox, market: market, operatorName: operatorName, technologies: [])) ?? []
             guard !Task.isCancelled else { return }
             sites = list.filter(\.hasValidCoordinate)

@@ -1,31 +1,146 @@
 import Foundation
 import CryptoKit
+import UserNotifications
+
+struct LocalAccountSession: Codable, Equatable, Sendable {
+    let ownerScopeId: String
+    let sessionId: String
+    var ownerNamespace: String { LocalAccountScope.storageNamespace(for: ownerScopeId) }
+    var isCurrent: Bool { LocalAccountScope.sessionSnapshot() == self }
+    func matchesAuthToken(_ token: String) -> Bool {
+        guard ownerScopeId.hasPrefix("user:") else { return false }
+        return E2EEV2NotificationSessionClaims.expirationMs(token: token,
+            expectedUserId: String(ownerScopeId.dropFirst(5)), now: Date()) != nil
+    }
+}
 
 /// Portée locale active des caches et files privées. Les anciennes données sans
 /// propriétaire restent dans leur ancien namespace et ne sont jamais attribuées
 /// automatiquement au compte qui se connecte ensuite.
 enum LocalAccountScope {
+    /// Les lectures UI ne doivent jamais attendre une écriture `UserDefaults` :
+    /// celle-ci notifie SwiftUI synchronement et peut reprendre le main thread.
+    /// `stateLock` ne protège donc que l'état mémoire, tandis que `mutationLock`
+    /// sérialise mutations + persistance sans être acquis par les lecteurs.
+    private static let stateLock = NSLock()
+    private static let mutationLock = NSRecursiveLock()
     private static let userKey = "SignalQuest.LocalAccountScope.userId.v1"
+    private static let sessionKey = "SignalQuest.LocalAccountScope.sessionId.v1"
+
+    private struct State {
+        var userId: String?
+        var sessionId: String?
+    }
+
+    // Accès exclusivement sous `stateLock` ; l'annotation documente cette
+    // synchronisation explicite pour Swift 6.
+    nonisolated(unsafe) private static var state: State = {
+        let defaults = UserDefaults.standard
+        let rawUser = defaults.string(forKey: userKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let userId = rawUser?.isEmpty == false ? rawUser : nil
+        let rawSession = defaults.string(forKey: sessionKey)
+        let sessionId = userId != nil && rawSession.flatMap(UUID.init(uuidString:)) != nil
+            ? rawSession
+            : nil
+        return State(userId: userId, sessionId: sessionId)
+    }()
+
+    static var currentUserId: String? {
+        stateLock.lock(); defer { stateLock.unlock() }
+        return state.userId
+    }
 
     static var currentOwnerScopeId: String {
-        guard let userId = UserDefaults.standard.string(forKey: userKey), !userId.isEmpty else {
+        guard let userId = currentUserId else {
             return "guest"
         }
         return "user:\(userId)"
     }
 
+    static var currentSessionId: String? {
+        stateLock.lock(); defer { stateLock.unlock() }
+        guard state.userId != nil else { return nil }
+        return state.sessionId
+    }
+
     static var storageNamespace: String {
-        SHA256.hash(data: Data(currentOwnerScopeId.utf8))
+        storageNamespace(for: currentOwnerScopeId)
+    }
+
+    static func storageNamespace(for ownerScopeId: String) -> String {
+        SHA256.hash(data: Data(ownerScopeId.utf8))
             .map { String(format: "%02x", $0) }
             .joined()
     }
 
     static func activate(userId: String) {
-        UserDefaults.standard.set(userId, forKey: userKey)
+        if currentUserId != userId { E2EEV2NotificationContextEvents.revoke() }
+        mutationLock.lock(); defer { mutationLock.unlock() }
+        stateLock.lock()
+        if state.userId != userId || state.sessionId == nil {
+            state.sessionId = UUID().uuidString.lowercased()
+        }
+        state.userId = userId
+        let snapshot = state
+        stateLock.unlock()
+        persist(snapshot)
+    }
+
+    static func invalidateNotificationSession() {
+        mutationLock.lock(); defer { mutationLock.unlock() }
+        stateLock.lock()
+        state.sessionId = nil
+        let snapshot = state
+        stateLock.unlock()
+        persist(snapshot)
     }
 
     static func deactivate() {
-        UserDefaults.standard.removeObject(forKey: userKey)
+        mutationLock.lock()
+        stateLock.lock()
+        state = State(userId: nil, sessionId: nil)
+        let snapshot = state
+        stateLock.unlock()
+        persist(snapshot)
+        mutationLock.unlock()
+        E2EEV2NotificationContextEvents.revoke()
+    }
+
+    static func sessionSnapshot() -> LocalAccountSession? {
+        stateLock.lock(); defer { stateLock.unlock() }
+        guard let userId = state.userId, let sessionId = state.sessionId else { return nil }
+        return .init(ownerScopeId: "user:\(userId)", sessionId: sessionId)
+    }
+
+    /// Préparer réseau, crypto et données hors verrou ; publier seulement les écritures locales prêtes.
+    static func publish<T>(for session: LocalAccountSession, _ commit: () throws -> T) throws -> T {
+        try publishIfUnchanged(session, commit)
+    }
+
+    static func publishIfUnchanged<T>(_ session: LocalAccountSession?, _ commit: () throws -> T) throws -> T {
+        mutationLock.lock(); defer { mutationLock.unlock() }
+        stateLock.lock()
+        let current = state.userId.flatMap { userId in
+            state.sessionId.map { LocalAccountSession(ownerScopeId: "user:\(userId)", sessionId: $0) }
+        }
+        stateLock.unlock()
+        guard current == session else { throw CancellationError() }
+        return try commit()
+    }
+
+    private static func persist(_ snapshot: State) {
+        let defaults = UserDefaults.standard
+        if let userId = snapshot.userId {
+            defaults.set(userId, forKey: userKey)
+        } else {
+            defaults.removeObject(forKey: userKey)
+        }
+        if let sessionId = snapshot.sessionId {
+            defaults.set(sessionId, forKey: sessionKey)
+        } else {
+            defaults.removeObject(forKey: sessionKey)
+        }
     }
 }
 
@@ -76,6 +191,8 @@ protocol AuthServicing: Sendable {
     /// SANS appel réseau. Utilisé sur session expirée (ROB-02) : pas de POST logout
     /// (qui re-échouerait en 401 et boucherait), juste le nettoyage local.
     func clearLocalSession() async
+    /// Only after the server has acknowledged deletion of this exact account.
+    func eraseDeletedAccountVault(ownerScopeId: String) async
     /// PERF-START-01 : mémorise le dernier utilisateur authentifié pour un démarrage
     /// à froid optimiste (affichage immédiat + revalidation en arrière-plan).
     func cacheUser(_ user: AuthUser)
@@ -91,6 +208,7 @@ extension AuthServicing {
     func installAuthTokenForDebugQA(_ token: String) {}
     func clearLocalSessionForDebugQA() async {}
     func clearLocalSession() async {}
+    func eraseDeletedAccountVault(ownerScopeId: String) async {}
     func cacheUser(_ user: AuthUser) {}
     func cachedUser() -> AuthUser? { nil }
     func hasStoredCredentials() -> Bool { false }
@@ -222,22 +340,43 @@ final class AuthService: AuthServicing {
     }
 
     func logout() async throws {
-        _ = try? await api.request(
-            APIEndpoint(path: "/api/auth/logout", method: .post),
-            as: SuccessResponse.self
-        )
-        // Erase end-to-end encryption material before clearing the session so a
-        // different account on this device can never reuse the keys.
-        await e2ee?.wipeLocalKeys()
+        let closing = LocalAccountScope.sessionSnapshot()
+        let token = api.credentials.accessToken()
+        if let closing, let token {
+            _ = try? await api.performSingleAttempt(APIEndpoint(path: "/api/auth/logout", method: .post),
+                fixedAuthToken: token, expectedSession: closing)
+        }
+        guard LocalAccountScope.sessionSnapshot() == closing, api.credentials.accessToken() == token else { return }
+        // Révoquer l'accès avant de quitter la session ; le coffre v2 propriétaire reste chiffré.
+        await e2ee?.lockLocalKeys(expectedSession: closing)
+        if e2ee == nil {
+            try? LocalAccountScope.publishIfUnchanged(closing) { LocalAccountScope.invalidateNotificationSession() }
+        }
+        guard LocalAccountScope.currentSessionId == nil,
+              LocalAccountScope.currentOwnerScopeId == (closing?.ownerScopeId ?? "guest"),
+              api.credentials.accessToken() == token else { return }
+        if let ownerScopeId = closing?.ownerScopeId {
+            OutageReportDraftStore.purge(ownerScopeId: ownerScopeId)
+        }
         LocalAccountScope.deactivate()
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         api.credentials.clearAll()
         try? sessionStore.remove(Self.cachedUserKey)
     }
 
     func clearLocalSession() async {
-        // Purge locale complète, sans appel réseau (utilisée sur session expirée).
-        await e2ee?.wipeLocalKeys()
+        // Verrouillage local, sans appel réseau : l'expiration ne détruit pas l'identité v2 approuvée.
+        let closing = LocalAccountScope.sessionSnapshot()
+        let token = api.credentials.accessToken()
+        await e2ee?.lockLocalKeys(expectedSession: closing)
+        guard LocalAccountScope.currentSessionId == nil || LocalAccountScope.sessionSnapshot() == closing else { return }
+        guard LocalAccountScope.currentOwnerScopeId == (closing?.ownerScopeId ?? "guest"),
+              api.credentials.accessToken() == token else { return }
+        if let ownerScopeId = closing?.ownerScopeId {
+            OutageReportDraftStore.purge(ownerScopeId: ownerScopeId)
+        }
         LocalAccountScope.deactivate()
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         api.credentials.clearAll()
         try? sessionStore.remove(Self.cachedUserKey)
     }
@@ -248,8 +387,19 @@ final class AuthService: AuthServicing {
         await clearLocalSession()
     }
 
+    func eraseDeletedAccountVault(ownerScopeId: String) async {
+        await e2ee?.eraseLocalVault(ownerScopeId: ownerScopeId)
+    }
+
     func cacheUser(_ user: AuthUser) {
+        let previousUserId = LocalAccountScope.currentUserId
+        if let previousUserId, previousUserId != user.id {
+            OutageReportDraftStore.purge(ownerScopeId: "user:\(previousUserId)")
+        }
         LocalAccountScope.activate(userId: user.id)
+        if previousUserId != user.id {
+            UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+        }
         guard
             let data = try? JSONEncoder.signalQuest.encode(user),
             let json = String(data: data, encoding: .utf8)
@@ -266,13 +416,12 @@ final class AuthService: AuthServicing {
     }
 
     func wipeE2EEIfIdentityChanged(to userId: String) async {
-        // `lastUserId` vit dans le Keychain AUTH ("fr.signalquest.ios"), distinct
-        // du store E2EE wipé → il survit au wipe et aux redémarrages, ce qui permet
-        // de détecter un changement de compte même après une expiration de session.
+        // API conservée : le changement de propriétaire verrouille désormais le coffre,
+        // sans effacer son identité approuvée ni ses époques historiques.
         let store = KeychainStore()
         let last = try? store.string(for: "lastUserId")
         if let last, last != userId {
-            await e2ee?.wipeLocalKeys()
+            await e2ee?.lockLocalKeys(expectedSession: LocalAccountScope.sessionSnapshot())
         }
         try? store.set(userId, for: "lastUserId")
     }
@@ -357,7 +506,12 @@ final class AuthSessionViewModel: ObservableObject {
         guard case .authenticated = state else { return }
         state = .loggedOut
         infoMessage = "Ta session a expiré. Reconnecte-toi pour continuer."
-        Task { await service.clearLocalSession() }
+        Task {
+            // La session HTTP est peut-être déjà invalide, mais le secret de révocation
+            // push reste disponible dans le Trousseau et rend la suppression rejouable.
+            await AppDelegate.sharedPush?.unregister()
+            await service.clearLocalSession()
+        }
     }
 
     /// E2EE-WIPE-02 : centralise tous les passages RÉELS en `.authenticated`. Purge
@@ -366,9 +520,11 @@ final class AuthSessionViewModel: ObservableObject {
     /// même utilisateur → aucune ressaisie du mot de passe E2EE.
     private func setAuthenticated(_ user: AuthUser) async {
         await service.wipeE2EEIfIdentityChanged(to: user.id)
-        state = .authenticated(user)
-        // PERF-START-01 : mémorise l'utilisateur pour un prochain cold start optimiste.
+        // Active d'abord le namespace local. Les observers de `state` peuvent lancer
+        // immédiatement l'enregistrement push et des reprises de files ; ils doivent
+        // tous voir le nouveau propriétaire, jamais le précédent.
         service.cacheUser(user)
+        state = .authenticated(user)
     }
 
     func bootstrap() async {
@@ -405,6 +561,8 @@ final class AuthSessionViewModel: ObservableObject {
             switch error {
             case .http(let status, _, _, _, _) where status == 401 || status == 403:
                 state = .loggedOut
+                await AppDelegate.sharedPush?.unregister()
+                await service.clearLocalSession()
             case .transport, .cancelled:
                 // Network problem at launch — keep the session and offer a retry
                 // instead of bouncing a logged-in user to the login screen.
@@ -432,6 +590,7 @@ final class AuthSessionViewModel: ObservableObject {
         } catch let error as APIError {
             if case .http(let status, _, _, _, _) = error, status == 401 || status == 403 {
                 state = .loggedOut
+                await AppDelegate.sharedPush?.unregister()
                 await service.clearLocalSession()
             }
             // transport / 5xx / annulation : garder l'affichage optimiste.
@@ -565,14 +724,18 @@ final class AuthSessionViewModel: ObservableObject {
     }
 
     func logout() async {
+        let closing = LocalAccountScope.sessionSnapshot()
         // Revoke the push token (while the session is still valid) before the
         // service tears down credentials and E2EE keys.
         await AppDelegate.sharedPush?.unregister()
+        guard LocalAccountScope.sessionSnapshot() == closing else { return }
         // CALL-VOIP-05 : révoque aussi le token VoIP côté serveur pour qu'un autre
         // compte sur cet appareil ne reçoive pas les pushes VoIP de l'ancien
         // utilisateur (best-effort, session encore valide ici).
         await AppDelegate.sharedCallManager?.unregisterVoIPToken()
+        guard LocalAccountScope.sessionSnapshot() == closing else { return }
         try? await service.logout()
+        guard LocalAccountScope.currentUserId == nil else { return }
         state = .loggedOut
     }
 }

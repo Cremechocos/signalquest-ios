@@ -15,15 +15,120 @@ enum VersionPolicyState: Equatable, Sendable {
     }
 }
 
+enum ClientWriteStatus: Equatable, Sendable {
+    case current
+    case legacyAllowed
+    case legacyGrace
+    case blocked
+}
+
+struct ClientProtocolPolicy: Equatable, Sendable {
+    let serverProtocolVersion: Int
+    let minWriteProtocol: Int
+    let legacyWriteDeadline: Date?
+    let serverCapabilities: Set<String>
+    let writeStatus: ClientWriteStatus
+
+    static let fallback = ClientProtocolPolicy(
+        serverProtocolVersion: 1,
+        minWriteProtocol: 1,
+        legacyWriteDeadline: nil,
+        serverCapabilities: [],
+        writeStatus: .current
+    )
+}
+
+enum ClientProtocolContract {
+    static let currentProtocolVersion = 1
+    static let protocolVersionHeader = E2EEV2ProtocolWire.protocolVersionHeader
+    static let capabilitiesHeaderName = E2EEV2ProtocolWire.capabilitiesHeader
+    static let capabilities: Set<String> = [
+        "exact_schedules_v2",
+        "message_reminder_idempotency_v1",
+        "network_identity_v2",
+        "push_recipient_scope_v2",
+    ]
+    static let capabilitiesHeader = capabilities.sorted().joined(separator: ",")
+
+    static func evaluateWriteStatus(
+        minWriteProtocol: Int,
+        legacyWriteDeadline: Date?,
+        now: Date = Date()
+    ) -> ClientWriteStatus {
+        let normalizedMinimum = (1...100).contains(minWriteProtocol) ? minWriteProtocol : 1
+        if currentProtocolVersion >= normalizedMinimum { return .current }
+        guard let legacyWriteDeadline else { return .legacyAllowed }
+        return now < legacyWriteDeadline ? .legacyGrace : .blocked
+    }
+}
+
+enum E2EEV2ActivationDecision: Equatable, Sendable {
+    enum Reason: Equatable, Sendable {
+        case securityReviewRequired
+        case protocolVersionRequired
+        case capabilityMissing
+    }
+
+    case enabled
+    case disabled(reason: Reason, missingCapabilities: Set<String>)
+}
+
+enum E2EEV2ActivationPolicy {
+    static let protocolVersion = E2EEV2ProtocolWire.version
+    static let contractPreviewCapability = E2EEV2ProtocolWire.contractPreviewCapability
+    static let deviceIdentityCapability = E2EEV2ProtocolWire.deviceIdentityCapability
+    static let messageEnvelopeCapability = E2EEV2ProtocolWire.messageEnvelopeCapability
+    static let encryptedMediaCapability = "e2ee_encrypted_media_v2"
+    static let historyMigrationCapability = "e2ee_history_migration_v2"
+    static let verifiedCallsCapability = "e2ee_verified_calls_v2"
+
+    static let requiredWriteCapabilities: Set<String> = [
+        deviceIdentityCapability,
+        messageEnvelopeCapability,
+    ]
+    static let requiredFullCapabilities = requiredWriteCapabilities.union([
+        encryptedMediaCapability,
+        historyMigrationCapability,
+        verifiedCallsCapability,
+    ])
+
+    static func evaluate(
+        policy: ClientProtocolPolicy,
+        securityReviewApproved: Bool,
+        requiredCapabilities: Set<String> = requiredWriteCapabilities,
+        clientProtocolVersion: Int = ClientProtocolContract.currentProtocolVersion,
+        clientCapabilities: Set<String> = ClientProtocolContract.capabilities
+    ) -> E2EEV2ActivationDecision {
+        guard securityReviewApproved else {
+            return .disabled(reason: .securityReviewRequired, missingCapabilities: [])
+        }
+        guard clientProtocolVersion >= protocolVersion,
+              policy.serverProtocolVersion >= protocolVersion else {
+            return .disabled(reason: .protocolVersionRequired, missingCapabilities: [])
+        }
+        let missing = Set(requiredCapabilities.filter { capability in
+            !clientCapabilities.contains(capability) || !policy.serverCapabilities.contains(capability)
+        })
+        return missing.isEmpty
+            ? .enabled
+            : .disabled(reason: .capabilityMissing, missingCapabilities: missing)
+    }
+}
+
 struct AppVersionPolicy: Decodable, Equatable, Sendable {
     let minVersionCode: Int
     let recommendedVersionCode: Int
     let warnMessage: String?
     let blockMessage: String?
     let storeURL: URL?
+    let serverProtocolVersion: Int
+    let minWriteProtocol: Int
+    let legacyWriteDeadline: Date?
+    let serverCapabilities: Set<String>
 
     enum CodingKeys: String, CodingKey {
         case minVersionCode, recommendedVersionCode, warnMessage, blockMessage, storeUrl
+        case serverProtocolVersion, minWriteProtocol, legacyWriteDeadline, serverCapabilities
     }
 
     init(from decoder: Decoder) throws {
@@ -33,14 +138,42 @@ struct AppVersionPolicy: Decodable, Equatable, Sendable {
         warnMessage = c.decodeFlexibleString(forKey: .warnMessage)
         blockMessage = c.decodeFlexibleString(forKey: .blockMessage)
         storeURL = c.decodeLossyURL(forKey: .storeUrl)
+        serverProtocolVersion = ((try? c.decodeIfPresent(Int.self, forKey: .serverProtocolVersion)) ?? nil)
+            .flatMap { (1...100).contains($0) ? $0 : nil } ?? 1
+        minWriteProtocol = ((try? c.decodeIfPresent(Int.self, forKey: .minWriteProtocol)) ?? nil)
+            .flatMap { (1...100).contains($0) ? $0 : nil } ?? 1
+        legacyWriteDeadline = c.decodeFlexibleString(forKey: .legacyWriteDeadline)
+            .flatMap(SQDateParsing.parse)
+        let rawCapabilities = (try? c.decodeIfPresent([String].self, forKey: .serverCapabilities)) ?? nil
+        serverCapabilities = Set((rawCapabilities ?? []).compactMap { raw in
+            let normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard normalized.range(of: "^[a-z][a-z0-9_]{0,63}$", options: .regularExpression) != nil else {
+                return nil
+            }
+            return normalized
+        })
     }
 
-    init(minVersionCode: Int, recommendedVersionCode: Int, warnMessage: String?, blockMessage: String?, storeURL: URL?) {
+    init(
+        minVersionCode: Int,
+        recommendedVersionCode: Int,
+        warnMessage: String?,
+        blockMessage: String?,
+        storeURL: URL?,
+        serverProtocolVersion: Int = 1,
+        minWriteProtocol: Int = 1,
+        legacyWriteDeadline: Date? = nil,
+        serverCapabilities: Set<String> = []
+    ) {
         self.minVersionCode = minVersionCode
         self.recommendedVersionCode = recommendedVersionCode
         self.warnMessage = warnMessage
         self.blockMessage = blockMessage
         self.storeURL = storeURL
+        self.serverProtocolVersion = serverProtocolVersion
+        self.minWriteProtocol = minWriteProtocol
+        self.legacyWriteDeadline = legacyWriteDeadline
+        self.serverCapabilities = serverCapabilities
     }
 }
 
@@ -58,6 +191,7 @@ struct AppVersionPolicy: Decodable, Equatable, Sendable {
 @MainActor
 final class VersionPolicyService: ObservableObject {
     @Published private(set) var state: VersionPolicyState = .unknown
+    @Published private(set) var protocolPolicy: ClientProtocolPolicy = .fallback
 
     private let api: APIClient
     private let currentBuild: Int?
@@ -94,6 +228,16 @@ final class VersionPolicyService: ObservableObject {
                     authenticated: false
                 ),
                 as: AppVersionPolicy.self
+            )
+            protocolPolicy = ClientProtocolPolicy(
+                serverProtocolVersion: policy.serverProtocolVersion,
+                minWriteProtocol: policy.minWriteProtocol,
+                legacyWriteDeadline: policy.legacyWriteDeadline,
+                serverCapabilities: policy.serverCapabilities,
+                writeStatus: ClientProtocolContract.evaluateWriteStatus(
+                    minWriteProtocol: policy.minWriteProtocol,
+                    legacyWriteDeadline: policy.legacyWriteDeadline
+                )
             )
             state = Self.evaluate(policy: policy, currentBuild: currentBuild)
         } catch {

@@ -2,9 +2,87 @@ import Foundation
 import os
 import SwiftData
 
-/// Un point de couverture contribué par iOS (F1). PAS de signal radio (iOS ne
-/// l'expose pas) : seulement génération (`technology`) + connectivité + position,
-/// et débit/latence aux points testés.
+struct CoverageCellEvidenceUpload: Codable, Equatable, Sendable {
+    let cellType: String
+    let isPrimary: Bool
+    let technology: String?
+    let enb: String?
+    let gnb: String?
+    /// Identifiant local dans le noeud, distinct des identites completes.
+    let cellId: String?
+    let eci: String?
+    let nci: String?
+    let pci: Int?
+    let tac: String?
+    let earfcn: Int?
+    let nrarfcn: Int?
+    let timingAdvance: Int?
+    let timingAdvanceSourceTechnology: String?
+    let timingAdvanceSourceCellId: String?
+
+    /// Separe l'ancre LTE et la porteuse NR d'une preuve NSA. Le TA n'est
+    /// transporte que par la cellule correspondant a sa technologie source.
+    static func cells(from evidence: SpeedtestRadioEvidence) -> [CoverageCellEvidenceUpload] {
+        let rat = evidence.rat?.uppercased() ?? ""
+        let isNsa = evidence.is5gNsa == true || rat.contains("NSA")
+        let lteTimingAdvance = ["LTE", "LTE_ANCHOR"].contains(
+            evidence.timingAdvanceSourceTechnology?.uppercased() ?? ""
+        )
+        let nrTimingAdvance = evidence.timingAdvanceSourceTechnology?.uppercased() == "NR"
+
+        if isNsa {
+            var result: [CoverageCellEvidenceUpload] = []
+            if evidence.enb != nil || evidence.eci != nil || evidence.earfcn != nil || lteTimingAdvance {
+                result.append(CoverageCellEvidenceUpload(
+                    cellType: "LTE", isPrimary: true, technology: "LTE",
+                    enb: evidence.enb, gnb: nil, cellId: evidence.localCellId,
+                    eci: evidence.eci, nci: nil, pci: evidence.pci, tac: evidence.tac,
+                    earfcn: evidence.earfcn, nrarfcn: nil,
+                    timingAdvance: lteTimingAdvance ? evidence.timingAdvance : nil,
+                    timingAdvanceSourceTechnology: lteTimingAdvance ? evidence.timingAdvanceSourceTechnology : nil,
+                    timingAdvanceSourceCellId: lteTimingAdvance ? evidence.timingAdvanceSourceCellId : nil
+                ))
+            }
+            if evidence.gnb != nil || evidence.nci != nil || evidence.nrarfcn != nil {
+                result.append(CoverageCellEvidenceUpload(
+                    cellType: "NR", isPrimary: false, technology: "NR",
+                    enb: nil, gnb: evidence.gnb, cellId: nil,
+                    eci: nil, nci: evidence.nci, pci: nil, tac: nil,
+                    earfcn: nil, nrarfcn: evidence.nrarfcn,
+                    timingAdvance: nrTimingAdvance ? evidence.timingAdvance : nil,
+                    timingAdvanceSourceTechnology: nrTimingAdvance ? evidence.timingAdvanceSourceTechnology : nil,
+                    timingAdvanceSourceCellId: nrTimingAdvance ? evidence.timingAdvanceSourceCellId : nil
+                ))
+            }
+            return result
+        }
+
+        let isNr = rat == "NR" || evidence.is5gSa == true || evidence.nci != nil || evidence.gnb != nil
+        return [CoverageCellEvidenceUpload(
+            cellType: isNr ? "NR" : "LTE",
+            isPrimary: true,
+            technology: isNr ? "NR" : "LTE",
+            enb: isNr ? nil : evidence.enb,
+            gnb: isNr ? evidence.gnb : nil,
+            cellId: evidence.localCellId,
+            eci: isNr ? nil : evidence.eci,
+            nci: isNr ? evidence.nci : nil,
+            pci: evidence.pci,
+            tac: evidence.tac,
+            earfcn: isNr ? nil : evidence.earfcn,
+            nrarfcn: isNr ? evidence.nrarfcn : nil,
+            timingAdvance: (isNr ? nrTimingAdvance : lteTimingAdvance) ? evidence.timingAdvance : nil,
+            timingAdvanceSourceTechnology: (isNr ? nrTimingAdvance : lteTimingAdvance)
+                ? evidence.timingAdvanceSourceTechnology : nil,
+            timingAdvanceSourceCellId: (isNr ? nrTimingAdvance : lteTimingAdvance)
+                ? evidence.timingAdvanceSourceCellId : nil
+        )]
+    }
+}
+
+/// Un point de couverture contribue par iOS. Les API publiques ne fournissent
+/// normalement que la generation ; les preuves cellule restent donc optionnelles
+/// et ne sont emises que lorsqu'une source explicite les fournit.
 struct CoveragePointUpload: Codable, Equatable, Sendable {
     /// Identifiant purement client, stable dans la file locale. Le backend actuel
     /// ignore cette clé additive, mais elle évite toute collision entre deux points
@@ -16,9 +94,27 @@ struct CoveragePointUpload: Codable, Equatable, Sendable {
     let timestamp: Int
     /// Génération : "2G"/"3G"/"4G"/"5G NSA"/"5G SA" ou "Aucun" (zone sans réseau).
     let technology: String
+    var accuracy: Double? = nil
     var downloadMbps: Double? = nil
     var uploadMbps: Double? = nil
     var pingMs: Double? = nil
+    var observedPlmn: String? = nil
+    var enb: String? = nil
+    var gnb: String? = nil
+    var cellId: String? = nil
+    var eci: String? = nil
+    var nci: String? = nil
+    var pci: Int? = nil
+    var tac: String? = nil
+    var earfcn: Int? = nil
+    var nrarfcn: Int? = nil
+    var timingAdvance: Int? = nil
+    var timingAdvanceSourceTechnology: String? = nil
+    var timingAdvanceSourceCellId: String? = nil
+    var radioAgeMs: Int? = nil
+    var locationAgeMs: Int? = nil
+    var radioObservedAt: Date? = nil
+    var cells: [CoverageCellEvidenceUpload]? = nil
 
     init(
         localId: UUID = UUID(),
@@ -26,18 +122,54 @@ struct CoveragePointUpload: Codable, Equatable, Sendable {
         longitude: Double,
         timestamp: Int,
         technology: String,
+        accuracy: Double? = nil,
         downloadMbps: Double? = nil,
         uploadMbps: Double? = nil,
-        pingMs: Double? = nil
+        pingMs: Double? = nil,
+        observedPlmn: String? = nil,
+        enb: String? = nil,
+        gnb: String? = nil,
+        cellId: String? = nil,
+        eci: String? = nil,
+        nci: String? = nil,
+        pci: Int? = nil,
+        tac: String? = nil,
+        earfcn: Int? = nil,
+        nrarfcn: Int? = nil,
+        timingAdvance: Int? = nil,
+        timingAdvanceSourceTechnology: String? = nil,
+        timingAdvanceSourceCellId: String? = nil,
+        radioAgeMs: Int? = nil,
+        locationAgeMs: Int? = nil,
+        radioObservedAt: Date? = nil,
+        cells: [CoverageCellEvidenceUpload]? = nil
     ) {
         self.localId = localId
         self.latitude = latitude
         self.longitude = longitude
         self.timestamp = timestamp
         self.technology = technology
+        self.accuracy = accuracy
         self.downloadMbps = downloadMbps
         self.uploadMbps = uploadMbps
         self.pingMs = pingMs
+        self.observedPlmn = RadioLogPlmn.split(observedPlmn).map { $0.mcc + $0.mnc }
+        self.enb = enb
+        self.gnb = gnb
+        self.cellId = cellId
+        self.eci = eci
+        self.nci = nci
+        self.pci = pci
+        self.tac = tac
+        self.earfcn = earfcn
+        self.nrarfcn = nrarfcn
+        self.timingAdvance = timingAdvance
+        self.timingAdvanceSourceTechnology = timingAdvanceSourceTechnology
+        self.timingAdvanceSourceCellId = timingAdvanceSourceCellId
+        self.radioAgeMs = radioAgeMs
+        self.locationAgeMs = locationAgeMs
+        self.radioObservedAt = radioObservedAt
+        self.cells = cells
     }
 }
 
@@ -53,9 +185,27 @@ extension CoveragePointUpload {
             longitude: CoordinateGrid.snap(longitude),
             timestamp: timestamp,
             technology: technology,
+            accuracy: accuracy,
             downloadMbps: downloadMbps,
             uploadMbps: uploadMbps,
-            pingMs: pingMs
+            pingMs: pingMs,
+            observedPlmn: observedPlmn,
+            enb: enb,
+            gnb: gnb,
+            cellId: cellId,
+            eci: eci,
+            nci: nci,
+            pci: pci,
+            tac: tac,
+            earfcn: earfcn,
+            nrarfcn: nrarfcn,
+            timingAdvance: timingAdvance,
+            timingAdvanceSourceTechnology: timingAdvanceSourceTechnology,
+            timingAdvanceSourceCellId: timingAdvanceSourceCellId,
+            radioAgeMs: radioAgeMs,
+            locationAgeMs: locationAgeMs,
+            radioObservedAt: radioObservedAt,
+            cells: cells
         )
     }
 }
@@ -71,6 +221,11 @@ struct CoverageSessionUpload: Codable, Equatable, Sendable {
     var device: String? = nil
     var mcc: Int? = nil
     var mnc: Int? = nil
+    var observedPlmn: String? = nil
+    var simPlmn: String? = nil
+    var isRoaming: Bool? = nil
+    var networkIdentitySource: String? = nil
+    var networkIdentityObservedAt: Date? = nil
     var operatorKey: String? = nil
     /// Nom brut de l'abonnement/SIM remonté par CoreTelephony. Il peut désigner
     /// un MVNO et ne doit donc jamais remplacer `operatorKey` ni le PLMN observé.
@@ -78,6 +233,9 @@ struct CoverageSessionUpload: Codable, Equatable, Sendable {
     var mvnoKey: String? = nil
     var mvnoName: String? = nil
     var marketCode: String? = nil
+    /// Version binaire ayant enregistré la session. `unknown` reste préférable à
+    /// une absence ambiguë pour les anciens brouillons repris hors-ligne.
+    var appVersion: String? = nil
     var showOnMap: Bool
     var points: [CoveragePointUpload]
 

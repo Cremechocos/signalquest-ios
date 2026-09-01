@@ -5,9 +5,104 @@ import AVFAudio
 import CryptoKit
 import os
 
-enum CallTerminationAction: Equatable {
+enum CallTerminationAction: String, Codable, Equatable {
     case reject
     case leave
+}
+
+struct PendingCallTermination: Codable, Equatable {
+    let ownerScopeId: String
+    let callId: String
+    let action: CallTerminationAction
+    let createdAt: Date
+}
+
+/// Small account-scoped outbox for a hang-up performed while offline. Call IDs
+/// are opaque and bounded; stale entries expire locally even if the server TTL
+/// has already closed the room.
+final class CallTerminationRetryStore {
+    static let maximumAge: TimeInterval = 24 * 60 * 60
+    static let maximumCount = 32
+
+    private let defaults: UserDefaults
+    private let key: String
+
+    init(defaults: UserDefaults = .standard, key: String = "call-termination-outbox-v1") {
+        self.defaults = defaults
+        self.key = key
+    }
+
+    func enqueue(
+        ownerScopeId: String,
+        callId: String,
+        action: CallTerminationAction,
+        now: Date = Date()
+    ) {
+        guard validOwner(ownerScopeId), validCallId(callId) else { return }
+        var records = validRecords(now: now)
+        if let existing = records.first(where: {
+            $0.ownerScopeId == ownerScopeId && $0.callId == callId
+        }) {
+            records.removeAll { $0.ownerScopeId == ownerScopeId && $0.callId == callId }
+            records.append(.init(
+                ownerScopeId: ownerScopeId,
+                callId: callId,
+                // Once a participant has joined, leave is the only safe replay.
+                action: existing.action == .leave || action == .leave ? .leave : .reject,
+                createdAt: min(existing.createdAt, now)
+            ))
+        } else {
+            records.append(.init(
+                ownerScopeId: ownerScopeId,
+                callId: callId,
+                action: action,
+                createdAt: now
+            ))
+        }
+        persist(Array(records.sorted { $0.createdAt < $1.createdAt }.suffix(Self.maximumCount)))
+    }
+
+    func pending(ownerScopeId: String, now: Date = Date()) -> [PendingCallTermination] {
+        guard validOwner(ownerScopeId) else { return [] }
+        let records = validRecords(now: now)
+        persist(records)
+        return records.filter { $0.ownerScopeId == ownerScopeId }
+            .sorted { $0.createdAt < $1.createdAt }
+    }
+
+    func remove(ownerScopeId: String, callId: String, now: Date = Date()) {
+        persist(validRecords(now: now).filter {
+            !($0.ownerScopeId == ownerScopeId && $0.callId == callId)
+        })
+    }
+
+    private func validRecords(now: Date) -> [PendingCallTermination] {
+        guard let data = defaults.data(forKey: key),
+              let records = try? JSONDecoder().decode([PendingCallTermination].self, from: data) else {
+            return []
+        }
+        return records.filter {
+            validOwner($0.ownerScopeId) && validCallId($0.callId) &&
+                $0.createdAt <= now.addingTimeInterval(5 * 60) &&
+                now.timeIntervalSince($0.createdAt) <= Self.maximumAge
+        }
+    }
+
+    private func persist(_ records: [PendingCallTermination]) {
+        guard !records.isEmpty else {
+            defaults.removeObject(forKey: key)
+            return
+        }
+        if let data = try? JSONEncoder().encode(records) { defaults.set(data, forKey: key) }
+    }
+
+    private func validOwner(_ value: String) -> Bool {
+        value.hasPrefix("user:") && value.count > "user:".count
+    }
+
+    private func validCallId(_ value: String) -> Bool {
+        !value.isEmpty && value.count <= 128
+    }
 }
 
 struct CallLifecyclePolicy {
@@ -38,6 +133,13 @@ struct CallLifecyclePolicy {
         (2...maximumParticipants).contains(participantCount)
     }
 
+    /// An E2EE conversation must never fall back silently to transport-only
+    /// SRTP. This becomes true only after the audited v2 epoch/cryptor contract
+    /// is negotiated on every participant device.
+    static func canUseE2EECall(conversationE2EE: Bool, verifiedV2: Bool) -> Bool {
+        !conversationE2EE || verifiedV2
+    }
+
     /// Stable mapping so the same backend call cannot create several CallKit
     /// entries when PushKit delivery and foreground reconciliation race.
     static func callKitUUID(callId: String) -> UUID {
@@ -51,6 +153,34 @@ struct CallLifecyclePolicy {
             bytes[8], bytes[9], bytes[10], bytes[11],
             bytes[12], bytes[13], bytes[14], bytes[15]
         ))
+    }
+}
+
+enum IncomingCallE2EEExpectation: Equatable {
+    case unresolved
+    case legacy
+    case required(E2EEV2CallSessionDescriptor)
+    case invalid
+}
+
+enum IncomingCallE2EEContract {
+    /// PushKit must be handled synchronously, so the non-secret descriptor is
+    /// validated directly from the APNs payload. Older payloads stay
+    /// `unresolved` and are authenticated through `/pending` before answer.
+    static func parse(_ payload: [AnyHashable: Any]) -> IncomingCallE2EEExpectation {
+        let marker = payload["e2eeRequired"] as? Bool
+        guard let rawDescriptor = payload["e2ee"] else {
+            if marker == true { return .invalid }
+            return marker == false ? .legacy : .unresolved
+        }
+        guard marker == true,
+              JSONSerialization.isValidJSONObject(rawDescriptor),
+              let data = try? JSONSerialization.data(withJSONObject: rawDescriptor),
+              let value = try? JSONDecoder().decode(JSONValue.self, from: data),
+              let descriptor = E2EEV2CallBridge.parseDescriptor(value) else {
+            return .invalid
+        }
+        return .required(descriptor)
     }
 }
 
@@ -80,15 +210,23 @@ final class CallManager: NSObject, ObservableObject {
         /// « jamais répondu » (reject) de « répondu puis raccroché » (end). CALL-BUG-02.
         var isAnswered: Bool = false
         var isEnding: Bool = false
+        /// `nil` means a PushKit wake-up has not yet been reconciled with the
+        /// authenticated `/pending` contract. Such a call cannot be answered.
+        var requiresE2EE: Bool? = nil
+        var e2eeDescriptor: E2EEV2CallSessionDescriptor? = nil
     }
 
     enum CallError: LocalizedError {
         case missingCredentials
+        case e2eeUnavailable
+        case untrustedE2EESession
         case connectionFailed(String)
         case connectionEnded
         var errorDescription: String? {
             switch self {
             case .missingCredentials: return "Identifiants d'appel manquants."
+            case .e2eeUnavailable: return "L’appel chiffré de bout en bout n’est pas disponible sur cet appareil."
+            case .untrustedE2EESession: return "La vérification du chiffrement de l’appel a échoué."
             case .connectionFailed(let m): return String(localized: "Connexion à l'appel impossible : \(m)")
             case .connectionEnded: return String(localized: "L'appel s'est terminé pendant la connexion.")
             }
@@ -102,6 +240,7 @@ final class CallManager: NSObject, ObservableObject {
 
     private let callsService: CallsServicing
     private let api: APIClient
+    private let terminationRetryStore: CallTerminationRetryStore
     private let provider: CXProvider
     private let callController = CXCallController()
     private var voipRegistry: PKPushRegistry?
@@ -110,9 +249,14 @@ final class CallManager: NSObject, ObservableObject {
     private let deviceID = InstallationIdentity().deviceID()
     private let logger = Logger(subsystem: "fr.signalquest.ios", category: "CallKit")
 
-    init(callsService: CallsServicing, api: APIClient) {
+    init(
+        callsService: CallsServicing,
+        api: APIClient,
+        terminationRetryStore: CallTerminationRetryStore = CallTerminationRetryStore()
+    ) {
         self.callsService = callsService
         self.api = api
+        self.terminationRetryStore = terminationRetryStore
         let config = CXProviderConfiguration()
         config.supportsVideo = true
         config.maximumCallsPerCallGroup = 1
@@ -124,6 +268,7 @@ final class CallManager: NSObject, ObservableObject {
         // CALL-RTC-01 : quand le média se termine côté distant (l'autre raccroche,
         // room fermée, ou réseau tombé), LiveKit le signale → on clôt l'appel.
         liveKit.onRemoteDisconnect = { [weak self] in self?.handleRemoteDisconnect() }
+        liveKit.onE2EETrustLost = { [weak self] in self?.handleE2EETrustLost() }
     }
 
     /// Registers for VoIP pushes. Safe to call multiple times.
@@ -137,12 +282,25 @@ final class CallManager: NSObject, ObservableObject {
 
     // MARK: Outgoing
 
-    func startOutgoingCall(conversationId: String, mode: String, displayName: String) {
+    func startOutgoingCall(
+        conversationId: String,
+        mode: String,
+        displayName: String,
+        requiresE2EE: Bool = false
+    ) {
         guard activeCall == nil else { return }
         liveKit.prepareForCall()
         let uuid = UUID()
         let hasVideo = mode.lowercased() == "video"
-        activeCall = ActiveCall(id: uuid, callId: nil, conversationId: conversationId, handle: displayName, hasVideo: hasVideo, isOutgoing: true)
+        activeCall = ActiveCall(
+            id: uuid,
+            callId: nil,
+            conversationId: conversationId,
+            handle: displayName,
+            hasVideo: hasVideo,
+            isOutgoing: true,
+            requiresE2EE: requiresE2EE
+        )
         showCallScreen = true
         let action = CXStartCallAction(call: uuid, handle: CXHandle(type: .generic, value: displayName))
         action.isVideo = hasVideo
@@ -216,6 +374,8 @@ final class CallManager: NSObject, ObservableObject {
         handle: String,
         hasVideo: Bool,
         serverStatus: String? = nil,
+        requiresE2EE: Bool? = nil,
+        e2eeDescriptor: E2EEV2CallSessionDescriptor? = nil,
         completion: (() -> Void)?
     ) {
         let update = CXCallUpdate()
@@ -297,7 +457,9 @@ final class CallManager: NSObject, ObservableObject {
             handle: handle,
             hasVideo: hasVideo,
             isOutgoing: false,
-            serverStatus: serverStatus?.lowercased()
+            serverStatus: serverStatus?.lowercased(),
+            requiresE2EE: requiresE2EE,
+            e2eeDescriptor: e2eeDescriptor
         )
         provider.reportNewIncomingCall(with: uuid, update: update) { [weak self] error in
             let errorMessage = error?.localizedDescription
@@ -333,6 +495,7 @@ final class CallManager: NSObject, ObservableObject {
     /// plan (et après login) : demande au serveur les appels en attente et, si un appel
     /// « ringing »/« pending » n'est pas déjà actif, le présente via CallKit.
     func reconcilePendingIncomingCall() async {
+        await retryPendingCallTerminations()
         let pending: [CallSession]
         do {
             pending = try await callsService.pending()
@@ -352,6 +515,8 @@ final class CallManager: NSObject, ObservableObject {
                     // passe alors ACTIVE pendant que cet appareil sonne encore. On
                     // conserve ce statut pour choisir leave plutôt que reject.
                     activeCall?.serverStatus = call.status?.lowercased()
+                    activeCall?.requiresE2EE = call.e2eeRequired
+                    activeCall?.e2eeDescriptor = call.e2ee
                     return
                 }
                 // `/pending` ne renvoie qu'un appel (le plus récent). Si un second
@@ -384,6 +549,8 @@ final class CallManager: NSObject, ObservableObject {
             handle: call.displayName ?? call.participants?.first ?? "Appel SignalQuest",
             hasVideo: call.mode == "video",
             serverStatus: call.status,
+            requiresE2EE: call.e2eeRequired,
+            e2eeDescriptor: call.e2ee,
             completion: nil
         )
     }
@@ -398,12 +565,85 @@ final class CallManager: NSObject, ObservableObject {
             logger.error("Call session missing LiveKit credentials")
             throw CallError.missingCredentials
         }
-        await liveKit.connect(url: url, token: token, room: room, video: video, managesAudioSession: false)
+        let e2eeSession: E2EEV2LiveKitSession?
+        if session.e2eeRequired {
+            guard let descriptor = session.e2ee,
+                  let conversationId = activeCall?.conversationId else {
+                throw CallError.untrustedE2EESession
+            }
+            switch E2EEV2CallBridge.resolveRuntimeSession(
+                conversationId: conversationId,
+                callId: session.id,
+                liveKitURL: url,
+                descriptor: descriptor
+            ) {
+            case .ready(let material):
+                e2eeSession = try material.consume { epochKey, context in
+                    try E2EEV2LiveKitSession.make(epochKey: epochKey, context: context)
+                }
+            case .blocked:
+                throw CallError.untrustedE2EESession
+            }
+        } else {
+            guard activeCall?.requiresE2EE != true else {
+                throw CallError.untrustedE2EESession
+            }
+            e2eeSession = nil
+        }
+        await liveKit.connect(
+            url: url,
+            token: token,
+            room: room,
+            video: video,
+            managesAudioSession: false,
+            e2eeSession: e2eeSession
+        )
         if case .failed(let message) = liveKit.state {
             logger.error("LiveKit connect failed: \(message, privacy: .public)")
             throw CallError.connectionFailed(message)
         }
         guard liveKit.state == .connected else { throw CallError.connectionEnded }
+    }
+
+    private func outgoingE2EEContext(for call: ActiveCall) throws -> E2EEV2CallEpochContext? {
+        guard call.requiresE2EE == true else { return nil }
+        guard let conversationId = call.conversationId else { throw CallError.e2eeUnavailable }
+        switch E2EEV2CallBridge.prepareRuntimeRequest(conversationId: conversationId) {
+        case .prepared(let context): return context
+        case .runtimeClosed, .localEpochUnavailable: throw CallError.e2eeUnavailable
+        }
+    }
+
+    private func reconcileE2EEForAnswer(_ call: ActiveCall) async throws -> ActiveCall {
+        guard let callId = call.callId else { throw CallError.missingCredentials }
+        let serverCall = try await callsService.pending().first(where: { $0.id == callId })
+        guard let serverCall else { throw CallError.connectionEnded }
+        var reconciled = call
+        reconciled.serverStatus = serverCall.status?.lowercased()
+        reconciled.requiresE2EE = serverCall.e2eeRequired
+        reconciled.e2eeDescriptor = serverCall.e2ee
+        activeCall = reconciled
+        return reconciled
+    }
+
+    private func answerE2EEContext(for call: ActiveCall) throws -> E2EEV2CallEpochContext? {
+        guard call.requiresE2EE == true else {
+            guard call.requiresE2EE == false, call.e2eeDescriptor == nil else {
+                throw CallError.untrustedE2EESession
+            }
+            return nil
+        }
+        guard let conversationId = call.conversationId,
+              let descriptor = call.e2eeDescriptor else {
+            throw CallError.untrustedE2EESession
+        }
+        switch E2EEV2CallBridge.prepareRuntimeAnswerRequest(
+            conversationId: conversationId,
+            descriptor: descriptor
+        ) {
+        case .prepared(let context): return context
+        case .runtimeClosed, .localEpochUnavailable: throw CallError.e2eeUnavailable
+        }
     }
 
     private func tearDown() async {
@@ -443,26 +683,51 @@ final class CallManager: NSObject, ObservableObject {
         action: CallTerminationAction
     ) async {
         markRecentlyTerminated(callId)
+        let ownerScopeId = LocalAccountScope.currentOwnerScopeId
         do {
-            switch action {
-            case .reject:
-                do {
-                    try await callsService.reject(callId: callId)
-                } catch {
-                    // Course groupe : l'appel peut devenir ACTIVE entre le dernier
-                    // polling et le geste de refus. `/end` (leave) sait retirer un
-                    // participant encore `ringing` dans les deux états et reste
-                    // sans effet destructif si l'appel est déjà terminal.
-                    logger.info("reject raced with call state; retrying leave")
-                    try await callsService.end(callId: callId)
-                }
-            case .leave:
+            try await performBackendCallTermination(callId: callId, action: action)
+            terminationRetryStore.remove(ownerScopeId: ownerScopeId, callId: callId)
+        } catch {
+            terminationRetryStore.enqueue(
+                ownerScopeId: ownerScopeId,
+                callId: callId,
+                action: action
+            )
+            logger.error("backend call termination failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func performBackendCallTermination(
+        callId: String,
+        action: CallTerminationAction
+    ) async throws {
+        switch action {
+        case .reject:
+            do {
+                try await callsService.reject(callId: callId)
+            } catch {
+                // The global call can race from RINGING to ACTIVE. `/end` is an
+                // idempotent participant leave in both states.
                 try await callsService.end(callId: callId)
             }
-        } catch {
-            // Les routes sont idempotentes ; un échec réseau peut être réconcilié
-            // par le serveur/timeout sans retenir une UI CallKit fantôme.
-            logger.error("backend call termination failed: \(error.localizedDescription, privacy: .public)")
+        case .leave:
+            try await callsService.end(callId: callId)
+        }
+    }
+
+    func retryPendingCallTerminations() async {
+        let ownerScopeId = LocalAccountScope.currentOwnerScopeId
+        for record in terminationRetryStore.pending(ownerScopeId: ownerScopeId) {
+            do {
+                try await performBackendCallTermination(
+                    callId: record.callId,
+                    action: record.action
+                )
+                terminationRetryStore.remove(ownerScopeId: ownerScopeId, callId: record.callId)
+            } catch {
+                logger.error("call termination replay failed: \(error.localizedDescription, privacy: .public)")
+                return
+            }
         }
     }
 
@@ -472,6 +737,16 @@ final class CallManager: NSObject, ObservableObject {
     private func handleRemoteDisconnect() {
         guard let call = activeCall else { return }
         reportCallEnded(call.id, reason: .remoteEnded)
+        Task {
+            await notifyBackendCallTerminated(call)
+            await tearDown()
+        }
+    }
+
+    private func handleE2EETrustLost() {
+        guard let call = activeCall, !call.isEnding else { return }
+        activeCall?.isEnding = true
+        reportCallEnded(call.id, reason: .failed)
         Task {
             await notifyBackendCallTerminated(call)
             await tearDown()
@@ -628,8 +903,15 @@ extension CallManager: CXProviderDelegate {
                 action.fail(); return
             }
             do {
-                let session = try await self.callsService.initiate(conversationId: conversationId, mode: call.hasVideo ? "video" : "audio")
+                let context = try self.outgoingE2EEContext(for: call)
+                let session = try await self.callsService.initiate(
+                    conversationId: conversationId,
+                    mode: call.hasVideo ? "video" : "audio",
+                    e2ee: context
+                )
                 self.activeCall?.callId = session.id
+                self.activeCall?.requiresE2EE = session.e2eeRequired
+                self.activeCall?.e2eeDescriptor = session.e2ee
                 self.provider.reportOutgoingCall(with: action.callUUID, startedConnectingAt: nil)
                 try await self.connectLiveKit(for: session, video: call.hasVideo)
                 self.provider.reportOutgoingCall(with: action.callUUID, connectedAt: nil)
@@ -649,7 +931,9 @@ extension CallManager: CXProviderDelegate {
             let action = box.value
             guard let call = self.activeCall, let callId = call.callId else { action.fail(); return }
             do {
-                let session = try await self.callsService.answer(callId: callId)
+                let reconciled = try await self.reconcileE2EEForAnswer(call)
+                let context = try self.answerE2EEContext(for: reconciled)
+                let session = try await self.callsService.answer(callId: callId, e2ee: context)
                 // L'autorisation serveur a déjà fait passer le participant à
                 // `joined`; tout échec média ultérieur doit donc utiliser leave/end,
                 // jamais reject (qui n'accepte que RINGING).
@@ -728,6 +1012,7 @@ extension CallManager: PKPushRegistryDelegate {
         let conversationId = CallManager.string(dict, "conversationId", "conversation_id")
         let handle = CallManager.string(dict, "caller", "callerName", "handle", "title") ?? "Appel SignalQuest"
         let hasVideo = CallManager.string(dict, "mode", "type")?.lowercased() == "video"
+        let e2eeExpectation = IncomingCallE2EEContract.parse(dict)
         // `callId` est l'identité canonique. Elle prime sur un UUID de push pour
         // qu'une relivraison APNs (ou un producteur qui régénère son UUID) ne
         // crée jamais une seconde entrée CallKit pour le même appel.
@@ -745,7 +1030,40 @@ extension CallManager: PKPushRegistryDelegate {
                 self.reportInvalidIncomingPush(uuid: uuid, handle: handle, hasVideo: hasVideo, completion: completionBox.value)
                 return
             }
-            self.reportIncomingCall(uuid: uuid, callId: callId, conversationId: conversationId, handle: handle, hasVideo: hasVideo, completion: completionBox.value)
+            if e2eeExpectation == .invalid {
+                self.reportInvalidIncomingPush(
+                    uuid: uuid,
+                    handle: handle,
+                    hasVideo: hasVideo,
+                    completion: completionBox.value
+                )
+                return
+            }
+            let requirement: Bool?
+            let descriptor: E2EEV2CallSessionDescriptor?
+            switch e2eeExpectation {
+            case .unresolved:
+                requirement = nil
+                descriptor = nil
+            case .legacy:
+                requirement = false
+                descriptor = nil
+            case .required(let value):
+                requirement = true
+                descriptor = value
+            case .invalid:
+                return
+            }
+            self.reportIncomingCall(
+                uuid: uuid,
+                callId: callId,
+                conversationId: conversationId,
+                handle: handle,
+                hasVideo: hasVideo,
+                requiresE2EE: requirement,
+                e2eeDescriptor: descriptor,
+                completion: completionBox.value
+            )
         }
     }
 }

@@ -71,7 +71,7 @@ struct FeedPollView: View {
                         .font(SQFont.body(14, option.votedByMe ? .semibold : .regular))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(2)
-                        .minimumScaleFactor(0.85)
+                        .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: SQSpace.sm)
                     if revealed {
                         Text(share.formatted(.percent.precision(.fractionLength(0))))

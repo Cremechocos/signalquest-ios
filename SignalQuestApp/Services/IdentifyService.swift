@@ -30,10 +30,19 @@ struct IdentifyDirectRequest: Sendable {
     /// ce qui est préférable : sa règle fait autorité sur le calcul client.
     var sectorIndex: Int?
     var operatorName: String?
-    /// MCC/MNC tels qu'ils apparaissent dans le log — convertis en entiers à
-    /// l'envoi, le serveur les passe par `parseNumber`.
+    /// Clé canonique du réseau servant. `operatorName` reste le champ hérité :
+    /// il ne doit jamais être la seule preuve d'identité réseau.
+    var operatorKey: String?
+    var marketCode: String?
+    var rawOperatorName: String?
+    /// PLMN servant complet, conservé en chaîne pour préserver les MNC comme
+    /// `001`. MCC/MNC restent envoyés séparément pour les anciens serveurs.
+    var observedPlmn: String?
     var mcc: String?
     var mnc: String?
+    var simPlmn: String?
+    var isRoaming: Bool?
+    var networkIdentitySource: String?
     var latitude: Double?
     var longitude: Double?
 
@@ -49,8 +58,15 @@ struct IdentifyDirectRequest: Sendable {
         earfcn: Int? = nil,
         sectorIndex: Int? = nil,
         operatorName: String? = nil,
+        operatorKey: String? = nil,
+        marketCode: String? = nil,
+        rawOperatorName: String? = nil,
+        observedPlmn: String? = nil,
         mcc: String? = nil,
         mnc: String? = nil,
+        simPlmn: String? = nil,
+        isRoaming: Bool? = nil,
+        networkIdentitySource: String? = nil,
         latitude: Double? = nil,
         longitude: Double? = nil
     ) {
@@ -65,10 +81,41 @@ struct IdentifyDirectRequest: Sendable {
         self.earfcn = earfcn
         self.sectorIndex = sectorIndex
         self.operatorName = operatorName
+        self.operatorKey = operatorKey
+        self.marketCode = marketCode
+        self.rawOperatorName = rawOperatorName
+        self.observedPlmn = observedPlmn
         self.mcc = mcc
         self.mnc = mnc
+        self.simPlmn = simPlmn
+        self.isRoaming = isRoaming
+        self.networkIdentitySource = networkIdentitySource
         self.latitude = latitude
         self.longitude = longitude
+    }
+
+    /// Le PLMN explicite prime. Le couple structuré est un repli sûr car ses
+    /// deux composantes ont déjà conservé leur largeur d'origine.
+    var resolvedObservedPlmn: String? {
+        if let observedPlmn = Self.normalizedPlmn(observedPlmn) { return observedPlmn }
+        guard let mcc = Self.normalizedDigits(mcc, allowedLengths: [3]),
+              let mnc = Self.normalizedDigits(mnc, allowedLengths: [2, 3]) else {
+            return nil
+        }
+        return mcc + mnc
+    }
+
+    private static func normalizedPlmn(_ value: String?) -> String? {
+        normalizedDigits(value, allowedLengths: [5, 6])
+    }
+
+    private static func normalizedDigits(_ value: String?, allowedLengths: Set<Int>) -> String? {
+        guard let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              allowedLengths.contains(normalized.count),
+              normalized.allSatisfy(\.isNumber) else {
+            return nil
+        }
+        return normalized
     }
 }
 
@@ -151,8 +198,15 @@ final class IdentifyService: IdentifyServicing {
             let earfcn: Int?
             let sectorIndex: Int?
             let `operator`: String?
-            let mobileCountryCode: Int?
-            let mobileNetworkCode: Int?
+            let operatorKey: String?
+            let marketCode: String?
+            let rawOperatorName: String?
+            let observedPlmn: String?
+            let simPlmn: String?
+            let isRoaming: Bool?
+            let mobileCountryCode: String?
+            let mobileNetworkCode: String?
+            let networkIdentitySource: String?
             let userLat: Double?
             let userLng: Double?
         }
@@ -171,8 +225,15 @@ final class IdentifyService: IdentifyServicing {
                 earfcn: request.earfcn,
                 sectorIndex: request.sectorIndex,
                 operator: request.operatorName,
-                mobileCountryCode: request.mcc.flatMap(Int.init),
-                mobileNetworkCode: request.mnc.flatMap(Int.init),
+                operatorKey: request.operatorKey,
+                marketCode: request.marketCode,
+                rawOperatorName: request.rawOperatorName,
+                observedPlmn: request.resolvedObservedPlmn,
+                simPlmn: request.simPlmn,
+                isRoaming: request.isRoaming,
+                mobileCountryCode: request.mcc,
+                mobileNetworkCode: request.mnc,
+                networkIdentitySource: request.networkIdentitySource,
                 userLat: request.latitude,
                 userLng: request.longitude
             )

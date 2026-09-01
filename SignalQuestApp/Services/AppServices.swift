@@ -5,6 +5,47 @@ import CoreLocation
 // seul `scenePhase` d'une vue. Voir « Cycle de vie de la scène » plus bas.
 import UIKit
 
+/// État de présentation du badge Messages, borné à la session authentifiée qui
+/// a lancé son rafraîchissement. Une réponse de A ne peut ainsi jamais publier
+/// son compteur après un logout/login vers B, y compris pour le même compte
+/// reconnecté avec un nouvel identifiant de session.
+@MainActor
+final class InboxBadgePresentationState {
+    struct RefreshTicket: Equatable {
+        let session: LocalAccountSession
+        let generation: UInt
+    }
+
+    private let sessionSnapshot: () -> LocalAccountSession?
+    private(set) var unreadCount = 0
+    private var lastRefresh: Date = .distantPast
+    private var generation: UInt = 0
+
+    init(sessionSnapshot: @escaping () -> LocalAccountSession? = LocalAccountScope.sessionSnapshot) {
+        self.sessionSnapshot = sessionSnapshot
+    }
+
+    func beginRefresh(force: Bool, now: Date = Date()) -> RefreshTicket? {
+        guard let session = sessionSnapshot() else { return nil }
+        if !force, now.timeIntervalSince(lastRefresh) < 20 { return nil }
+        return RefreshTicket(session: session, generation: generation)
+    }
+
+    @discardableResult
+    func publish(unreadCount: Int, for ticket: RefreshTicket, now: Date = Date()) -> Bool {
+        guard ticket.generation == generation, sessionSnapshot() == ticket.session else { return false }
+        self.unreadCount = unreadCount
+        lastRefresh = now
+        return true
+    }
+
+    func reset() {
+        generation &+= 1
+        unreadCount = 0
+        lastRefresh = .distantPast
+    }
+}
+
 @MainActor
 final class AppServices: ObservableObject {
     let api: APIClient
@@ -52,6 +93,7 @@ final class AppServices: ObservableObject {
     /// lecture seule) — alimente la page « Logs antennes ».
     let radioLogs: RadioLogsServicing
     let e2ee: E2EEServicing
+    let epochRotations: E2EEV2EpochRotationRuntime
     let friends: FriendsServicing
     let gamification: GamificationServicing
     let gamificationV2: GamificationV2Servicing
@@ -74,6 +116,7 @@ final class AppServices: ObservableObject {
 
     /// Nombre de conversations non lues — alimente le badge de l'onglet Messages.
     @Published var unreadConversations = 0
+    private let inboxBadgeState = InboxBadgePresentationState()
 
     init(config: AppConfig = .current) {
         let credentials = CredentialStore()
@@ -83,6 +126,7 @@ final class AppServices: ObservableObject {
         router = appRouter
         let e2eeService = E2EEService(api: api)
         e2ee = e2eeService
+        epochRotations = E2EEV2EpochRotationRuntime(api: api)
         let sseClient = SSEClient(api: api)
         sse = sseClient
         auth = AuthService(api: api, e2ee: e2eeService)
@@ -156,22 +200,27 @@ final class AppServices: ObservableObject {
         callManager = CallManager(callsService: callsService, api: api)
     }
 
-    /// Horodatage du dernier rafraîchissement du badge, pour throttler les GET
-    /// complets déclenchés à CHAQUE changement d'onglet (PERF-BADGE-01).
-    private var lastInboxBadgeRefresh: Date = .distantPast
-
     /// Recalcule le nombre de conversations non lues (dernier message postérieur à
     /// la dernière lecture). Approximation côté client, sans appel dédié.
     /// `force` (retour foreground) contourne le throttle de 20 s.
     func refreshInboxBadge(force: Bool = false) async {
-        if !force, Date().timeIntervalSince(lastInboxBadgeRefresh) < 20 { return }
+        guard let ticket = inboxBadgeState.beginRefresh(force: force) else { return }
         guard let conversations = try? await messages.conversations() else { return }
-        lastInboxBadgeRefresh = Date()
-        unreadConversations = conversations.reduce(into: 0) { count, conversation in
+        let unread = conversations.reduce(into: 0) { count, conversation in
             guard let lastMessageAt = conversation.lastMessageAt else { return }
             let lastReadAt = conversation.lastReadAt ?? .distantPast
             if lastMessageAt > lastReadAt { count += 1 }
         }
+        guard inboxBadgeState.publish(unreadCount: unread, for: ticket) else { return }
+        unreadConversations = inboxBadgeState.unreadCount
+    }
+
+    /// Efface immédiatement tout état visuel privé de l'ancien compte. Le reset
+    /// invalide aussi les requêtes déjà parties et rouvre le throttle pour que le
+    /// nouveau compte puisse charger son propre badge sans attendre 20 secondes.
+    func resetAccountPresentationState() {
+        inboxBadgeState.reset()
+        unreadConversations = 0
     }
 
     // MARK: - Amorçage partagé
@@ -197,6 +246,7 @@ final class AppServices: ObservableObject {
             networkPath.start()
             await session.bootstrap()
             if case .authenticated(let user) = session.state {
+                epochRotations.resume()
                 // Le namespace du compte est actif : les files ne peuvent plus être
                 // rejouées avec l'identité d'un autre utilisateur.
                 await sessions.retryPendingCoverageSessions()
@@ -291,6 +341,7 @@ final class AppServices: ObservableObject {
     /// Retour au premier plan : la diffusion reprend si les réglages de partage
     /// et le mode l'autorisent (`reevaluate()` tranche).
     func enterForeground() {
+        if networkPath.isOnline { epochRotations.resume() }
         livePresence.setAppActive(true)
         liveShare.setAppActive(true)
     }
@@ -375,6 +426,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
 
     func create(
         conversationId: String,
+        e2eeEnabled: Bool,
         currentUserId: String,
         offerShare: Bool,
         message: String?,
@@ -390,6 +442,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
         do {
             let response = try await service.createLiveShare(
                 conversationId: conversationId,
+                e2eeEnabled: e2eeEnabled,
                 offerShare: offerShare,
                 message: message,
                 mode: mode,
@@ -410,8 +463,12 @@ final class ConversationLiveShareCoordinator: ObservableObject {
     }
 
     func accept(sessionId: String) async {
+        let e2eeV2Required = sessionsByID[sessionId]?.e2eeV2Required == true
         await mutate(sessionId: sessionId) {
-            try await service.acceptLiveShare(sessionId: sessionId)
+            try await service.acceptLiveShare(
+                sessionId: sessionId,
+                e2eeV2Required: e2eeV2Required
+            )
         }
     }
 
@@ -547,7 +604,11 @@ final class ConversationLiveShareCoordinator: ObservableObject {
     }
 
     private func syncStreams() {
-        let desired = Set(sessionsByID.values.filter(\.isOpen).map(\.id))
+        let desired = Set(sessionsByID.values.filter { session in
+            session.isOpen && (
+                session.e2eeV2Required != true || E2EEV2RuntimeReadGate.enabled
+            )
+        }.map(\.id))
         for id in Array(streamTasks.keys) where !desired.contains(id) {
             streamTasks.removeValue(forKey: id)?.cancel()
         }
@@ -566,7 +627,11 @@ final class ConversationLiveShareCoordinator: ObservableObject {
                         }
                     }
                 }
-                for await event in service.liveShareEvents(sessionId: id) {
+                guard let initial = self?.sessionsByID[id] else { return }
+                let events = initial.e2eeV2Required == true
+                    ? service.e2eeLiveShareEvents(session: initial)
+                    : service.liveShareEvents(sessionId: id)
+                for await event in events {
                     guard !Task.isCancelled, let self,
                           self.accountGeneration == generation else { return }
                     self.consume(event, sessionId: id)
@@ -621,6 +686,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
         return sessionsByID.values.filter {
             $0.status == "active" &&
             $0.sharerId == currentUserId &&
+            ($0.e2eeV2Required != true || E2EEV2RuntimeWriteGate.enabled) &&
             !terminalPublishFailures.contains($0.id)
         }
     }
@@ -655,13 +721,20 @@ final class ConversationLiveShareCoordinator: ObservableObject {
         networkPath.refreshNow()
         let status = networkPath.status
         let sim = networkPath.simPLMN()
+        let activeSimPlmn = status.connection == .cellular ? (status.simPlmn ?? sim.plmn) : nil
         let payload = LiveSharePayload(
             radio: LiveShareRadio(
                 connectionType: status.speedtestConnectionType,
                 technology: status.cellularTechnology?.displayName,
-                operatorName: status.operatorName,
-                mcc: status.operatorMcc ?? sim.mcc,
-                mnc: status.operatorMnc ?? sim.mnc
+                // CoreTelephony décrit la SIM, pas nécessairement le réseau
+                // visité. Aucun PLMN servant n'est donc fabriqué en roaming.
+                operatorName: nil,
+                mcc: nil,
+                mnc: nil,
+                observedPlmn: nil,
+                simPlmn: activeSimPlmn,
+                simOperatorName: status.operatorName,
+                networkIdentitySource: activeSimPlmn == nil ? nil : "SIM"
             ),
             location: currentLocation.map {
                 LiveShareLocation(
@@ -680,8 +753,15 @@ final class ConversationLiveShareCoordinator: ObservableObject {
         for session in publishableSessions {
             guard appIsActive, !Task.isCancelled else { break }
             do {
-                let updated = try await service.updateLiveShare(sessionId: session.id, payload: payload)
-                merge([updated])
+                if session.e2eeV2Required == true {
+                    try await service.updateE2eeLiveShare(session: session, payload: payload)
+                } else {
+                    let updated = try await service.updateLiveShare(
+                        sessionId: session.id,
+                        payload: payload
+                    )
+                    merge([updated])
+                }
                 payloadsBySessionID[session.id] = payload
                 sawSuccess = true
             } catch {

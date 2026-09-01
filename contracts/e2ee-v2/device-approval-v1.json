@@ -1,0 +1,21 @@
+{
+  "fixtureVersion": 1,
+  "approvalId": "approval_0000000000000001",
+  "pendingDeviceId": "device_0000000000000001",
+  "expiresAtMs": 1787566200000,
+  "testSecretB64": "QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=",
+  "qr": {
+    "challengeB64Url": "meiXvHYi-IQC7fKEmeI_sHlu8RsqmZtJPvJ04h_KJOA",
+    "payload": "SQE2EE2|1|approval_0000000000000001|device_0000000000000001|meiXvHYi-IQC7fKEmeI_sHlu8RsqmZtJPvJ04h_KJOA|1787566200000",
+    "proofHash": "88549b0b5c031ed4a7456539e6bda5d94e5d2df8fd567e88c9dc6e2b63497b52"
+  },
+  "push": {
+    "challengeB64Url": "Zo6u92H-mi7ViX6Fjz9l7BowhL4KuaROG2W1lmV5LG4",
+    "proofHash": "38f98ab2a1b86eb2e0b44bf89d175588e65de240ba21d07d028fed4f1ddead4b"
+  },
+  "proximity": {
+    "code": "NM4XCYAWHXGXRPS3",
+    "formattedCode": "NM4X-CYAW-HXGX-RPS3",
+    "proofHash": "bdf95f401a727814855a19f99fc19e9355759534aa656e6b91462f58eab1b159"
+  }
+}

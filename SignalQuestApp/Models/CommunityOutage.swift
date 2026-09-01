@@ -526,7 +526,7 @@ struct OutageRadioProbe: Encodable, Equatable {
 /// produit tranchées explicitement, et laissées dans des `@State` privés elles n'étaient
 /// démontrables que sur appareil. Ici un test les tient (`MapOutageFilterTests`), et la vue ne
 /// fait plus que les afficher.
-struct OutageReportDraft: Equatable {
+struct OutageReportDraft: Codable, Equatable {
     /// `nil` à l'ouverture : RIEN n'est coché tant que la personne n'a pas répondu.
     ///
     /// Optionnel plutôt qu'une troisième valeur d'`OutageSeverity` : « pas encore répondu » n'est
@@ -640,6 +640,8 @@ struct OutageReportDraft: Equatable {
 struct OutageVoteRequest: Encodable {
     /// `confirm`, `dispute` ou `repaired` — les trois valent le même geste et le même gain.
     let kind: String
+    /// Identifiant d'installation Keychain, indépendant du compte et limité à l'anti-doublon.
+    let deviceId: String
     let latitude: Double?
     let longitude: Double?
     let accuracyMeters: Double?

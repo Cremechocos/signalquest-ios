@@ -288,6 +288,8 @@ struct ANFRMapView: View {
                         .background(on ? AnyShapeStyle(op.color) : AnyShapeStyle(SQColor.surface), in: Capsule(style: .continuous))
                         .foregroundStyle(on ? SQColor.onAccent : SQColor.label)
                         .sqShadowSoft()
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(SQPressButtonStyle())
                     .accessibilityLabel("Filtre \(op.label)")
@@ -297,7 +299,7 @@ struct ANFRMapView: View {
             }
             .padding(.horizontal, SQSpace.xs)
         }
-        .frame(height: 40)
+        .frame(minHeight: 44)
     }
 
     private var loadingPill: some View {
@@ -584,7 +586,7 @@ struct ANFRMapKitView: UIViewRepresentable {
     let onSelectSite: (ANFRMapSite) -> Void
 
     @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
-    private var backdrop: MapBackdrop { MapBackdrop(rawValue: backdropRaw) ?? .applePlan }
+    private var backdrop: MapBackdrop { MapBackdrop.resolve(backdropRaw) }
 
     func makeCoordinator() -> Coordinator { Coordinator(center: $center, zoom: $zoom, onSelectSite: onSelectSite) }
 

@@ -173,6 +173,7 @@ final class LiveShareContractTests: XCTestCase {
 
         let response = try await service.createLiveShare(
             conversationId: "c-1",
+            e2eeEnabled: false,
             offerShare: true,
             message: " Route ",
             mode: "broadcast",
@@ -215,7 +216,13 @@ final class LiveShareContractTests: XCTestCase {
             capture: box
         )
         let payload = LiveSharePayload(
-            radio: LiveShareRadio(connectionType: "4G", operatorName: "SFR", mcc: 208, mnc: 10),
+            radio: LiveShareRadio(
+                connectionType: "4G",
+                observedPlmn: nil,
+                simPlmn: "310001",
+                simOperatorName: "T-Mobile SIM",
+                networkIdentitySource: "SIM"
+            ),
             location: LiveShareLocation(
                 latitude: 48.8,
                 longitude: 2.3,
@@ -233,7 +240,13 @@ final class LiveShareContractTests: XCTestCase {
             try JSONSerialization.jsonObject(with: box.body ?? Data()) as? [String: Any]
         )
         let encodedPayload = try XCTUnwrap(body["payload"] as? [String: Any])
-        XCTAssertEqual((encodedPayload["radio"] as? [String: Any])?["operator"] as? String, "SFR")
+        let radio = try XCTUnwrap(encodedPayload["radio"] as? [String: Any])
+        XCTAssertNil(radio["operator"])
+        XCTAssertNil(radio["mcc"])
+        XCTAssertNil(radio["mnc"])
+        XCTAssertEqual(radio["simPlmn"] as? String, "310001")
+        XCTAssertEqual(radio["simOperatorName"] as? String, "T-Mobile SIM")
+        XCTAssertEqual(radio["networkIdentitySource"] as? String, "SIM")
         XCTAssertEqual((encodedPayload["location"] as? [String: Any])?["accuracy"] as? Double, 6)
     }
 

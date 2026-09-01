@@ -12,6 +12,12 @@ import CoreLocation
 @MainActor
 final class MapOutageFilterTests: XCTestCase {
 
+    func testLocaleWithoutRegionDoesNotInventFrance() {
+        XCTAssertEqual(MapMarketStore.resolvedLocaleMarketCode(nil), "UNKNOWN")
+        XCTAssertEqual(MapMarketStore.resolvedLocaleMarketCode("   "), "UNKNOWN")
+        XCTAssertEqual(MapMarketStore.resolvedLocaleMarketCode("ca"), "CA")
+    }
+
     /// Registre minimal : la France (données ANFR) et un marché communautaire, où aucun open data
     /// ne publie d'incident opérateur.
     private func registry() throws -> [MarketRegistryEntry] {
@@ -462,6 +468,21 @@ final class MapOutageFilterTests: XCTestCase {
         XCTAssertEqual(OutageFeedBadge.tint(severity: "down", state: "resolved"), OutageTint.resolved)
     }
 
+    /// Un vote compte dans un quorum : il doit donc porter le même identifiant d'installation que
+    /// le signalement, sinon plusieurs comptes du même iPhone pèseraient chacun une voix.
+    func testOutageVoteCarriesInstallationDeviceId() throws {
+        let request = OutageVoteRequest(
+            kind: "confirm",
+            deviceId: "ios-installation-123456",
+            latitude: 48.0,
+            longitude: 2.0,
+            accuracyMeters: 12
+        )
+        let data = try JSONEncoder().encode(request)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["deviceId"] as? String, "ios-installation-123456")
+    }
+
     // MARK: - Refus d'écriture
 
     /// Les codes que les trois routes d'écriture émettent RÉELLEMENT.
@@ -479,7 +500,9 @@ final class MapOutageFilterTests: XCTestCase {
         ("INVALID_OPERATOR", 400, "Indiquez l'opérateur concerné"),
         ("COMMENT_TOO_LONG", 400, "Le commentaire est trop long"),
         ("PAYLOAD_TOO_LARGE", 400, "Les mesures radio jointes sont trop volumineuses"),
+        ("INVALID_DEVICE_ID", 400, "L'identifiant d'installation est invalide"),
         ("ALREADY_REPORTED", 409, "Vous avez déjà signalé cette panne"),
+        ("OPERATOR_INCIDENT_ACTIVE", 409, "L'opérateur a déjà déclaré cet incident"),
         ("OUTAGE_CLOSED", 409, "Cette panne est close. Signalez-en une nouvelle."),
         ("SELF_CONFIRMATION", 409, "Vous ne pouvez pas confirmer votre propre signalement"),
         ("NOT_FOUND", 404, "Panne introuvable"),

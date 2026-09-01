@@ -23,6 +23,7 @@ struct SpeedtestView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     // Défaut « Auto » : préflight hybride iPerf3 (OVH/Bouygues/Scaleway/MilkyWan)
     // + Cloudflare, le plus rapide gagne.
     @AppStorage("speedtest_download_target") private var downloadTargetRaw = SpeedtestDownloadTarget.hybridAuto.rawValue
@@ -549,7 +550,7 @@ struct SpeedtestView: View {
                 .fill(SQColor.separator)
                 .frame(height: 1)
 
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: SQSpace.md), GridItem(.flexible(), spacing: SQSpace.md)], spacing: SQSpace.md) {
+            LazyVGrid(columns: resultColumns, spacing: SQSpace.md) {
                 detailItem(label: "Réception moy.", value: speed(result.downloadAverageMbps), highlight: true)
                 detailItem(label: "DL max", value: speed(result.downloadMaxMbps), highlight: true)
                 detailItem(label: "Envoi moy.", value: speed(result.uploadAverageMbps))
@@ -583,13 +584,14 @@ struct SpeedtestView: View {
                     .font(SQFont.display(17, .semibold, relativeTo: .body))
                     .monospacedDigit()
                     .foregroundStyle(highlight ? SQColor.brandRed : SQColor.label)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let trailing {
                     Text(trailing)
                         .font(SQType.micro)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -619,7 +621,7 @@ struct SpeedtestView: View {
             Rectangle()
                 .fill(SQColor.separator)
                 .frame(height: 1)
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: SQSpace.md), GridItem(.flexible(), spacing: SQSpace.md)], spacing: SQSpace.md) {
+            LazyVGrid(columns: resultColumns, spacing: SQSpace.md) {
                 detailItem(label: "Réception moy.", value: speed(s.avgDownload), highlight: true)
                 detailItem(label: "DL max", value: speed(s.maxDownload), highlight: true)
                 detailItem(label: "Envoi moy.", value: speed(s.avgUpload))
@@ -673,17 +675,34 @@ struct SpeedtestView: View {
         options: [(value: Int, label: String)],
         selection: Binding<Int>
     ) -> some View {
-        HStack {
-            Text(title).foregroundStyle(SQColor.label)
-            Spacer()
-            ForEach(options, id: \.value) { option in
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    Text(title).foregroundStyle(SQColor.label)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: SQSpace.sm) { chipButtons(options: options, selection: selection) }
+                    }
+                }
+            } else {
+                HStack {
+                    Text(title).foregroundStyle(SQColor.label)
+                    Spacer()
+                    chipButtons(options: options, selection: selection)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func chipButtons(options: [(value: Int, label: String)], selection: Binding<Int>) -> some View {
+        ForEach(options, id: \.value) { option in
                 Button {
                     selection.wrappedValue = option.value
                     Haptics.selection()
                 } label: {
                     Text(option.label)
                         .font(.caption.weight(.bold))
-                        .frame(minWidth: 44)
+                        .frame(minWidth: 44, minHeight: 44)
                         .padding(.vertical, SQSpace.xs + 3)
                         .background(
                             selection.wrappedValue == option.value ? SQColor.brandRed : SQColor.fill,
@@ -693,7 +712,6 @@ struct SpeedtestView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(selection.wrappedValue == option.value ? [.isSelected] : [])
-            }
         }
     }
 
@@ -762,7 +780,7 @@ struct SpeedtestView: View {
                                     } label: {
                                         Text(value == 1 ? "1" : "×\(value)")
                                             .font(.caption.weight(.bold))
-                                            .frame(minWidth: 38)
+                                            .frame(minWidth: 44, minHeight: 44)
                                             .padding(.vertical, SQSpace.xs + 3)
                                             .background(burstCount == value ? SQColor.brandRed : SQColor.fill, in: Capsule(style: .continuous))
                                             .foregroundStyle(burstCount == value ? SQColor.onAccent : SQColor.label)
@@ -776,7 +794,7 @@ struct SpeedtestView: View {
                                 } label: {
                                     Image(systemName: "infinity")
                                         .font(.caption.weight(.bold))
-                                        .frame(minWidth: 38)
+                                        .frame(minWidth: 44, minHeight: 44)
                                         .padding(.vertical, SQSpace.xs + 3)
                                         .background(burstCount == Self.continuousBurst ? SQColor.brandRed : SQColor.fill, in: Capsule(style: .continuous))
                                         .foregroundStyle(burstCount == Self.continuousBurst ? SQColor.onAccent : SQColor.label)
@@ -840,6 +858,10 @@ struct SpeedtestView: View {
         .presentationDragIndicator(.visible)
     }
 
+    private var resultColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: SQSpace.md), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2)
+    }
+
     // MARK: - History
 
     // Fidèle au prototype : les cartes d'historique suivent directement le
@@ -847,7 +869,12 @@ struct SpeedtestView: View {
     private var historySection: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             if history.isEmpty {
-                EmptyStateView(title: "Aucun test", message: "Lance ton premier speedtest.", systemImage: "clock")
+                EmptyStateView(
+                    title: "Aucun test",
+                    message: "Lance ton premier speedtest.",
+                    systemImage: "clock",
+                    messageColor: SQColor.label
+                )
             } else {
                 VStack(spacing: SQSpace.sm + 2) {
                     ForEach(Array(history.enumerated()), id: \.element.id) { _, item in
@@ -1017,7 +1044,12 @@ struct SpeedtestView: View {
         if requestLocation {
             let requestedLocation = await services.location.currentLocation()
             location = requestedLocation.map {
-                Coordinates(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude)
+                Coordinates(
+                    latitude: $0.coordinate.latitude,
+                    longitude: $0.coordinate.longitude,
+                    accuracy: max(0, $0.horizontalAccuracy),
+                    observedAt: $0.timestamp
+                )
             }
         } else {
             location = nil

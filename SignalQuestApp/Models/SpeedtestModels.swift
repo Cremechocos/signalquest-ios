@@ -385,6 +385,132 @@ struct SpeedtestRunSettings: Codable, Equatable {
     )
 }
 
+/// Preuve radio brute jointe a une mesure. Toutes les identites sont explicites :
+/// `localCellId` n'est jamais promu en ECI/NCI et aucun gNB n'est derive d'un ECI.
+struct SpeedtestRadioEvidence: Codable, Equatable, Sendable {
+    var observedPlmn: String?
+    let rat: String?
+    let is5gNsa: Bool?
+    let is5gSa: Bool?
+    let enb: String?
+    let gnb: String?
+    let eci: String?
+    let nci: String?
+    let eciSource: String?
+    let nciSource: String?
+    let localCellId: String?
+    let pci: Int?
+    let tac: String?
+    let earfcn: Int?
+    let nrarfcn: Int?
+    let timingAdvance: Int?
+    let timingAdvanceSourceTechnology: String?
+    let timingAdvanceSourceCellId: String?
+    let radioAgeMs: Int?
+    let locationAgeMs: Int?
+    let locationAccuracyMeters: Double?
+    let radioObservedAt: Date?
+
+    private static func cleaned(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return nil }
+        return trimmed
+    }
+
+    init(
+        observedPlmn: String? = nil,
+        rat: String? = nil,
+        is5gNsa: Bool? = nil,
+        is5gSa: Bool? = nil,
+        enb: String? = nil,
+        gnb: String? = nil,
+        eci: String? = nil,
+        nci: String? = nil,
+        eciSource: String? = nil,
+        nciSource: String? = nil,
+        localCellId: String? = nil,
+        pci: Int? = nil,
+        tac: String? = nil,
+        earfcn: Int? = nil,
+        nrarfcn: Int? = nil,
+        timingAdvance: Int? = nil,
+        timingAdvanceSourceTechnology: String? = nil,
+        timingAdvanceSourceCellId: String? = nil,
+        radioAgeMs: Int? = nil,
+        locationAgeMs: Int? = nil,
+        locationAccuracyMeters: Double? = nil,
+        radioObservedAt: Date? = nil
+    ) {
+        self.observedPlmn = RadioLogPlmn.split(observedPlmn).map { $0.mcc + $0.mnc }
+        self.rat = rat
+        self.is5gNsa = is5gNsa
+        self.is5gSa = is5gSa
+        self.enb = Self.cleaned(enb)
+        self.gnb = Self.cleaned(gnb)
+        self.eci = Self.cleaned(eci)
+        self.nci = Self.cleaned(nci)
+        self.eciSource = Self.cleaned(eciSource)
+        self.nciSource = Self.cleaned(nciSource)
+        self.localCellId = Self.cleaned(localCellId)
+        self.pci = pci
+        self.tac = Self.cleaned(tac)
+        self.earfcn = earfcn
+        self.nrarfcn = nrarfcn
+        self.timingAdvance = timingAdvance
+        self.timingAdvanceSourceTechnology = Self.cleaned(timingAdvanceSourceTechnology)
+        self.timingAdvanceSourceCellId = Self.cleaned(timingAdvanceSourceCellId)
+        self.radioAgeMs = radioAgeMs
+        self.locationAgeMs = locationAgeMs
+        self.locationAccuracyMeters = locationAccuracyMeters
+        self.radioObservedAt = radioObservedAt
+    }
+
+    /// Snapshot limite aux informations que les API publiques iOS exposent.
+    /// Les identifiants modem restent nil plutot que d'etre reconstruits.
+    static func technologySnapshot(
+        technology: CellularRadioTechnology?,
+        observedAt: Date,
+        location: Coordinates?
+    ) -> SpeedtestRadioEvidence? {
+        guard let technology else { return nil }
+        let rat: String
+        switch technology {
+        case .twoG: rat = "GERAN"
+        case .threeG: rat = "UTRAN"
+        case .fourG: rat = "LTE"
+        case .fiveGNSA, .fiveGSA: rat = "NR"
+        }
+        let locationAgeMs = (location?.observedAt).map {
+            max(0, Int(observedAt.timeIntervalSince($0) * 1_000))
+        }
+        return SpeedtestRadioEvidence(
+            rat: rat,
+            is5gNsa: technology == .fiveGNSA,
+            is5gSa: technology == .fiveGSA,
+            radioAgeMs: 0,
+            locationAgeMs: locationAgeMs,
+            locationAccuracyMeters: location?.accuracy,
+            radioObservedAt: observedAt
+        )
+    }
+}
+
+struct SpeedtestPhysicalSiteAssociation: Codable, Equatable, Sendable {
+    struct FullCellIdentity: Codable, Equatable, Sendable {
+        let value: String
+        let kind: String
+        let source: String
+    }
+
+    let physicalSiteId: String?
+    let status: String
+    let method: String?
+    let distanceMeters: Double?
+    let resolverVersion: String
+    let resolvedAt: Date
+    let fullCellIdentity: FullCellIdentity?
+}
+
 struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     let id: UUID
     let label: String
@@ -414,6 +540,14 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     let networkOperatorName: String?
     let networkOperatorMcc: Int?
     let networkOperatorMnc: Int?
+    /// Preuve explicite du réseau servant, absente sur iOS tant qu'aucune API
+    /// publique ne l'expose. Ne jamais la reconstruire depuis la SIM ou un nom.
+    let observedPlmn: String?
+    /// PLMN de la SIM, secondaire et conservé en chaîne pour garder `001`.
+    let simPlmn: String?
+    let isRoaming: Bool?
+    let networkIdentitySource: String?
+    let radioEvidence: SpeedtestRadioEvidence?
     let marketCode: String?
     let operatorKey: String?
     /// Nom brut de la SIM. Un MVNO reste ici secondaire au réseau hôte porté
@@ -493,6 +627,11 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         networkOperatorName: String? = nil,
         networkOperatorMcc: Int? = nil,
         networkOperatorMnc: Int? = nil,
+        observedPlmn: String? = nil,
+        simPlmn: String? = nil,
+        isRoaming: Bool? = nil,
+        networkIdentitySource: String? = nil,
+        radioEvidence: SpeedtestRadioEvidence? = nil,
         marketCode: String? = nil,
         operatorKey: String? = nil,
         carrierName: String? = nil,
@@ -548,6 +687,11 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         self.networkOperatorName = networkOperatorName
         self.networkOperatorMcc = networkOperatorMcc
         self.networkOperatorMnc = networkOperatorMnc
+        self.observedPlmn = observedPlmn
+        self.simPlmn = simPlmn
+        self.isRoaming = isRoaming
+        self.networkIdentitySource = networkIdentitySource
+        self.radioEvidence = radioEvidence
         self.marketCode = marketCode
         self.operatorKey = operatorKey
         self.carrierName = carrierName
@@ -689,9 +833,37 @@ enum NetworkConnectionKind: String, Codable, Equatable, CaseIterable, Sendable {
     case other = "OTHER"
 }
 
-struct Coordinates: Codable, Equatable {
+struct Coordinates: Codable, Equatable, Sendable {
     let latitude: Double
     let longitude: Double
+    /// Precision du fix utilise pour la mesure. L'horodatage reste local et sert
+    /// uniquement a calculer `radioEvidence.locationAgeMs`.
+    let accuracy: Double?
+    let observedAt: Date?
+
+    init(latitude: Double, longitude: Double, accuracy: Double? = nil, observedAt: Date? = nil) {
+        self.latitude = latitude
+        self.longitude = longitude
+        self.accuracy = accuracy
+        self.observedAt = observedAt
+    }
+
+    enum CodingKeys: String, CodingKey { case latitude, longitude, accuracy }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        latitude = try c.decode(Double.self, forKey: .latitude)
+        longitude = try c.decode(Double.self, forKey: .longitude)
+        accuracy = try c.decodeIfPresent(Double.self, forKey: .accuracy)
+        observedAt = nil
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(latitude, forKey: .latitude)
+        try c.encode(longitude, forKey: .longitude)
+        try c.encodeIfPresent(accuracy, forKey: .accuracy)
+    }
 }
 
 struct DeviceInfo: Codable, Equatable {
@@ -736,6 +908,11 @@ struct SpeedtestSubmission: Encodable, Equatable {
     let mobileOperator: String?
     let mcc: Int?
     let mnc: Int?
+    let observedPlmn: String?
+    let simPlmn: String?
+    let isRoaming: Bool?
+    let networkIdentitySource: String?
+    let radioEvidence: SpeedtestRadioEvidence?
     let marketCode: String?
     let operatorKey: String?
     let carrierName: String?
@@ -786,8 +963,8 @@ struct SpeedtestSubmission: Encodable, Equatable {
     static let currentMethodologyVersion = 5
 
     enum CodingKeys: String, CodingKey {
-        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, marketCode, operatorKey, carrierName, mvnoKey, mvnoName, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort, methodologyVersion, engine, engineFallbackReason, requestedServerId
-        case rsrp, rsrq, snr, cellId, pci, enb, gnb, radioSnapshots
+        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, observedPlmn, simPlmn, isRoaming, networkIdentitySource, radioEvidence, marketCode, operatorKey, carrierName, mvnoKey, mvnoName, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort, methodologyVersion, engine, engineFallbackReason, requestedServerId
+        case rsrp, rsrq, snr, cellId, pci, tac, enb, gnb, earfcn, nrarfcn, timingAdvance, timingAdvanceSourceTechnology, timingAdvanceSourceCellId, radioSnapshots
         case pingDl, jitterDl, pingUl, jitterUl
     }
 
@@ -800,7 +977,9 @@ struct SpeedtestSubmission: Encodable, Equatable {
         guard let coordinate else { return nil }
         return Coordinates(
             latitude: CoordinateGrid.snap(coordinate.latitude),
-            longitude: CoordinateGrid.snap(coordinate.longitude)
+            longitude: CoordinateGrid.snap(coordinate.longitude),
+            accuracy: coordinate.accuracy,
+            observedAt: coordinate.observedAt
         )
     }
 
@@ -814,7 +993,14 @@ struct SpeedtestSubmission: Encodable, Equatable {
         guestDeleteToken: String? = nil,
         sessionId: String? = nil
     ) -> SpeedtestSubmission {
-        SpeedtestSubmission(
+        // La preuve imbriquee v2 prime si elle porte un PLMN exact. Les champs
+        // plats restent alignes dessus pour qu'une meme mesure ne puisse jamais
+        // etre resolue sur deux reseaux differents selon le lecteur backend.
+        let servingPlmn = RadioLogPlmn.split(result.radioEvidence?.observedPlmn)
+            ?? RadioLogPlmn.split(result.observedPlmn)
+        var normalizedRadioEvidence = result.radioEvidence
+        normalizedRadioEvidence?.observedPlmn = servingPlmn.map { $0.mcc + $0.mnc }
+        return SpeedtestSubmission(
             clientSubmissionId: result.id.uuidString,
             downloadSpeed: result.downloadAverageMbps,
             averageSpeed: result.downloadAverageMbps,
@@ -853,8 +1039,13 @@ struct SpeedtestSubmission: Encodable, Equatable {
             city: result.city,
             address: result.address,
             mobileOperator: result.carrierName ?? mobileOperator ?? result.networkOperatorName,
-            mcc: result.networkOperatorMcc,
-            mnc: result.networkOperatorMnc,
+            mcc: servingPlmn.flatMap { Int($0.mcc) },
+            mnc: servingPlmn.flatMap { Int($0.mnc) },
+            observedPlmn: servingPlmn.map { $0.mcc + $0.mnc },
+            simPlmn: RadioLogPlmn.split(result.simPlmn).map { $0.mcc + $0.mnc },
+            isRoaming: result.isRoaming,
+            networkIdentitySource: result.networkIdentitySource,
+            radioEvidence: normalizedRadioEvidence,
             marketCode: result.marketCode,
             operatorKey: result.operatorKey,
             carrierName: result.carrierName,
@@ -917,6 +1108,11 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encodeIfPresent(mobileOperator, forKey: .mobileOperator)
         try c.encodeIfPresent(mcc, forKey: .mcc)
         try c.encodeIfPresent(mnc, forKey: .mnc)
+        try c.encodeIfPresent(observedPlmn, forKey: .observedPlmn)
+        try c.encodeIfPresent(simPlmn, forKey: .simPlmn)
+        try c.encodeIfPresent(isRoaming, forKey: .isRoaming)
+        try c.encodeIfPresent(networkIdentitySource, forKey: .networkIdentitySource)
+        try c.encodeIfPresent(radioEvidence, forKey: .radioEvidence)
         try c.encodeIfPresent(marketCode, forKey: .marketCode)
         try c.encodeIfPresent(operatorKey, forKey: .operatorKey)
         try c.encodeIfPresent(carrierName, forKey: .carrierName)
@@ -942,10 +1138,16 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encodeNil(forKey: .rsrp)
         try c.encodeNil(forKey: .rsrq)
         try c.encodeNil(forKey: .snr)
-        try c.encodeNil(forKey: .cellId)
-        try c.encodeNil(forKey: .pci)
-        try c.encodeNil(forKey: .enb)
-        try c.encodeNil(forKey: .gnb)
+        try c.encode(radioEvidence?.localCellId, forKey: .cellId)
+        try c.encode(radioEvidence?.pci, forKey: .pci)
+        try c.encode(radioEvidence?.tac, forKey: .tac)
+        try c.encode(radioEvidence?.enb, forKey: .enb)
+        try c.encode(radioEvidence?.gnb, forKey: .gnb)
+        try c.encode(radioEvidence?.earfcn, forKey: .earfcn)
+        try c.encode(radioEvidence?.nrarfcn, forKey: .nrarfcn)
+        try c.encode(radioEvidence?.timingAdvance, forKey: .timingAdvance)
+        try c.encode(radioEvidence?.timingAdvanceSourceTechnology, forKey: .timingAdvanceSourceTechnology)
+        try c.encode(radioEvidence?.timingAdvanceSourceCellId, forKey: .timingAdvanceSourceCellId)
         try c.encodeNil(forKey: .radioSnapshots)
     }
 }
@@ -957,6 +1159,7 @@ struct SpeedtestSaveResponse: Codable {
     let requestId: String?
     /// Renvoyé uniquement à la création anonyme. Le serveur n'en conserve que le hash.
     let deleteToken: String?
+    let physicalSiteAssociation: SpeedtestPhysicalSiteAssociation?
 
     /// Le backend historique renvoie `data.id` lors de la création et `id` lors
     /// d'un rejeu idempotent. Accepter les deux évite de perdre le reçu invité

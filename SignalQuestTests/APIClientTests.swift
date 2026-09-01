@@ -28,6 +28,52 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(cookieStore.cookieHeader(), "auth_token=abc123")
     }
 
+    func testAuthenticatedResponseFailsClosedWhenCookieCannotBePersisted() async throws {
+        let credentials = CredentialStore(tokenStore: RejectingAuthTokenStore())
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        let lookupOnlyResponse = HeaderLookupOnlyHTTPURLResponse(
+            url: URL(string: "https://api.signalquest.test/api/auth/login")!,
+            setCookie: "auth_token=lookup-only; Path=/; HttpOnly"
+        )
+        XCTAssertThrowsError(try credentials.captureFromResponse(lookupOnlyResponse)) { error in
+            guard case RejectingAuthTokenStore.Failure.writeRejected = error else {
+                return XCTFail("La recherche insensible à la casse n'a pas atteint le TokenStore")
+            }
+        }
+
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1",
+                headerFields: ["Set-Cookie": "auth_token=never-persisted; Path=/; HttpOnly"]
+            )!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+
+        do {
+            let _: SuccessResponse = try await client.request(
+                APIEndpoint(path: "/api/auth/login", method: .post),
+                as: SuccessResponse.self
+            )
+            XCTFail("Une réponse auth ne doit pas réussir sans persistance du JWT")
+        } catch RejectingAuthTokenStore.Failure.writeRejected {
+            // Attendu : aucune publication de session authentifiée possible.
+        } catch {
+            XCTFail("Erreur inattendue : \(error)")
+        }
+        XCTAssertNil(credentials.accessToken())
+    }
+
+    func testSignedSimulatorHostCanRoundTripAuthKeychain() throws {
+        let store = KeychainStore(service: "fr.signalquest.ios.qa.auth-cookie")
+        try? store.removeAll()
+        defer { try? store.removeAll() }
+
+        try store.set("synthetic-auth-token", for: "auth_token")
+        XCTAssertEqual(try store.string(for: "auth_token"), "synthetic-auth-token")
+        try store.remove("auth_token")
+        XCTAssertNil(try store.string(for: "auth_token"))
+    }
+
     func testDecodesBackendErrorRequestIdAndRetryAfter() async {
         let client = APIClient(config: .test, cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore()), session: Self.mockSession())
 
@@ -167,6 +213,57 @@ final class APIClientTests: XCTestCase {
         }
     }
 
+    func testSingleAttemptReturnsHTTPFailureWithoutRefreshOrRetry() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("stale")
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        var hits = 0
+        MockURLProtocol.requestHandler = { request in
+            hits += 1
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 503,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data(#"{"error":"unavailable","code":"TEMPORARY"}"#.utf8))
+        }
+
+        let (data, response) = try await client.performSingleAttempt(
+            APIEndpoint(path: "/api/e2ee/v2/test", method: .post, body: Data("{}".utf8))
+        )
+
+        XCTAssertEqual(response.statusCode, 503)
+        XCTAssertEqual(hits, 1, "Une preuve signée ne doit jamais être rejouée automatiquement")
+        XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("TEMPORARY"))
+    }
+
+    func testRequestSpecificProtocolHeadersOverrideGlobalV1Contract() throws {
+        let client = APIClient(
+            config: .test,
+            credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+            session: Self.mockSession()
+        )
+        let request = try client.makeURLRequest(
+            APIEndpoint(
+                path: "/api/e2ee/v2/test",
+                method: .post,
+                headers: [
+                    ClientProtocolContract.protocolVersionHeader: "2",
+                    ClientProtocolContract.capabilitiesHeaderName: E2EEV2ActivationPolicy.contractPreviewCapability,
+                ],
+                body: Data("{}".utf8)
+            )
+        )
+
+        XCTAssertEqual(request.value(forHTTPHeaderField: ClientProtocolContract.protocolVersionHeader), "2")
+        XCTAssertEqual(
+            request.value(forHTTPHeaderField: ClientProtocolContract.capabilitiesHeaderName),
+            E2EEV2ActivationPolicy.contractPreviewCapability
+        )
+        XCTAssertEqual(ClientProtocolContract.currentProtocolVersion, 1)
+    }
+
     func testThrottleDelayHonorsShortRetryAfterAndCapsLong() {
         XCTAssertEqual(APIClient.throttleDelaySeconds(retryAfter: 2, attempt: 0), 2.0)
         XCTAssertNil(APIClient.throttleDelaySeconds(retryAfter: 42, attempt: 0))
@@ -289,6 +386,73 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(identity.deviceID(), firstID, "Logout must not rotate the installation identity")
     }
 
+    func testPushRegistrationSecretsAreScopedAndDurable() throws {
+        let store = InMemoryTokenStore()
+        let identity = InstallationIdentity(store: store)
+        let ownerA = PushOwnerScope.id(for: "account-a")
+        let ownerB = PushOwnerScope.id(for: "account-b")
+        let record = PushRegistrationRecord(
+            ownerScopeId: ownerA,
+            token: "fcm-a",
+            deviceID: "device-a",
+            revocationSecret: "secret-a",
+            registeredAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+
+        XCTAssertTrue(identity.saveRegistration(record))
+        XCTAssertEqual(identity.registration(ownerScopeId: ownerA), record)
+        XCTAssertNil(identity.registration(ownerScopeId: ownerB))
+
+        identity.enqueuePendingRevocation(record)
+        XCTAssertEqual(identity.pendingRevocations(), [record])
+        identity.completePendingRevocation(record)
+        XCTAssertTrue(identity.pendingRevocations().isEmpty)
+    }
+
+    func testPushRecipientPolicyRejectsCrossAccountAndLegacyPrivatePayloads() {
+        let ownerA = PushOwnerScope.id(for: "account-a")
+        let ownerB = PushOwnerScope.id(for: "account-b")
+
+        XCTAssertEqual(
+            PushRecipientPolicy.evaluate(["type": "message_new", "recipientOwnerScope": ownerA], currentOwnerScopeId: ownerA),
+            .acceptTargeted
+        )
+        XCTAssertEqual(
+            PushRecipientPolicy.evaluate(["type": "message_new", "recipientOwnerScope": ownerA], currentOwnerScopeId: ownerB),
+            .rejectWrongAccount
+        )
+        XCTAssertEqual(
+            PushRecipientPolicy.evaluate(["type": "message_new"], currentOwnerScopeId: ownerA),
+            .rejectMissingTarget
+        )
+        XCTAssertEqual(
+            PushRecipientPolicy.evaluate(["type": "e2ee_v2_device_approval"], currentOwnerScopeId: ownerA),
+            .rejectMissingTarget
+        )
+        XCTAssertEqual(
+            PushRecipientPolicy.evaluate(["type": "e2ee_v2_envelope"], currentOwnerScopeId: ownerA),
+            .rejectMissingTarget
+        )
+        XCTAssertEqual(
+            PushRecipientPolicy.evaluate(
+                ["type": "e2ee_v2_envelope", "recipientOwnerScope": ownerA],
+                currentOwnerScopeId: ownerA
+            ),
+            .acceptTargeted
+        )
+        XCTAssertEqual(
+            PushRecipientPolicy.evaluate(
+                ["type": "e2ee_v2_device_approval", "recipientOwnerScope": ownerA],
+                currentOwnerScopeId: ownerA
+            ),
+            .acceptTargeted
+        )
+        XCTAssertEqual(
+            PushRecipientPolicy.evaluate(["type": "anfr_update"], currentOwnerScopeId: nil),
+            .acceptPublic
+        )
+    }
+
     func testAccountDeletionUsesServerPreviewAndSupportedReauthenticationProofs() async throws {
         let client = APIClient(
             config: .test,
@@ -359,4 +523,35 @@ final class APIClientTests: XCTestCase {
         }
         return result
     }
+}
+
+private final class HeaderLookupOnlyHTTPURLResponse: HTTPURLResponse, @unchecked Sendable {
+    private let setCookie: String
+
+    init(url: URL, setCookie: String) {
+        self.setCookie = setCookie
+        super.init(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var allHeaderFields: [AnyHashable: Any] { [:] }
+
+    override func value(forHTTPHeaderField field: String) -> String? {
+        field.caseInsensitiveCompare("Set-Cookie") == .orderedSame ? setCookie : nil
+    }
+}
+
+private final class RejectingAuthTokenStore: TokenStore, @unchecked Sendable {
+    enum Failure: Error { case writeRejected }
+
+    func string(for key: String) throws -> String? { nil }
+    func set(_ value: String, for key: String, accessibility: KeychainAccessibility) throws {
+        throw Failure.writeRejected
+    }
+    func remove(_ key: String) throws {}
+    func keys(withPrefix prefix: String) throws -> [String] { [] }
+    func removeAll() throws {}
 }

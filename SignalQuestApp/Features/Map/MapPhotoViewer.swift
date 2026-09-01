@@ -57,6 +57,7 @@ struct MapPhotoViewer: View {
                 appeared = true
             }
         }
+        .accessibilityAction(.escape) { dismiss() }
     }
 
     // MARK: Photo
@@ -73,7 +74,7 @@ struct MapPhotoViewer: View {
                 Image(systemName: "xmark")
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(SQColor.label)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 44, height: 44)
                     .background(.ultraThinMaterial, in: Circle())
                     .background(SQColor.surfaceGlass, in: Circle())
                     .sqShadowSoft()
@@ -331,6 +332,7 @@ private struct ZoomablePhoto: View {
     let url: URL?
     let placeholder: URL?
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var scale: CGFloat = 1
     @State private var lastScale: CGFloat = 1
     @State private var offset: CGSize = .zero
@@ -361,7 +363,9 @@ private struct ZoomablePhoto: View {
                     .onChanged { value in scale = min(max(lastScale * value, 1), 4) }
                     .onEnded { _ in
                         lastScale = scale
-                        if scale <= 1 { withAnimation(.spring) { resetZoom() } }
+                        if scale <= 1 {
+                            withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { resetZoom() }
+                        }
                     }
             )
             .simultaneousGesture(
@@ -374,9 +378,27 @@ private struct ZoomablePhoto: View {
                     .onEnded { _ in lastOffset = offset }
             )
             .onTapGesture(count: 2) {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) {
                     if scale > 1 { resetZoom() } else { scale = 2.5; lastScale = 2.5 }
                 }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Photo en plein écran")
+            .accessibilityAddTraits(.isImage)
+            .accessibilityValue(scale > 1 ? "Zoom \(Int((scale * 100).rounded())) %" : "Taille adaptée")
+            .accessibilityAction(named: Text("Agrandir")) {
+                withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) {
+                    scale = min(4, max(2, scale + 0.5)); lastScale = scale
+                }
+            }
+            .accessibilityAction(named: Text("Réduire")) {
+                withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) {
+                    scale = max(1, scale - 0.5); lastScale = scale
+                    if scale == 1 { resetZoom() }
+                }
+            }
+            .accessibilityAction(named: Text("Taille adaptée")) {
+                withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { resetZoom() }
             }
         }
     }

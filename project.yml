@@ -1,5 +1,7 @@
 name: SignalQuest
 options:
+  # Keep French as the editorial/extraction language. Runtime fallback is English
+  # via CFBundleDevelopmentRegion in each app/extension Info.plist.
   developmentLanguage: fr
   # ⚠️ VÉRIFIÉ : XcodeGen 2.45.4 IGNORE silencieusement cette clé — le
   # `.pbxproj` généré garde `knownRegions = (Base, fr)`. Ce n'est pas bloquant :
@@ -58,6 +60,10 @@ targets:
         buildPhase: resources
       - path: SignalQuestApp/Resources/market_location_areas.json
         buildPhase: resources
+      - path: SignalQuestApp/Resources/plmn_assignment_registry.json
+        buildPhase: resources
+      - path: SignalQuestApp/Resources/radio_channel_registry_v1.json
+        buildPhase: resources
       - path: SignalQuestApp/Resources/Localizable.xcstrings
         buildPhase: resources
       # Clés lues par le SYSTÈME (prompts de permission, nom de l'app). Une app
@@ -109,6 +115,8 @@ targets:
       - name: Validate Build Environment
         path: ci_scripts/validate_build_environment.sh
         basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(SRCROOT)/SignalQuestApp
     postBuildScripts:
       # Sans upload des dSYM, les rapports Crashlytics arrivent non symbolisés
       # (adresses mémoire au lieu de noms de fonctions) et sont inexploitables.
@@ -136,6 +144,43 @@ targets:
       # Extension widget (embarquée dans l'app).
       - target: SignalQuestWidget
         embed: true
+      - target: SignalQuestNotificationService
+        embed: true
+  SignalQuestNotificationService:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: SignalQuestNotificationService
+        excludes:
+          - "*.entitlements"
+          - PrivacyInfo.xcprivacy
+          - Localizable.xcstrings
+      - path: SignalQuestNotificationService/Localizable.xcstrings
+        buildPhase: resources
+      - path: SignalQuestNotificationService/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      - path: SignalQuestApp/Core/Shared/E2EEV2NotificationContracts.swift
+      - path: SignalQuestApp/Core/Shared/E2EEV2NotificationRuntime.swift
+      - path: SignalQuestApp/Core/Shared/E2EEV2NotificationProcessor.swift
+      - path: SignalQuestApp/Core/Shared/E2EEV2NotificationContextStore.swift
+      - path: SignalQuestApp/Core/Security/KeychainStore.swift
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Staging: Config/Staging.xcconfig
+      Release: Config/Release.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.notification-service
+        PRODUCT_NAME: SignalQuestNotificationService
+        INFOPLIST_FILE: SignalQuestNotificationService/Info.plist
+        CODE_SIGN_ENTITLEMENTS: SignalQuestNotificationService/SignalQuestNotificationService.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+      configs:
+        Staging:
+          PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.beta.notification-service
   SignalQuestWidget:
     type: app-extension
     platform: iOS
@@ -161,6 +206,7 @@ targets:
       path: SignalQuestWidget/Info.plist
       properties:
         CFBundleDisplayName: SignalQuest
+        CFBundleDevelopmentRegion: en
         # XcodeGen écrit sinon les littéraux "1.0"/"1" dans le plist généré, et
         # les MARKETING_VERSION/CURRENT_PROJECT_VERSION ci-dessous n'ont alors
         # AUCUN effet : l'extension resterait en 1.0 (1) pendant que l'app hôte

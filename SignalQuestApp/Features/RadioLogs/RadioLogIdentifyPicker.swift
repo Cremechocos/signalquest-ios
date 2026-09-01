@@ -112,11 +112,15 @@ final class RadioLogIdentifyPicker: ObservableObject {
         }
 
         let origin = CLLocation(latitude: latitude, longitude: longitude)
-        let market = RadioLogOperatorResolver.marketCode(forOperator: site.operatorName, mcc: site.mcc) ?? "FR"
+        guard let market = site.resolvedMarketCode else {
+            errorMessage = String(localized: "Pays du relevé inconnu : impossible de rechercher une antenne sans inventer un marché.")
+            candidates = []
+            return
+        }
         // Clé canonique, pas le nom brut du log : « Orange » ne filtre rien
         // côté carte, « ORANGE » oui. `ALL` quand on ne sait pas — mieux vaut
         // proposer les antennes de tous les opérateurs que zéro.
-        let operatorKey = RadioLogOperatorResolver.operatorKey(forOperator: site.operatorName) ?? "ALL"
+        let operatorKey = site.resolvedOperatorKey ?? "ALL"
 
         async let hypothesisTask = service.hypothesis(for: site)
         async let nearbyTask = try? antennas.list(
@@ -266,14 +270,7 @@ final class RadioLogIdentifyPicker: ObservableObject {
     nonisolated static func request(for site: RadioLogSite, candidate: RadioLogCandidate) -> IdentifyDirectRequest {
         // Cellule représentative : la plus relevée, donc la plus sûre.
         let cell = site.cells.max { $0.logCount < $1.logCount }
-        let plmn: (mcc: String?, mnc: String?)
-        if let mcc = site.mcc, let mnc = site.mnc {
-            plmn = (mcc, mnc)
-        } else if let fallback = RadioLogOperatorResolver.mccMnc(forOperator: site.operatorName) {
-            plmn = (fallback.mcc, fallback.mnc)
-        } else {
-            plmn = (site.mcc, site.mnc)
-        }
+        let plmn = (mcc: site.mcc, mnc: site.mnc)
 
         return IdentifyDirectRequest(
             siteId: candidate.siteId,
@@ -287,9 +284,15 @@ final class RadioLogIdentifyPicker: ObservableObject {
             earfcn: site.earfcn ?? cell?.earfcn,
             // Clé canonique là aussi : le serveur ne lit `operator` que pour les
             // comptes privilégiés, mais quand il le lit, il le compare à des clés.
-            operatorName: RadioLogOperatorResolver.operatorKey(forOperator: site.operatorName) ?? site.operatorName,
+            operatorName: site.resolvedOperatorKey,
+            operatorKey: site.resolvedOperatorKey,
+            marketCode: site.resolvedMarketCode,
+            rawOperatorName: site.rawOperatorName,
+            observedPlmn: plmn.mcc.flatMap { mcc in plmn.mnc.map { mcc + $0 } },
             mcc: plmn.mcc,
             mnc: plmn.mnc,
+            isRoaming: site.isRoaming,
+            networkIdentitySource: cell?.networkIdentitySource,
             latitude: site.latitude,
             longitude: site.longitude
         )
@@ -298,10 +301,12 @@ final class RadioLogIdentifyPicker: ObservableObject {
     /// Ce qui manque, en clair, pour que l'identification ne parte pas vers un
     /// échec prévisible. Nil = la charge est complète.
     nonisolated static func blockingReason(for site: RadioLogSite) -> String? {
-        let hasPlmn = (site.mcc != nil && site.mnc != nil)
-            || RadioLogOperatorResolver.mccMnc(forOperator: site.operatorName) != nil
+        let hasPlmn = site.mcc != nil && site.mnc != nil
         if !hasPlmn {
-            return String(localized: "Opérateur du relevé inconnu : le serveur ne peut pas rattacher cette identification.")
+            return String(localized: "PLMN servant absent : choisis manuellement le pays et l’opérateur avant l’identification.")
+        }
+        if site.resolvedMarketCode == nil {
+            return String(localized: "Pays du relevé inconnu : choisis-le avant l’identification.")
         }
         if !site.hasCoordinate {
             return String(localized: "Aucun de ces relevés ne porte de position.")

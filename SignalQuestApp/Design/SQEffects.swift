@@ -40,7 +40,12 @@ private struct SQShimmerModifier: ViewModifier {
                 }
                 .clipped()
                 .onAppear {
-                    withAnimation(.linear(duration: 1.6).repeatForever(autoreverses: false)) {
+                    guard let animation = SQMotion.repeating(
+                        .linear(duration: 1.6),
+                        autoreverses: false,
+                        reduceMotion: reduceMotion
+                    ) else { return }
+                    withAnimation(animation) {
                         phase = 1
                     }
                 }
@@ -91,7 +96,12 @@ private struct SQLikePopFallbackModifier<T: Equatable>: ViewModifier {
     }
 }
 
-/// Apparition fondu + translation des cards au scroll (web `sqFadeUp`).
+/// Translation légère des cartes au scroll (web `sqFadeUp`).
+///
+/// Le contenu reste toujours à opacité pleine. Une opacité de 25 % appliquée
+/// aux éléments proches du bord du viewport faisait échouer le contraste et
+/// pouvait rendre une carte durablement illisible tant qu'elle n'atteignait
+/// pas exactement l'état `identity` du `scrollTransition`.
 /// `scrollTransition` est iOS 17+ ; sur iOS 16 la card apparaît normalement.
 private struct SQFadeUpModifier: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -102,7 +112,6 @@ private struct SQFadeUpModifier: ViewModifier {
         } else if #available(iOS 17.0, *) {
             content.scrollTransition(.animated(SQMotion.standard), axis: .vertical) { view, transition in
                 view
-                    .opacity(transition.isIdentity ? 1 : 0.25)
                     .offset(y: transition.isIdentity ? 0 : 14)
                     .scaleEffect(transition.isIdentity ? 1 : 0.98)
             }

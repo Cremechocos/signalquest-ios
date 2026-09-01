@@ -6,9 +6,20 @@ struct SpeedtestTriMetric: View {
     let result: SpeedtestRunResult?
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        HStack(spacing: SQSpace.md) {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: SQSpace.sm) { metricCells }
+            } else {
+                HStack(spacing: SQSpace.md) { metricCells }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var metricCells: some View {
             cell(
                 title: "Ping",
                 value: pingText,
@@ -27,7 +38,6 @@ struct SpeedtestTriMetric: View {
                 state: state(for: .upload),
                 quality: mbpsQuality(uploadMbps)
             )
-        }
     }
 
     var qualityStops: [Color] {
@@ -95,8 +105,9 @@ struct SpeedtestTriMetric: View {
     }
 
     func valueColor(_ value: String, state: CellState, quality: Color?) -> Color {
-        if value == "—" { return SQColor.labelTertiary }
-        if state == .active { return quality ?? SQColor.brandRed }
+        if value == "—" { return SQColor.label }
+        // La qualité reste portée par la barrette. Les couleurs RF/qualité ne
+        // sont pas toutes des encres texte garanties à 4,5:1.
         return SQColor.label
     }
 
@@ -114,14 +125,14 @@ struct SpeedtestTriMetric: View {
         VStack(spacing: 3) {
             Text(LocalizedStringKey(title))
                 .font(SQFont.body(12))
-                .foregroundStyle(SQColor.labelSecondary)
+                .foregroundStyle(SQColor.label)
             Text(value)
                 .font(SQFont.display(20, .bold, relativeTo: .title3))
                 .monospacedDigit()
                 .foregroundStyle(valueColor(value, state: state, quality: quality))
                 .contentTransition(.numericText())
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(barColor(state, quality: quality))
                 .frame(width: 26, height: 4)

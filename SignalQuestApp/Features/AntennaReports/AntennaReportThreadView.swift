@@ -455,6 +455,10 @@ struct AntennaReportImageViewer: View {
                     .onTapGesture(count: 2) { toggleZoom() }
                     .accessibilityLabel("Photo en plein écran")
                     .accessibilityAddTraits(.isImage)
+                    .accessibilityValue(scale > 1 ? "Zoom \(Int((scale * 100).rounded())) %" : "Taille adaptée")
+                    .accessibilityAction(named: Text("Agrandir")) { zoomIn() }
+                    .accessibilityAction(named: Text("Réduire")) { zoomOut() }
+                    .accessibilityAction(named: Text("Taille adaptée")) { resetZoom(animated: true) }
             }
 
             closeButton.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -522,6 +526,29 @@ struct AntennaReportImageViewer: View {
     private func toggleZoom() {
         withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) {
             if scale > 1 { scale = 1; lastScale = 1 } else { scale = 2.5; lastScale = 2.5 }
+        }
+    }
+
+    private func zoomIn() {
+        withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) {
+            scale = min(4, max(2, scale + 0.5))
+            lastScale = scale
+        }
+    }
+
+    private func zoomOut() {
+        withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) {
+            scale = max(1, scale - 0.5)
+            lastScale = scale
+        }
+    }
+
+    private func resetZoom(animated: Bool) {
+        let update = { scale = CGFloat(1); lastScale = CGFloat(1) }
+        if animated {
+            withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion), update)
+        } else {
+            update()
         }
     }
 }

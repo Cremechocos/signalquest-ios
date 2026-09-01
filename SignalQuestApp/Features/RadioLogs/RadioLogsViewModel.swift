@@ -363,11 +363,14 @@ final class RadioLogsViewModel: ObservableObject {
         nameTasks.insert(site.id)
         Task { [weak self] in
             guard let self else { return }
-            let market = RadioLogOperatorResolver.marketCode(forOperator: site.operatorName, mcc: site.mcc) ?? "FR"
+            guard let market = site.resolvedMarketCode else {
+                self.nameTasks.remove(site.id)
+                return
+            }
             let details = try? await self.antennas.details(
                 id: siteId,
                 market: market,
-                operatorName: site.operatorName ?? "ALL"
+                operatorName: site.resolvedOperatorKey ?? "ALL"
             )
             self.nameTasks.remove(site.id)
             guard let label = Self.locationLabel(from: details) else { return }

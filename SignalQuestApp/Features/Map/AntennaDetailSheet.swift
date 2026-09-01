@@ -125,7 +125,7 @@ struct AntennaDetailSheet: View {
     init(
         site: AntennaSite,
         market: String = "FR",
-        operatorName: String = "SFR",
+        operatorName: String = "ALL",
         service: AntennasServicing,
         customSite: AndroidCustomSiteMarker? = nil,
         onIsolateCoverage: ((AntennaCoverageFocus) -> Void)? = nil
@@ -134,7 +134,14 @@ struct AntennaDetailSheet: View {
         self.market = market
         self.customSite = customSite
         self.onIsolateCoverage = onIsolateCoverage
-        let resolved = operatorName == "ALL" ? (site.operators.first ?? "SFR") : operatorName
+        // Aucun repli SFR : un site étranger ou communautaire ne doit jamais être
+        // ouvert sous une facette française inventée. On conserve le choix reçu
+        // lorsqu'il existe réellement, sinon la première facette connue du site ;
+        // sans facette fiable, "ALL" laisse le backend répondre honnêtement.
+        let requested = operatorName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolved = site.operators.first {
+            $0.caseInsensitiveCompare(requested) == .orderedSame
+        } ?? site.operators.first ?? (requested.isEmpty ? "ALL" : requested)
         _selectedOperator = State(initialValue: resolved)
         _model = StateObject(wrappedValue: AntennaDetailViewModel(service: service))
     }

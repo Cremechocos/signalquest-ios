@@ -5,6 +5,23 @@ import SwiftUI
 @testable import SignalQuest
 
 final class SpeedtestTests: XCTestCase {
+    func testCloudflareFallbackPolicyQuarantinesOnlyForConfiguredCooldown() {
+        final class TestClock: @unchecked Sendable {
+            var value = Date(timeIntervalSince1970: 1_000)
+        }
+
+        let clock = TestClock()
+        let policy = CloudflareAutoFallbackPolicy(cooldown: 90, now: { clock.value })
+
+        XCTAssertFalse(policy.shouldAvoidCloudflare())
+        policy.recordTemporaryFailure()
+        XCTAssertTrue(policy.shouldAvoidCloudflare())
+
+        clock.value = clock.value.addingTimeInterval(90)
+        XCTAssertFalse(policy.shouldAvoidCloudflare())
+        XCTAssertFalse(policy.shouldAvoidCloudflare(), "La quarantaine expirée doit être nettoyée")
+    }
+
     func testMetricMath() throws {
         XCTAssertEqual(SpeedMetricCalculator.mbps(bytes: 1_000_000, seconds: 1), 8, accuracy: 0.001)
         XCTAssertEqual(SpeedMetricCalculator.average([10, 20, 30]), 20, accuracy: 0.001)
@@ -169,6 +186,7 @@ final class SpeedtestTests: XCTestCase {
             networkOperatorName: "SFR",
             networkOperatorMcc: 208,
             networkOperatorMnc: 10,
+            simPlmn: "20810",
             marketCode: "FR",
             operatorKey: "SFR",
             wifiSSID: nil,
@@ -188,26 +206,31 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(json["connectionType"] as? String, "5G NSA")
         XCTAssertEqual(json["networkType"] as? String, "CELLULAR")
         XCTAssertEqual(json["mobileOperator"] as? String, "SFR")
-        XCTAssertEqual(json["mcc"] as? Int, 208)
-        XCTAssertEqual(json["mnc"] as? Int, 10)
+        XCTAssertNil(json["mcc"])
+        XCTAssertNil(json["mnc"])
+        XCTAssertNil(json["observedPlmn"])
+        XCTAssertEqual(json["simPlmn"] as? String, "20810")
         XCTAssertEqual(json["marketCode"] as? String, "FR")
         XCTAssertEqual(json["operatorKey"] as? String, "SFR")
     }
 
-    func testMvnoPayloadKeepsHostNetworkAndObservedPlmnSeparate() throws {
+    func testMvnoPayloadKeepsHostNetworkAndSimPlmnSeparate() throws {
         let result = SpeedtestRunResult(
             label: "MVNO", downloadMbps: 50, downloadAverageMbps: 48,
             downloadMaxMbps: 55, durationSeconds: 10, connectionType: .cellular,
             cellularTechnology: .fourG, networkOperatorName: "Bouygues Telecom",
             networkOperatorMcc: 208, networkOperatorMnc: 20,
+            simPlmn: "20820",
             marketCode: "FR", operatorKey: "BOUYGUES",
             carrierName: "Lebara Mobile", mvnoKey: "LEBARA", mvnoName: "Lebara"
         )
         let payload = SpeedtestSubmission.iosPayload(from: result, streams: 4, deviceModel: "iPhone")
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder.signalQuest.encode(payload)) as? [String: Any])
 
-        XCTAssertEqual(json["mcc"] as? Int, 208)
-        XCTAssertEqual(json["mnc"] as? Int, 20)
+        XCTAssertNil(json["mcc"])
+        XCTAssertNil(json["mnc"])
+        XCTAssertNil(json["observedPlmn"])
+        XCTAssertEqual(json["simPlmn"] as? String, "20820")
         XCTAssertEqual(json["operatorKey"] as? String, "BOUYGUES")
         XCTAssertEqual(json["mobileOperator"] as? String, "Lebara Mobile")
         XCTAssertEqual(json["carrierName"] as? String, "Lebara Mobile")
@@ -229,6 +252,166 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertNil(json["mnc"])
         XCTAssertEqual(json["operatorKey"] as? String, "SFR")
         XCTAssertEqual(json["carrierName"] as? String, "Lebara Mobile")
+    }
+
+    func testExplicitServingPlmnPreservesThreeDigitMncInSpeedtestPayload() throws {
+        let evidence = SpeedtestRadioEvidence(observedPlmn: "310001", rat: "NR", is5gNsa: true)
+        let result = SpeedtestRunResult(
+            label: "US serving network", downloadMbps: 75, downloadAverageMbps: 70,
+            downloadMaxMbps: 82, durationSeconds: 10, connectionType: .cellular,
+            cellularTechnology: .fiveGNSA, networkOperatorName: "T-Mobile US",
+            networkOperatorMcc: 310, networkOperatorMnc: 1,
+            observedPlmn: "310001", simPlmn: "20815",
+            radioEvidence: evidence,
+            marketCode: "US", operatorKey: "T_MOBILE_US", carrierName: "Free"
+        )
+        let payload = SpeedtestSubmission.iosPayload(from: result, streams: 4, deviceModel: "iPhone")
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder.signalQuest.encode(payload)) as? [String: Any])
+
+        XCTAssertEqual(json["observedPlmn"] as? String, "310001")
+        XCTAssertEqual(json["mcc"] as? Int, 310)
+        XCTAssertEqual(json["mnc"] as? Int, 1)
+        XCTAssertEqual(json["simPlmn"] as? String, "20815")
+        XCTAssertEqual(json["operatorKey"] as? String, "T_MOBILE_US")
+        let nested = try XCTUnwrap(json["radioEvidence"] as? [String: Any])
+        XCTAssertEqual(nested["observedPlmn"] as? String, "310001")
+    }
+
+    func testSpeedtestRadioEvidenceV2KeepsExplicitNSAIdentitiesAndFreshness() throws {
+        let evidence = SpeedtestRadioEvidence(
+            observedPlmn: "20810",
+            rat: "NR",
+            is5gNsa: true,
+            is5gSa: false,
+            enb: "6506",
+            gnb: "16383",
+            eci: "1665538",
+            nci: "268419074",
+            eciSource: "modem_cell_identity",
+            nciSource: "modem_cell_identity",
+            localCellId: "2",
+            pci: 253,
+            tac: "A001",
+            earfcn: 2850,
+            nrarfcn: 428000,
+            timingAdvance: 4,
+            timingAdvanceSourceTechnology: "LTE_ANCHOR",
+            timingAdvanceSourceCellId: "1665538",
+            radioAgeMs: 250,
+            locationAgeMs: 500,
+            locationAccuracyMeters: 12,
+            radioObservedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let result = SpeedtestRunResult(
+            label: "NSA explicite",
+            downloadMbps: 100,
+            downloadAverageMbps: 95,
+            downloadMaxMbps: 110,
+            durationSeconds: 10,
+            connectionType: .cellular,
+            cellularTechnology: .fiveGNSA,
+            observedPlmn: "20810",
+            radioEvidence: evidence
+        )
+
+        let payload = SpeedtestSubmission.iosPayload(from: result, streams: 4, deviceModel: "iPhone")
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder.signalQuest.encode(payload)) as? [String: Any])
+        let nested = try XCTUnwrap(json["radioEvidence"] as? [String: Any])
+        XCTAssertEqual(nested["observedPlmn"] as? String, "20810")
+        XCTAssertEqual(nested["rat"] as? String, "NR")
+        XCTAssertEqual(nested["is5gNsa"] as? Bool, true)
+        XCTAssertEqual(nested["enb"] as? String, "6506")
+        XCTAssertEqual(nested["gnb"] as? String, "16383")
+        XCTAssertEqual(nested["eci"] as? String, "1665538")
+        XCTAssertEqual(nested["nci"] as? String, "268419074")
+        XCTAssertEqual(nested["localCellId"] as? String, "2")
+        XCTAssertEqual(nested["timingAdvanceSourceTechnology"] as? String, "LTE_ANCHOR")
+        XCTAssertEqual(nested["radioAgeMs"] as? Int, 250)
+        XCTAssertEqual(nested["locationAccuracyMeters"] as? Double, 12)
+        XCTAssertEqual(json["cellId"] as? String, "2")
+        XCTAssertEqual(json["gnb"] as? String, "16383")
+    }
+
+    func testSpeedtestRadioEvidenceNeverDerivesGnbFromLteEci() throws {
+        let evidence = SpeedtestRadioEvidence(
+            observedPlmn: "20810",
+            rat: "NR",
+            is5gNsa: true,
+            enb: "12197",
+            eci: "3112966",
+            eciSource: "modem_cell_identity"
+        )
+        let result = SpeedtestRunResult(
+            label: "Ancre NSA",
+            downloadMbps: 50,
+            downloadAverageMbps: 48,
+            downloadMaxMbps: 55,
+            durationSeconds: 10,
+            connectionType: .cellular,
+            cellularTechnology: .fiveGNSA,
+            observedPlmn: "20810",
+            radioEvidence: evidence
+        )
+        let payload = SpeedtestSubmission.iosPayload(from: result, streams: 4, deviceModel: "iPhone")
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder.signalQuest.encode(payload)) as? [String: Any])
+        let nested = try XCTUnwrap(json["radioEvidence"] as? [String: Any])
+        XCTAssertNil(nested["gnb"])
+        XCTAssertEqual(nested["eci"] as? String, "3112966")
+        XCTAssertTrue(json["gnb"] is NSNull)
+    }
+
+    func testDriveTestSplitsNSACellsAndKeepsLteAnchorTimingAdvanceOffNr() throws {
+        let evidence = SpeedtestRadioEvidence(
+            observedPlmn: "20810",
+            rat: "NR",
+            is5gNsa: true,
+            enb: "6506",
+            gnb: "16383",
+            eci: "1665538",
+            nci: "268419074",
+            localCellId: "2",
+            pci: 253,
+            earfcn: 2850,
+            nrarfcn: 428000,
+            timingAdvance: 4,
+            timingAdvanceSourceTechnology: "LTE_ANCHOR",
+            timingAdvanceSourceCellId: "1665538"
+        )
+        let cells = CoverageCellEvidenceUpload.cells(from: evidence)
+        XCTAssertEqual(cells.count, 2)
+        let lte = try XCTUnwrap(cells.first { $0.cellType == "LTE" })
+        let nr = try XCTUnwrap(cells.first { $0.cellType == "NR" })
+        XCTAssertTrue(lte.isPrimary)
+        XCTAssertEqual(lte.enb, "6506")
+        XCTAssertEqual(lte.eci, "1665538")
+        XCTAssertEqual(lte.timingAdvance, 4)
+        XCTAssertEqual(lte.timingAdvanceSourceTechnology, "LTE_ANCHOR")
+        XCTAssertFalse(nr.isPrimary)
+        XCTAssertEqual(nr.gnb, "16383")
+        XCTAssertEqual(nr.nci, "268419074")
+        XCTAssertNil(nr.timingAdvance)
+        XCTAssertNil(nr.timingAdvanceSourceTechnology)
+
+        let point = CoveragePointUpload(
+            latitude: 50.6292,
+            longitude: 3.0573,
+            timestamp: 1_700_000_000_000,
+            technology: "5G NSA",
+            observedPlmn: "20810",
+            enb: evidence.enb,
+            gnb: evidence.gnb,
+            cellId: evidence.localCellId,
+            eci: evidence.eci,
+            nci: evidence.nci,
+            timingAdvance: evidence.timingAdvance,
+            timingAdvanceSourceTechnology: evidence.timingAdvanceSourceTechnology,
+            timingAdvanceSourceCellId: evidence.timingAdvanceSourceCellId,
+            cells: cells
+        )
+        let pointJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder.signalQuest.encode(point)) as? [String: Any])
+        XCTAssertEqual((pointJSON["cells"] as? [[String: Any]])?.count, 2)
+        XCTAssertEqual(pointJSON["eci"] as? String, "1665538")
+        XCTAssertEqual(pointJSON["nci"] as? String, "268419074")
     }
 
     func testSpeedtestDetailDecodesBackendShape() throws {
@@ -326,10 +509,20 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertTrue(text.contains("signalquest.fr"))
     }
 
-    func testShareImageLocationFallsBackToFrance() {
-        // L'OG web place la ville (ou « France ») ; on vérifie la dérivation.
+    func testShareImageLocationKeepsMeasuredCityAndDoesNotInventCountry() {
         let withCity = makeSpeedtestResult(downloadSeries: [120, 180], uploadSeries: [40, 90])
         XCTAssertEqual(SpeedtestShareImageRenderer.location(for: withCity), "Paris")
+
+        let withoutCity = SpeedtestRunResult(
+            label: "Lieu inconnu",
+            downloadMbps: 120,
+            downloadAverageMbps: 110,
+            downloadMaxMbps: 130,
+            durationSeconds: 10,
+            connectionType: .cellular,
+            city: nil
+        )
+        XCTAssertNil(SpeedtestShareImageRenderer.location(for: withoutCity))
     }
 
     func testWifiSSIDNormalizationRejectsPlaceholders() {
@@ -464,6 +657,42 @@ final class SpeedtestTests: XCTestCase {
 
         XCTAssertEqual(creation.resolvedID, "created-id")
         XCTAssertEqual(replay.resolvedID, "replayed-id")
+        XCTAssertNil(creation.physicalSiteAssociation)
+        XCTAssertNil(replay.physicalSiteAssociation)
+    }
+
+    func testSaveResponseDecodesVersionedPhysicalSiteAssociationSeparately() throws {
+        let response = try JSONDecoder.signalQuest.decode(
+            SpeedtestSaveResponse.self,
+            from: Data(#"""
+            {
+              "success":true,
+              "id":"speed-physical-1",
+              "physicalSiteAssociation":{
+                "physicalSiteId":"site-lille-1",
+                "status":"resolved",
+                "method":"explicit_full_cell",
+                "distanceMeters":84.5,
+                "resolverVersion":"physical-site-v1",
+                "resolvedAt":"2026-08-30T00:00:00.000Z",
+                "fullCellIdentity":{
+                  "value":"1665538",
+                  "kind":"eci",
+                  "source":"modem_cell_identity"
+                }
+              }
+            }
+            """#.utf8)
+        )
+        let association = try XCTUnwrap(response.physicalSiteAssociation)
+        XCTAssertEqual(association.physicalSiteId, "site-lille-1")
+        XCTAssertEqual(association.status, "resolved")
+        XCTAssertEqual(association.method, "explicit_full_cell")
+        XCTAssertEqual(association.distanceMeters, 84.5)
+        XCTAssertEqual(association.resolverVersion, "physical-site-v1")
+        XCTAssertEqual(association.fullCellIdentity?.value, "1665538")
+        XCTAssertEqual(association.fullCellIdentity?.kind, "eci")
+        XCTAssertEqual(association.fullCellIdentity?.source, "modem_cell_identity")
     }
 
     func testSaveResponseParsesResolvedMvnoIdentity() throws {

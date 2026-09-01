@@ -166,6 +166,19 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
     let tech: String?
     /// Clé canonique du RÉSEAU servant, résolue serveur (« SFR », « BOUYGUES »…).
     let operatorKey: String?
+    /// Preuve réseau du point, distincte du nom de SIM. Les chaînes préservent
+    /// les MNC à trois chiffres avec zéro initial (`310001`).
+    private let observedPlmnValue: JSONValue?
+    private let observedMccValue: JSONValue?
+    private let observedMncValue: JSONValue?
+    var observedPlmn: String? { RadioLogPlmn.rawText(observedPlmnValue) }
+    var observedMcc: String? { RadioLogPlmn.rawText(observedMccValue) }
+    var observedMnc: String? { RadioLogPlmn.rawText(observedMncValue) }
+    let networkIdentitySource: String?
+    let networkIdentityConfidence: String?
+    let marketCode: String?
+    let countryCode: String?
+    let isRoaming: Bool?
     let mvnoKey: String?
     let mvnoName: String?
     /// Nom de la SIM tel qu'envoyé par le client. N'est PAS une clé : ne jamais
@@ -177,6 +190,8 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
         case id, latitude, lat, longitude, lng
         case signalStrength, rsrp, enb, gnb, pci, cellId
         case technology, networkType, operatorKey, mobileOperator, mvnoKey, mvnoName, timestamp
+        case observedPlmn, observedMcc, observedMnc, mobileCountryCode, mobileNetworkCode
+        case marketCode, countryCode, isRoaming, networkIdentitySource, networkIdentityConfidence
     }
 
     init(from decoder: Decoder) throws {
@@ -196,6 +211,16 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
         // mélange que ce chantier supprime : un « Lebara » ou un « Orange F » ne
         // correspond à aucune clé et fausse tout ce qui s'appuie dessus.
         operatorKey = c.decodeFlexibleString(forKey: .operatorKey)
+        observedPlmnValue = try? c.decodeIfPresent(JSONValue.self, forKey: .observedPlmn)
+        observedMccValue = (try? c.decodeIfPresent(JSONValue.self, forKey: .observedMcc))
+            ?? (try? c.decodeIfPresent(JSONValue.self, forKey: .mobileCountryCode))
+        observedMncValue = (try? c.decodeIfPresent(JSONValue.self, forKey: .observedMnc))
+            ?? (try? c.decodeIfPresent(JSONValue.self, forKey: .mobileNetworkCode))
+        networkIdentitySource = c.decodeFlexibleString(forKey: .networkIdentitySource)
+        networkIdentityConfidence = c.decodeFlexibleString(forKey: .networkIdentityConfidence)
+        marketCode = c.decodeFlexibleString(forKey: .marketCode)
+        countryCode = c.decodeFlexibleString(forKey: .countryCode)
+        isRoaming = try? c.decodeIfPresent(Bool.self, forKey: .isRoaming)
         simOperator = c.decodeFlexibleString(forKey: .mobileOperator)
         mvnoKey = c.decodeFlexibleString(forKey: .mvnoKey)
         mvnoName = c.decodeFlexibleString(forKey: .mvnoName)
@@ -204,6 +229,16 @@ struct CoverageSessionPoint: Decodable, Identifiable, Equatable {
 
     var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: lat, longitude: lng) }
     var hasValidCoordinate: Bool { lat != 0 || lng != 0 }
+
+    var plmnEvidence: RadioLogPlmnEvidence {
+        if [networkIdentitySource, networkIdentityConfidence].contains(where: {
+            $0?.uppercased().contains("AMBIGUOUS") == true
+        }) { return .legacyAmbiguous }
+        if networkIdentitySource?.uppercased() == "SIM_ONLY" { return .missing }
+        return RadioLogPlmn.resolve(observedPlmn: observedPlmnValue, mcc: observedMccValue, mnc: observedMncValue)
+    }
+
+    var servingPlmn: (mcc: String, mnc: String, plmn: String)? { plmnEvidence.components }
 }
 
 /// Speedtest rattaché à une session Drive Test — renvoyé par le backend SOUS

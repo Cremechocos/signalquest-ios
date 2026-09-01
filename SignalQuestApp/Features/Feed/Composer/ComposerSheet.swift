@@ -345,18 +345,16 @@ final class ComposerViewModel: ObservableObject {
         isBusy = true
         defer { isBusy = false }
         do {
-            var attachments: [CreatePostAttachment] = []
             // Encodage + downscale (≤1600 px) HORS du main thread pour ne pas geler
             // l'UI au tap « Publier » avec une photo pleine résolution (PERF-COMP-01).
-            if let imageData = await preparedImageData() {
-                attachments.append(try await service.uploadImage(data: imageData, mimeType: "image/jpeg"))
-            }
+            let imageData = await preparedImageData()
             let fallback = attachedSpeedtest != nil ? "Mon dernier speedtest SignalQuest" : "Photo SignalQuest"
             let safeBody = body.isEmpty ? fallback : body
-            _ = try await service.createPost(
+            _ = try await service.publishPost(
                 text: safeBody,
                 visibility: visibility.rawValue,
-                attachments: attachments,
+                imageData: imageData,
+                imageMimeType: "image/jpeg",
                 targetType: attachedSpeedtest != nil ? "speedtest" : nil,
                 targetId: attachedSpeedtest?.id,
                 extraMetadata: attachedSpeedtest.map { ["speedtestId": .string($0.id)] },
@@ -473,6 +471,7 @@ struct ComposerSheet: View {
                                 .font(SQType.body)
                                 .textFieldStyle(.plain)
                                 .focused($isInputFocused)
+                                .accessibilityIdentifier("feed.composer.text")
 
                             if !model.mentionSuggestions.isEmpty {
                                 mentionSuggestions

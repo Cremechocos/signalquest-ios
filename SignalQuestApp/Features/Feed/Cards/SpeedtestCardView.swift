@@ -13,6 +13,7 @@ struct SpeedtestCardView: View {
     var onAuthorTap: (() -> Void)? = nil
     /// Réaction emoji (appui long sur ❤️). Repli sur onLike si absent.
     var onReact: ((String) -> Void)? = nil
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var signal: SocialSignalSummary? { item.signal }
 
@@ -30,9 +31,11 @@ struct SpeedtestCardView: View {
 
                 if !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("feed.speedtest.subtitle")
                 }
 
                 // 4 tuiles Down / Up / Ping / Tech — valeurs nues (l'unité est
@@ -46,8 +49,9 @@ struct SpeedtestCardView: View {
 
                 if let footer = footer {
                     Text(footer)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .font(SQFont.body(12.5, relativeTo: .footnote))
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 if !item.text.isEmpty {
@@ -55,6 +59,7 @@ struct SpeedtestCardView: View {
                         .font(SQType.body)
                         .lineSpacing(3)
                         .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 CardActionsBar(
@@ -74,7 +79,7 @@ struct SpeedtestCardView: View {
     }
 
     private var gridColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: 4)
+        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4)
     }
 
     /// Débit sans unité (« 412 », « 64,3 ») — le rendu cible affiche les

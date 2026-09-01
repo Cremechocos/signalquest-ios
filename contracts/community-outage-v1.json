@@ -1,0 +1,103 @@
+{
+  "schema": "signalquest.community-outage.contract",
+  "version": 1,
+  "states": {
+    "open": ["reported", "confirmed", "dormant"],
+    "visible": ["reported", "confirmed"],
+    "terminal": ["resolved", "rejected"],
+    "resolvedReasons": [
+      "community_repaired",
+      "disputed",
+      "author_closed",
+      "operator_feed_cleared",
+      "admin"
+    ]
+  },
+  "thresholds": {
+    "confirmWeight": 3,
+    "confirmMargin": 2,
+    "disputeWeight": 2,
+    "repairedDistinctUsers": 2
+  },
+  "awards": {
+    "reported": 5,
+    "vote": 2,
+    "confirmed": 25,
+    "operatorConfirmed": 50
+  },
+  "deliveryStates": [
+    "pending",
+    "failed",
+    "accepted",
+    "received",
+    "opened",
+    "no_token",
+    "not_requested",
+    "failed_terminal",
+    "legacy_unknown"
+  ],
+  "writeErrorCodes": [
+    "UNAUTHORIZED",
+    "NOT_ELIGIBLE",
+    "POSITION_REQUIRED",
+    "UNKNOWN_SITE",
+    "INVALID_TARGET_KIND",
+    "MISSING_SCOPE",
+    "INVALID_OPERATOR",
+    "MARKET_OPERATOR_MISMATCH",
+    "COMMENT_TOO_LONG",
+    "PAYLOAD_TOO_LARGE",
+    "INVALID_DEVICE_ID",
+    "ALREADY_REPORTED",
+    "OPERATOR_INCIDENT_ACTIVE",
+    "OUTAGE_CLOSED",
+    "SELF_CONFIRMATION",
+    "NOT_FOUND",
+    "NOT_AUTHOR",
+    "OPEN_CONFLICT"
+  ],
+  "samples": {
+    "report": {
+      "targetKind": "custom",
+      "targetId": "site_contract_1",
+      "marketCode": "FR",
+      "operatorKey": "SFR",
+      "severity": "degraded",
+      "affectsData": true,
+      "affectsVoice": false,
+      "affectsSms": false,
+      "affectedTechnologies": ["4g", "5g"],
+      "affectedBands": ["b7", "n78"],
+      "affectedSectors": [60, 180],
+      "comment": "Débit très dégradé",
+      "deviceId": "550e8400-e29b-41d4-a716-446655440000",
+      "observedAt": "2026-08-31T10:00:00Z",
+      "latitude": 50.63,
+      "longitude": 3.06,
+      "accuracyMeters": 12.0
+    },
+    "vote": {
+      "kind": "confirm",
+      "deviceId": "550e8400-e29b-41d4-a716-446655440001",
+      "latitude": 50.63,
+      "longitude": 3.06,
+      "accuracyMeters": 12.0
+    },
+    "sighting": {
+      "servingGnb": "16383",
+      "servingMarketCode": "FR",
+      "servingOperatorKey": "SFR",
+      "serviceState": "in_service",
+      "technology": "5g",
+      "observedAt": "2026-08-31T10:05:00Z"
+    },
+    "sightingTarget": {
+      "enb": null,
+      "gnb": "16383",
+      "marketCode": "FR",
+      "operatorKey": "SFR",
+      "state": "reported",
+      "severity": "down"
+    }
+  }
+}

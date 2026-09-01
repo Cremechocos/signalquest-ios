@@ -12,6 +12,9 @@ import SwiftUI
 struct MessageImageTarget: Identifiable, Equatable {
     let id: String
     let url: URL
+    /// Session exacte ayant ouvert la pièce jointe. Le pipeline refusera sa
+    /// réponse si l'utilisateur se déconnecte ou change de compte entre-temps.
+    let accountSession: LocalAccountSession
 }
 
 struct MessageImageViewer: View {
@@ -40,7 +43,12 @@ struct MessageImageViewer: View {
                 .ignoresSafeArea()
 
             GeometryReader { geo in
-                RemoteImage(url: target.url, maxDimension: 1600, contentMode: .fit) {
+                RemoteImage(
+                    url: target.url,
+                    maxDimension: 1600,
+                    contentMode: .fit,
+                    cacheScope: .privateAccount(target.accountSession)
+                ) {
                     ProgressView()
                         .tint(.white)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -54,7 +62,13 @@ struct MessageImageViewer: View {
                 .onTapGesture(count: 2) { toggleZoom() }
                 .accessibilityLabel("Photo en plein écran")
                 .accessibilityAddTraits(.isImage)
+                .accessibilityValue(scale > 1 ? "Zoom \(Int((scale * 100).rounded())) %" : "Taille adaptée")
                 .accessibilityHint("Balayer vers le bas avec deux doigts pour fermer")
+                .accessibilityAction(named: Text("Agrandir")) { zoomIn() }
+                .accessibilityAction(named: Text("Réduire")) { zoomOut() }
+                .accessibilityAction(named: Text("Taille adaptée")) {
+                    withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { resetZoom() }
+                }
             }
 
             closeButton
@@ -133,6 +147,21 @@ struct MessageImageViewer: View {
                 scale = 2.5
                 lastScale = 2.5
             }
+        }
+    }
+
+    private func zoomIn() {
+        withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) {
+            scale = min(4, max(2, scale + 0.5))
+            lastScale = scale
+        }
+    }
+
+    private func zoomOut() {
+        withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) {
+            scale = max(1, scale - 0.5)
+            lastScale = scale
+            if scale == 1 { resetZoom() }
         }
     }
 

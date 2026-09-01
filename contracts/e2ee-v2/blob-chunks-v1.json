@@ -1,0 +1,27 @@
+{
+  "blobId": "opaque_blob_fixture_0123456789",
+  "algorithm": "AES_256_GCM_CHUNKED_HKDF_SHA256",
+  "kdfInfo": "signalquest-e2ee-v2-blob-key-v1",
+  "mediaKeyB64": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+  "noncePrefixB64": "oKGio6Slpqc=",
+  "plaintextChunksB64": [
+    "U2lnbmFsUXVlc3QgZW5jcnlwdGVkIG1lZGlhIGZpeHR1cmUgLyA=",
+    "AAECA/r7/P3+/w=="
+  ],
+  "saltCanonicalUtf8": "SQ-E2EE-V2-BLOB-SALT\n1\nopaque_blob_fixture_0123456789",
+  "saltB64": "EibGAhtUP70uJt0zqKYl22tnY3ogiwOOhmVnZQpXJG0=",
+  "derivedKeyB64": "8EDTygBOfhQq4rP44t26QcsyoPCeZkfaNl5GwZHc+7I=",
+  "chunkAadUtf8": [
+    "SQ-E2EE-V2-BLOB-CHUNK\n1\nopaque_blob_fixture_0123456789\nAES_256_GCM_CHUNKED_HKDF_SHA256\n0\n38\nMORE",
+    "SQ-E2EE-V2-BLOB-CHUNK\n1\nopaque_blob_fixture_0123456789\nAES_256_GCM_CHUNKED_HKDF_SHA256\n1\n10\nFINAL"
+  ],
+  "ciphertextChunksB64": [
+    "TYz+mcBLCrlomPbDjE3zmX0uZ0CetBLjVzscku46WBPedcX7Yrea5hsNwswY8BZSmwvrhfwW",
+    "gH9a7o7viel7+e2OsygNtl/pcJZqZFfDM7Q="
+  ],
+  "ciphertextB64": "TYz+mcBLCrlomPbDjE3zmX0uZ0CetBLjVzscku46WBPedcX7Yrea5hsNwswY8BZSmwvrhfwWgH9a7o7viel7+e2OsygNtl/pcJZqZFfDM7Q=",
+  "plaintextSha256": "3416e3f1b1cb3fb986eedd2869dd050fd0c6eb280ee3a0d6e5a60935834b0a79",
+  "ciphertextSha256": "d5acd93959db024c6af4e40304e6a5068eef450354ea7c86ad1288b86e4b46f6",
+  "plaintextSize": 48,
+  "ciphertextSize": 80
+}

@@ -83,10 +83,15 @@ final class SessionDetailViewModel: ObservableObject {
             Haptics.error()
             return
         }
-        // Les points de session ne portent pas de PLMN : on le dérive du nom
-        // d'opérateur. Sans lui, le serveur renvoie `MISSING_PLMN` — il refuse
-        // (à raison) d'attribuer une identification à un opérateur arbitraire.
-        let plmn = RadioLogOperatorResolver.mccMnc(forOperator: antenna.operatorName)
+        // Le PLMN du POINT observé est la seule preuve acceptable. Un nom comme
+        // « Orange » ou « Bouygues » n'est ni mondialement unique, ni une preuve
+        // de réseau servant. Les anciennes sessions sans PLMN restent lisibles,
+        // mais leur identification doit passer par le journal ou un choix manuel.
+        guard let plmn = sample?.servingPlmn else {
+            identifyResult = "PLMN servant absent dans cette session : identifie ce nœud depuis les logs radio ou choisis explicitement son réseau."
+            Haptics.error()
+            return
+        }
         let isNr = (sample?.gnb ?? antenna.gnb) != nil
         do {
             let result = try await service.identify(
@@ -97,9 +102,15 @@ final class SessionDetailViewModel: ObservableObject {
                     pci: (sample?.pci ?? antenna.pci).flatMap(Int.init),
                     cellId: sample?.cellId ?? antenna.cellId,
                     tech: isNr ? "5G" : "4G",
-                    operatorName: antenna.operatorName,
-                    mcc: plmn?.mcc,
-                    mnc: plmn?.mnc,
+                    operatorName: sample?.operatorKey,
+                    operatorKey: sample?.operatorKey,
+                    marketCode: sample?.marketCode,
+                    rawOperatorName: sample?.simOperator,
+                    observedPlmn: plmn.plmn,
+                    mcc: plmn.mcc,
+                    mnc: plmn.mnc,
+                    isRoaming: sample?.isRoaming,
+                    networkIdentitySource: sample?.networkIdentitySource,
                     latitude: coord.latitude,
                     longitude: coord.longitude
                 )
@@ -569,6 +580,11 @@ struct SessionDetailView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
+            if let siteId = antenna.siteId {
+                validationTarget = ValidationTarget(siteId: siteId, operatorName: antenna.operatorName)
+            }
+        }
+        .accessibilityAction(named: Text("Afficher les validations")) {
             if let siteId = antenna.siteId {
                 validationTarget = ValidationTarget(siteId: siteId, operatorName: antenna.operatorName)
             }

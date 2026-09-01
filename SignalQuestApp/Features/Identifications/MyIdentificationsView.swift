@@ -154,10 +154,15 @@ struct MyIdentificationsView: View {
             } else {
                 ForEach(model.filteredGroups) { group in
                     Section {
-                        IdentificationNodeRow(group: group, isWithdrawing: model.withdrawingId == group.representative.id)
+                        Button {
+                            selected = group.representative
+                        } label: {
+                            IdentificationNodeRow(group: group, isWithdrawing: model.withdrawingId == group.representative.id)
+                        }
+                            .buttonStyle(.plain)
                             .listRowBackground(SQColor.surface)
                             .contentShape(Rectangle())
-                            .onTapGesture { selected = group.representative }
+                            .accessibilityHint("Ouvre le détail de cette identification")
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
                                     pendingWithdraw = group.representative
@@ -167,10 +172,15 @@ struct MyIdentificationsView: View {
                             }
 
                         ForEach(group.cells) { cell in
-                            IdentificationCellRow(cell: cell, isWithdrawing: model.withdrawingId == cell.source.id)
+                            Button {
+                                selected = cell.source
+                            } label: {
+                                IdentificationCellRow(cell: cell, isWithdrawing: model.withdrawingId == cell.source.id)
+                            }
+                                .buttonStyle(.plain)
                                 .listRowBackground(SQColor.surface)
                                 .contentShape(Rectangle())
-                                .onTapGesture { selected = cell.source }
+                                .accessibilityHint("Ouvre le détail de cette cellule")
                                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                     Button(role: .destructive) {
                                         pendingWithdraw = cell.source

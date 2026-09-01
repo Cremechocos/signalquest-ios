@@ -8,6 +8,7 @@ SQ_APS_ENVIRONMENT = production
 SQ_ENVIRONMENT = staging
 SQ_DISPLAY_NAME = SignalQuest Beta
 SQ_APP_GROUP = group.fr.signalquest.ios.beta
+SQ_NOTIFICATION_KEYCHAIN_GROUP = fr.signalquest.ios.beta.notifications
 SQ_ASSOCIATED_DOMAIN = webcredentials:app.staging.invalid
 // Liens universels : le lien de partage Sentinelle ouvre l'app, pas Safari.
 // Chemins revendiqués côté serveur, dans .well-known/apple-app-site-association.

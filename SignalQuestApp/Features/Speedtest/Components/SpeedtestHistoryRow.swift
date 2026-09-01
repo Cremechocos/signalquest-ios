@@ -19,12 +19,13 @@ struct SpeedtestHistoryRow: View {
                 Text(titleLine)
                     .font(SQFont.body(15, .semibold))
                     .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(subtitleLine)
                     .font(SQFont.body(12.5))
                     .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 

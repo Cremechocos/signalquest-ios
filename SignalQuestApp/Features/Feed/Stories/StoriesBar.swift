@@ -40,8 +40,10 @@ struct StoriesBar: View {
                     Circle().fill(SQColor.surfaceMuted)
                     if let initial = currentUser?.displayName.first {
                         Text(String(initial).uppercased())
-                            .font(SQFont.display(23, .semibold))
+                            .font(SQFont.display(23, .semibold, relativeTo: .title2))
                             .foregroundStyle(SQColor.labelSecondary)
+                            .accessibilityHidden(true)
+                            .accessibilityIdentifier("feed.avatar.initial")
                     } else {
                         Image(systemName: "plus")
                             .font(.system(size: 20, weight: .semibold))
@@ -62,9 +64,12 @@ struct StoriesBar: View {
                         .overlay(Circle().stroke(SQColor.bg, lineWidth: 2))
                 }
                 Text("Ta story")
-                    .font(SQType.caption)
+                    .font(.footnote)
                     .foregroundStyle(SQColor.label)
-                    .frame(width: 70)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(minWidth: 70)
+                    .accessibilityIdentifier("feed.story.name")
             }
         }
         .buttonStyle(.plain)

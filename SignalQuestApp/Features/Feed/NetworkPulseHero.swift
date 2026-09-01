@@ -11,6 +11,8 @@ struct NetworkPulseHero: View {
     let pulse: NetworkPulse
     @State private var pulsing = false
     @State private var freshnessClock = Date()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
@@ -28,53 +30,52 @@ struct NetworkPulseHero: View {
                     .frame(width: 7, height: 7)
                     .opacity(pulseIsLive ? (pulsing ? 0.35 : 1) : 0.45)
                     .sqAnimation(
-                        pulseIsLive ? .easeInOut(duration: 0.7).repeatForever(autoreverses: true) : .default,
+                        SQMotion.repeating(
+                            .easeInOut(duration: 0.7),
+                            active: pulseIsLive && pulsing,
+                            reduceMotion: reduceMotion
+                        ),
                         value: pulsing
                     )
                 Text("Pouls réseau · autour de vous")
-                    .font(SQFont.body(13, .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(SQColor.onAccent)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
 
             // Ce que le chiffre représente, et de quand il date.
             Text(contextLine)
-                .font(SQFont.body(11))
+                .font(.caption)
                 .foregroundStyle(SQColor.onAccent)
-            HStack(spacing: 0) {
-                stat(value: rsrpText, label: "dBm moyen")
-                divider
-                stat(value: mbpsText, label: "Mbps médian")
-                divider
-                stat(value: operatorText, label: operatorLabel, compact: hasOperator)
-            }
+                .fixedSize(horizontal: false, vertical: true)
+            stats
 
             if hasDetails {
-                Divider().overlay(SQColor.onAccent.opacity(0.22))
+                Divider()
+                    .overlay(SQColor.onAccent.opacity(0.72))
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 6) {
                     if let trendText {
                         Text(trendText)
-                            .font(SQFont.body(12, .semibold))
-                            .foregroundStyle(SQColor.onAccent.opacity(0.92))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(SQColor.onAccent)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     ForEach(Array(pulse.operators.prefix(3).enumerated()), id: \.element.operatorKey) { index, op in
-                        HStack(spacing: SQSpace.xs) {
-                            Text("\(index + 1). \(op.label)")
-                            Spacer(minLength: SQSpace.xs)
-                            Text(operatorMetrics(op))
-                                .foregroundStyle(SQColor.onAccent)
-                        }
-                        .font(SQFont.body(11, .medium))
+                        operatorRow(index: index, entry: op)
                     }
                     if let technologyLine {
                         Text(technologyLine)
-                            .font(SQFont.body(11))
+                            .font(.caption)
                             .foregroundStyle(SQColor.onAccent)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     if let referenceLine {
                         Text(referenceLine)
-                            .font(SQFont.body(11))
+                            .font(.caption)
                             .foregroundStyle(SQColor.onAccent)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -82,7 +83,8 @@ struct NetworkPulseHero: View {
         .padding(.horizontal, SQSpace.lg + 2)
         .padding(.vertical, SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .background(SQColor.accentTextSurface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .accessibilityIdentifier("community.networkPulse")
         .sqShadowAccent()
         .onAppear { pulsing = true }
         .task(id: pulse.lastMeasuredAt) {
@@ -176,27 +178,76 @@ struct NetworkPulseHero: View {
     private func stat(value: String, label: String, compact: Bool = false) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(SQFont.display(compact ? 18 : 22, .bold))
+                .font(compact ? .headline.weight(.bold) : .title3.weight(.bold))
                 .monospacedDigit()
                 .foregroundStyle(SQColor.onAccent)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text(LocalizedStringKey(label))
-                .font(SQFont.body(11, .medium))
-                .foregroundStyle(SQColor.onAccent)
-                // Même correctif que `pulseTile` : `lineLimit(1)` sans repli
-                // tronquait « dBm moyen » dès que la police grandissait.
                 .lineLimit(2)
-                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(LocalizedStringKey(label))
+                .font(.caption.weight(.medium))
+                .foregroundStyle(SQColor.onAccent)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
     }
 
+    @ViewBuilder
+    private var stats: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(spacing: SQSpace.sm) {
+                stat(value: rsrpText, label: "dBm moyen")
+                horizontalDivider
+                stat(value: mbpsText, label: "Mbps médian")
+                horizontalDivider
+                stat(value: operatorText, label: operatorLabel, compact: hasOperator)
+            }
+        } else {
+            HStack(spacing: 0) {
+                stat(value: rsrpText, label: "dBm moyen")
+                divider
+                stat(value: mbpsText, label: "Mbps médian")
+                divider
+                stat(value: operatorText, label: operatorLabel, compact: hasOperator)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func operatorRow(index: Int, entry op: NetworkPulseOperator) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(index + 1). \(op.label)")
+                Text(operatorMetrics(op))
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(SQColor.onAccent)
+        } else {
+            HStack(spacing: SQSpace.xs) {
+                Text("\(index + 1). \(op.label)")
+                Spacer(minLength: SQSpace.xs)
+                Text(operatorMetrics(op))
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(SQColor.onAccent)
+        }
+    }
+
     private var divider: some View {
         Rectangle()
-            .fill(SQColor.onAccent.opacity(0.3))
+            .fill(SQColor.onAccent.opacity(0.72))
             .frame(width: 1, height: 30)
+            .accessibilityHidden(true)
+    }
+
+    private var horizontalDivider: some View {
+        Rectangle()
+            .fill(SQColor.onAccent.opacity(0.72))
+            .frame(height: 1)
+            .accessibilityHidden(true)
     }
 
     private var rsrpText: String { pulse.avgRsrpDbm.map { "\($0)" } ?? "—" }

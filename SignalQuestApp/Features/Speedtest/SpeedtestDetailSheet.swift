@@ -59,6 +59,7 @@ struct SpeedtestDetailContent: View {
     var onPublish: (() -> Void)?
     var isPublishing = false
     var onDismiss: (() -> Void)?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(spacing: SQSpace.lg) {
@@ -76,21 +77,37 @@ struct SpeedtestDetailContent: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
-            HStack(spacing: SQSpace.sm) {
-                if let generation {
-                    Text(generation)
-                        .font(SQFont.display(20, .bold))
-                        .foregroundStyle(SQColor.brandRed)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        if let generation {
+                            Text(generation)
+                                .font(SQFont.display(20, .bold))
+                                .foregroundStyle(SQColor.brandRed)
+                        }
+                        Text(Self.dateFormatter.string(from: result.createdAt))
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                } else {
+                    HStack(spacing: SQSpace.sm) {
+                        if let generation {
+                            Text(generation)
+                                .font(SQFont.display(20, .bold))
+                                .foregroundStyle(SQColor.brandRed)
+                        }
+                        Spacer(minLength: 0)
+                        Text(Self.dateFormatter.string(from: result.createdAt))
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
                 }
-                Spacer(minLength: 0)
-                Text(Self.dateFormatter.string(from: result.createdAt))
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
             }
             Text(contextLine)
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.labelSecondary)
-                .lineLimit(2)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -144,21 +161,15 @@ struct SpeedtestDetailContent: View {
     ) -> some View {
         let parts = Self.formatSpeedParts(average)
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
-            HStack(spacing: SQSpace.sm) {
-                Circle().fill(accent).frame(width: 8, height: 8)
-                Text(LocalizedStringKey(title))
-                    .font(SQFont.body(14, .semibold))
-                    .foregroundStyle(accent)
-                Spacer(minLength: 0)
-                if let maxValue, maxValue.isFinite, maxValue > 0 {
-                    let maxParts = Self.formatSpeedParts(maxValue)
-                    Text("Max \(maxParts.value) \(maxParts.unit)")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        speedCardHeader(title: title, accent: accent, maxValue: maxValue)
+                    }
                 } else {
-                    Text("Mesure indisponible")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                    HStack(spacing: SQSpace.sm) {
+                        speedCardHeader(title: title, accent: accent, maxValue: maxValue)
+                    }
                 }
             }
             HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
@@ -191,10 +202,34 @@ struct SpeedtestDetailContent: View {
         .sqShadowSoft()
     }
 
+    @ViewBuilder
+    private func speedCardHeader(title: String, accent: Color, maxValue: Double?) -> some View {
+        HStack(spacing: SQSpace.sm) {
+            Circle().fill(accent).frame(width: 8, height: 8)
+            Text(LocalizedStringKey(title))
+                .font(SQFont.body(14, .semibold))
+                .foregroundStyle(SQColor.label)
+        }
+        if let maxValue, maxValue.isFinite, maxValue > 0 {
+            let maxParts = Self.formatSpeedParts(maxValue)
+            Text("Max \(maxParts.value) \(maxParts.unit)")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+        } else {
+            Text("Mesure indisponible")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+        }
+        if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
+    }
+
     // MARK: Latences — ping, jitter, et les deux pings en charge
 
     private var latencyGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: SQSpace.sm) {
+        LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2),
+            spacing: SQSpace.sm
+        ) {
             latencyTile("Ping", value: Self.msText(result.pingMinMs ?? result.pingMs), tint: SQColor.labelSecondary, sub: pingSub)
             latencyTile("Jitter", value: Self.decimalText(result.jitterMs), tint: SQColor.labelSecondary, sub: "au repos")
             latencyTile("Ping chargé ↓", value: Self.msText(result.pingDlMs), tint: SQColor.success, sub: gigue(result.jitterDlMs))
@@ -216,9 +251,9 @@ struct SpeedtestDetailContent: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label.uppercased())
                 .font(SQFont.body(11, .semibold))
-                .foregroundStyle(tint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .foregroundStyle(SQColor.label)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
                     .font(SQFont.display(22, .bold))
@@ -231,7 +266,8 @@ struct SpeedtestDetailContent: View {
             Text(sub)
                 .font(SQFont.body(11))
                 .foregroundStyle(SQColor.labelSecondary)
-                .lineLimit(1)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -271,7 +307,26 @@ struct SpeedtestDetailContent: View {
     }
 
     private func metaRow(_ label: String, _ value: String, icon: String) -> some View {
-        HStack(spacing: SQSpace.md) {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    metaLabel(label, icon: icon)
+                    metaValue(value, alignment: .leading)
+                }
+            } else {
+                HStack(spacing: SQSpace.md) {
+                    metaLabel(label, icon: icon)
+                    Spacer(minLength: SQSpace.sm)
+                    metaValue(value, alignment: .trailing)
+                }
+            }
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.md - 2)
+    }
+
+    private func metaLabel(_ label: String, icon: String) -> some View {
+        HStack(spacing: SQSpace.sm) {
             Image(systemName: icon)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(SQColor.labelSecondary)
@@ -279,16 +334,16 @@ struct SpeedtestDetailContent: View {
             Text(LocalizedStringKey(label))
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.labelSecondary)
-            Spacer(minLength: SQSpace.sm)
-            Text(value)
-                .font(SQFont.body(14, .semibold))
-                .foregroundStyle(SQColor.label)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .multilineTextAlignment(.trailing)
         }
-        .padding(.horizontal, SQSpace.md)
-        .padding(.vertical, SQSpace.md - 2)
+    }
+
+    private func metaValue(_ value: String, alignment: TextAlignment) -> some View {
+        Text(value)
+            .font(SQFont.body(14, .semibold))
+            .foregroundStyle(SQColor.label)
+            .lineLimit(3)
+            .fixedSize(horizontal: false, vertical: true)
+            .multilineTextAlignment(alignment)
     }
 
     // MARK: Actions

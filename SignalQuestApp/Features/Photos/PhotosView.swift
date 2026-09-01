@@ -310,7 +310,7 @@ struct PhotosView: View {
             }
         }
         .sheet(isPresented: $showingUpload) {
-            PhotoUploadView(antennas: services.antennas) { data, siteId, desc, op, exif in
+            PhotoUploadView(antennas: services.antennas, markets: services.markets) { data, siteId, desc, op, exif in
                 await model.upload(data: data, siteId: siteId, description: desc, operatorName: op, exifMetadata: exif)
             }
             .presentationDetents([.large])
@@ -527,6 +527,12 @@ struct PhotoDetailView: View {
     private var likeCount: Int { photo.likeCount ?? photo.likes ?? 0 }
     private var commentCount: Int { photo.commentCount ?? comments.count }
     private var opColor: Color { SQBrand.operatorColor(photo.operator) }
+    private var photoMarketCode: String? {
+        let normalized = photo.marketCode?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
+        return normalized?.isEmpty == false ? normalized : nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -583,14 +589,23 @@ struct PhotoDetailView: View {
                 }
             }
             .sheet(isPresented: $showAntennaDetail) {
-                if let site = photo.minimalSite {
+                if let site = photo.minimalSite, let marketCode = photoMarketCode {
                     AntennaDetailSheet(
                         site: site,
-                        market: "FR",
+                        market: marketCode,
                         operatorName: photo.operator ?? "ALL",
                         service: services.antennas
                     )
                     .presentationDetents([.medium, .large])
+                    .presentationBackgroundCompat(SQColor.bg)
+                } else {
+                    ContentUnavailableCompat(
+                        title: "Détails du site indisponibles",
+                        message: "Cette ancienne photo ne contient pas de marché vérifiable. SignalQuest ne l’attribue pas automatiquement à la France.",
+                        systemImage: "globe.europe.africa"
+                    )
+                    .padding(SQSpace.lg)
+                    .presentationDetents([.medium])
                     .presentationBackgroundCompat(SQColor.bg)
                 }
             }
@@ -782,6 +797,12 @@ struct PhotoDetailView: View {
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                         .lineLimit(1)
+                    if photoMarketCode == nil {
+                        Text("Marché non renseigné · attribution automatique désactivée")
+                            .font(SQType.micro)
+                            .foregroundStyle(SQColor.warning)
+                            .lineLimit(2)
+                    }
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
@@ -898,6 +919,7 @@ struct PhotoDetailView: View {
 @MainActor
 struct PhotoUploadView: View {
     let antennas: AntennasServicing
+    let markets: MarketRegistryServicing
     /// Renvoie `true` si l'upload a réussi (la feuille se ferme alors). Le dernier
     /// paramètre est le JSON `exifMetadata` extrait de l'original.
     var onUpload: (Data, String, String, String?, String?) async -> Bool
@@ -1080,7 +1102,7 @@ struct PhotoUploadView: View {
             }
             .signalQuestBackground()
             .sheet(isPresented: $showSitePicker) {
-                AntennaSitePickerSheet(antennas: antennas) { site in
+                AntennaSitePickerSheet(antennas: antennas, markets: markets) { site in
                     selectedSite = site
                     selectedOperator = nil
                     showSitePicker = false
@@ -1247,6 +1269,7 @@ struct PhotoShareSheet: View {
 
 struct AntennaSitePickerSheet: View {
     let antennas: AntennasServicing
+    let markets: MarketRegistryServicing
     let onSelect: (AntennaSite) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -1260,6 +1283,8 @@ struct AntennaSitePickerSheet: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var sitesLoadTask: Task<Void, Never>?
+    @State private var marketLabel: String?
+    @State private var isCommunityFallback = false
 
     var body: some View {
         NavigationStack {
@@ -1289,7 +1314,9 @@ struct AntennaSitePickerSheet: View {
                     }
                 }
                 .ignoresSafeArea(edges: .bottom)
-                .onAppear { scheduleSitesLoad(for: region) }
+                // Ne charge pas Paris par défaut : le centre initial est seulement
+                // un cadrage visuel. Le premier fetch suit un déplacement explicite
+                // ou une position autorisée, jamais un marché supposé.
 
                 VStack(spacing: SQSpace.sm) {
                     HStack(spacing: SQSpace.sm) {
@@ -1302,6 +1329,15 @@ struct AntennaSitePickerSheet: View {
                     .padding(.vertical, SQSpace.sm + 2)
                     .background(SQColor.surface, in: Capsule(style: .continuous))
                     .sqShadowSoft()
+
+                    if let marketLabel {
+                        Text(isCommunityFallback ? "\(marketLabel) · sites communautaires" : marketLabel)
+                            .font(SQType.micro)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .padding(.horizontal, SQSpace.md)
+                            .padding(.vertical, SQSpace.xs)
+                            .background(SQColor.surface, in: Capsule(style: .continuous))
+                    }
 
                     if let errorMessage {
                         Text(errorMessage)
@@ -1377,11 +1413,62 @@ struct AntennaSitePickerSheet: View {
         guard let box = visibleBox else { return }
         isLoading = true
         defer { isLoading = false }
+        isCommunityFallback = false
+
+        guard let market = await markets.marketForLocation(
+            latitude: region.center.latitude,
+            longitude: region.center.longitude
+        ) else {
+            sites = []
+            marketLabel = nil
+            errorMessage = "Pays non référencé à cet emplacement. Déplace la carte vers une zone terrestre connue."
+            return
+        }
+        guard !Task.isCancelled else { return }
+        let marketCode = market.marketCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !marketCode.isEmpty else {
+            sites = []
+            marketLabel = nil
+            errorMessage = "Le registre ne fournit pas de code marché fiable pour cette zone."
+            return
+        }
+        marketLabel = market.label
+
         do {
-            sites = try await antennas.list(bbox: box)
+            let operatorKeys = market.selectableOperators
+                .map(\.key)
+                .filter { !$0.isEmpty && $0.uppercased() != "ALL" }
+            var merged: [AntennaSite] = []
+            var seen = Set<String>()
+            for operatorKey in operatorKeys.isEmpty ? ["ALL"] : operatorKeys {
+                guard !Task.isCancelled else { return }
+                let batch = try await antennas.list(
+                    bbox: box,
+                    market: marketCode,
+                    operatorName: operatorKey,
+                    technologies: []
+                )
+                for site in batch {
+                    let key = site.siteId ?? site.id
+                    if seen.insert(key).inserted { merged.append(site) }
+                }
+            }
+            if merged.isEmpty {
+                let community = try await antennas.listCommunitySites(
+                    bbox: box,
+                    market: marketCode,
+                    operatorName: nil
+                )
+                for site in community {
+                    let key = site.siteId ?? site.id
+                    if seen.insert(key).inserted { merged.append(site) }
+                }
+                isCommunityFallback = !merged.isEmpty
+            }
+            sites = merged
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            if !error.isCancellation { errorMessage = error.localizedDescription }
         }
     }
 }

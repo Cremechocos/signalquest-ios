@@ -14,6 +14,7 @@ struct RatingCardView: View {
     var onAuthorTap: (() -> Void)? = nil
     /// Réaction emoji (appui long sur ❤️). Repli sur onLike si absent.
     var onReact: ((String) -> Void)? = nil
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var signal: SocialSignalSummary? { item.signal }
     private var stars: Int { max(0, min(5, signal?.ratingStars ?? 0)) }
@@ -86,7 +87,7 @@ struct RatingCardView: View {
     }
 
     private var gridColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: 3)
+        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: dynamicTypeSize.isAccessibilitySize ? 1 : 3)
     }
 
     /// Libellé de la tuile identifiant selon le type d'identification.

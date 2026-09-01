@@ -70,6 +70,17 @@ final class MapAccessibilityTests: XCTestCase {
         XCTAssertNil(MapAccessibility.describe(payload(kind: .coverage, subtitle: "", metric: nil)).value)
     }
 
+    func testSearchPinIsAnnouncedAsTemporaryLocation() {
+        var pin = payload(kind: .customSite, title: "Gare de Lyon", subtitle: "Paris")
+        pin.isSearchPin = true
+
+        let description = MapAccessibility.describe(pin)
+
+        XCTAssertTrue(description.label.contains("Gare de Lyon"), description.label)
+        XCTAssertEqual(description.value, "Paris")
+        XCTAssertNotNil(description.hint)
+    }
+
     /// Un cluster n'est pas un lieu : il doit annoncer ce qu'il regroupe, et
     /// dire comment le développer.
     func testClusterAnnouncesItsCount() {
@@ -247,5 +258,67 @@ final class MapAccessibilityTests: XCTestCase {
 
         XCTAssertNotEqual(view.accessibilityLabel, firstLabel)
         XCTAssertTrue(view.accessibilityLabel?.contains("Pylône") == true, view.accessibilityLabel ?? "nil")
+    }
+}
+
+final class InAppNotificationQueueTests: XCTestCase {
+
+    func testErrorPreemptsOrdinaryFeedbackThenInterruptedItemResumes() {
+        var queue = SQInAppNotificationQueue()
+        let info = SQInAppNotificationItem(body: "info")
+        let error = SQInAppNotificationItem(body: "error", variant: .error)
+
+        XCTAssertTrue(queue.offer(info))
+        XCTAssertTrue(queue.offer(error))
+        XCTAssertEqual(queue.current?.item.body, "error")
+        XCTAssertFalse(error.canBePreempted)
+
+        queue.dismiss(id: error.id)
+        XCTAssertEqual(queue.current?.item.body, "info")
+    }
+
+    func testUndoCannotBePreemptedEvenByAnError() {
+        var queue = SQInAppNotificationQueue()
+        let undo = SQInAppNotificationItem(
+            body: "deleted",
+            actionLabel: "undo",
+            action: {},
+            priority: .high,
+            canBePreempted: false
+        )
+        let error = SQInAppNotificationItem(body: "error", variant: .error)
+
+        XCTAssertTrue(queue.offer(undo))
+        XCTAssertFalse(queue.offer(error))
+        XCTAssertEqual(queue.current?.item.body, "deleted")
+        XCTAssertEqual(queue.pendingItems.map(\.body), ["error"])
+    }
+
+    func testPendingItemsArePriorityOrderedAndFifoWithinPriority() {
+        var queue = SQInAppNotificationQueue()
+        queue.offer(
+            SQInAppNotificationItem(body: "blocker", canBePreempted: false)
+        )
+        queue.offer(SQInAppNotificationItem(body: "normal"))
+        queue.offer(SQInAppNotificationItem(body: "warning-1", variant: .warning))
+        queue.offer(SQInAppNotificationItem(body: "warning-2", variant: .warning))
+        queue.offer(SQInAppNotificationItem(body: "error", variant: .error))
+
+        XCTAssertEqual(
+            queue.pendingItems.map(\.body),
+            ["error", "warning-1", "warning-2", "normal"]
+        )
+    }
+
+    func testStaleDismissDoesNotCloseCurrentPreemptingError() {
+        var queue = SQInAppNotificationQueue()
+        let info = SQInAppNotificationItem(body: "info")
+        let error = SQInAppNotificationItem(body: "error", variant: .error)
+        queue.offer(info)
+        queue.offer(error)
+
+        queue.dismiss(id: info.id)
+
+        XCTAssertEqual(queue.current?.item.id, error.id)
     }
 }

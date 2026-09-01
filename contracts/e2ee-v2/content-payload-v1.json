@@ -1,0 +1,16 @@
+{
+  "schema": "signalquest.e2ee-content",
+  "version": 1,
+  "kind": "LOCATION",
+  "replyToId": "message_01J7ABCD23456789",
+  "mentions": [
+    "user_01J7ABCD234567890123"
+  ],
+  "body": {
+    "latitude": 48.8566,
+    "longitude": 2.3522,
+    "accuracyMeters": 12.5,
+    "altitudeMeters": null,
+    "label": "Paris"
+  }
+}

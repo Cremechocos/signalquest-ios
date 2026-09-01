@@ -113,6 +113,7 @@ final class FeedViewModel: ObservableObject {
             errorMessage = nil
             return
         }
+        Task { await service.retryPendingPosts() }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -385,6 +386,8 @@ struct FeedView: View {
     @StateObject private var model: FeedViewModel
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var presentedSheet: FeedSheet?
     /// Post en attente de confirmation de suppression. La suppression est
@@ -411,15 +414,6 @@ struct FeedView: View {
     @State private var routedProfileId: String?
     /// Post ouvert via deep-link / notification (résolu en item complet).
     @State private var routedPostItem: RoutedPost?
-    /// Partage réussi en attente d'annulation (pilule éphémère en bas du feed).
-    @State private var shareUndo: ShareUndoState?
-
-    private struct ShareUndoState: Identifiable {
-        let id = UUID()
-        let messageId: String
-        let conversationTitle: String
-    }
-
     private enum FeedSheet: Identifiable {
         case detail(UnifiedSocialFeedItem)
         case comments(UnifiedSocialFeedItem)
@@ -526,7 +520,6 @@ struct FeedView: View {
         }
         // Directement sur le ScrollView (avant le ZStack de signalQuestBackground).
         .sqDockAutoMinimize()
-        .overlay(alignment: .bottom) { shareUndoPill }
         // Header custom (DA Crème) : plus de gros titre nav système.
         .toolbar(.hidden, for: .navigationBar)
         // Destinations du menu `⋯`. En navigation (et non en feuille) : ce sont
@@ -697,49 +690,21 @@ struct FeedView: View {
 
     private func presentShareUndo(messageId: String, conversation: MessageConversation) {
         let title = conversation.displayTitle.isEmpty ? "la conversation" : conversation.displayTitle
-        let state = ShareUndoState(messageId: messageId, conversationTitle: title)
-        withAnimation(SQMotion.snappy) { shareUndo = state }
-        Task {
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
-            await MainActor.run {
-                if shareUndo?.id == state.id { withAnimation(SQMotion.snappy) { shareUndo = nil } }
-            }
+        inAppNotifications.showUndo(body: "Partagé vers \(title)", actionLabel: "Annuler") {
+            undoShare(messageId: messageId)
         }
     }
 
-    private func undoShare(_ state: ShareUndoState) {
-        withAnimation(SQMotion.snappy) { shareUndo = nil }
+    private func undoShare(messageId: String) {
         Task {
-            try? await services.messages.deleteMessage(messageId: state.messageId, forEveryone: true)
-            await MainActor.run { Haptics.success() }
-        }
-    }
-
-    /// Pilule éphémère « Partagé · Annuler » (parité pilule Android). Le message
-    /// partagé est supprimé côté serveur si l'utilisateur annule.
-    @ViewBuilder
-    private var shareUndoPill: some View {
-        if let state = shareUndo {
-            HStack(spacing: SQSpace.sm) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(SQColor.success)
-                    .accessibilityHidden(true)
-                Text("Partagé vers \(state.conversationTitle)")
-                    .font(SQType.caption.weight(.medium))
-                    .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
-                Spacer(minLength: SQSpace.sm)
-                Button("Annuler") { undoShare(state) }
-                    .font(SQType.caption.weight(.bold))
-                    .tint(SQColor.brandRed)
+            do {
+                try await services.messages.deleteMessage(messageId: messageId, forEveryone: true)
+                await MainActor.run { Haptics.success() }
+            } catch {
+                await MainActor.run {
+                    inAppNotifications.showError("Impossible d’annuler le partage. Réessaie.")
+                }
             }
-            .padding(.horizontal, SQSpace.md)
-            .padding(.vertical, SQSpace.sm + 2)
-            .background(SQColor.surface, in: Capsule(style: .continuous))
-            .sqShadowDock()
-            .padding(.horizontal, SQSpace.xl)
-            .padding(.bottom, SQSpace.lg)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
 
@@ -800,21 +765,34 @@ struct FeedView: View {
     // MARK: Header custom — titre display + boutons circulaires
 
     private var header: some View {
-        HStack(spacing: SQSpace.sm + 2) {
-            Text("Communauté")
-                .font(SQFont.display(26, .bold))
-                .foregroundStyle(SQColor.label)
-                // Quatre boutons d'action à droite ne laissent plus la largeur
-                // d'un titre display de 26 pt : sans ces trois modificateurs,
-                // « Communauté » se coupait en « Communau / té ». Réduction
-                // plutôt que troncature — un titre d'écran ne doit pas finir
-                // en « … ».
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .allowsTightening(true)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityIdentifier("feed.header")
-            Spacer(minLength: SQSpace.sm)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    headerTitle
+                    headerActions
+                }
+            } else {
+                HStack(spacing: SQSpace.sm + 2) {
+                    headerTitle
+                    Spacer(minLength: SQSpace.sm)
+                    headerActions
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var headerTitle: some View {
+        Text("Communauté")
+            .font(SQFont.display(26, .bold))
+            .foregroundStyle(SQColor.label)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier("feed.header")
+    }
+
+    private var headerActions: some View {
+        HStack(spacing: SQSpace.sm) {
             headerButton(systemImage: "bubble.left.and.bubble.right", label: "Messages") {
                 showMessages = true
             } decoration: {
@@ -843,7 +821,7 @@ struct FeedView: View {
             // rétrécissait déjà pour tenir.
             communityMenu
         }
-        .accessibilityElement(children: .contain)
+        .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil, alignment: .trailing)
     }
 
     /// L'onglet « Photos », en galerie.
@@ -913,7 +891,7 @@ struct FeedView: View {
             Image(systemName: "ellipsis")
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(SQColor.label)
-                .frame(width: 42, height: 42)
+                .frame(width: 44, height: 44)
                 .background(SQColor.surface, in: Circle())
                 .sqShadowSoft()
         }
@@ -943,7 +921,7 @@ struct FeedView: View {
             Image(systemName: systemImage)
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(SQColor.label)
-                .frame(width: 42, height: 42)
+                .frame(width: 44, height: 44)
                 .background(SQColor.surface, in: Circle())
                 .sqShadowSoft()
                 .overlay(alignment: .topTrailing) { decoration() }
@@ -1082,7 +1060,7 @@ struct FeedView: View {
                             Text(LocalizedStringKey(tab.title))
                                 .font(SQFont.body(13, .semibold))
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.8)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                         .padding(.horizontal, SQSpace.md)
                         .padding(.vertical, SQSpace.sm)
@@ -1117,18 +1095,20 @@ struct FeedView: View {
                         Task { await model.load() }
                     } label: {
                         Text("#\(tag.tag)")
-                            .font(SQFont.body(13, .semibold))
+                            .font(.body.weight(.semibold))
                             .padding(.horizontal, SQSpace.md + 1)
                             .padding(.vertical, SQSpace.sm)
                             .background(
-                                isOn ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
+                                isOn ? AnyShapeStyle(SQColor.accentTextSurface) : AnyShapeStyle(SQColor.surface),
                                 in: Capsule(style: .continuous)
                             )
                             .foregroundStyle(isOn ? SQColor.onAccent : SQColor.label)
                             .sqShadowSoft()
+                            .accessibilityIdentifier("feed.hashtag")
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(isOn ? .isSelected : [])
+                    .accessibilityIdentifier("feed.hashtag")
                 }
             }
             .padding(.horizontal, SQSpace.xl)

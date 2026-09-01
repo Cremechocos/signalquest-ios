@@ -209,15 +209,24 @@ enum MapMarketStore {
     }
 
     /// Code marché utilisable AVANT le chargement du registre (init synchrone) :
-    /// dernier choix persisté, sinon pays de la locale appareil, sinon "FR".
+    /// dernier choix persisté, sinon pays de la locale appareil, sinon "UNKNOWN".
     static func initialMarketCode() -> String { lastMarket() ?? localeMarketCode() }
 
     static func initialOperatorKey() -> String { lastOperator() ?? "ALL" }
 
-    /// Pays de la locale appareil (ISO, ex. "FR" / "CA"). Repli "FR" si absent —
-    /// jamais affiché tel quel : la détection registre le corrige juste après.
+    /// Pays de la locale appareil (ISO, ex. "FR" / "CA"). Sans région, aucun
+    /// pays n'est inventé : le registre ou la position affinera ensuite le choix.
     static func localeMarketCode() -> String {
-        Locale.current.region?.identifier.uppercased() ?? "FR"
+        resolvedLocaleMarketCode(Locale.current.region?.identifier)
+    }
+
+    static func resolvedLocaleMarketCode(_ regionIdentifier: String?) -> String {
+        guard let normalized = regionIdentifier?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased(), !normalized.isEmpty else {
+            return "UNKNOWN"
+        }
+        return normalized
     }
 }
 

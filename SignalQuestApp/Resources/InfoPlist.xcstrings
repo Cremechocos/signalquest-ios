@@ -7,7 +7,13 @@
       "localizations" : {
         "fr" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "SignalQuest"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "SignalQuest"
           }
         }
@@ -19,14 +25,33 @@
       "localizations" : {
         "fr" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
+            "value" : "SignalQuest"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "SignalQuest"
           }
         }
       }
     },
     "Export NetMonster" : {
-
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export NetMonster"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NetMonster export"
+          }
+        }
+      }
     },
     "NSCameraUsageDescription" : {
       "extractionState" : "manual",

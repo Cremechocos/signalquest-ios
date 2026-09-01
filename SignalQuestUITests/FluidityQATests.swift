@@ -1,8 +1,10 @@
 import XCTest
 
-/// Mesures de FLUIDITÉ objectives (build Release, appareil physique). UN SEUL bloc
-/// `measure()` par méthode (contrainte XCTest) → une méthode par scénario. Les
-/// résultats « measured […] » s'impriment dans la sortie de test + le .xcresult.
+/// Mesures de FLUIDITÉ objectives. La commande d'exécution doit imposer Release ;
+/// un simulateur fournit une baseline reproductible, tandis qu'un appareil physique
+/// reste nécessaire pour généraliser aux performances réelles. UN SEUL bloc `measure()`
+/// par méthode (contrainte XCTest) → une méthode par scénario. Les résultats
+/// « measured […] » s'impriment dans la sortie de test + le .xcresult.
 @MainActor
 final class FluidityQATests: XCTestCase {
     override func setUp() { continueAfterFailure = true }
@@ -15,6 +17,7 @@ final class FluidityQATests: XCTestCase {
             // Rien : on garde la session déjà présente dans le Keychain (compte RÉEL
             // de l'utilisateur, déjà connecté). Aucune injection, aucun reset.
         } else if token.isEmpty {
+            app.launchEnvironment["SQ_PERFORMANCE_QA"] = "1"
             app.launchArguments += ["--mock-auth", "--reset-map"]
         } else {
             app.launchEnvironment["SQ_AUTH_TOKEN"] = token
@@ -35,6 +38,23 @@ final class FluidityQATests: XCTestCase {
         let opts = XCTMeasureOptions()
         opts.invocationOptions = [.manuallyStart, .manuallyStop]
         return opts
+    }
+
+    private func interactionMetrics(
+        for app: XCUIApplication,
+        includeMemory: Bool
+    ) -> [any XCTMetric] {
+        var metrics: [any XCTMetric] = [
+            XCTOSSignpostMetric.scrollDecelerationMetric,
+            XCTCPUMetric(application: app),
+        ]
+        if includeMemory {
+            metrics.append(XCTMemoryMetric(application: app))
+        }
+        if #available(iOS 26.0, *) {
+            metrics.append(XCTHitchMetric(application: app))
+        }
+        return metrics
     }
 
     /// Temps de lancement à froid (Release).
@@ -58,7 +78,7 @@ final class FluidityQATests: XCTestCase {
         XCTAssertTrue(community.waitForExistence(timeout: 25))
         community.tap()
         XCTAssertTrue(app.descendants(matching: .any)["feed.header"].firstMatch.waitForExistence(timeout: 10))
-        measure(metrics: [XCTOSSignpostMetric.scrollDecelerationMetric, XCTCPUMetric(), XCTMemoryMetric()], options: measureOptions()) {
+        measure(metrics: interactionMetrics(for: app, includeMemory: true), options: measureOptions()) {
             startMeasuring()
             for _ in 0..<6 { app.swipeUp(velocity: .fast) }
             for _ in 0..<4 { app.swipeDown(velocity: .fast) }
@@ -109,7 +129,7 @@ final class FluidityQATests: XCTestCase {
         let left   = app.coordinate(withNormalizedOffset: CGVector(dx: 0.22, dy: 0.45))
         let right  = app.coordinate(withNormalizedOffset: CGVector(dx: 0.78, dy: 0.45))
         let up     = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.30))
-        measure(metrics: [XCTOSSignpostMetric.scrollDecelerationMetric, XCTCPUMetric()], options: measureOptions()) {
+        measure(metrics: interactionMetrics(for: app, includeMemory: true), options: measureOptions()) {
             startMeasuring()
             for _ in 0..<6 {
                 center.press(forDuration: 0.02, thenDragTo: left)

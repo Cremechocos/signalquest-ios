@@ -200,8 +200,15 @@ struct LiveShareRadio: Codable, Equatable, Sendable {
     let connectionType: String?
     let technology: String?
     let operatorName: String?
+    let operatorKey: String?
     let mcc: Int?
     let mnc: Int?
+    let observedPlmn: String?
+    let simPlmn: String?
+    let simOperatorName: String?
+    let marketCode: String?
+    let isRoaming: Bool?
+    let networkIdentitySource: String?
     let band: Int?
     let rsrp: Int?
     let rsrq: Int?
@@ -211,8 +218,15 @@ struct LiveShareRadio: Codable, Equatable, Sendable {
         connectionType: String? = nil,
         technology: String? = nil,
         operatorName: String? = nil,
+        operatorKey: String? = nil,
         mcc: Int? = nil,
         mnc: Int? = nil,
+        observedPlmn: String? = nil,
+        simPlmn: String? = nil,
+        simOperatorName: String? = nil,
+        marketCode: String? = nil,
+        isRoaming: Bool? = nil,
+        networkIdentitySource: String? = nil,
         band: Int? = nil,
         rsrp: Int? = nil,
         rsrq: Int? = nil,
@@ -221,8 +235,15 @@ struct LiveShareRadio: Codable, Equatable, Sendable {
         self.connectionType = connectionType
         self.technology = technology
         self.operatorName = operatorName
+        self.operatorKey = operatorKey
         self.mcc = mcc
         self.mnc = mnc
+        self.observedPlmn = observedPlmn
+        self.simPlmn = simPlmn
+        self.simOperatorName = simOperatorName
+        self.marketCode = marketCode
+        self.isRoaming = isRoaming
+        self.networkIdentitySource = networkIdentitySource
         self.band = band
         self.rsrp = rsrp
         self.rsrq = rsrq
@@ -230,8 +251,22 @@ struct LiveShareRadio: Codable, Equatable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case connectionType, technology, mcc, mnc, band, rsrp, rsrq, snr
+        case connectionType, technology, operatorKey, mcc, mnc, observedPlmn, simPlmn
+        case simOperatorName, marketCode, isRoaming, networkIdentitySource
+        case band, rsrp, rsrq, snr
         case operatorName = "operator"
+    }
+
+    var displayOperatorName: String? {
+        if let operatorName = operatorName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !operatorName.isEmpty {
+            return operatorName
+        }
+        if let simOperatorName = simOperatorName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !simOperatorName.isEmpty {
+            return "SIM \(simOperatorName)"
+        }
+        return nil
     }
 }
 
@@ -263,6 +298,8 @@ struct LiveShareSession: Decodable, Identifiable, Equatable, Sendable {
     let createdAt: Date?
     let acceptedAt: Date?
     var endedAt: Date?
+    let expiresAt: Date?
+    let e2eeV2Required: Bool?
     var requester: LiveShareUser?
     var sharer: LiveShareUser?
 
@@ -272,6 +309,7 @@ struct LiveShareSession: Decodable, Identifiable, Equatable, Sendable {
     /// On tolère aussi une session qui ne contient que `lastLocation`, afin qu'un
     /// client ancien ne fasse pas disparaître la carte.
     var decodedPayload: LiveSharePayload? {
+        if e2eeV2Required == true { return nil }
         if let lastPayload,
            let data = lastPayload.data(using: .utf8),
            let payload = try? JSONDecoder.signalQuest.decode(LiveSharePayload.self, from: data) {
@@ -487,7 +525,7 @@ struct SavedMessageEntry: Decodable, Identifiable, Equatable {
     }
 }
 
-struct SendMessageRequest: Encodable {
+struct SendMessageRequest: Codable, Equatable, Sendable {
     let kind: String
     let content: String?
     let e2ee: E2EEPayload?
@@ -496,9 +534,11 @@ struct SendMessageRequest: Encodable {
     /// Durée de vie (messages éphémères, parité Android) → le backend en dérive
     /// `expiresAt`. Optionnel : omis (nil) = message permanent.
     var ttlSeconds: Int? = nil
+    /// Cle stable partagee avec Android et le backend pour les reprises apres kill process.
+    var clientRequestId: String? = nil
 }
 
-struct E2EEPayload: Codable, Equatable {
+struct E2EEPayload: Codable, Equatable, Sendable {
     let v: Int
     let ivB64: String
     let ciphertextB64: String

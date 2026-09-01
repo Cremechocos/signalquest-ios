@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "source": {
+    "version": 1,
+    "conversationId": "conversation_1234567890",
+    "messageId": "message_123456789012",
+    "senderId": "user_123456789012345",
+    "kind": "TEXT",
+    "content": "Bonjour, monde 🌍",
+    "metadata": "{\"formatted\":true}",
+    "createdAt": "2026-08-23T00:00:00.000Z",
+    "editedAt": null,
+    "replyToId": null,
+    "expiresAt": null
+  },
+  "canonicalSourceB64": "eyJ2ZXJzaW9uIjoxLCJjb252ZXJzYXRpb25JZCI6ImNvbnZlcnNhdGlvbl8xMjM0NTY3ODkwIiwibWVzc2FnZUlkIjoibWVzc2FnZV8xMjM0NTY3ODkwMTIiLCJzZW5kZXJJZCI6InVzZXJfMTIzNDU2Nzg5MDEyMzQ1Iiwia2luZCI6IlRFWFQiLCJjb250ZW50IjoiQm9uam91ciwgbW9uZGUg8J+MjSIsIm1ldGFkYXRhIjoie1wiZm9ybWF0dGVkXCI6dHJ1ZX0iLCJjcmVhdGVkQXQiOiIyMDI2LTA4LTIzVDAwOjAwOjAwLjAwMFoiLCJlZGl0ZWRBdCI6bnVsbCwicmVwbHlUb0lkIjpudWxsLCJleHBpcmVzQXQiOm51bGx9",
+  "sourceHash": "aeead23b2ad7a84405ed4831cb40d4ac727d1d91adc94e89d56cc7cb69baa041",
+  "clientRequestId": "history:message_123456789012:aeead23b2ad7a844"
+}

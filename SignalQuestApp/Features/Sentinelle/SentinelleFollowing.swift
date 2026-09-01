@@ -40,7 +40,7 @@ struct SentinelleFollowedCard: View {
                             .fixedSize(horizontal: false, vertical: true)
                         // Les piles se nomment, elles ne se montrent pas.
                         Text(box.families.isEmpty ? "en attente de mesure" : box.families.joined(separator: " · "))
-                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .font(.system(.caption, design: .monospaced, weight: .medium))
                             .foregroundStyle(SQColor.labelSecondary)
                         Text(summary)
                             .font(SQFont.body(12))
@@ -57,6 +57,13 @@ struct SentinelleFollowedCard: View {
                 // graphe pour y lire une valeur.
                 .contentShape(Rectangle())
                 .onTapGesture { withAnimation(.easeOut(duration: 0.18)) { open.toggle() } }
+                .frame(minHeight: 44)
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint(open ? "Réduit les détails" : "Affiche les détails")
+                .accessibilityAction {
+                    withAnimation(.easeOut(duration: 0.18)) { open.toggle() }
+                }
 
                 if open {
                     Divider().overlay(SQColor.separator)
@@ -97,7 +104,7 @@ struct SentinelleFollowedCard: View {
                                     Text(incident.endedAt == nil
                                         ? String(localized: "en cours")
                                         : SentinelleWording.duration(incident.durationSec))
-                                        .font(.system(size: 12, design: .monospaced))
+                                        .font(.system(.caption, design: .monospaced))
                                         .foregroundStyle(SQColor.labelSecondary)
                                 }
                             }
@@ -142,11 +149,11 @@ struct SentinelleFollowedCard: View {
     private func detailStat(_ label: String, _ value: String?) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
+                .font(.caption2.weight(.semibold))
                 .textCase(.uppercase)
                 .foregroundStyle(SQColor.labelSecondary)
             Text(value ?? "—")
-                .font(.system(size: 15, design: .monospaced))
+                .font(.system(.body, design: .monospaced))
                 .foregroundStyle(SQColor.label)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -277,7 +284,7 @@ struct SentinelleShareInvite: View {
                         Text(box.families.isEmpty
                             ? String(localized: "en attente de mesure")
                             : box.families.joined(separator: " · "))
-                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .font(.system(.caption, design: .monospaced, weight: .medium))
                             .foregroundStyle(SQColor.labelSecondary)
                     }
                     Spacer(minLength: SQSpace.sm)

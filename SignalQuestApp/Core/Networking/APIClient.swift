@@ -94,7 +94,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
 
     func request<T: Decodable>(_ endpoint: APIEndpoint, as type: T.Type) async throws -> T {
         let (data, response) = try await performWithRefresh(endpoint)
-        credentials.captureFromResponse(response)
+        try credentials.captureFromResponse(response)
         do {
             return try decoder.decode(T.self, from: data)
         } catch {
@@ -104,15 +104,54 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
 
     func request(_ endpoint: APIEndpoint) async throws {
         let (_, response) = try await performWithRefresh(endpoint)
-        credentials.captureFromResponse(response)
+        try credentials.captureFromResponse(response)
     }
 
     /// Variante brute : renvoie le corps de réponse tel quel. Utilisée par les
     /// caches (tuiles) qui stockent les octets et décodent ensuite.
     func requestData(_ endpoint: APIEndpoint) async throws -> Data {
         let (data, response) = try await performWithRefresh(endpoint)
-        credentials.captureFromResponse(response)
+        try credentials.captureFromResponse(response)
         return data
+    }
+
+    /// Tentative réseau brute et unique. Contrairement à `request`, cette voie
+    /// ne rafraîchit pas la session, ne rejoue pas les 429/503 et ne transforme
+    /// pas les statuts HTTP non-2xx en erreur. Elle est réservée aux requêtes
+    /// signées dont le nonce ne doit jamais être réutilisé par un retry opaque.
+    func performSingleAttempt(
+        _ endpoint: APIEndpoint,
+        fixedAuthToken: String? = nil,
+        expectedSession: LocalAccountSession? = nil
+    ) async throws -> (Data, HTTPURLResponse) {
+        guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
+        var request = try makeURLRequest(endpoint)
+        if let fixedAuthToken {
+            request.setValue("auth_token=\(fixedAuthToken)", forHTTPHeaderField: "Cookie")
+            request.httpShouldHandleCookies = false
+        }
+        guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
+        let result = try await performSingleAttempt(request, captureCredentials: expectedSession == nil) { request in
+            try await self.session.data(for: request)
+        }
+        guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
+        return result
+    }
+
+    /// Variante fichier de la tentative unique. Le corps doit être absent de
+    /// l'endpoint : URLSession lit le fichier fourni sans le charger intégralement
+    /// en mémoire, ce qui convient aux parties média E2EE déjà chiffrées.
+    func uploadFileSingleAttempt(
+        _ endpoint: APIEndpoint,
+        fromFile fileURL: URL
+    ) async throws -> (Data, HTTPURLResponse) {
+        guard endpoint.body == nil else {
+            throw APIError.transport("single-attempt-upload-body-must-be-file")
+        }
+        let request = try makeURLRequest(endpoint)
+        return try await performSingleAttempt(request) { request in
+            try await self.session.upload(for: request, fromFile: fileURL)
+        }
     }
 
     func requestJSON<T: Decodable, Body: Encodable>(
@@ -196,7 +235,11 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     /// (`UIDevice` est `@MainActor`) au profit de `ProcessInfo`/`uname`, sûrs hors
     /// du main actor et compatibles concurrence stricte.
     private static let clientInfoHeaders: [String: String] = {
-        var headers = ["X-Client-Platform": "ios"]
+        var headers = [
+            "X-Client-Platform": "ios",
+            ClientProtocolContract.protocolVersionHeader: String(ClientProtocolContract.currentProtocolVersion),
+            ClientProtocolContract.capabilitiesHeaderName: ClientProtocolContract.capabilitiesHeader,
+        ]
         let osVersion = ProcessInfo.processInfo.operatingSystemVersion
         var osLabel = "iOS \(osVersion.majorVersion).\(osVersion.minorVersion)"
         if osVersion.patchVersion > 0 { osLabel += ".\(osVersion.patchVersion)" }
@@ -345,7 +388,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
                     skipsAutoRefresh: true
                 )
                 let (_, response) = try await self.perform(endpoint)
-                self.credentials.captureFromResponse(response)
+                try self.credentials.captureFromResponse(response)
             }
             existing = newTask
             return newTask
@@ -388,6 +431,32 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             // quand une requête est annulée (pan de carte, changement d'onglet,
             // rechargement). On la normalise en `.cancelled` pour qu'elle soit
             // filtrée par `isCancellation` et JAMAIS affichée comme un échec.
+            throw APIError.cancelled
+        } catch {
+            throw APIError.transport(error.localizedDescription)
+        }
+    }
+
+    private func performSingleAttempt(
+        _ request: URLRequest,
+        captureCredentials: Bool = true,
+        operation: (URLRequest) async throws -> (Data, URLResponse)
+    ) async throws -> (Data, HTTPURLResponse) {
+        if config.debugLogsEnabled {
+            logger.debug("single-attempt \(request.httpMethod ?? "GET", privacy: .public) \(request.url?.absoluteString ?? "-", privacy: .public)")
+        }
+        do {
+            let (data, response) = try await operation(request)
+            guard let http = response as? HTTPURLResponse else {
+                throw APIError.transport("non-http-response")
+            }
+            if captureCredentials { try credentials.captureFromResponse(response) }
+            return (data, http)
+        } catch is CancellationError {
+            throw APIError.cancelled
+        } catch let error as APIError {
+            throw error
+        } catch let urlError as URLError where urlError.code == .cancelled {
             throw APIError.cancelled
         } catch {
             throw APIError.transport(error.localizedDescription)

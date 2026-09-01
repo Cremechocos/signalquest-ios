@@ -21,6 +21,7 @@ final class CarPlaySearchController: NSObject, CPSearchTemplateDelegate {
 
     private let antennas: AntennasServicing
     private let around: () -> CLLocationCoordinate2D?
+    private let market: () -> String?
     private let onSelect: (CLLocationCoordinate2D, String) -> Void
 
     /// Résultats du dernier appel, indexés par identifiant d'item : `CPListItem`
@@ -34,9 +35,11 @@ final class CarPlaySearchController: NSObject, CPSearchTemplateDelegate {
 
     init(antennas: AntennasServicing,
          around: @escaping () -> CLLocationCoordinate2D?,
+         market: @escaping () -> String?,
          onSelect: @escaping (CLLocationCoordinate2D, String) -> Void) {
         self.antennas = antennas
         self.around = around
+        self.market = market
         self.onSelect = onSelect
     }
 
@@ -102,7 +105,16 @@ final class CarPlaySearchController: NSObject, CPSearchTemplateDelegate {
     }
 
     private func searchSites(_ query: String) async -> [Result] {
-        guard let sites = try? await antennas.quickSearch(query: query) else { return [] }
+        guard let market = market() else { return [] }
+        let department = market.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() == "DROM"
+            ? around().flatMap(DromRegion.from)?.department
+            : nil
+        guard let sites = try? await antennas.quickSearch(
+            query: query,
+            market: market,
+            department: department
+        )
+        else { return [] }
         return sites.compactMap { site in
             guard let lat = site.latitude, let lon = site.longitude else { return nil }
             return Result(

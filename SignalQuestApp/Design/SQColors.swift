@@ -29,8 +29,16 @@ enum SQColor {
 
     // MARK: Labels
     static let label = Color("LabelPrimary")
-    static let labelSecondary = Color("LabelSecondary")
-    static let labelTertiary = Color("LabelTertiary")
+    static let labelSecondary = fieldAwareLabel(
+        asset: "LabelSecondary",
+        highLight: (0x4E, 0x40, 0x2E),
+        highDark: (0xD8, 0xCD, 0xB8)
+    )
+    static let labelTertiary = fieldAwareLabel(
+        asset: "LabelTertiary",
+        highLight: (0x5C, 0x4C, 0x38),
+        highDark: (0xC8, 0xBB, 0xA4)
+    )
 
     // MARK: Lines / fills
     static var separator: Color { SQOledPalette.surface(asset: "Separator", oled: .outline) }
@@ -74,12 +82,44 @@ enum SQColor {
     static let onAccent = dynamicTint(
         light: (0xFB, 0xF7, 0xEF, 1.0), dark: (0x19, 0x14, 0x10, 1.0)
     )
+    /// Aplat brique portant plusieurs lignes de petit texte (héro du Feed).
+    /// Le `brandRed` nominal atteint 5,05:1 en clair, mais l'anticrénelage des
+    /// libellés 11-13 pt le fait passer sous AA. Cette surface plus profonde
+    /// monte à 8,05:1 en clair, avec une marge réelle pour l'anticrénelage et
+    /// les petites légendes denses ; le sombre conserve son couple spécifique.
+    static let accentTextSurface = dynamicTint(
+        light: (0x80, 0x34, 0x2A, 1.0), dark: (0xD9, 0x7A, 0x66, 1.0)
+    )
     /// Texte posé sur le bouton encre (`label`) : crème en clair, nuit en sombre.
     static let onInk = dynamicTint(
         light: (0xFB, 0xF7, 0xEF, 1.0), dark: (0x19, 0x14, 0x10, 1.0)
     )
 
     // MARK: Teintes translucides (calculées, pas de colorset)
+
+    /// Les assets continuent de répondre à clair/sombre. En mode terrain — ou
+    /// lorsque « Augmenter le contraste » est actif dans iOS — les encres
+    /// secondaires deviennent réellement plus contrastées au lieu de ne
+    /// renforcer que leur graisse.
+    private static func fieldAwareLabel(
+        asset: String,
+        highLight: (UInt8, UInt8, UInt8),
+        highDark: (UInt8, UInt8, UInt8)
+    ) -> Color {
+        Color(UIColor { traits in
+            let highContrast = SQFieldMode.isEnabled || traits.accessibilityContrast == .high
+            guard highContrast else {
+                return UIColor(named: asset, in: .main, compatibleWith: traits) ?? .label
+            }
+            let rgb = traits.userInterfaceStyle == .dark ? highDark : highLight
+            return UIColor(
+                red: CGFloat(rgb.0) / 255,
+                green: CGFloat(rgb.1) / 255,
+                blue: CGFloat(rgb.2) / 255,
+                alpha: 1
+            )
+        })
+    }
 
     /// Brique à 12 % (18 % en sombre) : pastilles d'icônes, pilule active du
     /// dock, tags, fonds teintés.

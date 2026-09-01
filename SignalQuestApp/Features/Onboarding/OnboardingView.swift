@@ -337,9 +337,13 @@ private struct RadioWavesScene: View {
                         .scaleEffect(rippling ? 2.1 : 1)
                         .opacity(rippling ? 0 : 0.7)
                         .animation(
-                            .easeOut(duration: 2.7)
-                                .repeatForever(autoreverses: false)
-                                .delay(ringDelays[index]),
+                            SQMotion.repeating(
+                                .easeOut(duration: 2.7),
+                                autoreverses: false,
+                                delay: ringDelays[index],
+                                active: active,
+                                reduceMotion: reduceMotion
+                            ),
                             value: rippling
                         )
                 }
@@ -356,9 +360,23 @@ private struct RadioWavesScene: View {
         .onChangeCompat(of: active) { _, isOn in
             // (Re)démarre la propagation à chaque activation de la slide.
             rippling = false
-            if isOn { DispatchQueue.main.async { rippling = true } }
+            if isOn && !reduceMotion {
+                DispatchQueue.main.async {
+                    guard active, !reduceMotion else { return }
+                    rippling = true
+                }
+            }
         }
-        .onAppear { if active { rippling = true } }
+        .onChangeCompat(of: reduceMotion) { _, isReduced in
+            rippling = false
+            if active && !isReduced {
+                DispatchQueue.main.async {
+                    guard active, !reduceMotion else { return }
+                    rippling = true
+                }
+            }
+        }
+        .onAppear { if active && !reduceMotion { rippling = true } }
     }
 }
 
@@ -369,6 +387,7 @@ private struct SpeedDialScene: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var swept = false
     @State private var idling = false
+    @State private var motionGeneration = 0
 
     private static let restAngle: Double = -104
     private static let cruiseAngle: Double = 52
@@ -418,29 +437,64 @@ private struct SpeedDialScene: View {
         }
         .offset(y: 24)   // recentre optiquement le demi-cadran dans la scène
         .onChangeCompat(of: active) { _, isOn in
-            guard isOn else { return }
-            startSweep()
+            if isOn {
+                startSweep()
+            } else {
+                stopIdleMotion()
+            }
+        }
+        .onChangeCompat(of: reduceMotion) { _, isReduced in
+            if isReduced {
+                swept = true
+                stopIdleMotion()
+            } else if active {
+                startSweep()
+            }
         }
         .onAppear { if active { startSweep() } }
+        .onDisappear { stopIdleMotion() }
     }
 
     private func startSweep() {
-        guard !swept else { return }
         if reduceMotion {
             swept = true      // aiguille posée en croisière, aucune boucle
+            stopIdleMotion()
             return
         }
-        // Balayage repos → croisière : ressort avec léger dépassement, comme
-        // une aiguille physique qui se stabilise.
-        withAnimation(.spring(response: 0.9, dampingFraction: 0.62)) {
-            swept = true
+        let idleDelay: Double
+        if swept {
+            idleDelay = 0
+        } else {
+            // Balayage repos → croisière : ressort avec léger dépassement,
+            // comme une aiguille physique qui se stabilise.
+            withAnimation(.spring(response: 0.9, dampingFraction: 0.62)) {
+                swept = true
+            }
+            idleDelay = 1.0
         }
-        // Puis respiration d'ambiance ±3,5° autour de la croisière.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) {
+
+        scheduleIdleMotion(after: idleDelay)
+    }
+
+    private func scheduleIdleMotion(after delay: Double) {
+        motionGeneration += 1
+        let generation = motionGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard generation == motionGeneration, active, !reduceMotion else { return }
+            guard let animation = SQMotion.repeating(
+                .easeInOut(duration: 2.6),
+                active: active,
+                reduceMotion: reduceMotion
+            ) else { return }
+            withAnimation(animation) {
                 idling = true
             }
         }
+    }
+
+    private func stopIdleMotion() {
+        motionGeneration += 1
+        idling = false
     }
 }
 
@@ -482,6 +536,10 @@ private struct LiveMapScene: View {
                 pinging = false
             }
         }
+        .onChangeCompat(of: reduceMotion) { _, isReduced in
+            pinging = false
+            if active && !isReduced { ignite() }
+        }
     }
 
     private func ignite() {
@@ -490,7 +548,7 @@ private struct LiveMapScene: View {
         pinging = false
         // Les pings partent une fois la vague d'allumage retombée.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
-            if active { pinging = true }
+            if active && !reduceMotion { pinging = true }
         }
     }
 
@@ -506,9 +564,13 @@ private struct LiveMapScene: View {
                     .scaleEffect(pinging ? 3.4 : 1)
                     .opacity(pinging ? 0 : 0.8)
                     .animation(
-                        .easeOut(duration: 2.4)
-                            .repeatForever(autoreverses: false)
-                            .delay(pingDelay),
+                        SQMotion.repeating(
+                            .easeOut(duration: 2.4),
+                            autoreverses: false,
+                            delay: pingDelay,
+                            active: active,
+                            reduceMotion: reduceMotion
+                        ),
                         value: pinging
                     )
             }

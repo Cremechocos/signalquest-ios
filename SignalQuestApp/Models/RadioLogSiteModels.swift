@@ -19,6 +19,9 @@ struct RadioLogCell: Identifiable, Sendable, Equatable {
     /// Identité complète (ECI en LTE, NCI en NR).
     let ci: Int64?
     let eciCellId: String?
+    let identityKind: String
+    /// Provenance du relevé représentatif, jamais remplacée par SERVING_CELL.
+    let networkIdentitySource: String?
     let band: Int?
     let earfcn: Int?
     /// Meilleur RSRP observé sur cette cellule (le moins négatif).
@@ -30,7 +33,7 @@ struct RadioLogCell: Identifiable, Sendable, Equatable {
 
     /// `ECI 160466202` / `NCI …` — l'identité complète de la cellule.
     var identityLabel: String? {
-        if let ci { return "\(ci > 268_435_455 ? "NCI" : "ECI") \(ci)" }
+        if let ci { return "\(identityKind) \(ci)" }
         if let eciCellId { return "Cell \(eciCellId)" }
         return nil
     }
@@ -50,7 +53,13 @@ struct RadioLogSite: Identifiable, Sendable, Equatable {
     let id: String
     let kind: RadioLogNodeKind
     let node: String
+    /// Libellé canonique du réseau servant. Le nom modem brut reste séparé.
     let operatorName: String?
+    let rawOperatorName: String?
+    let operatorKey: String?
+    let marketCode: String?
+    let countryCode: String?
+    let isRoaming: Bool?
     let mcc: String?
     let mnc: String?
     let cells: [RadioLogCell]
@@ -68,6 +77,38 @@ struct RadioLogSite: Identifiable, Sendable, Equatable {
     let earfcn: Int?
     /// Techno normalisée envoyée au serveur (`4G` / `5G`).
     var techLabel: String { kind.techLabel }
+
+    var resolvedOperatorKey: String? {
+        operatorKey
+    }
+
+    /// Aucun repli mondial vers la France : sans marché prouvé, l'action est bloquée.
+    var resolvedMarketCode: String? {
+        marketCode
+    }
+
+    /// PLMN servant exact, reconstruit uniquement depuis les composantes déjà
+    /// validées par [RadioLogPlmnEvidence]. Aucun nettoyage permissif ici.
+    var observedPlmn: String? {
+        guard let mcc, let mnc,
+              mcc.count == 3, (2...3).contains(mnc.count),
+              mcc.unicodeScalars.allSatisfy({ $0.value >= 48 && $0.value <= 57 }),
+              mnc.unicodeScalars.allSatisfy({ $0.value >= 48 && $0.value <= 57 })
+        else { return nil }
+        return mcc + mnc
+    }
+
+    /// Cellule la mieux documentée pour le quick-identify. Le serveur reçoit
+    /// ainsi CI/NCI, cellule locale et PCI cohérents, au lieu du seul nœud.
+    var quickIdentifyCell: RadioLogCell? {
+        cells.max { lhs, rhs in
+            let leftEvidence = [lhs.ci != nil, lhs.eciCellId != nil, lhs.pci != nil].filter { $0 }.count
+            let rightEvidence = [rhs.ci != nil, rhs.eciCellId != nil, rhs.pci != nil].filter { $0 }.count
+            if leftEvidence != rightEvidence { return leftEvidence < rightEvidence }
+            if lhs.logCount != rhs.logCount { return lhs.logCount < rhs.logCount }
+            return lhs.id > rhs.id
+        }
+    }
 
     /// `eNB 626821` — le titre de la carte.
     var nodeLabel: String { "\(kind.rawValue) \(node)" }
@@ -105,8 +146,9 @@ struct RadioLogSite: Identifiable, Sendable, Equatable {
 enum RadioLogSiteBuilder {
     /// Regroupe les lignes du journal en sites.
     ///
-    /// La règle de nœud est celle de `IdentifiedNodeGroup.group` : en 5G le gNB
-    /// prime, sinon l'eNB. Une ligne sans aucun nœud est ignorée — elle ne peut
+    /// En NSA, l'eNB de l'ancre LTE prime toujours. En SA, le gNB reste le nœud
+    /// logique, sans constituer à lui seul une preuve de site physique. Une ligne
+    /// sans aucun nœud est ignorée — elle ne peut
     /// ni s'afficher ni s'identifier, et la garder gonflerait les compteurs d'une
     /// matière sur laquelle la page ne sait rien dire.
     static func build(from entries: [RadioLogEntry]) -> [RadioLogSite] {
@@ -114,6 +156,11 @@ enum RadioLogSiteBuilder {
             let kind: RadioLogNodeKind
             let node: String
             var operatorName: String?
+            var rawOperatorName: String?
+            var operatorKey: String?
+            var marketCode: String?
+            var countryCode: String?
+            var isRoaming: Bool?
             var mcc: String?
             var mnc: String?
             var cells: [String: RadioLogCell] = [:]
@@ -127,16 +174,30 @@ enum RadioLogSiteBuilder {
         }
 
         var accumulators: [String: Accumulator] = [:]
+        var networks: [String: RadioLogOperatorResolver.ServingNetwork] = [:]
 
         for entry in entries where !entry.isDeleted {
-            guard let (kind, node) = nodeIdentity(of: entry) else { continue }
-            let plmn = RadioLogPlmn.split(entry.mccMnc)
+            let plmn = entry.plmnEvidence.components
+            let network = plmn.map { plmn in
+                if let cached = networks[plmn.plmn] { return cached }
+                let resolved = RadioLogOperatorResolver.servingNetwork(observedPlmn: plmn.plmn)
+                networks[plmn.plmn] = resolved
+                return resolved
+            }
+            guard let (kind, node) = nodeIdentity(of: entry, network: network) else { continue }
+            let canonicalCi = entry.canonicalCellIdentity
+            // Ni le nom modem, ni les métadonnées SIM/home ne tranchent une
+            // attribution. Le PLMN exact gagne même en cas de métadonnées périmées.
+            let canonicalKey = network?.operatorKey
+            let canonicalName = network?.operatorName
             let key = siteKey(
-                operatorName: entry.operatorName,
+                operatorName: canonicalName,
+                operatorKey: canonicalKey,
                 mcc: plmn?.mcc,
                 mnc: plmn?.mnc,
                 kind: kind,
-                node: node
+                node: node,
+                unresolvedNetworkKey: plmn == nil ? entry.unresolvedNetworkKey : nil
             )
             let seenAt = entry.firstSeenAt ?? entry.observedAt
             let lastAt = entry.lastSeenAt ?? entry.observedAt
@@ -144,7 +205,12 @@ enum RadioLogSiteBuilder {
             var accumulator = accumulators[key] ?? Accumulator(
                 kind: kind,
                 node: node,
-                operatorName: entry.operatorName,
+                operatorName: canonicalName,
+                rawOperatorName: entry.rawOperatorName,
+                operatorKey: canonicalKey,
+                marketCode: network?.marketCode,
+                countryCode: network?.countryCode,
+                isRoaming: entry.isRoaming,
                 mcc: plmn?.mcc,
                 mnc: plmn?.mnc,
                 firstSeenAt: seenAt,
@@ -154,7 +220,13 @@ enum RadioLogSiteBuilder {
             accumulator.logCount += 1
             accumulator.firstSeenAt = min(accumulator.firstSeenAt, seenAt)
             accumulator.lastSeenAt = max(accumulator.lastSeenAt, lastAt)
-            if accumulator.operatorName == nil { accumulator.operatorName = entry.operatorName }
+            if accumulator.operatorName == nil { accumulator.operatorName = canonicalName }
+            if accumulator.rawOperatorName == nil { accumulator.rawOperatorName = entry.rawOperatorName }
+            if accumulator.operatorKey == nil { accumulator.operatorKey = canonicalKey }
+            if accumulator.marketCode == nil { accumulator.marketCode = network?.marketCode }
+            if accumulator.countryCode == nil { accumulator.countryCode = network?.countryCode }
+            if entry.isRoaming == true { accumulator.isRoaming = true }
+            else if accumulator.isRoaming == nil { accumulator.isRoaming = entry.isRoaming }
             if accumulator.mcc == nil { accumulator.mcc = plmn?.mcc }
             if accumulator.mnc == nil { accumulator.mnc = plmn?.mnc }
             if entry.hasCoordinate, let lat = entry.latitude, let lng = entry.longitude {
@@ -164,13 +236,16 @@ enum RadioLogSiteBuilder {
             if let band = entry.band, band > 0 { accumulator.bandCounts[band, default: 0] += 1 }
             if let earfcn = entry.earfcn, earfcn >= 0 { accumulator.earfcnCounts[earfcn, default: 0] += 1 }
 
-            let cellKey = cellIdentity(of: entry)
+            let cellKey = cellIdentity(of: entry, canonicalCi: canonicalCi)
             if let existing = accumulator.cells[cellKey] {
                 accumulator.cells[cellKey] = RadioLogCell(
                     id: existing.id,
                     pci: existing.pci ?? entry.pci,
-                    ci: existing.ci ?? entry.ci,
+                    ci: existing.ci ?? canonicalCi,
                     eciCellId: existing.eciCellId ?? entry.eciCellId,
+                    identityKind: existing.identityKind == entry.cellIdentityKind ? existing.identityKind : "CI",
+                    networkIdentitySource: existing.networkIdentitySource == entry.networkIdentitySource
+                        ? existing.networkIdentitySource : nil,
                     band: existing.band ?? entry.band,
                     earfcn: existing.earfcn ?? entry.earfcn,
                     bestRsrp: bestRsrp(existing.bestRsrp, entry.rsrp),
@@ -180,8 +255,10 @@ enum RadioLogSiteBuilder {
                 accumulator.cells[cellKey] = RadioLogCell(
                     id: "\(key)#\(cellKey)",
                     pci: entry.pci,
-                    ci: entry.ci,
+                    ci: canonicalCi,
                     eciCellId: entry.eciCellId,
+                    identityKind: entry.cellIdentityKind,
+                    networkIdentitySource: entry.networkIdentitySource,
                     band: entry.band,
                     earfcn: entry.earfcn,
                     bestRsrp: entry.rsrp,
@@ -198,6 +275,11 @@ enum RadioLogSiteBuilder {
                 kind: accumulator.kind,
                 node: accumulator.node,
                 operatorName: accumulator.operatorName,
+                rawOperatorName: accumulator.rawOperatorName,
+                operatorKey: accumulator.operatorKey,
+                marketCode: accumulator.marketCode,
+                countryCode: accumulator.countryCode,
+                isRoaming: accumulator.isRoaming,
                 mcc: accumulator.mcc,
                 mnc: accumulator.mnc,
                 cells: accumulator.cells.values.sorted(by: cellOrder),
@@ -215,32 +297,73 @@ enum RadioLogSiteBuilder {
     /// Clé de site — recomposable à l'identique depuis un `RadioLogSite`.
     static func siteKey(
         operatorName: String?,
+        operatorKey: String?,
         mcc: String?,
         mnc: String?,
         kind: RadioLogNodeKind,
-        node: String
+        node: String,
+        unresolvedNetworkKey: String? = nil
     ) -> String {
-        [
-            operatorName?.uppercased() ?? "",
-            mcc ?? "",
-            mnc ?? "",
+        let plmn = (mcc.flatMap { mcc in mnc.map { mnc in "\(mcc)\(mnc)" } })
+        let networkKey = plmn
+            ?? unresolvedNetworkKey
+            ?? operatorKey.map { "OP:\($0.uppercased())" }
+            ?? "UNRESOLVED:\(operatorName?.uppercased() ?? "")"
+        return [
+            "v2",
+            networkKey,
             kind.rawValue,
             node
         ].joined(separator: "|")
     }
 
-    private static func nodeIdentity(of entry: RadioLogEntry) -> (RadioLogNodeKind, String)? {
-        if entry.isNr, let gnb = entry.gnb { return (.gnb, gnb) }
-        if let enb = entry.enb { return (.enb, enb) }
-        if let gnb = entry.gnb { return (.gnb, gnb) }
+    private static func nodeIdentity(
+        of entry: RadioLogEntry, network: RadioLogOperatorResolver.ServingNetwork?
+    ) -> (RadioLogNodeKind, String)? {
+        guard !entry.isNtmUnknownCellIdentity, !entry.cellIdentityEvidenceRequiresRefresh else { return nil }
+        // Contrat NSA explicite : même si une porteuse NR fournit un gNB valide,
+        // l'unité physique principale du relevé reste l'ancre LTE observée.
+        if entry.technology.uppercased().contains("NSA"),
+           let enb = entry.enb, let node = Int64(enb), node > 0, node <= 1_048_575 {
+            return (.enb, enb)
+        }
+        if let gnb = entry.gnb, let node = Int64(gnb), node > 0, node <= 4_294_967_295,
+           entry.servingPlmn != nil, entry.isNr,
+           entry.nodeIdentityKind?.uppercased() != "ENB_REPORTED",
+           entry.nodeIdentityKind?.uppercased() != "CELL_IDENTITY" {
+            let reportedNodeAgrees = entry.nodeIdentityRaw == nil ||
+                entry.nodeIdentityKind?.uppercased() != "GNB_REPORTED" || entry.nodeIdentityRaw == gnb
+            let valid: Bool
+            if let ci = entry.ci {
+                // Un label NR/5G + un ECI LTE ne suffit pas. Une NCI entière reste
+                // immuable, y compris si le gNB ancien contredit la stratégie.
+                let nrEvidence = entry.hasExplicitNrSource || ci > 268_435_455
+                if network?.hasConfirmedNrLocalWidth == true {
+                    valid = nrEvidence && ci > 0 && ci <= 68_719_476_735 && (ci >> 14) == node
+                } else {
+                    // Hors stratégie connue, seule une identité NR explicitement
+                    // typée peut accompagner un nœud rapporté, sans aucun calcul.
+                    valid = entry.hasExplicitNrSource && ci > 0 && ci <= 68_719_476_735 &&
+                        entry.nodeIdentityKind?.uppercased() == "GNB_REPORTED"
+                }
+            } else {
+                // Le nœud peut être rapporté seul ; ne jamais reconstruire un
+                // NCI depuis ce gNB et un numéro de cellule locale.
+                valid = true
+            }
+            if valid && reportedNodeAgrees { return (.gnb, gnb) }
+        }
+        if let enb = entry.enb, !entry.hasExplicitNrSource, (entry.ci ?? 0) <= 268_435_455 {
+            return (.enb, enb)
+        }
         return nil
     }
 
     /// Identité d'une cellule DANS son site : le couple (PCI, identité complète).
     /// Deux relevés du même PCI sur des ECI différents restent deux rangées —
     /// c'est bien deux cellules physiques.
-    private static func cellIdentity(of entry: RadioLogEntry) -> String {
-        let identity = entry.ci.map(String.init) ?? entry.eciCellId ?? ""
+    private static func cellIdentity(of entry: RadioLogEntry, canonicalCi: Int64?) -> String {
+        let identity = canonicalCi.map(String.init) ?? entry.eciCellId ?? ""
         return "\(entry.pci.map(String.init) ?? "")/\(identity)"
     }
 
@@ -290,8 +413,9 @@ enum RadioLogSiteBuilder {
 
 /// Réponse à l'unique question que pose la page : « ce site est-il déjà identifié ? ».
 ///
-/// Un SEUL critère — l'eNB/gNB est connu du serveur. Pas de troisième état
-/// « hypothèse » ici : une hypothèse de proximité coûte 3,7× plus cher à
+/// L'eNB connu peut confirmer l'ancre LTE. Un gNB connu exige en plus une preuve
+/// de cellule physique (CI/NCI locale ou PCI). Pas de troisième état
+/// « hypothèse » ici : une hypothèse de proximité à confirmer a sa
 /// résoudre (elle exige la position) et ne répond pas à cette question. Elle a sa
 /// place là où l'on regarde UN site à la fois, c'est-à-dire dans la feuille
 /// d'identification et la file en chaîne.

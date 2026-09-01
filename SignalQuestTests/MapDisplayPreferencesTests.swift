@@ -1,6 +1,49 @@
 import XCTest
 @testable import SignalQuest
 
+/// Anciennes préférences basemap : aucun chemin ne doit réactiver CARTO.
+final class MapBackdropMigrationTests: XCTestCase {
+    func testLegacyCartoResolvesToNativeAppleEvenBeforeMigration() {
+        XCTAssertEqual(MapBackdrop.resolve("carto"), .applePlan)
+        XCTAssertEqual(MapBackdrop.carto.mapKitKind, .applePlan)
+        XCTAssertFalse(MapBackdrop.carto.usesThirdPartyTiles)
+        XCTAssertEqual(MapBackdrop.carto.label, MapBackdrop.applePlan.label)
+    }
+
+    func testOnlySupportedChoicesAreOfferedAndUnknownValuesAreSafe() {
+        XCTAssertEqual(MapBackdrop.allCases, [.applePlan, .osm, .topo, .satellite])
+        XCTAssertEqual(MapBackdrop.resolve(nil), .applePlan)
+        XCTAssertEqual(MapBackdrop.resolve("future-provider"), .applePlan)
+        for choice in MapBackdrop.allCases {
+            XCTAssertEqual(MapBackdrop.resolve(choice.rawValue), choice)
+        }
+    }
+
+    func testMigrationIsIdempotentAndPreservesUnrelatedPreferences() throws {
+        let suite = "SignalQuest.MapBackdropTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("carto", forKey: MapBackdrop.storageKey)
+        defaults.set("sentinel", forKey: "unrelated-setting")
+        MapBackdrop.migrateLegacyPreference(in: defaults)
+        MapBackdrop.migrateLegacyPreference(in: defaults)
+        XCTAssertEqual(defaults.string(forKey: MapBackdrop.storageKey), "applePlan")
+        XCTAssertEqual(MapBackdrop.current(in: defaults), .applePlan)
+        XCTAssertEqual(defaults.string(forKey: "unrelated-setting"), "sentinel")
+    }
+
+    func testMigrationDoesNotOverwriteAnExplicitSupportedChoice() throws {
+        let suite = "SignalQuest.MapBackdropTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        for choice in MapBackdrop.allCases {
+            defaults.set(choice.rawValue, forKey: MapBackdrop.storageKey)
+            MapBackdrop.migrateLegacyPreference(in: defaults)
+            XCTAssertEqual(defaults.string(forKey: MapBackdrop.storageKey), choice.rawValue)
+        }
+    }
+}
+
 /// Réglages d'affichage de la carte : croisement des bandes et style d'azimut.
 /// Tous deux persistent entre deux lancements, et leur valeur par défaut doit
 /// reproduire le comportement d'avant — sinon la carte changerait toute seule

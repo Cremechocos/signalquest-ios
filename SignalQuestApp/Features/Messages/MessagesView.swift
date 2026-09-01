@@ -95,7 +95,12 @@ struct MessagesView: View {
 
     var body: some View {
         List {
-            header
+            VStack(alignment: .leading, spacing: SQSpace.md) {
+                header
+                if E2EEV2RuntimeReadGate.enabled {
+                    E2EEV2NotificationPreviewNotice()
+                }
+            }
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: SQSpace.xl, bottom: SQSpace.sm, trailing: SQSpace.xl))

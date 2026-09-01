@@ -383,6 +383,9 @@ struct RadioLogsView: View {
                     )
                     .contentShape(Rectangle())
                     .onTapGesture { model.toggleExpansion(site) }
+                    .accessibilityAction(named: Text(model.expandedSiteId == site.id ? "Réduire les cellules" : "Afficher les cellules")) {
+                        model.toggleExpansion(site)
+                    }
                     .padding(.bottom, M.cardSpacing)
                     .onAppear {
                         // La commune n'est chargée que pour ce qui s'affiche —
@@ -456,12 +459,22 @@ private struct IndeterminateSlide: ViewModifier {
     func body(content: Content) -> some View {
         content
             .offset(x: offset)
-            .onAppear {
-                guard !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
-                    offset = width * 0.7
-                }
+            .onAppear { updateMotion() }
+            .onChangeCompat(of: reduceMotion) { _, _ in
+                updateMotion()
             }
+    }
+
+    private func updateMotion() {
+        offset = 0
+        guard let animation = SQMotion.repeating(
+            .easeInOut(duration: 1.1),
+            active: width > 0,
+            reduceMotion: reduceMotion
+        ) else { return }
+        withAnimation(animation) {
+            offset = width * 0.7
+        }
     }
 }
 

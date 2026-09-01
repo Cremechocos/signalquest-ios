@@ -301,7 +301,7 @@ final class MapExplorerViewModel: ObservableObject {
     }
 
     var defaultOperatorKeyForCurrentMarket: String {
-        currentMarketEntry.map(Self.defaultOperatorKey(for:)) ?? "SFR"
+        currentMarketEntry.map(Self.defaultOperatorKey(for:)) ?? "ALL"
     }
 
     /// Opérateurs filtrables du marché courant (clés registre + "ALL").
@@ -938,7 +938,11 @@ final class MapExplorerViewModel: ObservableObject {
     private func performSearch(_ q: String) async {
         isSearching = true
         searchFailed = false
-        async let antennasResult = (try? await antennasService.quickSearch(query: q)) ?? []
+        async let antennasResult = (try? await antennasService.quickSearch(
+            query: q,
+            market: marketFilter,
+            department: currentDromRegion?.department
+        )) ?? []
         async let placesResult = geocodePlaces(q)
         let antennas = await antennasResult
         let places = await placesResult
@@ -1103,6 +1107,13 @@ struct MapExplorerView: View {
 
     @State private var mapCenter: CLLocationCoordinate2D
     @State private var mapZoom: Double
+    /// État de scène, pas une donnée métier : le pin de recherche survit à une
+    /// recréation de cette vue (rotation / restauration SwiftUI), mais n'est
+    /// jamais envoyé à l'API ni enregistré dans le catalogue utilisateur.
+    @SceneStorage("map.searchPin.latitude.v1") private var searchPinLatitude = ""
+    @SceneStorage("map.searchPin.longitude.v1") private var searchPinLongitude = ""
+    @SceneStorage("map.searchPin.title.v1") private var searchPinTitle = ""
+    @SceneStorage("map.searchPin.subtitle.v1") private var searchPinSubtitle = ""
     /// Dernier palier de zoom qui affecte le RENDU des couches (clustering/cônes).
     /// Tant qu'il ne change pas, un changement de `mapZoom` ne reconstruit PAS les
     /// couches (PERF-MAP-01) : entre deux frontières, `annotationPayloads` est identique.
@@ -1605,12 +1616,11 @@ struct MapExplorerView: View {
                         // Cette barre dense conserve une taille exploitable quand le
                         // texte système est au maximum. Les libellés restent annoncés
                         // intégralement par VoiceOver.
-                        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
                     if filters.contains(.friend) {
                         friendsStatusPanel
-                            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                             .padding(.horizontal, SQSpace.md)
-                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .transition(.move(edge: .top))
                     }
                     // Les contrôles de coloration couverture (bascule + légende) ont
                     // quitté la colonne haute (surchargée) → carte flottante bas-centre
@@ -1704,25 +1714,30 @@ struct MapExplorerView: View {
                     ProgressView()
                         .controlSize(.mini)
                         .tint(presentation.color)
+                        .accessibilityHidden(true)
                 } else {
                     Image(systemName: presentation.icon)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(presentation.color)
                 }
                 Text(presentation.label)
-                    .font(SQFont.body(13, .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(SQColor.label)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: SQSpace.sm)
                 Text("\(friendsWithRecentLocation.count)/\(model.liveFriends.count) localisés")
-                    .font(SQFont.archivo(11, .semibold))
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("map.friends.count")
                 if effectiveFriendsConnectionState == .unavailable {
                     Button {
                         friendsStreamGeneration &+= 1
                     } label: {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 13, weight: .semibold))
-                            .frame(width: 32, height: 32)
+                            .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -1734,9 +1749,10 @@ struct MapExplorerView: View {
                 Text(effectiveFriendsConnectionState == .connecting
                      ? String(localized: "Connexion à la carte des amis…")
                      : String(localized: "Aucun ami ne partage de position récente."))
-                    .font(SQFont.body(12))
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .font(.caption)
+                    .foregroundStyle(SQColor.label)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: SQSpace.sm) {
@@ -1791,13 +1807,14 @@ struct MapExplorerView: View {
                     SQAvatar(url: friend.avatarUrl, name: friend.name ?? "Ami", size: 24)
                 }
                 Text(title)
-                    .font(SQFont.body(12, .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
-            .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
+            .foregroundStyle(isSelected ? SQColor.accentInk : SQColor.label)
             .padding(.horizontal, SQSpace.sm + 2)
-            .frame(minHeight: 40)
-            .background(isSelected ? SQColor.brandRed : SQColor.surfaceMuted, in: Capsule())
+            .frame(minHeight: 44)
+            .background(isSelected ? SQColor.accentSoft : SQColor.surfaceMuted, in: Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(friend == nil ? "Afficher tous les amis" : "Filtrer sur \(title)")
@@ -1931,7 +1948,7 @@ struct MapExplorerView: View {
             Image(systemName: "building.2.fill")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(SQColor.label)
-                .frame(width: 42, height: 42)
+                .frame(width: 44, height: 44)
                 .background { mapGlassBackground(Circle()) }
                 .sqShadowCard()
         }
@@ -1959,10 +1976,11 @@ struct MapExplorerView: View {
             .frame(width: 18, height: 18)
             .accessibilityHidden(!(model.isLoading || model.isSearching))
             .accessibilityLabel(model.isSearching ? "Recherche en cours" : (model.isLoading ? "Chargement de la carte" : ""))
-            TextField("Rechercher une ville, une adresse, un site…", text: $model.searchQuery)
+            TextField("Rechercher une ville, une adresse, un site…", text: $model.searchQuery, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(SQFont.body(15))
+                .font(.body)
                 .foregroundStyle(SQColor.label)
+                .lineLimit(1...2)
                 .submitLabel(.search)
                 .autocorrectionDisabled()
                 .onSubmit { Task { await model.search() } }
@@ -1972,16 +1990,19 @@ struct MapExplorerView: View {
                 Button {
                     model.searchQuery = ""
                     model.searchResults = []
+                    clearSearchPin()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(SQColor.labelTertiary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Effacer la recherche")
             }
         }
         .padding(.horizontal, SQSpace.md + 2)
-        .frame(height: 42)
+        .frame(minHeight: 44)
         .frame(maxWidth: .infinity)
         .background { mapGlassBackground(Capsule(style: .continuous)) }
         .sqShadowCard()
@@ -2005,12 +2026,17 @@ struct MapExplorerView: View {
                         .background(SQColor.brandRed, in: Circle())
                         .foregroundStyle(SQColor.onAccent)
                         .offset(x: 4, y: -4)
+                        .accessibilityHidden(true)
                 }
             }
             .sqShadowCard()
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel("Calques et filtres")
+        .accessibilityLabel(
+            activeFilterCount > 0
+                ? "Calques et filtres, \(activeFilterCount) actif\(activeFilterCount > 1 ? "s" : "")"
+                : "Calques et filtres"
+        )
     }
 
     /// Sélecteur d'opérateur compact (bas-gauche) : menu des opérateurs du marché
@@ -2035,16 +2061,17 @@ struct MapExplorerView: View {
                     .fill(model.operatorFilter.uppercased() == "ALL" ? SQColor.brandRed : model.operatorAccent(model.operatorFilter))
                     .frame(width: 9, height: 9)
                 Text(model.operatorShortLabel(model.operatorFilter))
-                    .font(SQFont.body(13.5, .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
+                    .foregroundStyle(Color.primary)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(Color.primary)
             }
             .padding(.horizontal, SQSpace.md)
-            .frame(height: 42)
-            .foregroundStyle(SQColor.label)
-            .background { mapGlassBackground(Capsule(style: .continuous)) }
+            .frame(minHeight: 44)
+            .foregroundStyle(Color.primary)
+            .background(SQColor.surface, in: Capsule(style: .continuous))
             .sqShadowCard()
         }
         .accessibilityLabel("Opérateur affiché : \(model.operatorShortLabel(model.operatorFilter))")
@@ -2103,7 +2130,8 @@ struct MapExplorerView: View {
                     Text(focus.summary)
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: SQSpace.sm)
                 Button {
@@ -2139,18 +2167,20 @@ struct MapExplorerView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
             Text(text)
-                .font(SQFont.body(13, .semibold))
-                .foregroundStyle(SQColor.label)
-                .lineLimit(2)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("map.status.text")
         }
         .padding(.horizontal, SQSpace.md + 2)
         .padding(.vertical, SQSpace.sm + 2)
-        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .sqShadowCard()
         // Bornée à 280 (repli 2 lignes pour les erreurs longues) et CENTRÉE dans la
         // colonne bas-centre (alignement centré par défaut du `.frame`) — plus
         // d'alignement `.leading` hérité de l'ancienne position bas-gauche.
-        .frame(maxWidth: 280)
+        .frame(maxWidth: 340)
+        .accessibilityElement(children: .combine)
     }
 
     private var activeFilterCount: Int {
@@ -2239,6 +2269,8 @@ struct MapExplorerView: View {
                 Text(model.searchFailed ? "Recherche indisponible" : "Aucun résultat")
                     .font(SQFont.body(14, .medium))
                     .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer()
             }
             .padding(.horizontal, SQSpace.md + 2)
@@ -2259,12 +2291,12 @@ struct MapExplorerView: View {
                     .foregroundStyle(SQColor.brandRed)
                 Text(site.siteId ?? site.id)
                     .font(SQFont.body(14, .semibold))
-                    .lineLimit(1)
+                    .lineLimit(2)
                 if let address = site.address {
                     Text(address)
                         .font(SQFont.body(13))
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
             case .place(let place):
                 Image(systemName: "mappin.circle.fill")
@@ -2272,12 +2304,12 @@ struct MapExplorerView: View {
                     .foregroundStyle(SQColor.brandRed)
                 Text(place.name)
                     .font(SQFont.body(14, .semibold))
-                    .lineLimit(1)
+                    .lineLimit(2)
                 if let subtitle = place.subtitle {
                     Text(subtitle)
                         .font(SQFont.body(13))
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
             }
             Spacer()
@@ -2293,9 +2325,11 @@ struct MapExplorerView: View {
         dismissSearch()
         switch result {
         case .place(let place):
+            setSearchPin(place)
             mapCenter = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
             mapZoom = 14
         case .antenna(let site):
+            clearSearchPin()
             if site.hasValidCoordinate, let lat = site.latitude, let lng = site.longitude {
                 mapCenter = CLLocationCoordinate2D(latitude: lat, longitude: lng)
                 mapZoom = 15
@@ -2311,6 +2345,53 @@ struct MapExplorerView: View {
         model.isSearching = false
         model.searchFailed = false
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
+    private var searchPinPayload: MapAnnotationPayload? {
+        guard let latitude = Double(searchPinLatitude),
+              let longitude = Double(searchPinLongitude),
+              latitude.isFinite,
+              longitude.isFinite,
+              (-90.0...90.0).contains(latitude),
+              (-180.0...180.0).contains(longitude),
+              latitude != 0 || longitude != 0
+        else { return nil }
+        return MapAnnotationPayload(
+            id: "searched-place-pin",
+            // Le type ne participe pas aux filtres : `isSearchPin` le distingue
+            // de tout site communautaire au rendu et à l'accessibilité.
+            kind: .customSite,
+            title: searchPinTitle.isEmpty ? "Lieu recherché" : searchPinTitle,
+            subtitle: searchPinSubtitle,
+            coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
+            metric: nil,
+            backendId: nil,
+            details: nil,
+            antennaId: nil,
+            clusterCount: nil,
+            azimuths: [],
+            showsAzimuths: false,
+            tint: SQColor.brandRed,
+            glyphOverride: "mappin.circle.fill",
+            isSearchPin: true
+        )
+    }
+
+    private func setSearchPin(_ place: PlaceResult) {
+        searchPinLatitude = String(place.latitude)
+        searchPinLongitude = String(place.longitude)
+        searchPinTitle = place.name
+        searchPinSubtitle = place.subtitle ?? ""
+        refreshMapRender()
+    }
+
+    private func clearSearchPin() {
+        guard !searchPinLatitude.isEmpty || !searchPinLongitude.isEmpty || !searchPinTitle.isEmpty else { return }
+        searchPinLatitude = ""
+        searchPinLongitude = ""
+        searchPinTitle = ""
+        searchPinSubtitle = ""
+        refreshMapRender()
     }
 
     /// Reconstruit le cache des couches lourdes. Appelé uniquement sur changement
@@ -2377,7 +2458,11 @@ struct MapExplorerView: View {
             return
         }
         Task {
-            let results = (try? await services.antennas.search(query: siteId)) ?? []
+            let results = (try? await services.antennas.quickSearch(
+                query: siteId,
+                market: model.marketFilter,
+                department: model.currentDromRegion?.department
+            )) ?? []
             guard let site = results.first(where: { $0.id == siteId || $0.siteId == siteId }) ?? results.first else { return }
             selectedAntenna = site
             if let lat = site.latitude, let lng = site.longitude {
@@ -2487,6 +2572,7 @@ struct MapExplorerView: View {
         payloads += plannedPayloads
         payloads += outagePayloads
         payloads += communityOutagePayloads
+        if let searchPinPayload { payloads.append(searchPinPayload) }
         return payloads
     }
 
@@ -3487,8 +3573,10 @@ struct MapExplorerView: View {
 
     private func selectAnnotation(_ annotation: MapAnnotationPayload) {
         Haptics.light()
+        if annotation.isSearchPin { return }
         if let antennaId = annotation.antennaId,
            let site = model.antennas.first(where: { $0.id == antennaId }) {
+            clearSearchPin()
             selectedAntenna = site
             return
         }
@@ -3541,6 +3629,7 @@ struct MapExplorerView: View {
         // Site ajouté à la main : même fiche terrain que les antennes officielles.
         if annotation.kind == .customSite, let siteId = annotation.backendId,
            let site = model.customSiteTiles.flatMap(\.markers).first(where: { $0.id == siteId }) {
+            clearSearchPin()
             selectedCustomSite = site
             return
         }

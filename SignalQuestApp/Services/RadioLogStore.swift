@@ -7,6 +7,49 @@ struct RadioLogSnapshot: Codable, Sendable {
     var cursor: RadioLogCursor?
     var lastSyncedAtMs: Int?
 
+    enum CodingKeys: String, CodingKey { case entries, cursor, lastSyncedAtMs, plmnEvidenceVersion }
+
+    init(entries: [RadioLogEntry] = [], cursor: RadioLogCursor? = nil, lastSyncedAtMs: Int? = nil) {
+        self.entries = entries
+        self.cursor = cursor
+        self.lastSyncedAtMs = lastSyncedAtMs
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        entries = try c.decode([RadioLogEntry].self, forKey: .entries)
+        cursor = try c.decodeIfPresent(RadioLogCursor.self, forKey: .cursor)
+        lastSyncedAtMs = try c.decodeIfPresent(Int.self, forKey: .lastSyncedAtMs)
+        if (try c.decodeIfPresent(Int.self, forKey: .plmnEvidenceVersion) ?? 0) < 1 {
+            // v0 transformait les nombres JSON en chaînes et omettait le format
+            // d'import. Garder les observations et les PLMN complets explicites.
+            // Seules les preuves devenues indécidables exigent une relecture.
+            var needsRefresh = false
+            entries = entries.map { entry in
+                let plmnNeedsRefresh = entry.legacyCacheNeedsPlmnRefresh
+                let cellNeedsRefresh = entry.legacyCacheNeedsCellIdentityRefresh
+                guard plmnNeedsRefresh || cellNeedsRefresh else { return entry }
+                var preserved = entry
+                if plmnNeedsRefresh { preserved.plmnEvidenceRequiresRefresh = true }
+                if cellNeedsRefresh { preserved.cellIdentityEvidenceRequiresRefresh = true }
+                needsRefresh = true
+                return preserved
+            }
+            if needsRefresh {
+                cursor = nil
+                lastSyncedAtMs = nil
+            }
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(entries, forKey: .entries)
+        try c.encodeIfPresent(cursor, forKey: .cursor)
+        try c.encodeIfPresent(lastSyncedAtMs, forKey: .lastSyncedAtMs)
+        try c.encode(1, forKey: .plmnEvidenceVersion)
+    }
+
     var lastSyncedAt: Date? {
         lastSyncedAtMs.map { Date(timeIntervalSince1970: Double($0) / 1000) }
     }

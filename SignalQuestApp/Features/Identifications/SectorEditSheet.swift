@@ -21,11 +21,18 @@ final class SectorEditViewModel: ObservableObject {
     }
 
     var operatorName: String { item.operatorName ?? "ALL" }
-    var market: String { item.marketCode ?? "FR" }
+    var market: String? {
+        let value = item.marketCode?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
+        return value.isEmpty ? nil : value
+    }
 
     func load() async {
         isLoading = true
         defer { isLoading = false }
+        guard let market else {
+            errorMessage = "Le marché de cette identification n'est pas renseigné. Aucun pays ne sera déduit automatiquement."
+            return
+        }
         guard let details = try? await antennas.details(id: item.siteId, market: market, operatorName: operatorName),
               let core = details.core else {
             errorMessage = "Impossible de charger les secteurs de ce site."

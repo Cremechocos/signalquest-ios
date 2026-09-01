@@ -95,6 +95,7 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
     /// ouverture passé ce délai. C'est ce que l'utilisateur ressentait.
     private let identifiedTtlMs = 7 * 24 * 60 * 60 * 1000
     private let unidentifiedTtlMs = 24 * 60 * 60 * 1000
+    private static let maxPlausibleSiteDistanceMeters = 100_000.0
 
     /// Recul appliqué au curseur STOCKÉ avant de reprendre un rattrapage. Il
     /// s'ajoute à celui du serveur : un rattrapage repris des jours plus tard ne
@@ -287,12 +288,9 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
 
     /// Balaie les sites par fenêtres concurrentes bornées.
     ///
-    /// CHARGE MINIMALE, volontairement : opérateur, PLMN, eNB/gNB, techno, bande.
-    /// Ni PCI, ni cellId, ni position. Android l'a mesuré sur 150 sites réels — le
-    /// PCI et le cellId ne changent rien (10 trouvés dans les trois cas), la
-    /// position fait passer à 141 mais en `resolutionMode: proximity`, c'est-à-dire
-    /// des hypothèses de voisinage, pour 3,7× le temps. La question posée ici est
-    /// « ce site est-il déjà identifié ? » : une hypothèse n'y répond pas.
+    /// Le lot reste borné, mais chaque item transporte la preuve disponible :
+    /// PLMN exact, position médiane et cellule représentative. Un gNB logique
+    /// seul ne peut pas désigner un site physique.
     func scanStream(sites: [RadioLogSite]) -> AsyncStream<[String: RadioLogSiteState]> {
         AsyncStream { continuation in
             let task = Task { [weak self] in
@@ -327,21 +325,12 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
     }
 
     private func scanWindow(_ window: [RadioLogSite]) async -> [String: RadioLogSiteState] {
-        let items = window.map { site in
-            QuickIdentifyBatchItem(
-                id: site.id,
-                operator: site.operatorName,
-                market: RadioLogOperatorResolver.marketCode(forOperator: site.operatorName, mcc: site.mcc),
-                mcc: site.mcc,
-                mnc: site.mnc,
-                enb: site.kind == .enb ? site.node : nil,
-                gnb: site.kind == .gnb ? site.node : nil,
-                pci: nil, cellId: nil, ci: nil, lat: nil, lng: nil,
-                band: site.band,
-                earfcn: site.earfcn,
-                tech: site.techLabel
-            )
-        }
+        // Un nœud sans PLMN exact n'est pas une recherche mondiale : l'API
+        // historique pourrait appliquer son marché par défaut. Il reste lisible,
+        // mais aucune réponse ne doit lui fabriquer un rattachement.
+        let eligible = window.filter { $0.observedPlmn != nil && $0.resolvedMarketCode != nil }
+        guard !eligible.isEmpty else { return [:] }
+        let items = eligible.map(Self.batchItem)
         do {
             let response: QuickIdentifyBatchResponse = try await api.requestJSON(
                 "/api/android/map/identify/quick/batch",
@@ -358,7 +347,7 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
             // Un statut pour CHAQUE site demandé, non trouvés compris. Ne rien
             // rendre pour un site le laisserait « jamais vérifié » et le ferait
             // revenir à la passe suivante, indéfiniment.
-            return window.reduce(into: [:]) { states, site in
+            return eligible.reduce(into: [:]) { states, site in
                 states[site.id] = Self.state(from: byId[site.id]?.result, site: site)
             }
         } catch {
@@ -371,47 +360,61 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
         }
     }
 
-    /// Un seul critère : le nœud eNB/gNB est-il connu du serveur ?
-    ///
-    /// La réponse est dans `matchedRadio`, et NULLE PART AILLEURS. Quand le
-    /// serveur y liste le type de nœud qu'on a envoyé, c'est qu'il l'a retrouvé
-    /// dans ses validations : le nœud est connu, point.
-    ///
-    /// ⚠️ NE PAS se fier à `requiresUserConfirmation` ni à `resolutionMode` pour
-    /// trancher cette question — ils répondent à une AUTRE : « sait-on à quel
-    /// site rattacher ce nœud ? ». Mesuré sur un journal réel, 35 sites sur 150
-    /// reviennent en `resolutionMode: "shared_operator"`,
-    /// `requiresUserConfirmation: true`, `source: "fr_validations"` — ET avec
-    /// leur eNB dans `matchedRadio`. Ce sont des sites MUTUALISÉS : le nœud est
-    /// parfaitement connu, c'est l'opérateur propriétaire qui demande
-    /// confirmation. Les rejeter affichait « Non identifié » sur 23 % du
-    /// catalogue à tort.
-    ///
-    /// Ces deux champs restent utiles pour le cas où le serveur ne détaille
-    /// AUCUNE correspondance : là, `found: true` peut venir d'un simple repli
-    /// géographique, et l'accepter ferait dire « Identifié » à « il y a une
-    /// antenne dans le coin ».
+    static func batchItem(for site: RadioLogSite) -> QuickIdentifyBatchItem {
+        let cell = site.quickIdentifyCell
+        return QuickIdentifyBatchItem(
+            id: site.id,
+            operator: site.resolvedOperatorKey,
+            market: site.resolvedMarketCode,
+            observedPlmn: site.observedPlmn,
+            mcc: site.mcc,
+            mnc: site.mnc,
+            enb: site.kind == .enb ? site.node : nil,
+            gnb: site.kind == .gnb ? site.node : nil,
+            pci: cell?.pci.map(String.init),
+            cellId: cell?.eciCellId,
+            ci: cell?.ci.map(String.init),
+            lat: site.latitude,
+            lng: site.longitude,
+            band: site.band,
+            earfcn: site.earfcn,
+            tech: site.techLabel
+        )
+    }
+
+    /// Un eNB validé peut identifier l'ancre LTE. Un gNB, lui, est un nœud
+    /// logique potentiellement multi-site : il exige en plus une cellule/PCI
+    /// reconnue. Les réponses ambiguës, non résolues ou physiquement absurdes
+    /// restent toujours non identifiées.
     static func state(from resolution: QuickIdentifyResolution?, site: RadioLogSite) -> RadioLogSiteState {
+        guard site.observedPlmn != nil else { return .unchecked }
         guard let resolution, resolution.found == true else { return .unidentified }
+        guard !resolution.isAmbiguousOrUnresolved else { return .unidentified }
+        if let distance = resolution.distanceMeters,
+           distance > maxPlausibleSiteDistanceMeters {
+            return .unidentified
+        }
         guard let siteId = resolution.canonicalSiteId ?? resolution.siteId, !siteId.isEmpty else {
             return .unidentified
         }
 
-        let matched = resolution.matchedTypes
-        if matched.contains(site.kind == .enb ? "enb" : "gnb") {
+        if resolution.matchesNode(site) {
+            if site.kind == .gnb && !resolution.matchesPhysicalCell(of: site) {
+                return .unidentified
+            }
             return .identified(siteId: siteId)
         }
         // D'autres identifiants correspondent (PCI, cellId) mais pas le nœud :
         // l'unité de la page est le SITE, une cellule ne l'identifie pas.
-        if !matched.isEmpty { return .unidentified }
+        if !resolution.matchedRadio.isEmpty { return .unidentified }
 
-        // Aucune correspondance détaillée. On accepte — parité Android, et le
-        // balayage n'envoie aucune position — SAUF si le serveur annonce
-        // lui-même une résolution géographique ou à confirmer.
+        // Compatibilité eNB historique seulement : un gNB sans détail reste
+        // toujours non identifié, même avec `found:true`.
         if resolution.requiresUserConfirmation == true { return .unidentified }
         if let mode = resolution.resolutionMode?.lowercased(), mode.contains("proximity") {
             return .unidentified
         }
+        if site.kind == .gnb { return .unidentified }
         return .identified(siteId: siteId)
     }
 
@@ -419,9 +422,13 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
 
     func hypothesis(for site: RadioLogSite) async -> RadioLogSiteHypothesis? {
         guard let latitude = site.latitude, let longitude = site.longitude else { return nil }
+        guard let market = site.resolvedMarketCode else { return nil }
+        guard let observedPlmn = site.observedPlmn else { return nil }
+        let cell = site.quickIdentifyCell
         var query: [URLQueryItem] = [
-            URLQueryItem(name: "operator", value: site.operatorName ?? "ALL"),
-            URLQueryItem(name: "market", value: RadioLogOperatorResolver.marketCode(forOperator: site.operatorName, mcc: site.mcc) ?? "FR"),
+            URLQueryItem(name: "operator", value: site.resolvedOperatorKey ?? "ALL"),
+            URLQueryItem(name: "market", value: market),
+            URLQueryItem(name: "observedPlmn", value: observedPlmn),
             URLQueryItem(name: "lat", value: String(latitude)),
             URLQueryItem(name: "lng", value: String(longitude)),
             URLQueryItem(name: "tech", value: site.techLabel)
@@ -435,29 +442,78 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
         if let band = site.band { query.append(URLQueryItem(name: "band", value: String(band))) }
         if let earfcn = site.earfcn { query.append(URLQueryItem(name: "earfcn", value: String(earfcn))) }
         // Le PCI de la première cellule aide le serveur à dériver le secteur.
-        if let pci = site.cells.compactMap(\.pci).first {
+        if let pci = cell?.pci {
             query.append(URLQueryItem(name: "pci", value: String(pci)))
         }
+        if let cellId = cell?.eciCellId { query.append(URLQueryItem(name: "cellId", value: cellId)) }
+        if let ci = cell?.ci { query.append(URLQueryItem(name: "ci", value: String(ci))) }
 
         guard let resolution = try? await api.request(
             APIEndpoint(path: "/api/android/map/identify/quick", query: query),
             as: QuickIdentifyResolution.self
         ) else { return nil }
 
-        guard let payload = resolution.hypothesis,
+        guard resolution.found == true,
+              !resolution.isAmbiguousOrUnresolved,
+              let payload = resolution.hypothesis,
               let siteId = payload.canonicalSiteId ?? payload.siteId ?? resolution.canonicalSiteId ?? resolution.siteId,
               !siteId.isEmpty
         else { return nil }
+
+        let effectiveDistance = payload.distanceMeters ?? resolution.distanceMeters
+        guard effectiveDistance.map({ $0 <= Self.maxPlausibleSiteDistanceMeters }) != false else { return nil }
 
         return RadioLogSiteHypothesis(
             siteId: siteId,
             latitude: payload.latitude,
             longitude: payload.longitude,
             confidenceScore: payload.confidenceScore,
-            distanceMeters: (payload.distanceMeters ?? resolution.distanceMeters).map { Int($0.rounded()) },
+            distanceMeters: effectiveDistance.map { Int($0.rounded()) },
             sector: payload.sector,
             resolutionMode: resolution.resolutionMode ?? resolution.source
         )
+    }
+}
+
+private extension QuickIdentifyResolution {
+    func matchesNode(_ site: RadioLogSite) -> Bool {
+        let expectedType = site.kind == .enb ? "enb" : "gnb"
+        return matchedRadio.contains { match in
+            guard match.type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == expectedType else {
+                return false
+            }
+            guard let value = match.value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+                return true // Compat anciennes réponses `matchedRadioTypes`.
+            }
+            return value == site.node
+        }
+    }
+
+    func matchesPhysicalCell(of site: RadioLogSite) -> Bool {
+        let pciValues = Set(site.cells.compactMap(\.pci).map(String.init))
+        let cellValues = Set(site.cells.flatMap { cell -> [String] in
+            var values: [String] = []
+            if let ci = cell.ci { values.append(String(ci)) }
+            if let local = cell.eciCellId { values.append(local) }
+            return values
+        })
+        var hasExactCellIdentity = false
+        var hasMatchingPci = false
+        for match in matchedRadio {
+            guard let value = match.value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+                continue
+            }
+            switch match.type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "pci": hasMatchingPci = hasMatchingPci || pciValues.contains(value)
+            case "cellid", "ci", "nci":
+                hasExactCellIdentity = hasExactCellIdentity || cellValues.contains(value)
+            default: break
+            }
+        }
+        if hasExactCellIdentity { return true }
+        // Un PCI est réutilisé sur tout le réseau. Il ne départage un gNB
+        // multi-site qu'avec une distance locale nette, comme le résolveur Android.
+        return hasMatchingPci && distanceMeters.map { $0 <= 3_000 } == true
     }
 }
 

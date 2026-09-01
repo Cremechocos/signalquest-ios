@@ -19,6 +19,7 @@ struct OutageCardView: View {
     var onShare: () -> Void
     var onAuthorTap: (() -> Void)? = nil
     var onReact: ((String) -> Void)? = nil
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     // MARK: - Lecture de la metadata
 
@@ -213,7 +214,8 @@ struct OutageCardView: View {
                             Text(token)
                                 .font(SQType.caption.weight(.semibold))
                                 .foregroundStyle(ink)
-                                .lineLimit(1)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                                 .padding(.horizontal, SQSpace.sm + 1)
                                 .padding(.vertical, SQSpace.xs + 1)
                                 // Un CONTOUR teinté, jamais un aplat : l'aplat est réservé à
@@ -282,8 +284,8 @@ struct OutageCardView: View {
             Text(headline)
                 .font(SQFont.display(19, .bold))
                 .foregroundStyle(SQColor.label)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             if let stateTag {
                 SQEditorialTag(text: stateTag.label, color: stateTag.color)
@@ -300,7 +302,7 @@ struct OutageCardView: View {
     }
 
     private var gridColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: 3)
+        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: dynamicTypeSize.isAccessibilitySize ? 1 : 3)
     }
 
     /// Ce que l'opérateur en dit, quand il en dit quelque chose — sinon le décompte communautaire.

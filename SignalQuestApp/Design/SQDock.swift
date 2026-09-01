@@ -29,11 +29,11 @@ struct SQDock: View {
     static let clearance: CGFloat = 80
 
     private let items: [(tab: AppRouter.AppTab, label: String, icon: String)] = [
-        (.home, "Accueil", "house"),
-        (.map, "Carte", "map"),
-        (.speed, "Tester", "speedometer"),
-        (.community, "Communauté", "person.2"),
-        (.profile, "Profil", "person.crop.circle")
+        (.home, String(localized: "Accueil"), "house"),
+        (.map, String(localized: "Carte"), "map"),
+        (.speed, String(localized: "Tester"), "speedometer"),
+        (.community, String(localized: "Communauté"), "person.2"),
+        (.profile, String(localized: "Profil"), "person.crop.circle")
     ]
 
     var body: some View {
@@ -53,6 +53,7 @@ struct SQDock: View {
         .padding(.horizontal, SQSpace.lg)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Navigation principale")
+        .accessibilityIdentifier("main.navigation")
     }
 
     private func dockItem(_ item: (tab: AppRouter.AppTab, label: String, icon: String)) -> some View {
@@ -91,7 +92,9 @@ struct SQDock: View {
             }
             .padding(.vertical, 7)
             .frame(maxWidth: .infinity)
-            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+            // accessibility2 avoisine 200 % : le précédent plafond AX1
+            // arrêtait la navigation principale avant le critère demandé.
+            .dynamicTypeSize(...DynamicTypeSize.accessibility2)
             .foregroundStyle(isActive ? SQColor.brandRed : SQColor.dockInactive)
             .background {
                 if isActive {
@@ -107,7 +110,7 @@ struct SQDock: View {
         .accessibilityShowsLargeContentViewer {
             Label(item.label, systemImage: item.icon)
         }
-        .accessibilityLabel(badge > 0 ? "\(item.label), \(badge) non lus" : item.label)
+        .accessibilityLabel(badge > 0 ? "\(item.label), \(String(localized: "\(badge) conversations non lues"))" : item.label)
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
     }
 

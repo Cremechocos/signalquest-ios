@@ -313,6 +313,8 @@ struct ANFRStatsView: View {
                             .background(selected ? SQColor.brandRed : SQColor.surface, in: Capsule(style: .continuous))
                             .foregroundStyle(selected ? SQColor.onAccent : SQColor.label)
                             .sqShadowSoft()
+                            .padding(.vertical, 4)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(SQPressButtonStyle())
                     .sqAnimation(SQMotion.fast, value: selected)
@@ -718,6 +720,26 @@ private struct ANFRTrendChart: View {
             drawn = false
             withAnimation(.easeInOut(duration: 0.7)) { drawn = true }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilitySummary)
+        .accessibilityRepresentation {
+            VStack(alignment: .leading) {
+                Text(accessibilitySummary)
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(points) { point in
+                    Text("\(point.generation.label), \(point.date.formatted(.dateTime.month().year())) : \(point.value.formatted()) supports")
+                }
+            }
+        }
+    }
+
+    private var accessibilitySummary: String {
+        let generations = Set(points.map { $0.generation.label }).sorted().joined(separator: ", ")
+        guard let first = points.min(by: { $0.date < $1.date }),
+              let last = points.max(by: { $0.date < $1.date }) else {
+            return String(localized: "Évolution ANFR : aucune donnée")
+        }
+        return String(localized: "Évolution ANFR \(generations), de \(first.date.formatted(.dateTime.month().year())) à \(last.date.formatted(.dateTime.month().year())).")
     }
 }
 

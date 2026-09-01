@@ -1,5 +1,6 @@
 import CoreLocation
 import SwiftUI
+import UIKit
 
 /// Feuille de signalement d'une panne.
 ///
@@ -41,6 +42,9 @@ struct OutageReportSheet: View {
     /// qu'un signalement pouvait partir sans que personne n'ait jamais choisi.
     @State private var draft = OutageReportDraft()
     @State private var submitting = false
+    @State private var draftLoaded = false
+    @State private var shouldPersistDraft = true
+    @State private var draftSaveTask: Task<Void, Never>?
     @State private var errorMessage: String?
     @State private var distanceMeters: Int?
     @State private var accuracyMeters: Int?
@@ -98,10 +102,21 @@ struct OutageReportSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annuler") { dismiss() }
+                        .disabled(submitting)
                 }
             }
         }
-        .task { await measureDistance() }
+        .task {
+            restoreDraft()
+            await measureDistance()
+        }
+        .onChangeCompat(of: draft) { _, _ in scheduleDraftSave() }
+        .onDisappear {
+            draftSaveTask?.cancel()
+            if shouldPersistDraft, let scope = draftScope {
+                OutageReportDraftStore.save(draft, scope: scope)
+            }
+        }
     }
 
     // MARK: - Sections
@@ -343,6 +358,7 @@ struct OutageReportSheet: View {
             Text(title)
                 .font(SQFont.body(12.5, .semibold))
                 .foregroundStyle(SQColor.labelSecondary)
+                .accessibilityAddTraits(.isHeader)
             content()
         }
         .padding(SQSpace.md)
@@ -418,6 +434,7 @@ struct OutageReportSheet: View {
     }
 
     private func submit() async {
+        guard !submitting else { return }
         let here = services.location.lastLocation
         // Le brouillon refuse lui-même de produire un corps tant que la gravité n'est pas choisie :
         // le bouton désactivé ne couvre pas les chemins clavier et VoiceOver.
@@ -454,12 +471,48 @@ struct OutageReportSheet: View {
         do {
             let response = try await service.report(body)
             submitting = false
+            draftSaveTask?.cancel()
+            shouldPersistDraft = false
+            if let scope = draftScope { OutageReportDraftStore.clear(scope: scope) }
             onSubmitted?(response)
             dismiss()
         } catch {
             submitting = false
             // Le CODE du serveur, mis en mots ICI : sa phrase à lui n'existe qu'en français.
-            errorMessage = OutageWriteError.message(for: error)
+            let message = OutageWriteError.message(for: error)
+            errorMessage = message
+            UIAccessibility.post(notification: .announcement, argument: message)
+        }
+    }
+
+    private var draftScope: OutageReportDraftScope? {
+        let owner = LocalAccountScope.currentOwnerScopeId
+        guard owner.hasPrefix("user:") else { return nil }
+        return .init(
+            ownerScopeId: owner,
+            targetKind: targetKind,
+            targetId: siteId,
+            marketCode: marketCode,
+            operatorKey: operatorKey
+        )
+    }
+
+    private func restoreDraft() {
+        guard !draftLoaded else { return }
+        draftLoaded = true
+        guard let scope = draftScope,
+              let restored = OutageReportDraftStore.restore(scope: scope) else { return }
+        draft = restored
+    }
+
+    private func scheduleDraftSave() {
+        guard draftLoaded, shouldPersistDraft, let scope = draftScope else { return }
+        let snapshot = draft
+        draftSaveTask?.cancel()
+        draftSaveTask = Task {
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+            OutageReportDraftStore.save(snapshot, scope: scope)
         }
     }
 }

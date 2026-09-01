@@ -116,6 +116,15 @@ struct ConversationDetailView: View {
 
     private var isE2EE: Bool { conversation.e2eeEnabled == true }
     private var canSend: Bool { !isE2EE || isE2EEUnlocked }
+    /// Les médias d'une conversation sont privés même si leur URL ressemble à
+    /// une URL CDN ordinaire. La session est capturée avant chaque rendu afin
+    /// qu'un résultat tardif ne traverse jamais un changement de compte.
+    private var privateImageCacheScope: ImageCacheScope? {
+        guard case .authenticated(let user) = session.state,
+              let localSession = LocalAccountScope.sessionSnapshot(),
+              localSession.ownerScopeId == "user:\(user.id)" else { return nil }
+        return .privateAccount(localSession)
+    }
     /// L'utilisateur peut-il épingler/désépingler (owner/admin) — le backend
     /// renvoie 403 sinon, on masque donc l'action quand le rôle ne le permet pas.
     private var canPin: Bool {
@@ -1132,12 +1141,28 @@ struct ConversationDetailView: View {
             ? AnyShape(bubbleShape(mine: mine))
             : AnyShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         return Button {
-            guard let url = attachment.url else { return }
+            guard let url = attachment.url,
+                  case .privateAccount(let accountSession) = privateImageCacheScope else { return }
             Haptics.selection()
-            imageViewerTarget = MessageImageTarget(id: attachment.id ?? url.absoluteString, url: url)
+            imageViewerTarget = MessageImageTarget(
+                id: attachment.id ?? url.absoluteString,
+                url: url,
+                accountSession: accountSession
+            )
         } label: {
-            RemoteImage(url: attachment.url, maxDimension: 240, contentMode: .fill) {
-                Rectangle().fill(SQColor.surfaceMuted).sqShimmer()
+            Group {
+                if let privateImageCacheScope {
+                    RemoteImage(
+                        url: attachment.url,
+                        maxDimension: 240,
+                        contentMode: .fill,
+                        cacheScope: privateImageCacheScope
+                    ) {
+                        Rectangle().fill(SQColor.surfaceMuted).sqShimmer()
+                    }
+                } else {
+                    Rectangle().fill(SQColor.surfaceMuted)
+                }
             }
             .frame(width: size.width, height: size.height)
             .clipShape(shape)
@@ -1452,6 +1477,12 @@ struct ConversationDetailView: View {
             errorMessage = nil
             return
         }
+        // La reprise ne doit jamais retarder l'ouverture de la conversation. Le backend
+        // deduplique par clientRequestId si deux ouvertures reveillent la meme ligne.
+        Task {
+            await service.retryPendingTextMessages()
+            await service.retryPendingAttachments()
+        }
         do {
             let page = try await service.messages(conversationId: conversation.id, cursor: nil)
             messages = Self.normalized(page.messages)
@@ -1720,7 +1751,11 @@ struct ConversationDetailView: View {
 
     private func vote(messageId: String, pollId: String, optionIds: [String]) async {
         do {
-            let updated = try await service.votePoll(pollId: pollId, optionIds: optionIds)
+            let updated = try await service.votePoll(
+                pollId: pollId,
+                optionIds: optionIds,
+                in: conversation
+            )
             pollsByMessageId[messageId] = mergePollTexts(updated, messageId: messageId)
             Haptics.selection()
         } catch {
@@ -1731,7 +1766,7 @@ struct ConversationDetailView: View {
 
     private func closePoll(messageId: String, pollId: String) async {
         do {
-            let updated = try await service.closePoll(pollId: pollId)
+            let updated = try await service.closePoll(pollId: pollId, in: conversation)
             pollsByMessageId[messageId] = mergePollTexts(updated, messageId: messageId)
             Haptics.success()
         } catch {
@@ -1871,8 +1906,8 @@ struct ConversationDetailView: View {
     /// `mimeType` arbitraire, et le backend reconnaît `audio/*` pour déclencher
     /// la transcription de son côté.
     ///
-    /// Le fichier temporaire est supprimé dans TOUS les cas, y compris en échec :
-    /// une note ratée ne doit pas rester dans le cache de l'appareil.
+    /// Le fichier du recorder est supprimé dans tous les cas ; le service en copie d'abord le
+    /// contenu dans son outbox protégée, donc un échec ou kill processus reste reprenable.
     private func sendVoiceNote(url: URL, duration: TimeInterval) async {
         defer { try? FileManager.default.removeItem(at: url) }
         isSending = true
@@ -1885,24 +1920,14 @@ struct ConversationDetailView: View {
                 throw E2EEError.unsupported("Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils.")
             }
             guard let data = try? Data(contentsOf: url), !data.isEmpty else { return }
-            let uploaded = try await service.uploadAttachment(
-                conversationId: conversation.id,
-                data: data,
+            let sent = try await service.sendAttachmentData(
+                data,
                 filename: url.lastPathComponent,
-                mimeType: "audio/m4a"
-            )
-            let attachment = UploadedAttachment(
+                mimeType: "audio/m4a",
                 kind: "AUDIO",
-                url: uploaded.url,
-                fileName: uploaded.fileName ?? url.lastPathComponent,
-                contentType: uploaded.contentType ?? "audio/m4a",
-                size: uploaded.size ?? data.count,
-                width: nil,
-                height: nil
-            )
-            let sent = try await service.sendAttachments(
-                [attachment],
                 caption: "",
+                width: nil,
+                height: nil,
                 in: conversation,
                 replyToId: replyTarget?.id,
                 e2ee: e2ee
@@ -1931,25 +1956,15 @@ struct ConversationDetailView: View {
             }).value else {
                 throw E2EEError.unsupported("Image illisible")
             }
-            let uploaded = try await service.uploadAttachment(
-                conversationId: conversation.id,
-                data: prepared.data,
-                filename: "photo.jpg",
-                mimeType: "image/jpeg"
-            )
-            let attachment = UploadedAttachment(
-                kind: "IMAGE",
-                url: uploaded.url,
-                fileName: uploaded.fileName ?? "photo.jpg",
-                contentType: uploaded.contentType ?? "image/jpeg",
-                size: uploaded.size ?? prepared.data.count,
-                width: uploaded.width ?? prepared.width,
-                height: uploaded.height ?? prepared.height
-            )
             let caption = rawCaption.trimmingCharacters(in: .whitespacesAndNewlines)
-            let sent = try await service.sendAttachments(
-                [attachment],
+            let sent = try await service.sendAttachmentData(
+                prepared.data,
+                filename: "photo.jpg",
+                mimeType: "image/jpeg",
+                kind: "IMAGE",
                 caption: caption,
+                width: prepared.width,
+                height: prepared.height,
                 in: conversation,
                 replyToId: replyTarget?.id,
                 e2ee: e2ee
@@ -1987,9 +2002,17 @@ struct ConversationDetailView: View {
         let alreadyMine = message.reactions.contains { $0.emoji == emoji && $0.userId == currentUserId }
         do {
             if alreadyMine {
-                try await service.removeReaction(messageId: message.id, emoji: emoji)
+                try await service.removeReaction(
+                    messageId: message.id,
+                    emoji: emoji,
+                    in: conversation
+                )
             } else {
-                try await service.react(messageId: message.id, emoji: emoji)
+                try await service.react(
+                    messageId: message.id,
+                    emoji: emoji,
+                    in: conversation
+                )
             }
             await refreshDelta()
         } catch {
@@ -2078,6 +2101,24 @@ struct ConversationDetailView: View {
     }
 
     private func startCall(mode: String) {
+        let verifiedV2: Bool
+        if isE2EE {
+            if case .prepared = E2EEV2CallBridge.prepareRuntimeRequest(conversationId: conversation.id) {
+                verifiedV2 = true
+            } else {
+                verifiedV2 = false
+            }
+        } else {
+            verifiedV2 = true
+        }
+        guard CallLifecyclePolicy.canUseE2EECall(
+            conversationE2EE: isE2EE,
+            verifiedV2: verifiedV2
+        ) else {
+            errorMessage = "Cet appel nécessite E2EE v2 vérifié. Aucun appel non chiffré de bout en bout n’a été lancé."
+            Haptics.error()
+            return
+        }
         guard conversation.participants.count >= 2 else {
             errorMessage = "Aucun autre participant n’est disponible pour cet appel."
             Haptics.error()
@@ -2088,7 +2129,12 @@ struct ConversationDetailView: View {
             Haptics.error()
             return
         }
-        services.callManager.startOutgoingCall(conversationId: conversation.id, mode: mode, displayName: conversationTitle)
+        services.callManager.startOutgoingCall(
+            conversationId: conversation.id,
+            mode: mode,
+            displayName: conversationTitle,
+            requiresE2EE: isE2EE
+        )
     }
 
     private var otherParticipantId: String? {
@@ -2328,7 +2374,7 @@ private struct LiveShareConversationBar: View {
         let payload = coordinator.payload(for: session.id)
         let radio = payload?.radio
         let parts = [
-            radio?.operatorName,
+            radio?.displayOperatorName,
             radio?.technology ?? radio?.connectionType,
             radio?.band.map { "B\($0)" },
             radio?.rsrp.map { "RSRP \($0) dBm" }
@@ -2524,6 +2570,7 @@ private struct LiveShareManagementSheet: View {
         Task {
             await coordinator.create(
                 conversationId: conversation.id,
+                e2eeEnabled: conversation.e2eeEnabled == true,
                 currentUserId: currentUserId,
                 offerShare: offerShare,
                 message: message,
@@ -2635,7 +2682,7 @@ private struct LiveShareSessionCard: View {
     private var radioLine: String? {
         guard let radio = payload?.radio else { return nil }
         let parts = [
-            radio.operatorName,
+            radio.displayOperatorName,
             radio.technology ?? radio.connectionType,
             radio.band.map { "B\($0)" },
             radio.rsrp.map { "RSRP \($0) dBm" },

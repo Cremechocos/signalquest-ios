@@ -557,17 +557,38 @@ final class DriveTestViewModel: ObservableObject {
 
     /// Point de couverture PORTANT le débit/latence mesurés, à la position du test.
     private func captureMeasuredCoveragePoint(_ result: SpeedtestRunResult) {
+        let location = services.location.lastLocation
         guard sessionMode.recordsCoverage, !isPausedForWiFi,
-              let coordinate = services.location.lastLocation?.coordinate ?? userLocation else { return }
+              let coordinate = location?.coordinate ?? userLocation else { return }
+        let evidence = result.radioEvidence
+        let cells = evidence.map { CoverageCellEvidenceUpload.cells(from: $0) } ?? []
         appendCoveragePoint(
             CoveragePointUpload(
                 latitude: coordinate.latitude,
                 longitude: coordinate.longitude,
                 timestamp: Self.nowMs(),
                 technology: currentGeneration,
+                accuracy: location.map { max(0, $0.horizontalAccuracy) },
                 downloadMbps: result.downloadAverageMbps,
                 uploadMbps: result.uploadAverageMbps,
-                pingMs: result.pingMinMs ?? result.pingMs
+                pingMs: result.pingMinMs ?? result.pingMs,
+                observedPlmn: evidence?.observedPlmn,
+                enb: evidence?.enb,
+                gnb: evidence?.gnb,
+                cellId: evidence?.localCellId,
+                eci: evidence?.eci,
+                nci: evidence?.nci,
+                pci: evidence?.pci,
+                tac: evidence?.tac,
+                earfcn: evidence?.earfcn,
+                nrarfcn: evidence?.nrarfcn,
+                timingAdvance: evidence?.timingAdvance,
+                timingAdvanceSourceTechnology: evidence?.timingAdvanceSourceTechnology,
+                timingAdvanceSourceCellId: evidence?.timingAdvanceSourceCellId,
+                radioAgeMs: evidence?.radioAgeMs,
+                locationAgeMs: evidence?.locationAgeMs,
+                radioObservedAt: evidence?.radioObservedAt,
+                cells: cells.isEmpty ? nil : cells
             ),
             at: coordinate
         )
@@ -584,16 +605,30 @@ final class DriveTestViewModel: ObservableObject {
             sessionId: sessionId,
             startTime: startedAt,
             endTime: max(startedAt, endTime ?? coveragePoints.last?.timestamp ?? Self.nowMs()),
-            mcc: plmn.mcc,
-            mnc: plmn.mnc,
+            // CoreTelephony expose ici le PLMN SIM, pas le PLMN servant. Le
+            // recopier dans mcc/mnc attribuerait le roaming au reseau d'origine.
+            mcc: nil,
+            mnc: nil,
+            observedPlmn: nil,
+            simPlmn: plmn.plmn,
+            networkIdentitySource: plmn.plmn == nil ? nil : "SIM_ONLY",
+            networkIdentityObservedAt: plmn.plmn == nil ? nil : Date(),
             operatorKey: displayedOperatorKey,
             carrierName: services.networkPath.status.operatorName,
             marketCode: market,
+            appVersion: Self.coverageAppVersion,
             showOnMap: coverageShowOnMap,
             // Coordonnées tronquées (~111 m) avant persistance/envoi : la trace
             // publiée sur la carte communautaire ne révèle pas le trajet au mètre.
             points: coveragePoints.map { $0.minimizedCoordinates() }
         )
+    }
+
+    private static var coverageAppVersion: String {
+        let version = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let version, !version.isEmpty else { return "unknown" }
+        return version
     }
 
     /// Écrit chaque nouveau point dans le JSON atomique avant toute tentative
@@ -1070,8 +1105,16 @@ final class DriveTestViewModel: ObservableObject {
         services.networkPath.refreshNow()
         let status = services.networkPath.status
         isVPNActive = VPNDetector.isActive()
-        let coordinate = services.location.lastLocation?.coordinate ?? userLocation
-        let location = coordinate.map { Coordinates(latitude: $0.latitude, longitude: $0.longitude) }
+        let lastLocation = services.location.lastLocation
+        let coordinate = lastLocation?.coordinate ?? userLocation
+        let location = coordinate.map {
+            Coordinates(
+                latitude: $0.latitude,
+                longitude: $0.longitude,
+                accuracy: lastLocation.map { max(0, $0.horizontalAccuracy) },
+                observedAt: lastLocation?.timestamp
+            )
+        }
         let settings = makeSettings()
         let measured = try await services.speedtest.run(
             pathStatus: status,
@@ -1212,6 +1255,9 @@ struct DriveTestView: View {
     /// Mode du Drive Test, persisté localement. Défaut « Les deux » → la couverture
     /// est enregistrée par défaut (le choix d'un mode couverture vaut consentement).
     @AppStorage(DriveTestMode.storageKey) private var driveTestModeRaw = DriveTestMode.both.rawValue
+    /// Le préflight est une interface d'exception : `nil` quand tout est prêt,
+    /// sinon uniquement les avertissements ou blocages réellement observables.
+    @State private var preflightReport: DriveTestPreflightReport?
     private var driveTestMode: DriveTestMode { DriveTestMode(rawValue: driveTestModeRaw) ?? .both }
 
     init(services: AppServices) {
@@ -1242,6 +1288,17 @@ struct DriveTestView: View {
         .sheet(isPresented: $showDisclosure) {
             DriveTestDisclosureView { showDisclosure = false }
                 .interactiveDismissDisabled()
+        }
+        .sheet(item: $preflightReport) { report in
+            DriveTestPreflightSheet(
+                report: report,
+                onDismiss: { preflightReport = nil },
+                onStartAnyway: {
+                    preflightReport = nil
+                    model.start()
+                },
+                onAction: handlePreflightAction
+            )
         }
         // L'onglet Tester encore sélectionné = on a quitté l'écran (retour) ;
         // un autre onglet = l'écran est seulement masqué, la session continue.
@@ -1280,6 +1337,8 @@ struct DriveTestView: View {
                     .frame(width: 40, height: 40)
                     .background { mapGlassBackground(Circle()) }
                     .sqShadowSoft()
+                    .padding(2)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(SQPressButtonStyle())
             .accessibilityLabel(showMapLegend ? "Masquer la légende" : "Afficher la légende")
@@ -1753,8 +1812,82 @@ struct DriveTestView: View {
                 GradientButton("Arrêter le drive test", systemImage: "stop.fill", style: .accent) { model.stop() }
             }
         } else {
-            GradientButton(startButtonTitle, systemImage: "play.fill") { model.start() }
+            GradientButton(startButtonTitle, systemImage: "play.fill") { requestStart() }
         }
+    }
+
+    private func requestStart() {
+        let report = DriveTestPreflightPolicy.evaluate(makePreflightSnapshot())
+        guard !report.isReady else {
+            model.start()
+            return
+        }
+        preflightReport = report
+    }
+
+    private func makePreflightSnapshot() -> DriveTestPreflightSnapshot {
+        let authorization: DriveTestPreflightSnapshot.LocationAuthorization
+        switch services.location.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
+            authorization = .authorized
+        case .notDetermined:
+            authorization = .notDetermined
+        default:
+            authorization = .denied
+        }
+
+        let location = services.location.lastLocation
+        let locationAge = location.map { max(0, Date().timeIntervalSince($0.timestamp)) }
+        let status = services.networkPath.status
+        let battery = Self.currentBatterySnapshot()
+        return DriveTestPreflightSnapshot(
+            locationAuthorization: authorization,
+            locationAgeSeconds: locationAge,
+            horizontalAccuracyMeters: location?.horizontalAccuracy,
+            availableStorageBytes: Self.availableStorageBytes(),
+            batteryPercent: battery.percent,
+            isCharging: battery.isCharging,
+            isOnline: services.networkPath.isOnline,
+            connection: status.connection,
+            isConstrained: status.isConstrained,
+            recordsCoverage: driveTestMode.recordsCoverage,
+            runsSpeedtest: driveTestMode.runsSpeedtest
+        )
+    }
+
+    private func handlePreflightAction(_ action: DriveTestPreflightIssue.Action) {
+        switch action {
+        case .none:
+            break
+        case .requestLocation:
+            preflightReport = nil
+            services.location.requestWhenInUse()
+        case .openSettings:
+            preflightReport = nil
+            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+            UIApplication.shared.open(url)
+        }
+    }
+
+    private static func availableStorageBytes() -> Int64? {
+        let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+        return try? home.resourceValues(
+            forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+        ).volumeAvailableCapacityForImportantUsage
+    }
+
+    private static func currentBatterySnapshot() -> (percent: Int?, isCharging: Bool) {
+        let device = UIDevice.current
+        let monitoringWasEnabled = device.isBatteryMonitoringEnabled
+        device.isBatteryMonitoringEnabled = true
+        defer {
+            if !monitoringWasEnabled { device.isBatteryMonitoringEnabled = false }
+        }
+        let percent = device.batteryLevel >= 0
+            ? Int((device.batteryLevel * 100).rounded())
+            : nil
+        let isCharging = device.batteryState == .charging || device.batteryState == .full
+        return (percent, isCharging)
     }
 
     private var startButtonTitle: String {

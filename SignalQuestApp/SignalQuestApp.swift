@@ -16,6 +16,7 @@ struct SignalQuestApp: App {
     @AppStorage(SQOledPalette.storageKey) private var pureBlack = false
 
     init() {
+        MapBackdrop.migrateLegacyPreference()
         // Le test UI d'onboarding doit pouvoir repartir d'une première
         // ouverture, même après les autres parcours de la même suite. Ce flag
         // est éliminé des binaires Release par AppEnvironment.
@@ -104,6 +105,8 @@ struct AppRootView: View {
     /// l'injection : les vues s'y abonnent pour se rafraîchir au changement,
     /// les formateurs purs (`SQUnits`) lisent le `UserDefaults` derrière.
     @StateObject private var unitsStore = SQUnitsStore()
+    @StateObject private var inAppNotifications = SQInAppNotificationCenter()
+    @AppStorage(SQFieldMode.storageKey) private var fieldMode = false
 
     /// Enregistre les notifications APNs + le token VoIP dès que la session
     /// devient authentifiée. Idempotent : `requestAuthorizationAndRegister` ne
@@ -126,6 +129,11 @@ struct AppRootView: View {
         await services.callManager.reconcilePendingIncomingCall()
     }
 
+    private func authenticatedUserID(in state: AuthSessionViewModel.State) -> String? {
+        guard case .authenticated(let user) = state else { return nil }
+        return user.id
+    }
+
     var body: some View {
         // L'onboarding vit DANS la hiérarchie (ZStack d'`OnboardingHost`) et non
         // plus dans un `fullScreenCover` : son drapeau « complété » n'est écrit
@@ -146,6 +154,9 @@ struct AppRootView: View {
             // au changement d'état de la politique de version.
             .environmentObject(services.versionPolicy)
             .environmentObject(appLock)
+            .environmentObject(inAppNotifications)
+            .environment(\.legibilityWeight, fieldMode ? .bold : nil)
+            .controlSize(fieldMode ? .large : .regular)
             .task {
                 // `networkPath.start()` et `session.bootstrap()` ont migré dans
                 // `bootstrapIfNeeded` : la scène CarPlay a besoin des deux, et
@@ -175,14 +186,18 @@ struct AppRootView: View {
                     await services.livePresence.refreshSharingSettings()
                 }
             }
-            .onChangeCompat(of: session.state) { _, newState in
+            .onChangeCompat(of: session.state) { oldState, newState in
                 // Un login effectué dans une session déjà lancée (cas nominal
                 // installation → premier login, ou après logout/login) doit lui
                 // aussi déclencher l'enregistrement push/VoIP — sinon l'utilisateur
                 // ne reçoit ni notifications ni appels tant qu'il ne relance pas
                 // l'app à froid. Les deux appels sont idempotents.
+                if authenticatedUserID(in: oldState) != authenticatedUserID(in: newState) {
+                    services.resetAccountPresentationState()
+                }
                 Task { await registerPushIfAuthenticated(newState) }
                 if case .authenticated = newState {
+                    services.epochRotations.resume()
                     appLock.lockOnActivationIfNeeded()
                     Task {
                         await services.livePresence.refreshSharingSettings()
@@ -193,6 +208,7 @@ struct AppRootView: View {
                         }
                     }
                 } else {
+                    services.epochRotations.stop()
                     appLock.reset()   // jamais verrouillé par-dessus l'écran de login
                     services.livePresence.stopForSignOut()
                     services.liveShare.stopForSignOut()
@@ -201,6 +217,16 @@ struct AppRootView: View {
             .onChangeCompat(of: hasCompletedOnboarding) { _, completed in
                 guard completed else { return }
                 Task { await registerPushIfAuthenticated(session.state) }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: E2EEV2RotationEvents.resume).receive(on: RunLoop.main)) { note in
+                guard let owner = note.userInfo?["owner"] as? String,
+                      let id = note.userInfo?["session"] as? String else { return }
+                services.epochRotations.resume(expected: .init(ownerScopeId: owner, sessionId: id))
+            }
+            .onReceive(NotificationCenter.default.publisher(for: E2EEV2NotificationContextEvents.refresh).receive(on: RunLoop.main)) { note in
+                guard let reason = note.userInfo?["reason"] as? String,
+                      reason == "identity" || reason == "credentials" else { return }
+                services.epochRotations.resume()
             }
             .onChangeCompat(of: scenePhase) { _, phase in
                 switch phase {
@@ -217,6 +243,7 @@ struct AppRootView: View {
                             await services.callManager.retryVoIPTokenRegistrationIfNeeded()
                             await services.callManager.reconcilePendingIncomingCall()
                             await services.livePresence.refreshSharingSettings()
+                            await services.push.refreshE2eeV2NotificationContext()
                         }
                     }
                     services.enterForeground()
@@ -233,6 +260,7 @@ struct AppRootView: View {
                     // plan de l'autre fenêtre inoffensif : sa garde anti-boucle
                     // s'en charge déjà. Corriger ce seul cas suffit donc.
                     guard !services.hasVisibleWindowScene else { break }
+                    services.epochRotations.stop()
                     appLock.didEnterBackground()
                     services.enterBackground()
                 default:
@@ -282,6 +310,10 @@ struct RootView: View {
         .overlay(alignment: .top) {
             OfflineBanner(isVisible: !networkPath.isOnline)
         }
+        .overlay(alignment: .top) {
+            SQInAppNotificationHost()
+                .padding(.top, networkPath.isOnline ? SQSpace.sm : 52)
+        }
         // Verrouillage biométrique : masque tout le contenu authentifié tant que
         // l'utilisateur ne s'est pas déverrouillé par Face ID / Touch ID.
         .overlay {
@@ -296,7 +328,11 @@ struct RootView: View {
         // l'utilisateur resterait injoignable jusqu'au prochain passage foreground.
         .onChangeCompat(of: networkPath.isOnline) { _, online in
             guard online, case .authenticated = session.state else { return }
-            Task { await callManager.retryVoIPTokenRegistrationIfNeeded() }
+            services.epochRotations.resume()
+            Task {
+                await callManager.retryVoIPTokenRegistrationIfNeeded()
+                await callManager.retryPendingCallTerminations()
+            }
         }
     }
 

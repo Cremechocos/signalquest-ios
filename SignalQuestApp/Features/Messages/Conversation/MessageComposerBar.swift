@@ -50,15 +50,15 @@ struct MessageComposerBar: View {
     private var standardBar: some View {
         HStack(spacing: SQSpace.sm + 2) {
             Menu {
-                Button { onPoll() } label: {
-                    Label("Créer un sondage", systemImage: "chart.bar")
-                }
                 Button { onSchedule(text) } label: {
                     Label("Programmer l'envoi", systemImage: "clock")
                 }
-                // Localisation : refusée par le backend en E2EE → proposée
-                // uniquement en conversation non chiffrée.
+                // Les contenus structurés et médias v1 exposeraient encore
+                // leurs métadonnées : ils restent masqués jusqu'au runtime v2.
                 if !isE2EE {
+                    Button { onPoll() } label: {
+                        Label("Créer un sondage", systemImage: "chart.bar")
+                    }
                     Button { onShareLocation() } label: {
                         Label("Partager ma position", systemImage: "location.fill")
                     }
@@ -109,7 +109,7 @@ struct MessageComposerBar: View {
             // Micro OU envoi, selon qu'il y a du texte : c'est la convention de
             // toutes les messageries, et ça évite un bouton de plus dans une
             // barre déjà dense.
-            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending {
+            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending && !isE2EE {
                 Button {
                     Haptics.selection()
                     Task { await recorder.start() }

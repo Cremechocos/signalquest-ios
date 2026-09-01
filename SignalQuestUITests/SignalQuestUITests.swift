@@ -101,6 +101,29 @@ enum SignalQuestUITestSupport {
 
 @MainActor
 final class SignalQuestUITests: XCTestCase {
+    func testFrenchEnglishAndUnsupportedLanguageNavigation() {
+        let englishTabs = ["Home", "Map", "Test", "Community", "Profile"]
+        for legacyDock in [false, true] {
+            for (locale, expectedTabs) in [("fr", SignalQuestUITestSupport.tabs), ("en", englishTabs), ("ja", englishTabs)] {
+                let app = XCUIApplication()
+                let arguments = legacyDock ? ["--mock-auth", "--qa-legacy-dock"] : ["--mock-auth"]
+                SignalQuestUITestSupport.launch(app, arguments: arguments, locale: locale)
+                for title in expectedTabs {
+                    let tab = legacyDock
+                        ? app.buttons.matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", title, title + ",")).firstMatch
+                        : SignalQuestUITestSupport.tab(named: title, in: app)
+                    XCTAssertTrue(tab.waitForExistence(timeout: 10), "Locale \(locale), legacy=\(legacyDock) : onglet \(title) absent")
+                }
+                XCTAssertTrue(app.descendants(matching: .any)["home.action.speedtest"].firstMatch.waitForExistence(timeout: 10))
+                let screenshot = XCTAttachment(screenshot: app.screenshot())
+                screenshot.name = "localization-\(locale)-\(legacyDock ? "legacy" : "native")"
+                screenshot.lifetime = .keepAlways
+                add(screenshot)
+                app.terminate()
+            }
+        }
+    }
+
     func testLaunchShowsLogin() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth"])
@@ -312,4 +335,208 @@ final class SignalQuestUITests: XCTestCase {
         pointsShot.lifetime = .keepAlways
         add(pointsShot)
     }
+
+    /// P0-03-03 — vrai parcours authentifié, sans mock d'auth dans l'app.
+    ///
+    /// Le même test est lancé en deux phases sur le même simulateur :
+    /// 1. `switch` avec le backend local actif : A → brouillon → logout → B ;
+    /// 2. `offline-relaunch` après arrêt du backend : B doit repartir de sa session
+    ///    locale et ne toujours pas voir le brouillon de A.
+    ///
+    /// Le chemin du fichier 0600 et les identifiants restent exclusivement dans
+    /// l'environnement du runner XCUITest. Ils ne sont jamais copiés dans
+    /// `XCUIApplication.launchEnvironment` ni dans les arguments de l'app.
+    func testAuthenticatedAccountSwitchKeepsDraftPrivate() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let fixturePath = environment["SQ_ACCOUNT_SWITCH_FIXTURE_PATH"] else {
+            throw XCTSkip("Fixture P0-03-03 absente")
+        }
+        let phase = try XCTUnwrap(
+            AccountSwitchPhase(rawValue: environment["SQ_ACCOUNT_SWITCH_PHASE"] ?? ""),
+            "SQ_ACCOUNT_SWITCH_PHASE doit valoir switch ou offline-relaunch"
+        )
+        let fixture = try AccountSwitchFixture.loadSecurely(from: fixturePath)
+        let draftSentinel = "P0-03-03-\(fixture.runId)-A-PRIVATE"
+        let app = XCUIApplication()
+        app.launchEnvironment = [:]
+        XCTAssertNil(app.launchEnvironment["SQ_ACCOUNT_SWITCH_FIXTURE_PATH"])
+        addTeardownBlock { app.terminate() }
+
+        switch phase {
+        case .switchAccounts:
+            SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth", "--qa-tab-profile"])
+            login(fixture.users.a, in: app)
+            assertAuthenticatedUser(fixture.users.a, in: app)
+
+            relaunch(app, arguments: ["--qa-tab-community"])
+            openComposer(in: app)
+            let draft = composerTextField(in: app)
+            if !composerText(in: draft).isEmpty {
+                let clear = app.buttons["Supprimer le brouillon"]
+                XCTAssertTrue(clear.waitForExistence(timeout: 5), "Ancien brouillon synthétique impossible à réinitialiser")
+                clear.tap()
+            }
+            XCTAssertEqual(composerText(in: composerTextField(in: app)), "", "Le compte A de fixture doit commencer sans ancien brouillon")
+            draft.tap()
+            draft.typeText(draftSentinel)
+            XCTAssertEqual(composerText(in: composerTextField(in: app)), draftSentinel)
+            app.buttons["Annuler"].tap()
+
+            relaunch(app, arguments: ["--qa-tab-profile"])
+            assertAuthenticatedUser(fixture.users.a, in: app)
+            logoutFromProfile(in: app)
+            login(fixture.users.b, in: app)
+            assertAuthenticatedUser(fixture.users.b, in: app)
+            relaunch(app, arguments: ["--qa-tab-community"])
+            assertComposerDoesNotContain(draftSentinel, in: app)
+
+        case .offlineRelaunch:
+            // Aucun `--reset-auth` : on valide le cold start optimiste du compte B
+            // avec les credentials et le cache utilisateur laissés par la phase 1.
+            SignalQuestUITestSupport.launch(app, arguments: ["--qa-tab-profile"])
+            assertAuthenticatedUser(fixture.users.b, in: app)
+            relaunch(app, arguments: ["--qa-tab-community"])
+            assertComposerDoesNotContain(draftSentinel, in: app)
+        }
+    }
+
+    private func login(_ user: AccountSwitchFixture.User, in app: XCUIApplication) {
+        let email = app.textFields["Email"]
+        let password = app.secureTextFields["Mot de passe"]
+        XCTAssertTrue(email.waitForExistence(timeout: 15), "Champ e-mail absent")
+        XCTAssertTrue(password.waitForExistence(timeout: 5), "Champ mot de passe absent")
+        email.tap()
+        email.typeText(user.email)
+        password.tap()
+        password.typeText(user.password)
+
+        let submit = app.buttons["Se connecter"]
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(submit, in: app), "Bouton de connexion inaccessible")
+        submit.tap()
+        dismissNotificationPermissionIfPresent(in: app)
+        XCTAssertTrue(
+            SignalQuestUITestSupport.tab(named: "Profil", in: app).waitForExistence(timeout: 20),
+            "La connexion locale n'a pas ouvert l'application"
+        )
+    }
+
+    private func dismissNotificationPermissionIfPresent(in app: XCUIApplication) {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let denyFrench = springboard.buttons["Ne pas autoriser"]
+        let denyEnglish = springboard.buttons["Don’t Allow"]
+        let deny = denyFrench.exists ? denyFrench : denyEnglish
+        if deny.waitForExistence(timeout: 3) {
+            deny.tap()
+            app.activate()
+            XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5), "L'app ne revient pas au premier plan après la permission")
+        }
+    }
+
+    private func assertAuthenticatedUser(_ user: AccountSwitchFixture.User, in app: XCUIApplication) {
+        let displayName = app.descendants(matching: .any)["profile.displayName"].firstMatch
+        XCTAssertTrue(displayName.waitForExistence(timeout: 15), "Profil authentifié absent")
+        XCTAssertEqual(displayName.label, user.name, "Le profil visible n'est pas celui attendu")
+    }
+
+    private func logoutFromProfile(in app: XCUIApplication) {
+        let logout = app.buttons["Déconnexion"]
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(logout, in: app), "Déconnexion inaccessible")
+        logout.tap()
+        XCTAssertTrue(app.buttons["Se connecter"].waitForExistence(timeout: 20), "Le logout n'a pas rouvert la connexion")
+    }
+
+    private func openComposer(in app: XCUIApplication) {
+        let create = app.buttons["Créer une publication"]
+        XCTAssertTrue(create.waitForExistence(timeout: 15), "Action de création absente")
+        create.tap()
+        XCTAssertTrue(composerTextField(in: app).waitForExistence(timeout: 10), "Champ du brouillon absent")
+    }
+
+    private func assertComposerDoesNotContain(_ sentinel: String, in app: XCUIApplication) {
+        openComposer(in: app)
+        let draft = composerTextField(in: app)
+        XCTAssertEqual(composerText(in: draft), "", "Le compte B voit un brouillon privé qui ne lui appartient pas")
+        XCTAssertNotEqual(composerText(in: draft), sentinel)
+        app.buttons["Annuler"].tap()
+    }
+
+    private func composerTextField(in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)["feed.composer.text"].firstMatch
+    }
+
+    private func composerText(in element: XCUIElement) -> String {
+        let placeholder = "Quoi de neuf sur le réseau ?"
+        guard let value = element.value as? String, value != placeholder else { return "" }
+        return value
+    }
+
+    private func relaunch(_ app: XCUIApplication, arguments: [String]) {
+        app.terminate()
+        SignalQuestUITestSupport.launch(app, arguments: arguments)
+    }
+}
+
+private enum AccountSwitchPhase: String {
+    case switchAccounts = "switch"
+    case offlineRelaunch = "offline-relaunch"
+}
+
+private struct AccountSwitchFixture: Decodable {
+    struct User: Decodable {
+        let id: String
+        let email: String
+        let password: String
+        let name: String
+
+        fileprivate var isValid: Bool {
+            !id.isEmpty && !email.isEmpty && email.contains("@") && !password.isEmpty && !name.isEmpty
+        }
+    }
+
+    struct Users: Decodable {
+        let a: User
+        let b: User
+
+        enum CodingKeys: String, CodingKey {
+            case a = "A"
+            case b = "B"
+        }
+    }
+
+    let version: Int
+    let runId: String
+    let baseUrl: String
+    let users: Users
+
+    static func loadSecurely(from path: String) throws -> Self {
+        let fileURL = URL(fileURLWithPath: path)
+        let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        let permissions = (attributes[.posixPermissions] as? NSNumber)?.intValue ?? -1
+        guard permissions & 0o777 == 0o600,
+              attributes[.type] as? FileAttributeType == .typeRegular else {
+            throw AccountSwitchFixtureError.insecureFile
+        }
+        let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
+        guard data.count <= 64 * 1024 else { throw AccountSwitchFixtureError.invalidFixture }
+        let fixture = try JSONDecoder().decode(Self.self, from: data)
+        guard fixture.version == 1,
+              !fixture.runId.isEmpty,
+              fixture.users.a.isValid,
+              fixture.users.b.isValid,
+              fixture.users.a.id != fixture.users.b.id,
+              fixture.users.a.email != fixture.users.b.email,
+              let url = URLComponents(string: fixture.baseUrl),
+              url.scheme == "http",
+              url.host == "127.0.0.1",
+              url.port == 4182,
+              url.path.isEmpty || url.path == "/" else {
+            throw AccountSwitchFixtureError.invalidFixture
+        }
+        return fixture
+    }
+}
+
+private enum AccountSwitchFixtureError: Error {
+    case insecureFile
+    case invalidFixture
 }

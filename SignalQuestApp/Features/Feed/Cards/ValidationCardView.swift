@@ -13,6 +13,7 @@ struct ValidationCardView: View {
     var onAuthorTap: (() -> Void)? = nil
     /// Réaction emoji (appui long sur ❤️). Repli sur onLike si absent.
     var onReact: ((String) -> Void)? = nil
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var signal: SocialSignalSummary? { item.signal }
     private var accent: Color { TechAccent.color(for: signal?.technology) }
@@ -29,18 +30,19 @@ struct ValidationCardView: View {
                     onAuthorTap: onAuthorTap
                 )
 
-                HStack(alignment: .center, spacing: SQSpace.md) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Identification antenne")
-                            .font(SQType.heading)
-                            .foregroundStyle(SQColor.label)
-                        Text(subtitle)
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .lineLimit(1)
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(alignment: .leading, spacing: SQSpace.sm) {
+                            validationHeading
+                            SQEditorialTag(text: signal?.technology ?? "—", color: accent)
+                        }
+                    } else {
+                        HStack(alignment: .center, spacing: SQSpace.md) {
+                            validationHeading
+                            Spacer()
+                            SQEditorialTag(text: signal?.technology ?? "—", color: accent)
+                        }
                     }
-                    Spacer()
-                    SQEditorialTag(text: signal?.technology ?? "—", color: accent)
                 }
 
                 // Tuile mise en avant en accent brique (DA), pas en couleur techno.
@@ -86,7 +88,20 @@ struct ValidationCardView: View {
     }
 
     private var gridColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: 4)
+        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4)
+    }
+
+    private var validationHeading: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Identification antenne")
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
+            Text(subtitle)
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     /// Libellé de la tuile identifiant selon le type d'identification.

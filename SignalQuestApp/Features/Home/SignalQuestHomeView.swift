@@ -9,6 +9,7 @@ struct SignalQuestHomeView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let user: AuthUser
 
     @State private var latestMeasurement: SpeedtestRunResult?
@@ -35,10 +36,15 @@ struct SignalQuestHomeView: View {
     /// trois gestes que quelqu'un dont le réseau vient de tomber ne fera pas.
     @State private var nearbyOutage: CommunityOutage?
 
-    private let gridColumns = [
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14)
-    ]
+    private var gridColumns: [GridItem] {
+        if dynamicTypeSize.isAccessibilitySize {
+            return [GridItem(.flexible())]
+        }
+        return [
+            GridItem(.flexible(), spacing: 14),
+            GridItem(.flexible(), spacing: 14)
+        ]
+    }
 
     /// Rayon commun de la section « Autour de toi » (mesures, pouls, comparaison).
     private static let nearbyRadiusMeters = 1000
@@ -221,16 +227,17 @@ struct SignalQuestHomeView: View {
                 .background(networkTintSoft, in: Circle())
             VStack(alignment: .leading, spacing: 1) {
                 Text(LocalizedStringKey(networkTitle))
-                    .font(SQFont.body(16, .semibold))
+                    .font(.headline.weight(.semibold))
                     .foregroundStyle(SQColor.label)
+                    .accessibilityIdentifier("home.network.title")
                 Text(LocalizedStringKey(networkSubtitle))
-                    .font(SQFont.body(13.5))
+                    .font(.subheadline)
                     .foregroundStyle(SQColor.labelSecondary)
                     .lineLimit(1)
             }
             Spacer(minLength: SQSpace.sm)
             Text(LocalizedStringKey(networkBadge))
-                .font(SQFont.body(12, .semibold))
+                .font(.subheadline.weight(.semibold))
                 .padding(.horizontal, 11)
                 .padding(.vertical, 6)
                 .foregroundStyle(networkTint)
@@ -296,7 +303,7 @@ struct SignalQuestHomeView: View {
         guard isOnline else { return SQColor.danger }
         if networkStatus.isConstrained { return SQColor.warning }
         if let quality = networkQuality { return quality.level.swiftUIColor }
-        return SQColor.labelSecondary
+        return SQColor.label
     }
 
     private var networkTintSoft: Color {
@@ -382,17 +389,17 @@ struct SignalQuestHomeView: View {
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(LocalizedStringKey(title))
-                        .font(SQFont.display(16.5, .semibold))
-                        .foregroundStyle(accented ? SQColor.onAccent : SQColor.label)
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(accented ? SQColor.onAccent : Color.primary)
                     Text(LocalizedStringKey(subtitle))
-                        .font(SQFont.body(12.5))
+                        .font(.body.weight(.semibold))
                         // Pas d'alpha sur brique : à 12,5 pt il faut 4,5:1, que
                         // `onAccent` n'atteint qu'à α ≈ 0,92 — indiscernable du
                         // plein. La hiérarchie tient déjà par la taille (16,5
                         // semi-gras contre 12,5 normal).
-                        .foregroundStyle(accented ? SQColor.onAccent : SQColor.labelSecondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
+                        .foregroundStyle(accented ? SQColor.onAccent : Color.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("home.action.subtitle.\(identifier)")
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -755,7 +762,10 @@ struct SignalQuestHomeView: View {
     private func nearestOutage(around location: CLLocation) async -> CommunityOutage? {
         let latitude = location.coordinate.latitude
         let longitude = location.coordinate.longitude
-        let market = await services.markets.marketForLocation(latitude: latitude, longitude: longitude)?.code ?? "FR"
+        guard let market = await services.markets.marketForLocation(
+            latitude: latitude,
+            longitude: longitude
+        )?.code else { return nil }
         let halfSpanLat = Self.outageHalfSpanLat
         let halfSpanLng = halfSpanLat / max(cos(latitude * .pi / 180), 0.01)
         let bounds = MapBounds(
@@ -781,7 +791,10 @@ struct SignalQuestHomeView: View {
     /// Tous les speedtests communautaires à ≤ 1 km RÉELS de la position (la maille
     /// des tuiles déborde largement, d'où le filtrage par distance).
     private func nearbySpeedtests(latitude: Double, longitude: Double, around location: CLLocation, maxAge: TimeInterval) async -> [AndroidSpeedtestMarker] {
-        let market = await services.markets.marketForLocation(latitude: latitude, longitude: longitude)?.code ?? "FR"
+        guard let market = await services.markets.marketForLocation(
+            latitude: latitude,
+            longitude: longitude
+        )?.code else { return [] }
         let bounds = MapBounds(
             north: latitude + Self.nearbyHalfSpanLat,
             south: latitude - Self.nearbyHalfSpanLat,

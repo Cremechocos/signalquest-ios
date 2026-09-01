@@ -109,12 +109,17 @@ struct SQEditorialTag: View {
 
     var body: some View {
         Text(text)
-            .font(SQFont.body(11.5, .semibold))
-            .lineLimit(1)
+            .font(.caption.weight(.semibold))
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, SQSpace.sm + 2)
             .padding(.vertical, SQSpace.xs + 1)
-            .foregroundStyle(color)
+            // La teinte reste portée par la capsule. Le texte utilise l'encre
+            // sémantique : plusieurs couleurs opérateur/tech ne garantissent
+            // pas 4,5:1 sur leur propre fond translucide.
+            .foregroundStyle(SQColor.label)
             .background(color.opacity(0.13), in: Capsule(style: .continuous))
+            .accessibilityIdentifier("feed.tag")
     }
 }
 
@@ -134,17 +139,17 @@ struct CardMetricTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(LocalizedStringKey(label))
-                .font(SQFont.body(11))
-                .foregroundStyle(SQColor.labelSecondary)
-                // Sans repli, « Tech » et « Down » se tronquaient à Dynamic Type
-                // élevé alors que la valeur, elle, savait se réduire.
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Color.primary)
                 .lineLimit(2)
-                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("feed.metric.label")
             Text(value)
-                .font(SQFont.display(15, .bold))
-                .foregroundStyle(highlight ? accent : SQColor.label)
-                .lineLimit(valueLineLimit)
-                .minimumScaleFactor(0.7)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(Color.primary)
+                .lineLimit(max(2, valueLineLimit))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("feed.metric.value")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, SQSpace.sm + 2)
@@ -166,9 +171,27 @@ struct CardHeader: View {
     let kindBadge: String
     let kindColor: Color
     var onAuthorTap: (() -> Void)? = nil
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        HStack(spacing: SQSpace.md) {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    authorContent
+                    SQEditorialTag(text: kindBadge, color: kindColor)
+                }
+            } else {
+                HStack(spacing: SQSpace.md) {
+                    authorContent
+                    Spacer()
+                    SQEditorialTag(text: kindBadge, color: kindColor)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var authorContent: some View {
             if let onAuthorTap {
                 Button {
                     Haptics.light()
@@ -181,9 +204,6 @@ struct CardHeader: View {
             } else {
                 authorBlock
             }
-            Spacer()
-            SQEditorialTag(text: kindBadge, color: kindColor)
-        }
     }
 
     private var authorBlock: some View {
@@ -192,9 +212,10 @@ struct CardHeader: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
                     Text(author.displayName)
-                        .font(SQFont.body(16, .semibold))
+                        .font(SQFont.body(16, .semibold, relativeTo: .headline))
                         .foregroundStyle(SQColor.label)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                     // Badges accolés au nom, comme sur le web et Android.
                     SQUserBadges(badges: author.badges)
                 }
@@ -207,10 +228,11 @@ struct CardHeader: View {
                     }
                     if let createdAt {
                         Text("·")
+                            .accessibilityHidden(true)
                         Text(createdAt, format: .relative(presentation: .named, unitsStyle: .abbreviated))
                     }
                 }
-                .font(SQType.caption)
+                .font(SQFont.body(12.5, relativeTo: .footnote))
                 .foregroundStyle(SQColor.labelSecondary)
             }
         }
@@ -230,9 +252,10 @@ struct CardActionsBar: View {
 
     @State private var showReactionPicker = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        HStack(spacing: SQSpace.xl) {
+        HStack(spacing: dynamicTypeSize.isAccessibilitySize ? SQSpace.sm : SQSpace.xl) {
             likeButton
             actionButton(
                 count: item.commentsCount,

@@ -1266,6 +1266,7 @@ final class CarPlayCoordinator {
         let controller = CarPlaySearchController(
             antennas: services.antennas,
             around: { [weak self] in self?.services.location.lastLocation?.coordinate },
+            market: { MapMarketStore.initialMarketCode() },
             onSelect: { [weak self] coordinate, title in
                 self?.startNavigation(to: coordinate, title: title)
             }

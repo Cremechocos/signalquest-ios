@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "deviceId": "device_0000000000000001",
+  "emailChallenge": {
+    "challengeId": "challenge_00000000000001",
+    "expiresAtMs": 1787566800000,
+    "maskedEmail": "a***@example.com"
+  },
+  "bootstrap": {
+    "generation": 1,
+    "establishmentMethod": "account_reauth",
+    "establishedAt": "2026-08-24T10:20:00.000Z",
+    "alreadyBootstrapped": false,
+    "epochRotationRequired": false
+  }
+}
