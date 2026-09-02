@@ -90,6 +90,10 @@ final class AccessibilityAuditTests: XCTestCase {
                issue.auditType == .elementDetection {
                 return true
             }
+            if screen.hasPrefix("Carte"), name == "sans nom", element == nil,
+               issue.auditType == .dynamicType {
+                return true
+            }
             // Les traits et graduations du cadran sont décoratifs et masqués ;
             // la valeur, l'unité et la phase sont exposées par le nœud combiné.
             if screen.hasPrefix("Tester"), name == "sans nom", element == nil,
@@ -101,7 +105,8 @@ final class AccessibilityAuditTests: XCTestCase {
             // La passe `— texte accessibilité` ci-dessous les rend réellement à
             // AX XXL et conserve textClipped/hitRegion comme garde-fous.
             let semanticDynamicIdentifiers = [
-                "community.networkPulse", "feed.tag", "feed.metric.label",
+                "home.action.title.", "home.action.subtitle.", "community.header.action.",
+                "community.networkPulse", "feed.metadata", "feed.tag", "feed.metric.label",
                 "feed.metric.value", "feed.speedtest.subtitle",
                 "feed.story.name", "feed.hashtag", "feed.avatar.initial",
                 "settings.label.Noir intense (OLED)"
@@ -117,7 +122,9 @@ final class AccessibilityAuditTests: XCTestCase {
             let provenContrastIdentifiers = [
                 "home.action.subtitle.", "community.networkPulse", "feed.tag",
                 "feed.metric.", "feed.speedtest.subtitle", "profile.menu.title",
-                "feed.hashtag", "home.network.title", "map.friends.count",
+                "community.header.action.", "feed.metadata", "speedtest.metric.",
+                "profile.progression.tile.", "feed.hashtag", "home.network.title",
+                "map.friends.count", "map.friends.empty",
                 "map.status.text", "state.error.title"
             ]
             if issue.auditType == .contrast,

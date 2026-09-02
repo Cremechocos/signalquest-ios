@@ -294,14 +294,15 @@ struct ProfileView: View {
                 }
             }
             .frame(height: 10)
-            .accessibilityElement()
-            .accessibilityLabel("Progression vers le niveau suivant")
-            .accessibilityValue("\(Int(progress * 100)) %")
+            .accessibilityHidden(true)
         }
         .padding(.vertical, SQSpace.lg)
         .padding(.horizontal, SQSpace.lg + 2)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .sqShadowCard()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Progression · Niveau \(level)")
+        .accessibilityValue("\(inLevel) sur \(goal) points · \(Int(progress * 100)) %")
     }
 
     // MARK: - Menu
@@ -455,6 +456,7 @@ struct ProfileView: View {
                     .foregroundStyle(SQColor.label)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("profile.progression.tile.label.\(title)")
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, SQSpace.md)
@@ -463,6 +465,8 @@ struct ProfileView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(LocalizedStringKey(title))
+        .accessibilityIdentifier("profile.progression.tile.\(title)")
     }
 
     private var menuSeparator: some View {

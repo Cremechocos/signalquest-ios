@@ -116,7 +116,7 @@ struct NetworkPathStatus: Equatable, Sendable {
     var displayName: String {
         switch connection {
         case .wifi:
-            return "WiFi"
+            return "Wi‑Fi"
         case .cellular:
             return cellularTechnology?.displayName ?? "Cellulaire"
         case .wired:

@@ -98,6 +98,9 @@ struct SignalQuestHomeView: View {
     private var header: some View {
         HStack(spacing: SQSpace.md + 2) {
             SQAvatar(url: user.avatarUrl, name: user.name ?? "S", size: 54)
+                // Le nom est annoncé juste à droite ; relire aussi l'image
+                // produit un élément sans description utile dans VoiceOver.
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
                 Text("Bonjour,")
                     .font(SQFont.body(14))
@@ -320,7 +323,7 @@ struct SignalQuestHomeView: View {
             actionTile(
                 identifier: "speedtest",
                 title: "Tester",
-                subtitle: "Débit & latence en 30 s",
+                subtitle: "Débit & latence",
                 systemImage: "speedometer",
                 accented: true
             ) { router.selectedTab = .speed }
@@ -335,7 +338,7 @@ struct SignalQuestHomeView: View {
             actionTile(
                 identifier: "community",
                 title: "Communauté",
-                subtitle: "Fil, stories, entraide",
+                subtitle: "Fil & entraide",
                 systemImage: "person.2"
             ) { router.selectedTab = .community }
 
@@ -351,7 +354,7 @@ struct SignalQuestHomeView: View {
 
     private var messagesSubtitle: String {
         let unread = services.unreadConversations
-        if unread <= 0 { return String(localized: "Conversations chiffrées") }
+        if unread <= 0 { return String(localized: "Conversations") }
         return unread == 1 ? "1 non lu" : "\(unread) non lus"
     }
 
@@ -368,12 +371,15 @@ struct SignalQuestHomeView: View {
             Haptics.selection()
             action()
         } label: {
-            VStack(alignment: .leading, spacing: SQSpace.md) {
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: SQSpace.sm + 2))
+                : AnyLayout(HStackLayout(alignment: .center, spacing: SQSpace.sm + 2))
+            layout {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: systemImage)
-                        .font(.system(size: 19, weight: .medium))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(accented ? SQColor.onAccent : SQColor.brandRed)
-                        .frame(width: 42, height: 42)
+                        .frame(width: 36, height: 36)
                         .background(
                             accented ? AnyShapeStyle(SQColor.onAccent.opacity(0.18)) : AnyShapeStyle(SQColor.accentSoft),
                             in: Circle()
@@ -389,27 +395,35 @@ struct SignalQuestHomeView: View {
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(LocalizedStringKey(title))
-                        .font(.headline.weight(.bold))
+                        .font(SQFont.body(16, .bold, relativeTo: .headline))
                         .foregroundStyle(accented ? SQColor.onAccent : Color.primary)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                        .minimumScaleFactor(0.85)
+                        .accessibilityIdentifier("home.action.title.\(identifier)")
                     Text(LocalizedStringKey(subtitle))
-                        .font(.body.weight(.semibold))
+                        .font(SQFont.body(12, .semibold, relativeTo: .footnote))
                         // Pas d'alpha sur brique : à 12,5 pt il faut 4,5:1, que
                         // `onAccent` n'atteint qu'à α ≈ 0,92 — indiscernable du
                         // plein. La hiérarchie tient déjà par la taille (16,5
                         // semi-gras contre 12,5 normal).
                         .foregroundStyle(accented ? SQColor.onAccent : Color.primary)
+                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("home.action.subtitle.\(identifier)")
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(SQSpace.lg + 2)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: dynamicTypeSize.isAccessibilitySize ? nil : 72,
+                alignment: .leading
+            )
+            .padding(dynamicTypeSize.isAccessibilitySize ? SQSpace.lg : SQSpace.md)
             .background(
                 accented ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
-                in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
+                in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
             )
-            .modifier(HomeTileShadow(accented: accented))
-            .contentShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+            .modifier(HomeTileShadow())
+            .contentShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         }
         .buttonStyle(SQPressButtonStyle())
         // Les DEUX morceaux passent par le catalogue : composer les `String`
@@ -468,17 +482,11 @@ struct SignalQuestHomeView: View {
     /// Agrégat de zone (pouls réseau) : 3 mini-tuiles RSRP / débit médian / meilleur op.
     /// Tappable vers la comparaison des opérateurs dès qu'au moins deux sont mesurés.
     private func pulseRow(_ pulse: NetworkPulse) -> some View {
-        HStack(spacing: SQSpace.sm + 2) {
-            if let rsrp = pulse.avgRsrpDbm {
-                // Clé de lecture du dBm (négatif, contre-intuitif) directement sur la
-                // tuile grand public : plus proche de 0 = meilleur signal (INT-16).
-                pulseTileButton(value: "\(rsrp)", unit: "dBm", metric: .signal)
-            }
-            if let median = pulse.medianDownloadMbps {
-                pulseTileButton(value: "\(median)", unit: String(localized: "Mbps médian"), metric: .download)
-            }
-            if let best = pulse.bestOperator, !best.isEmpty {
-                pulseTileButton(value: best, unit: String(localized: "meilleur op."), metric: .download)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: SQSpace.sm) { pulseTiles(pulse) }
+            } else {
+                HStack(spacing: SQSpace.sm + 2) { pulseTiles(pulse) }
             }
         }
         .accessibilityElement(children: .contain)
@@ -492,6 +500,21 @@ struct SignalQuestHomeView: View {
                 )
                 .environmentObject(services)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func pulseTiles(_ pulse: NetworkPulse) -> some View {
+        if let rsrp = pulse.avgRsrpDbm {
+            // Clé de lecture du dBm (négatif, contre-intuitif) directement sur la
+            // tuile grand public : plus proche de 0 = meilleur signal (INT-16).
+            pulseTileButton(value: "\(rsrp)", unit: "dBm", metric: .signal)
+        }
+        if let median = pulse.medianDownloadMbps {
+            pulseTileButton(value: "\(median)", unit: String(localized: "Mbps médian"), metric: .download)
+        }
+        if let best = pulse.bestOperator, !best.isEmpty {
+            pulseTileButton(value: best, unit: String(localized: "meilleur op."), metric: .download)
         }
     }
 
@@ -517,6 +540,7 @@ struct SignalQuestHomeView: View {
                 .foregroundStyle(SQColor.brandRed)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+                .accessibilityIdentifier("home.pulse.value")
             Text(LocalizedStringKey(unit))
                 .font(SQFont.body(11))
                 .foregroundStyle(SQColor.labelSecondary)
@@ -527,6 +551,7 @@ struct SignalQuestHomeView: View {
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
                 .multilineTextAlignment(.center)
+                .accessibilityIdentifier("home.pulse.unit")
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, SQSpace.sm + 2)
@@ -568,7 +593,8 @@ struct SignalQuestHomeView: View {
                     Text(nearbyContext(for: measure))
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                        .accessibilityIdentifier("home.nearby.context")
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
@@ -824,8 +850,7 @@ struct SignalQuestHomeView: View {
 
 /// Ombre de tuile : accent sous la tuile Tester, carte sinon.
 private struct HomeTileShadow: ViewModifier {
-    let accented: Bool
     func body(content: Content) -> some View {
-        if accented { content.sqShadowAccent() } else { content.sqShadowCard() }
+        content.sqShadowSoft()
     }
 }

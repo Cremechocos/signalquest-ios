@@ -22,7 +22,7 @@ extension SpeedtestPhase {
         case .download: return String(localized: "Téléchargement")
         case .upload: return "Envoi"
         case .saving: return "Synchronisation"
-        case .finished: return String(localized: "Téléchargement")
+        case .finished: return String(localized: "Résultat")
         case .failed: return "Erreur"
         }
     }

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Specialised feed card for `kind = speedtest`. Mirrors the Android layout:
-/// Down / Up / Ping / RSRP in a 4-tile grid with the operator + tech badge.
+/// Réception / Envoi / Ping / RSRP dans une grille 2×2 lisible avec unités.
 struct SpeedtestCardView: View {
     let item: UnifiedSocialFeedItem
     var onTap: () -> Void
@@ -38,13 +38,17 @@ struct SpeedtestCardView: View {
                         .accessibilityIdentifier("feed.speedtest.subtitle")
                 }
 
-                // 4 tuiles Down / Up / Ping / Tech — valeurs nues (l'unité est
-                // dans le libellé implicite, cf. proto), Down en accent brique.
+                // Deux colonnes : quatre tuiles serrées rendaient les libellés
+                // et unités illisibles sur iPhone. Une mesure reste toujours
+                // compréhensible hors contexte et par VoiceOver.
                 LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
-                    CardMetricTile(label: "Down", value: bareSpeed(signal?.downloadMbps), highlight: true)
-                    CardMetricTile(label: "Up", value: bareSpeed(signal?.uploadMbps))
-                    CardMetricTile(label: "Ping", value: bareInt(signal?.pingMs))
-                    CardMetricTile(label: signal?.rsrp == nil ? "Tech" : "RSRP", value: signal?.rsrp == nil ? (signal?.technology ?? "—") : bareInt(signal?.rsrp))
+                    CardMetricTile(label: "Réception", value: SignalFormatters.speed(signal?.downloadMbps), highlight: true)
+                    CardMetricTile(label: "Envoi", value: SignalFormatters.speed(signal?.uploadMbps))
+                    CardMetricTile(label: "Ping", value: SignalFormatters.ms(signal?.pingMs))
+                    CardMetricTile(
+                        label: signal?.rsrp == nil ? "Technologie" : "RSRP",
+                        value: signal?.rsrp == nil ? (signal?.technology ?? "—") : SignalFormatters.dbm(signal?.rsrp)
+                    )
                 }
 
                 if let footer = footer {
@@ -79,20 +83,7 @@ struct SpeedtestCardView: View {
     }
 
     private var gridColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4)
-    }
-
-    /// Débit sans unité (« 412 », « 64,3 ») — le rendu cible affiche les
-    /// valeurs nues dans les tuiles.
-    private func bareSpeed(_ value: Double?) -> String {
-        guard let value else { return "—" }
-        if value >= 100 { return "\(Int(value.rounded()))" }
-        return String(format: "%.1f", value)
-    }
-
-    private func bareInt(_ value: Double?) -> String {
-        guard let value else { return "—" }
-        return "\(Int(value.rounded()))"
+        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2)
     }
 
     private var subtitle: String {

@@ -28,8 +28,9 @@ struct SignalDetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg + 2) {
-                    SQSheetHandle()
                     header
+                        .padding(SQSpace.lg)
+                        .sqEditorialCard()
                     if let signal {
                         metricsGrid(for: signal)
                         extraMetrics(for: signal)
@@ -60,10 +61,18 @@ struct SignalDetailSheet: View {
                 .padding(SQSpace.xl)
             }
             .signalQuestBackground()
+            .navigationTitle(sheetTitle)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Fermer") { dismiss() }
-                        .tint(SQColor.brandRed)
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(SQColor.label)
+                            .frame(width: 34, height: 34)
+                            .background(SQColor.surfaceMuted, in: Circle())
+                    }
+                    .accessibilityLabel("Fermer")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -84,8 +93,19 @@ struct SignalDetailSheet: View {
                 }
             }
         }
+        .task(id: item.sourceId) { await loadSpeedtestDetailIfNeeded() }
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.hidden)
+        .presentationDragIndicator(.visible)
+    }
+
+    private var sheetTitle: String {
+        switch item.kind.lowercased() {
+        case "speedtest": return String(localized: "Speedtest partagé")
+        case "coverage", "session", "drive_test": return String(localized: "Mesure partagée")
+        case "outage": return String(localized: "Panne signalée")
+        case "photo", "antenna_photo": return String(localized: "Photo partagée")
+        default: return String(localized: "Publication")
+        }
     }
 
     // MARK: Header
@@ -117,20 +137,28 @@ struct SignalDetailSheet: View {
                 Text(item.author.displayName)
                     .font(SQType.title)
                     .foregroundStyle(SQColor.label)
-                HStack(spacing: 6) {
-                    if let place = signal?.city ?? item.placeLabel {
-                        Image(systemName: "mappin")
-                            .accessibilityHidden(true)
-                        Text(place)
-                    }
-                    if let date = item.createdAt {
-                        Text("·")
-                        Text(date, format: .dateTime.day().month(.abbreviated).hour().minute())
-                    }
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 6) { sheetMetadataItems(includeSeparator: true) }
+                    VStack(alignment: .leading, spacing: 3) { sheetMetadataItems() }
                 }
                 .font(.caption)
                 .foregroundStyle(SQColor.labelSecondary)
+                .accessibilityElement(children: .combine)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func sheetMetadataItems(includeSeparator: Bool = false) -> some View {
+        if let place = signal?.city ?? item.placeLabel {
+            Text(place).lineLimit(1)
+        }
+        if let date = item.createdAt {
+            if includeSeparator, (signal?.city ?? item.placeLabel) != nil {
+                Text("·").accessibilityHidden(true)
+            }
+            Text(date, format: .dateTime.day().month(.abbreviated).hour().minute())
+                .lineLimit(1)
         }
     }
 
@@ -152,11 +180,10 @@ struct SignalDetailSheet: View {
         switch kind {
         case "speedtest":
             let detail = speedtestDetail
-            tiles.append(.init(label: "Download", value: SignalFormatters.speed(detail?.averageSpeed ?? detail?.downloadAvg ?? signal.downloadMbps), highlight: true, accent: accent))
-            tiles.append(.init(label: "Upload", value: SignalFormatters.speed(detail?.uploadAvg ?? signal.uploadMbps)))
+            tiles.append(.init(label: "Réception", value: SignalFormatters.speed(detail?.averageSpeed ?? detail?.downloadAvg ?? signal.downloadMbps), highlight: true, accent: accent))
+            tiles.append(.init(label: "Envoi", value: SignalFormatters.speed(detail?.uploadAvg ?? signal.uploadMbps)))
             tiles.append(.init(label: "Ping min", value: SignalFormatters.ms(detail?.pingMin ?? detail?.ping ?? signal.pingMs)))
             tiles.append(.init(label: "Jitter", value: SignalFormatters.ms(detail?.jitter ?? signal.jitterMs)))
-            tiles.append(.init(label: "Serveur", value: detail?.downloadServerName ?? detail?.server ?? signal.serverName ?? "—"))
         case "validation":
             tiles.append(.init(label: "Identifiant", value: signal.identifierValue ?? "—", highlight: true, accent: accent))
             tiles.append(.init(label: "Type", value: signal.identifierType?.uppercased() ?? "—"))
@@ -271,6 +298,22 @@ struct SignalDetailSheet: View {
         return String(format: "%.5f, %.5f", lat, lon)
     }
 
+    private func loadSpeedtestDetailIfNeeded() async {
+        guard item.kind.lowercased() == "speedtest",
+              let sourceId = item.sourceId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !sourceId.isEmpty else { return }
+        do {
+            speedtestDetail = try await services.speedtest.details(id: sourceId)
+            detailError = nil
+        } catch {
+            // Le résumé du post reste une source valide : l'échec du détail ne
+            // doit pas transformer une publication lisible en écran d'erreur.
+            if signal == nil {
+                detailError = String(localized: "Détails momentanément indisponibles")
+            }
+        }
+    }
+
     // MARK: Actions row
 
     private var actionsRow: some View {
@@ -290,11 +333,16 @@ struct SignalDetailSheet: View {
                 .accessibilityLabel("Partager")
         }
         .frame(maxWidth: .infinity)
+        .padding(4)
+        .background(
+            SQColor.surface,
+            in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
+        )
+        .sqShadowSoft()
     }
 
-    /// Bouton d'action « Crème » : capsule sans bordure — surface + ombre repos
-    /// au repos, teinte douce de l'accent quand actif (rouge like, vert repost,
-    /// rouge bookmark). `pop` déclenche le rebond élastique du like.
+    /// Une seule barre porte les cinq actions. Les boutons n'empilent plus cinq
+    /// capsules et cinq ombres concurrentes ; seul l'état actif reçoit un fond.
     private func actionButton(systemImage: String, tint: Color, active: Bool, pop: Bool = false, action: @escaping () -> Void) -> some View {
         let shape = Capsule(style: .continuous)
         return Button {
@@ -307,8 +355,7 @@ struct SignalDetailSheet: View {
                 .sqLikePop(trigger: pop)
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 44)
-                .background(active ? AnyShapeStyle(tint.opacity(0.12)) : AnyShapeStyle(SQColor.surface), in: shape)
-                .sqShadowSoft()
+                .background(active ? AnyShapeStyle(tint.opacity(0.12)) : AnyShapeStyle(Color.clear), in: shape)
                 .sqAnimation(SQMotion.fast, value: active)
         }
         .buttonStyle(SQPressButtonStyle())

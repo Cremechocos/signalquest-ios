@@ -85,9 +85,9 @@ struct SentinelleFollowedCard: View {
                     }
 
                     HStack(spacing: SQSpace.md) {
-                        detailStat("Dispo. 30 j", box.uptimePct.map { String(format: "%.2f %%", $0) })
+                        detailStat("Dispo. 30 j", formattedUptime)
                         detailStat("Latence", box.lastRttMs.map { String(format: "%.0f ms", $0) })
-                        detailStat("Coupures", "\(box.outages)")
+                        detailStat("Coupures", SentinelleWording.outages(box.outages))
                     }
 
                     if box.incidents.isEmpty {
@@ -170,12 +170,18 @@ struct SentinelleFollowedCard: View {
 
     private var summary: String {
         var parts: [String] = []
-        if let uptime = box.uptimePct { parts.append(String(format: "%.2f %% sur 30 j", uptime)) }
-        if let rtt = box.lastRttMs { parts.append(String(format: "%.0f ms", rtt)) }
+        if let formattedUptime { parts.append("\(formattedUptime) sur 30 j") }
+        if let rtt = box.lastRttMs { parts.append(SentinelleWording.ms(rtt)) }
         if box.outages > 0 {
-            parts.append("\(box.outages) coupure\(box.outages > 1 ? "s" : "")")
+            parts.append(SentinelleWording.outages(box.outages))
         }
         return parts.isEmpty ? String(localized: "Aucune coupure enregistrée.") : parts.joined(separator: " · ")
+    }
+
+    private var formattedUptime: String? {
+        guard let uptime = box.uptimePct else { return nil }
+        let decimals = uptime.rounded() == uptime ? 0 : 2
+        return SentinelleWording.percent(uptime, decimals: decimals)
     }
 }
 

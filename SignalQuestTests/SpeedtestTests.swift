@@ -77,7 +77,7 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertTrue(cellular.isExpensive)
         XCTAssertEqual(NetworkPathStatus.map(NetworkPathSnapshot(usesWiFi: false, usesCellular: true, usesWired: false, isExpensive: true, isConstrained: false), cellularTechnology: .fiveGNSA).displayName, "5G NSA")
         XCTAssertEqual(NetworkPathStatus.map(NetworkPathSnapshot(usesWiFi: false, usesCellular: true, usesWired: false, isExpensive: true, isConstrained: false), cellularTechnology: .fiveGNSA, operatorName: "SFR").shareDisplayName, "SFR 5G NSA")
-        XCTAssertEqual(NetworkPathStatus.map(NetworkPathSnapshot(usesWiFi: true, usesCellular: false, usesWired: false, isExpensive: false, isConstrained: false), cellularTechnology: .fiveGNSA, operatorName: "SFR").shareDisplayName, "WiFi")
+        XCTAssertEqual(NetworkPathStatus.map(NetworkPathSnapshot(usesWiFi: true, usesCellular: false, usesWired: false, isExpensive: false, isConstrained: false), cellularTechnology: .fiveGNSA, operatorName: "SFR").shareDisplayName, "Wi‑Fi")
         XCTAssertEqual(CellularRadioTechnology.map(CTRadioAccessTechnologyEdge), .twoG)
         XCTAssertEqual(CellularRadioTechnology.map(CTRadioAccessTechnologyWCDMA), .threeG)
         XCTAssertEqual(CellularRadioTechnology.map(CTRadioAccessTechnologyLTE), .fourG)
@@ -103,12 +103,42 @@ final class SpeedtestTests: XCTestCase {
         // WiFi : affiche le FAI (résolu par IP), pas le SSID (plus parlant + évite
         // d'exposer le nom du réseau privé).
         let wifi = makeSpeedtestResult(downloadSeries: nil, uploadSeries: nil, connectionType: .wifi, networkOperatorName: "Orange", wifiSSID: "Livebox-1234")
-        XCTAssertEqual(wifi.networkShareDisplayName, "Orange • WiFi")
+        XCTAssertEqual(wifi.networkShareDisplayName, "Wi‑Fi · Orange")
         XCTAssertFalse(wifi.networkShareDisplayName.contains("Livebox"))
 
-        // WiFi sans FAI résolu → « WiFi » seul (pas de SSID exposé).
+        // Wi‑Fi sans FAI résolu → « Wi‑Fi » seul (pas de SSID exposé).
         let wifiNoFai = makeSpeedtestResult(downloadSeries: nil, uploadSeries: nil, connectionType: .wifi, networkOperatorName: nil, wifiSSID: "Livebox-1234")
-        XCTAssertEqual(wifiNoFai.networkShareDisplayName, "WiFi")
+        XCTAssertEqual(wifiNoFai.networkShareDisplayName, "Wi‑Fi")
+
+        XCTAssertEqual(
+            SpeedtestServerBar(operatorName: "SFR", network: "Wi‑Fi", server: "Lyon BBR").label,
+            "Wi‑Fi · SFR · Lyon BBR"
+        )
+        XCTAssertEqual(SpeedtestPhase.finished.dialTitle, "Résultat")
+    }
+
+    @MainActor
+    func testSpeedtestPrimaryMetricsKeepUnitsAndDialBreathingRoom() {
+        let progress = SpeedtestLiveProgress(
+            phase: .download,
+            downloadAverageMbps: 198.4,
+            uploadAverageMbps: 64.2,
+            pingFinalMs: 21
+        )
+        let metrics = SpeedtestTriMetric(activePhase: .download, progress: progress, result: nil)
+        XCTAssertEqual(metrics.pingText, "21")
+        XCTAssertEqual(metrics.mbpsText(metrics.downloadMbps), "198")
+        XCTAssertEqual(metrics.mbpsText(metrics.uploadMbps), "64.2")
+
+        let dial = SignatureSpeedDial(
+            value: 198.4,
+            unit: "Mbps",
+            phaseTitle: "Téléchargement",
+            phase: .download,
+            completionLabel: nil
+        )
+        XCTAssertEqual(dial.diameter, 310)
+        XCTAssertEqual(dial.arcRadius, 110)
     }
 
     func testSpeedtestPayloadEncodesNullRadioFields() throws {

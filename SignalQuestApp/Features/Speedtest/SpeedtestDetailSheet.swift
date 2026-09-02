@@ -114,7 +114,7 @@ struct SpeedtestDetailContent: View {
 
     private var generation: String? {
         switch result.connectionType {
-        case .wifi: return "WiFi"
+        case .wifi: return "Wi‑Fi"
         case .cellular: return result.cellularTechnology?.displayName ?? "Cellulaire"
         case .wired: return "Ethernet"
         case .other: return nil

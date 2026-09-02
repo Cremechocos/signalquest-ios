@@ -175,6 +175,64 @@ final class SignalQuestUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Speedtest iOS partagé depuis Paris. Radio détaillée indisponible sur iOS, mais débit et latence contribuent à la carte."].waitForExistence(timeout: 5))
     }
 
+    func testCommunityPostCardAndDetailRemainReadable() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])
+        SignalQuestUITestSupport.tab(named: "Communauté", in: app).tap()
+
+        let header = app.descendants(matching: .any)["feed.header"].firstMatch
+        XCTAssertTrue(header.waitForExistence(timeout: 10))
+        XCTAssertEqual(header.label, "Communauté")
+
+        let postText = app.staticTexts[
+            "Speedtest iOS partagé depuis Paris. Radio détaillée indisponible sur iOS, mais débit et latence contribuent à la carte."
+        ]
+        XCTAssertTrue(postText.waitForExistence(timeout: 8))
+
+        let cardScreenshot = XCTAttachment(screenshot: app.screenshot())
+        cardScreenshot.name = "community-post-card-readable"
+        cardScreenshot.lifetime = .keepAlways
+        add(cardScreenshot)
+
+        postText.tap()
+
+        XCTAssertTrue(app.navigationBars["Speedtest partagé"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["Fermer"].exists)
+        XCTAssertTrue(app.staticTexts["Réception"].exists)
+        XCTAssertTrue(app.staticTexts["Envoi"].exists)
+
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "community-post-detail-readable"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
+    func testUpdatedHomeSpeedtestAndCommunityVisualStates() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])
+
+        XCTAssertTrue(app.descendants(matching: .any)["home.action.speedtest"].firstMatch.waitForExistence(timeout: 10))
+        attachScreenshot(app, name: "updated-home")
+
+        SignalQuestUITestSupport.tab(named: "Tester", in: app).tap()
+        XCTAssertTrue(app.buttons["Lancer le test"].waitForExistence(timeout: 10))
+        attachScreenshot(app, name: "updated-speedtest-idle")
+
+        SignalQuestUITestSupport.tab(named: "Communauté", in: app).tap()
+        XCTAssertTrue(app.descendants(matching: .any)["feed.header"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Messages"].exists)
+        XCTAssertTrue(app.buttons["Explorer"].exists)
+        XCTAssertTrue(app.buttons["Créer une publication"].exists)
+        attachScreenshot(app, name: "updated-community")
+    }
+
+    private func attachScreenshot(_ app: XCUIApplication, name: String) {
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = name
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testMapRendersMockedAnnotations() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])

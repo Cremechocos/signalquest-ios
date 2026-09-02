@@ -326,6 +326,15 @@ final class SentinelleListOrderTests: XCTestCase {
         XCTAssertNil(buckets[0].key)
         XCTAssertEqual(buckets[0].boxes.map(\.orderLabel), ["a", "b"])
     }
+
+    func testLesAliasOperateurOntUnNomAffichableSansInventerLesInconnus() {
+        XCTAssertEqual(SentinelleListOrder.displayOperator("BOUYGUES"), "Bouygues Telecom")
+        XCTAssertEqual(SentinelleListOrder.displayOperator("ByTel"), "Bouygues Telecom")
+        XCTAssertEqual(SentinelleListOrder.displayOperator("bouygues telecom"), "Bouygues Telecom")
+        XCTAssertEqual(SentinelleListOrder.displayOperator("FREE"), "Free")
+        XCTAssertEqual(SentinelleListOrder.displayOperator("SFR"), "SFR")
+        XCTAssertEqual(SentinelleListOrder.displayOperator("310-260"), "310-260")
+    }
 }
 
 /// Extraction du jeton d'un lien de partage.

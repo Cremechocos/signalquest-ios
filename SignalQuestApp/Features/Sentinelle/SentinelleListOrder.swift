@@ -36,6 +36,25 @@ enum SentinelleListOrder {
 
     static let unknownOperator = String(localized: "Opérateur inconnu")
 
+    /// Le contrat conserve la clé canonique pour grouper et appeler l'API,
+    /// mais l'interface n'expose pas les variantes historiques du backend.
+    /// Une clé inconnue reste intacte pour ne jamais franciser ou inventer un
+    /// opérateur étranger.
+    static func displayOperator(_ raw: String) -> String {
+        let normalized = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .uppercased()
+            .replacingOccurrences(of: " ", with: "")
+        switch normalized {
+        case "BOUYGUES", "BOUYGUESTELECOM", "BYTEL": return "Bouygues Telecom"
+        case "FREE", "FREEMOBILE": return "Free"
+        case "ORANGE", "ORANGEFRANCE": return "Orange"
+        case "SFR": return "SFR"
+        default: return raw
+        }
+    }
+
     /// Ce qu'il faut d'une box pour l'ordonner. Volontairement minimal : les box
     /// à soi et les connexions suivies n'ont pas les mêmes champs, seul ce socle
     /// leur est commun.

@@ -9,14 +9,14 @@ struct SpeedtestServerBar: View {
     /// Serveur de download/ping actif (CDN AWS CloudFront par défaut).
     let server: String
 
-    /// « Orange · 5G NSA · CloudFront Paris » — l'opérateur quand il est connu.
+    /// « 5G NSA · Orange · CloudFront Paris » ou « Wi‑Fi · SFR · Lyon BBR » :
+    /// le lien réellement utilisé est toujours annoncé avant son fournisseur.
     var label: String {
-        var parts: [String] = []
+        var parts: [String] = [network]
         if let op = operatorName?.trimmingCharacters(in: .whitespacesAndNewlines),
            !op.isEmpty, op != network {
             parts.append(op)
         }
-        parts.append(network)
         parts.append(server)
         return parts.joined(separator: " · ")
     }

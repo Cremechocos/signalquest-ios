@@ -1753,6 +1753,7 @@ struct MapExplorerView: View {
                     .foregroundStyle(SQColor.label)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("map.friends.empty")
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: SQSpace.sm) {
@@ -1976,13 +1977,14 @@ struct MapExplorerView: View {
             .frame(width: 18, height: 18)
             .accessibilityHidden(!(model.isLoading || model.isSearching))
             .accessibilityLabel(model.isSearching ? "Recherche en cours" : (model.isLoading ? "Chargement de la carte" : ""))
-            TextField("Rechercher une ville, une adresse, un site…", text: $model.searchQuery, axis: .vertical)
+            TextField("Ville, adresse ou site", text: $model.searchQuery, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.body)
                 .foregroundStyle(SQColor.label)
                 .lineLimit(1...2)
                 .submitLabel(.search)
                 .autocorrectionDisabled()
+                .accessibilityLabel("Rechercher une ville, une adresse ou un site")
                 .onSubmit { Task { await model.search() } }
                 // Suggestions à la frappe (anti-rebond + annulation côté modèle).
                 .onChangeCompat(of: model.searchQuery) { _, _ in model.scheduleSearch() }

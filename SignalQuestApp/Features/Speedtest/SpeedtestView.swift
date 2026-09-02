@@ -134,14 +134,27 @@ struct SpeedtestView: View {
         )
     }
 
-    /// Opérateur affiché dans le bandeau : priorité au résultat mesuré, puis à
-    /// l'API device (CoreTelephony), puis — en cellulaire uniquement — à
-    /// l'opérateur résolu par IP côté backend (le FAI WiFi n'a pas sa place ici).
+    /// Fournisseur affiché dans le bandeau, lié au chemin réellement mesuré.
+    ///
+    /// En Wi‑Fi, le nom vient de l'IP/ASN (le FAI de la box), jamais de
+    /// CoreTelephony qui décrit la SIM inactive. En cellulaire, le résultat puis
+    /// le chemin radio priment. Cette séparation évite qu'une SIM SFR fasse croire
+    /// qu'un test lancé sur une box Orange utilise le réseau mobile SFR.
     private var headerOperatorName: String? {
-        if let measured = result?.networkOperatorName { return measured }
-        if let live = currentNetworkStatus.operatorName { return live }
-        // Repli IP : opérateur mobile en cellulaire, FAI en WiFi.
-        return detectedOperator?.label
+        let connection = result?.connectionType ?? currentNetworkStatus.connection
+        switch connection {
+        case .wifi:
+            return result?.networkOperatorName
+                ?? detectedOperator?.shortLabel
+                ?? detectedOperator?.label
+        case .cellular:
+            return result?.networkOperatorName
+                ?? currentNetworkStatus.operatorName
+                ?? detectedOperator?.shortLabel
+                ?? detectedOperator?.label
+        case .wired, .other:
+            return nil
+        }
     }
 
     /// Résout l'opérateur via IP (ASN) côté backend, en transmettant l'état VPN
@@ -159,13 +172,12 @@ struct SpeedtestView: View {
                     VPNWarningBanner()
                 }
 
-                SignatureSpeedDial(
-                    value: gaugeDisplay.value,
-                    unit: gaugeDisplay.unit,
-                    phaseTitle: phase.dialTitle,
-                    phase: phase,
-                    completionLabel: dialCompletionLabel
-                )
+                ViewThatFits(in: .horizontal) {
+                    signatureDial
+                    signatureDial
+                        .scaleEffect(0.9)
+                        .frame(width: 279, height: 279)
+                }
                 .frame(maxWidth: .infinity)
 
                 SpeedtestTriMetric(
@@ -303,6 +315,18 @@ struct SpeedtestView: View {
         }
     }
 
+    /// 310 pt sur les iPhone actuels pour laisser respirer la valeur ; repli
+    /// proportionnel sur les écrans compacts afin de ne jamais rogner l'arc.
+    private var signatureDial: some View {
+        SignatureSpeedDial(
+            value: gaugeDisplay.value,
+            unit: gaugeDisplay.unit,
+            phaseTitle: phase.dialTitle,
+            phase: phase,
+            completionLabel: dialCompletionLabel
+        )
+    }
+
     // MARK: - Header (titre centré + capsule serveur, DA « Crème & Terre cuite »)
 
     private var header: some View {
@@ -322,8 +346,8 @@ struct SpeedtestView: View {
                     .foregroundStyle(SQColor.label)
             }
             SpeedtestServerBar(
-                // Opérateur : résultat mesuré → API device → repli IP
-                // (cellulaire). Cf. headerOperatorName.
+                // Fournisseur du chemin mesuré : FAI IP en Wi‑Fi, opérateur
+                // servant/SIM seulement en cellulaire. Cf. headerOperatorName.
                 operatorName: headerOperatorName,
                 network: result?.networkDisplayName ?? currentNetworkStatus.displayName,
                 // Serveur de download/ping ACTIF. On n'affiche plus le VPS de

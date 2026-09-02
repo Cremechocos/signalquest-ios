@@ -207,9 +207,9 @@ struct CardHeader: View {
     }
 
     private var authorBlock: some View {
-        HStack(spacing: SQSpace.md) {
+        HStack(alignment: .top, spacing: SQSpace.md) {
             SQAvatar(url: author.avatarUrl, name: author.displayName)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: SQSpace.xs + 1) {
                 HStack(spacing: 5) {
                     Text(author.displayName)
                         .font(SQFont.body(16, .semibold, relativeTo: .headline))
@@ -219,22 +219,43 @@ struct CardHeader: View {
                     // Badges accolés au nom, comme sur le web et Android.
                     SQUserBadges(badges: author.badges)
                 }
-                HStack(spacing: 6) {
-                    if let place {
-                        Image(systemName: "location.fill")
-                            .font(.caption2)
-                            .accessibilityHidden(true)
-                        Text(place)
-                    }
-                    if let createdAt {
-                        Text("·")
-                            .accessibilityHidden(true)
-                        Text(createdAt, format: .relative(presentation: .named, unitsStyle: .abbreviated))
-                    }
-                }
+                metadata
                 .font(SQFont.body(12.5, relativeTo: .footnote))
                 .foregroundStyle(SQColor.labelSecondary)
             }
+        }
+    }
+
+    /// Lieu et date restent deux informations distinctes. La version
+    /// précédente ajoutait des pictogrammes sans action, ce qui formait une
+    /// ligne dense et mal alignée. Le texte suffit et se replie proprement.
+    private var metadata: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                metadataItems(includeSeparator: true)
+            }
+            VStack(alignment: .leading, spacing: 3) { metadataItems() }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("feed.metadata")
+    }
+
+    @ViewBuilder
+    private func metadataItems(includeSeparator: Bool = false) -> some View {
+        if let place {
+            Text(place)
+                .lineLimit(1)
+                .accessibilityIdentifier("feed.metadata.place")
+        }
+        if let createdAt {
+            if includeSeparator, place != nil {
+                Text("·")
+                    .accessibilityHidden(true)
+                    .accessibilityIdentifier("feed.metadata.separator")
+            }
+            Text(createdAt, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                .lineLimit(1)
+                .accessibilityIdentifier("feed.metadata.date")
         }
     }
 }
@@ -252,10 +273,9 @@ struct CardActionsBar: View {
 
     @State private var showReactionPicker = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        HStack(spacing: dynamicTypeSize.isAccessibilitySize ? SQSpace.sm : SQSpace.xl) {
+        HStack(spacing: 0) {
             likeButton
             actionButton(
                 count: item.commentsCount,
@@ -271,11 +291,10 @@ struct CardActionsBar: View {
                 action: onRepost
             )
             .accessibilityAddTraits(item.repostedByMe ? .isSelected : [])
-            Spacer()
             Button(action: onFavorite) {
                 Image(systemName: item.favoritedByMe ? "bookmark.fill" : "bookmark")
                     .foregroundStyle(item.favoritedByMe ? SQColor.brandRed : SQColor.labelSecondary)
-                    .frame(minWidth: 44, minHeight: 44)
+                    .frame(maxWidth: .infinity, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .accessibilityLabel(item.favoritedByMe ? "Retirer des favoris" : "Ajouter aux favoris")
@@ -284,13 +303,18 @@ struct CardActionsBar: View {
             Button(action: onShare) {
                 Image(systemName: "paperplane")
                     .foregroundStyle(SQColor.labelSecondary)
-                    .frame(minWidth: 44, minHeight: 44)
+                    .frame(maxWidth: .infinity, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .accessibilityLabel("Partager")
         }
+        .padding(.horizontal, 4)
+        .background(
+            SQColor.surfaceMuted,
+            in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+        )
         .buttonStyle(.plain)
-        .font(SQFont.body(14, .semibold))
+        .font(SQFont.body(15, .medium))
         .overlay(alignment: .topLeading) {
             if showReactionPicker {
                 ReactionPicker { emoji in
@@ -317,7 +341,7 @@ struct CardActionsBar: View {
         }
         .foregroundStyle(item.likedByMe ? SQColor.like : SQColor.labelSecondary)
         .sqLikePop(trigger: item.likedByMe)
-        .frame(minHeight: 44)
+        .frame(maxWidth: .infinity, minHeight: 44)
         .contentShape(Rectangle())
         .onTapGesture {
             if showReactionPicker { dismissPicker() } else { onLike() }
@@ -358,7 +382,7 @@ struct CardActionsBar: View {
                 }
             }
             .foregroundStyle(tint)
-            .frame(minHeight: 44)
+            .frame(maxWidth: .infinity, minHeight: 44)
             .contentShape(Rectangle())
         }
         .accessibilityLabel(LocalizedStringKey(label))

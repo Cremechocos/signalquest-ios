@@ -457,6 +457,9 @@ struct E2EEV2TrustedDevicesView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(SQColor.bg.ignoresSafeArea())
+        .tint(SQColor.brandRed)
         .navigationTitle("Appareils E2EE v2")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await model.load() }

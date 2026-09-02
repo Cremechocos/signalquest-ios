@@ -238,7 +238,7 @@ private struct SpeedtestShareCard: View {
     /// inconnu) → nil : on ne revendique jamais une génération inconnue.
     private var generationLabel: String? {
         switch result.connectionType {
-        case .wifi: return "WiFi"
+        case .wifi: return "Wi‑Fi"
         case .cellular: return result.cellularTechnology?.displayName ?? "Cellulaire"
         case .wired: return "Ethernet"
         case .other: return nil

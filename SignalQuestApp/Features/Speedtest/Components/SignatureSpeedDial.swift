@@ -11,9 +11,9 @@ struct SignatureSpeedDial: View {
 
     let arcSpan: Double = 0.75   // 270°, départ 135°
     let lineWidth: CGFloat = 18
-    let diameter: CGFloat = 288
+    let diameter: CGFloat = 310
     /// Rayon de la ligne médiane de l'arc, des graduations et des libellés.
-    var arcRadius: CGFloat { 100 }
+    var arcRadius: CGFloat { 110 }
     var tickInnerRadius: CGFloat { arcRadius + lineWidth / 2 + 5 }
     var labelRadius: CGFloat { arcRadius + lineWidth / 2 + 22 }
 
@@ -130,15 +130,17 @@ struct SignatureSpeedDial: View {
                 .frame(width: arcRadius * 2, height: arcRadius * 2)
 
             // Arc actif teinté par la qualité (brique → ambre → olive).
-            // Teinte pleine : le dégradé angulaire laissait une couture visible
-            // au départ de l'arc. L'epsilon garde un point quand la valeur est 0.
-            Circle()
-                .trim(from: 0, to: max(0.0006, arcSpan * normalized))
-                .stroke(qualityColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                .rotationEffect(.degrees(135))
-                .frame(width: arcRadius * 2, height: arcRadius * 2)
-                .shadow(color: qualityColor.opacity(colorScheme == .dark ? 0.5 : 0.3), radius: 10, x: 0, y: 0)
-                .sqAnimation(.snappy(duration: 0.32), value: normalized)
+            // À zéro, on ne dessine RIEN : un epsilon avec lineCap rond créait
+            // un gros point posé sur « 1 Mbps » avant toute mesure.
+            if normalized > 0 {
+                Circle()
+                    .trim(from: 0, to: arcSpan * normalized)
+                    .stroke(qualityColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(135))
+                    .frame(width: arcRadius * 2, height: arcRadius * 2)
+                    .shadow(color: qualityColor.opacity(colorScheme == .dark ? 0.5 : 0.3), radius: 10, x: 0, y: 0)
+                    .sqAnimation(.snappy(duration: 0.32), value: normalized)
+            }
 
             arcTip
 

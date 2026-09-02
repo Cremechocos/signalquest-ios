@@ -387,7 +387,6 @@ struct FeedView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var presentedSheet: FeedSheet?
     /// Post en attente de confirmation de suppression. La suppression est
@@ -762,66 +761,62 @@ struct FeedView: View {
         }
     }
 
-    // MARK: Header custom — titre display + boutons circulaires
+    // MARK: Header custom — titre, menu secondaire, actions nommées
 
     private var header: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: SQSpace.sm) {
-                    headerTitle
-                    headerActions
-                }
-            } else {
-                HStack(spacing: SQSpace.sm + 2) {
-                    headerTitle
-                    Spacer(minLength: SQSpace.sm)
-                    headerActions
-                }
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            HStack(spacing: SQSpace.md) {
+                headerTitle(singleLine: true)
+                Spacer(minLength: SQSpace.sm)
+                communityMenu
             }
+            headerActions
         }
         .accessibilityElement(children: .contain)
     }
 
-    private var headerTitle: some View {
+    private func headerTitle(singleLine: Bool) -> some View {
         Text("Communauté")
             .font(SQFont.display(26, .bold))
             .foregroundStyle(SQColor.label)
-            .fixedSize(horizontal: false, vertical: true)
+            .lineLimit(singleLine ? 1 : nil)
+            .fixedSize(horizontal: singleLine, vertical: true)
             .accessibilityAddTraits(.isHeader)
             .accessibilityIdentifier("feed.header")
     }
 
     private var headerActions: some View {
-        HStack(spacing: SQSpace.sm) {
-            headerButton(systemImage: "bubble.left.and.bubble.right", label: "Messages") {
-                showMessages = true
-            } decoration: {
-                if services.unreadConversations > 0 {
-                    Circle()
-                        .fill(SQColor.brandRed)
-                        .frame(width: 10, height: 10)
-                        .padding(2)
-                        .background(SQColor.surface, in: Circle())
-                        .offset(x: 1, y: -1)
-                }
-            }
-            .accessibilityValue(services.unreadConversations == 0
-                                ? "Aucun message non lu"
-                                : "\(services.unreadConversations) conversations non lues")
-            headerButton(systemImage: "magnifyingglass", label: "Explorer") {
-                showExplore = true
-            }
-            headerButton(systemImage: "square.and.pencil", label: "Créer une publication") {
-                showComposer = true
-            }
-            // Menu de débordement. Il accueille ce qui vivait dans le menu du
-            // Profil sans y avoir sa place — Amis, Notifications, Appels,
-            // Préférences du fil — plus « Ma semaine ». Un cinquième bouton rond
-            // n'était pas possible : à quatre, le titre « Communauté » se
-            // rétrécissait déjà pour tenir.
-            communityMenu
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: SQSpace.sm) { primaryHeaderActions }
+            VStack(spacing: SQSpace.sm) { primaryHeaderActions }
         }
-        .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil, alignment: .trailing)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var primaryHeaderActions: some View {
+        headerActionButton(
+            identifier: "messages",
+            systemImage: "bubble.left.and.bubble.right",
+            title: "Messages",
+            badgeCount: services.unreadConversations
+        ) {
+            showMessages = true
+        }
+        .accessibilityValue(services.unreadConversations == 0
+                            ? "Aucun message non lu"
+                            : "\(services.unreadConversations) conversations non lues")
+        headerActionButton(identifier: "explore", systemImage: "magnifyingglass", title: "Explorer") {
+            showExplore = true
+        }
+        headerActionButton(
+            identifier: "publish",
+            systemImage: "square.and.pencil",
+            title: "Publier",
+            accessibilityLabel: "Créer une publication"
+        ) {
+            showComposer = true
+        }
     }
 
     /// L'onglet « Photos », en galerie.
@@ -898,36 +893,44 @@ struct FeedView: View {
         .accessibilityLabel("Plus")
     }
 
-    /// Bouton circulaire d'en-tête 42 pt : fond surface + ombre douce, icône
-    /// encre ; `decoration` pose le point « non-lus » au-dessus du cercle.
-    private func headerButton(
+    /// Actions principales nommées : plus découvrables que quatre cercles
+    /// anonymes et capables de se disposer verticalement avec Dynamic Type.
+    private func headerActionButton(
+        identifier: String,
         systemImage: String,
-        label: String,
+        title: String,
+        accessibilityLabel: String? = nil,
+        badgeCount: Int = 0,
         action: @escaping () -> Void
-    ) -> some View {
-        headerButton(systemImage: systemImage, label: label, action: action) { EmptyView() }
-    }
-
-    private func headerButton<Decoration: View>(
-        systemImage: String,
-        label: String,
-        action: @escaping () -> Void,
-        @ViewBuilder decoration: () -> Decoration
     ) -> some View {
         Button {
             Haptics.light()
             action()
         } label: {
-            Image(systemName: systemImage)
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(SQColor.label)
-                .frame(width: 44, height: 44)
-                .background(SQColor.surface, in: Circle())
-                .sqShadowSoft()
-                .overlay(alignment: .topTrailing) { decoration() }
+            HStack(spacing: SQSpace.xs + 1) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+                Text(LocalizedStringKey(title))
+                    .font(SQFont.body(13, .semibold, relativeTo: .subheadline))
+                    .lineLimit(1)
+                    .accessibilityIdentifier("community.header.action.\(identifier).label")
+                if badgeCount > 0 {
+                    Text("\(min(badgeCount, 99))")
+                        .font(SQFont.body(10, .bold, relativeTo: .caption2))
+                        .foregroundStyle(SQColor.onAccent)
+                        .frame(minWidth: 18, minHeight: 18)
+                        .background(SQColor.brandRed, in: Circle())
+                }
+            }
+            .foregroundStyle(SQColor.label)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.horizontal, SQSpace.md)
+            .background(SQColor.surface, in: Capsule(style: .continuous))
+            .sqShadowSoft()
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel(LocalizedStringKey(label))
+        .accessibilityLabel(LocalizedStringKey(accessibilityLabel ?? title))
+        .accessibilityIdentifier("community.header.action.\(identifier)")
     }
 
     // MARK: Hashtags — capsules pleines/douces

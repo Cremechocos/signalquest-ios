@@ -452,7 +452,7 @@ struct SentinelleView: View {
                 ForEach(SentinelleListOrder.grouped(model.targets, by: group, sort: sort)) { bucket in
                 if let key = bucket.key {
                     HStack {
-                        Text(key).font(SQFont.body(12)).foregroundStyle(SQColor.labelSecondary)
+                        Text(SentinelleListOrder.displayOperator(key)).font(SQFont.body(12)).foregroundStyle(SQColor.labelSecondary)
                         Spacer()
                     }
                 }
@@ -484,7 +484,7 @@ struct SentinelleView: View {
                     ForEach(SentinelleListOrder.grouped(model.following, by: group, sort: sort)) { bucket in
                         if let key = bucket.key {
                             HStack {
-                                Text(key).font(SQFont.body(12)).foregroundStyle(SQColor.labelSecondary)
+                                Text(SentinelleListOrder.displayOperator(key)).font(SQFont.body(12)).foregroundStyle(SQColor.labelSecondary)
                                 Spacer()
                             }
                         }

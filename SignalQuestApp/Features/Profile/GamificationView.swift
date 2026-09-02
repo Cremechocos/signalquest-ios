@@ -6,6 +6,7 @@ final class GamificationViewModel: ObservableObject {
     @Published var events: [GamificationEvent] = []
     @Published var catalog: [GamificationBadge] = []
     @Published var errorMessage: String?
+    @Published private(set) var isLoadingProfile = true
 
     /// État de la section Quêtes v2 — indépendante du reste de la page :
     /// squelette pendant le chargement, masquée silencieusement en cas d'échec.
@@ -30,6 +31,8 @@ final class GamificationViewModel: ObservableObject {
     }
 
     func load() async {
+        if profile == nil { isLoadingProfile = true }
+        defer { isLoadingProfile = false }
         do {
             async let p = service.profile()
             async let e = service.events()
@@ -98,7 +101,7 @@ struct GamificationView: View {
                 // plus hauts que le viewport, la scrollTransition ne les amène
                 // jamais à l'identité → sections estompées en permanence (même
                 // piège que le menu Profil).
-                levelCard
+                levelBlock
                     .sqFadeUp()
                 questsBlock
                 if !badgeList.isEmpty { badgesGrid }
@@ -128,6 +131,44 @@ struct GamificationView: View {
         }
     }
 
+    @ViewBuilder
+    private var levelBlock: some View {
+        if model.profile != nil {
+            levelCard
+        } else if model.isLoadingProfile {
+            levelCardSkeleton
+        }
+    }
+
+    /// Ne jamais afficher « Niveau 0 · 0 pts » pendant le réseau : ce sont des
+    /// données plausibles mais fausses pour un compte existant, donc plus
+    /// trompeuses qu'un squelette explicite.
+    private var levelCardSkeleton: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+            HStack {
+                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                    .fill(SQColor.surfaceMuted)
+                    .frame(width: 126, height: 28)
+                Spacer()
+                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                    .fill(SQColor.surfaceMuted)
+                    .frame(width: 112, height: 34)
+            }
+            Capsule(style: .continuous)
+                .fill(SQColor.surfaceMuted)
+                .frame(height: 8)
+            RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                .fill(SQColor.surfaceMuted)
+                .frame(width: 148, height: 17)
+        }
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqShadowCard()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Chargement de la progression")
+    }
+
     private var levelCard: some View {
         VStack(alignment: .leading, spacing: SQSpace.md + 2) {
             HStack(alignment: .firstTextBaseline) {
@@ -155,6 +196,9 @@ struct GamificationView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .sqShadowCard()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Niveau \(model.profile?.level ?? 0)")
+        .accessibilityValue("\(model.profile?.points ?? 0) points · progression \(Int(xpProgress * 100)) %")
     }
 
     private var xpBar: some View {
@@ -169,9 +213,7 @@ struct GamificationView: View {
             }
         }
         .frame(height: 8)
-        .accessibilityElement()
-        .accessibilityLabel("Progression vers le niveau suivant")
-        .accessibilityValue("\(Int(xpProgress * 100)) %")
+        .accessibilityHidden(true)
     }
 
     private var badgesGrid: some View {

@@ -23,18 +23,21 @@ struct SpeedtestTriMetric: View {
             cell(
                 title: "Ping",
                 value: pingText,
+                unit: "ms",
                 state: state(for: .ping),
                 quality: pingQuality
             )
             cell(
                 title: "Réception",
                 value: mbpsText(downloadMbps),
+                unit: "Mbps",
                 state: state(for: .download),
                 quality: mbpsQuality(downloadMbps)
             )
             cell(
                 title: "Envoi",
                 value: mbpsText(uploadMbps),
+                unit: "Mbps",
                 state: state(for: .upload),
                 quality: mbpsQuality(uploadMbps)
             )
@@ -64,7 +67,7 @@ struct SpeedtestTriMetric: View {
 
     var pingText: String {
         guard let value = pingMsValue else { return "—" }
-        return "\(Int(value.rounded())) ms"
+        return "\(Int(value.rounded()))"
     }
 
     var pingQuality: Color? {
@@ -79,7 +82,8 @@ struct SpeedtestTriMetric: View {
         return SpeedtestQualityPalette.color(forRatio: ratio, stops: qualityStops)
     }
 
-    /// Débit sans unité (« 403 », « 38.5 ») — le « Mbps » est porté par le cadran.
+    /// Valeur compacte ; l'unité reste visible dans chaque carte, y compris
+    /// lorsque la mesure n'a pas encore commencé.
     func mbpsText(_ value: Double?) -> String {
         guard let value, value.isFinite, value > 0 else { return "—" }
         if value >= 100 { return "\(Int(value.rounded()))" }
@@ -121,18 +125,26 @@ struct SpeedtestTriMetric: View {
     }
 
     @ViewBuilder
-    func cell(title: String, value: String, state: CellState, quality: Color?) -> some View {
+    func cell(title: String, value: String, unit: String, state: CellState, quality: Color?) -> some View {
         VStack(spacing: 3) {
             Text(LocalizedStringKey(title))
                 .font(SQFont.body(12))
                 .foregroundStyle(SQColor.label)
-            Text(value)
-                .font(SQFont.display(20, .bold, relativeTo: .title3))
-                .monospacedDigit()
-                .foregroundStyle(valueColor(value, state: state, quality: quality))
-                .contentTransition(.numericText())
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("speedtest.metric.\(title.lowercased()).title")
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(value)
+                    .font(SQFont.display(20, .bold, relativeTo: .title3))
+                    .monospacedDigit()
+                    .foregroundStyle(valueColor(value, state: state, quality: quality))
+                    .contentTransition(.numericText())
+                    .accessibilityIdentifier("speedtest.metric.\(title.lowercased()).value")
+                Text(unit)
+                    .font(SQFont.body(10.5, .semibold, relativeTo: .caption))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityIdentifier("speedtest.metric.\(title.lowercased()).unit")
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
             RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(barColor(state, quality: quality))
                 .frame(width: 26, height: 4)
@@ -143,12 +155,13 @@ struct SpeedtestTriMetric: View {
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .sqShadowSoft()
         .sqAnimation(.snappy(duration: 0.25), value: state)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityIdentifier("speedtest.metric.\(title.lowercased())")
         // `title` est un littéral d'interface, `value` une mesure : seul le
         // premier — et le repli « non mesuré » — passent par le catalogue.
         .accessibilityLabel(
             Text(LocalizedStringKey(title)) + Text(" : ")
-                + (value == "—" ? Text("non mesuré") : Text(value))
+                + (value == "—" ? Text("non mesuré") + Text(" · \(unit)") : Text("\(value) \(unit)"))
         )
     }
 }

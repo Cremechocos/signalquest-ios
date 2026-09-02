@@ -724,7 +724,7 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     var networkDisplayName: String {
         switch connectionType {
         case .wifi:
-            return "WiFi"
+            return "Wi‑Fi"
         case .cellular:
             return cellularTechnology?.displayName ?? "Cellulaire"
         case .wired:
@@ -740,9 +740,9 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
             // Affiche le FAI (résolu par IP, porté par networkOperatorName) plutôt
             // que le SSID — plus parlant et évite d'exposer le nom du réseau privé.
             if let fai = networkOperatorName?.trimmingCharacters(in: .whitespacesAndNewlines), !fai.isEmpty {
-                return "\(fai) • WiFi"
+                return "Wi‑Fi · \(fai)"
             }
-            return "WiFi"
+            return "Wi‑Fi"
         case .cellular:
             let technology = cellularTechnology?.displayName
             let simName = mvnoName ?? carrierName
