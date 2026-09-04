@@ -319,6 +319,11 @@ struct SocialSignalSummary: Codable, Equatable {
     let cellId: String?
     let pci: Int?
     let `operator`: String?
+    let servingOperator: String?
+    let simOperator: String?
+    let isRoaming: Bool?
+    let observedPlmn: String?
+    let simPlmn: String?
     let city: String?
     let capturedAt: Date?
     let downloadMbps: Double?
@@ -350,7 +355,7 @@ struct SocialSignalSummary: Codable, Equatable {
     let longitude: Double?
 
     enum CodingKeys: String, CodingKey {
-        case type, technology, rsrp, rsrq, sinr, band, cellId, pci, city, capturedAt, downloadMbps, uploadMbps, pingMs, jitterMs, maxDownloadMbps, distanceMeters, durationSeconds, detectedTechs, averageSignalDbm, minSignalDbm, maxSignalDbm, pointsCount, siteLabel, identifierType, identifierValue, identifierSource, validationCount, ratingStars, ratingTrend, frequency, earfcn, arfcn, sectors, deviceModel, serverName, latitude, longitude
+        case type, technology, rsrp, rsrq, sinr, band, cellId, pci, city, capturedAt, downloadMbps, uploadMbps, pingMs, jitterMs, maxDownloadMbps, distanceMeters, durationSeconds, detectedTechs, averageSignalDbm, minSignalDbm, maxSignalDbm, pointsCount, siteLabel, identifierType, identifierValue, identifierSource, validationCount, ratingStars, ratingTrend, frequency, earfcn, arfcn, sectors, deviceModel, serverName, latitude, longitude, servingOperator, simOperator, isRoaming, observedPlmn, simPlmn
         case `operator` = "operator"
     }
 
@@ -365,6 +370,11 @@ struct SocialSignalSummary: Codable, Equatable {
         cellId = c.decodeFlexibleString(forKey: .cellId)
         pci = try c.decodeIfPresent(Int.self, forKey: .pci)
         `operator` = try c.decodeIfPresent(String.self, forKey: .operator)
+        servingOperator = try c.decodeIfPresent(String.self, forKey: .servingOperator)
+        simOperator = try c.decodeIfPresent(String.self, forKey: .simOperator)
+        isRoaming = try c.decodeIfPresent(Bool.self, forKey: .isRoaming)
+        observedPlmn = try c.decodeIfPresent(String.self, forKey: .observedPlmn)
+        simPlmn = try c.decodeIfPresent(String.self, forKey: .simPlmn)
         city = try c.decodeIfPresent(String.self, forKey: .city)
         capturedAt = try c.decodeIfPresent(Date.self, forKey: .capturedAt)
         downloadMbps = try c.decodeIfPresent(Double.self, forKey: .downloadMbps)

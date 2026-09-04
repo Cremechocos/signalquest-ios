@@ -227,7 +227,8 @@ struct SignalDetailSheet: View {
         let speedtestPairs: [(String, String)] = speedtestDetail.map { detail in
             [
                 ("Réseau", [detail.connectionType, detail.networkType].compactMap { $0 }.joined(separator: " / ")),
-                ("Opérateur", detail.mobileOperator ?? ""),
+                ("Réseau utilisé", signal.servingOperator ?? signal.operator ?? detail.mobileOperator ?? ""),
+                ("SIM", signal.isRoaming == true ? signal.simOperator ?? "" : ""),
                 ("Appareil", [detail.deviceType, detail.deviceModel].compactMap { $0 }.joined(separator: " ")),
                 ("Durée", SignalFormatters.duration(detail.testDuration)),
                 ("Ping moyen", SignalFormatters.ms(detail.pingAvg)),

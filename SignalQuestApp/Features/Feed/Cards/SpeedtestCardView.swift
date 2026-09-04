@@ -87,7 +87,11 @@ struct SpeedtestCardView: View {
     }
 
     private var subtitle: String {
-        [signal?.operator, signal?.deviceModel]
+        [
+            signal?.servingOperator ?? signal?.operator,
+            signal?.isRoaming == true ? signal?.simOperator.map { "SIM \($0)" } : nil,
+            signal?.deviceModel,
+        ]
             .compactMap { $0 }
             .joined(separator: " · ")
     }
