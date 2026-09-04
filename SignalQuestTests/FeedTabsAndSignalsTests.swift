@@ -193,6 +193,29 @@ final class FeedItemOwnershipTests: XCTestCase {
     }
 }
 
+final class FeedRoamingSpeedtestTests: XCTestCase {
+    func testVisitedNetworkAndSimAreDecodedSeparately() throws {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let item = try decoder.decode(UnifiedSocialFeedItem.self, from: Data("""
+        {"id":"speed-post","kind":"speedtest","author":{"id":"u1"},"text":"",
+         "commentsCount":0,"repostsCount":0,"favoritesCount":0,
+         "likedByMe":false,"favoritedByMe":false,"repostedByMe":false,
+         "signal":{"type":"speedtest","operator":"Vodafone Germany",
+           "servingOperator":"Vodafone Germany","simOperator":"Orange F",
+           "isRoaming":true,"observedPlmn":"26202","simPlmn":"20801",
+           "detectedTechs":[]}}
+        """.utf8))
+
+        XCTAssertEqual(item.signal?.operator, "Vodafone Germany")
+        XCTAssertEqual(item.signal?.servingOperator, "Vodafone Germany")
+        XCTAssertEqual(item.signal?.simOperator, "Orange F")
+        XCTAssertEqual(item.signal?.isRoaming, true)
+        XCTAssertEqual(item.signal?.observedPlmn, "26202")
+        XCTAssertEqual(item.signal?.simPlmn, "20801")
+    }
+}
+
 /// Le sondage du fil a une forme DIFFÉRENTE de celui de la messagerie
 /// (`label`/`votesCount`/`votedByMe` contre `text`/`count`/`votesByMe`).
 /// Confondre les deux donnerait un décodage silencieusement vide.

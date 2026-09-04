@@ -183,6 +183,40 @@ struct MapAnnotationPayload: Identifiable, Equatable {
 }
 
 extension MapAnnotationPayload {
+    static func searchPin(
+        latitudeText: String,
+        longitudeText: String,
+        title: String,
+        subtitle: String
+    ) -> MapAnnotationPayload? {
+        guard let latitude = Double(latitudeText),
+              let longitude = Double(longitudeText),
+              latitude.isFinite,
+              longitude.isFinite,
+              (-90.0...90.0).contains(latitude),
+              (-180.0...180.0).contains(longitude),
+              latitude != 0 || longitude != 0
+        else { return nil }
+
+        return MapAnnotationPayload(
+            id: "searched-place-pin",
+            kind: .customSite,
+            title: title.isEmpty ? "Lieu recherché" : title,
+            subtitle: subtitle,
+            coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
+            metric: nil,
+            backendId: nil,
+            details: nil,
+            antennaId: nil,
+            clusterCount: nil,
+            azimuths: [],
+            showsAzimuths: false,
+            tint: SQColor.searchPin,
+            glyphOverride: "mappin.circle.fill",
+            isSearchPin: true
+        )
+    }
+
     var markerColor: Color {
         // La couleur registry de l'opérateur prime quand elle est connue
         // (antennes, sites communautaires).
