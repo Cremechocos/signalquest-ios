@@ -99,6 +99,7 @@ final class MapSearchTests: XCTestCase {
         XCTAssertEqual(pin.title, "Lille")
         XCTAssertEqual(pin.subtitle, "Nord")
         XCTAssertEqual(pin.glyphOverride, "mappin.circle.fill")
+        XCTAssertEqual(pin.tint, SQColor.searchPin)
         XCTAssertTrue(pin.isSearchPin)
     }
 

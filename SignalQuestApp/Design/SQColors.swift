@@ -13,6 +13,10 @@ enum SQColor {
     static let brandPink = Color("BrandPink")
     static let brandBlue = Color("BrandBlue")
     static let brandGreen = Color("BrandGreen")
+    /// Repère de recherche cartographique, volontairement hors palettes opérateur.
+    static let searchPin = dynamicTint(
+        light: (0x7C, 0x3A, 0xED, 1.0), dark: (0xA7, 0x8B, 0xFA, 1.0)
+    )
 
     // MARK: Surfaces
     /// Surfaces — DYNAMIQUES depuis l'ajout du mode « Noir intense (OLED) ».

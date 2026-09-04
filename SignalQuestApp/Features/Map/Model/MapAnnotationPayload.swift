@@ -211,7 +211,7 @@ extension MapAnnotationPayload {
             clusterCount: nil,
             azimuths: [],
             showsAzimuths: false,
-            tint: SQColor.brandRed,
+            tint: SQColor.searchPin,
             glyphOverride: "mappin.circle.fill",
             isSearchPin: true
         )
