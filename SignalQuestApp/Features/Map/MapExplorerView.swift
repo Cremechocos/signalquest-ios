@@ -2350,32 +2350,11 @@ struct MapExplorerView: View {
     }
 
     private var searchPinPayload: MapAnnotationPayload? {
-        guard let latitude = Double(searchPinLatitude),
-              let longitude = Double(searchPinLongitude),
-              latitude.isFinite,
-              longitude.isFinite,
-              (-90.0...90.0).contains(latitude),
-              (-180.0...180.0).contains(longitude),
-              latitude != 0 || longitude != 0
-        else { return nil }
-        return MapAnnotationPayload(
-            id: "searched-place-pin",
-            // Le type ne participe pas aux filtres : `isSearchPin` le distingue
-            // de tout site communautaire au rendu et à l'accessibilité.
-            kind: .customSite,
-            title: searchPinTitle.isEmpty ? "Lieu recherché" : searchPinTitle,
-            subtitle: searchPinSubtitle,
-            coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
-            metric: nil,
-            backendId: nil,
-            details: nil,
-            antennaId: nil,
-            clusterCount: nil,
-            azimuths: [],
-            showsAzimuths: false,
-            tint: SQColor.brandRed,
-            glyphOverride: "mappin.circle.fill",
-            isSearchPin: true
+        MapAnnotationPayload.searchPin(
+            latitudeText: searchPinLatitude,
+            longitudeText: searchPinLongitude,
+            title: searchPinTitle,
+            subtitle: searchPinSubtitle
         )
     }
 

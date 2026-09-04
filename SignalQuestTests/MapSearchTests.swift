@@ -82,4 +82,42 @@ final class MapSearchTests: XCTestCase {
             }
         }
     }
+
+    func testSelectedPlaceBuildsASeparateSearchPin() throws {
+        let pin = try XCTUnwrap(
+            MapAnnotationPayload.searchPin(
+                latitudeText: "50.62925",
+                longitudeText: "3.057256",
+                title: "Lille",
+                subtitle: "Nord"
+            )
+        )
+
+        XCTAssertEqual(pin.id, "searched-place-pin")
+        XCTAssertEqual(pin.coordinate.latitude, 50.62925, accuracy: 0.0000001)
+        XCTAssertEqual(pin.coordinate.longitude, 3.057256, accuracy: 0.0000001)
+        XCTAssertEqual(pin.title, "Lille")
+        XCTAssertEqual(pin.subtitle, "Nord")
+        XCTAssertEqual(pin.glyphOverride, "mappin.circle.fill")
+        XCTAssertTrue(pin.isSearchPin)
+    }
+
+    func testClearedOrInvalidCoordinatesDoNotBuildASearchPin() {
+        XCTAssertNil(
+            MapAnnotationPayload.searchPin(
+                latitudeText: "",
+                longitudeText: "",
+                title: "",
+                subtitle: ""
+            )
+        )
+        XCTAssertNil(
+            MapAnnotationPayload.searchPin(
+                latitudeText: "95",
+                longitudeText: "3",
+                title: "Invalide",
+                subtitle: ""
+            )
+        )
+    }
 }
