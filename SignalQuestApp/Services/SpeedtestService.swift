@@ -739,12 +739,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         progress?(SpeedtestLiveProgress(phase: .download, fraction: 0, serverName: serverName, stage: "preparation", usefulElapsedSeconds: 0))
 
         let dlSamplesBox = SpeedtestSamplesBox()
-        let dlLiveSampler = SpeedtestLiveSampler()
+        let dlLiveSampler = SpeedtestPhaseLiveSampler(showsWarmupRate: true)
         let dlState = ProgressState()
         let usefulDuration = Double(durationSeconds)
-        /// Octets et temps cumulés pendant l'omit — permettent au live sampler
-        /// de voir un flux continu (omit + utile) pour une aiguille sans saut.
-        let dlOmitBridge = OmitBridge()
         // Boîte GRAPHE : timeline complète (grâce [0, omit] + utile décalé de
         // l'omit) en fenêtres fines — la courbe de partage montre le test en
         // totalité, montée en charge comprise. Les stats restent sur l'utile.
@@ -795,9 +792,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             knownOpenPorts: endpoint.openPorts,
             onProgress: { @Sendable bytes, elapsed in
                 let elapsedMs = elapsed * 1000.0
-                // Flux continu : omit + utile → aiguille sans discontinuité.
-                let bridged = dlOmitBridge.bridged(usefulBytes: bytes, usefulMs: elapsedMs)
-                let needleMbps = dlLiveSampler.observe(totalBytes: bridged.totalBytes, elapsedMs: bridged.totalMs)
+                let needleMbps = dlLiveSampler.observeUseful(totalBytes: bytes, elapsedMs: elapsedMs)
                 let averageMbps = (Double(bytes) * 8.0 / 1_000_000.0) / max(0.1, elapsed)
                 if let interval = dlState.interval(bytes: bytes, time: elapsedMs) {
                     dlSamplesBox.append(start: interval.start, end: interval.end, bytes: interval.bytes)
@@ -815,12 +810,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             },
             onWarmup: { @Sendable rawBytes, wallSeconds in
                 let wallMs = wallSeconds * 1000.0
-                dlOmitBridge.capture(rawBytes: rawBytes, rawMs: wallMs)
                 // Rampe réelle enregistrée pour la courbe (segment de grâce).
                 if let interval = dlGraphWarmupState.interval(bytes: rawBytes, time: wallMs) {
                     dlGraphBox.append(start: interval.start, end: interval.end, bytes: interval.bytes)
                 }
-                let needleMbps = dlLiveSampler.observe(totalBytes: rawBytes, elapsedMs: wallMs)
+                let needleMbps = dlLiveSampler.observeWarmup(totalBytes: rawBytes, elapsedMs: wallMs)
                 progress?(SpeedtestLiveProgress(
                     phase: .download,
                     currentMbps: needleMbps,
@@ -833,7 +827,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             },
             onPortAttempt: { @Sendable _, attempt in
                 dlSamplesBox.reset(); dlGraphBox.reset(); dlState.reset(); dlGraphWarmupState.reset()
-                dlLiveSampler.reset(); dlOmitBridge.reset()
+                dlLiveSampler.reset()
                 progress?(SpeedtestLiveProgress(phase: .download, fraction: 0, serverName: serverName, stage: attempt > 0 ? "reconnecting" : "preparation", usefulElapsedSeconds: 0))
             }
             )
@@ -926,9 +920,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let contextTask = resultContextTask(pathStatus: pathStatus, location: location)
 
         let ulSamplesBox = SpeedtestSamplesBox()
-        let ulLiveSampler = SpeedtestLiveSampler()
+        let ulLiveSampler = SpeedtestPhaseLiveSampler(showsWarmupRate: false)
         let ulState = ProgressState()
-        let ulOmitBridge = OmitBridge()
         let ulGraphBox = SpeedtestSamplesBox()
         let ulGraphWarmupState = ProgressState()
 
@@ -998,8 +991,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                         knownOpenPorts: endpoint.openPorts,
                         onProgress: { @Sendable bytes, elapsed in
                             let elapsedMs = elapsed * 1000.0
-                            let bridged = ulOmitBridge.bridged(usefulBytes: bytes, usefulMs: elapsedMs)
-                            let needleMbps = ulLiveSampler.observe(totalBytes: bridged.totalBytes, elapsedMs: bridged.totalMs)
+                            let needleMbps = ulLiveSampler.observeUseful(totalBytes: bytes, elapsedMs: elapsedMs)
                             let averageMbps = (Double(bytes) * 8.0 / 1_000_000.0) / max(0.1, elapsed)
                             if let interval = ulState.interval(bytes: bytes, time: elapsedMs) {
                                 ulSamplesBox.append(start: interval.start, end: interval.end, bytes: interval.bytes)
@@ -1017,11 +1009,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                         },
                         onWarmup: { @Sendable rawBytes, wallSeconds in
                             let wallMs = wallSeconds * 1000.0
-                            ulOmitBridge.capture(rawBytes: rawBytes, rawMs: wallMs)
                             if let interval = ulGraphWarmupState.interval(bytes: rawBytes, time: wallMs) {
                                 ulGraphBox.append(start: interval.start, end: interval.end, bytes: interval.bytes)
                             }
-                            let needleMbps = ulLiveSampler.observe(totalBytes: rawBytes, elapsedMs: wallMs)
+                            let needleMbps = ulLiveSampler.observeWarmup(totalBytes: rawBytes, elapsedMs: wallMs)
                             progress?(SpeedtestLiveProgress(
                                 phase: .upload,
                                 currentMbps: needleMbps,
@@ -1034,7 +1025,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                         },
                         onPortAttempt: { @Sendable _, attempt in
                             ulSamplesBox.reset(); ulGraphBox.reset(); ulState.reset(); ulGraphWarmupState.reset()
-                            ulLiveSampler.reset(); ulOmitBridge.reset()
+                            ulLiveSampler.reset()
                             progress?(SpeedtestLiveProgress(phase: .upload, fraction: 0, serverName: serverName, stage: attempt > 0 ? "reconnecting" : "preparation", usefulElapsedSeconds: 0))
                         }
                     )
@@ -3926,35 +3917,30 @@ class SafeCounter: @unchecked Sendable {
     }
 }
 
-/// Pont de continuité omit → utile pour le `SpeedtestLiveSampler`.
-/// Pendant l'omit le live sampler reçoit les octets bruts ; quand la phase
-/// utile démarre, les octets repartent de zéro (post-omit). L'OmitBridge
-/// ajoute l'offset omit aux valeurs utiles pour que le sampler voie un flux
-/// **continu** et que l'aiguille ne saute pas à zéro puis remonte.
-final class OmitBridge: @unchecked Sendable {
-    struct Bridged: Sendable { let totalBytes: Int; let totalMs: Double }
+/// Separate display windows for warmup and useful bytes. The useful window and
+/// its smoothing always start at the observed measurement boundary. Warmup upload
+/// writes can fill local TCP buffers, so their rate is not shown as throughput.
+final class SpeedtestPhaseLiveSampler: Sendable {
+    private let warmupSampler: SpeedtestLiveSampler
+    private let usefulSampler: SpeedtestLiveSampler
+    private let showsWarmupRate: Bool
 
-    private let lock = NSLock()
-    private var rawBytes: Int = 0
-    private var rawMs: Double = 0
-
-    func reset() { lock.lock(); rawBytes = 0; rawMs = 0; lock.unlock() }
-
-    /// À appeler depuis `onWarmup` avec les octets bruts cumulés.
-    func capture(rawBytes: Int, rawMs: Double) {
-        lock.lock()
-        self.rawBytes = rawBytes
-        self.rawMs = rawMs
-        lock.unlock()
+    init(showsWarmupRate: Bool, smoothing: Double = 0.35) {
+        self.showsWarmupRate = showsWarmupRate
+        warmupSampler = SpeedtestLiveSampler(smoothing: smoothing)
+        usefulSampler = SpeedtestLiveSampler(smoothing: smoothing)
     }
 
-    /// À appeler depuis `onProgress` : ajoute l'offset omit aux valeurs utiles.
-    func bridged(usefulBytes: Int, usefulMs: Double) -> Bridged {
-        lock.lock()
-        let b = rawBytes
-        let m = rawMs
-        lock.unlock()
-        return Bridged(totalBytes: b + usefulBytes, totalMs: m + usefulMs)
+    func reset() { warmupSampler.reset(); usefulSampler.reset() }
+
+    func observeWarmup(totalBytes: Int, elapsedMs: Double) -> Double {
+        // Keep traffic accounting, including the observed closing warmup snapshot.
+        let rate = warmupSampler.observe(totalBytes: totalBytes, elapsedMs: elapsedMs)
+        return showsWarmupRate ? rate : 0
+    }
+
+    func observeUseful(totalBytes: Int, elapsedMs: Double) -> Double {
+        usefulSampler.observe(totalBytes: totalBytes, elapsedMs: elapsedMs)
     }
 }
 
@@ -4550,7 +4536,7 @@ actor IPerf3Runner {
                     }
                     guard isTestRunning.value, !Task.isCancelled else { return }
                     let omitSnapshot = totalBytesCounter.markMeasurementStart()
-                    // The bridge receives the actual byte/time boundary, not the previous tick.
+                    // Warmup traffic includes the actual byte/time boundary, not just the previous tick.
                     warmupHandler?(omitSnapshot.bytes, omitSnapshot.timestamp - start)
                     let bytesAtOmit = omitSnapshot.bytes
                     if omitBytesCounter.value == 0, bytesAtOmit > 0 {

@@ -375,3 +375,36 @@ extension SpeedtestV6ContractTests {
         do { _ = try await service.details(id: "private-test"); XCTFail("Response survived token owner change") } catch { }
     }
 }
+
+
+extension SpeedtestV6ContractTests {
+    func testUploadWarmupIsNotDisplayedAndUsefulWindowStartsWithoutWarmupBytes() {
+        let sampler = SpeedtestPhaseLiveSampler(showsWarmupRate: false)
+        let trafficBefore = SpeedtestDataMeter.shared.bytes
+        for tick in 1...20 {
+            XCTAssertEqual(sampler.observeWarmup(totalBytes: tick * 5_943_750, elapsedMs: Double(tick) * 150), 0)
+        }
+        // 317 Mbps of local warmup writes must not pollute the first useful 62 Mbps.
+        XCTAssertEqual(sampler.observeUseful(totalBytes: 1_162_500, elapsedMs: 150), 62, accuracy: 0.001)
+        XCTAssertEqual(sampler.observeUseful(totalBytes: 7_750_000, elapsedMs: 1000), 62, accuracy: 0.001)
+        XCTAssertEqual(SpeedtestDataMeter.shared.bytes - trafficBefore, 118_875_000 + 7_750_000)
+    }
+
+    func testDownloadWarmupCanDisplayRateButNeverEntersUsefulWindow() {
+        let sampler = SpeedtestPhaseLiveSampler(showsWarmupRate: true)
+        XCTAssertEqual(sampler.observeWarmup(totalBytes: 39_625_000, elapsedMs: 1000), 317, accuracy: 0.001)
+        XCTAssertEqual(sampler.observeUseful(totalBytes: 1_162_500, elapsedMs: 150), 62, accuracy: 0.001)
+        sampler.reset()
+        XCTAssertEqual(sampler.observeWarmup(totalBytes: 125_000_000, elapsedMs: 1000), 1000, accuracy: 0.001)
+        XCTAssertEqual(sampler.observeUseful(totalBytes: 468_750, elapsedMs: 150), 25, accuracy: 0.001)
+    }
+
+    func testUsefulLiveRemainsRecentThroughputAfterWarmup() {
+        let sampler = SpeedtestPhaseLiveSampler(showsWarmupRate: false, smoothing: 1)
+        _ = sampler.observeWarmup(totalBytes: 100_000_000, elapsedMs: 1000)
+        _ = sampler.observeUseful(totalBytes: 7_750_000, elapsedMs: 1000)
+        // The second useful second is 100 Mbps, though the cumulative mean is 81.
+        XCTAssertEqual(sampler.observeUseful(totalBytes: 20_250_000, elapsedMs: 2000), 100, accuracy: 0.001)
+        XCTAssertEqual(sampler.observeUseful(totalBytes: 20_250_000, elapsedMs: 3000), 0, accuracy: 0.001)
+    }
+}
