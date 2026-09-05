@@ -124,10 +124,12 @@ struct SQShareCardTheme {
 /// fait en amont, le rendu ne décide de rien.
 struct SQShareCardModel {
     struct Graph {
-        /// ≤ 32 points, jamais vide.
+        /// Real samples; empty means the historical curve is unavailable.
         let points: [Double]
         let localMax: Double
         let accentColor: UIColor
+        var normalizedTimes: [Double]? = nil
+        var durationSeconds: Double? = nil
     }
 
     struct StatBlock {
@@ -137,6 +139,7 @@ struct SQShareCardModel {
         let maxValue: String
         let labelColor: UIColor
         let graph: Graph
+        var maxUnit: String? = nil
     }
 
     struct UnderLoadRow {
@@ -282,7 +285,7 @@ enum SQShareCardRenderer {
         let mutedAttrs = attributes(SQShareFonts.mono(size: 12.5 * s, weight: 400), t.textSecondary)
         let valueAttrs = attributes(SQShareFonts.mono(size: 12.5 * s, weight: 700), t.textPrimary)
         let segLabel = "MAX "
-        let segUnit = " \(block.unit)"
+        let segUnit = " \(block.maxUnit ?? block.unit)"
         let totalW = segLabel.size(withAttributes: mutedAttrs).width
             + block.maxValue.size(withAttributes: valueAttrs).width
             + segUnit.size(withAttributes: mutedAttrs).width
@@ -316,7 +319,18 @@ enum SQShareCardRenderer {
         cg.restoreGState()
 
         let points = graph.points
-        guard points.count >= 2, graph.localMax > 0 else { return }
+        let captionAttrs = attributes(SQShareFonts.mono(size: 10 * s, weight: 400), t.textSecondary)
+        guard points.count >= 2, graph.localMax > 0 else {
+            draw(String(localized: "Courbe indisponible"), attrs: captionAttrs, x: rect.minX + 8 * s, baseline: rect.midY)
+            return
+        }
+        let caption: String
+        if let duration = graph.durationSeconds {
+            caption = String(localized: "Débit récent") + " · 0–" + String(format: "%.1f", locale: Locale.autoupdatingCurrent, duration) + " s"
+        } else {
+            caption = String(localized: "Courbe historique sans horodatage")
+        }
+        draw(caption, attrs: captionAttrs, x: rect.minX + 8 * s, baseline: rect.maxY + 16 * s)
         let padXInner = 8 * s
         let padY = 5 * s
         let innerW = rect.width - 2 * padXInner
@@ -325,7 +339,8 @@ enum SQShareCardRenderer {
 
         let path = CGMutablePath()
         for (index, value) in points.enumerated() {
-            let x = rect.minX + padXInner + CGFloat(index) * stepX
+            let fraction = graph.normalizedTimes.flatMap { index < $0.count ? $0[index] : nil }
+            let x = rect.minX + padXInner + (fraction.map { CGFloat($0) * innerW } ?? CGFloat(index) * stepX)
             let ratio = CGFloat((value / graph.localMax).clampedUnit)
             let y = rect.minY + padY + innerH - ratio * innerH
             index == 0 ? path.move(to: CGPoint(x: x, y: y)) : path.addLine(to: CGPoint(x: x, y: y))

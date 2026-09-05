@@ -30,14 +30,14 @@ struct SpeedtestTriMetric: View {
             cell(
                 title: "Réception",
                 value: mbpsText(downloadMbps),
-                unit: "Mbps",
+                unit: SpeedtestDetailContent.formatSpeedParts(downloadMbps).unit,
                 state: state(for: .download),
                 quality: mbpsQuality(downloadMbps)
             )
             cell(
                 title: "Envoi",
                 value: mbpsText(uploadMbps),
-                unit: "Mbps",
+                unit: SpeedtestDetailContent.formatSpeedParts(uploadMbps).unit,
                 state: state(for: .upload),
                 quality: mbpsQuality(uploadMbps)
             )
@@ -48,7 +48,7 @@ struct SpeedtestTriMetric: View {
     }
 
     var pingMsValue: Double? {
-        let value = result?.pingMinMs ?? progress.pingFinalMs ?? progress.pingLiveMs
+        let value = result?.primaryPingMs ?? progress.pingFinalMs ?? progress.pingLiveMs
         guard let value, value.isFinite, value >= 0 else { return nil }
         return value
     }
@@ -85,9 +85,7 @@ struct SpeedtestTriMetric: View {
     /// Valeur compacte ; l'unité reste visible dans chaque carte, y compris
     /// lorsque la mesure n'a pas encore commencé.
     func mbpsText(_ value: Double?) -> String {
-        guard let value, value.isFinite, value > 0 else { return "—" }
-        if value >= 100 { return "\(Int(value.rounded()))" }
-        return String(format: "%.1f", value)
+        SpeedtestDetailContent.formatSpeedParts(value).value
     }
 
     enum CellState { case pending, active, done }

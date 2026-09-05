@@ -1,0 +1,1535 @@
+{
+  "schemaVersion": 1,
+  "methodologyVersion": 6,
+  "cases": [
+    {
+      "name": "constant-1100-150ms",
+      "startMs": 0,
+      "endMs": 15000,
+      "samples": [
+        {
+          "startMs": 0,
+          "endMs": 150,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 150,
+          "endMs": 300,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 300,
+          "endMs": 450,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 450,
+          "endMs": 600,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 600,
+          "endMs": 750,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 750,
+          "endMs": 900,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 900,
+          "endMs": 1050,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 1050,
+          "endMs": 1200,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 1200,
+          "endMs": 1350,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 1350,
+          "endMs": 1500,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 1500,
+          "endMs": 1650,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 1650,
+          "endMs": 1800,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 1800,
+          "endMs": 1950,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 1950,
+          "endMs": 2100,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 2100,
+          "endMs": 2250,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 2250,
+          "endMs": 2400,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 2400,
+          "endMs": 2550,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 2550,
+          "endMs": 2700,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 2700,
+          "endMs": 2850,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 2850,
+          "endMs": 3000,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 3000,
+          "endMs": 3150,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 3150,
+          "endMs": 3300,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 3300,
+          "endMs": 3450,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 3450,
+          "endMs": 3600,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 3600,
+          "endMs": 3750,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 3750,
+          "endMs": 3900,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 3900,
+          "endMs": 4050,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 4050,
+          "endMs": 4200,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 4200,
+          "endMs": 4350,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 4350,
+          "endMs": 4500,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 4500,
+          "endMs": 4650,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 4650,
+          "endMs": 4800,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 4800,
+          "endMs": 4950,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 4950,
+          "endMs": 5100,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 5100,
+          "endMs": 5250,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 5250,
+          "endMs": 5400,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 5400,
+          "endMs": 5550,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 5550,
+          "endMs": 5700,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 5700,
+          "endMs": 5850,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 5850,
+          "endMs": 6000,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 6000,
+          "endMs": 6150,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 6150,
+          "endMs": 6300,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 6300,
+          "endMs": 6450,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 6450,
+          "endMs": 6600,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 6600,
+          "endMs": 6750,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 6750,
+          "endMs": 6900,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 6900,
+          "endMs": 7050,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 7050,
+          "endMs": 7200,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 7200,
+          "endMs": 7350,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 7350,
+          "endMs": 7500,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 7500,
+          "endMs": 7650,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 7650,
+          "endMs": 7800,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 7800,
+          "endMs": 7950,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 7950,
+          "endMs": 8100,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 8100,
+          "endMs": 8250,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 8250,
+          "endMs": 8400,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 8400,
+          "endMs": 8550,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 8550,
+          "endMs": 8700,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 8700,
+          "endMs": 8850,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 8850,
+          "endMs": 9000,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 9000,
+          "endMs": 9150,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 9150,
+          "endMs": 9300,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 9300,
+          "endMs": 9450,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 9450,
+          "endMs": 9600,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 9600,
+          "endMs": 9750,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 9750,
+          "endMs": 9900,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 9900,
+          "endMs": 10050,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 10050,
+          "endMs": 10200,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 10200,
+          "endMs": 10350,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 10350,
+          "endMs": 10500,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 10500,
+          "endMs": 10650,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 10650,
+          "endMs": 10800,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 10800,
+          "endMs": 10950,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 10950,
+          "endMs": 11100,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 11100,
+          "endMs": 11250,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 11250,
+          "endMs": 11400,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 11400,
+          "endMs": 11550,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 11550,
+          "endMs": 11700,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 11700,
+          "endMs": 11850,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 11850,
+          "endMs": 12000,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 12000,
+          "endMs": 12150,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 12150,
+          "endMs": 12300,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 12300,
+          "endMs": 12450,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 12450,
+          "endMs": 12600,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 12600,
+          "endMs": 12750,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 12750,
+          "endMs": 12900,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 12900,
+          "endMs": 13050,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 13050,
+          "endMs": 13200,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 13200,
+          "endMs": 13350,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 13350,
+          "endMs": 13500,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 13500,
+          "endMs": 13650,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 13650,
+          "endMs": 13800,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 13800,
+          "endMs": 13950,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 13950,
+          "endMs": 14100,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 14100,
+          "endMs": 14250,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 14250,
+          "endMs": 14400,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 14400,
+          "endMs": 14550,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 14550,
+          "endMs": 14700,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 14700,
+          "endMs": 14850,
+          "bytes": 20625000
+        },
+        {
+          "startMs": 14850,
+          "endMs": 15000,
+          "bytes": 20625000
+        }
+      ],
+      "averageMbps": 1100.0,
+      "maxMbps": 1100.0,
+      "p90Mbps": 1100.0,
+      "p95Mbps": 1100.0
+    },
+    {
+      "name": "constant-irregular-clock-origin",
+      "startMs": 9876543,
+      "endMs": 9892943,
+      "samples": [
+        {
+          "startMs": 9876543,
+          "endMs": 9876656,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9876656,
+          "endMs": 9876863,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9876863,
+          "endMs": 9877012,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9877012,
+          "endMs": 9877363,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9877363,
+          "endMs": 9877476,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9877476,
+          "endMs": 9877683,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9877683,
+          "endMs": 9877832,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9877832,
+          "endMs": 9878183,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9878183,
+          "endMs": 9878296,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9878296,
+          "endMs": 9878503,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9878503,
+          "endMs": 9878652,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9878652,
+          "endMs": 9879003,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9879003,
+          "endMs": 9879116,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9879116,
+          "endMs": 9879323,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9879323,
+          "endMs": 9879472,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9879472,
+          "endMs": 9879823,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9879823,
+          "endMs": 9879936,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9879936,
+          "endMs": 9880143,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9880143,
+          "endMs": 9880292,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9880292,
+          "endMs": 9880643,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9880643,
+          "endMs": 9880756,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9880756,
+          "endMs": 9880963,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9880963,
+          "endMs": 9881112,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9881112,
+          "endMs": 9881463,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9881463,
+          "endMs": 9881576,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9881576,
+          "endMs": 9881783,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9881783,
+          "endMs": 9881932,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9881932,
+          "endMs": 9882283,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9882283,
+          "endMs": 9882396,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9882396,
+          "endMs": 9882603,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9882603,
+          "endMs": 9882752,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9882752,
+          "endMs": 9883103,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9883103,
+          "endMs": 9883216,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9883216,
+          "endMs": 9883423,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9883423,
+          "endMs": 9883572,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9883572,
+          "endMs": 9883923,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9883923,
+          "endMs": 9884036,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9884036,
+          "endMs": 9884243,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9884243,
+          "endMs": 9884392,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9884392,
+          "endMs": 9884743,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9884743,
+          "endMs": 9884856,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9884856,
+          "endMs": 9885063,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9885063,
+          "endMs": 9885212,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9885212,
+          "endMs": 9885563,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9885563,
+          "endMs": 9885676,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9885676,
+          "endMs": 9885883,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9885883,
+          "endMs": 9886032,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9886032,
+          "endMs": 9886383,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9886383,
+          "endMs": 9886496,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9886496,
+          "endMs": 9886703,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9886703,
+          "endMs": 9886852,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9886852,
+          "endMs": 9887203,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9887203,
+          "endMs": 9887316,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9887316,
+          "endMs": 9887523,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9887523,
+          "endMs": 9887672,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9887672,
+          "endMs": 9888023,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9888023,
+          "endMs": 9888136,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9888136,
+          "endMs": 9888343,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9888343,
+          "endMs": 9888492,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9888492,
+          "endMs": 9888843,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9888843,
+          "endMs": 9888956,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9888956,
+          "endMs": 9889163,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9889163,
+          "endMs": 9889312,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9889312,
+          "endMs": 9889663,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9889663,
+          "endMs": 9889776,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9889776,
+          "endMs": 9889983,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9889983,
+          "endMs": 9890132,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9890132,
+          "endMs": 9890483,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9890483,
+          "endMs": 9890596,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9890596,
+          "endMs": 9890803,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9890803,
+          "endMs": 9890952,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9890952,
+          "endMs": 9891303,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9891303,
+          "endMs": 9891416,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9891416,
+          "endMs": 9891623,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9891623,
+          "endMs": 9891772,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9891772,
+          "endMs": 9892123,
+          "bytes": 48262500
+        },
+        {
+          "startMs": 9892123,
+          "endMs": 9892236,
+          "bytes": 15537500
+        },
+        {
+          "startMs": 9892236,
+          "endMs": 9892443,
+          "bytes": 28462500
+        },
+        {
+          "startMs": 9892443,
+          "endMs": 9892592,
+          "bytes": 20487500
+        },
+        {
+          "startMs": 9892592,
+          "endMs": 9892943,
+          "bytes": 48262500
+        }
+      ],
+      "averageMbps": 1100.0,
+      "maxMbps": 1100.0,
+      "p90Mbps": 1100.0,
+      "p95Mbps": 1100.0
+    },
+    {
+      "name": "burst-600ms",
+      "startMs": 0,
+      "endMs": 10000,
+      "samples": [
+        {
+          "startMs": 0,
+          "endMs": 150,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 150,
+          "endMs": 300,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 300,
+          "endMs": 450,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 450,
+          "endMs": 600,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 600,
+          "endMs": 750,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 750,
+          "endMs": 900,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 900,
+          "endMs": 1050,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 1050,
+          "endMs": 1200,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 1200,
+          "endMs": 1350,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 1350,
+          "endMs": 1500,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 1500,
+          "endMs": 1650,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 1650,
+          "endMs": 1800,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 1800,
+          "endMs": 1950,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 1950,
+          "endMs": 2100,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 2100,
+          "endMs": 2250,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 2250,
+          "endMs": 2400,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 2400,
+          "endMs": 2550,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 2550,
+          "endMs": 2700,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 2700,
+          "endMs": 2850,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 2850,
+          "endMs": 3000,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 3000,
+          "endMs": 3150,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 3150,
+          "endMs": 3300,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 3300,
+          "endMs": 3450,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 3450,
+          "endMs": 3600,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 3600,
+          "endMs": 3750,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 3750,
+          "endMs": 3900,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 3900,
+          "endMs": 4050,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 4050,
+          "endMs": 4200,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 4200,
+          "endMs": 4350,
+          "bytes": 15000000
+        },
+        {
+          "startMs": 4350,
+          "endMs": 4500,
+          "bytes": 15000000
+        },
+        {
+          "startMs": 4500,
+          "endMs": 4650,
+          "bytes": 15000000
+        },
+        {
+          "startMs": 4650,
+          "endMs": 4800,
+          "bytes": 15000000
+        },
+        {
+          "startMs": 4800,
+          "endMs": 4950,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 4950,
+          "endMs": 5100,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 5100,
+          "endMs": 5250,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 5250,
+          "endMs": 5400,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 5400,
+          "endMs": 5550,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 5550,
+          "endMs": 5700,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 5700,
+          "endMs": 5850,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 5850,
+          "endMs": 6000,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 6000,
+          "endMs": 6150,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 6150,
+          "endMs": 6300,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 6300,
+          "endMs": 6450,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 6450,
+          "endMs": 6600,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 6600,
+          "endMs": 6750,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 6750,
+          "endMs": 6900,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 6900,
+          "endMs": 7050,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 7050,
+          "endMs": 7200,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 7200,
+          "endMs": 7350,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 7350,
+          "endMs": 7500,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 7500,
+          "endMs": 7650,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 7650,
+          "endMs": 7800,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 7800,
+          "endMs": 7950,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 7950,
+          "endMs": 8100,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 8100,
+          "endMs": 8250,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 8250,
+          "endMs": 8400,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 8400,
+          "endMs": 8550,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 8550,
+          "endMs": 8700,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 8700,
+          "endMs": 8850,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 8850,
+          "endMs": 9000,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 9000,
+          "endMs": 9150,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 9150,
+          "endMs": 9300,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 9300,
+          "endMs": 9450,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 9450,
+          "endMs": 9600,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 9600,
+          "endMs": 9750,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 9750,
+          "endMs": 9900,
+          "bytes": 1875000
+        },
+        {
+          "startMs": 9900,
+          "endMs": 10000,
+          "bytes": 1250000
+        }
+      ],
+      "averageMbps": 142.0,
+      "maxMbps": 240.0,
+      "p90Mbps": 310.0,
+      "p95Mbps": 485.0
+    },
+    {
+      "name": "stall-one-second",
+      "startMs": 0,
+      "endMs": 5000,
+      "samples": [
+        {
+          "startMs": 0,
+          "endMs": 100,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 100,
+          "endMs": 200,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 200,
+          "endMs": 300,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 300,
+          "endMs": 400,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 400,
+          "endMs": 500,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 500,
+          "endMs": 600,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 600,
+          "endMs": 700,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 700,
+          "endMs": 800,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 800,
+          "endMs": 900,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 900,
+          "endMs": 1000,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 1000,
+          "endMs": 1100,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 1100,
+          "endMs": 1200,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 1200,
+          "endMs": 1300,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 1300,
+          "endMs": 1400,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 1400,
+          "endMs": 1500,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 1500,
+          "endMs": 1600,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 1600,
+          "endMs": 1700,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 1700,
+          "endMs": 1800,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 1800,
+          "endMs": 1900,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 1900,
+          "endMs": 2000,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 2000,
+          "endMs": 2100,
+          "bytes": 0
+        },
+        {
+          "startMs": 2100,
+          "endMs": 2200,
+          "bytes": 0
+        },
+        {
+          "startMs": 2200,
+          "endMs": 2300,
+          "bytes": 0
+        },
+        {
+          "startMs": 2300,
+          "endMs": 2400,
+          "bytes": 0
+        },
+        {
+          "startMs": 2400,
+          "endMs": 2500,
+          "bytes": 0
+        },
+        {
+          "startMs": 2500,
+          "endMs": 2600,
+          "bytes": 0
+        },
+        {
+          "startMs": 2600,
+          "endMs": 2700,
+          "bytes": 0
+        },
+        {
+          "startMs": 2700,
+          "endMs": 2800,
+          "bytes": 0
+        },
+        {
+          "startMs": 2800,
+          "endMs": 2900,
+          "bytes": 0
+        },
+        {
+          "startMs": 2900,
+          "endMs": 3000,
+          "bytes": 0
+        },
+        {
+          "startMs": 3000,
+          "endMs": 3100,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 3100,
+          "endMs": 3200,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 3200,
+          "endMs": 3300,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 3300,
+          "endMs": 3400,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 3400,
+          "endMs": 3500,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 3500,
+          "endMs": 3600,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 3600,
+          "endMs": 3700,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 3700,
+          "endMs": 3800,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 3800,
+          "endMs": 3900,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 3900,
+          "endMs": 4000,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 4000,
+          "endMs": 4100,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 4100,
+          "endMs": 4200,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 4200,
+          "endMs": 4300,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 4300,
+          "endMs": 4400,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 4400,
+          "endMs": 4500,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 4500,
+          "endMs": 4600,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 4600,
+          "endMs": 4700,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 4700,
+          "endMs": 4800,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 4800,
+          "endMs": 4900,
+          "bytes": 2500000
+        },
+        {
+          "startMs": 4900,
+          "endMs": 5000,
+          "bytes": 2500000
+        }
+      ],
+      "averageMbps": 160.0,
+      "maxMbps": 200.0,
+      "p90Mbps": 200.0,
+      "p95Mbps": 200.0
+    }
+  ]
+}

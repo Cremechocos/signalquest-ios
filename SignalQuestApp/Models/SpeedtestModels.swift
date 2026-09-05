@@ -598,6 +598,14 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
     let uploadMeasurementSource: String?
     let deviceModel: String?
     let osVersion: String?
+    let measurementTrace: SpeedtestMeasurementTrace?
+    let methodologyVersion: Int?
+    let ownerScopeId: String?
+    let pingServerHost: String?
+    let pingServerPort: Int?
+    let uploadServerHost: String?
+    let uploadServerPort: Int?
+    var primaryPingMs: Double? { methodologyVersion == 6 ? pingMinMs : pingMs }
 
     init(
         id: UUID = UUID(),
@@ -658,7 +666,14 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         uploadGraceWindowCount: Int? = nil,
         uploadMeasurementSource: String? = nil,
         deviceModel: String? = nil,
-        osVersion: String? = nil
+        osVersion: String? = nil,
+        measurementTrace: SpeedtestMeasurementTrace? = nil,
+        methodologyVersion: Int? = nil,
+        ownerScopeId: String? = nil,
+        pingServerHost: String? = nil,
+        pingServerPort: Int? = nil,
+        uploadServerHost: String? = nil,
+        uploadServerPort: Int? = nil
     ) {
         self.id = id
         self.label = label
@@ -719,6 +734,13 @@ struct SpeedtestRunResult: Codable, Identifiable, Equatable {
         self.uploadMeasurementSource = uploadMeasurementSource
         self.deviceModel = deviceModel
         self.osVersion = osVersion
+        self.measurementTrace = measurementTrace
+        self.methodologyVersion = methodologyVersion
+        self.ownerScopeId = ownerScopeId
+        self.pingServerHost = pingServerHost
+        self.pingServerPort = pingServerPort
+        self.uploadServerHost = uploadServerHost
+        self.uploadServerPort = uploadServerPort
     }
 
     var networkDisplayName: String {
@@ -876,7 +898,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
     let clientSubmissionId: String
     let downloadSpeed: Double
     let averageSpeed: Double
-    let maxSpeed: Double
+    let maxSpeed: Double?
     let uploadSpeed: Double?
     let uploadAvg: Double?
     let uploadMax: Double?
@@ -944,6 +966,13 @@ struct SpeedtestSubmission: Encodable, Equatable {
     let engineFallbackReason: String?
     let requestedServerId: String?
 
+    var measurementTrace: SpeedtestMeasurementTrace? = nil
+    var methodologyVersion: Int = 5
+    var pingServerHost: String? = nil
+    var pingServerPort: Int? = nil
+    var uploadServerHost: String? = nil
+    var uploadServerPort: Int? = nil
+
     /// Version de la méthodologie de mesure, commune aux deux plateformes.
     ///
     /// iOS ne l'envoyait pas du tout : filtrer les agrégats dessus aurait donc
@@ -961,9 +990,10 @@ struct SpeedtestSubmission: Encodable, Equatable {
     /// numéro, la rupture dans la série historique serait inexplicable et se
     /// lirait comme une dégradation du réseau. Moyenne, p90 et p95 sont
     /// INCHANGÉES : seul le max est concerné.
-    static let currentMethodologyVersion = 5
+    static let currentMethodologyVersion = 6
 
     enum CodingKeys: String, CodingKey {
+        case measurementTrace, pingServerHost, pingServerPort, uploadServerHost, uploadServerPort
         case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, observedPlmn, simPlmn, isRoaming, networkIdentitySource, radioEvidence, marketCode, operatorKey, carrierName, mvnoKey, mvnoName, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort, methodologyVersion, engine, engineFallbackReason, requestedServerId
         case rsrp, rsrq, snr, cellId, pci, tac, enb, gnb, earfcn, nrarfcn, timingAdvance, timingAdvanceSourceTechnology, timingAdvanceSourceCellId, radioSnapshots
         case pingDl, jitterDl, pingUl, jitterUl
@@ -1001,7 +1031,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
             ?? RadioLogPlmn.split(result.observedPlmn)
         var normalizedRadioEvidence = result.radioEvidence
         normalizedRadioEvidence?.observedPlmn = servingPlmn.map { $0.mcc + $0.mnc }
-        return SpeedtestSubmission(
+        var payload = SpeedtestSubmission(
             clientSubmissionId: result.id.uuidString,
             downloadSpeed: result.downloadAverageMbps,
             averageSpeed: result.downloadAverageMbps,
@@ -1009,7 +1039,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
             // pic réel : c'est un « max robuste » qui écrête les rafales aberrantes
             // pour l'affichage. Le vrai maximum instantané est transmis à part dans
             // `downloadMax`/`downloadPeakMbps` (TEL-14).
-            maxSpeed: result.downloadP90Mbps ?? result.downloadAverageMbps,
+            maxSpeed: result.methodologyVersion == 6 ? result.downloadP90Mbps : (result.downloadP90Mbps ?? result.downloadAverageMbps),
             uploadSpeed: result.uploadAverageMbps,
             uploadAvg: result.uploadAverageMbps,
             uploadMax: result.uploadMaxMbps,
@@ -1021,7 +1051,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
             uploadP90: result.uploadP90Mbps,
             uploadP95: result.uploadP95Mbps,
             uploadPeakMbps: result.uploadMaxMbps,
-            ping: result.pingMinMs ?? result.pingMs,
+            ping: result.primaryPingMs,
             pingAvg: result.pingMs,
             pingMedian: result.pingMedianMs,
             pingMin: result.pingMinMs,
@@ -1069,6 +1099,13 @@ struct SpeedtestSubmission: Encodable, Equatable {
             engineFallbackReason: result.engineFallbackReason,
             requestedServerId: result.requestedServerId
         )
+        payload.pingServerHost = result.pingServerHost
+        payload.pingServerPort = result.pingServerPort
+        payload.uploadServerHost = result.uploadServerHost
+        payload.uploadServerPort = result.uploadServerPort
+        payload.measurementTrace = result.measurementTrace
+        payload.methodologyVersion = result.methodologyVersion ?? 5
+        return payload
     }
 
     func encode(to encoder: Encoder) throws {
@@ -1131,7 +1168,12 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encodeIfPresent(downloadServerId, forKey: .downloadServerId)
         try c.encodeIfPresent(downloadServerCode, forKey: .downloadServerCode)
         try c.encodeIfPresent(downloadServerHost, forKey: .downloadServerHost)
-        try c.encode(Self.currentMethodologyVersion, forKey: .methodologyVersion)
+        try c.encode(methodologyVersion, forKey: .methodologyVersion)
+        try c.encodeIfPresent(measurementTrace, forKey: .measurementTrace)
+        try c.encodeIfPresent(pingServerHost, forKey: .pingServerHost)
+        try c.encodeIfPresent(pingServerPort, forKey: .pingServerPort)
+        try c.encodeIfPresent(uploadServerHost, forKey: .uploadServerHost)
+        try c.encodeIfPresent(uploadServerPort, forKey: .uploadServerPort)
         try c.encodeIfPresent(engine, forKey: .engine)
         try c.encodeIfPresent(engineFallbackReason, forKey: .engineFallbackReason)
         try c.encodeIfPresent(requestedServerId, forKey: .requestedServerId)
@@ -1241,14 +1283,27 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
     let rsrq: Double?
     let snr: Double?
     let timingAdvance: Double?
+    let measurementTrace: SpeedtestMeasurementTrace?
+    let methodologyVersion: Int?
+    let pingServerHost: String?
+    let pingServerPort: Int?
+    let uploadServerHost: String?
+    let uploadServerPort: Int?
 
     enum CodingKeys: String, CodingKey {
+        case measurementTrace, methodologyVersion, pingServerHost, pingServerPort, uploadServerHost, uploadServerPort
         case id, timestamp, createdAt, downloadSpeed, maxSpeed, averageSpeed, downloadAvg, downloadP90, downloadP95, downloadMax, downloadPeakMbps, testDuration, streams, uploadSpeed, uploadAvg, uploadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, server, downloadServerId, downloadServerName, connectionType, networkType, mobileOperator, mcc, mnc, latitude, longitude, address, locationBlurred, deviceType, deviceModel, isPublic, isVisibleOnMap, shareExactLocation, isOwner, rsrp, rsrq, snr, timingAdvance
         case pingDl, jitterDl, pingUl, jitterUl
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        pingServerHost = try c.decodeIfPresent(String.self, forKey: .pingServerHost)
+        pingServerPort = try c.decodeIfPresent(Int.self, forKey: .pingServerPort)
+        uploadServerHost = try c.decodeIfPresent(String.self, forKey: .uploadServerHost)
+        uploadServerPort = try c.decodeIfPresent(Int.self, forKey: .uploadServerPort)
+        measurementTrace = try c.decodeIfPresent(SpeedtestMeasurementTrace.self, forKey: .measurementTrace)
+        methodologyVersion = try c.decodeIfPresent(Int.self, forKey: .methodologyVersion)
         id = c.decodeFlexibleString(forKey: .id) ?? UUID().uuidString
         timestamp = try? c.decodeIfPresent(Date.self, forKey: .timestamp)
         createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt)
