@@ -435,7 +435,7 @@ private struct SpeedtestShareCard: View {
                 labelColor: textSecondary,
                 timedSeries: trace?.recentSeries,
                 timedAverageSeries: trace?.averageSeries,
-                timeOriginMs: trace?.warmupEndOffsetMs
+                timeOriginMs: trace?.sampleStartMs
             )
             .overlay {
                 if series.isEmpty, (avg ?? 0) <= 0 {

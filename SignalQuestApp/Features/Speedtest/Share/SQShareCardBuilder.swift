@@ -169,9 +169,9 @@ enum SQShareCardBuilder {
             // réseau : 300 Mb/s est excellent en 4G et médiocre en 5G.
             accentColor: theme.qualityColor(ratio: average / Swift.max(gaugeMax, 1)),
             normalizedTimes: trace.map { phase in
-                (timed ?? []).map { Double($0.elapsedMs - phase.warmupEndOffsetMs) / Double(max(1, phase.usefulDurationMs)) }
+                (timed ?? []).map { Double($0.elapsedMs - phase.sampleStartMs) / Double(max(1, phase.sampleDurationMs)) }
             },
-            durationSeconds: trace.map { Double($0.usefulDurationMs) / 1000 }
+            durationSeconds: trace.map { Double($0.sampleDurationMs) / 1000 }
         )
     }
 

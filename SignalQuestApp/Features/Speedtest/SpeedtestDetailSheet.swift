@@ -195,7 +195,7 @@ struct SpeedtestDetailContent: View {
                 labelColor: SQColor.labelSecondary,
                 timedSeries: trace?.recentSeries,
                 timedAverageSeries: trace?.averageSeries,
-                timeOriginMs: trace?.warmupEndOffsetMs
+                timeOriginMs: trace?.sampleStartMs
             )
             .frame(height: 108)
             // Alternative non visuelle (A11Y-08) : la courbe de débit n'a aucun
@@ -203,13 +203,12 @@ struct SpeedtestDetailContent: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Self.graphAccessibilityLabel(title: title, average: average, maxValue: maxValue))
             if let trace {
-                if trace.byteSource != trace.sampleByteSource || trace.finalMeasurement?.source == "server-received" {
-                    Text("Courbe et MAX : octets écrits côté client")
-                        .font(.caption).foregroundStyle(SQColor.labelSecondary)
+                ForEach(Self.throughputSourceLabels(trace), id: \.self) { label in
+                    Text(label).font(.caption).foregroundStyle(SQColor.labelSecondary)
                 }
                 Text("Débit récent · fenêtre de 1 s · pointillés : moyenne cumulée")
                     .font(.caption).foregroundStyle(SQColor.labelSecondary)
-                Text("Mesure : \(Double(trace.usefulDurationMs) / 1000, format: .number.precision(.fractionLength(2))) s · MAX sur \(Double(trace.peakWindowMs) / 1000, format: .number.precision(.fractionLength(2))) s")
+                Text("Mesure : \(Double(trace.sampleDurationMs) / 1000, format: .number.precision(.fractionLength(2))) s · MAX sur \(Double(Self.maxWindowMs(trace)) / 1000, format: .number.precision(.fractionLength(2))) s")
                     .font(.caption).foregroundStyle(SQColor.labelSecondary)
             } else if !(series ?? []).isEmpty {
                 Text("Courbe historique sans horodatage")
@@ -323,8 +322,8 @@ struct SpeedtestDetailContent: View {
             if let version = result.methodologyVersion {
                 metaRow("Méthodologie", String(version), icon: "info.circle")
             }
-            if let source = result.uploadMeasurementSource {
-                metaRow("Octets envoi", byteSourceLabel(source), icon: "arrow.up")
+            if let source = Self.resultByteSource(result.measurementTrace?.phases.first(where: { $0.phase == "upload" }), fallback: result.uploadMeasurementSource) {
+                metaRow("Octets envoi", Self.byteSourceLabel(source), icon: "arrow.up")
             }
             if let average = result.pingMs {
                 metaRow("Ping moyen", "\(Self.msText(average)) ms", icon: "timer")
@@ -341,12 +340,39 @@ struct SpeedtestDetailContent: View {
         .sqShadowSoft()
     }
 
-    private func byteSourceLabel(_ source: String) -> String {
+    static func resultByteSource(_ phase: SpeedtestPhaseTrace?, fallback: String?) -> String? {
+        phase?.finalMeasurement?.source ?? fallback ?? phase?.byteSource
+    }
+
+    static func maxByteSource(_ phase: SpeedtestPhaseTrace) -> String {
+        if let receipt = phase.finalMeasurement, receipt.maxMbps != nil { return receipt.source }
+        return phase.sampleByteSource
+    }
+
+    static func maxWindowMs(_ phase: SpeedtestPhaseTrace) -> Int64 {
+        if let receipt = phase.finalMeasurement, receipt.maxMbps != nil { return receipt.peakWindowMs }
+        return phase.peakWindowMs
+    }
+
+    static func throughputSourceLabels(_ phase: SpeedtestPhaseTrace, bundle: Bundle = .main) -> [String] {
+        let curveSource = phase.sampleByteSource
+        let maxSource = maxByteSource(phase)
+        let curveLabel = byteSourceLabel(curveSource, bundle: bundle)
+        if curveSource == maxSource {
+            return [String(localized: "Courbe et MAX : \(curveLabel)", bundle: bundle)]
+        }
+        let maxLabel = byteSourceLabel(maxSource, bundle: bundle)
+        return [String(localized: "Courbe : \(curveLabel)", bundle: bundle),
+                String(localized: "MAX : \(maxLabel)", bundle: bundle)]
+    }
+
+    static func byteSourceLabel(_ source: String, bundle: Bundle = .main) -> String {
         switch source {
-        case "server-received": return String(localized: "Reçus côté serveur")
-        case "client-written": return String(localized: "Écrits côté client")
-        case "client-received": return String(localized: "Reçus côté client")
-        default: return String(localized: "Source inconnue")
+        case "tcp-acknowledged": return String(localized: "Acquittés TCP (en-têtes inclus)", bundle: bundle)
+        case "server-received": return String(localized: "Reçus côté serveur", bundle: bundle)
+        case "client-written": return String(localized: "Écrits côté client", bundle: bundle)
+        case "client-received": return String(localized: "Reçus côté client", bundle: bundle)
+        default: return String(localized: "Source inconnue", bundle: bundle)
         }
     }
 

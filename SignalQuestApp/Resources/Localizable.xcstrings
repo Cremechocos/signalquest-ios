@@ -41566,6 +41566,70 @@
           }
         }
       }
+    },
+    "Acquittés TCP (en-têtes inclus)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acquittés TCP (en-têtes inclus)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TCP acknowledged (headers included)"
+          }
+        }
+      }
+    },
+    "MAX : %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MAX : %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MAX: %@"
+          }
+        }
+      }
+    },
+    "Courbe et MAX : %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Courbe et MAX : %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Curve and MAX: %@"
+          }
+        }
+      }
+    },
+    "Courbe : %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Courbe : %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Curve: %@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -1289,9 +1289,10 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
     let pingServerPort: Int?
     let uploadServerHost: String?
     let uploadServerPort: Int?
+    let uploadMeasurementSource: String?
 
     enum CodingKeys: String, CodingKey {
-        case measurementTrace, methodologyVersion, pingServerHost, pingServerPort, uploadServerHost, uploadServerPort
+        case measurementTrace, methodologyVersion, pingServerHost, pingServerPort, uploadServerHost, uploadServerPort, uploadMeasurementSource
         case id, timestamp, createdAt, downloadSpeed, maxSpeed, averageSpeed, downloadAvg, downloadP90, downloadP95, downloadMax, downloadPeakMbps, testDuration, streams, uploadSpeed, uploadAvg, uploadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, server, downloadServerId, downloadServerName, connectionType, networkType, mobileOperator, mcc, mnc, latitude, longitude, address, locationBlurred, deviceType, deviceModel, isPublic, isVisibleOnMap, shareExactLocation, isOwner, rsrp, rsrq, snr, timingAdvance
         case pingDl, jitterDl, pingUl, jitterUl
     }
@@ -1302,6 +1303,7 @@ struct SpeedtestDetail: Decodable, Identifiable, Equatable {
         pingServerPort = try c.decodeIfPresent(Int.self, forKey: .pingServerPort)
         uploadServerHost = try c.decodeIfPresent(String.self, forKey: .uploadServerHost)
         uploadServerPort = try c.decodeIfPresent(Int.self, forKey: .uploadServerPort)
+        uploadMeasurementSource = try c.decodeIfPresent(String.self, forKey: .uploadMeasurementSource)
         measurementTrace = try c.decodeIfPresent(SpeedtestMeasurementTrace.self, forKey: .measurementTrace)
         methodologyVersion = try c.decodeIfPresent(Int.self, forKey: .methodologyVersion)
         id = c.decodeFlexibleString(forKey: .id) ?? UUID().uuidString

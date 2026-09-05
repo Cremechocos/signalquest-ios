@@ -56,3 +56,8 @@ Archive et export App Store Connect terminés avec code retour 0.
 Cette IPA remplace l'IPA `/tmp/sq-speedtest-v6-ios-148/export/SignalQuest.ipa`, conservée uniquement pour traçabilité.
 
 Aucun commit, push ni upload par cette tâche. La vérification sur iPhone physique reste à effectuer.
+
+
+## Limite complémentaire : écriture locale et ACK TCP
+
+Le correctif de chauffe n'élimine pas l'avance possible du compteur `contentProcessed` sur le drainage TCP. Ce compteur reste `client-written`, même dans la fenêtre utile. L'investigation publique Darwin/Network.framework, ses sondes et la décision de ne pas changer le transport sans preuve physique sont détaillées dans [la note TCP ACK](2026-09-05-ios-tcp-ack-feasibility.md). Aucun débit ACK local n'est déclaré mesuré.

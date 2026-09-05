@@ -225,7 +225,9 @@ struct SignalDetailSheet: View {
     @ViewBuilder
     private func extraMetrics(for signal: SocialSignalSummary) -> some View {
         let speedtestPairs: [(String, String)] = speedtestDetail.map { detail in
-            [
+            let uploadSource = SpeedtestDetailContent.resultByteSource(
+                detail.measurementTrace?.phases.first(where: { $0.phase == "upload" }), fallback: detail.uploadMeasurementSource)
+            return [
                 ("Réseau", [detail.connectionType, detail.networkType].compactMap { $0 }.joined(separator: " / ")),
                 ("Réseau utilisé", signal.servingOperator ?? signal.operator ?? detail.mobileOperator ?? ""),
                 ("SIM", signal.isRoaming == true ? signal.simOperator ?? "" : ""),
@@ -234,6 +236,8 @@ struct SignalDetailSheet: View {
                 ("Ping moyen", SignalFormatters.ms(detail.pingAvg)),
                 ("Ping médian", SignalFormatters.ms(detail.pingMedian)),
                 ("Ping max", SignalFormatters.ms(detail.pingMax)),
+                ("Octets envoi", uploadSource == "tcp-acknowledged"
+                    ? SpeedtestDetailContent.byteSourceLabel("tcp-acknowledged") : ""),
                 ("Position", coordinatesText(lat: detail.latitude, lon: detail.longitude))
             ].filter { !$0.1.isEmpty && $0.1 != "—" }
         } ?? []

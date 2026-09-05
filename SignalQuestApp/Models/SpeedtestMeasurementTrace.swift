@@ -26,14 +26,20 @@ struct SpeedtestPhaseTrace: Codable, Equatable, Sendable {
     let peakWindowMs: Int64
     let samples: [SpeedtestMeasurementInterval]
     var finalMeasurement: SpeedtestFinalMeasurement? = nil
+    /// Optional clock boundaries of the sample counter, independent of payload measurement.
+    var sampleStartOffsetMs: Int64? = nil
+    var sampleEndOffsetMs: Int64? = nil
 
+    var sampleStartMs: Int64 { sampleStartOffsetMs ?? warmupEndOffsetMs }
+    var sampleEndMs: Int64 { sampleEndOffsetMs ?? measurementEndOffsetMs }
+    var sampleDurationMs: Int64 { sampleEndMs - sampleStartMs }
     var usefulDurationMs: Int64 { measurementEndOffsetMs - warmupEndOffsetMs }
     var recentSeries: [SpeedtestTimedRate] { SpeedtestTraceMath.windows(samples, windowMs: liveWindowMs) }
     var averageSeries: [SpeedtestTimedRate] {
         var bytes: Int64 = 0
         return samples.map { sample in
             bytes += sample.bytes
-            return SpeedtestTimedRate(elapsedMs: sample.endMs, mbps: SpeedtestTraceMath.mbps(bytes: Double(bytes), durationMs: sample.endMs - warmupEndOffsetMs))
+            return SpeedtestTimedRate(elapsedMs: sample.endMs, mbps: SpeedtestTraceMath.mbps(bytes: Double(bytes), durationMs: sample.endMs - sampleStartMs))
         }
     }
 }

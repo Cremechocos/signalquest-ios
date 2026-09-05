@@ -408,3 +408,149 @@ extension SpeedtestV6ContractTests {
         XCTAssertEqual(sampler.observeUseful(totalBytes: 20_250_000, elapsedMs: 3000), 0, accuracy: 0.001)
     }
 }
+
+
+extension SpeedtestV6ContractTests {
+    @MainActor
+    func testReceivedTCPAcknowledgedTraceDecodesAndHasFrenchEnglishLabels() throws {
+        let json = #"""
+        {"id":"remote-ack-test","methodologyVersion":6,"uploadMeasurementSource":"tcp-acknowledged","measurementTrace":{
+          "schemaVersion":1,"methodologyVersion":6,"runId":"remote-ack-run","abandonedAttempts":[],
+          "phases":[{"phase":"upload","attemptId":"upload-1","startOffsetMs":0,
+            "warmupEndOffsetMs":0,"measurementEndOffsetMs":1000,"totalEndOffsetMs":1000,
+            "measuredBytes":131072,"totalTransferredBytes":131072,"byteSource":"client-written",
+            "sampleByteSource":"tcp-acknowledged","liveWindowMs":1000,"peakWindowMs":1000,
+            "samples":[{"startMs":0,"endMs":1000,"bytes":102400}],
+            "finalMeasurement":{"bytes":102400,"durationMs":1000,"source":"tcp-acknowledged",
+              "averageMbps":0.8192,"maxMbps":null,"peakWindowMs":1000,"samples":[]}}]}}
+        """#
+        let detail = try JSONDecoder().decode(SpeedtestDetail.self, from: Data(json.utf8))
+        let phase = try XCTUnwrap(detail.measurementTrace?.phases.first)
+        XCTAssertEqual(detail.uploadMeasurementSource, "tcp-acknowledged")
+        XCTAssertEqual(phase.byteSource, "client-written")
+        XCTAssertEqual(phase.finalMeasurement?.source, "tcp-acknowledged")
+        XCTAssertEqual(SpeedtestDetailContent.resultByteSource(phase, fallback: "client-written"), "tcp-acknowledged")
+        XCTAssertEqual(SpeedtestDetailContent.maxByteSource(phase), "tcp-acknowledged")
+        var serverReceipt = phase
+        serverReceipt.finalMeasurement = .init(bytes: 102400, durationMs: 1000, source: "server-received",
+            averageMbps: 0.8192, maxMbps: nil, peakWindowMs: 1000, samples: [])
+        XCTAssertEqual(SpeedtestDetailContent.resultByteSource(serverReceipt, fallback: nil), "server-received")
+        XCTAssertEqual(SpeedtestDetailContent.maxByteSource(serverReceipt), "tcp-acknowledged")
+        XCTAssertEqual(phase.sampleByteSource, "tcp-acknowledged")
+        XCTAssertEqual(phase.measuredBytes, 131072)
+        for (language, expected) in [("fr", "Acquittés TCP (en-têtes inclus)"), ("en", "TCP acknowledged (headers included)")] {
+            let path = try XCTUnwrap(Bundle.main.path(forResource: language, ofType: "lproj"))
+            let bundle = try XCTUnwrap(Bundle(path: path))
+            XCTAssertEqual(SpeedtestDetailContent.byteSourceLabel(try XCTUnwrap(phase.finalMeasurement?.source), bundle: bundle), expected)
+        }
+    }
+}
+
+
+extension SpeedtestV6ContractTests {
+    private func receivedTCPPhase(finalSource: String, finalMax: Double?) -> SpeedtestPhaseTrace {
+        SpeedtestPhaseTrace(phase: "upload", attemptId: "received-upload", startOffsetMs: 0,
+            warmupEndOffsetMs: 0, measurementEndOffsetMs: 3000, totalEndOffsetMs: 3000,
+            measuredBytes: 37_500_000, totalTransferredBytes: 37_500_000, byteSource: "client-written",
+            sampleByteSource: "tcp-acknowledged", liveWindowMs: 1000, peakWindowMs: 1000,
+            samples: [.init(startMs: 0, endMs: 3000, bytes: 37_500_000)],
+            finalMeasurement: .init(bytes: 37_500_000, durationMs: 3000, source: finalSource,
+                averageMbps: 100, maxMbps: finalMax, peakWindowMs: 1000, samples: []))
+    }
+
+    private func localizationBundle(_ language: String) throws -> Bundle {
+        let path = try XCTUnwrap(Bundle.main.path(forResource: language, ofType: "lproj"))
+        return try XCTUnwrap(Bundle(path: path))
+    }
+
+    @MainActor
+    func testVPSCurveTCPAndConfirmedServerMaxHaveSeparateLabels() throws {
+        var phase = receivedTCPPhase(finalSource: "server-received", finalMax: 80)
+        phase.finalMeasurement = .init(bytes: 37_500_000, durationMs: 10000, source: "server-received",
+            averageMbps: 30, maxMbps: 80, peakWindowMs: 3000, samples: [])
+        XCTAssertEqual(SpeedtestDetailContent.maxWindowMs(phase), 3000)
+        XCTAssertEqual(SpeedtestDetailContent.throughputSourceLabels(phase, bundle: try localizationBundle("fr")),
+            ["Courbe : Acquittés TCP (en-têtes inclus)", "MAX : Reçus côté serveur"])
+        XCTAssertEqual(SpeedtestDetailContent.throughputSourceLabels(phase, bundle: try localizationBundle("en")),
+            ["Curve: TCP acknowledged (headers included)", "MAX: Received by the server"])
+    }
+
+    @MainActor
+    func testIPerfCurveTCPAndFallbackMaxTCPHaveOneLabel() throws {
+        let phase = receivedTCPPhase(finalSource: "server-received", finalMax: nil)
+        XCTAssertEqual(SpeedtestDetailContent.maxWindowMs(phase), phase.peakWindowMs)
+        XCTAssertEqual(SpeedtestDetailContent.throughputSourceLabels(phase, bundle: try localizationBundle("fr")),
+            ["Courbe et MAX : Acquittés TCP (en-têtes inclus)"])
+        XCTAssertEqual(SpeedtestDetailContent.throughputSourceLabels(phase, bundle: try localizationBundle("en")),
+            ["Curve and MAX: TCP acknowledged (headers included)"])
+    }
+
+    @MainActor
+    func testCloudflareTCPFinalAndTCPMaxHaveOneLabel() throws {
+        let phase = receivedTCPPhase(finalSource: "tcp-acknowledged", finalMax: 100)
+        XCTAssertEqual(SpeedtestDetailContent.resultByteSource(phase, fallback: "client-written"), "tcp-acknowledged")
+        XCTAssertEqual(SpeedtestDetailContent.throughputSourceLabels(phase, bundle: try localizationBundle("fr")),
+            ["Courbe et MAX : Acquittés TCP (en-têtes inclus)"])
+        XCTAssertEqual(SpeedtestDetailContent.throughputSourceLabels(phase, bundle: try localizationBundle("en")),
+            ["Curve and MAX: TCP acknowledged (headers included)"])
+    }
+}
+
+
+extension SpeedtestV6ContractTests {
+    @MainActor
+    func testOffsetSampleBoundsDriveCurvesWithoutChangingFinalReceipt() throws {
+        let json = #"""
+        {"phase":"upload","attemptId":"offset-samples","startOffsetMs":0,
+         "warmupEndOffsetMs":1000,"measurementEndOffsetMs":13000,"totalEndOffsetMs":14000,
+         "sampleStartOffsetMs":1500,"sampleEndOffsetMs":11500,
+         "measuredBytes":150000000,"totalTransferredBytes":160000000,
+         "byteSource":"client-written","sampleByteSource":"tcp-acknowledged",
+         "liveWindowMs":1000,"peakWindowMs":3000,
+         "samples":[{"startMs":1500,"endMs":2500,"bytes":12500000},
+                    {"startMs":2500,"endMs":11500,"bytes":112500000}],
+         "finalMeasurement":{"bytes":100000000,"durationMs":8000,"source":"server-received",
+             "averageMbps":100,"maxMbps":null,"peakWindowMs":2400,"samples":[]}}
+        """#
+        let phase = try JSONDecoder().decode(SpeedtestPhaseTrace.self, from: Data(json.utf8))
+        XCTAssertEqual(phase.sampleStartOffsetMs, 1500)
+        XCTAssertEqual(phase.sampleEndOffsetMs, 11500)
+        XCTAssertEqual(phase.usefulDurationMs, 12000)
+        XCTAssertEqual(phase.sampleDurationMs, 10000)
+        XCTAssertEqual(phase.finalMeasurement?.durationMs, 8000)
+        XCTAssertEqual(phase.finalMeasurement?.source, "server-received")
+        XCTAssertEqual(SpeedtestDetailContent.maxWindowMs(phase), 3000)
+        for point in phase.averageSeries { XCTAssertEqual(point.mbps, 100, accuracy: 0.001) }
+        for point in phase.recentSeries { XCTAssertEqual(point.mbps, 100, accuracy: 0.001) }
+        let trace = SpeedtestMeasurementTrace(runId: "received-offset-run", phases: [phase], abandonedAttempts: [])
+        let result = SpeedtestRunResult(label: "received", downloadMbps: 100, downloadAverageMbps: 100,
+            downloadMaxMbps: 100, uploadAverageMbps: 100, uploadMaxMbps: 100, durationSeconds: 14,
+            connectionType: .wifi, measurementTrace: trace, methodologyVersion: 6)
+        let graph = SQShareCardBuilder.model(for: result, theme: .light).upload.graph
+        XCTAssertEqual(graph.durationSeconds, 10)
+        XCTAssertEqual(try XCTUnwrap(graph.normalizedTimes?.first), 0.1, accuracy: 0.00001)
+        XCTAssertEqual(try XCTUnwrap(graph.normalizedTimes?.last), 1, accuracy: 0.00001)
+    }
+
+    func testLegacyBoundsFallbackAndLocalIOSTraceDoesNotEmitSampleBounds() throws {
+        let recorder = SpeedtestTraceRecorder()
+        recorder.retain(phase: "upload", id: "local-ios", start: recorder.origin, baseline: recorder.origin + 1,
+            end: recorder.origin + 4, measuredBytes: 37_500_000, totalBytes: 40_000_000,
+            source: "client-written", samples: [.init(startMs: 0, endMs: 1000, bytes: 12_500_000),
+                .init(startMs: 1000, endMs: 3000, bytes: 25_000_000)])
+        let encoded = try JSONEncoder().encode(try XCTUnwrap(recorder.snapshot()))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        let rawPhase = try XCTUnwrap((object["phases"] as? [[String: Any]])?.first)
+        XCTAssertNil(rawPhase["sampleStartOffsetMs"])
+        XCTAssertNil(rawPhase["sampleEndOffsetMs"])
+        let decoded = try JSONDecoder().decode(SpeedtestMeasurementTrace.self, from: encoded)
+        let phase = try XCTUnwrap(decoded.phases.first)
+        XCTAssertNil(phase.sampleStartOffsetMs)
+        XCTAssertNil(phase.sampleEndOffsetMs)
+        XCTAssertEqual(phase.sampleStartMs, phase.warmupEndOffsetMs)
+        XCTAssertEqual(phase.sampleEndMs, phase.measurementEndOffsetMs)
+        XCTAssertEqual(phase.sampleDurationMs, phase.usefulDurationMs)
+        XCTAssertEqual(phase.sampleDurationMs, 3000)
+        XCTAssertEqual(try XCTUnwrap(phase.averageSeries.last).mbps, 100, accuracy: 0.001)
+    }
+}

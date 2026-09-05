@@ -134,7 +134,7 @@ struct DriveSpeedtestDetailSheet: View {
                     accent: Self.speedColor(result.downloadAverageMbps), plotBackground: SQColor.surfaceMuted,
                     gridColor: SQColor.separator, labelColor: SQColor.labelSecondary,
                     timedSeries: trace?.recentSeries, timedAverageSeries: trace?.averageSeries,
-                    timeOriginMs: trace?.warmupEndOffsetMs)
+                    timeOriginMs: trace?.sampleStartMs)
                     .frame(height: 108)
                 if trace == nil {
                     Text("Courbe historique sans horodatage").font(.caption)
