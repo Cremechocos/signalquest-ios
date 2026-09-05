@@ -19,7 +19,7 @@ struct ContinuousSessionAccumulator {
             sumUpload += upload
             uploadCount += 1
         }
-        if let ping = result.pingMinMs ?? result.pingMs {
+        if let ping = result.primaryPingMs {
             minPing = min(minPing, ping)
         }
     }

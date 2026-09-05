@@ -87,12 +87,12 @@ final class SQShareCardBuilderTests: XCTestCase {
     /// Latence héros : min ?: médiane ?: moyenne — convention partagée avec
     /// Android. Un affichage qui glisserait vers la moyenne gonflerait la valeur
     /// mise en avant sur toutes les cartes.
-    func testLatencyHeroPrefersMinThenMedianThenAverage() {
-        XCTAssertEqual(model(result()).latencyValueText, "14")
-        XCTAssertEqual(model(result(pingMin: nil)).latencyValueText, "18")
+    func testLegacyLatencyHeroPreservesHistoricalAverage() {
+        XCTAssertEqual(model(result()).latencyValueText, "24")
+        XCTAssertEqual(model(result(pingMin: nil)).latencyValueText, "24")
         XCTAssertEqual(model(result(pingMin: nil, pingMedian: nil)).latencyValueText, "24")
         XCTAssertEqual(
-            model(result(pingMin: nil, pingMedian: nil, pingAverage: nil)).latencyValueText, "0"
+            model(result(pingMin: nil, pingMedian: nil, pingAverage: nil)).latencyValueText, "—"
         )
     }
 
@@ -106,11 +106,9 @@ final class SQShareCardBuilderTests: XCTestCase {
 
     /// Sous deux points mesurés, la carte trace une ligne PLATE plutôt qu'un
     /// graphe inventé : le trait dit « pas de détail », pas « débit instable ».
-    func testEmptySeriesFallsBackToAFlatLine() {
+    func testEmptySeriesRemainsUnavailable() {
         let graph = model(result(downloadSeries: nil)).download.graph
-        XCTAssertEqual(graph.points.count, 12)
-        XCTAssertEqual(Set(graph.points).count, 1, "la ligne de repli doit être plate")
-        XCTAssertEqual(graph.points.first ?? 0, 770.24, accuracy: 0.01)
+        XCTAssertTrue(graph.points.isEmpty, "Missing historical samples must not become a flat curve")
     }
 
     func testLongSeriesIsDownsampled() {
@@ -251,7 +249,7 @@ final class SQShareCardBuilderTests: XCTestCase {
         )
 
         XCTAssertTrue(text.contains("770 Mbps"))
-        XCTAssertTrue(text.contains("ping 14 ms"))
+        XCTAssertTrue(text.contains("ping 24 ms"))
         XCTAssertTrue(text.contains("#SignalQuest"))
         XCTAssertFalse(text.contains("Orange"))
         XCTAssertFalse(text.contains("Lyon"))

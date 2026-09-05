@@ -17,7 +17,7 @@ struct SpeedtestBurstSummary {
         maxDownload = downloads.max() ?? 0
         let uploads = results.compactMap { $0.uploadAverageMbps }
         avgUpload = uploads.isEmpty ? 0 : uploads.reduce(0, +) / Double(uploads.count)
-        let pings = results.compactMap { $0.pingMinMs ?? $0.pingMs }
+        let pings = results.compactMap { $0.primaryPingMs }
         minPing = pings.min() ?? 0
         self.truncatedAt = truncatedAt
     }

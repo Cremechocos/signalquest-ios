@@ -37,6 +37,7 @@ struct SpeedtestDetailSheet: View {
                             .font(.title3)
                             .foregroundStyle(SQColor.labelSecondary)
                     }
+                    .frame(minWidth: 44, minHeight: 44)
                     .accessibilityLabel("Fermer")
                 }
             }
@@ -138,7 +139,8 @@ struct SpeedtestDetailContent: View {
                 average: result.downloadAverageMbps,
                 maxValue: result.downloadMaxMbps,
                 series: result.downloadSeriesMbps,
-                graceCount: result.downloadGraceWindowCount
+                graceCount: result.downloadGraceWindowCount,
+                trace: result.measurementTrace?.phases.first { $0.phase == "download" }
             )
             speedCard(
                 title: "Envoi",
@@ -146,7 +148,8 @@ struct SpeedtestDetailContent: View {
                 average: result.uploadAverageMbps,
                 maxValue: result.uploadMaxMbps,
                 series: result.uploadSeriesMbps,
-                graceCount: result.uploadGraceWindowCount
+                graceCount: result.uploadGraceWindowCount,
+                trace: result.measurementTrace?.phases.first { $0.phase == "upload" }
             )
         }
     }
@@ -157,7 +160,8 @@ struct SpeedtestDetailContent: View {
         average: Double?,
         maxValue: Double?,
         series: [Double]?,
-        graceCount: Int?
+        graceCount: Int?,
+        trace: SpeedtestPhaseTrace? = nil
     ) -> some View {
         let parts = Self.formatSpeedParts(average)
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
@@ -188,13 +192,28 @@ struct SpeedtestDetailContent: View {
                 accent: accent,
                 plotBackground: SQColor.surfaceMuted,
                 gridColor: SQColor.separator,
-                labelColor: SQColor.labelSecondary
+                labelColor: SQColor.labelSecondary,
+                timedSeries: trace?.recentSeries,
+                timedAverageSeries: trace?.averageSeries,
+                timeOriginMs: trace?.sampleStartMs
             )
             .frame(height: 108)
             // Alternative non visuelle (A11Y-08) : la courbe de débit n'a aucun
             // descripteur accessible, on la résume pour VoiceOver.
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Self.graphAccessibilityLabel(title: title, average: average, maxValue: maxValue))
+            if let trace {
+                ForEach(Self.throughputSourceLabels(trace), id: \.self) { label in
+                    Text(label).font(.caption).foregroundStyle(SQColor.labelSecondary)
+                }
+                Text("Débit récent · fenêtre de 1 s · pointillés : moyenne cumulée")
+                    .font(.caption).foregroundStyle(SQColor.labelSecondary)
+                Text("Mesure : \(Double(trace.sampleDurationMs) / 1000, format: .number.precision(.fractionLength(2))) s · MAX sur \(Double(Self.maxWindowMs(trace)) / 1000, format: .number.precision(.fractionLength(2))) s")
+                    .font(.caption).foregroundStyle(SQColor.labelSecondary)
+            } else if !(series ?? []).isEmpty {
+                Text("Courbe historique sans horodatage")
+                    .font(.caption).foregroundStyle(SQColor.labelSecondary)
+            }
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -230,7 +249,7 @@ struct SpeedtestDetailContent: View {
             columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2),
             spacing: SQSpace.sm
         ) {
-            latencyTile("Ping", value: Self.msText(result.pingMinMs ?? result.pingMs), tint: SQColor.labelSecondary, sub: pingSub)
+            latencyTile("Ping", value: Self.msText(result.primaryPingMs), tint: SQColor.labelSecondary, sub: pingSub)
             latencyTile("Jitter", value: Self.decimalText(result.jitterMs), tint: SQColor.labelSecondary, sub: "au repos")
             latencyTile("Ping chargé ↓", value: Self.msText(result.pingDlMs), tint: SQColor.success, sub: gigue(result.jitterDlMs))
             latencyTile("Ping chargé ↑", value: Self.msText(result.pingUlMs), tint: SQColor.warning, sub: gigue(result.jitterUlMs))
@@ -291,6 +310,27 @@ struct SpeedtestDetailContent: View {
                 Divider().overlay(SQColor.separator)
                 metaRow("Appareil", device, icon: "iphone")
             }
+            if let host = result.downloadServerHost {
+                metaRow("Serveur réception", endpoint(host, result.downloadServerPort), icon: "arrow.down")
+            }
+            if let host = result.uploadServerHost {
+                metaRow("Serveur envoi", endpoint(host, result.uploadServerPort), icon: "arrow.up")
+            }
+            if let host = result.pingServerHost {
+                metaRow("Ancre ping", endpoint(host, result.pingServerPort), icon: "timer")
+            }
+            if let version = result.methodologyVersion {
+                metaRow("Méthodologie", String(version), icon: "info.circle")
+            }
+            if let source = Self.resultByteSource(result.measurementTrace?.phases.first(where: { $0.phase == "upload" }), fallback: result.uploadMeasurementSource) {
+                metaRow("Octets envoi", Self.byteSourceLabel(source), icon: "arrow.up")
+            }
+            if let average = result.pingMs {
+                metaRow("Ping moyen", "\(Self.msText(average)) ms", icon: "timer")
+            }
+            if result.methodologyVersion == nil {
+                metaRow("Ping", String(localized: "Valeur historique"), icon: "clock")
+            }
             if let proto = result.pingProtocol?.trimmedNonEmptyDetail {
                 Divider().overlay(SQColor.separator)
                 metaRow("Ping", "mesuré en \(proto)", icon: "timer")
@@ -298,6 +338,46 @@ struct SpeedtestDetailContent: View {
         }
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         .sqShadowSoft()
+    }
+
+    static func resultByteSource(_ phase: SpeedtestPhaseTrace?, fallback: String?) -> String? {
+        phase?.finalMeasurement?.source ?? fallback ?? phase?.byteSource
+    }
+
+    static func maxByteSource(_ phase: SpeedtestPhaseTrace) -> String {
+        if let receipt = phase.finalMeasurement, receipt.maxMbps != nil { return receipt.source }
+        return phase.sampleByteSource
+    }
+
+    static func maxWindowMs(_ phase: SpeedtestPhaseTrace) -> Int64 {
+        if let receipt = phase.finalMeasurement, receipt.maxMbps != nil { return receipt.peakWindowMs }
+        return phase.peakWindowMs
+    }
+
+    static func throughputSourceLabels(_ phase: SpeedtestPhaseTrace, bundle: Bundle = .main) -> [String] {
+        let curveSource = phase.sampleByteSource
+        let maxSource = maxByteSource(phase)
+        let curveLabel = byteSourceLabel(curveSource, bundle: bundle)
+        if curveSource == maxSource {
+            return [String(localized: "Courbe et MAX : \(curveLabel)", bundle: bundle)]
+        }
+        let maxLabel = byteSourceLabel(maxSource, bundle: bundle)
+        return [String(localized: "Courbe : \(curveLabel)", bundle: bundle),
+                String(localized: "MAX : \(maxLabel)", bundle: bundle)]
+    }
+
+    static func byteSourceLabel(_ source: String, bundle: Bundle = .main) -> String {
+        switch source {
+        case "tcp-acknowledged": return String(localized: "Acquittés TCP (en-têtes inclus)", bundle: bundle)
+        case "server-received": return String(localized: "Reçus côté serveur", bundle: bundle)
+        case "client-written": return String(localized: "Écrits côté client", bundle: bundle)
+        case "client-received": return String(localized: "Reçus côté client", bundle: bundle)
+        default: return String(localized: "Source inconnue", bundle: bundle)
+        }
+    }
+
+    private func endpoint(_ host: String, _ port: Int?) -> String {
+        port.map { "\(host):\($0)" } ?? host
     }
 
     private var deviceLine: String? {

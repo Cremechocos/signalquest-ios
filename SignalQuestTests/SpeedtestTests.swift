@@ -128,7 +128,7 @@ final class SpeedtestTests: XCTestCase {
         let metrics = SpeedtestTriMetric(activePhase: .download, progress: progress, result: nil)
         XCTAssertEqual(metrics.pingText, "21")
         XCTAssertEqual(metrics.mbpsText(metrics.downloadMbps), "198")
-        XCTAssertEqual(metrics.mbpsText(metrics.uploadMbps), "64.2")
+        XCTAssertEqual(metrics.mbpsText(metrics.uploadMbps), SpeedtestDetailSheet.formatSpeedParts(64.2).value)
 
         let dial = SignatureSpeedDial(
             value: 198.4,

@@ -20,7 +20,7 @@ struct SpeedtestView: View {
     // (moyenne cumulée plombée par le démarrage). 14 s laisse la mesure se
     // stabiliser sans allonger excessivement le test. Le drive test garde 10 s
     // (résolution spatiale du trajet).
-    @AppStorage("speedtest_duration_seconds") private var durationSeconds = 14
+    @AppStorage("speedtest_duration_seconds") private var durationSeconds = 10
     @AppStorage("speedtest_streams") private var streams = 16
     @AppStorage("speedtest_reliability_mode") private var reliabilityMode = true
     /// Serveur LibreSpeed choisi manuellement (hostname). Vide = le plus proche.
@@ -318,13 +318,27 @@ struct SpeedtestView: View {
     /// 310 pt sur les iPhone actuels pour laisser respirer la valeur ; repli
     /// proportionnel sur les écrans compacts afin de ne jamais rogner l'arc.
     private var signatureDial: some View {
+        VStack(spacing: SQSpace.xs) {
         SignatureSpeedDial(
             value: gaugeDisplay.value,
             unit: gaugeDisplay.unit,
-            phaseTitle: phase.dialTitle,
+            phaseTitle: liveProgress.stage == "finalizing" ? String(localized: "Finalisation") : phase.dialTitle,
             phase: phase,
             completionLabel: dialCompletionLabel
         )
+        if phase == .download || phase == .upload {
+            Text(liveProgress.stage == "warmup" ? String(localized: "Chauffe") : liveProgress.stage == "reconnecting" ? String(localized: "Reconnexion") : liveProgress.stage == "preparation" ? String(localized: "Préparation") : String(localized: "Mesure"))
+                .font(.caption.weight(.semibold))
+            if let useful = liveProgress.usefulElapsedSeconds {
+                Text("Temps utile : \(useful, format: .number.precision(.fractionLength(1))) s")
+                    .font(.caption).monospacedDigit()
+            }
+            if let total = liveProgress.totalElapsedSeconds {
+                Text("Total : \(total, format: .number.precision(.fractionLength(1))) s")
+                    .font(.caption).foregroundStyle(SQColor.labelSecondary).monospacedDigit()
+            }
+        }
+        }
     }
 
     // MARK: - Header (titre centré + capsule serveur, DA « Crème & Terre cuite »)
@@ -487,7 +501,7 @@ struct SpeedtestView: View {
                 detailItem(label: "DL max", value: speed(result.downloadMaxMbps), highlight: true)
                 detailItem(label: "Envoi moy.", value: speed(result.uploadAverageMbps))
                 detailItem(label: "UL max", value: speed(result.uploadMaxMbps))
-                detailItem(label: "Ping", value: ms(result.pingMinMs ?? result.pingMs), trailing: result.pingProtocol)
+                detailItem(label: "Ping", value: ms(result.primaryPingMs), trailing: result.pingProtocol)
                 detailItem(label: "Jitter", value: ms(result.jitterMs))
                 detailItem(label: "Ping DL", value: ms(result.pingDlMs))
                 detailItem(label: "Jitter DL", value: ms(result.jitterDlMs))
@@ -881,7 +895,7 @@ struct SpeedtestView: View {
     private var gaugeDisplay: (value: Double, unit: String) {
         switch phase {
         case .ping:
-            let value = liveProgress.pingLiveMs ?? liveProgress.pingFinalMs ?? result?.pingMinMs ?? result?.pingMs ?? 0
+            let value = liveProgress.pingLiveMs ?? liveProgress.pingFinalMs ?? result?.primaryPingMs ?? 0
             return (value, "ms")
         case .upload:
             let value = liveProgress.uploadLiveMbps ?? liveProgress.uploadAverageMbps ?? result?.uploadAverageMbps ?? 0
@@ -1019,7 +1033,7 @@ struct SpeedtestView: View {
             currentMbps: measured.downloadAverageMbps,
             downloadAverageMbps: measured.downloadAverageMbps,
             uploadAverageMbps: measured.uploadAverageMbps,
-            pingFinalMs: measured.pingMinMs ?? measured.pingMs,
+            pingFinalMs: measured.primaryPingMs,
             jitterMs: measured.jitterMs,
             pingProtocol: measured.pingProtocol,
             serverName: measured.serverName
@@ -1049,7 +1063,7 @@ struct SpeedtestView: View {
             fraction: 1,
             downloadAverageMbps: measured.downloadAverageMbps,
             uploadAverageMbps: measured.uploadAverageMbps,
-            pingFinalMs: measured.pingMinMs ?? measured.pingMs,
+            pingFinalMs: measured.primaryPingMs,
             jitterMs: measured.jitterMs,
             pingProtocol: measured.pingProtocol,
             serverName: measured.serverName
@@ -1111,7 +1125,7 @@ struct SpeedtestView: View {
                 liveActivity.end(
                     downloadMbps: measured.downloadAverageMbps,
                     uploadMbps: measured.uploadAverageMbps ?? 0,
-                    pingMs: measured.pingMinMs ?? measured.pingMs ?? 0
+                    pingMs: measured.primaryPingMs ?? 0
                 )
                 Haptics.success()
             } catch is CancellationError {
@@ -1468,14 +1482,15 @@ struct SpeedtestView: View {
     }
 
     private func mergeProgress(current: SpeedtestLiveProgress, new: SpeedtestLiveProgress) -> SpeedtestLiveProgress {
-        SpeedtestLiveProgress(
+        let restarting = new.stage == "reconnecting" || new.stage == "preparation"
+        return SpeedtestLiveProgress(
             phase: new.phase,
             currentMbps: new.currentMbps,
             fraction: new.fraction,
-            downloadLiveMbps: new.downloadLiveMbps ?? current.downloadLiveMbps,
-            downloadAverageMbps: new.downloadAverageMbps ?? current.downloadAverageMbps,
-            uploadLiveMbps: new.uploadLiveMbps ?? current.uploadLiveMbps,
-            uploadAverageMbps: new.uploadAverageMbps ?? current.uploadAverageMbps,
+            downloadLiveMbps: new.downloadLiveMbps ?? (restarting && new.phase == .download ? nil : current.downloadLiveMbps),
+            downloadAverageMbps: new.downloadAverageMbps ?? (restarting && new.phase == .download ? nil : current.downloadAverageMbps),
+            uploadLiveMbps: new.uploadLiveMbps ?? (restarting && new.phase == .upload ? nil : current.uploadLiveMbps),
+            uploadAverageMbps: new.uploadAverageMbps ?? (restarting && new.phase == .upload ? nil : current.uploadAverageMbps),
             pingLiveMs: new.pingLiveMs ?? current.pingLiveMs,
             pingFinalMs: new.pingFinalMs ?? current.pingFinalMs,
             jitterMs: new.jitterMs ?? current.jitterMs,
@@ -1483,7 +1498,10 @@ struct SpeedtestView: View {
             pingSampleCount: new.pingSampleCount > 0 ? new.pingSampleCount : current.pingSampleCount,
             pingSampleTarget: new.pingSampleTarget > 0 ? new.pingSampleTarget : current.pingSampleTarget,
             serverName: new.serverName ?? current.serverName,
-            notice: new.notice ?? current.notice
+            notice: new.notice ?? current.notice,
+            stage: new.stage,
+            usefulElapsedSeconds: new.usefulElapsedSeconds,
+            totalElapsedSeconds: new.totalElapsedSeconds ?? current.totalElapsedSeconds
         )
     }
 }

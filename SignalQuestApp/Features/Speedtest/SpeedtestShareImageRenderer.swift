@@ -28,7 +28,7 @@ enum SpeedtestShareImageRenderer {
     ) -> String {
         let download = Int(result.downloadAverageMbps.rounded())
         let upload = result.uploadAverageMbps.map { "\(Int($0.rounded())) Mbps up" } ?? "-- Mbps up"
-        let ping = (result.pingMinMs ?? result.pingMs).map { "\(Int($0.rounded())) ms" } ?? "--"
+        let ping = (result.primaryPingMs).map { "\(Int($0.rounded())) ms" } ?? "--"
         var context = ""
         if options.includeNetworkContext {
             let net = result.networkShareDisplayName.trimmedNonEmpty ?? "réseau mobile"
@@ -286,7 +286,8 @@ private struct SpeedtestShareCard: View {
                     avg: result.downloadAverageMbps,
                     maxValue: result.downloadMaxMbps,
                     series: dlSeries,
-                    graceCount: dlGraceCount
+                    graceCount: dlGraceCount,
+                    trace: result.measurementTrace?.phases.first { $0.phase == "download" }
                 )
                 statCard(
                     label: "Upload",
@@ -294,7 +295,8 @@ private struct SpeedtestShareCard: View {
                     avg: result.uploadAverageMbps,
                     maxValue: result.uploadMaxMbps,
                     series: ulSeries,
-                    graceCount: ulGraceCount
+                    graceCount: ulGraceCount,
+                    trace: result.measurementTrace?.phases.first { $0.phase == "upload" }
                 )
             }
             .frame(maxHeight: .infinity)
@@ -376,7 +378,8 @@ private struct SpeedtestShareCard: View {
         avg: Double?,
         maxValue: Double?,
         series: [Double],
-        graceCount: Int
+        graceCount: Int,
+        trace: SpeedtestPhaseTrace? = nil
     ) -> some View {
         let avgParts = formatSpeedParts(avg)
         return VStack(alignment: .leading, spacing: 0) {
@@ -429,7 +432,10 @@ private struct SpeedtestShareCard: View {
                 accent: accentColor,
                 plotBackground: surfaceMuted,
                 gridColor: separator,
-                labelColor: textSecondary
+                labelColor: textSecondary,
+                timedSeries: trace?.recentSeries,
+                timedAverageSeries: trace?.averageSeries,
+                timeOriginMs: trace?.sampleStartMs
             )
             .overlay {
                 if series.isEmpty, (avg ?? 0) <= 0 {
@@ -457,7 +463,7 @@ private struct SpeedtestShareCard: View {
             latencyCell(
                 label: "Ping",
                 tint: textSecondary,
-                value: msText(result.pingMinMs ?? result.pingMs),
+                value: msText(result.primaryPingMs),
                 subline: pingSubline
             )
             gridDivider
@@ -630,23 +636,17 @@ struct SpeedtestShareGraph: View {
     let plotBackground: Color
     let gridColor: Color
     let labelColor: Color
+    var timedSeries: [SpeedtestTimedRate]? = nil
+    var timedAverageSeries: [SpeedtestTimedRate]? = nil
+    var timeOriginMs: Int64? = nil
 
     /// Série affichée : mesures du moteur si ≥ 2 points ; sinon moyenne réelle
     /// plate (toujours une donnée mesurée, jamais une courbe fantaisie).
     private var displaySeries: [Double] {
-        if series.count >= 2 {
-            return series
-        }
-        if let only = series.first, only > 0 {
-            return [only, only]
-        }
-        if averageMbps.isFinite, averageMbps > 0 {
-            return [averageMbps, averageMbps]
-        }
-        return [0, 0]
+        timedSeries?.map(\.mbps) ?? series
     }
 
-    private var isSparse: Bool { series.count < 2 }
+    private var isSparse: Bool { displaySeries.count < 2 }
     private var hasData: Bool { displaySeries.contains(where: { $0 > 0 }) }
 
     var body: some View {
@@ -656,6 +656,22 @@ struct SpeedtestShareGraph: View {
             }
             if hasData {
                 axisLabels
+                if let timedSeries, let last = timedSeries.last {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Text("0 s")
+                            Spacer()
+                            Text("\(Double(last.elapsedMs - (timeOriginMs ?? 0)) / 1000, format: .number.precision(.fractionLength(1))) s")
+                        }
+                        .font(.caption2).foregroundStyle(labelColor).padding(8)
+                    }
+                }
+            } else if displaySeries.isEmpty {
+                Text("Courbe indisponible")
+                    .font(.caption)
+                    .foregroundStyle(labelColor)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .background(plotBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -668,9 +684,9 @@ struct SpeedtestShareGraph: View {
     private var axisLabels: some View {
         let maxV = displaySeries.max() ?? 0
         return VStack(alignment: .leading, spacing: 0) {
-            Text(axisLabel(maxV))
+            Text("\(axisLabel(maxV)) Mbps")
             Spacer(minLength: 0)
-            Text("0")
+            if timedSeries == nil { Text("0") }
         }
         .font(SQFont.body(10, .medium, relativeTo: .caption2))
         .foregroundStyle(labelColor)
@@ -688,6 +704,7 @@ struct SpeedtestShareGraph: View {
     /// la partie utile est bucketisée, la grâce reste intacte (frontière stable).
     private func effectiveSeries(maxPoints: Int = 44) -> (values: [Double], grace: Int) {
         let base = displaySeries
+        if timedSeries != nil { return (base, 0) }
         let grace = isSparse ? 0 : min(max(0, graceCount), base.count)
         guard base.count > maxPoints else { return (base, grace) }
         let useful = Array(base[grace...])
@@ -702,13 +719,20 @@ struct SpeedtestShareGraph: View {
         let w = size.width, h = size.height
         let axisMax = max(pts.max() ?? 0, 0.001)
         let topInset: CGFloat = 14
-        let bottomInset: CGFloat = 6
+        let bottomInset: CGFloat = timedSeries == nil ? 6 : 22
         let leftInset: CGFloat = 2
         let rightInset: CGFloat = 6
         let plotHeight = max(1, h - topInset - bottomInset)
         let plotWidth = max(1, w - leftInset - rightInset)
         let step = plotWidth / CGFloat(max(pts.count - 1, 1))
-        let x: (Int) -> CGFloat = { leftInset + CGFloat($0) * step }
+        let x: (Int) -> CGFloat = { index in
+            if let timedSeries, let first = timedSeries.first, let last = timedSeries.last,
+               last.elapsedMs > first.elapsedMs, index < timedSeries.count {
+                let origin = timeOriginMs ?? first.elapsedMs
+                return leftInset + CGFloat(timedSeries[index].elapsedMs - origin) / CGFloat(max(1, last.elapsedMs - origin)) * plotWidth
+            }
+            return leftInset + CGFloat(index) * step
+        }
         let y: (Double) -> CGFloat = {
             h - bottomInset - CGFloat(min(1, max(0, $0 / axisMax))) * plotHeight
         }
@@ -734,8 +758,17 @@ struct SpeedtestShareGraph: View {
             }
         }
 
+        let averagePath = Path { path in
+            guard let timedAverageSeries, let last = timedAverageSeries.last, let origin = timeOriginMs else { return }
+            for (index, sample) in timedAverageSeries.enumerated() {
+                let point = CGPoint(x: leftInset + CGFloat(sample.elapsedMs - origin) / CGFloat(max(1, last.elapsedMs - origin)) * plotWidth,
+                                    y: y(sample.mbps))
+                if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
+            }
+        }
         return ZStack {
             grid.stroke(gridColor.opacity(0.5), lineWidth: 1)
+            averagePath.stroke(labelColor, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
             if hasData {
                 fill.fill(
                     LinearGradient(

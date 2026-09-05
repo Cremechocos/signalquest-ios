@@ -31,9 +31,6 @@ enum SQShareCardBuilder {
     /// Au-delà, un échantillon est un artefact de mesure, pas un débit.
     private static let seriesClampMbps: Double = 20_000
 
-    /// Repli quand une série a moins de deux points exploitables.
-    private static let fallbackPointCount = 12
-
     /// Au-delà, les points sont moyennés par buckets.
     private static let maxPoints = 32
 
@@ -91,7 +88,8 @@ enum SQShareCardBuilder {
             average: result.downloadAverageMbps,
             peak: result.downloadMaxMbps,
             gaugeMax: SpeedtestGaugeScale.maxSpeed(for: result, upload: false),
-            theme: theme
+            theme: theme,
+            trace: result.measurementTrace?.phases.first { $0.phase == "download" }
         )
         let uploadAverage = result.uploadAverageMbps ?? 0
         let uploadGraph = graph(
@@ -99,12 +97,12 @@ enum SQShareCardBuilder {
             average: uploadAverage,
             peak: result.uploadMaxMbps ?? uploadAverage,
             gaugeMax: SpeedtestGaugeScale.maxSpeed(for: result, upload: true),
-            theme: theme
+            theme: theme,
+            trace: result.measurementTrace?.phases.first { $0.phase == "upload" }
         )
 
-        // Latence héros : min ?: médiane ?: moyenne — convention produit d'Android,
-        // la valeur la plus représentative d'un réseau au repos.
-        let latency = result.pingMinMs ?? result.pingMedianMs ?? result.pingMs ?? 0
+        // v6 uses the measured minimum; archives preserve their historical value.
+        let latency = result.primaryPingMs ?? 0
 
         return SQShareCardModel(
             theme: theme,
@@ -114,24 +112,26 @@ enum SQShareCardBuilder {
             download: .init(
                 label: String(localized: "Download"),
                 value: formatMbps(result.downloadAverageMbps, locale: locale),
-                unit: "Mbps",
+                unit: result.downloadAverageMbps >= 1000 ? "Gbps" : "Mbps",
                 maxValue: formatMbps(result.downloadMaxMbps, locale: locale),
                 labelColor: downloadGraph.accentColor,
-                graph: downloadGraph
+                graph: downloadGraph,
+                maxUnit: result.downloadMaxMbps >= 1000 ? "Gbps" : "Mbps"
             ),
             upload: .init(
                 label: String(localized: "Upload"),
-                value: formatMbps(uploadAverage, locale: locale),
-                unit: "Mbps",
-                maxValue: formatMbps(result.uploadMaxMbps ?? uploadAverage, locale: locale),
+                value: result.uploadAverageMbps.map { formatMbps($0, locale: locale) } ?? "—",
+                unit: uploadAverage >= 1000 ? "Gbps" : "Mbps",
+                maxValue: result.uploadMaxMbps.map { formatMbps($0, locale: locale) } ?? "—",
                 labelColor: uploadGraph.accentColor,
-                graph: uploadGraph
+                graph: uploadGraph,
+                maxUnit: (result.uploadMaxMbps ?? uploadAverage) >= 1000 ? "Gbps" : "Mbps"
             ),
             latencyLabel: String(localized: "Latence"),
-            latencyValueText: "\(Int(latency.rounded()))",
+            latencyValueText: result.primaryPingMs.map { "\(Int($0.rounded()))" } ?? "—",
             latencyUnit: "ms",
             latencySubText: latencySubText(for: result, locale: locale),
-            latencyColor: theme.latencyColor(ms: latency),
+            latencyColor: result.primaryPingMs == nil ? theme.textSecondary : theme.latencyColor(ms: latency),
             underLoadLabel: String(localized: "Sous charge"),
             underLoadRows: underLoadRows(
                 for: result, download: downloadGraph, upload: uploadGraph, locale: locale
@@ -158,31 +158,29 @@ enum SQShareCardBuilder {
 
     private static func graph(
         samples: [Double], average: Double, peak: Double,
-        gaugeMax: Double, theme: SQShareCardTheme
+        gaugeMax: Double, theme: SQShareCardTheme, trace: SpeedtestPhaseTrace? = nil
     ) -> SQShareCardModel.Graph {
-        let points = downsample(prepareSeries(samples, average: average, peak: peak))
+        let timed = trace?.recentSeries
+        let points = timed?.map(\.mbps) ?? downsample(prepareSeries(samples, average: average, peak: peak))
         return .init(
             points: points,
             localMax: Swift.max(points.max() ?? 1, 1) * graphHeadroomFactor,
             // La teinte suit le débit MOYEN rapporté au maximum atteignable sur ce
             // réseau : 300 Mb/s est excellent en 4G et médiocre en 5G.
-            accentColor: theme.qualityColor(ratio: average / Swift.max(gaugeMax, 1))
+            accentColor: theme.qualityColor(ratio: average / Swift.max(gaugeMax, 1)),
+            normalizedTimes: trace.map { phase in
+                (timed ?? []).map { Double($0.elapsedMs - phase.sampleStartMs) / Double(max(1, phase.sampleDurationMs)) }
+            },
+            durationSeconds: trace.map { Double($0.sampleDurationMs) / 1000 }
         )
     }
 
-    /// Nettoyage d'une série : on ne garde que des valeurs finies et positives,
-    /// bornées. Sous deux points, la carte trace une ligne PLATE à la moyenne
-    /// plutôt qu'un graphe inventé — le trait dit alors « pas de détail », ce qui
-    /// reste honnête, là où une courbe fabriquée mentirait sur la mesure.
+    /// Historical samples keep their existing scale; missing samples stay missing.
     private static func prepareSeries(_ samples: [Double], average: Double, peak: Double) -> [Double] {
         let clean = samples
             .filter { $0.isFinite && $0 >= 0 }
             .map { Swift.min($0, seriesClampMbps) }
-        guard clean.count >= 2 else {
-            let safeAverage = average.isFinite ? Swift.max(average, 0) : 0
-            let ceiling = Swift.max(safeAverage, peak.isFinite ? peak : 0, 1)
-            return Array(repeating: Swift.min(safeAverage, ceiling), count: fallbackPointCount)
-        }
+        guard clean.count >= 2 else { return [] }
         return clean
     }
 
@@ -310,10 +308,10 @@ enum SQShareCardBuilder {
 
     // MARK: - Formats
 
-    /// « 1240,6 » — TOUJOURS en Mbps, séparateur de la locale. Pas de bascule
-    /// Gbps : « 1240,6 Mbps » est plus précis que « 1,24 Gbps ».
+    /// Localized Mbps below 1000, Gbps above; persisted measurements remain Mbps.
     private static func formatMbps(_ value: Double, locale: Locale) -> String {
-        decimal(value.isFinite && value >= 0 ? value : 0, locale: locale)
+        let safe = value.isFinite && value >= 0 ? value : 0
+        return safe >= 1000 ? String(format: "%.2f", locale: locale, safe / 1000) : decimal(safe, locale: locale)
     }
 
     private static func decimal(_ value: Double, locale: Locale) -> String {

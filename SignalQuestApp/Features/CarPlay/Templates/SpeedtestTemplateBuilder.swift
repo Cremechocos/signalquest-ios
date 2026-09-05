@@ -110,7 +110,7 @@ enum SpeedtestTemplateBuilder {
         if let upload = result.uploadMbps {
             items.append(CPInformationItem(title: String(localized: "Montant"), detail: mbps(upload)))
         }
-        if let ping = result.pingMs {
+        if let ping = result.primaryPingMs {
             items.append(CPInformationItem(title: String(localized: "Latence"),
                                            detail: "\(Int(ping.rounded())) ms"))
         }

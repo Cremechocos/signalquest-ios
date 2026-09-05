@@ -571,7 +571,7 @@ final class DriveTestViewModel: ObservableObject {
                 accuracy: location.map { max(0, $0.horizontalAccuracy) },
                 downloadMbps: result.downloadAverageMbps,
                 uploadMbps: result.uploadAverageMbps,
-                pingMs: result.pingMinMs ?? result.pingMs,
+                pingMs: result.primaryPingMs,
                 observedPlmn: evidence?.observedPlmn,
                 enb: evidence?.enb,
                 gnb: evidence?.gnb,
@@ -1152,7 +1152,7 @@ final class DriveTestViewModel: ObservableObject {
             phaseLabel: "\(liveOperatorPrefix)Test \(index) terminé",
             downloadMbps: measured.downloadAverageMbps,
             uploadMbps: measured.uploadAverageMbps ?? 0,
-            pingMs: measured.pingMinMs ?? measured.pingMs ?? 0,
+            pingMs: measured.primaryPingMs ?? 0,
             progress: 1, runIndex: index, runTotal: 0
         )
         return measured
@@ -1160,7 +1160,7 @@ final class DriveTestViewModel: ObservableObject {
 
     private func livePhaseFinalize(_ measured: SpeedtestRunResult) {
         livePhase = .finished
-        livePing = measured.pingMinMs ?? measured.pingMs ?? livePing
+        livePing = measured.primaryPingMs ?? livePing
         liveDownload = measured.downloadAverageMbps
         liveUpload = measured.uploadAverageMbps ?? liveUpload
     }

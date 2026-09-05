@@ -43,7 +43,7 @@ struct SpeedtestHistoryRow: View {
     var titleLine: String {
         var parts = [result.createdAt.formatted(.dateTime.day().month(.abbreviated))]
         parts.append("\(shortSpeed(result.downloadAverageMbps)) Mbps")
-        if let ping = result.pingMinMs ?? result.pingMs, ping.isFinite, ping >= 0 {
+        if let ping = result.primaryPingMs, ping.isFinite, ping >= 0 {
             parts.append("\(Int(ping.rounded())) ms")
         }
         return parts.joined(separator: " · ")

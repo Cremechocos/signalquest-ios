@@ -6,6 +6,7 @@ import SwiftUI
 struct DriveSpeedtestDetailSheet: View {
     let point: DriveSpeedtestPoint
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var result: SpeedtestRunResult { point.result }
 
@@ -88,14 +89,14 @@ struct DriveSpeedtestDetailSheet: View {
     // MARK: Tuiles de métriques
 
     private var metricsGrid: some View {
-        let columns = [GridItem(.flexible()), GridItem(.flexible())]
+        let columns = Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2)
         return GlassCard {
             LazyVGrid(columns: columns, spacing: SQSpace.sm) {
                 metricTile("Download", value: Self.format(result.downloadAverageMbps), unit: "Mbps",
                            detail: "max \(Self.format(result.downloadMaxMbps))", color: Self.speedColor(result.downloadAverageMbps), icon: "arrow.down")
                 metricTile("Upload", value: Self.format(result.uploadAverageMbps ?? 0), unit: "Mbps",
                            detail: result.uploadMaxMbps.map { "max \(Self.format($0))" } ?? "—", color: SQColor.success, icon: "arrow.up")
-                metricTile("Ping", value: Self.format(result.pingMinMs ?? result.pingMs ?? 0), unit: "ms",
+                metricTile("Ping", value: Self.format(result.primaryPingMs ?? 0), unit: "ms",
                            detail: pingRange, color: SQColor.warning, icon: "bolt.horizontal")
                 metricTile("Gigue", value: Self.format(result.jitterMs ?? 0), unit: "ms",
                            detail: "stabilité", color: SQColor.info, icon: "waveform.path")
@@ -128,8 +129,16 @@ struct DriveSpeedtestDetailSheet: View {
                 Text("Débit pendant le test")
                     .font(SQFont.body(13, .semibold))
                     .foregroundStyle(SQColor.labelSecondary)
-                Sparkline(values: series, color: Self.speedColor(result.downloadAverageMbps))
-                    .frame(height: 56)
+                let trace = result.measurementTrace?.phases.first { $0.phase == "download" }
+                SpeedtestShareGraph(series: series, averageMbps: result.downloadAverageMbps,
+                    accent: Self.speedColor(result.downloadAverageMbps), plotBackground: SQColor.surfaceMuted,
+                    gridColor: SQColor.separator, labelColor: SQColor.labelSecondary,
+                    timedSeries: trace?.recentSeries, timedAverageSeries: trace?.averageSeries,
+                    timeOriginMs: trace?.sampleStartMs)
+                    .frame(height: 108)
+                if trace == nil {
+                    Text("Courbe historique sans horodatage").font(.caption)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -240,41 +249,6 @@ struct DriveSpeedtestDetailSheet: View {
         case 30..<100: return Color(hex: 0xEAB308)
         case 10..<30: return Color(hex: 0xF97316)
         default: return Color(hex: 0xEF4444)
-        }
-    }
-}
-
-/// Sparkline minimaliste (courbe normalisée + remplissage dégradé sous la courbe).
-private struct Sparkline: View {
-    let values: [Double]
-    let color: Color
-
-    var body: some View {
-        GeometryReader { geo in
-            let maxV = max(values.max() ?? 1, 0.0001)
-            let stepX = values.count > 1 ? geo.size.width / CGFloat(values.count - 1) : 0
-            let points = values.enumerated().map { i, v in
-                CGPoint(x: CGFloat(i) * stepX, y: geo.size.height * (1 - CGFloat(v / maxV)))
-            }
-            ZStack {
-                // Remplissage sous la courbe.
-                Path { p in
-                    guard let first = points.first else { return }
-                    p.move(to: CGPoint(x: first.x, y: geo.size.height))
-                    p.addLine(to: first)
-                    for pt in points.dropFirst() { p.addLine(to: pt) }
-                    if let last = points.last { p.addLine(to: CGPoint(x: last.x, y: geo.size.height)) }
-                    p.closeSubpath()
-                }
-                .fill(LinearGradient(colors: [color.opacity(0.28), color.opacity(0.02)], startPoint: .top, endPoint: .bottom))
-                // Courbe.
-                Path { p in
-                    guard let first = points.first else { return }
-                    p.move(to: first)
-                    for pt in points.dropFirst() { p.addLine(to: pt) }
-                }
-                .stroke(color, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
-            }
         }
     }
 }
