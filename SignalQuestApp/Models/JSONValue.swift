@@ -56,6 +56,10 @@ enum JSONValue: Codable, Equatable, Sendable {
 /// est thread-safe depuis iOS 7 ; `nonisolated(unsafe)` documente ce partage
 /// concurrent sûr (les types Foundation ne sont pas `Sendable`).
 enum SQDateParsing {
+    // Styles immuables et Sendable pour les deux formes UTC canoniques.
+    private static let canonicalWithFraction = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+    private static let canonicalNoFraction = Date.ISO8601FormatStyle(includingFractionalSeconds: false)
+
     nonisolated(unsafe) private static let isoWithFraction: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -80,17 +84,67 @@ enum SQDateParsing {
         return f
     }
 
-    /// Essaie les formats dans le MÊME ordre que l'ancienne stratégie : ISO avec
+    /// Accélère uniquement les formes UTC canoniques validées. Pour toutes les
+    /// autres entrées ou si le style échoue, garde l'ordre historique : ISO avec
     /// puis sans fraction, local avec puis sans fraction, enfin « jour seul »
-    /// (ex. `date5g` prévisionnel = "2026-06-30", `lastInServiceDate`). Comportement
-    /// de parsing strictement identique.
+    /// (ex. `date5g` prévisionnel = "2026-06-30", `lastInServiceDate`).
     static func parse(_ value: String) -> Date? {
+        if let byteCount = canonicalUTCByteCount(value),
+           let date = try? (byteCount == 24 ? canonicalWithFraction : canonicalNoFraction).parse(value) {
+            // Le calcul depuis l'epoch Unix retrouve l'arrondi des formatters
+            // historiques, y compris avant 2001. Seulement 0 ou 3 décimales ici :
+            // les autres précisions restent intégralement sur le repli existant.
+            return Date(timeIntervalSince1970: (date.timeIntervalSince1970 * 1000).rounded() / 1000)
+        }
         if let date = isoWithFraction.date(from: value) { return date }
         if let date = isoNoFraction.date(from: value) { return date }
         if let date = localWithFraction.date(from: value) { return date }
         if let date = localNoFraction.date(from: value) { return date }
         if let date = dateOnly.date(from: value) { return date }
         return nil
+    }
+
+    /// Limite la voie rapide à `YYYY-MM-DDTHH:mm:ss[.SSS]Z` en ASCII et aux
+    /// années 1900...2099, intervalle vérifié pour l'égalité avec le parseur
+    /// historique. Les autres années et valeurs hors plage gardent son arrondi
+    /// et ses règles d'acceptation (notamment les secondes 60/61).
+    private static func canonicalUTCByteCount(_ value: String) -> Int? {
+        let byteCount = value.utf8.count
+        guard byteCount == 20 || byteCount == 24 else { return nil }
+        let bytes = Array(value.utf8)
+        guard bytes[4] == 45, bytes[7] == 45, bytes[10] == 84,
+              bytes[13] == 58, bytes[16] == 58, bytes.last == 90 else { return nil }
+        for index in 0..<19 where index != 4 && index != 7 && index != 10 && index != 13 && index != 16 {
+            guard (48...57).contains(bytes[index]) else { return nil }
+        }
+        if byteCount == 24 {
+            guard bytes[19] == 46 else { return nil }
+            for index in 20...22 {
+                guard (48...57).contains(bytes[index]) else { return nil }
+            }
+        }
+
+        func pair(at index: Int) -> Int {
+            Int(bytes[index] - 48) * 10 + Int(bytes[index + 1] - 48)
+        }
+        let year = pair(at: 0) * 100 + pair(at: 2)
+        let month = pair(at: 5)
+        let day = pair(at: 8)
+        guard (1900...2099).contains(year), (1...12).contains(month),
+              (1...31).contains(day), pair(at: 11) <= 23,
+              pair(at: 14) <= 59, pair(at: 17) <= 59 else { return nil }
+        // Une date civile impossible reste sur le repli : ne pas dépendre de
+        // différences de normalisation entre les versions de Foundation.
+        let maximumDay: Int
+        switch month {
+        case 2:
+            maximumDay = year.isMultiple(of: 4)
+                && (!year.isMultiple(of: 100) || year.isMultiple(of: 400)) ? 29 : 28
+        case 4, 6, 9, 11: maximumDay = 30
+        default: maximumDay = 31
+        }
+        guard day <= maximumDay else { return nil }
+        return byteCount
     }
 }
 
