@@ -42236,6 +42236,54 @@
           }
         }
       }
+    },
+    "Vue partielle": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vue partielle"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partial view"
+          }
+        }
+      }
+    },
+    "Choisir les couleurs et consulter la légende": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir les couleurs et consulter la légende"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose colors and view the legend"
+          }
+        }
+      }
+    },
+    "Consulter les limites des données affichées": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consulter les limites des données affichées"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View limits of the displayed data"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

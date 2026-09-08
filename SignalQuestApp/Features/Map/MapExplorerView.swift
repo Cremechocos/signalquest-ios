@@ -1520,7 +1520,6 @@ struct MapExplorerView: View {
     @State private var viewportGate = MapViewportLoadGate()
     @State private var viewportRefreshID = 0
     @State private var showFilterSheet = false
-    @State private var showCoverageLegend = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var filterSheetDetent: PresentationDetent = .large
     // Écrans ANFR, repris du menu Profil : c'est ici qu'on cherche une carte.
@@ -1918,9 +1917,7 @@ struct MapExplorerView: View {
                             .padding(.horizontal, SQSpace.md)
                             .transition(.move(edge: .top))
                     }
-                    // Les contrôles de coloration couverture (bascule + légende) ont
-                    // quitté la colonne haute (surchargée) → carte flottante bas-centre
-                    // (cf. `coverageControlsOverlay`).
+                    // Le mode de couverture et les limites restent dans la rangée basse.
                     // Panneau de recherche : visible dès qu'une requête est saisie
                     // (résultats, ou message « aucun résultat »/erreur).
                     if !model.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -1932,35 +1929,9 @@ struct MapExplorerView: View {
                 .frame(maxWidth: 640)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-                // Bas-gauche : pilule opérateur seule (le statut/toast est passé au
-                // centre pour ne plus se disputer la place avec les contrôles couverture).
-                VStack {
-                    Spacer()
-                    HStack {
-                        operatorPill
-                        Spacer()
-                    }
-                    .padding(.leading, SQSpace.md)
-                    .padding(.bottom, mapControlsBottomInset)
-                }
-
-                // Bas-droite : FAB localiser (unique).
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        mapFabStack
-                    }
-                    .padding(.trailing, SQSpace.md)
-                    .padding(.bottom, mapControlsBottomInset)
-                }
-
-                // Bas-centre : statut transitoire + contrôles de coloration couverture,
-                // empilés au-dessus de la rangée pilule/FAB (jamais au même niveau
-                // qu'elles). Le spinner de chargement a rejoint la barre de recherche.
-                coverageControlsOverlay
-
-                marketSwitchNoticeOverlay
+                // La pile se dimensionne selon les contrôles : aucun décalage
+                // fixe ne peut faire chevaucher une grande police et l'opérateur.
+                mapBottomControls
             }
         }
     }
@@ -2135,120 +2106,43 @@ struct MapExplorerView: View {
         #endif
     }
 
-    /// Contrôles de coloration couverture (bascule Signal/Génération + légende),
-    /// affichés seulement quand la couche Couverture est active. Déplacés de la
-    /// colonne haute (qui empilait jusqu'à 5 blocs). Empilé avec le statut transitoire
-    /// (toast) dans une colonne centrée, ancrée juste au-dessus de la rangée basse
-    /// (pilule opérateur à gauche, FAB à droite) — plus jamais en conflit avec elles.
-    private var coverageControlsOverlay: some View {
+    /// Une seule rangée compacte ; les réglages et explications s'ouvrent au toucher.
+    /// Les grandes tailles de texte se replient sans réduire les cibles tactiles.
+    private var mapBottomControls: some View {
         VStack(spacing: SQSpace.sm) {
             Spacer()
-            if filters.contains(.coverage), model.operatorFilter.uppercased() != "ALL" {
-                coverageFocusBanner
-                coverageColoringToggle
-                coverageLegendCompact
-            }
+            marketSwitchNotice
+            if showsCoverageKey { coverageFocusBanner }
+            MapContextControls(
+                byGeneration: $coverageByGeneration,
+                showsCoverage: showsCoverageKey,
+                limitMessages: showsDisplayLimit ? model.displayLimitMessages : []
+            )
             mapStatusToast
+            HStack {
+                operatorPill
+                Spacer(minLength: SQSpace.sm)
+                mapFabStack
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, SQSpace.md)
-        // Juste au-dessus de la rangée basse (pilule/FAB) : on part du même dégagement
-        // qu'elle + la hauteur d'une rangée, pour empiler sans la chevaucher.
-        .padding(.bottom, mapControlsBottomInset + 50)
+        .padding(.bottom, mapControlsBottomInset)
+        .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: showsCoverageKey)
+        .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: showsDisplayLimit)
     }
 
-    /// Une seule surface ; les grandes tailles de texte passent en grille
-    /// pour garder tous les niveaux dans la largeur disponible.
-    @ViewBuilder
-    private var coverageLegendCompact: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            Button { showCoverageLegend = true } label: {
-                Label("Légende", systemImage: "list.bullet")
-                    .font(SQType.subhead)
-                    .foregroundStyle(SQColor.label)
-                    .padding(.horizontal, SQSpace.md)
-                    .padding(.vertical, SQSpace.xs)
-                    .frame(minHeight: 44)
-            }
-            .buttonStyle(.plain)
-            .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.lg)) }
-            .sqShadowSoft()
-            .accessibilityIdentifier("map.coverage.legend")
-            .sheet(isPresented: $showCoverageLegend) { coverageLegendDetail }
-        } else {
-            coverageLegendInline
-        }
+    private var showsCoverageKey: Bool {
+        filters.contains(.coverage) && model.operatorFilter.uppercased() != "ALL"
     }
 
-    private var coverageLegendDetail: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.lg) { coverageLegendEntries }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(SQSpace.xl)
-            }
-            .background(SQColor.surface)
-            .navigationTitle("Légende")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Fermer") { showCoverageLegend = false }
-                        .tint(SQColor.accentInk)
-                        .accessibilityIdentifier("map.coverage.legend.close")
-                }
-            }
-        }
+    private var showsDisplayLimit: Bool {
+        model.errorMessage == nil && !model.displayLimitMessages.isEmpty
     }
 
-    private var coverageLegendInline: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: SQSpace.sm + 1) { coverageLegendEntries }
-                .fixedSize(horizontal: true, vertical: false)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), alignment: .leading)],
-                      alignment: .leading, spacing: SQSpace.sm) {
-                coverageLegendEntries
-            }
-        }
-        .padding(.horizontal, SQSpace.md)
-        .padding(.vertical, SQSpace.xs + 3)
-        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)) }
-        .sqShadowSoft()
-        .frame(maxWidth: 420)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(coverageByGeneration ? "Légende génération" : "Légende qualité du signal")
-        .accessibilityIdentifier("map.coverage.legend")
-    }
-
-    @ViewBuilder
-    private var coverageLegendEntries: some View {
-        if coverageByGeneration {
-            ForEach(CoverageGenerationBand.visibleBands) { band in
-                legendDot(color: band.swiftUIColor, text: band.title)
-            }
-        } else {
-            ForEach(CoverageQualityBand.visibleBands) { band in
-                legendDot(color: band.swiftUIColor, text: band.title)
-            }
-        }
-    }
-
-    private func legendDot(color: Color, text: String) -> some View {
-        HStack(spacing: 3) {
-            Circle().fill(color).frame(width: 8, height: 8)
-            Text(text)
-                .font(SQFont.body(10.5, .semibold))
-                .foregroundStyle(SQColor.label)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    /// Bandeau discret « Marché : X » affiché 2 s après un switch automatique :
-    /// capsule crème + point brique, ombre douce (langage des surfaces carte).
-    /// Ancré EN BAS (toast transitoire au-dessus du dock) : à ~124 pt du haut il
-    /// chevauchait la zone haute (chips / bascule couverture / légende).
-    private var marketSwitchNoticeOverlay: some View {
+    /// Notice transitoire dans la même pile : elle ne masque aucun contrôle.
+    private var marketSwitchNotice: some View {
         VStack {
-            Spacer()
             if let notice = model.marketSwitchNotice {
                 HStack(spacing: SQSpace.sm) {
                     Circle()
@@ -2266,8 +2160,7 @@ struct MapExplorerView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .padding(.bottom, mapControlsBottomInset)
-        .animation(SQMotion.resolve(SQMotion.snappy, reduceMotion), value: model.marketSwitchNotice)
+        .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: model.marketSwitchNotice)
         .allowsHitTesting(false)
     }
 
@@ -2513,7 +2406,8 @@ struct MapExplorerView: View {
                     .accessibilityIdentifier("map.status.retry")
             }
         } else if !model.displayLimitMessages.isEmpty {
-            mapToast(model.displayLimitMessages.joined(separator: "\n"), icon: "info.circle.fill", tint: SQColor.warning)
+            // Le contrôle « Vue partielle » porte cet état et son explication.
+            EmptyView()
         } else if viewportGate.admitted == nil {
             mapToast(String(localized: "Préparation de la carte…"), icon: "map", tint: SQColor.labelSecondary)
         } else if filters.contains(.coverage), model.operatorFilter.uppercased() == "ALL" {
@@ -2607,21 +2501,6 @@ struct MapExplorerView: View {
                 }
             }
         }
-    }
-
-    /// Bascule de coloration de la couche Couverture : Signal (RSRP) ↔ Génération.
-    private var coverageColoringToggle: some View {
-        Picker("Coloration couverture", selection: $coverageByGeneration) {
-            Text("Signal").tag(false)
-            Text("Génération").tag(true)
-        }
-        .pickerStyle(.segmented)
-        .padding(SQSpace.xs)
-        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
-        .sqShadowSoft()
-        .frame(maxWidth: 280)
-        .padding(.horizontal, SQSpace.md)
-        .accessibilityLabel("Coloration de la couverture : signal ou génération")
     }
 
     private var searchSuggestions: some View {

@@ -4,6 +4,52 @@ import XCTest
 /// Inspect the attached screen as well: accessibility presence alone is not painting.
 @MainActor
 final class MapHTTPRuntimeQATests: XCTestCase {
+    func testCompactCoverageControlsKeepDetailsAndColorSwitchAccessible() async throws {
+        try await exerciseCompactCoverageControls(locale: "fr")
+    }
+
+    func testCompactCoverageControlsKeepEnglishDetailsAndSelection() async throws {
+        try await exerciseCompactCoverageControls(locale: "en")
+    }
+
+    private func exerciseCompactCoverageControls(locale: String) async throws {
+        try requireFixture()
+        _ = try await configure("partial")
+        let app = try launchGuest(locale: locale, extraArguments: ["--qa-map-layers"])
+        defer { app.terminate() }
+        try selectSFR(in: app)
+        let coverage = app.buttons["map.coverage.legend"]
+        XCTAssertTrue(coverage.waitForExistence(timeout: 25))
+        let limits = app.buttons["map.status.limit"]
+        XCTAssertTrue(limits.waitForExistence(timeout: 25))
+        XCTAssertGreaterThanOrEqual(coverage.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(limits.frame.height, 44)
+        XCTAssertLessThan(coverage.frame.width + limits.frame.width, app.frame.width - 16)
+        XCTAssertFalse(app.segmentedControls.firstMatch.exists)
+        capture(app, name: "map-context-compact-partial")
+
+        try tap(limits, in: app)
+        XCTAssertTrue(app.staticTexts["map.status.limit.detail"].waitForExistence(timeout: 10))
+        capture(app, name: "map-context-limit-detail")
+        try tap(app.buttons["map.status.limit.close"], in: app)
+        try tap(coverage, in: app)
+        // Le mode est mémorisé entre lancements : exercer une vraie bascule,
+        // quel que soit le réglage laissé par une autre recette.
+        app.segmentedControls["map.coverage.mode"].buttons["Signal"].tap()
+        let modeTitle = locale == "en" ? "Generation" : "Génération"
+        let generation = app.segmentedControls["map.coverage.mode"].buttons[modeTitle]
+        XCTAssertTrue(generation.waitForExistence(timeout: 10))
+        generation.tap()
+        XCTAssertTrue(generation.isSelected)
+        XCTAssertTrue(app.staticTexts["5G"].exists)
+        capture(app, name: "map-context-generation-detail")
+        try tap(app.buttons["map.coverage.legend.close"], in: app)
+        XCTAssertEqual(coverage.value as? String, modeTitle)
+        XCTAssertTrue(app.buttons["map.operator"].isHittable)
+        XCTAssertTrue(app.buttons["map.filters"].isHittable)
+        capture(app, name: "map-context-compact-generation")
+    }
+
     func testInitialDeviceLocationSelectsCanadaAndFramesItsActualMeasurements() async throws {
         try requireFixture()
         guard ProcessInfo.processInfo.environment["SQ_MAP_LOCATION_QA"] == "1" else {
@@ -51,9 +97,9 @@ final class MapHTTPRuntimeQATests: XCTestCase {
 
     func testCoverageLegendFitsSmallScreensAtAccessibilityTextSize() async throws {
         try requireFixture()
-        _ = try await configure("baseline")
+        _ = try await configure("partial")
         let app = try launchGuest(locale: "en", extraArguments: [
-            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL", "--qa-map-layers"
         ])
         defer { app.terminate() }
         try selectSFR(in: app)
@@ -68,11 +114,39 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         XCTAssertLessThanOrEqual(legend.frame.maxX, app.frame.maxX - 8)
         XCTAssertTrue(app.buttons["map.operator"].isHittable)
         XCTAssertTrue(app.buttons["map.filters"].isHittable)
+        let limits = app.buttons["map.status.limit"]
+        XCTAssertTrue(limits.waitForExistence(timeout: 15))
+        XCTAssertGreaterThanOrEqual(limits.frame.minX, app.frame.minX + 8)
+        XCTAssertLessThanOrEqual(limits.frame.maxX, app.frame.maxX - 8)
+        XCTAssertTrue(limits.isHittable)
+        XCTAssertLessThanOrEqual(max(legend.frame.maxY, limits.frame.maxY) + 4,
+                                 app.buttons["map.operator"].frame.minY,
+                                 "Les contrôles contextuels doivent dégager le sélecteur opérateur")
+        capture(app, name: "map-context-both-accessibility-text-size")
+        try tap(limits, in: app)
+        XCTAssertTrue(app.staticTexts["map.status.limit.detail"].waitForExistence(timeout: 10))
+        capture(app, name: "map-context-limit-accessibility-detail")
+        try tap(app.buttons["map.status.limit.close"], in: app)
         try tap(app.buttons["map.coverage.legend"], in: app)
+        // Les options deviennent des rangées accessibles aux très grandes tailles.
+        // Ne pas supposer que la préférence persistée est encore « Signal ».
+        try tap(app.buttons["Signal"], in: app)
         for title in ["Excellent", "Good", "Fair", "Weak", "Very weak"] {
             XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 10))
         }
         capture(app, name: "map-coverage-accessibility-legend-detail")
+        // L'iPhone est verrouillé en portrait dans Info.plist ; l'iPad prend
+        // en charge les deux orientations et exerce le redimensionnement.
+        if ProcessInfo.processInfo.environment["SQ_MAP_LANDSCAPE_QA"] == "1" {
+            let wasLandscape = app.frame.width > app.frame.height
+            XCUIDevice.shared.orientation = wasLandscape ? .portrait : .landscapeLeft
+            let rotated = NSPredicate { _, _ in (app.frame.width > app.frame.height) != wasLandscape }
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: rotated, object: nil)], timeout: 15), .completed)
+            XCTAssertTrue(app.buttons["map.coverage.legend.close"].isHittable)
+            XCTAssertTrue(app.buttons["Signal"].isSelected, "La feuille et sa sélection doivent survivre au repli de la rangée")
+            capture(app, name: "map-context-sheet-kept-after-rotation")
+            XCUIDevice.shared.orientation = wasLandscape ? .landscapeLeft : .portrait
+        }
         try tap(app.buttons["map.coverage.legend.close"], in: app)
         XCTAssertTrue(app.buttons["map.filters"].isHittable)
     }
