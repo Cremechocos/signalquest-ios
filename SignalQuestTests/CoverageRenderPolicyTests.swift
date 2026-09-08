@@ -5,6 +5,24 @@ import XCTest
 /// par la donnée (points si présents, sinon clusters), caps relevés, seuil de fetch.
 final class CoverageRenderPolicyTests: XCTestCase {
 
+    func testVerifiedBandOverviewRemainsRenderableAtRegionalZoom() throws {
+        let bytes = Data(#"{"tile":{"z":8,"x":130,"y":87},"points":[],"clusters":[{"id":"lte-band7","lat":50.5,"lng":4.4,"count":4,"avgRsrp":-90,"tech":"4G"}],"stats":{"sampleCount":4,"representation":"overview","appliedBandFilter":{"version":1,"bands":[7],"match":"any"}}}"#.utf8)
+        let tile = try JSONDecoder.signalQuest.decode(AndroidCoverageTileResponse.self, from: bytes)
+        let mode = CoverageRenderPolicy.mode(for: tile, selectedBands: [7])
+        let visibleIDs = mode.useClusters ? tile.clusters.map(\.id) : []
+        XCTAssertEqual(visibleIDs, ["lte-band7"], "A verified overview must not disappear when its band is selected")
+    }
+
+    func testAggregatedPointKeepsItsSecondaryBandAndExcludesAnAbsentBand() throws {
+        let bytes = Data(#"{"id":"aggregate","lat":48.8,"lng":2.3,"band":3,"bands":[3,7],"tech":"4G"}"#.utf8)
+        let point = try JSONDecoder.signalQuest.decode(AndroidCoveragePoint.self, from: bytes)
+        XCTAssertTrue(CoverageRenderPolicy.matches(point, selectedBands: [7]))
+        XCTAssertFalse(CoverageRenderPolicy.matches(point, selectedBands: [17]))
+        let legacy = try JSONDecoder.signalQuest.decode(AndroidCoveragePoint.self,
+            from: Data(#"{"id":"legacy","lat":48.8,"lng":2.3,"band":7}"#.utf8))
+        XCTAssertTrue(CoverageRenderPolicy.matches(legacy, selectedBands: [7]))
+    }
+
     func testCoverageImportResponseDecodesLegacyMinimalShape() throws {
         let response = try JSONDecoder.signalQuest.decode(
             CoverageImportResponse.self,

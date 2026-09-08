@@ -29,8 +29,12 @@ struct GlassCard<Content: View>: View {
     }
 }
 
+/// Actions partagées : primaire encre, accent terracotta ; API historique conservée.
 struct GradientButton: View {
     enum Style { case primary, secondary, ghost, accent, destructive }
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.isEnabled) private var isEnabled
 
     let title: String
     let systemImage: String?
@@ -66,10 +70,6 @@ struct GradientButton: View {
         self.init(title, systemImage: systemImage, isBusy: isBusy, style: isProminent ? .primary : .secondary, action: action)
     }
 
-    // Boutons « Crème & Terre cuite » : capsules hauteur 56, libellé Bricolage
-    // SemiBold 16. Primaire = encre pleine ; accent (action en cours / stop) =
-    // brique ; secondaire = surface + ombre repos ; destructif = texte danger
-    // sur teinte danger. Aucune bordure.
     var body: some View {
         Button {
             Haptics.medium()
@@ -84,24 +84,37 @@ struct GradientButton: View {
                 }
                 Text(LocalizedStringKey(title))
                     .font(SQType.button)
-                    .lineLimit(allowsMultiline ? nil : 1)
-                    .minimumScaleFactor(allowsMultiline ? 1 : 0.82)
+                    .lineLimit(allowsMultiline || dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: allowsMultiline)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, allowsMultiline ? SQSpace.lg : 0)
-            .padding(.vertical, allowsMultiline ? SQSpace.sm : 0)
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.vertical, SQSpace.sm)
             .frame(maxWidth: .infinity)
-            .frame(minHeight: 56)
+            .frame(minHeight: SQSpace.primaryActionHeight)
             .foregroundStyle(foreground)
-            .background(background, in: Capsule(style: .continuous))
-            .modifier(GradientButtonShadow(style: style))
+            .background {
+                switch style {
+                case .primary, .accent:
+                    Capsule(style: .continuous).fill(background)
+                default:
+                    RoundedRectangle(cornerRadius: SQRadius.control, style: .continuous)
+                        .fill(background)
+                }
+            }
+            .overlay {
+                if style == .secondary {
+                    RoundedRectangle(cornerRadius: SQRadius.control, style: .continuous)
+                        .strokeBorder(SQColor.controlOutline, lineWidth: 1)
+                }
+            }
         }
         .disabled(isBusy)
         .buttonStyle(SQPressButtonStyle())
     }
 
     private var foreground: Color {
+        guard isEnabled else { return SQColor.labelSecondary }
         switch style {
         case .primary: return SQColor.onInk
         case .accent: return SQColor.onAccent
@@ -111,9 +124,10 @@ struct GradientButton: View {
     }
 
     private var background: AnyShapeStyle {
+        guard isEnabled else { return AnyShapeStyle(SQColor.surfaceMuted) }
         switch style {
         case .primary: return AnyShapeStyle(SQColor.label)
-        case .accent: return AnyShapeStyle(SQColor.brandRed)
+        case .accent: return AnyShapeStyle(SQColor.accent)
         case .secondary: return AnyShapeStyle(SQColor.surface)
         case .ghost: return AnyShapeStyle(Color.clear)
         case .destructive: return AnyShapeStyle(SQColor.dangerSoft)
@@ -121,31 +135,12 @@ struct GradientButton: View {
     }
 }
 
-/// Ombre portée par style de bouton : encre sous le primaire, brique sous
-/// l'accent, repos sous le secondaire, rien sous ghost/destructif.
-private struct GradientButtonShadow: ViewModifier {
-    let style: GradientButton.Style
-
-    func body(content: Content) -> some View {
-        switch style {
-        case .primary:
-            content.shadow(color: SQColor.shadowDock, radius: 12, x: 0, y: 10)
-        case .accent:
-            content.sqShadowAccent()
-        case .secondary:
-            content.sqShadowSoft()
-        case .ghost, .destructive:
-            content
-        }
-    }
-}
-
-/// Léger enfoncement au tap (press = scale 0.97, 160 ms).
+/// Retour tactile visuel court, sans réduction sous Reduce Motion.
 struct SQPressButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.985 : 1)
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }

@@ -2,6 +2,35 @@ import SwiftUI
 import MapKit
 import UIKit
 
+/// Keeps custom accessibility content outside MapKit's specialized AX tree.
+/// The map still owns all drawing and gestures; both siblings fill this view.
+@MainActor
+final class SQMapKitContainerView: UIView {
+    let mapView = SQViewportMapView(frame: .zero)
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        installMap()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        installMap()
+    }
+
+    private func installMap() {
+        isAccessibilityElement = false
+        mapView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(mapView)
+        NSLayoutConstraint.activate([
+            mapView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            mapView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            mapView.topAnchor.constraint(equalTo: topAnchor),
+            mapView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+}
+
 /// Carte principale rendue avec MapKit (Apple Plan natif). Consomme les MÊMES
 /// payloads que le moteur de rendu (`renderedAnnotations`, etc.).
 struct MapKitMapView: UIViewRepresentable {
@@ -12,6 +41,7 @@ struct MapKitMapView: UIViewRepresentable {
     /// Permet à `updateUIView` de distinguer « les données ont changé » de « seule la
     /// caméra a bougé » et d'éviter le hash/compare O(n) des couches à chaque pan.
     let renderVersion: Int
+    let viewportRefreshID: Int
     let colorScheme: ColorScheme
     /// Espace réservé aux ornements MapKit (logo Apple / mentions légales).
     /// La carte peut rester plein écran, mais ses mentions ne doivent pas passer
@@ -19,7 +49,7 @@ struct MapKitMapView: UIViewRepresentable {
     let ornamentBottomInset: CGFloat
     @Binding var center: CLLocationCoordinate2D
     @Binding var zoom: Double
-    let onMoveEnd: (MapBounds, Double) -> Void
+    let onMoveEnd: (MapViewportSnapshot, MKCoordinateRegion) -> Void
     let onSelect: (MapAnnotationPayload) -> Void
     @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
     var backdrop: MapBackdrop { MapBackdrop.resolve(backdropRaw) }
@@ -30,8 +60,13 @@ struct MapKitMapView: UIViewRepresentable {
         Coordinator(center: $center, zoom: $zoom, onMoveEnd: onMoveEnd, onSelect: onSelect)
     }
 
-    func makeUIView(context: Context) -> MKMapView {
-        let map = MKMapView(frame: .zero)
+    func makeUIView(context: Context) -> SQMapKitContainerView {
+        let container = SQMapKitContainerView(frame: .zero)
+        let map = container.mapView
+        map.onViewportLayout = { [weak coordinator = context.coordinator, weak map] viewport in
+            guard let map else { return }
+            coordinator?.publishViewport(viewport, from: map)
+        }
         map.delegate = context.coordinator
         applyOrnamentInsets(to: map)
         map.showsUserLocation = true
@@ -57,15 +92,16 @@ struct MapKitMapView: UIViewRepresentable {
         tap.delegate = context.coordinator
         tap.cancelsTouchesInView = false
         map.addGestureRecognizer(tap)
-        context.coordinator.installSpeedtestAccessibility(on: map)
+        context.coordinator.installSpeedtestAccessibility(on: map, in: container)
         let region = MKCoordinateRegion(center: center, span: Coordinator.span(forZoom: zoom, width: Self.referenceWidth))
         map.setRegion(region, animated: false)
         context.coordinator.lastAppliedCenter = center
         context.coordinator.lastAppliedZoom = zoom
-        return map
+        return container
     }
 
-    func updateUIView(_ map: MKMapView, context: Context) {
+    func updateUIView(_ container: SQMapKitContainerView, context: Context) {
+        let map = container.mapView
         applyOrnamentInsets(to: map)
         context.coordinator.applyBackdrop(backdrop, on: map)
         // PERF-MAP-03 : ne resynchroniser les couches que si les données ont changé.
@@ -78,19 +114,20 @@ struct MapKitMapView: UIViewRepresentable {
             context.coordinator.apply(annotations: annotations, on: map)
         }
         context.coordinator.applyCameraIfNeeded(center: center, zoom: zoom, on: map)
+        if context.coordinator.lastViewportRefreshID != viewportRefreshID {
+            context.coordinator.lastViewportRefreshID = viewportRefreshID
+            (map as? SQViewportMapView)?.requestViewportDelivery()
+        }
     }
 
     private func applyOrnamentInsets(to map: MKMapView) {
-        guard abs(map.layoutMargins.bottom - ornamentBottomInset) > 0.5 else { return }
-        var margins = map.layoutMargins
-        margins.bottom = ornamentBottomInset
-        map.layoutMargins = margins
+        (map as? SQViewportMapView)?.setOrnamentBottomInset(ornamentBottomInset)
     }
 
     @MainActor final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
         @Binding var center: CLLocationCoordinate2D
         @Binding var zoom: Double
-        let onMoveEnd: (MapBounds, Double) -> Void
+        let onMoveEnd: (MapViewportSnapshot, MKCoordinateRegion) -> Void
         let onSelect: (MapAnnotationPayload) -> Void
         var annotationsById: [String: SQMapKitAnnotation] = [:]
         var payloadsById: [String: MapAnnotationPayload] = [:]
@@ -107,13 +144,15 @@ struct MapKitMapView: UIViewRepresentable {
         var appliedBackdrop: MapBackdrop?
         var tileOverlay: MKTileOverlay?
         var lastRenderVersion = -1
+        var lastViewportRefreshID = -1
+        private var isMovingCamera = false
         /// Dernier cap de carte propagé aux marqueurs. Les lobes d'azimut sont
         /// dessinés en repère écran : ils doivent contre-tourner quand la carte
         /// pivote, mais ne rien recalculer tant qu'elle ne pivote pas.
         var lastAppliedMapHeading: Double = 0
 
         init(center: Binding<CLLocationCoordinate2D>, zoom: Binding<Double>,
-             onMoveEnd: @escaping (MapBounds, Double) -> Void,
+             onMoveEnd: @escaping (MapViewportSnapshot, MKCoordinateRegion) -> Void,
              onSelect: @escaping (MapAnnotationPayload) -> Void) {
             _center = center
             _zoom = zoom
@@ -236,13 +275,19 @@ struct MapKitMapView: UIViewRepresentable {
             updateSpeedtestAccessibility(on: map)
         }
 
-        func installSpeedtestAccessibility(on map: MKMapView) {
-            let container = UIView(frame: map.bounds)
+        func installSpeedtestAccessibility(on map: MKMapView, in host: UIView) {
+            let container = UIView(frame: host.bounds)
             container.backgroundColor = .clear
             container.isUserInteractionEnabled = false
             container.isAccessibilityElement = false
-            container.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            map.addSubview(container)
+            container.translatesAutoresizingMaskIntoConstraints = false
+            host.addSubview(container)
+            NSLayoutConstraint.activate([
+                container.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+                container.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+                container.topAnchor.constraint(equalTo: host.topAnchor),
+                container.bottomAnchor.constraint(equalTo: host.bottomAnchor)
+            ])
             speedtestAccessibilityContainer = container
             updateSpeedtestAccessibility(on: map)
         }
@@ -253,7 +298,7 @@ struct MapKitMapView: UIViewRepresentable {
             guard let container = speedtestAccessibilityContainer else { return }
             let centerPoint = MKMapPoint(map.centerCoordinate)
             let visible = latestSpeedtestFeatures
-                .filter { map.visibleMapRect.contains(MKMapPoint($0.coordinate)) }
+                .filter { map.bounds.contains(map.convert($0.coordinate, toPointTo: map)) }
                 .sorted {
                     MKMapPoint($0.coordinate).distance(to: centerPoint)
                         < MKMapPoint($1.coordinate).distance(to: centerPoint)
@@ -403,6 +448,7 @@ struct MapKitMapView: UIViewRepresentable {
 
         // MARK: Caméra — n'applique QUE les changements programmatiques (GPS, cluster).
         func applyCameraIfNeeded(center: CLLocationCoordinate2D, zoom: Double, on map: MKMapView) {
+            guard CLLocationCoordinate2DIsValid(center), zoom.isFinite else { return }
             let movedCenter = lastAppliedCenter.map {
                 abs($0.latitude - center.latitude) > 0.00005 || abs($0.longitude - center.longitude) > 0.00005
             } ?? true
@@ -414,23 +460,35 @@ struct MapKitMapView: UIViewRepresentable {
             map.setRegion(MKCoordinateRegion(center: center, span: Self.span(forZoom: zoom, width: width)), animated: true)
         }
 
+        func mapView(_ map: MKMapView, regionWillChangeAnimated animated: Bool) {
+            isMovingCamera = true
+        }
+
         func mapView(_ map: MKMapView, regionDidChangeAnimated animated: Bool) {
-            let width = map.bounds.width > 0 ? map.bounds.width : MapKitMapView.referenceWidth
-            let z = Self.zoom(forRegion: map.region, width: width)
-            // Reflète l'état réel dans les bindings (le guard ci-dessus évite la boucle).
-            lastAppliedCenter = map.centerCoordinate
-            lastAppliedZoom = z
-            center = map.centerCoordinate
-            zoom = z
-            let r = map.region
-            let bounds = MapBounds(
-                north: r.center.latitude + r.span.latitudeDelta / 2,
-                south: r.center.latitude - r.span.latitudeDelta / 2,
-                east: r.center.longitude + r.span.longitudeDelta / 2,
-                west: r.center.longitude - r.span.longitudeDelta / 2
-            )
-            onMoveEnd(bounds, z)
+            isMovingCamera = false
+            (map as? SQViewportMapView)?.requestViewportDelivery()
             updateSpeedtestAccessibility(on: map)
+        }
+
+        func publishViewport(_ viewport: MapViewportSnapshot, from map: MKMapView) {
+            #if DEBUG
+            (map as? SQViewportMapView)?.recordViewportForQA(event: isMovingCamera ? "candidate-moving" : "candidate-still", snapshot: viewport)
+            #endif
+            guard !isMovingCamera else { return }
+            // Un binding peut déjà demander une nouvelle caméra, alors qu'une
+            // livraison de layout de l'ancienne attend encore dans la main queue.
+            if let lastAppliedCenter,
+               abs(lastAppliedCenter.latitude - center.latitude) > 0.00005
+                || abs(lastAppliedCenter.longitude - center.longitude) > 0.00005 { return }
+            if let lastAppliedZoom, abs(lastAppliedZoom - zoom) > 0.01 { return }
+            lastAppliedCenter = map.centerCoordinate
+            lastAppliedZoom = viewport.zoom
+            center = map.centerCoordinate
+            zoom = viewport.zoom
+            #if DEBUG
+            (map as? SQViewportMapView)?.recordViewportForQA(event: "published", snapshot: viewport)
+            #endif
+            onMoveEnd(viewport, map.region)
         }
 
         func mapView(_ map: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {

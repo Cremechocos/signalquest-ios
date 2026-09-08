@@ -10482,7 +10482,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Choose a carrier to display coverage."
+            "value": "Choose an operator to display coverage."
           }
         },
         "fr": {
@@ -41627,6 +41627,660 @@
           "stringUnit": {
             "state": "translated",
             "value": "Curve: %@"
+          }
+        }
+      }
+    },
+    "Cette zone dépasse la projection disponible pour la carte.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette zone dépasse la projection disponible pour la carte."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This area is outside the projection available for the map."
+          }
+        }
+      }
+    },
+    "Vue cartographique indisponible. Déplace la carte pour réessayer.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vue cartographique indisponible. Déplace la carte pour réessayer."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The map view is unavailable. Move the map to try again."
+          }
+        }
+      }
+    },
+    "Une partie de cette zone dépasse la projection de la carte.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une partie de cette zone dépasse la projection de la carte."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Part of this area is outside the map projection."
+          }
+        }
+      }
+    },
+    "Niveau de détail adapté pour couvrir toute la zone visible. Zoome pour préciser.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niveau de détail adapté pour couvrir toute la zone visible. Zoome pour préciser."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detail adjusted to cover the visible area. Zoom in for more detail."
+          }
+        }
+      }
+    },
+    "Une limite de données a été atteinte. Zoome pour explorer plus précisément cette zone.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une limite de données a été atteinte. Zoome pour explorer plus précisément cette zone."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A data limit has been reached. Zoom in to explore this area in more detail."
+          }
+        }
+      }
+    },
+    "Certains signalements sont momentanément indisponibles.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Certains signalements sont momentanément indisponibles."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some reports are temporarily unavailable."
+          }
+        }
+      }
+    },
+    "Préparation de la carte…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Préparation de la carte…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing the map…"
+          }
+        }
+      }
+    },
+    "Aucun résultat reçu pour cette vue et ces filtres.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun résultat reçu pour cette vue et ces filtres."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No results received for this view and these filters."
+          }
+        }
+      }
+    },
+    "Chargement interrompu. Déplace la carte pour réessayer.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chargement interrompu. Déplace la carte pour réessayer."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading interrupted. Move the map to try again."
+          }
+        }
+      }
+    },
+    "Données cartographiques indisponibles.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Map data is unavailable."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Données cartographiques indisponibles."
+          }
+        }
+      }
+    },
+    "Données incomplètes. Certaines zones sont indisponibles.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incomplete data. Some areas are unavailable."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Données incomplètes. Certaines zones sont indisponibles."
+          }
+        }
+      }
+    },
+    "Les zones non actualisées conservent leurs dernières données.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Areas that could not be refreshed keep their last available data."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les zones non actualisées conservent leurs dernières données."
+          }
+        }
+      }
+    },
+    "Choisis ce que tu veux voir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose what you want to see."
+          }
+        }
+      }
+    },
+    "Filtres de la carte": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Map filters"
+          }
+        }
+      }
+    },
+    "Couches": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Layers"
+          }
+        }
+      }
+    },
+    "Réglages experts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expert filters"
+          }
+        }
+      }
+    },
+    "Les options incompatibles ont été ajustées au pays choisi.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Options that do not apply to the selected country have been adjusted."
+          }
+        }
+      }
+    },
+    "Dans ce pays, les sites proviennent de la communauté.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sites in this country are contributed by the community."
+          }
+        }
+      }
+    },
+    "Générations": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generations"
+          }
+        }
+      }
+    },
+    "Bandes et fréquences": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bands and frequencies"
+          }
+        }
+      }
+    },
+    "Mutualisation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Site sharing"
+          }
+        }
+      }
+    },
+    "Inclure les cellules non consolidées": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Include cells not yet consolidated"
+          }
+        }
+      }
+    },
+    "Filtres actuels": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current filters"
+          }
+        }
+      }
+    },
+    "Modifications à appliquer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes to apply"
+          }
+        }
+      }
+    },
+    "Appliquer les filtres": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply filters"
+          }
+        }
+      }
+    },
+    "Toutes générations": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All generations"
+          }
+        }
+      }
+    },
+    "Toutes bandes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All bands"
+          }
+        }
+      }
+    },
+    "Outre-mer français": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "French overseas territories"
+          }
+        }
+      }
+    },
+    "Les pays disponibles ont changé. Vérifie ton choix.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available countries have changed. Check your selection."
+          }
+        }
+      }
+    },
+    "Développé": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expanded"
+          }
+        }
+      }
+    },
+    "Réduit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapsed"
+          }
+        }
+      }
+    },
+    "Pays": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Country"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pays"
+          }
+        }
+      }
+    },
+    "Azimuts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azimuths"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azimuts"
+          }
+        }
+      }
+    },
+    "Certaines sources sont en panne. Les dernières données disponibles sont conservées.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some sources are unavailable. The latest available data is retained."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Certaines sources sont en panne. Les dernières données disponibles sont conservées."
+          }
+        }
+      }
+    },
+    "Aucune source vérifiée n’est disponible pour ce pays et cet opérateur.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No verified source is available for this country and carrier."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune source vérifiée n’est disponible pour ce pays et cet opérateur."
+          }
+        }
+      }
+    },
+    "Résultat partiel. Zoome pour préciser la zone.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partial results. Zoom in to narrow the area."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Résultat partiel. Zoome pour préciser la zone."
+          }
+        }
+      }
+    },
+    "Certains opérateurs ne disposent pas de source publique vérifiée.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some carriers have no verified public source."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Certains opérateurs ne disposent pas de source publique vérifiée."
+          }
+        }
+      }
+    },
+    "Le filtre de fréquence n’est pas disponible pour ces données. Zoome ou retire ce filtre pour les consulter.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The frequency filter is unavailable for this data. Zoom in or remove the filter to view it."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le filtre de fréquence n’est pas disponible pour ces données. Zoome ou retire ce filtre pour les consulter."
+          }
+        }
+      }
+    },
+    "Les sources prévisionnelles ne sont pas disponibles dans ce pays.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planned-site sources are not available in this country."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les sources prévisionnelles ne sont pas disponibles dans ce pays."
+          }
+        }
+      }
+    },
+    "Filtres actifs : %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active filters: %lld"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtres actifs : %lld"
+          }
+        }
+      }
+    },
+    "Excellent": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excellent"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excellent"
+          }
+        }
+      }
+    },
+    "Bon": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bon"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Good"
+          }
+        }
+      }
+    },
+    "Moyen": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moyen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fair"
+          }
+        }
+      }
+    },
+    "Faible": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Faible"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weak"
+          }
+        }
+      }
+    },
+    "Inconnu": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inconnu"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown"
+          }
+        }
+      }
+    },
+    "Vue partielle": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vue partielle"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partial view"
+          }
+        }
+      }
+    },
+    "Choisir les couleurs et consulter la légende": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir les couleurs et consulter la légende"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose colors and view the legend"
+          }
+        }
+      }
+    },
+    "Consulter les limites des données affichées": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consulter les limites des données affichées"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View limits of the displayed data"
           }
         }
       }

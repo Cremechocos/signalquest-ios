@@ -143,7 +143,7 @@ final class AuthSessionTests: XCTestCase {
 
     // MARK: ROB-02 — signal global de session expirée
 
-    func testSessionExpiredNotificationRoutesToLogin() async {
+    func testSessionExpiredNotificationRoutesToLogin() async throws {
         let mock = MockAuthService()
         mock.storedCredentials = true
         mock.cacheUser(.mock)
@@ -157,7 +157,11 @@ final class AuthSessionTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 30_000_000)
         XCTAssertEqual(vm.state, .authenticated(.mock))
 
-        NotificationCenter.default.post(name: .sqAuthSessionExpired, object: nil)
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-expired-session")
+        let expiration = AuthSessionExpiration(credentials: credentials, snapshot: credentials.snapshot(),
+            localSession: LocalAccountScope.sessionSnapshot())
+        NotificationCenter.default.post(name: .sqAuthSessionExpired, object: expiration)
 
         await waitUntil { vm.state == .loggedOut && mock.clearLocalSessionCount >= 1 }
         XCTAssertEqual(vm.state, .loggedOut, "un 401 non récupérable doit re-router vers login (ROB-02)")
@@ -165,13 +169,55 @@ final class AuthSessionTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(mock.clearLocalSessionCount, 1)
     }
 
-    func testSessionExpiredIgnoredWhenNotAuthenticated() async {
+    func testSessionExpiredIgnoredWhenNotAuthenticated() async throws {
         let mock = MockAuthService()
         let vm = AuthSessionViewModel(service: mock)
         // État initial `.checking` (ni authentifié).
-        NotificationCenter.default.post(name: .sqAuthSessionExpired, object: nil)
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-expired-session")
+        let expiration = AuthSessionExpiration(credentials: credentials, snapshot: credentials.snapshot(),
+            localSession: LocalAccountScope.sessionSnapshot())
+        NotificationCenter.default.post(name: .sqAuthSessionExpired, object: expiration)
         await waitUntil(timeout: 0.3) { vm.state == .loggedOut }
         // Ne bascule PAS : rien à déconnecter, et surtout aucune boucle de nettoyage.
+        XCTAssertEqual(mock.clearLocalSessionCount, 0)
+    }
+
+    func testQueuedExpirationFromAccountACannotLogOutAccountB() async throws {
+        let mock = MockAuthService()
+        mock.storedCredentials = true
+        mock.meResult = .success(makeSecondUser())
+        mock.cacheUser(makeSecondUser())
+        let vm = AuthSessionViewModel(service: mock)
+        await vm.bootstrap()
+        await waitUntil { mock.meCallCount >= 1 }
+        try await Task.sleep(nanoseconds: 30_000_000)
+
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("account-a")
+        let expirationA = AuthSessionExpiration(credentials: credentials, snapshot: credentials.snapshot(),
+            localSession: LocalAccountScope.sessionSnapshot())
+        try credentials.setAccessToken("account-b")
+        NotificationCenter.default.post(name: .sqAuthSessionExpired, object: expirationA)
+        await Task.yield()
+
+        XCTAssertEqual(vm.state, .authenticated(makeSecondUser()))
+        XCTAssertEqual(mock.clearLocalSessionCount, 0)
+        XCTAssertNil(vm.infoMessage)
+    }
+
+    func testUnscopedExpirationNotificationCannotLogOutAuthenticatedUser() async throws {
+        let mock = MockAuthService()
+        mock.storedCredentials = true
+        mock.cacheUser(.mock)
+        let vm = AuthSessionViewModel(service: mock)
+        await vm.bootstrap()
+        await waitUntil { mock.meCallCount >= 1 }
+        try await Task.sleep(nanoseconds: 30_000_000)
+
+        NotificationCenter.default.post(name: .sqAuthSessionExpired, object: nil)
+        await Task.yield()
+        XCTAssertEqual(vm.state, .authenticated(.mock))
         XCTAssertEqual(mock.clearLocalSessionCount, 0)
     }
 }

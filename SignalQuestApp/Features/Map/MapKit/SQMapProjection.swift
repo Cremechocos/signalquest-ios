@@ -18,8 +18,8 @@ enum SQMapProjection {
     }
 
     static func zoom(forRegion region: MKCoordinateRegion, width: CGFloat) -> Double {
-        let lonDelta = max(region.span.longitudeDelta, 0.0000001)
-        return log2(Double(width) * 360.0 / (256.0 * lonDelta))
+        (try? MapViewportProjection.zoom(longitudeDelta: region.span.longitudeDelta,
+                                         widthPoints: Double(width))) ?? .nan
     }
 
     /// Longueur des lobes d'azimut, en points, selon le zoom. Nulle en dessous

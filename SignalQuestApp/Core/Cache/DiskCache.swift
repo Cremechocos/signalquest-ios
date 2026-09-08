@@ -34,8 +34,8 @@ actor DiskCache {
         try? fileManager.createDirectory(at: root, withIntermediateDirectories: true)
     }
 
-    func write<T: Codable>(_ value: T, for key: String) async throws {
-        let data = try encoder.encode(CacheEnvelope(createdAt: Date(), value: value))
+    func write<T: Codable>(_ value: T, for key: String, createdAt: Date = Date()) async throws {
+        let data = try encoder.encode(CacheEnvelope(createdAt: createdAt, value: value))
         let fileURL = url(for: key)
         try data.write(to: fileURL, options: [.atomic])
         if let fileProtection {
@@ -45,6 +45,12 @@ actor DiskCache {
     }
 
     func read<T: Codable>(_ type: T.Type, for key: String, maxAge: TimeInterval? = nil) async throws -> T? {
+        try await readEntry(type, for: key, maxAge: maxAge)?.value
+    }
+
+    /// Conserve la date d'origine lors d'une promotion disque vers mémoire.
+    /// Le format sur disque est identique aux enveloppes déjà enregistrées.
+    func readEntry<T: Codable>(_ type: T.Type, for key: String, maxAge: TimeInterval? = nil) async throws -> CacheEnvelope<T>? {
         let url = url(for: key)
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         let data = try Data(contentsOf: url)
@@ -52,7 +58,18 @@ actor DiskCache {
         if let maxAge, Date().timeIntervalSince(envelope.createdAt) > maxAge {
             return nil
         }
-        return envelope.value
+        return envelope
+    }
+
+    /// Uniquement les clés du cache appelant, jamais les files durables voisines.
+    func removeAll(withPrefix prefix: String) {
+        let safePrefix = url(for: prefix).deletingPathExtension().lastPathComponent
+        guard !safePrefix.isEmpty,
+              let files = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+        else { return }
+        for file in files where file.pathExtension == "json" && file.lastPathComponent.hasPrefix(safePrefix) {
+            try? FileManager.default.removeItem(at: file)
+        }
     }
 
     func remove(_ key: String) {
@@ -116,7 +133,9 @@ actor DiskCache {
     }
 }
 
-private struct CacheEnvelope<T: Codable>: Codable {
+struct CacheEnvelope<T: Codable>: Codable {
     let createdAt: Date
     let value: T
 }
+
+extension CacheEnvelope: Sendable where T: Sendable {}

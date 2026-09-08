@@ -9,6 +9,19 @@ extension Notification.Name {
     static let sqAuthSessionExpired = Notification.Name("fr.signalquest.ios.authSessionExpired")
 }
 
+/// Le contexte est vérifié à l'émission ET lorsque le main actor traite le
+/// signal. Une notification déjà en file ne doit jamais déconnecter le compte B.
+struct AuthSessionExpiration: Sendable {
+    let credentials: CredentialStore
+    let snapshot: CredentialStore.Snapshot
+    let localSession: LocalAccountSession?
+
+    var isCurrent: Bool {
+        credentials.isCurrent(snapshot, matchingRevision: true)
+            && LocalAccountScope.sessionSnapshot() == localSession
+    }
+}
+
 protocol APIClientProtocol: Sendable {
     func request<T: Decodable>(_ endpoint: APIEndpoint, as type: T.Type) async throws -> T
     func request(_ endpoint: APIEndpoint) async throws
@@ -33,7 +46,20 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     private let logger = Logger(subsystem: "fr.signalquest.ios", category: "APIClient")
     /// Coalesces concurrent refresh attempts so we hit /api/auth/refresh once
     /// even if several requests 401 at the same time.
-    private let refreshState = OSAllocatedUnfairLock<Task<Void, Error>?>(initialState: nil)
+    private struct RefreshAttempt {
+        let sessionID: UUID
+        let task: Task<Void, Error>
+    }
+    private let refreshState = OSAllocatedUnfairLock<RefreshAttempt?>(initialState: nil)
+    private struct Response {
+        let data: Data
+        let context: CredentialStore.Snapshot
+    }
+    private struct SingleAttemptResponse {
+        let data: Data
+        let response: HTTPURLResponse
+        let context: CredentialStore.Snapshot
+    }
 
     /// Session propriétaire du client.
     ///
@@ -93,26 +119,38 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     // MARK: Public surface
 
     func request<T: Decodable>(_ endpoint: APIEndpoint, as type: T.Type) async throws -> T {
-        let (data, response) = try await performWithRefresh(endpoint)
-        try credentials.captureFromResponse(response)
+        let expected = credentials.snapshot().sessionID
+        return try await request(endpoint, as: type, expectedSessionID: expected)
+    }
+
+    func request<T: Decodable>(_ endpoint: APIEndpoint, as type: T.Type, expectedSessionID: UUID?) async throws -> T {
+        let context = credentials.snapshot()
+        guard expectedSessionID == nil || context.sessionID == expectedSessionID else { throw APIError.cancelled }
+        let result = try await performWithRefresh(endpoint, context: context)
+        guard credentials.isCurrent(result.context) else { throw APIError.cancelled }
+        let decoded: T
         do {
-            return try decoder.decode(T.self, from: data)
+            decoded = try decoder.decode(T.self, from: result.data)
         } catch {
             throw APIError.decoding(error.localizedDescription)
         }
+        guard credentials.isCurrent(result.context) else { throw APIError.cancelled }
+        return decoded
     }
 
     func request(_ endpoint: APIEndpoint) async throws {
-        let (_, response) = try await performWithRefresh(endpoint)
-        try credentials.captureFromResponse(response)
+        let result = try await performWithRefresh(endpoint, context: credentials.snapshot())
+        guard credentials.isCurrent(result.context) else { throw APIError.cancelled }
     }
 
     /// Variante brute : renvoie le corps de réponse tel quel. Utilisée par les
     /// caches (tuiles) qui stockent les octets et décodent ensuite.
-    func requestData(_ endpoint: APIEndpoint) async throws -> Data {
-        let (data, response) = try await performWithRefresh(endpoint)
-        try credentials.captureFromResponse(response)
-        return data
+    func requestData(_ endpoint: APIEndpoint, expectedSessionID: UUID? = nil) async throws -> Data {
+        let context = credentials.snapshot()
+        guard expectedSessionID == nil || context.sessionID == expectedSessionID else { throw APIError.cancelled }
+        let result = try await performWithRefresh(endpoint, context: context)
+        guard credentials.isCurrent(result.context) else { throw APIError.cancelled }
+        return result.data
     }
 
     /// Tentative réseau brute et unique. Contrairement à `request`, cette voie
@@ -125,17 +163,20 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         expectedSession: LocalAccountSession? = nil
     ) async throws -> (Data, HTTPURLResponse) {
         guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
-        var request = try makeURLRequest(endpoint)
+        let context = credentials.snapshot()
+        var request = try makeURLRequest(endpoint, credentials: context)
         if let fixedAuthToken {
             request.setValue("auth_token=\(fixedAuthToken)", forHTTPHeaderField: "Cookie")
             request.httpShouldHandleCookies = false
         }
         guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
-        let result = try await performSingleAttempt(request, captureCredentials: expectedSession == nil) { request in
+        let result = try await performSingleAttempt(request, context: context,
+            captureCredentials: expectedSession == nil, startsNewSession: !endpoint.authenticated) { request in
             try await self.session.data(for: request)
         }
         guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
-        return result
+        guard credentials.isCurrent(result.context) else { throw APIError.cancelled }
+        return (result.data, result.response)
     }
 
     /// Variante fichier de la tentative unique. Le corps doit être absent de
@@ -148,10 +189,14 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         guard endpoint.body == nil else {
             throw APIError.transport("single-attempt-upload-body-must-be-file")
         }
-        let request = try makeURLRequest(endpoint)
-        return try await performSingleAttempt(request) { request in
+        let context = credentials.snapshot()
+        let request = try makeURLRequest(endpoint, credentials: context)
+        let result = try await performSingleAttempt(request, context: context,
+            startsNewSession: !endpoint.authenticated) { request in
             try await self.session.upload(for: request, fromFile: fileURL)
         }
+        guard credentials.isCurrent(result.context) else { throw APIError.cancelled }
+        return (result.data, result.response)
     }
 
     func requestJSON<T: Decodable, Body: Encodable>(
@@ -277,6 +322,10 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     }
 
     func makeURLRequest(_ endpoint: APIEndpoint) throws -> URLRequest {
+        try makeURLRequest(endpoint, credentials: credentials.snapshot())
+    }
+
+    private func makeURLRequest(_ endpoint: APIEndpoint, credentials snapshot: CredentialStore.Snapshot) throws -> URLRequest {
         let base = endpoint.baseURL ?? config.apiBaseURL
         guard var components = URLComponents(
             url: base.appendingPathComponent(endpoint.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))),
@@ -298,10 +347,19 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             request.setValue(value, forHTTPHeaderField: key)
         }
         endpoint.headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+        let cacheDirectives = endpoint.headers.first {
+            $0.key.caseInsensitiveCompare("Cache-Control") == .orderedSame
+        }?.value.lowercased().split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } ?? []
+        if cacheDirectives.contains("no-cache") || cacheDirectives.contains("no-store") || cacheDirectives.contains("max-age=0") {
+            // Les caches métier décident déjà de leur fraîcheur. Une lecture
+            // réseau demandée ne doit pas recycler un ancien 200 de URLCache.
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+        }
         if let idempotencyKey = endpoint.idempotencyKey {
             request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
         }
-        if endpoint.authenticated, let token = credentials.accessToken() {
+        request.httpShouldHandleCookies = false
+        if endpoint.authenticated, let token = snapshot.accessToken {
             // Le backend n'authentifie QUE par le cookie `auth_token`
             // (`extractAuthToken` dans packages/db/auth.ts) ; l'en-tête
             // Authorization n'est lu que par `requireAdmin` et le secret
@@ -336,26 +394,38 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
 
     // MARK: Internals
 
-    private func performWithRefresh(_ endpoint: APIEndpoint, attempt: Int = 0) async throws -> (Data, URLResponse) {
+    private func performWithRefresh(
+        _ endpoint: APIEndpoint,
+        context: CredentialStore.Snapshot,
+        attempt: Int = 0
+    ) async throws -> Response {
+        let sent = try credentials.snapshot(forSession: context)
         do {
-            return try await perform(endpoint)
-        } catch APIError.http(let status, let code, let message, let requestId, let retryAfter) where status == 401 && endpoint.authenticated && !endpoint.skipsAutoRefresh {
+            return try await perform(endpoint, context: sent)
+        } catch APIError.http(let status, _, _, _, _) where status == 401 && endpoint.authenticated && !endpoint.skipsAutoRefresh {
             // Try a refresh once, then retry the original request. The endpoint's
             // idempotency key is unchanged, so a replayed POST won't duplicate.
             do {
-                try await ensureRefreshed()
+                try await ensureRefreshed(after: sent)
             } catch {
-                // Refresh impossible → session morte : signaler globalement pour
-                // re-router vers login (ROB-02) plutôt que laisser l'appelant avaler
-                // le 401 (souvent via `try?`).
-                notifySessionExpired()
-                throw APIError.http(status: status, code: code, message: message, requestId: requestId, retryAfter: retryAfter)
+                // Seul un refus d'authentification du refresh prouve l'expiration.
+                // Réseau coupé, 429, 5xx et annulation gardent leur nature : les
+                // appelants ne doivent pas transformer une panne en déconnexion.
+                guard credentials.isCurrent(sent) else { throw APIError.cancelled }
+                if case APIError.http(let refreshStatus, _, _, _, _) = error,
+                   refreshStatus == 401 || refreshStatus == 403 {
+                    guard credentials.isCurrent(sent, matchingRevision: true) else { throw APIError.cancelled }
+                    notifySessionExpired(for: sent)
+                }
+                throw error
             }
+            let retryContext = try credentials.snapshot(forSession: sent)
             do {
-                return try await perform(endpoint)
+                return try await perform(endpoint, context: retryContext)
             } catch APIError.http(let retryStatus, let retryCode, let retryMessage, let retryRequestId, let retryRetryAfter) where retryStatus == 401 {
                 // Refresh « réussi » mais le token reste rejeté → session morte.
-                notifySessionExpired()
+                guard credentials.isCurrent(retryContext, matchingRevision: true) else { throw APIError.cancelled }
+                notifySessionExpired(for: retryContext)
                 throw APIError.http(status: retryStatus, code: retryCode, message: retryMessage, requestId: retryRequestId, retryAfter: retryRetryAfter)
             }
         } catch APIError.http(let status, let code, let message, let requestId, let retryAfter)
@@ -366,7 +436,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
                 throw APIError.http(status: status, code: code, message: message, requestId: requestId, retryAfter: retryAfter)
             }
             try await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
-            return try await performWithRefresh(endpoint, attempt: attempt + 1)
+            return try await performWithRefresh(endpoint, context: context, attempt: attempt + 1)
         }
     }
 
@@ -376,31 +446,40 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     /// token avant de rouvrir le flux (SSE-API-07). Silencieux : un échec de
     /// refresh laisse simplement la reconnexion suivante échouer puis reboucler.
     func refreshSession() async {
-        try? await ensureRefreshed()
+        try? await ensureRefreshed(after: credentials.snapshot())
     }
 
     /// Diffuse « session expirée » (ROB-02). `NotificationCenter` est thread-safe ;
     /// l'observateur (AuthSessionViewModel) rebascule sur le main actor. Idempotent :
     /// plusieurs posts rapprochés se résolvent en un seul passage `.loggedOut`.
-    private func notifySessionExpired() {
-        NotificationCenter.default.post(name: .sqAuthSessionExpired, object: nil)
+    private func notifySessionExpired(for snapshot: CredentialStore.Snapshot) {
+        guard snapshot.accessToken != nil else { return }
+        let expiration = AuthSessionExpiration(credentials: credentials, snapshot: snapshot,
+            localSession: LocalAccountScope.sessionSnapshot())
+        guard expiration.isCurrent else { return }
+        NotificationCenter.default.post(name: .sqAuthSessionExpired, object: expiration)
     }
 
-    private func ensureRefreshed() async throws {
+    private func ensureRefreshed(after rejected: CredentialStore.Snapshot) async throws {
+        let current = try credentials.snapshot(forSession: rejected)
+        // Une autre requête a déjà renouvelé le token rejeté : utiliser ce token
+        // pour le rejeu sans lancer un deuxième refresh.
+        guard current.revision == rejected.revision else { return }
         let task: Task<Void, Error> = refreshState.withLock { existing in
-            if let existing { return existing }
+            if let existing, existing.sessionID == rejected.sessionID { return existing.task }
             let newTask = Task<Void, Error> { [weak self] in
-                guard let self else { return }
+                guard let self else { throw APIError.cancelled }
+                let latest = try self.credentials.snapshot(forSession: rejected)
+                guard latest.revision == rejected.revision else { return }
                 let endpoint = APIEndpoint(
                     path: "/api/auth/refresh",
                     method: .post,
                     authenticated: true,
                     skipsAutoRefresh: true
                 )
-                let (_, response) = try await self.perform(endpoint)
-                try self.credentials.captureFromResponse(response)
+                _ = try await self.perform(endpoint, context: latest)
             }
-            existing = newTask
+            existing = RefreshAttempt(sessionID: rejected.sessionID, task: newTask)
             return newTask
         }
         defer {
@@ -414,24 +493,26 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
                 // alors qu'elle est encore en vol ; D lance T3 → deux refresh
                 // concurrents. Sur un backend qui fait tourner la session, cela
                 // se solde par une déconnexion.
-                if state == task { state = nil }
+                if state?.task == task { state = nil }
             }
         }
         try await task.value
+        guard credentials.isCurrent(rejected) else { throw APIError.cancelled }
     }
 
-    private func perform(_ endpoint: APIEndpoint) async throws -> (Data, URLResponse) {
-        let request = try makeURLRequest(endpoint)
+    private func perform(_ endpoint: APIEndpoint, context: CredentialStore.Snapshot) async throws -> Response {
+        try Task.checkCancellation()
+        guard credentials.isCurrent(context) else { throw APIError.cancelled }
+        let request = try makeURLRequest(endpoint, credentials: context)
         if config.debugLogsEnabled {
             logger.debug("\(request.httpMethod ?? "GET", privacy: .public) \(request.url?.absoluteString ?? "-", privacy: .public)")
         }
+        let data: Data
+        let response: URLResponse
         do {
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse else { return (data, response) }
-            if (200..<300).contains(http.statusCode) {
-                return (data, response)
-            }
-            throw decodeHTTPError(data: data, response: http)
+            (data, response) = try await session.data(for: request)
+            try Task.checkCancellation()
+            guard credentials.isCurrent(context) else { throw APIError.cancelled }
         } catch is CancellationError {
             throw APIError.cancelled
         } catch let error as APIError {
@@ -445,23 +526,39 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         } catch {
             throw APIError.transport(error.localizedDescription)
         }
+        guard let http = response as? HTTPURLResponse else {
+            return Response(data: data, context: context)
+        }
+        guard (200..<300).contains(http.statusCode) else { throw decodeHTTPError(data: data, response: http) }
+        // L'échec de persistance du token reste une erreur de stockage, pas un
+        // faux succès auth ni une panne réseau (contrat de connexion existant).
+        let captured = try credentials.captureFromResponse(response, for: context, startsNewSession: !endpoint.authenticated)
+        return Response(data: data, context: captured)
     }
 
     private func performSingleAttempt(
         _ request: URLRequest,
+        context: CredentialStore.Snapshot,
         captureCredentials: Bool = true,
+        startsNewSession: Bool = false,
         operation: (URLRequest) async throws -> (Data, URLResponse)
-    ) async throws -> (Data, HTTPURLResponse) {
+    ) async throws -> SingleAttemptResponse {
         if config.debugLogsEnabled {
             logger.debug("single-attempt \(request.httpMethod ?? "GET", privacy: .public) \(request.url?.absoluteString ?? "-", privacy: .public)")
         }
         do {
+            try Task.checkCancellation()
+            guard credentials.isCurrent(context) else { throw APIError.cancelled }
             let (data, response) = try await operation(request)
+            try Task.checkCancellation()
+            guard credentials.isCurrent(context) else { throw APIError.cancelled }
             guard let http = response as? HTTPURLResponse else {
                 throw APIError.transport("non-http-response")
             }
-            if captureCredentials { try credentials.captureFromResponse(response) }
-            return (data, http)
+            let captured = captureCredentials && (200..<300).contains(http.statusCode)
+                ? try credentials.captureFromResponse(response, for: context, startsNewSession: startsNewSession)
+                : context
+            return SingleAttemptResponse(data: data, response: http, context: captured)
         } catch is CancellationError {
             throw APIError.cancelled
         } catch let error as APIError {

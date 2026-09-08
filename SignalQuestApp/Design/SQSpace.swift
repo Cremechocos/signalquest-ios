@@ -11,4 +11,5 @@ enum SQSpace {
     static let xxl: CGFloat = 24
     static let xxxl: CGFloat = 32
     static let huge: CGFloat = 40
+    static let primaryActionHeight: CGFloat = 52
 }

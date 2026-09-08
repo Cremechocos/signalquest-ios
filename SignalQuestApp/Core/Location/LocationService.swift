@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import Combine
 
 @MainActor
 final class LocationService: NSObject, ObservableObject, CLLocationManagerDelegate {
@@ -13,9 +14,32 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     /// carte communautaire) à une position quittée depuis longtemps (TEL-01/ROB-04).
     static let defaultMaxLocationAge: TimeInterval = 60
 
-    private let manager: CLLocationManager
-    private var locationContinuations: [UUID: CheckedContinuation<CLLocation?, Never>] = [:]
-    private var authorizationContinuations: [UUID: CheckedContinuation<CLAuthorizationStatus, Never>] = [:]
+    private let manager: any LocationManagerDriving
+    /// requestLocation ne peut pas coexister avec startUpdatingLocation sur le
+    /// même CLLocationManager. Ce second gestionnaire garde les lectures
+    /// ponctuelles indépendantes du suivi et de ses paramètres d'énergie.
+    private let makeOneShotManager: @MainActor () -> any LocationManagerDriving
+    private var oneShotManager: (any LocationManagerDriving)?
+    private var oneShotDelegate: LocationOneShotDelegate?
+    private var oneShotGeneration: UUID?
+    private let now: @Sendable () -> Date
+    private let sleep: @Sendable (UInt64) async throws -> Void
+    private struct PendingLocation {
+        let continuation: CheckedContinuation<CLLocation?, Never>
+        let policy: LocationFixPolicy
+        let startedAt: Date
+        let startingFixSequence: UInt64
+        let timer: Task<Void, Never>
+        var acquisitionAttempts = 0
+    }
+    private var pending: [UUID: PendingLocation] = [:]
+    private var fixSequence: UInt64 = 0
+    private var trackingIsActive = false
+    private var oneShotOutstanding = false
+    private var authorizationRequested = false
+    private var cachedFix: CLLocation?
+    private var cacheGeneration = UUID()
+    private var cacheExpiration: Task<Void, Never>?
     /// Suivi continu demandé (drive test) : permet de (re)démarrer le tracking dès
     /// que l'autorisation est accordée, même si l'utilisateur valide le prompt après.
     /// Suivi continu demandé (rafale / drive test). Exposé en lecture parce que
@@ -68,15 +92,46 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     /// ouvertes en pile s'éteignent mutuellement.
     private var headingSubscribers = 0
 
-    override init() {
-        manager = CLLocationManager()
+    override convenience init() {
+        self.init(manager: CLLocationManager(), makeOneShotManager: { CLLocationManager() })
+    }
+
+    init(
+        manager: any LocationManagerDriving,
+        makeOneShotManager: @escaping @MainActor () -> any LocationManagerDriving,
+        now: @escaping @Sendable () -> Date = { Date() },
+        sleep: @escaping @Sendable (UInt64) async throws -> Void = { try await Task.sleep(nanoseconds: $0) }
+    ) {
+        self.manager = manager
+        self.makeOneShotManager = makeOneShotManager
+        self.now = now
+        self.sleep = sleep
         authorizationStatus = manager.authorizationStatus
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
     }
 
+    /// Ne confond pas le dernier relevé reçu avec une position admissible.
+    /// Les usages de consultation peuvent demander explicitement un âge plus
+    /// long ; les publications gardent le plafond par défaut.
+    func cachedLocation(maxAge: TimeInterval = LocationService.defaultMaxLocationAge,
+                        maximumAccuracy: CLLocationAccuracy? = nil) -> CLLocation? {
+        guard let cachedFix, isUsable(cachedFix, maxAge: maxAge, maximumAccuracy: maximumAccuracy) else { return nil }
+        return cachedFix
+    }
+
+    func isUsable(_ fix: CLLocation, maxAge: TimeInterval = LocationService.defaultMaxLocationAge,
+                  maximumAccuracy: CLLocationAccuracy? = nil) -> Bool {
+        LocationFixPolicy.isAuthorized(manager.authorizationStatus)
+            && LocationFixPolicy(maxAge: maxAge, maximumAccuracy: maximumAccuracy).accepts(fix, now: now())
+    }
+
+    deinit { cacheExpiration?.cancel() }
+
     func requestWhenInUse() {
+        guard manager.authorizationStatus == .notDetermined, !authorizationRequested else { return }
+        authorizationRequested = true
         manager.requestWhenInUseAuthorization()
     }
 
@@ -110,13 +165,15 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         case .authorizedWhenInUse, .authorizedAlways:
             beginTrackingNow()
         case .notDetermined:
-            manager.requestWhenInUseAuthorization() // le tracking démarrera à l'octroi
+            requestWhenInUse() // le tracking démarrera à l'octroi
         default:
             break // refusé : pas de tracking (le drive test tournera sans position)
         }
     }
 
     private func beginTrackingNow() {
+        guard !trackingIsActive else { return }
+        trackingIsActive = true
         manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
         // PERF-GPS-01 : ne livrer un fix que tous les 8 m (= le seuil applicatif de la
         // trace). Supprime les fixes redondants à l'arrêt / basse vitesse, qui
@@ -141,6 +198,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 
     /// Coupe réellement le suivi et restaure les réglages one-shot par défaut.
     private func endTrackingNow() {
+        trackingIsActive = false
         manager.stopUpdatingLocation()
         if manager.allowsBackgroundLocationUpdates {
             manager.allowsBackgroundLocationUpdates = false
@@ -167,78 +225,194 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     }
 
     func requestOneShotLocation() {
-        guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
-            requestWhenInUse()
-            return
-        }
-        manager.requestLocation()
+        Task { _ = await currentLocation() }
     }
 
     func currentLocation(
         timeoutSeconds: UInt64 = 8,
-        maxAge: TimeInterval = LocationService.defaultMaxLocationAge
+        maxAge: TimeInterval = LocationService.defaultMaxLocationAge,
+        maximumAccuracy: CLLocationAccuracy? = nil
     ) async -> CLLocation? {
-        // En suivi continu (drive test), `lastLocation` est rafraîchi en flux : on
-        // peut le renvoyer directement. Hors suivi, on ne le réutilise que s'il est
-        // récent ; périmé, on redemande un fix au lieu de renvoyer une vieille position.
-        if let lastLocation, wantsTracking || lastLocation.timestamp.timeIntervalSinceNow > -maxAge {
-            return lastLocation
+        let policy = LocationFixPolicy(maxAge: maxAge, maximumAccuracy: maximumAccuracy)
+        guard policy.isValid, !Task.isCancelled else { return nil }
+        refreshAuthorization()
+        if LocationFixPolicy.isAuthorized(authorizationStatus), let cached = cachedLocation(maxAge: maxAge, maximumAccuracy: maximumAccuracy) {
+            return cached
         }
-        if authorizationStatus == .notDetermined {
-            let status = await withCheckedContinuation { continuation in
-                let requestID = UUID()
-                authorizationContinuations[requestID] = continuation
-                if authorizationContinuations.count == 1 { requestWhenInUse() }
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: min(timeoutSeconds, 6) * 1_000_000_000)
-                    authorizationContinuations.removeValue(forKey: requestID)?
-                        .resume(returning: authorizationStatus)
+        guard authorizationStatus == .notDetermined || LocationFixPolicy.isAuthorized(authorizationStatus), timeoutSeconds > 0 else { return nil }
+        let id = UUID()
+        let startedAt = now()
+        let duration = min(timeoutSeconds, 60) * 1_000_000_000
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                guard !Task.isCancelled else { continuation.resume(returning: nil); return }
+                let delay = sleep
+                let timer = Task { @MainActor [weak self] in
+                    do { try await delay(duration) } catch { return }
+                    guard !Task.isCancelled else { return }
+                    self?.finishRequest(id, useAdmissibleCache: true)
+                }
+                pending[id] = PendingLocation(continuation: continuation, policy: policy, startedAt: startedAt, startingFixSequence: fixSequence, timer: timer)
+                if authorizationStatus == .notDetermined {
+                    requestWhenInUse()
+                } else {
+                    beginOneShotIfNeeded()
                 }
             }
-            authorizationStatus = status
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.finishRequest(id, useAdmissibleCache: false) }
         }
-        guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
-            return nil
+    }
+
+    private func beginOneShotIfNeeded() {
+        guard !oneShotOutstanding,
+              pending.values.contains(where: { $0.acquisitionAttempts < 2 }),
+              LocationFixPolicy.isAuthorized(manager.authorizationStatus) else { return }
+        for id in Array(pending.keys) { pending[id]?.acquisitionAttempts += 1 }
+        let generation = UUID()
+        let driver = makeOneShotManager()
+        let delegate = LocationOneShotDelegate(service: self, generation: generation)
+        oneShotManager = driver
+        oneShotDelegate = delegate
+        oneShotGeneration = generation
+        driver.delegate = delegate
+        oneShotOutstanding = true
+        let requested = pending.values.compactMap { $0.policy.maximumAccuracy }.min()
+        driver.desiredAccuracy = requested ?? kCLLocationAccuracyHundredMeters
+        driver.requestLocation()
+    }
+
+    private func finishRequest(_ id: UUID, useAdmissibleCache: Bool) {
+        guard let request = pending.removeValue(forKey: id) else { return }
+        request.timer.cancel()
+        let value: CLLocation?
+        if useAdmissibleCache, LocationFixPolicy.isAuthorized(manager.authorizationStatus), let cachedFix,
+           request.policy.maxAge != 0 || request.startingFixSequence != fixSequence,
+           request.policy.accepts(cachedFix, now: now(), requestedAt: request.startedAt) {
+            value = cachedFix
+        } else { value = nil }
+        request.continuation.resume(returning: value)
+        if pending.isEmpty, authorizationStatus == .notDetermined { authorizationRequested = false }
+        if pending.isEmpty { retireOneShot() }
+    }
+
+    private func retireOneShot() {
+        oneShotGeneration = nil
+        oneShotManager?.delegate = nil
+        if oneShotOutstanding { oneShotManager?.stopUpdatingLocation() }
+        oneShotOutstanding = false
+        oneShotManager = nil
+        oneShotDelegate = nil
+    }
+
+    // Le jeton appartient au delegate créé pour cette acquisition, et non au
+    // manager réutilisé ni à la génération lue au traitement d'un ancien callback.
+    func receiveLocations(_ locations: [CLLocation], generation: UUID) {
+        guard generation == oneShotGeneration else { return }
+        receiveLocations(locations, fromOneShot: true)
+    }
+
+    func receiveLocationFailure(_ error: Error, generation: UUID) {
+        guard generation == oneShotGeneration else { return }
+        receiveLocationFailure(error, fromOneShot: true)
+    }
+
+    /// Relit l'état natif au traitement, au lieu de réappliquer une ancienne
+    /// valeur capturée dans un callback mis en attente.
+    func refreshAuthorization() {
+        let status = manager.authorizationStatus
+        let changed = authorizationStatus != status
+        authorizationStatus = status
+        if status != .notDetermined { authorizationRequested = false }
+        if LocationFixPolicy.isAuthorized(status) {
+            if wantsTracking, !trackingIsActive { beginTrackingNow() }
+            if changed { beginOneShotIfNeeded() }
+        } else if status != .notDetermined {
+            cachedFix = nil
+            lastLocation = nil
+            cacheGeneration = UUID()
+            cacheExpiration?.cancel()
+            endTrackingNow()
+            manager.stopUpdatingHeading()
+            headingDegrees = nil
+            for id in Array(pending.keys) { finishRequest(id, useAdmissibleCache: false) }
         }
-        return await withCheckedContinuation { continuation in
-            let requestID = UUID()
-            locationContinuations[requestID] = continuation
-            if locationContinuations.count == 1 { manager.requestLocation() }
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: timeoutSeconds * 1_000_000_000)
-                locationContinuations.removeValue(forKey: requestID)?
-                    .resume(returning: lastLocation)
-            }
+    }
+
+    func receiveLocations(_ locations: [CLLocation], fromOneShot: Bool = false) {
+        refreshAuthorization()
+        guard LocationFixPolicy.isAuthorized(manager.authorizationStatus) else { return }
+        if fromOneShot {
+            oneShotOutstanding = false
+            retireOneShot()
         }
+        let clock = now()
+        let admissible = locations.filter {
+            LocationFixPolicy(maxAge: .greatestFiniteMagnitude, maximumAccuracy: nil).accepts($0, now: clock)
+        }.sorted { $0.timestamp > $1.timestamp }
+        guard let newest = admissible.first else {
+            if fromOneShot { beginOneShotIfNeeded() }
+            return
+        }
+        let previous = cachedFix
+        if cachedFix.map({ newest.timestamp >= $0.timestamp }) ?? true {
+            cachedFix = newest
+            fixSequence &+= 1
+            lastLocation = cachedLocation()
+            scheduleCacheExpiration()
+        }
+        errorMessage = nil
+        // Ne rediffuse ni un vieux relevé reçu en lot, ni deux fois le même
+        // relevé livré par les gestionnaires ponctuel et continu.
+        if isUsable(newest), previous.map({ newest.timestamp >= $0.timestamp }) ?? true,
+           previous?.timestamp != newest.timestamp || previous?.coordinate.latitude != newest.coordinate.latitude || previous?.coordinate.longitude != newest.coordinate.longitude {
+            for observer in Array(locationObservers.values) { observer(newest) }
+        }
+        for (id, request) in Array(pending) {
+            guard let value = admissible.first(where: { request.policy.accepts($0, now: clock, requestedAt: request.startedAt) }) else { continue }
+            pending.removeValue(forKey: id)?.timer.cancel()
+            request.continuation.resume(returning: value)
+        }
+        if pending.isEmpty { retireOneShot() }
+        else if fromOneShot { beginOneShotIfNeeded() }
+    }
+
+    private func scheduleCacheExpiration() {
+        cacheExpiration?.cancel()
+        let generation = UUID()
+        cacheGeneration = generation
+        guard let fix = lastLocation else { return }
+        let remaining = max(0, Self.defaultMaxLocationAge - now().timeIntervalSince(fix.timestamp)) + 0.01
+        let delay = sleep
+        cacheExpiration = Task { @MainActor [weak self] in
+            do { try await delay(UInt64(min(remaining, Self.defaultMaxLocationAge + LocationFixPolicy.futureTolerance + 0.1) * 1_000_000_000)) } catch { return }
+            guard !Task.isCancelled, let self, self.cacheGeneration == generation else { return }
+            self.lastLocation = self.cachedLocation()
+        }
+    }
+
+    func receiveLocationFailure(_ error: Error, fromOneShot: Bool = true) {
+        errorMessage = error.localizedDescription
+        if (error as? CLError)?.code == .denied {
+            cachedFix = nil
+            lastLocation = nil
+            cacheGeneration = UUID()
+            cacheExpiration?.cancel()
+        }
+        guard fromOneShot || (error as? CLError)?.code == .denied else { return }
+        for id in Array(pending.keys) { finishRequest(id, useAdmissibleCache: false) }
+        retireOneShot()
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        let status = manager.authorizationStatus
-        Task { @MainActor in
-            authorizationStatus = status
-            // Suivi continu demandé avant l'octroi : on le (re)démarre maintenant.
-            if wantsTracking, status == .authorizedWhenInUse || status == .authorizedAlways {
-                beginTrackingNow()
-            }
-            let continuations = Array(authorizationContinuations.values)
-            authorizationContinuations.removeAll()
-            continuations.forEach { $0.resume(returning: status) }
-        }
+        Task { @MainActor in self.refreshAuthorization() }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        let source = ObjectIdentifier(manager)
         Task { @MainActor in
-            lastLocation = locations.last
-            errorMessage = nil
-            if let last = locations.last {
-                // Copie avant itération : un abonné qui se désabonne depuis son
-                // propre handler (arrivée à destination, par exemple) muterait
-                // le dictionnaire en cours de parcours.
-                for observer in Array(locationObservers.values) { observer(last) }
-            }
-            let continuations = Array(locationContinuations.values)
-            locationContinuations.removeAll()
-            continuations.forEach { $0.resume(returning: locations.last) }
+            guard source == ObjectIdentifier(self.manager) else { return }
+            self.receiveLocations(locations)
         }
     }
 
@@ -262,11 +436,10 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        let source = ObjectIdentifier(manager)
         Task { @MainActor in
-            errorMessage = error.localizedDescription
-            let continuations = Array(locationContinuations.values)
-            locationContinuations.removeAll()
-            continuations.forEach { $0.resume(returning: nil) }
+            guard source == ObjectIdentifier(self.manager) else { return }
+            self.receiveLocationFailure(error, fromOneShot: false)
         }
     }
 }
