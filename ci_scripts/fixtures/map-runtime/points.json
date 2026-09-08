@@ -1,0 +1,123 @@
+[
+  {
+    "key": "ORANGE-NW",
+    "lat": 45.19,
+    "lng": 5.7089,
+    "operator": "ORANGE",
+    "tech": "4G",
+    "band": 3,
+    "source": "coverage",
+    "downloadMbps": 120,
+    "rsrp": -75
+  },
+  {
+    "key": "ORANGE-NE",
+    "lat": 45.19,
+    "lng": 5.7169,
+    "operator": "ORANGE",
+    "tech": "4G",
+    "band": 3,
+    "source": "coverage",
+    "downloadMbps": 160,
+    "rsrp": -80
+  },
+  {
+    "key": "ORANGE-C",
+    "lat": 45.188,
+    "lng": 5.7129,
+    "operator": "ORANGE",
+    "tech": "4G",
+    "band": 3,
+    "source": "coverage",
+    "downloadMbps": 200,
+    "rsrp": -85
+  },
+  {
+    "key": "ORANGE-SW",
+    "lat": 45.186,
+    "lng": 5.7089,
+    "operator": "ORANGE",
+    "tech": "4G",
+    "band": 3,
+    "source": "coverage",
+    "downloadMbps": 240,
+    "rsrp": -90
+  },
+  {
+    "key": "ORANGE-SE",
+    "lat": 45.186,
+    "lng": 5.7169,
+    "operator": "ORANGE",
+    "tech": "4G",
+    "band": 3,
+    "source": "coverage",
+    "downloadMbps": 280,
+    "rsrp": -95
+  },
+  {
+    "key": "SFR-NW",
+    "lat": 45.1903,
+    "lng": 5.7092,
+    "operator": "SFR",
+    "tech": "4G",
+    "band": 3,
+    "source": "coverage",
+    "downloadMbps": 120,
+    "rsrp": -75
+  },
+  {
+    "key": "SFR-NE",
+    "lat": 45.1903,
+    "lng": 5.7172,
+    "operator": "SFR",
+    "tech": "4G",
+    "band": 3,
+    "source": "coverage",
+    "downloadMbps": 160,
+    "rsrp": -80
+  },
+  {
+    "key": "SFR-C",
+    "lat": 45.188300000000005,
+    "lng": 5.7132000000000005,
+    "operator": "SFR",
+    "tech": "4G",
+    "band": 3,
+    "source": "coverage",
+    "downloadMbps": 200,
+    "rsrp": -85
+  },
+  {
+    "key": "SFR-SW",
+    "lat": 45.1863,
+    "lng": 5.7092,
+    "operator": "SFR",
+    "tech": "4G",
+    "band": 3,
+    "source": "coverage",
+    "downloadMbps": 240,
+    "rsrp": -90
+  },
+  {
+    "key": "SFR-SE",
+    "lat": 45.1863,
+    "lng": 5.7172,
+    "operator": "SFR",
+    "tech": "4G",
+    "band": 3,
+    "source": "coverage",
+    "downloadMbps": 280,
+    "rsrp": -95
+  },
+  {
+    "key": "ORANGE-IOS",
+    "lat": 45.188,
+    "lng": 5.7144,
+    "operator": "ORANGE",
+    "tech": "5G",
+    "band": 78,
+    "source": "ios",
+    "downloadMbps": 600,
+    "rsrp": null
+  }
+]

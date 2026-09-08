@@ -6,6 +6,7 @@ import CoreGraphics
 enum SQRadius {
     static let sm: CGFloat = 10
     static let md: CGFloat = 14
+    static let control = md
     static let lg: CGFloat = 20
     static let xl: CGFloat = 22
     static let xxl: CGFloat = 26

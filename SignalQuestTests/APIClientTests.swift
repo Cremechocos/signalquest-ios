@@ -7,6 +7,49 @@ final class APIClientTests: XCTestCase {
         super.tearDown()
     }
 
+    func testExpectedSessionRejectsARequestPreparedBeforeAccountChanged() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("account-a")
+        let expected = credentials.snapshot().sessionID
+        try credentials.setAccessToken("account-b")
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        MockURLProtocol.requestHandler = { _ in throw URLError(.unsupportedURL) }
+        do {
+            _ = try await client.request(APIEndpoint(path: "/api/owner"), as: SuccessResponse.self, expectedSessionID: expected)
+            XCTFail("A request crossed the prepared session")
+        } catch { XCTAssertEqual(error as? APIError, .cancelled) }
+        do {
+            _ = try await client.requestData(APIEndpoint(path: "/api/owner"), expectedSessionID: expected)
+            XCTFail("A raw request crossed the prepared session")
+        } catch { XCTAssertEqual(error as? APIError, .cancelled) }
+    }
+
+    func testNetworkFreshnessHeadersBypassTheURLCacheLayer() async throws {
+        let client = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()), session: Self.mockSession())
+        MockURLProtocol.requestHandler = { request in
+            guard request.cachePolicy == .reloadIgnoringLocalCacheData else { throw URLError(.cannotLoadFromNetwork) }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+        for directive in ["no-cache", "private, no-store", "max-age=0"] {
+            let result = try await client.request(APIEndpoint(path: "/api/map", headers: ["cache-control": directive]), as: SuccessResponse.self)
+            XCTAssertEqual(result.success, true, directive)
+        }
+    }
+
+    func testExpectedCurrentSessionAllowsTheRequest() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("account-a")
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+        let response = try await client.request(APIEndpoint(path: "/api/owner"), as: SuccessResponse.self,
+                                                expectedSessionID: credentials.snapshot().sessionID)
+        XCTAssertEqual(response.success, true)
+    }
+
     func testDecodesSuccessAndStoresAuthCookie() async throws {
         let session = Self.mockSession()
         let cookieStore = AuthCookieStore(tokenStore: InMemoryTokenStore())
@@ -134,6 +177,291 @@ final class APIClientTests: XCTestCase {
     }
 
     // MARK: - Sprint 1 : idempotence & throttling (429/503)
+
+    func testAccountSwitchCancels401AndThrottleRetriesBeforeTheyCanUseAccountB() async throws {
+        for status in [401, 429, 503] {
+            let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+            try credentials.setAccessToken("account-a")
+            let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+            var cookies: [String?] = []
+            MockURLProtocol.requestHandler = { request in
+                cookies.append(request.value(forHTTPHeaderField: "Cookie"))
+                try credentials.setAccessToken("account-b")
+                let response = HTTPURLResponse(url: request.url!, statusCode: status,
+                    httpVersion: nil, headerFields: ["Retry-After": "0"])!
+                return (response, Data(#"{"error":"retry"}"#.utf8))
+            }
+
+            do {
+                let _: SuccessResponse = try await client.requestJSON("/api/speedtests", body: ["owner": "a"])
+                XCTFail("La requête de A doit être annulée sur \(status)")
+            } catch APIError.cancelled {} catch { XCTFail("Erreur inattendue : \(error)") }
+            XCTAssertEqual(cookies, ["auth_token=account-a"])
+            XCTAssertEqual(credentials.accessToken(), "account-b")
+        }
+    }
+
+    func testLateSuccessCannotPublishAccountADataOrOverwriteAccountBCookie() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("account-a")
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        MockURLProtocol.requestHandler = { request in
+            try credentials.setAccessToken("account-b")
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                headerFields: ["Set-Cookie": "auth_token=account-a-late; Path=/"])!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+
+        do {
+            let _: SuccessResponse = try await client.request(APIEndpoint(path: "/api/auth/refresh", method: .post), as: SuccessResponse.self)
+            XCTFail("Une réponse de A ne doit pas être publiée sous B")
+        } catch APIError.cancelled {} catch { XCTFail("Erreur inattendue : \(error)") }
+        XCTAssertEqual(credentials.accessToken(), "account-b")
+    }
+
+    func testLateLoginCannotReplaceAnotherLoginThatAlreadyCompleted() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
+            try credentials.setAccessToken("account-b")
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                headerFields: ["Set-Cookie": "auth_token=account-a-late; Path=/"])!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+
+        do {
+            let _: SuccessResponse = try await client.request(
+                APIEndpoint(path: "/api/auth/login", method: .post, authenticated: false), as: SuccessResponse.self)
+            XCTFail("La connexion concurrente terminée est propriétaire du magasin")
+        } catch APIError.cancelled {} catch { XCTFail("Erreur inattendue : \(error)") }
+        XCTAssertEqual(credentials.accessToken(), "account-b")
+    }
+
+    func testLogoutAndSameTokenReloginStillInvalidateOldResponse() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("same-account")
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        MockURLProtocol.requestHandler = { request in
+            credentials.clearAll()
+            try credentials.setAccessToken("same-account")
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+
+        do {
+            _ = try await client.requestData(APIEndpoint(path: "/api/user/privacy"))
+            XCTFail("La génération de connexion doit compter même si le token est identique")
+        } catch APIError.cancelled {} catch { XCTFail("Erreur inattendue : \(error)") }
+    }
+
+    func testSingleAttemptCannotCaptureLateCookieAfterAccountSwitch() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("account-a")
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        MockURLProtocol.requestHandler = { request in
+            try credentials.setAccessToken("account-b")
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                headerFields: ["Set-Cookie": "auth_token=account-a-late; Path=/"])!
+            return (response, Data("{}".utf8))
+        }
+        do {
+            _ = try await client.performSingleAttempt(APIEndpoint(path: "/api/e2ee/v2/test", method: .post))
+            XCTFail("Une tentative signée garde également sa session propriétaire")
+        } catch APIError.cancelled {} catch { XCTFail("Erreur inattendue : \(error)") }
+        XCTAssertEqual(credentials.accessToken(), "account-b")
+    }
+
+    func testConcurrentRefreshRotationCannotBeRolledBackByAnOlderCookie() throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("old")
+        let sent = credentials.snapshot()
+        let url = URL(string: "https://api.signalquest.test/api/auth/refresh")!
+        let fresh = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil,
+            headerFields: ["Set-Cookie": "auth_token=fresh; Path=/"])!
+        let late = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil,
+            headerFields: ["Set-Cookie": "auth_token=late; Path=/"])!
+
+        try credentials.captureFromResponse(fresh, for: sent)
+        try credentials.captureFromResponse(late, for: sent)
+        XCTAssertTrue(credentials.isCurrent(sent), "Le refresh conserve la connexion")
+        XCTAssertFalse(credentials.isCurrent(sent, matchingRevision: true))
+        XCTAssertEqual(credentials.accessToken(), "fresh")
+
+        try credentials.setAccessToken("account-b")
+        XCTAssertThrowsError(try credentials.captureFromResponse(late, for: sent)) { error in
+            guard case APIError.cancelled = error else { return XCTFail("Erreur inattendue : \(error)") }
+        }
+        XCTAssertEqual(credentials.accessToken(), "account-b")
+    }
+
+    func testRefreshNetworkServerAndCancellationFailuresPreserveSession() async throws {
+        for mode in ["offline", "cancelled", "429", "503"] {
+            let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+            try credentials.setAccessToken("account-a")
+            let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+            let unexpectedExpiration = expectation(description: "Pas d'expiration pour \(mode)")
+            unexpectedExpiration.isInverted = true
+            let observer = NotificationCenter.default.addObserver(forName: .sqAuthSessionExpired,
+                object: nil, queue: nil) { _ in unexpectedExpiration.fulfill() }
+            MockURLProtocol.requestHandler = { request in
+                let status: Int
+                if request.url?.path == "/api/auth/refresh" {
+                    if mode == "offline" { throw URLError(.notConnectedToInternet) }
+                    if mode == "cancelled" { throw URLError(.cancelled) }
+                    status = Int(mode)!
+                } else { status = 401 }
+                let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+                return (response, Data(#"{"error":"synthetic"}"#.utf8))
+            }
+
+            do {
+                try await client.request(APIEndpoint(path: "/api/auth/me"))
+                XCTFail("L'erreur de refresh doit être remontée")
+            } catch let error as APIError {
+                switch (mode, error) {
+                case ("offline", .transport), ("cancelled", .cancelled), ("429", .http(status: 429, code: _, message: _, requestId: _, retryAfter: _)), ("503", .http(status: 503, code: _, message: _, requestId: _, retryAfter: _)): break
+                default: XCTFail("Le type de panne a été perdu : \(error)")
+                }
+            } catch { XCTFail("Erreur inattendue : \(error)") }
+            await fulfillment(of: [unexpectedExpiration], timeout: 0.03)
+            NotificationCenter.default.removeObserver(observer)
+            XCTAssertEqual(credentials.accessToken(), "account-a")
+        }
+    }
+
+    func testRejectedRefreshEmitsExpirationScopedToTheRejectedCredential() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("account-a")
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        let expirationReceived = expectation(description: "Session A refusée")
+        let observer = NotificationCenter.default.addObserver(forName: .sqAuthSessionExpired,
+            object: nil, queue: nil) { notification in
+                guard let expiration = notification.object as? AuthSessionExpiration else {
+                    return XCTFail("L'expiration doit porter son propriétaire")
+                }
+                XCTAssertTrue(expiration.isCurrent)
+                XCTAssertEqual(expiration.snapshot.accessToken, "account-a")
+                expirationReceived.fulfill()
+            }
+        defer { NotificationCenter.default.removeObserver(observer) }
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"error":"unauthorized"}"#.utf8))
+        }
+        do { try await client.request(APIEndpoint(path: "/api/auth/me")) } catch {}
+        await fulfillment(of: [expirationReceived], timeout: 1)
+    }
+
+    func testAlreadyRefreshedTokenRetriesWithoutRedundantRefresh() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("stale")
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        var paths: [String] = []
+        MockURLProtocol.requestHandler = { request in
+            paths.append(request.url!.path)
+            if paths.count == 1 {
+                let refresh = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                    headerFields: ["Set-Cookie": "auth_token=fresh; Path=/"])!
+                try credentials.captureFromResponse(refresh, for: credentials.snapshot())
+                return (HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!, Data("{}".utf8))
+            }
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "auth_token=fresh")
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(#"{"success":true}"#.utf8))
+        }
+        let _: SuccessResponse = try await client.request(APIEndpoint(path: "/api/feed"), as: SuccessResponse.self)
+        XCTAssertEqual(paths, ["/api/feed", "/api/feed"])
+    }
+
+    func testConcurrent401RequestsShareOneRefreshAndKeepTheSameAccount() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("account-a-stale")
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        let lock = NSLock()
+        var refreshCount = 0
+        var successfulRequests = 0
+        MockURLProtocol.requestHandler = { request in
+            lock.withLock {
+                let isRefresh = request.url?.path == "/api/auth/refresh"
+                let fresh = request.value(forHTTPHeaderField: "Cookie") == "auth_token=account-a-fresh"
+                if isRefresh { refreshCount += 1 }
+                if !isRefresh && fresh { successfulRequests += 1 }
+                let status = isRefresh || fresh ? 200 : 401
+                let headers = isRefresh ? ["Set-Cookie": "auth_token=account-a-fresh; Path=/"] : nil
+                return (HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil,
+                    headerFields: headers)!, Data(#"{"success":true}"#.utf8))
+            }
+        }
+
+        async let first: Void = client.request(APIEndpoint(path: "/api/feed"))
+        async let second: Void = client.request(APIEndpoint(path: "/api/user/privacy"))
+        async let third: Void = client.request(APIEndpoint(path: "/api/notifications"))
+        _ = try await (first, second, third)
+
+        XCTAssertEqual(refreshCount, 1)
+        XCTAssertEqual(successfulRequests, 3)
+        XCTAssertEqual(credentials.accessToken(), "account-a-fresh")
+    }
+
+    func testAccountSwitchDuringRefreshCannotCaptureCookieOrRetryOriginalMutation() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("account-a")
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        var calls: [String] = []
+        MockURLProtocol.requestHandler = { request in
+            calls.append(request.url!.path)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "auth_token=account-a")
+            let isRefresh = request.url?.path == "/api/auth/refresh"
+            if isRefresh { try credentials.setAccessToken("account-b") }
+            let response = HTTPURLResponse(url: request.url!, statusCode: isRefresh ? 200 : 401,
+                httpVersion: nil, headerFields: isRefresh ? ["Set-Cookie": "auth_token=account-a-refreshed; Path=/"] : nil)!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+
+        do {
+            let _: SuccessResponse = try await client.requestJSON("/api/speedtests", body: ["owner": "a"])
+            XCTFail("La mutation de A doit être abandonnée")
+        } catch APIError.cancelled {} catch { XCTFail("Erreur inattendue : \(error)") }
+        XCTAssertEqual(calls, ["/api/speedtests", "/api/auth/refresh"])
+        XCTAssertEqual(credentials.accessToken(), "account-b")
+    }
+
+    func testAccountSwitchDuringThrottleBackoffCancelsTheDelayedReplay() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("account-a")
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        let firstResponse = expectation(description: "Backoff demandé")
+        var calls = 0
+        MockURLProtocol.requestHandler = { request in
+            calls += 1
+            firstResponse.fulfill()
+            return (HTTPURLResponse(url: request.url!, statusCode: 429, httpVersion: nil,
+                headerFields: ["Retry-After": "1"])!, Data("{}".utf8))
+        }
+        let requestA = Task { try await client.request(APIEndpoint(path: "/api/speedtests", method: .post)) }
+        await fulfillment(of: [firstResponse], timeout: 1)
+        // Le transport a terminé ; le rejeu attend le Retry-After serveur.
+        try await Task.sleep(nanoseconds: 50_000_000)
+        try credentials.setAccessToken("account-b")
+        do {
+            try await requestA.value
+            XCTFail("Le rejeu différé ne doit pas franchir une connexion")
+        } catch APIError.cancelled {} catch { XCTFail("Erreur inattendue : \(error)") }
+        XCTAssertEqual(calls, 1)
+    }
+
+    func testSingleAttemptHTTPFailureDoesNotInstallItsCookie() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("account-a")
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        MockURLProtocol.requestHandler = { request in
+            return (HTTPURLResponse(url: request.url!, statusCode: 503, httpVersion: nil,
+                headerFields: ["Set-Cookie": "auth_token=error-response; Path=/"])!, Data("{}".utf8))
+        }
+        let (_, response) = try await client.performSingleAttempt(APIEndpoint(path: "/api/e2ee/v2/test"))
+        XCTAssertEqual(response.statusCode, 503)
+        XCTAssertEqual(credentials.accessToken(), "account-a")
+    }
 
     /// Un POST porte une clé d'idempotence et REJOUE la même clé après un
     /// refresh 401, pour qu'un retry transparent ne crée pas de doublon.

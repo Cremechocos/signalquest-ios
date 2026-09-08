@@ -97,6 +97,7 @@ struct LoginView: View {
                         showGuestMap = true
                     }
                     .accessibilityLabel("Explorer la carte sans compte")
+                    .accessibilityIdentifier("login.guestMap")
                     .sqAuthAppear(appeared, delay: 0.11)
 
                     GradientButton(String(localized: "Tester sans compte"), systemImage: "speedometer", style: .secondary) {
@@ -203,6 +204,7 @@ struct LoginView: View {
 /// Hérite de `services`/`router` de l'environnement (injectés sur RootView).
 private struct GuestMapPreview: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// Le commentaire ci-dessus disait déjà que les services viennent de
     /// l'environnement — mais `MapExplorerView()` s'appuyait sur ses valeurs par
     /// défaut et construisait donc un SECOND graphe complet : autre `APIClient`,
@@ -220,18 +222,7 @@ private struct GuestMapPreview: View {
                 // safe-area dédiée garde donc les sorties invité visibles et
                 // accessibles, indépendamment de cette préférence interne.
                 .safeAreaInset(edge: .top, spacing: 0) {
-                    HStack(spacing: SQSpace.md) {
-                        Button("Fermer") { dismiss() }
-                            .font(SQFont.archivo(15, .semibold))
-                        Spacer()
-                        Text("Explorer")
-                            .font(SQFont.archivo(16, .bold))
-                            .foregroundStyle(SQColor.label)
-                            .accessibilityAddTraits(.isHeader)
-                        Spacer()
-                        Button("Se connecter") { dismiss() }
-                            .font(SQFont.archivo(14, .bold))
-                    }
+                    guestNavigationControls
                     .foregroundStyle(SQColor.brandRed)
                     .padding(.horizontal, SQSpace.md)
                     .frame(minHeight: 50)
@@ -248,6 +239,51 @@ private struct GuestMapPreview: View {
                     }
                 }
         }
+    }
+
+    @ViewBuilder
+    private var guestNavigationControls: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(spacing: SQSpace.xs) {
+                guestTitle
+                HStack(spacing: SQSpace.md) {
+                    closeButton
+                    Spacer(minLength: SQSpace.sm)
+                    signInButton
+                }
+            }
+            .padding(.vertical, SQSpace.xs)
+        } else {
+            HStack(spacing: SQSpace.md) {
+                closeButton
+                Spacer(minLength: SQSpace.sm)
+                guestTitle
+                Spacer(minLength: SQSpace.sm)
+                signInButton
+            }
+        }
+    }
+
+    private var guestTitle: some View {
+        Text("Explorer")
+            .font(SQFont.archivo(16, .bold))
+            .foregroundStyle(SQColor.label)
+            .fixedSize(horizontal: true, vertical: false)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private var closeButton: some View {
+        Button("Fermer") { dismiss() }
+            .font(SQFont.archivo(15, .semibold))
+            .fixedSize(horizontal: true, vertical: false)
+            .frame(minHeight: 44)
+    }
+
+    private var signInButton: some View {
+        Button("Se connecter") { dismiss() }
+            .font(SQFont.archivo(14, .bold))
+            .fixedSize(horizontal: true, vertical: false)
+            .frame(minHeight: 44)
     }
 }
 

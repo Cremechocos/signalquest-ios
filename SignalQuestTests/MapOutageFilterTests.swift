@@ -56,21 +56,13 @@ final class MapOutageFilterTests: XCTestCase {
     }
 
     private func sheet(market: String, markets: [MarketRegistryEntry]) -> MapAdvancedFilterSheet {
-        MapAdvancedFilterSheet(
-            market: .constant(market),
-            operatorName: .constant("ALL"),
-            technologies: .constant([]),
-            bands: .constant([]),
-            bandMatch: .constant(.any),
-            azimuthStyle: .constant(.lobes),
-            sharing: .constant([]),
-            speedtestDays: .constant(30),
-            coverageDays: .constant(30),
-            layers: .constant(MapFilterStore.defaultFilters),
-            includeObserved: .constant(false),
-            plannedStatuses: .constant([]),
-            allMarkets: markets
-        )
+        var selection = MapFilterSelection.defaults(market: market, operatorName: "ALL")
+        selection.azimuthStyle = .lobes
+        selection.speedtestDays = 30
+        selection.coverageDays = 30
+        selection.includeObserved = false
+        selection.plannedStatuses = []
+        return MapAdvancedFilterSheet(selection: selection, allMarkets: markets, dromRegion: nil, onApply: { _ in true })
     }
 
     /// Aucune puce ne doit porter `.communityOutage` : ce genre est un MARQUEUR, pas une case.
@@ -98,11 +90,17 @@ final class MapOutageFilterTests: XCTestCase {
         XCTAssertTrue(france.contains(.outage))
         XCTAssertTrue(france.contains(.planned))
 
-        for market in ["BA", "CA"] {
+        for market in ["BA"] {
             let kinds = sheet(market: market, markets: markets).layerOptions.map(\.0)
             XCTAssertTrue(kinds.contains(.outage), "Marché \(market) sans puce « Pannes »")
             XCTAssertFalse(kinds.contains(.planned), "Prévisionnels proposés hors FR/DROM (\(market))")
         }
+    }
+
+    func testCanadianPlannedLayerCanBeChosenWhenTheRegistryExposesTheCapability() throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "market_registry_fallback", withExtension: "json"))
+        let markets = try JSONDecoder.signalQuest.decode(MarketRegistryPayload.self, from: Data(contentsOf: url)).markets
+        XCTAssertTrue(sheet(market: "CA", markets: markets).layerOptions.map(\.0).contains(.planned))
     }
 
     /// Toutes les puces de couche ont une traduction ANGLAISE.

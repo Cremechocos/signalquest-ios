@@ -181,11 +181,13 @@ enum MapFilterStore {
 enum MapMarketStore {
     static let marketKey = "map.lastMarket.v1"
     static let operatorKey = "map.lastOperator.v1"
+    static let manualMarketKey = "map.manualMarket.v1"
 
     /// QA `--reset-map` : oublie le marché/opérateur pour rejouer la détection.
     static func reset() {
         UserDefaults.standard.removeObject(forKey: marketKey)
         UserDefaults.standard.removeObject(forKey: operatorKey)
+        UserDefaults.standard.removeObject(forKey: manualMarketKey)
     }
 
     static func save(market: String, operator op: String) {
@@ -194,6 +196,20 @@ enum MapMarketStore {
         UserDefaults.standard.set(market, forKey: marketKey)
         let op = op.trimmingCharacters(in: .whitespacesAndNewlines)
         UserDefaults.standard.set(op.isEmpty ? "ALL" : op, forKey: operatorKey)
+    }
+
+    /// Seules les actions explicites posent cette préférence : les versions
+    /// antérieures persistaient aussi les bascules automatiques de caméra.
+    static func saveManual(market: String, operator op: String) {
+        guard !market.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        save(market: market, operator: op)
+        UserDefaults.standard.set(lastMarket(), forKey: manualMarketKey)
+    }
+
+    static func manualMarket() -> String? {
+        guard let manual = UserDefaults.standard.string(forKey: manualMarketKey),
+              manual.caseInsensitiveCompare(lastMarket() ?? "") == .orderedSame else { return nil }
+        return manual
     }
 
     static func lastMarket() -> String? {

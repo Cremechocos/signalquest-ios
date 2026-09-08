@@ -19,6 +19,29 @@ enum CoverageRenderPolicy {
     /// Rendu piloté par la DONNÉE reçue (robuste quel que soit le zoom / le seuil de
     /// fetch) : on affiche les points bruts s'il y en a (ou si un filtre bande est actif),
     /// sinon les clusters. Mutuellement exclusifs.
+    static func mode(for tile: AndroidCoverageTileResponse, selectedBands: Set<Int>) -> (useClusters: Bool, useRawPoints: Bool) {
+        let verified = tile.stats?.appliedBandFilter?.matches(selectedBands) == true
+        return mode(hasPoints: !tile.points.isEmpty, hasClusters: !tile.clusters.isEmpty,
+                    hasBandFilter: !selectedBands.isEmpty && !verified)
+    }
+
+    static func matches(_ point: AndroidCoveragePoint, selectedBands: Set<Int>) -> Bool {
+        guard !selectedBands.isEmpty else { return true }
+        let observed = Set((point.bands ?? []) + (point.band.map { [$0] } ?? []))
+        return !observed.isDisjoint(with: selectedBands)
+    }
+
+    /// Raw legacy points remain locally filterable. An aggregate or empty legacy
+    /// response cannot claim that the server honored the selected bands.
+    static func validate(_ tile: AndroidCoverageTileResponse, selectedBands: Set<Int>) throws {
+        guard !selectedBands.isEmpty else { return }
+        if let applied = tile.stats?.appliedBandFilter {
+            guard applied.matches(selectedBands) else { throw CoverageBandFilterUnavailable() }
+        } else if tile.points.isEmpty {
+            throw CoverageBandFilterUnavailable()
+        }
+    }
+
     static func mode(hasPoints: Bool, hasClusters: Bool, hasBandFilter: Bool) -> (useClusters: Bool, useRawPoints: Bool) {
         let useRawPoints = hasPoints || hasBandFilter
         let useClusters = hasClusters && !useRawPoints
@@ -60,12 +83,12 @@ enum CoverageQualityBand: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .excellent: return "Excellent"
-        case .good: return "Bon"
-        case .fair: return "Moyen"
-        case .weak: return "Faible"
+        case .excellent: return String(localized: "Excellent")
+        case .good: return String(localized: "Bon")
+        case .fair: return String(localized: "Moyen")
+        case .weak: return String(localized: "Faible")
         case .poor: return String(localized: "Très faible")
-        case .unknown: return "Inconnu"
+        case .unknown: return String(localized: "Inconnu")
         }
     }
 
@@ -143,7 +166,7 @@ enum CoverageGenerationBand: String, CaseIterable, Identifiable {
         case .g4: return "4G"
         case .g3: return "3G"
         case .g2: return "2G"
-        case .none: return "Aucun"
+        case .none: return String(localized: "Aucun")
         }
     }
 
@@ -194,5 +217,11 @@ enum SpeedBand: String, CaseIterable {
         case .slow:        return UIColor(red: 0xF9 / 255, green: 0x73 / 255, blue: 0x16 / 255, alpha: 1.0)
         case .verySlow:    return UIColor(red: 0xEF / 255, green: 0x44 / 255, blue: 0x44 / 255, alpha: 1.0)
         }
+    }
+}
+
+struct CoverageBandFilterUnavailable: Error, LocalizedError {
+    var errorDescription: String? {
+        String(localized: "Le filtre de fréquence n’est pas disponible pour ces données. Zoome ou retire ce filtre pour les consulter.")
     }
 }

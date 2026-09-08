@@ -483,8 +483,9 @@ final class AuthSessionViewModel: ObservableObject {
         // échouer en silence.
         sessionExpiredObserver = NotificationCenter.default.addObserver(
             forName: .sqAuthSessionExpired, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.handleSessionExpired() }
+        ) { [weak self] notification in
+            guard let expiration = notification.object as? AuthSessionExpiration else { return }
+            MainActor.assumeIsolated { self?.handleSessionExpired(expiration) }
         }
     }
 
@@ -498,18 +499,21 @@ final class AuthSessionViewModel: ObservableObject {
     /// le nettoyage asynchrone pour qu'une notification ré-entrante (autres requêtes
     /// 401 concurrentes) voie déjà l'état déconnecté et devienne un no-op (pas de
     /// boucle, pas de POST logout qui re-échouerait).
-    private func handleSessionExpired() {
+    private func handleSessionExpired(_ expiration: AuthSessionExpiration) {
         // Mode démo / QA : la session est un utilisateur mock SANS vrai token — tout
         // appel authentifié renvoie 401, ce qui déclencherait à tort une déconnexion.
         // On ne réagit jamais au signal dans ce mode (parité avec le guard de bootstrap).
         guard !AppEnvironment.usesDemoData else { return }
+        guard expiration.isCurrent else { return }
         guard case .authenticated = state else { return }
         state = .loggedOut
         infoMessage = "Ta session a expiré. Reconnecte-toi pour continuer."
         Task {
+            guard expiration.isCurrent else { return }
             // La session HTTP est peut-être déjà invalide, mais le secret de révocation
             // push reste disponible dans le Trousseau et rend la suppression rejouable.
             await AppDelegate.sharedPush?.unregister()
+            guard expiration.isCurrent else { return }
             await service.clearLocalSession()
         }
     }

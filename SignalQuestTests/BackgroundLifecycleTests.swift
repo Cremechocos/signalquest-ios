@@ -80,22 +80,21 @@ final class BackgroundLifecycleTests: XCTestCase {
 
     /// Deux fonctions (par exemple Drive Test et CarPlay) doivent recevoir le
     /// même fix. Retirer l'une ne doit ni écraser ni arrêter l'autre.
-    func testLocationObserversAreIndependent() async {
-        let location = LocationService()
-        let firstReceived = expectation(description: "premier observateur")
-        let secondReceivedTwice = expectation(description: "second observateur")
-        secondReceivedTwice.expectedFulfillmentCount = 2
-
-        let firstToken = location.addLocationObserver { _ in firstReceived.fulfill() }
-        let secondToken = location.addLocationObserver { _ in secondReceivedTwice.fulfill() }
-        let manager = CLLocationManager()
-
-        location.locationManager(manager, didUpdateLocations: [CLLocation(latitude: 48.8566, longitude: 2.3522)])
-        await fulfillment(of: [firstReceived], timeout: 1)
-
+    func testLocationObserversAreIndependent() {
+        let manager = LocationTestDriver()
+        let location = LocationService(manager: manager, makeOneShotManager: { LocationTestDriver() })
+        var firstLatitudes: [Double] = []
+        var secondLatitudes: [Double] = []
+        let firstToken = location.addLocationObserver { firstLatitudes.append($0.coordinate.latitude) }
+        let secondToken = location.addLocationObserver { secondLatitudes.append($0.coordinate.latitude) }
+        location.receiveLocations([CLLocation(latitude: 48.8566, longitude: 2.3522)])
         location.removeLocationObserver(firstToken)
-        location.locationManager(manager, didUpdateLocations: [CLLocation(latitude: 48.8570, longitude: 2.3530)])
-        await fulfillment(of: [secondReceivedTwice], timeout: 1)
+        XCTAssertEqual(manager.stops, 0, "Le second observateur maintient le suivi")
+        location.receiveLocations([CLLocation(latitude: 48.8570, longitude: 2.3530)])
+        XCTAssertEqual(firstLatitudes, [48.8566])
+        XCTAssertEqual(secondLatitudes, [48.8566, 48.8570])
+        XCTAssertEqual(manager.starts, 1)
         location.removeLocationObserver(secondToken)
+        XCTAssertEqual(manager.stops, 1)
     }
 }

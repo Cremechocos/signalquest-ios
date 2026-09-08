@@ -366,8 +366,9 @@ struct PlannedSiteActivation: Decodable, Equatable, Sendable {
     }
 }
 
-struct PlannedSiteLive: Decodable, Identifiable, Equatable {
+struct PlannedSiteLive: Decodable, MapFeedSite, Equatable, Sendable {
     let id: String
+    let sourceId: String?
     let `operator`: String?
     let lat: Double?
     let lon: Double?
@@ -384,12 +385,14 @@ struct PlannedSiteLive: Decodable, Identifiable, Equatable {
     let activation: PlannedSiteActivation?
 
     enum CodingKeys: String, CodingKey {
+        case sourceId
         case `operator` = "operator"
         case lat, lon, codeSite, idStation, plannedKey, referenceId, departement, commune, date5g, sourceUpdatedAt, technologies, activation
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        sourceId = try c.decodeIfPresent(String.self, forKey: .sourceId)
         `operator` = try c.decodeIfPresent(String.self, forKey: .operator)
         lat = try c.decodeIfPresent(Double.self, forKey: .lat)
         lon = try c.decodeIfPresent(Double.self, forKey: .lon)
@@ -417,6 +420,13 @@ struct PlannedSiteLive: Decodable, Identifiable, Equatable {
 
 struct PlannedSitesResponse: Decodable, Equatable {
     let sites: [PlannedSiteLive]
+    let availability: MapFeedAvailability
+    private enum CodingKeys: String, CodingKey { case sites }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sites = try c.decode([PlannedSiteLive].self, forKey: .sites)
+        availability = try MapFeedAvailability(from: decoder)
+    }
 }
 
 /// État d'un service réseau sur un site en panne (ex. « Data 4G » → « HS »).
@@ -426,8 +436,9 @@ struct OutageService: Equatable, Sendable {
     let status: String
 }
 
-struct OutageSiteLive: Decodable, Identifiable, Equatable {
+struct OutageSiteLive: Decodable, MapFeedSite, Equatable, Sendable {
     let id: String
+    let sourceId: String?
     let `operator`: String?
     let siteId: String?
     let lat: Double?
@@ -447,6 +458,7 @@ struct OutageSiteLive: Decodable, Identifiable, Equatable {
     var status: String? { reason ?? issueType }
 
     enum CodingKeys: String, CodingKey {
+        case sourceId
         // Clés `/api/android/map/incidents` : lat/lon minuscules, code_site_op,
         // issueType. On garde des replis (Lat/Lon majuscules, sup_id…) pour rester
         // robuste si la source bascule sur `/api/sites-hs`.
@@ -460,11 +472,14 @@ struct OutageSiteLive: Decodable, Identifiable, Equatable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        sourceId = try c.decodeIfPresent(String.self, forKey: .sourceId)
         siteId = c.decodeFlexibleString(forKey: .code_site_op)
             ?? c.decodeFlexibleString(forKey: .siteId)
             ?? c.decodeFlexibleString(forKey: .sup_id)
             ?? c.decodeFlexibleString(forKey: .codeSite)
-        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? siteId ?? UUID().uuidString
+        let rawID = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? siteId ?? UUID().uuidString
+        // Operator site codes are not globally unique across feed sources.
+        id = sourceId.flatMap { $0.isEmpty ? nil : $0 + ":" + rawID } ?? rawID
         `operator` = try c.decodeIfPresent(String.self, forKey: .operator)
         lat = (try? c.decodeIfPresent(Double.self, forKey: .lat))
             ?? (try? c.decodeIfPresent(Double.self, forKey: .latitude))
@@ -498,6 +513,13 @@ struct OutageSiteLive: Decodable, Identifiable, Equatable {
 
 struct OutageSitesResponse: Decodable, Equatable {
     let sites: [OutageSiteLive]
+    let availability: MapFeedAvailability
+    private enum CodingKeys: String, CodingKey { case sites }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sites = try c.decode([OutageSiteLive].self, forKey: .sites)
+        availability = try MapFeedAvailability(from: decoder)
+    }
 }
 
 /// Un incident déclaré par un OPÉRATEUR pour un site précis
@@ -888,6 +910,7 @@ struct AndroidCoveragePoint: Decodable, Identifiable, Equatable, Sendable {
     let tech: String?
     let timestamp: Date?
     let band: Int?
+    var bands: [Int]? = nil
     let groupId: String?
     let isPrimary: Bool?
     let cellType: String?
@@ -1216,6 +1239,7 @@ struct AndroidCoverageStats: Decodable, Equatable, Sendable {
     let hasMore: Bool?
     let truncated: Bool?
     let representation: String?
+    var appliedBandFilter: CoverageAppliedBandFilter? = nil
 }
 
 struct MapDisplayItem: Identifiable, Equatable {
@@ -1347,5 +1371,14 @@ struct MapItemDetails: Equatable {
         self.isPrimary = isPrimary
         self.cellType = cellType
         self.note = note
+    }
+}
+
+struct CoverageAppliedBandFilter: Decodable, Equatable, Sendable {
+    let version: Int
+    let bands: [Int]
+    let match: String
+    func matches(_ selected: Set<Int>) -> Bool {
+        version == 1 && match == "any" && bands == selected.sorted()
     }
 }

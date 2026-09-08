@@ -1,0 +1,4 @@
+__pycache__/
+scenario.json
+scenario.json.tmp
+requests.ndjson

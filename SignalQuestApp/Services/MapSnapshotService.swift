@@ -2,6 +2,9 @@ import Foundation
 import CoreLocation
 
 protocol MapSnapshotServicing: Sendable {
+    /// Opaque login generation; token refreshes keep the same session.
+    var sessionIdentifier: UUID { get }
+    func invalidateTiles() async
     func snapshot(bounds: MapBounds, zoom: Double, lightweight: Bool) async throws -> SocialMapSnapshot
     /// Flux temps réel des amis (position + présence + radio), branché sur le SSE
     /// serveur `/api/social/map/stream`. Se reconnecte automatiquement.
@@ -10,6 +13,8 @@ protocol MapSnapshotServicing: Sendable {
     func friendsSnapshot() async throws -> [SocialFriendLive]
     func plannedSites(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> [PlannedSiteLive]
     func outageSites(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> [OutageSiteLive]
+    func plannedSitesLayer(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> MapFeedResult<PlannedSiteLive>
+    func outageSitesLayer(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> MapFeedResult<OutageSiteLive>
     /// Les incidents déclarés par les opérateurs pour UN site (fiche antenne).
     func operatorIncidents(forSiteId siteId: String?, market: String, operatorName: String?, latitude: Double, longitude: Double, territory: String?) async throws -> SiteOperatorIncidentsResponse
     func coveragePoints(bounds: MapBounds, market: String, operatorName: String, technology: String?, bands: Set<Int>) async throws -> [CoverageHeatPoint]
@@ -40,8 +45,9 @@ struct MapBounds: Equatable, Sendable {
 
 final class MapSnapshotService: MapSnapshotServicing {
     private let api: APIClient
-    private let cache: DiskCache
+    private let socialCache: TileCache
     private let tileCache: TileCache
+    var sessionIdentifier: UUID { api.credentials.snapshot().sessionID }
 
     // Dossier DÉDIÉ. `MapSnapshotService` et `MarketRegistryService` prenaient
     // tous deux le `DiskCache()` par défaut, donc le même dossier — deux acteurs
@@ -51,7 +57,7 @@ final class MapSnapshotService: MapSnapshotServicing {
     // TTL n'ont rien à voir (snapshot 30 s, registre 24 h).
     init(api: APIClient, cache: DiskCache = DiskCache(folderName: "SignalQuestMapCache"), tileCache: TileCache = TileCache()) {
         self.api = api
-        self.cache = cache
+        self.socialCache = TileCache(disk: cache, memoryTTL: 30, diskTTL: 30)
         self.tileCache = tileCache
     }
 
@@ -61,26 +67,44 @@ final class MapSnapshotService: MapSnapshotServicing {
         // montrer à l'utilisateur, il n'y a simplement rien à charger — et
         // `Error.isCancellation` fait déjà taire ce cas chez tous les appelants.
         guard bounds.isFinite, zoom.isFinite else { throw APIError.cancelled }
-        let key = "social-map-\(Int(bounds.north * 100))-\(Int(bounds.south * 100))-\(Int(bounds.east * 100))-\(Int(bounds.west * 100))-\(Int(zoom))-\(lightweight)"
-        if let cached = try await cache.read(SocialMapSnapshot.self, for: key, maxAge: 30) {
-            return cached
+        let owner = api.credentials.snapshot()
+        // Les couches sociales sont privées ; un invité ne doit ni les demander
+        // ni déclencher un refresh de session à chaque déplacement de carte.
+        guard owner.accessToken?.isEmpty == false else { return .empty }
+        let segments = try bounds.canonicalSegments
+        var parts: [SocialMapSnapshot] = []
+        for segment in segments {
+            guard api.credentials.isCurrent(owner) else { throw APIError.cancelled }
+            parts.append(try await snapshotSegment(bounds: segment, zoom: zoom, lightweight: lightweight, owner: owner))
         }
-        let snapshot: SocialMapSnapshot = try await api.request(
-            APIEndpoint(
-                path: "/api/social/map/snapshot",
-                query: [
-                    URLQueryItem(name: "north", value: "\(bounds.north)"),
-                    URLQueryItem(name: "south", value: "\(bounds.south)"),
-                    URLQueryItem(name: "east", value: "\(bounds.east)"),
-                    URLQueryItem(name: "west", value: "\(bounds.west)"),
-                    URLQueryItem(name: "zoom", value: "\(zoom)"),
-                    URLQueryItem(name: "lightweight", value: lightweight ? "1" : "0")
-                ]
-            ),
-            as: SocialMapSnapshot.self
-        )
-        try? await cache.write(snapshot, for: key)
-        return snapshot
+        guard api.credentials.isCurrent(owner) else { throw APIError.cancelled }
+        return try MapSnapshotMerging.social(parts, lightweight: lightweight)
+    }
+
+    private func snapshotSegment(bounds: MapBounds, zoom: Double, lightweight: Bool,
+                                 owner: CredentialStore.Snapshot) async throws -> SocialMapSnapshot {
+        let key = "social-map-v2-\(owner.sessionID)-\(bounds.north.bitPattern)-\(bounds.south.bitPattern)-\(bounds.east.bitPattern)-\(bounds.west.bitPattern)-\(zoom.bitPattern)-\(lightweight)"
+        let bytes = try await socialCache.data(for: key, maxAge: 30, validate: {
+            _ = try JSONDecoder.signalQuest.decode(SocialMapSnapshot.self, from: $0)
+        }) { [api] in
+            try await api.requestData(
+                APIEndpoint(
+                    path: "/api/social/map/snapshot",
+                    query: [
+                        URLQueryItem(name: "north", value: "\(bounds.north)"),
+                        URLQueryItem(name: "south", value: "\(bounds.south)"),
+                        URLQueryItem(name: "east", value: "\(bounds.east)"),
+                        URLQueryItem(name: "west", value: "\(bounds.west)"),
+                        URLQueryItem(name: "zoom", value: "\(zoom)"),
+                        URLQueryItem(name: "lightweight", value: lightweight ? "1" : "0"),
+                    ],
+                    headers: ["Cache-Control": "no-cache"]
+                ),
+                expectedSessionID: owner.sessionID
+            )
+        }
+        guard api.credentials.isCurrent(owner) else { throw APIError.cancelled }
+        return try JSONDecoder.signalQuest.decode(SocialMapSnapshot.self, from: bytes)
     }
 
     /// Amis en temps réel via le SSE `/api/social/map/stream` (le backend re-poll
@@ -113,6 +137,7 @@ final class MapSnapshotService: MapSnapshotServicing {
     }
 
     func friendsSnapshot() async throws -> [SocialFriendLive] {
+        guard api.credentials.snapshot().accessToken?.isEmpty == false else { return [] }
         struct FriendsEnvelope: Decodable { let friends: [SocialFriendLive] }
         let envelope: FriendsEnvelope = try await api.request(
             APIEndpoint(
@@ -128,6 +153,10 @@ final class MapSnapshotService: MapSnapshotServicing {
     }
 
     func plannedSites(market: String, operatorName: String, territory: String? = nil, bands: Set<Int> = []) async throws -> [PlannedSiteLive] {
+        try await plannedSitesLayer(market: market, operatorName: operatorName, territory: territory, bands: bands).sites
+    }
+
+    func plannedSitesLayer(market: String, operatorName: String, territory: String? = nil, bands: Set<Int> = []) async throws -> MapFeedResult<PlannedSiteLive> {
         var query = [
             URLQueryItem(name: "market", value: market),
             URLQueryItem(name: "operator", value: operatorName)
@@ -140,10 +169,14 @@ final class MapSnapshotService: MapSnapshotServicing {
             APIEndpoint(path: "/api/map/planned-sites", query: query),
             as: PlannedSitesResponse.self
         )
-        return response.sites
+        return MapFeedResult(sites: response.sites, availability: response.availability)
     }
 
     func outageSites(market: String, operatorName: String, territory: String? = nil, bands: Set<Int> = []) async throws -> [OutageSiteLive] {
+        try await outageSitesLayer(market: market, operatorName: operatorName, territory: territory, bands: bands).sites
+    }
+
+    func outageSitesLayer(market: String, operatorName: String, territory: String? = nil, bands: Set<Int> = []) async throws -> MapFeedResult<OutageSiteLive> {
         // `/api/android/map/incidents` accepte « ALL » pour FR (tous opérateurs
         // confondus, ~800 incidents) comme pour DROM/CA — pas besoin d'agréger.
         var query = [
@@ -162,7 +195,7 @@ final class MapSnapshotService: MapSnapshotServicing {
             APIEndpoint(path: "/api/android/map/incidents", query: query, authenticated: false),
             as: OutageSitesResponse.self
         )
-        return response.sites
+        return MapFeedResult(sites: response.sites, availability: response.availability)
     }
 
     /// Les incidents qu'un opérateur déclare LUI-MÊME sur un site précis.
@@ -223,6 +256,18 @@ final class MapSnapshotService: MapSnapshotServicing {
     }
 
     func coveragePoints(bounds: MapBounds, market: String, operatorName: String, technology: String?, bands: Set<Int> = []) async throws -> [CoverageHeatPoint] {
+        let owner = api.credentials.snapshot()
+        let segments = try bounds.canonicalSegments
+        var parts: [[CoverageHeatPoint]] = []
+        for segment in segments {
+            guard api.credentials.isCurrent(owner) else { throw APIError.cancelled }
+            parts.append(try await coveragePointsSegment(bounds: segment, market: market, operatorName: operatorName, technology: technology, bands: bands, owner: owner))
+        }
+        guard api.credentials.isCurrent(owner) else { throw APIError.cancelled }
+        return MapSnapshotMerging.unique(parts, id: \.id)
+    }
+
+    private func coveragePointsSegment(bounds: MapBounds, market: String, operatorName: String, technology: String?, bands: Set<Int>, owner: CredentialStore.Snapshot) async throws -> [CoverageHeatPoint] {
         var query = [
             URLQueryItem(name: "north", value: "\(bounds.north)"),
             URLQueryItem(name: "south", value: "\(bounds.south)"),
@@ -237,30 +282,43 @@ final class MapSnapshotService: MapSnapshotServicing {
             query.append(URLQueryItem(name: "technology", value: technology))
         }
         query.append(contentsOf: Self.bandQueryItems(bands))
-        let response: CoveragePointsResponse = try await api.request(
-            APIEndpoint(path: "/api/coverage/points", query: query),
-            as: CoveragePointsResponse.self
+        let response: AvailableTile<CoveragePointsResponse> = try await api.request(
+            APIEndpoint(path: "/api/coverage/points", query: query, headers: ["Cache-Control": "no-cache"]),
+            as: AvailableTile<CoveragePointsResponse>.self, expectedSessionID: owner.sessionID
         )
-        return response.points
+        return response.value.points
     }
 
     /// Photos publiques de tous les membres dans la zone (endpoint additif
     /// `/api/map/photos`). Filtre par opérateur DE LA PHOTO ; `friendsOnly`
     /// restreint aux amis (mode « Amis »). Coords résolues côté backend.
     func publicPhotos(bounds: MapBounds, zoom: Double, market: String, operatorName: String, friendsOnly: Bool) async throws -> [MapPublicPhoto] {
+        let owner = api.credentials.snapshot()
+        let segments = try bounds.canonicalSegments
+        var parts: [[MapPublicPhoto]] = []
+        for segment in segments {
+            guard api.credentials.isCurrent(owner) else { throw APIError.cancelled }
+            parts.append(try await publicPhotosSegment(bounds: segment, zoom: zoom, market: market, operatorName: operatorName, friendsOnly: friendsOnly, owner: owner))
+        }
+        guard api.credentials.isCurrent(owner) else { throw APIError.cancelled }
+        return MapSnapshotMerging.unique(parts, id: \.id)
+    }
+
+    private func publicPhotosSegment(bounds: MapBounds, zoom: Double, market: String, operatorName: String, friendsOnly: Bool, owner: CredentialStore.Snapshot) async throws -> [MapPublicPhoto] {
+        guard zoom.isFinite else { throw MapTilePlanningError.invalidZoom }
         let query = [
             URLQueryItem(name: "north", value: "\(bounds.north)"),
             URLQueryItem(name: "south", value: "\(bounds.south)"),
             URLQueryItem(name: "east", value: "\(bounds.east)"),
             URLQueryItem(name: "west", value: "\(bounds.west)"),
-            URLQueryItem(name: "zoom", value: "\(Int(zoom))"),
+            URLQueryItem(name: "zoom", value: "\(Int(min(20, max(0, floor(zoom)))))"),
             URLQueryItem(name: "market", value: market),
             URLQueryItem(name: "operator", value: operatorName),
             URLQueryItem(name: "friendsOnly", value: friendsOnly ? "1" : "0")
         ]
         let response: MapPublicPhotosResponse = try await api.request(
             APIEndpoint(path: "/api/map/photos", query: query),
-            as: MapPublicPhotosResponse.self
+            as: MapPublicPhotosResponse.self, expectedSessionID: owner.sessionID
         )
         return response.photos
     }
@@ -272,9 +330,8 @@ final class MapSnapshotService: MapSnapshotServicing {
             zoom: zoom,
             cacheKey: { tile in
                 // `antennas-v2` : la tuile porte désormais hasEnb/hasGnb et les
-                // composants d'adresse. `TileCache.removeAll()` ne vide que la
-                // mémoire — sans changer le préfixe, les tuiles déjà sur disque
-                // (1 h) se rendraient sans coche ni adresse.
+                // composants d'adresse. Cette version de clé distingue les
+                // anciens contrats ; la purge actuelle vide aussi le disque.
                 "antennas-v2:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):az=\(withAzimuth):bands=\(bandKey)"
             },
             endpoint: { tile in
@@ -293,31 +350,16 @@ final class MapSnapshotService: MapSnapshotServicing {
     }
 
     func speedtestTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0, bands: Set<Int> = [], maxAge: TimeInterval? = nil) async throws -> [AndroidSpeedtestTileResponse] {
-        // Speedtests : TOUT afficher, sans cluster ni cap. Le backend plafonne
-        // chaque page à 5000 ; on pagine par `offset` (jusqu'à 4 pages = 20 000
-        // points/tuile, comme Android) et on fusionne en une seule réponse.
-        let tiles = Self.visibleTiles(bounds: bounds, zoom: zoom)
-        guard !tiles.isEmpty else { return [] }
-        return try await withThrowingTaskGroup(of: AndroidSpeedtestTileResponse?.self) { group in
-            for tile in tiles {
-                group.addTask { [api, tileCache] in
-                    try await Self.fetchSpeedtestTilePaged(
-                        api: api,
-                        tileCache: tileCache,
-                        tile: tile,
-                        market: market,
-                        operatorName: operatorName,
-                        days: days,
-                        bands: bands,
-                        maxAge: maxAge
-                    )
-                }
-            }
-            var responses: [AndroidSpeedtestTileResponse] = []
-            for try await response in group {
-                if let response { responses.append(response) }
-            }
-            return responses
+        // Pagination bornée : les limites restantes restent visibles dans stats.
+        // Le plan couvre l'emprise entière en adaptant son niveau avant énumération.
+        let tiles = try MapTilePlanner.plan(bounds: bounds, zoom: zoom).tiles
+        let owner = api.credentials.snapshot()
+        return try await Self.collectTiles(tiles, api: api, owner: owner) { [api, tileCache] tile in
+            try await Self.fetchSpeedtestTilePaged(
+                api: api, tileCache: tileCache, tile: tile, market: market,
+                operatorName: operatorName, days: days, bands: bands, maxAge: maxAge,
+                owner: owner
+            )
         }
     }
 
@@ -332,15 +374,21 @@ final class MapSnapshotService: MapSnapshotServicing {
         operatorName: String,
         days: Int,
         bands: Set<Int>,
-        maxAge: TimeInterval?
-    ) async throws -> AndroidSpeedtestTileResponse? {
+        maxAge: TimeInterval?,
+        owner: CredentialStore.Snapshot
+    ) async throws -> AndroidSpeedtestTileResponse {
         var merged: [AndroidSpeedtestMarker] = []
         var tileMeta: AndroidMapTile?
+        var lastStats: AndroidSpeedtestStats?
         var offset = 0
         for _ in 0..<speedtestMaxPages {
+            try Task.checkCancellation()
+            guard api.credentials.isCurrent(owner) else { throw APIError.cancelled }
             let pageOffset = offset
             let key = "speedtests:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):days=\(days):bands=\(bandCacheKey(bands)):off=\(pageOffset)"
-            let data = try await tileCache.data(for: key, maxAge: maxAge) {
+            let data = try await tileCache.data(for: key, maxAge: maxAge, validate: {
+                _ = try MapTileAdmission.decode(AndroidSpeedtestTileResponse.self, from: $0, expectedTile: tile)
+            }) {
                 var query = [
                     URLQueryItem(name: "market", value: market),
                     URLQueryItem(name: "operator", value: operatorName),
@@ -353,18 +401,25 @@ final class MapSnapshotService: MapSnapshotServicing {
                     APIEndpoint(
                         path: "/api/android/map/tiles/speedtests/\(tile.z)/\(tile.x)/\(tile.y)",
                         query: query,
+                        headers: ["Cache-Control": "no-cache"],
                         authenticated: false
-                    )
+                    ), expectedSessionID: owner.sessionID
                 )
             }
             let page = try JSONDecoder.signalQuest.decode(AndroidSpeedtestTileResponse.self, from: data)
             tileMeta = page.tile
+            lastStats = page.stats
             merged.append(contentsOf: page.markers)
             guard page.stats?.hasMore == true, let next = page.stats?.nextOffset, next > pageOffset else { break }
             offset = next
         }
-        guard let tileMeta else { return nil }
-        return AndroidSpeedtestTileResponse(tile: tileMeta, clusters: [], markers: merged, stats: nil)
+        guard let tileMeta else { throw APIError.decoding("Missing speedtest tile page") }
+        var seen = Set<String>()
+        merged = merged.filter { seen.insert($0.id).inserted }
+        let remaining = lastStats?.hasMore == true || lastStats?.truncated == true
+        return AndroidSpeedtestTileResponse(tile: tileMeta, clusters: [], markers: merged,
+            stats: AndroidSpeedtestStats(returnedCount: merged.count, hasMore: remaining,
+                                          nextOffset: remaining ? lastStats?.nextOffset : nil, truncated: remaining))
     }
 
     func coverageTiles(bounds: MapBounds, zoom: Double, market: String, operatorName: String, days: Int = 0, bands: Set<Int> = [], maxAge: TimeInterval? = nil) async throws -> [AndroidCoverageTileResponse] {
@@ -392,7 +447,7 @@ final class MapSnapshotService: MapSnapshotServicing {
             cacheKey: { tile in
                 // Le z fait partie de la clé, donc detail/limit (dérivés du z)
                 // sont couverts ; days et bandes doivent être explicites.
-                "coverage:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):days=\(days):bands=\(bandKey)\(focusKey)"
+                "coverage-bands-v2:\(market):\(operatorName):\(tile.z)/\(tile.x)/\(tile.y):days=\(days):bands=\(bandKey)\(focusKey)"
             },
             endpoint: { tile in
                 var query = [
@@ -415,7 +470,8 @@ final class MapSnapshotService: MapSnapshotServicing {
                     query: query,
                     authenticated: false
                 )
-            }
+            },
+            validate: { try CoverageRenderPolicy.validate($0, selectedBands: bands) }
         )
     }
 
@@ -466,31 +522,98 @@ final class MapSnapshotService: MapSnapshotServicing {
         )
     }
 
-    private func fetchTiles<T: Decodable & Sendable>(
+    private func fetchTiles<T: MapTilePayload>(
         bounds: MapBounds,
         zoom: Double,
         detailBoost: Int = 0,
         maxTiles: Int = 24,
         maxAge: TimeInterval? = nil,
         cacheKey: @escaping @Sendable (AndroidMapTile) -> String,
-        endpoint: @escaping @Sendable (AndroidMapTile) -> APIEndpoint
+        endpoint: @escaping @Sendable (AndroidMapTile) -> APIEndpoint,
+        validate: @escaping @Sendable (T) throws -> Void = { _ in }
     ) async throws -> [T] {
-        let tiles = Self.visibleTiles(bounds: bounds, zoom: zoom, detailBoost: detailBoost, maxTiles: maxTiles)
-        guard !tiles.isEmpty else { return [] }
-        return try await withThrowingTaskGroup(of: T.self) { group in
-            for tile in tiles {
-                group.addTask { [api, tileCache] in
-                    let data = try await tileCache.data(for: cacheKey(tile), maxAge: maxAge) {
-                        try await api.requestData(endpoint(tile))
+        let tiles = try MapTilePlanner.plan(bounds: bounds, zoom: zoom,
+                                             detailBoost: detailBoost, tileBudget: maxTiles).tiles
+        let owner = api.credentials.snapshot()
+        return try await Self.collectTiles(tiles, api: api, owner: owner) { [api, tileCache] tile in
+            let data = try await tileCache.data(for: cacheKey(tile), maxAge: maxAge, validate: {
+                let value = try MapTileAdmission.decode(T.self, from: $0, expectedTile: tile)
+                try validate(value)
+            }) {
+                var request = endpoint(tile)
+                request.headers["Cache-Control"] = "no-cache"
+                return try await api.requestData(request, expectedSessionID: owner.sessionID)
+            }
+            return try JSONDecoder.signalQuest.decode(T.self, from: data)
+        }
+    }
+
+    private static func collectTiles<T: MapTilePayload>(
+        _ tiles: [AndroidMapTile], api: APIClient, owner: CredentialStore.Snapshot,
+        fetch: @escaping @Sendable (AndroidMapTile) async throws -> T
+    ) async throws -> [T] {
+        try Task.checkCancellation()
+        guard api.credentials.isCurrent(owner) else { throw APIError.cancelled }
+        return try await withThrowingTaskGroup(of: (Int, Result<T, Error>).self) { group in
+            for (index, tile) in tiles.enumerated() {
+                group.addTask {
+                    do {
+                        try Task.checkCancellation()
+                        guard api.credentials.isCurrent(owner) else { throw APIError.cancelled }
+                        let value = try await fetch(tile)
+                        try Task.checkCancellation()
+                        guard api.credentials.isCurrent(owner) else { throw APIError.cancelled }
+                        return (index, .success(value))
+                    } catch {
+                        // Cancellation (including cache invalidation or account
+                        // replacement) invalidates the batch, never just one tile.
+                        guard !error.isCancellation, !Task.isCancelled,
+                              api.credentials.isCurrent(owner) else { throw APIError.cancelled }
+                        return (index, .failure(error))
                     }
-                    return try JSONDecoder.signalQuest.decode(T.self, from: data)
                 }
             }
-            var responses: [T] = []
-            for try await response in group {
-                responses.append(response)
+            var results: [(Int, Result<T, Error>)] = []
+            for try await result in group { results.append(result) }
+            try Task.checkCancellation()
+            guard api.credentials.isCurrent(owner) else { throw APIError.cancelled }
+            var successful: [T] = []
+            var failed: [AndroidMapTile] = []
+            var firstError: Error?
+            for (index, result) in results.sorted(by: { $0.0 < $1.0 }) {
+                switch result {
+                case .success(let value): successful.append(value)
+                case .failure(let error):
+                    failed.append(tiles[index])
+                    firstError = firstError ?? error
+                }
             }
-            return responses
+            if let firstError {
+                throw MapTileBatchFailure(requestedTiles: tiles, successfulTiles: successful,
+                                          failedTiles: failed, cause: firstError)
+            }
+            return successful
+        }
+    }
+
+    /// Supprime les tuiles persistées et invalide les réponses antérieures.
+    /// Utilisé après une mutation de visibilité ou un changement de contrat.
+    func invalidateTiles() async {
+        async let tiles: Void = tileCache.removeAll()
+        async let social: Void = socialCache.removeAll()
+        _ = await (tiles, social)
+    }
+
+    private struct AvailableTile<Value: Decodable>: Decodable {
+        let value: Value
+        private enum CodingKeys: String, CodingKey { case degraded }
+        init(from decoder: Decoder) throws {
+            let flags = try decoder.container(keyedBy: CodingKeys.self)
+            if try flags.decodeIfPresent(Bool.self, forKey: .degraded) == true {
+                throw APIError.http(status: 503, code: "DATABASE_UNAVAILABLE",
+                    message: "Données cartographiques temporairement indisponibles", requestId: nil, retryAfter: 15)
+            }
+            value = try Value(from: decoder)
         }
     }
 
@@ -527,42 +650,7 @@ final class MapSnapshotService: MapSnapshotServicing {
         }
     }
 
-    private static func visibleTiles(bounds: MapBounds, zoom: Double, detailBoost: Int = 0, maxTiles: Int = 24) -> [AndroidMapTile] {
-        // `Int(zoom.rounded(.down))` trappe sur NaN/infini. Les `min`/`max` qui
-        // suivent neutralisent les NaN de lat/lon par accident (sémantique de
-        // Swift.min/max), mais pas celui du zoom. Point d'entrée des 4 couches
-        // de tuiles : la garde ici les couvre toutes.
-        guard bounds.isFinite, zoom.isFinite else { return [] }
-        let z = min(16, max(4, Int(zoom.rounded(.down)) + detailBoost))
-        let north = min(85.05112878, max(-85.05112878, bounds.north))
-        let south = min(85.05112878, max(-85.05112878, bounds.south))
-        let west = min(180, max(-180, bounds.west))
-        let east = min(180, max(-180, bounds.east))
-        let topLeft = tileXY(lat: north, lon: west, z: z)
-        let bottomRight = tileXY(lat: south, lon: east, z: z)
-        let minX = min(topLeft.x, bottomRight.x)
-        let maxX = max(topLeft.x, bottomRight.x)
-        let minY = min(topLeft.y, bottomRight.y)
-        let maxY = max(topLeft.y, bottomRight.y)
-        let maxTileCount = maxTiles
-        var tiles: [AndroidMapTile] = []
-        for x in minX...maxX {
-            for y in minY...maxY {
-                tiles.append(AndroidMapTile(z: z, x: x, y: y))
-                if tiles.count >= maxTileCount { return tiles }
-            }
-        }
-        return tiles
-    }
 
-    private static func tileXY(lat: Double, lon: Double, z: Int) -> (x: Int, y: Int) {
-        let n = pow(2.0, Double(z))
-        let latRad = lat * .pi / 180
-        let x = Int(((lon + 180.0) / 360.0 * n).rounded(.down))
-        let y = Int(((1.0 - log(tan(latRad) + 1.0 / cos(latRad)) / .pi) / 2.0 * n).rounded(.down))
-        let maxIndex = Int(n) - 1
-        return (min(max(x, 0), maxIndex), min(max(y, 0), maxIndex))
-    }
 }
 
 extension SocialMapSnapshot {
@@ -649,4 +737,13 @@ extension SocialMapSnapshot {
         rawCoveragePointsCount: 0,
         logicalCoveragePointsCount: 0
     )
+}
+
+extension MapSnapshotServicing {
+    func plannedSitesLayer(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> MapFeedResult<PlannedSiteLive> {
+        MapFeedResult(sites: try await plannedSites(market: market, operatorName: operatorName, territory: territory, bands: bands))
+    }
+    func outageSitesLayer(market: String, operatorName: String, territory: String?, bands: Set<Int>) async throws -> MapFeedResult<OutageSiteLive> {
+        MapFeedResult(sites: try await outageSites(market: market, operatorName: operatorName, territory: territory, bands: bands))
+    }
 }

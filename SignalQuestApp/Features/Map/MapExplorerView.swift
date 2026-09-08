@@ -49,6 +49,7 @@ final class MapExplorerViewModel: ObservableObject {
     private var friendsFromStream = false
     @Published var antennas: [AntennaSite] = []
     @Published var antennaClusters: [AndroidMapCluster] = []
+    private var retainedAntennaTiles: [AndroidAntennaTileResponse] = []
     @Published var speedtestTiles: [AndroidSpeedtestTileResponse] = []
     @Published var coverageTiles: [AndroidCoverageTileResponse] = []
     @Published var communitySiteTiles: [AndroidCommunitySiteTileResponse] = []
@@ -73,6 +74,9 @@ final class MapExplorerViewModel: ObservableObject {
     @Published private(set) var friendsVersion = 0
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published private(set) var hasCurrentResponse = false
+    @Published private(set) var tileLoadIssues: [MapDisplayItem.Kind: MapTileLoadIssue] = [:]
+    @Published private(set) var displayLimitMessages: [String] = []
     // Marché + opérateur initiaux : dernier choix persisté, sinon le pays de la
     // locale appareil (jamais la France imposée). La détection fine (SIM/GPS) est
     // appliquée ensuite dans `resolveInitialSelection`.
@@ -123,22 +127,136 @@ final class MapExplorerViewModel: ObservableObject {
     let marketsService: MarketRegistryServicing
     let communityOutageService: CommunityOutageServicing
 
-    private var marketDetectionTask: Task<Void, Never>?
     private var noticeTask: Task<Void, Never>?
     /// Recherche courante (annulée à chaque nouvelle frappe → pas de résultat obsolète).
     private var searchTask: Task<Void, Never>?
     /// Dernier centre caméra connu — biais de proximité de la recherche de lieux.
     private var lastCenter: CLLocationCoordinate2D?
-    /// Code détecté au passage précédent : un switch auto exige deux
-    /// détections consécutives du même marché.
-    private var pendingAutoMarketCode: String?
-    /// Vrai entre un switch automatique et sa consommation par la vue,
-    /// pour court-circuiter le recentrage du picker manuel.
-    private var autoMarketSwitchInProgress = false
+    private var hasResolvedInitialSelection = false
+    private var initialCameraConsumed = false
+    private var initialSelectionToObserve: (market: String, operatorName: String)?
+    private var initialGPSCenter: CLLocationCoordinate2D?
+    private var initialResolvedFromManual = false
+    private var marketBeforeInitialResolution: String?
+    private var marketAlignmentGeneration = UUID()
+    private var manualSelectionGeneration = UUID()
     /// Vrai pendant la sélection initiale (cascade marché/opérateur à
     /// l'ouverture) : les `onChange` de marketFilter/operatorFilter doivent alors
     /// court-circuiter recentrage + rechargement, car le `.task` les pilote lui-même.
     private(set) var initialSelectionInProgress = false
+
+    private struct LoadContext: Equatable {
+        let session: UUID
+        let market: String
+        let operatorName: String
+        let technologies: Set<String>
+        let bands: Set<Int>
+        let bandMatch: BandMatchMode
+        let focus: AntennaCoverageFocus?
+        let sharing: Set<String>
+        let includeObserved: Bool
+        let speedtestDays: Int
+        let coverageDays: Int
+        let filters: Set<MapDisplayItem.Kind>
+        let lightweight: Bool
+        let communityOnly: Bool
+        let supportsCommunity: Bool
+    }
+
+    private var displayedContext: LoadContext?
+    private var activeLoad: (id: UUID, context: LoadContext)?
+
+    private func loadContext(filters: Set<MapDisplayItem.Kind>, lightweight: Bool) -> LoadContext {
+        LoadContext(
+            session: mapService.sessionIdentifier, market: marketFilter, operatorName: operatorFilter,
+            technologies: techFilters, bands: bandFilters, bandMatch: bandMatch, focus: coverageFocus,
+            sharing: sharingFilters, includeObserved: includeObservedSites,
+            speedtestDays: speedtestDays, coverageDays: coverageDays, filters: filters,
+            lightweight: lightweight, communityOnly: isCommunityOnlyMarket,
+            supportsCommunity: supportsCommunityLayers
+        )
+    }
+
+    /// Reserve before debounce as well as for direct/initial loads. Cancellation
+    /// only saves work; this identity is what authorizes publication.
+    @discardableResult
+    func prepareLoad(filters: Set<MapDisplayItem.Kind>, lightweight: Bool = true) -> UUID {
+        let context = loadContext(filters: filters, lightweight: lightweight)
+        let id = UUID()
+        activeLoad = (id, context)
+        discardIncompatibleData(for: context)
+        errorMessage = nil
+        hasCurrentResponse = false
+        tileLoadIssues = [:]
+        displayLimitMessages = []
+        isLoading = true
+        return id
+    }
+
+    func cancelPendingLoad() {
+        activeLoad = nil
+        isLoading = false
+    }
+
+    private func isCurrentLoad(_ id: UUID, context: LoadContext) -> Bool {
+        activeLoad?.id == id
+            && context == loadContext(filters: context.filters, lightweight: context.lightweight)
+    }
+
+    /// Keep a failed layer's previous data only if its meaning has not changed.
+    /// Moving the camera can retain nearby data; changing owner or attribution cannot.
+    private func discardIncompatibleData(for next: LoadContext) {
+        let previous = displayedContext
+        displayedContext = next
+        guard previous != next else { return }
+        let sameAccount = previous?.session == next.session
+        let sameMarket = sameAccount && previous?.market == next.market
+        let sameOperator = sameMarket && previous?.operatorName == next.operatorName
+        let sameBands = sameOperator && previous?.bands == next.bands
+        let sameCommunity = sameBands && previous?.communityOnly == next.communityOnly
+            && previous?.supportsCommunity == next.supportsCommunity
+        func sameLayer(_ kind: MapDisplayItem.Kind) -> Bool {
+            previous?.filters.contains(kind) == next.filters.contains(kind)
+        }
+        if !sameOperator || previous?.lightweight != next.lightweight
+            || !sameLayer(.validation) || !sameLayer(.session) {
+            snapshot = .empty
+        }
+        if !sameAccount {
+            liveFriends = []
+            deactivateFriendsStream()
+            friendsVersion &+= 1
+        }
+        if !sameCommunity || !sameLayer(.antenna) || previous?.technologies != next.technologies
+            || previous?.sharing != next.sharing || previous?.bandMatch != next.bandMatch {
+            antennas = []
+            antennaClusters = []
+            retainedAntennaTiles = []
+        }
+        if !sameCommunity || !sameLayer(.communitySite) || !sameLayer(.antenna)
+            || previous?.includeObserved != next.includeObserved {
+            communitySiteTiles = []
+        }
+        if !sameOperator || !sameLayer(.customSite) || !sameLayer(.antenna)
+            || previous?.communityOnly != next.communityOnly {
+            customSiteTiles = []
+        }
+        if !sameBands || !sameLayer(.speedtest) || previous?.speedtestDays != next.speedtestDays {
+            speedtestTiles = []
+        }
+        if !sameBands || !sameLayer(.coverage) || previous?.coverageDays != next.coverageDays
+            || previous?.technologies != next.technologies || previous?.focus != next.focus {
+            coverageTiles = []
+            coverageHeat = []
+        }
+        if !sameBands || !sameLayer(.planned) { plannedSites = [] }
+        if !sameBands || !sameLayer(.outage) || !sameLayer(.antenna) { outages = [] }
+        if !sameOperator || !sameLayer(.outage) || !sameLayer(.antenna) || !sameLayer(.customSite) {
+            communityOutages = []
+        }
+        if !sameMarket || !sameLayer(.photo) || !sameLayer(.friend) { publicPhotos = [] }
+        dataVersion &+= 1
+    }
 
     init(
         map: MapSnapshotServicing,
@@ -160,80 +278,131 @@ final class MapExplorerViewModel: ObservableObject {
         currentMarketEntry = payload.market(forCode: marketFilter)
     }
 
-    /// Sélection initiale du marché + opérateur à l'ouverture de la carte, **sans
-    /// jamais imposer la France**. À appeler après `loadRegistry()`.
-    ///
-    /// Cascade : si l'utilisateur a déjà un choix persisté cohérent, on le
-    /// respecte. Sinon, marché via MCC (cellulaire) → GPS (si déjà autorisé) →
-    /// locale appareil → 1ʳᵉ entrée du registre ; opérateur via `operatorKey`
-    /// (IP/ASN, hors VPN) → MNC → **« Tous »**. Ne touche `marketFilter` /
-    /// `operatorFilter` que si la détection apporte une valeur différente, et pose
-    /// `initialSelectionInProgress` pour que les `onChange` ne rechargent pas en
-    /// double (le `.task` pilote le recentrage + l'unique `load`).
+    /// La position propose le pays une seule fois. Un choix manuel persistant
+    /// reste prioritaire aux ouvertures suivantes ; la caméra ne choisit aucun pays.
     func resolveInitialSelection(
         networkPath: NetworkPathMonitor,
         networkOperator: NetworkOperatorServicing,
         location: LocationService
     ) async {
+        guard !hasResolvedInitialSelection else { return }
+        let manualGeneration = manualSelectionGeneration
+        let previousMarket = marketFilter
         let payload = await marketsService.registry()
-        guard !payload.markets.isEmpty else { return }
+        guard !Task.isCancelled, manualGeneration == manualSelectionGeneration,
+              !payload.markets.isEmpty else { return }
 
-        networkPath.refreshNow()
-        let status = networkPath.status
-
-        // 1. Marché.
-        var entry: MarketRegistryEntry?
-        if status.connection == .cellular, let mcc = status.operatorMcc {
-            entry = payload.markets.first { $0.publicSelectable && $0.mccs.contains(mcc) }
+        let manualMarket = MapMarketStore.manualMarket()
+        var entry = payload.markets.first {
+            $0.publicSelectable && ($0.marketCode.caseInsensitiveCompare(manualMarket ?? "") == .orderedSame
+                || $0.code.caseInsensitiveCompare(manualMarket ?? "") == .orderedSame)
         }
+        let hasManualCountry = entry != nil
+        var locatedCenter: CLLocationCoordinate2D?
         if entry == nil,
-           location.authorizationStatus == .authorizedWhenInUse
-            || location.authorizationStatus == .authorizedAlways,
+           location.authorizationStatus == .authorizedWhenInUse || location.authorizationStatus == .authorizedAlways,
            let loc = await location.currentLocation(timeoutSeconds: 4) {
             let resolved = await marketsService.marketForLocation(
-                latitude: loc.coordinate.latitude,
-                longitude: loc.coordinate.longitude
+                latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude
             )
-            entry = resolved?.publicSelectable == true ? resolved : nil
+            if resolved?.publicSelectable == true { entry = resolved; locatedCenter = loc.coordinate }
+        }
+        guard !Task.isCancelled, manualGeneration == manualSelectionGeneration else { return }
+        if entry == nil, let previous = MapMarketStore.lastMarket() {
+            entry = payload.markets.first { $0.publicSelectable && $0.marketCode.caseInsensitiveCompare(previous) == .orderedSame }
+        }
+        networkPath.refreshNow()
+        let status = networkPath.status
+        // La SIM n'est qu'un repli lorsque la position est indisponible, jamais
+        // une preuve du pays visité (itinérance).
+        if entry == nil, status.connection == .cellular, let mcc = status.operatorMcc {
+            entry = payload.markets.first { $0.publicSelectable && $0.mccs.contains(mcc) }
         }
         if entry == nil { entry = Self.localeMarketEntry(in: payload) }
         if entry == nil { entry = payload.markets.first { $0.publicSelectable } }
         guard let entry else { return }
-        let marketCode = entry.marketCode.isEmpty ? entry.code : entry.marketCode
-        // Marché : on respecte la sélection persistée si elle correspond au marché
-        // détecté (on ne la remplace pas).
-        let persistedMarketMatches = MapMarketStore.lastMarket()?.uppercased() == marketCode.uppercased()
+        let code = entry.marketCode.isEmpty ? entry.code : entry.marketCode
 
-        // 2. Opérateur : celui de la SIM/réseau RÉEL (IP/ASN hors VPN → MNC). C'est le
-        // DÉFAUT de la carte, appliqué MÊME quand le marché est persisté (avant, l'early-
-        // return bloquait l'opérateur sur le dernier choix / « Tous »). Si la détection
-        // échoue (WiFi, VPN, pas de cellulaire) on garde l'opérateur courant/persisté.
-        var detectedOperator: String?
-        if status.connection == .cellular {
+        var selectedOperator = operatorFilter
+        if !hasManualCountry, status.connection == .cellular {
             if let detected = await networkOperator.resolve(viaVpn: VPNDetector.isActive()),
-               let key = detected.operatorKey,
-               entry.operatorEntry(forKey: key) != nil {
-                detectedOperator = key
+               let key = detected.operatorKey, entry.operatorEntry(forKey: key) != nil {
+                selectedOperator = key
             } else if let mcc = status.operatorMcc, let mnc = status.operatorMnc,
                       let key = entry.radioOperatorKey(mcc: mcc, mnc: mnc) {
-                // SIM DROM (MCC 340/647, MNC seul ambigu) → opérateur exact via radioOperators/PLMN.
-                detectedOperator = key
-            } else if let mnc = status.operatorMnc,
-                      let op = entry.selectableOperators.first(where: { $0.mncs.contains(mnc) }) {
-                detectedOperator = op.key
+                selectedOperator = key
             }
         }
-
-        // 3. Application (les onChange court-circuitent grâce au flag).
+        guard !Task.isCancelled, manualGeneration == manualSelectionGeneration else { return }
+        let mayRestore = hasManualCountry || previousMarket.caseInsensitiveCompare(code) == .orderedSame
+        let restoredCenter = mayRestore ? lastCenter ?? MapRegionStore.lastRegion()?.center : nil
+        // Un repli de cadrage n'est pas un territoire observé : ne pas éliminer
+        // SRR après une exploration manuelle hors des îles.
+        let dromRegion = (locatedCenter ?? restoredCenter).flatMap(DromRegion.from)
+        let options = MapFilterSelection.operatorOptions(for: entry, dromRegion: dromRegion)
+        selectedOperator = options.first { $0.caseInsensitiveCompare(selectedOperator) == .orderedSame } ?? "ALL"
+        hasResolvedInitialSelection = true
+        initialGPSCenter = locatedCenter
+        initialResolvedFromManual = hasManualCountry
+        marketBeforeInitialResolution = previousMarket
         initialSelectionInProgress = true
+        initialSelectionToObserve = (code, selectedOperator)
         currentMarketEntry = entry
-        if let detectedOperator, operatorFilter.uppercased() != detectedOperator.uppercased() {
-            operatorFilter = detectedOperator
+        currentDromRegion = code.uppercased() == "DROM" ? dromRegion : nil
+        marketFilter = code
+        operatorFilter = selectedOperator
+        MapMarketStore.save(market: code, operator: selectedOperator)
+    }
+
+    /// Caméra par défaut d'un marché : centre/zoom du registre quand ils sont
+    /// connus, sinon les valeurs statiques historiques.
+    func defaultMapRegion(forMarketCode code: String) -> MKCoordinateRegion {
+        // Le centre global du registre DROM peut être hors de toute île.
+        // Une emprise territoriale réelle reste nécessaire pour charger ses sites.
+        if code.uppercased() == "DROM" {
+            let territory = currentDromRegion ?? lastCenter.flatMap(DromRegion.from) ?? .guadeloupe
+            let delta = territory == .guyane ? 6.0 : 2.0
+            return MKCoordinateRegion(center: territory.center,
+                span: MKCoordinateSpan(latitudeDelta: delta, longitudeDelta: delta))
         }
-        if !persistedMarketMatches, marketFilter.uppercased() != marketCode.uppercased() {
-            marketFilter = marketCode
+        if let entry = registryMarket(forCode: code),
+           let lat = entry.defaultCenterLatitude,
+           let lng = entry.defaultCenterLongitude,
+           CLLocationCoordinate2DIsValid(CLLocationCoordinate2D(latitude: lat, longitude: lng)) {
+            let proposedZoom = entry.defaultMapZoom ?? 6
+            let zoom = proposedZoom.isFinite ? min(20, max(1, proposedZoom)) : 6
+            let lonDelta = min(300.0, max(0.01, 360 / pow(2, zoom)))
+            return MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: lat, longitude: lng),
+                span: MKCoordinateSpan(
+                    latitudeDelta: min(120.0, lonDelta * 0.8),
+                    longitudeDelta: lonDelta
+                )
+            )
         }
-        MapMarketStore.save(market: persistedMarketMatches ? marketFilter : marketCode, operator: operatorFilter)
+        return MapExplorerView.region(for: code)
+    }
+
+    func takeInitialMapRegion(restoring saved: MKCoordinateRegion?) -> MKCoordinateRegion? {
+        guard hasResolvedInitialSelection, !initialCameraConsumed else { return nil }
+        initialCameraConsumed = true
+        if initialResolvedFromManual, let saved { return saved }
+        if let center = initialGPSCenter {
+            return MKCoordinateRegion(center: center, latitudinalMeters: 6000, longitudinalMeters: 6000)
+        }
+        if marketBeforeInitialResolution?.caseInsensitiveCompare(marketFilter) == .orderedSame, let saved {
+            return saved
+        }
+        return defaultMapRegion(forMarketCode: marketFilter)
+    }
+
+    /// SwiftUI observes the country after the startup task has returned. Keep
+    /// its origin until that observation so it cannot recenter over the GPS fix.
+    func consumeInitialSelectionObservation(_ selection: MapFilterSelection) -> Bool {
+        guard let initial = initialSelectionToObserve,
+              initial.market == selection.market, initial.operatorName == selection.operatorName else { return false }
+        initialSelectionToObserve = nil
+        return true
     }
 
     /// Fin de la phase de sélection initiale (réautorise recentrage + rechargement
@@ -265,9 +434,13 @@ final class MapExplorerViewModel: ObservableObject {
 
     /// Réaligne l'entrée courante et le filtre opérateur après un changement
     /// de marché. `resetOperator` force le retour à l'opérateur par défaut
-    /// (switch automatique) ; sinon on ne corrige que les valeurs invalides.
+    /// (changement explicite) ; sinon on ne corrige que les valeurs invalides.
     func alignWithMarket(code: String, resetOperator: Bool) async {
+        let generation = UUID()
+        marketAlignmentGeneration = generation
         let entry = await marketsService.market(forCode: code)
+        guard marketAlignmentGeneration == generation,
+              marketFilter.caseInsensitiveCompare(code) == .orderedSame else { return }
         currentMarketEntry = entry
         guard let entry else { return }
         let validKeys = Set(entry.selectableOperators.map { $0.key.uppercased() } + ["ALL"])
@@ -283,9 +456,67 @@ final class MapExplorerViewModel: ObservableObject {
         let validSharing = Set(MapFilterCatalog.sharing(forMarket: entry.marketCode).map(\.value))
         let prunedSharing = sharingFilters.intersection(validSharing)
         if prunedSharing != sharingFilters { sharingFilters = prunedSharing }
-        // DROM : caler le territoire courant (et purger un opérateur d'un autre DOM)
-        // dès le changement de marché, sans attendre le prochain arrêt caméra.
-        if let center = lastCenter { updateDromRegion(for: center) }
+        // A manual country switch may still have the previous camera centre.
+        // Do not replace its prepared DROM context with that unrelated location.
+        if entry.marketCode.uppercased() != "DROM" { currentDromRegion = nil }
+        else if let center = lastCenter, DromRegion.from(center) != nil { updateDromRegion(for: center) }
+    }
+
+    func filterSelection(layers: Set<MapDisplayItem.Kind>) -> MapFilterSelection {
+        MapFilterSelection(market: marketFilter, operatorName: operatorFilter,
+            technologies: techFilters, bands: bandFilters, bandMatch: bandMatch,
+            azimuthStyle: azimuthStyle, sharing: sharingFilters, speedtestDays: speedtestDays,
+            coverageDays: coverageDays, layers: layers, includeObserved: includeObservedSites,
+            plannedStatuses: plannedStatusFilters)
+    }
+
+    /// Commits a complete value on the main actor, before any scheduled load.
+    /// The sheet itself never touches these observable values or their stores.
+    func applyFilterSelection(_ selection: MapFilterSelection) -> MapFilterSelection? {
+        guard let entry = registryMarket(forCode: selection.market), entry.publicSelectable else { return nil }
+        let region: DromRegion?
+        if entry.marketCode.uppercased() != "DROM" { region = nil }
+        else if marketFilter.uppercased() == "DROM" { region = currentDromRegion }
+        else if let latitude = entry.defaultCenterLatitude, let longitude = entry.defaultCenterLongitude {
+            region = DromRegion.from(latitude: latitude, longitude: longitude) ?? .guadeloupe
+        } else { region = .guadeloupe }
+        let result = selection.normalized(for: entry, dromRegion: region)
+        if marketFilter.caseInsensitiveCompare(result.market) != .orderedSame
+            || operatorFilter.caseInsensitiveCompare(result.operatorName) != .orderedSame {
+            coverageFocus = nil
+        }
+        invalidatePendingSelectionResolution()
+        currentMarketEntry = entry
+        currentDromRegion = region
+        marketFilter = result.market
+        operatorFilter = result.operatorName
+        techFilters = result.technologies
+        bandFilters = result.bands
+        bandMatch = result.bandMatch
+        azimuthStyle = result.azimuthStyle
+        sharingFilters = result.sharing
+        speedtestDays = result.speedtestDays
+        coverageDays = result.coverageDays
+        includeObservedSites = result.includeObserved
+        plannedStatusFilters = result.plannedStatuses
+        MapMarketStore.saveManual(market: result.market, operator: result.operatorName)
+        return result
+    }
+
+    private func invalidatePendingSelectionResolution() {
+        manualSelectionGeneration = UUID()
+        marketAlignmentGeneration = UUID()
+        hasResolvedInitialSelection = true
+        initialCameraConsumed = true
+        initialSelectionToObserve = nil
+    }
+
+    func chooseOperatorManually(_ key: String) {
+        guard let canonical = operatorOptions.first(where: { $0.caseInsensitiveCompare(key) == .orderedSame }) else { return }
+        invalidatePendingSelectionResolution()
+        if operatorFilter.caseInsensitiveCompare(canonical) != .orderedSame { coverageFocus = nil }
+        operatorFilter = canonical
+        MapMarketStore.saveManual(market: marketFilter, operator: canonical)
     }
 
     var supportsCommunityLayers: Bool {
@@ -411,72 +642,13 @@ final class MapExplorerViewModel: ObservableObject {
     }
     #endif
 
-    // MARK: Changement automatique de marché (caméra idle)
+    // MARK: Contexte géographique de la caméra
 
-    /// Appelé à chaque fin de déplacement caméra. Debounce 600 ms puis
-    /// résolution du marché sous le centre de la carte.
-    func scheduleMarketDetection(center: CLLocationCoordinate2D) {
-        lastCenter = center   // biais de proximité pour la recherche de lieux (MKLocalSearch)
+    /// Le centre sert à la recherche de lieux et aux territoires DROM.
+    /// Un déplacement ne déclenche ni résolution de pays ni changement du choix manuel.
+    func recordViewportCenter(_ center: CLLocationCoordinate2D) {
+        lastCenter = center
         updateDromRegion(for: center)
-        MessageSyncLog.logger.debug("market detect schedule lat=\(center.latitude, privacy: .private) lng=\(center.longitude, privacy: .private)")
-        marketDetectionTask?.cancel()
-        marketDetectionTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 600_000_000)
-            guard !Task.isCancelled else { return }
-            await self?.detectMarket(at: center)
-        }
-    }
-
-    /// À consommer dans `.onChangeCompat(of: marketFilter)` : vrai si le changement
-    /// vient du switch automatique (la caméra ne doit alors pas bouger).
-    func consumeAutoMarketSwitch() -> Bool {
-        defer { autoMarketSwitchInProgress = false }
-        return autoMarketSwitchInProgress
-    }
-
-    private func detectMarket(at center: CLLocationCoordinate2D) async {
-        // Hysteresis France : tant que le centre reste dans la zone tampon
-        // (métropole + Corse), on ne quitte pas FR.
-        if marketFilter.uppercased() == "FR",
-           marketsService.franceHysteresisContains(latitude: center.latitude, longitude: center.longitude) {
-            pendingAutoMarketCode = nil
-            return
-        }
-        guard let entry = await marketsService.marketForLocation(latitude: center.latitude, longitude: center.longitude) else {
-            MessageSyncLog.logger.debug("market detect: aucun marché à lat=\(center.latitude, privacy: .private) lng=\(center.longitude, privacy: .private)")
-            pendingAutoMarketCode = nil
-            return
-        }
-        let code = entry.marketCode.isEmpty ? entry.code : entry.marketCode
-        MessageSyncLog.logger.debug("market detect: \(code, privacy: .public) (courant \(self.marketFilter, privacy: .public))")
-        guard code.uppercased() != marketFilter.uppercased() else {
-            pendingAutoMarketCode = nil
-            return
-        }
-        // Stabilité : deux détections du même marché espacées dans le temps.
-        // La seconde est auto-planifiée — un pan unique qui s'arrête sur un
-        // autre pays doit suffire, sans attendre un nouvel événement caméra.
-        guard pendingAutoMarketCode?.uppercased() == code.uppercased() else {
-            pendingAutoMarketCode = code
-            marketDetectionTask?.cancel()
-            marketDetectionTask = Task { [weak self] in
-                try? await Task.sleep(nanoseconds: 700_000_000)
-                guard !Task.isCancelled else { return }
-                await self?.detectMarket(at: center)
-            }
-            return
-        }
-        pendingAutoMarketCode = nil
-        applyAutoMarketSwitch(to: entry, code: code)
-    }
-
-    private func applyAutoMarketSwitch(to entry: MarketRegistryEntry, code: String) {
-        autoMarketSwitchInProgress = true
-        currentMarketEntry = entry
-        operatorFilter = Self.defaultOperatorKey(for: entry)
-        marketFilter = code
-        if let center = lastCenter { updateDromRegion(for: center) }
-        showMarketNotice("Marché : \(entry.label)")
     }
 
     /// Met à jour le territoire DROM courant depuis le centre du viewport, et réaligne
@@ -509,18 +681,64 @@ final class MapExplorerViewModel: ObservableObject {
         }
     }
 
-    func load(region: MKCoordinateRegion, zoom: Double, filters: Set<MapDisplayItem.Kind>, lightweight: Bool = true) async {
+    /// La suppression visuelle précède le prochain await réseau. Les anciennes
+    /// réponses déjà en vol perdent aussi leur droit de remplacer ces données.
+    func applySpeedtestVisibility(serverID: String, isSharedOnMap: Bool) {
+        activeLoad = nil
+        isLoading = false
+        if !isSharedOnMap {
+            speedtestTiles = speedtestTiles.map { tile in
+                AndroidSpeedtestTileResponse(tile: tile.tile, clusters: [],
+                    markers: tile.markers.filter { $0.id != serverID }, stats: tile.stats)
+            }
+            let kept = snapshot.speedtests.filter { $0.id != serverID }
+            let removed = snapshot.speedtests.count - kept.count
+            snapshot = SocialMapSnapshot(timestamp: snapshot.timestamp, friends: snapshot.friends,
+                photos: snapshot.photos, validations: snapshot.validations, sessions: snapshot.sessions,
+                coveragePoints: snapshot.coveragePoints, speedtests: kept,
+                photosCount: snapshot.photosCount, validationsCount: snapshot.validationsCount,
+                sessionsCount: snapshot.sessionsCount, coveragePointsCount: snapshot.coveragePointsCount,
+                speedtestsCount: max(0, snapshot.speedtestsCount - removed),
+                rawCoveragePointsCount: snapshot.rawCoveragePointsCount,
+                logicalCoveragePointsCount: snapshot.logicalCoveragePointsCount)
+        }
+        dataVersion &+= 1
+    }
+
+    func load(region: MKCoordinateRegion, zoom: Double, filters: Set<MapDisplayItem.Kind>, lightweight: Bool = true, requestID: UUID? = nil, refresh: Bool = false) async {
         let bounds = MapBounds(
             north: region.center.latitude + region.span.latitudeDelta / 2,
             south: region.center.latitude - region.span.latitudeDelta / 2,
             east: region.center.longitude + region.span.longitudeDelta / 2,
             west: region.center.longitude - region.span.longitudeDelta / 2
         )
-        await load(bounds: bounds, zoom: zoom, filters: filters, lightweight: lightweight)
+        await load(bounds: bounds, zoom: zoom, filters: filters, lightweight: lightweight, requestID: requestID, refresh: refresh)
     }
 
-    func load(bounds: MapBounds, zoom: Double, filters: Set<MapDisplayItem.Kind>, lightweight: Bool = true) async {
+    func load(bounds: MapBounds, zoom: Double, filters: Set<MapDisplayItem.Kind>, lightweight: Bool = true, requestID: UUID? = nil, refresh: Bool = false) async {
+        guard !Task.isCancelled else { return }
+        let id = requestID ?? prepareLoad(filters: filters, lightweight: lightweight)
+        guard let context = activeLoad?.context, isCurrentLoad(id, context: context) else { return }
+        defer {
+            // An older operation must never stop the newer operation's spinner.
+            if activeLoad?.id == id {
+                discardIncompatibleData(for: loadContext(filters: filters, lightweight: lightweight))
+                isLoading = false
+            }
+        }
+        let querySegments: [MapBounds]
+        do {
+            querySegments = try bounds.canonicalSegments
+            let projection = try MapTilePlanner.plan(bounds: bounds, zoom: zoom, tileBudget: 1, maximumZoom: 0)
+            if projection.clipsPolarArea {
+                displayLimitMessages.append(String(localized: "Une partie de cette zone dépasse la projection de la carte."))
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
         if AppEnvironment.usesDemoData {
+            hasCurrentResponse = true
             snapshot = .demo
             #if DEBUG
             // QA (DEBUG) : injecte de vraies photos géolocalisées même en démo pour
@@ -539,10 +757,6 @@ final class MapExplorerViewModel: ObservableObject {
             dataVersion &+= 1
             return
         }
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-
         // Couches de carte indépendantes : chargées EN PARALLÈLE (async let) au
         // lieu d'enchaîner ~7 allers-retours en série. La latence perçue passe de
         // la SOMME des couches au MAX d'une seule (cf. audit SCALABILITY-02). Les
@@ -550,6 +764,7 @@ final class MapExplorerViewModel: ObservableObject {
         // chargement) dans des constantes locales pour l'usage concurrent, et on
         // garde les transformations isolées MainActor (Self.antennas…) APRÈS le await.
         let svc = mapService
+        let sessionID = context.session
         let antennasSvc = antennasService
         let outagesSvc = communityOutageService
         let market = marketFilter
@@ -597,15 +812,17 @@ final class MapExplorerViewModel: ObservableObject {
         // Sites prévisionnels et pannes : FR métropole ET DROM (le backend répond
         // pour FR/DROM). En DROM on déduit le territoire (974, 971…) du centre du
         // viewport pour la résolution opérateur par île, comme le sélecteur web.
-        let supportsPlannedOutage = ["FR", "DROM"].contains(market.uppercased())
+        let entry = registryMarket(forCode: market)
+        let supportsPlanned = entry?.capabilities.previsionnel ?? ["FR", "DROM"].contains(market.uppercased())
+        let supportsOutage = entry?.capabilities.incidents ?? ["FR", "DROM"].contains(market.uppercased())
         let territory = market.uppercased() == "DROM" ? Self.dromTerritory(for: bounds) : nil
-        let wantsPlanned = filters.contains(.planned) && supportsPlannedOutage
+        let wantsPlanned = filters.contains(.planned) && supportsPlanned
         // Incidents opérateurs : chargés AUSSI filtre « Pannes » éteint, exactement comme les
         // signalements communautaires — ils deviennent alors le badge du point d'antenne. Sans
         // cela, une antenne que l'OPÉRATEUR déclare hors service ne portait aucune marque, là où
         // un simple signalement d'utilisateur en portait une : c'est l'information la plus fiable
         // qui s'effaçait. La garde de marché reste, elle : ces flux sont FR/DROM.
-        let wantsOutage = (filters.contains(.outage) || filters.contains(.antenna)) && supportsPlannedOutage
+        let wantsOutage = (filters.contains(.outage) || filters.contains(.antenna)) && supportsOutage
         // Couverture masquée en « Tous » (superposer tous les opérateurs n'a pas de
         // sens) → on ne la télécharge même pas dans ce cas.
         let wantsCoverage = filters.contains(.coverage) && op.uppercased() != "ALL"
@@ -618,81 +835,108 @@ final class MapExplorerViewModel: ObservableObject {
         // le snapshot COMPLET que pour ces couches (les photos ont leur endpoint).
         let needsHeavySnapshot = filters.contains(.validation) || filters.contains(.session)
         let snapshotLightweight = lightweight && !needsHeavySnapshot
+        let wantsSocialSnapshot = filters.contains(.friend) || needsHeavySnapshot
+        let usesAdvancedAntennaFilters = !techs.isEmpty || !bands.isEmpty || !sharing.isEmpty
+        do {
+            var plans: [MapTilePlan] = []
+            if (wantsAntenna && !usesAdvancedAntennaFilters) || wantsCommunitySites || wantsCustomSites || wantsSpeedtest {
+                plans.append(try MapTilePlanner.plan(bounds: bounds, zoom: zoom))
+            }
+            if wantsCoverage {
+                let boost = zoom < 11 ? 1 : 0
+                plans.append(try MapTilePlanner.plan(bounds: bounds, zoom: zoom, detailBoost: boost, tileBudget: boost > 0 ? 40 : 24))
+            }
+            if plans.contains(where: \.usesReducedDetail) {
+                displayLimitMessages.append(String(localized: "Niveau de détail adapté pour couvrir toute la zone visible. Zoome pour préciser."))
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
         async let snapshotResult: (snapshot: SocialMapSnapshot?, error: String?) = {
+            guard wantsSocialSnapshot else { return (.empty, nil) }
             do { return (try await svc.snapshot(bounds: bounds, zoom: zoom, lightweight: snapshotLightweight), nil) }
             catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
-        // tiles non-nil → tuiles disponibles ; list non-nil → repli sur la liste bbox.
-        // ROB-08 : `tiles`/`list` nil AVEC `error` non-nil ⇒ échec réseau réel (la
-        // couche précédente sera conservée + toast) ; nil SANS error ⇒ annulation
-        // (couche conservée, sans toast). Le repli tuiles→liste reste silencieux
-        // (best-effort) ; seul l'échec TERMINAL (liste indisponible) est signalé.
-        async let antennaRaw: (tiles: [AndroidAntennaTileResponse]?, list: [AntennaSite]?, error: String?) = {
+        // Keep admitted tiles until publication. If none was admitted, preserve
+        // the existing bbox fallback; an admitted empty tile must not broaden it.
+        async let antennaRaw: (tiles: MapTileLayerResult<AndroidAntennaTileResponse>?, list: [AntennaSite]?, error: String?) = {
             guard wantsAntenna else { return (nil, [], nil) }
-            let usesAdvancedAntennaFilters = !techs.isEmpty || !bands.isEmpty || !sharing.isEmpty
-            if !usesAdvancedAntennaFilters,
-               let tiles = try? await svc.antennaTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, withAzimuth: true, bands: bands) {
-                return (tiles, nil, nil)
+            if !usesAdvancedAntennaFilters {
+                let result = await MapTileLayerResult.load {
+                    try await svc.antennaTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, withAzimuth: true, bands: bands)
+                }
+                if result.tiles != nil { return (result, nil, result.errorMessage) }
+                guard result.errorMessage != nil else { return (nil, nil, nil) }
             }
+            guard !Task.isCancelled, svc.sessionIdentifier == sessionID else { return (nil, nil, nil) }
             do {
-                let list = try await antennasSvc.list(bbox: bounds.asBoundingBox, market: market, operatorName: op, technologies: techs, bands: bands, bandMatch: bandMatchMode, sharing: sharing)
-                return (nil, list, nil)
+                var parts: [[AntennaSite]] = []
+                for segment in querySegments {
+                    guard !Task.isCancelled, svc.sessionIdentifier == sessionID else { return (nil, nil, nil) }
+                    parts.append(try await antennasSvc.list(bbox: segment.asBoundingBox, market: market, operatorName: op,
+                        technologies: techs, bands: bands, bandMatch: bandMatchMode, sharing: sharing))
+                }
+                return (nil, MapSnapshotMerging.unique(parts, id: \.id), nil)
             } catch {
                 return (nil, nil, error.isCancellation ? nil : error.localizedDescription)
             }
         }()
-        async let communityRaw: (value: [AndroidCommunitySiteTileResponse]?, error: String?) = {
-            guard wantsCommunitySites else { return ([], nil) }
-            do { return (try await svc.communitySiteTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, includeObserved: includeObserved, bands: bands), nil) }
-            catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
-        }()
-        async let customRaw: (value: [AndroidCustomSiteTileResponse]?, error: String?) = {
-            guard wantsCustomSites else { return ([], nil) }
-            do { return (try await svc.customSiteTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op), nil) }
-            catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
-        }()
-        async let speedtestRaw: (value: [AndroidSpeedtestTileResponse]?, error: String?) = {
-            guard wantsSpeedtest else { return ([], nil) }
-            do { return (try await svc.speedtestTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: stDays, bands: bands, maxAge: nil), nil) }
-            catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
-        }()
+        async let communityRaw = MapTileLayerResult.load(enabled: wantsCommunitySites) {
+            try await svc.communitySiteTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, includeObserved: includeObserved, bands: bands)
+        }
+        async let customRaw = MapTileLayerResult.load(enabled: wantsCustomSites) {
+            try await svc.customSiteTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op)
+        }
+        async let speedtestRaw = MapTileLayerResult.load(enabled: wantsSpeedtest) {
+            try await svc.speedtestTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: stDays, bands: bands, maxAge: refresh ? 0 : nil)
+        }
         // Prévisionnels & pannes : respectent le filtre opérateur de la carte
         // (l'opérateur sélectionné `op`, ou ALL quand « Tous » est choisi). Le
         // backend FR accepte ALL comme un opérateur précis.
-        async let plannedRaw: (value: [PlannedSiteLive]?, error: String?) = {
-            guard wantsPlanned else { return ([], nil) }
+        async let plannedRaw: (value: MapFeedResult<PlannedSiteLive>?, error: String?) = {
+            guard wantsPlanned else { return (MapFeedResult(sites: []), nil) }
             do {
-                let sites = try await svc.plannedSites(market: market, operatorName: op, territory: territory, bands: bands)
+                let sites = try await svc.plannedSitesLayer(market: market, operatorName: op, territory: territory, bands: bands)
                 return (sites.filter { bounds.contains(lat: $0.lat, lon: $0.lon) }, nil)
             } catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
-        async let outageRaw: (value: [OutageSiteLive]?, error: String?) = {
-            guard wantsOutage else { return ([], nil) }
+        async let outageRaw: (value: MapFeedResult<OutageSiteLive>?, error: String?) = {
+            guard wantsOutage else { return (MapFeedResult(sites: []), nil) }
             do {
-                let sites = try await svc.outageSites(market: market, operatorName: op, territory: territory, bands: bands)
+                let sites = try await svc.outageSitesLayer(market: market, operatorName: op, territory: territory, bands: bands)
                 return (sites.filter { bounds.contains(lat: $0.lat, lon: $0.lon) }, nil)
             } catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
-        async let communityOutageRaw: (value: [CommunityOutage]?, error: String?) = {
-            guard wantsCommunityOutages else { return ([], nil) }
-            do { return (try await outagesSvc.outages(in: bounds, marketCode: market, operatorKey: op), nil) }
-            catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
+        async let communityOutageRaw: (value: [CommunityOutage]?, error: String?, atLimit: Bool) = {
+            guard wantsCommunityOutages else { return ([], nil, false) }
+            do {
+                var parts: [[CommunityOutage]] = []
+                for segment in querySegments {
+                    parts.append(try await outagesSvc.outages(in: segment, marketCode: market, operatorKey: op))
+                }
+                return (MapSnapshotMerging.unique(parts, id: \.id), nil, parts.contains { $0.count >= 500 })
+            } catch { return (nil, error.isCancellation ? nil : error.localizedDescription, false) }
         }()
-        async let coverageRaw: (value: (tiles: [AndroidCoverageTileResponse], heat: [CoverageHeatPoint])?, error: String?) = {
-            guard wantsCoverage else { return (([], []), nil) }
-            let tiles = (try? await svc.coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: covDays, bands: bands, maxAge: nil, focus: focus)) ?? []
-            // Le repli « points bruts » n'a pas de filtre par site : l'utiliser
-            // en couverture isolée afficherait TOUT l'opérateur en prétendant
-            // montrer ce pylône. Mieux vaut une carte vide qu'une carte fausse.
-            if tiles.isEmpty, focus == nil {
-                // Repli points bruts : source TERMINALE de la couche → son échec est
-                // signalé (couche conservée) au lieu d'être avalé en « vide ».
-                do {
-                    let points = try await svc.coveragePoints(bounds: bounds, market: market, operatorName: op, technology: techs.sorted().first, bands: bands)
-                    return (([], points), nil)
-                } catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
+        async let coverageRaw: (value: (tiles: MapTileLayerResult<AndroidCoverageTileResponse>, heat: [CoverageHeatPoint])?, error: String?) = {
+            guard wantsCoverage else { return ((MapTileLayerResult(tiles: []), []), nil) }
+            let result = await MapTileLayerResult.load {
+                try await svc.coverageTiles(bounds: bounds, zoom: zoom, market: market, operatorName: op, days: covDays, bands: bands, maxAge: refresh ? 0 : nil, focus: focus)
             }
-            return ((tiles, []), nil)
+            if result.tiles != nil {
+                return ((result, []), result.errorMessage)
+            }
+            guard let tileError = result.errorMessage else { return (nil, nil) }
+            guard !Task.isCancelled, svc.sessionIdentifier == sessionID else { return (nil, nil) }
+            // This legacy fallback cannot represent a site or another time window.
+            guard focus == nil, covDays == 30, techs.count <= 1, bands.isEmpty else {
+                // Without a compatible fallback, retain only failed identities.
+                return result.failure == nil ? (nil, tileError) : ((result, []), tileError)
+            }
+            do {
+                let points = try await svc.coveragePoints(bounds: bounds, market: market, operatorName: op, technology: techs.sorted().first, bands: bands)
+                return ((MapTileLayerResult(tiles: []), points), nil)
+            } catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
         }()
         async let photosRaw: (value: [MapPublicPhoto]?, error: String?) = {
             guard wantsPhoto else { return ([], nil) }
@@ -718,7 +962,7 @@ final class MapExplorerViewModel: ObservableObject {
         // Chargement REMPLACÉ (pan / changement de filtre / d'onglet suivant) : on
         // conserve les données déjà à l'écran au lieu de tout effacer et d'afficher
         // une erreur « Requête annulée ». (Régression du chargement parallèle.)
-        if Task.isCancelled { return }
+        guard !Task.isCancelled, isCurrentLoad(id, context: context) else { return }
 
         // ROB-08 : agrège les échecs RÉELS de couche. Chaque assignation ci-dessous
         // est gardée — une couche qui échoue CONSERVE ses données précédentes et
@@ -741,31 +985,41 @@ final class MapExplorerViewModel: ObservableObject {
         }
         #endif
 
-        if let tiles = antenna.tiles {
+        if let result = antenna.tiles, let tiles = result.retaining(retainedAntennaTiles) {
+            tileLoadIssues[.antenna] = result.issue(retaining: retainedAntennaTiles)
+            retainedAntennaTiles = tiles
             antennaClusters = tiles.flatMap(\.clusters)
             antennas = Self.antennas(from: tiles).filter(\.hasValidCoordinate)
         } else if let list = antenna.list {
+            retainedAntennaTiles = []
             antennaClusters = []
             antennas = list.filter(\.hasValidCoordinate)
-        } else if let error = antenna.error {
-            // Échec réseau : on garde les antennes/clusters déjà affichés.
-            layerError = layerError ?? error
         }
+        if let error = antenna.error { layerError = layerError ?? error }
 
-        if let value = community.value { communitySiteTiles = value }
-        else if let error = community.error { layerError = layerError ?? error }
+        tileLoadIssues[.communitySite] = community.issue(retaining: communitySiteTiles)
+        if let value = community.retaining(communitySiteTiles) { communitySiteTiles = value }
+        if let error = community.errorMessage { layerError = layerError ?? error }
 
-        if let value = custom.value { customSiteTiles = value }
-        else if let error = custom.error { layerError = layerError ?? error }
+        tileLoadIssues[.customSite] = custom.issue(retaining: customSiteTiles)
+        if let value = custom.retaining(customSiteTiles) { customSiteTiles = value }
+        if let error = custom.errorMessage { layerError = layerError ?? error }
 
-        if let value = speedtest.value { speedtestTiles = value }
-        else if let error = speedtest.error { layerError = layerError ?? error }
+        tileLoadIssues[.speedtest] = speedtest.issue(retaining: speedtestTiles)
+        if let value = speedtest.retaining(speedtestTiles) { speedtestTiles = value }
+        if let error = speedtest.errorMessage { layerError = layerError ?? error }
 
-        if let value = planned.value { plannedSites = value }
-        else if let error = planned.error { layerError = layerError ?? error }
+        if let value = planned.value {
+            plannedSites = value.retaining(plannedSites.filter { bounds.contains(lat: $0.lat, lon: $0.lon) })
+            if let error = value.availability.errorMessage { layerError = layerError ?? String(localized: "Prévisionnels") + ": " + error }
+            if let info = value.availability.information { displayLimitMessages.append(String(localized: "Prévisionnels") + ": " + info) }
+        } else if let error = planned.error { layerError = layerError ?? error }
 
-        if let value = outage.value { outages = value }
-        else if let error = outage.error { layerError = layerError ?? error }
+        if let value = outage.value {
+            outages = value.retaining(outages.filter { bounds.contains(lat: $0.lat, lon: $0.lon) })
+            if let error = value.availability.errorMessage { layerError = layerError ?? String(localized: "Pannes") + ": " + error }
+            if let info = value.availability.information { displayLimitMessages.append(String(localized: "Pannes") + ": " + info) }
+        } else if let error = outage.error { layerError = layerError ?? error }
 
         // Pas de `layerError` ici, contrairement aux autres couches : une panne
         // signalée indisponible n'empêche de lire ni les antennes ni le signal, et
@@ -774,11 +1028,11 @@ final class MapExplorerViewModel: ObservableObject {
         if let value = communityOutage.value { communityOutages = value }
 
         if let value = coverage.value {
-            coverageTiles = value.tiles
+            tileLoadIssues[.coverage] = value.tiles.issue(retaining: coverageTiles)
+            if let tiles = value.tiles.retaining(coverageTiles) { coverageTiles = tiles }
             coverageHeat = value.heat
-        } else if let error = coverage.error {
-            layerError = layerError ?? error
         }
+        if let error = coverage.error { layerError = layerError ?? error }
         // QA (DEBUG) : injecte des photos publiques de démo pour visualiser la
         // couche (le compte de test n'a pas forcément de photos géolocalisées).
         if AppEnvironment.usesDemoPhotos {
@@ -804,7 +1058,25 @@ final class MapExplorerViewModel: ObservableObject {
         }
         // ROB-08 : nil si tout a réussi (errorMessage déjà remis à nil en début de
         // `load`) ; sinon signale l'indisponibilité sans avoir écrasé les couches.
-        errorMessage = layerError
+        // Identify each affected layer, and explain when its failed zones retain
+        // older data. The existing retry invalidates caches before loading again.
+        let tileMessages = tileLoadIssues.sorted { $0.key.rawValue < $1.key.rawValue }.map {
+            MapTileLoadIssue.layerName($0.key) + ": " + $0.value.message
+        }
+        errorMessage = tileMessages.isEmpty ? layerError : tileMessages.joined(separator: "\n")
+        hasCurrentResponse = layerError == nil && snap.snapshot != nil
+            && (antenna.tiles != nil || antenna.list != nil)
+            && community.tiles != nil && custom.tiles != nil && speedtest.tiles != nil
+            && planned.value?.availability.isComplete == true && outage.value?.availability.isComplete == true && communityOutage.value != nil
+            && coverage.value != nil && photos.value != nil
+        if MapDataLimits.speedtests(speedtestTiles) || MapDataLimits.coverage(coverageTiles)
+            || MapDataLimits.communitySites(communitySiteTiles) || MapDataLimits.customSites(customSiteTiles)
+            || communityOutage.atLimit {
+            displayLimitMessages.append(String(localized: "Une limite de données a été atteinte. Zoome pour explorer plus précisément cette zone."))
+        }
+        if communityOutage.error != nil {
+            displayLimitMessages.append(String(localized: "Certains signalements sont momentanément indisponibles."))
+        }
         dataVersion &+= 1
     }
 
@@ -894,7 +1166,7 @@ final class MapExplorerViewModel: ObservableObject {
         ]
         return seeds.enumerated().map { index, seed in
             let radio: SocialRadioSnapshot? = (seed.tech != nil || seed.op != nil)
-                ? SocialRadioSnapshot(technology: seed.tech, rsrp: seed.rsrp, rsrq: nil, snr: nil, pci: nil, enb: nil, gnb: nil, cellId: nil, band: seed.tech == "5G" ? 78 : 7, `operator`: seed.op, city: "Grenoble", updatedAt: Date())
+                ? SocialRadioSnapshot(technology: seed.tech, rsrp: seed.rsrp, rsrq: nil, snr: nil, pci: nil, enb: nil, gnb: nil, cellId: nil, band: seed.tech == "5G" ? 78 : 7, operator: seed.op, city: "Grenoble", updatedAt: Date())
                 : nil
             return SocialFriendLive(
                 id: "demo-friend-\(index)",
@@ -1095,6 +1367,7 @@ final class MapExplorerViewModel: ObservableObject {
 struct MapExplorerView: View {
     private struct FriendsStreamTaskKey: Hashable {
         let enabled: Bool
+        let session: UUID?
         let generation: Int
     }
 
@@ -1104,6 +1377,7 @@ struct MapExplorerView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var mapCenter: CLLocationCoordinate2D
     @State private var mapZoom: Double
@@ -1152,7 +1426,12 @@ struct MapExplorerView: View {
     @State private var cellsForNewSite: [AndroidCommunitySiteMarker] = []
     @State private var fetchTask: Task<Void, Never>?
     @State private var lastRegion: MKCoordinateRegion
+    @State private var viewportGate = MapViewportLoadGate()
+    @State private var viewportRefreshID = 0
     @State private var showFilterSheet = false
+    @State private var showCoverageLegend = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var filterSheetDetent: PresentationDetent = .large
     // Écrans ANFR, repris du menu Profil : c'est ici qu'on cherche une carte.
     @State private var showsANFRMap = false
     @State private var showsANFRStats = false
@@ -1172,7 +1451,7 @@ struct MapExplorerView: View {
         // Restaure la dernière région, sinon vue pays du marché initial (dernier
         // choix persisté ou pays de la locale) — jamais une ville ni la France imposée.
         let region = MapRegionStore.lastRegion() ?? Self.region(for: MapMarketStore.initialMarketCode())
-        let initialZoom = Self.zoom(forSpan: region)
+        let initialZoom = SQMapProjection.zoom(forRegion: region, width: SQMapProjection.referenceWidth)
         _mapCenter = State(initialValue: region.center)
         _lastRegion = State(initialValue: region)
         _mapZoom = State(initialValue: initialZoom)
@@ -1252,21 +1531,12 @@ struct MapExplorerView: View {
         }
         .sheet(isPresented: $showFilterSheet) {
             MapAdvancedFilterSheet(
-                market: $model.marketFilter,
-                operatorName: $model.operatorFilter,
-                technologies: $model.techFilters,
-                bands: $model.bandFilters,
-                bandMatch: $model.bandMatch,
-                azimuthStyle: $model.azimuthStyle,
-                sharing: $model.sharingFilters,
-                speedtestDays: $model.speedtestDays,
-                coverageDays: $model.coverageDays,
-                layers: $filters,
-                includeObserved: $model.includeObservedSites,
-                plannedStatuses: $model.plannedStatusFilters,
-                allMarkets: model.registryMarkets
+                selection: filterSelection,
+                allMarkets: model.registryMarkets,
+                dromRegion: model.currentDromRegion,
+                onApply: applyFilterSelection
             )
-            .presentationDetents([.medium, .large])
+            .presentationDetents([.medium, .large], selection: $filterSheetDetent)
             .presentationBackgroundCompat(SQColor.bg)
         }
         .task {
@@ -1281,19 +1551,17 @@ struct MapExplorerView: View {
                 filters = [.friend, .photo, .antenna]
             }
             await model.loadRegistry()
-            // Sélection auto du marché + opérateur (SIM/GPS/locale) AVANT le 1er
+            // Sélection initiale du pays + opérateur (choix manuel/GPS/replis) AVANT le 1er
             // chargement : évite le flash « France/SFR puis Canada/Bell ».
             await model.resolveInitialSelection(
                 networkPath: services.networkPath,
                 networkOperator: services.networkOperator,
                 location: services.location
             )
+            guard !Task.isCancelled else { model.endInitialSelection(); return }
             // 1er lancement sans région mémorisée : recentre sur le marché résolu.
-            if MapRegionStore.lastRegion() == nil {
-                let region = region(forMarketCode: model.marketFilter)
-                mapCenter = region.center
-                mapZoom = Self.zoom(forSpan: region)
-                lastRegion = region
+            if let region = model.takeInitialMapRegion(restoring: MapRegionStore.lastRegion()) {
+                requestCamera(region: region)
             }
             // QA (DEBUG) : cadre ville pour visualiser les marqueurs amis individuels
             // (avatars, cônes de cap, présence) plutôt qu'un cluster continental.
@@ -1302,12 +1570,11 @@ struct MapExplorerView: View {
                     center: CLLocationCoordinate2D(latitude: 45.188, longitude: 5.724),
                     latitudinalMeters: 2200, longitudinalMeters: 2200
                 )
-                mapCenter = region.center
-                mapZoom = 14.5
-                lastRegion = region
+                requestCamera(center: region.center, zoom: 14.5)
             }
-            await model.load(region: lastRegion, zoom: mapZoom, filters: filters)
             model.endInitialSelection()
+            viewportGate.configure()
+            scheduleCurrentViewport()
             refreshMapRender()
             #if DEBUG
             await runQAPanIfRequested()
@@ -1371,9 +1638,10 @@ struct MapExplorerView: View {
         // ma propre position « carte ouverte » est liée à l'écran via onAppear.
         .task(id: FriendsStreamTaskKey(
             enabled: filters.contains(.friend),
+            session: services.map.sessionIdentifier,
             generation: friendsStreamGeneration
         )) {
-            guard filters.contains(.friend) else {
+            guard filters.contains(.friend), services.auth.hasStoredCredentials() else {
                 model.deactivateFriendsStream()
                 selectedFriendFilterID = nil
                 return
@@ -1411,55 +1679,20 @@ struct MapExplorerView: View {
             }
         }
         .onDisappear {
+            viewportGate.pause()
             services.livePresence.mapDidDisappear()
+            fetchTask?.cancel()
+            model.cancelPendingLoad()
             model.deactivateFriendsStream()
         }
-        .onChangeCompat(of: filters) { _, newValue in
-            // Mémorise les couches localement (restaurées au prochain affichage / relance).
-            MapFilterStore.save(newValue)
-            // Affiche/masque une couche immédiatement, sans attendre le rechargement.
-            refreshMapRender()
-            scheduleLoad(region: lastRegion)
+        .onChangeCompat(of: filterSelection) { previous, current in
+            filtersDidChange(from: previous, to: current)
         }
         .onChangeCompat(of: selectedFriendFilterID) { _, _ in
             refreshFriendsRender()
         }
         .onChangeCompat(of: coverageByGeneration) { _, _ in
             // Bascule Signal ↔ Génération : recolore la couche sans recharger le réseau.
-            refreshMapRender()
-        }
-        .onChangeCompat(of: model.marketFilter) { _, newValue in
-            // Pendant la sélection initiale, le `.task` pilote recentrage + load.
-            guard !model.initialSelectionInProgress else { return }
-            // Le switch automatique (caméra) et le picker manuel partagent ce
-            // binding mais pas le même chemin : seul le manuel recentre.
-            let isAutoSwitch = model.consumeAutoMarketSwitch()
-            Task { await model.alignWithMarket(code: newValue, resetOperator: false) }
-            if isAutoSwitch {
-                scheduleLoad(region: lastRegion)
-            } else {
-                // Recentre on the selected market so its data is actually in view
-                // (a market switch from France must not leave the camera over France).
-                let region = region(forMarketCode: newValue)
-                mapCenter = region.center
-                mapZoom = Self.zoom(forSpan: region)
-                scheduleLoad(region: region)
-            }
-            MapMarketStore.save(market: model.marketFilter, operator: model.operatorFilter)
-        }
-        .onChangeCompat(of: model.operatorFilter) { _, _ in
-            guard !model.initialSelectionInProgress else { return }
-            scheduleLoad(region: lastRegion)
-            MapMarketStore.save(market: model.marketFilter, operator: model.operatorFilter)
-        }
-        .onChangeCompat(of: model.techFilters) { _, _ in scheduleLoad(region: lastRegion) }
-        .onChangeCompat(of: model.bandFilters) { _, _ in scheduleLoad(region: lastRegion) }
-        .onChangeCompat(of: model.sharingFilters) { _, _ in scheduleLoad(region: lastRegion) }
-        .onChangeCompat(of: model.includeObservedSites) { _, _ in scheduleLoad(region: lastRegion) }
-        .onChangeCompat(of: model.plannedStatusFilters) { _, newValue in
-            // Filtre 100 % client : les sites prévisionnels sont déjà chargés →
-            // on reconstruit juste le rendu, sans requête backend.
-            MapPlannedStatusStore.save(newValue)
             refreshMapRender()
         }
         // Données rechargées → reconstruit le cache des couches une seule fois.
@@ -1476,6 +1709,11 @@ struct MapExplorerView: View {
             lastZoomRenderBucket = bucket
             refreshMapRender()
         }
+        .onChangeCompat(of: scenePhase) { _, phase in
+            guard phase == .active, router.selectedTab == .map else { return }
+            fetchTask?.cancel()
+            fetchTask = Task { await reloadCurrentRegion() }
+        }
         // Notification/deep link antenne : ouvre la fiche du site demandé.
         .onChangeCompat(of: router.openSiteId) { _, _ in openSiteFromRouterIfNeeded() }
         // Test de l'historique : cadre la carte sur le lieu de la mesure.
@@ -1485,6 +1723,7 @@ struct MapExplorerView: View {
         // Tap sur une notification de panne : seul l'identifiant a voyagé.
         .onChangeCompat(of: router.openCommunityOutageId) { _, _ in openCommunityOutageFromNotificationIfNeeded() }
         .onAppear {
+            viewportRefreshID &+= 1
             services.livePresence.mapDidAppear()
             Task { await services.livePresence.refreshSharingSettings() }
             focusFromRouterIfNeeded()
@@ -1529,12 +1768,7 @@ struct MapExplorerView: View {
         guard let focus = router.pendingMapFocus else { return }
         router.pendingMapFocus = nil
         let coordinate = CLLocationCoordinate2D(latitude: focus.latitude, longitude: focus.longitude)
-        mapCenter = coordinate
-        mapZoom = 15
-        scheduleLoad(region: MKCoordinateRegion(
-            center: coordinate,
-            span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
-        ))
+        requestCamera(center: coordinate, zoom: 15)
     }
 
     private var mapLayer: some View {
@@ -1544,24 +1778,17 @@ struct MapExplorerView: View {
             coverageHeatFeatures: renderedCoverageFeatures,
             speedtestFeatures: renderedSpeedtestFeatures,
             renderVersion: renderVersion,
+            viewportRefreshID: viewportRefreshID,
             colorScheme: colorScheme,
             ornamentBottomInset: horizontalSizeClass == .regular ? SQSpace.sm : SQDock.clearance,
             center: $mapCenter,
             zoom: $mapZoom,
-            onMoveEnd: { bounds, zoom in
-                let region = MKCoordinateRegion(
-                    center: CLLocationCoordinate2D(
-                        latitude: (bounds.north + bounds.south) / 2,
-                        longitude: (bounds.east + bounds.west) / 2
-                    ),
-                    span: MKCoordinateSpan(
-                        latitudeDelta: abs(bounds.north - bounds.south),
-                        longitudeDelta: abs(bounds.east - bounds.west)
-                    )
-                )
+            onMoveEnd: { viewport, region in
+                let changed = viewportGate.latest != viewport
+                viewportGate.record(viewport)
                 lastRegion = region
-                model.scheduleMarketDetection(center: region.center)
-                scheduleLoad(bounds: bounds, zoom: zoom)
+                model.recordViewportCenter(region.center)
+                if changed { scheduleCurrentViewport() }
             },
             onSelect: selectAnnotation
         )
@@ -1574,7 +1801,7 @@ struct MapExplorerView: View {
     #if DEBUG
     /// Hook QA (DEBUG) : `SQ_QA_PAN_TO="lat,lng[,zoom]"` déplace la caméra
     /// après stabilisation, comme la fin d'un pan utilisateur — le delegate
-    /// MapKit déclenche alors la chaîne réelle de détection de marché.
+    /// MapKit déclenche alors la chaîne réelle de chargement du pays choisi.
     private func runQAPanIfRequested() async {
         guard let raw = ProcessInfo.processInfo.environment["SQ_QA_PAN_TO"] else { return }
         let parts = raw.split(separator: ",").compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
@@ -1585,23 +1812,8 @@ struct MapExplorerView: View {
     }
     #endif
 
-    /// Caméra par défaut d'un marché : centre/zoom du registre quand ils sont
-    /// connus, sinon les valeurs statiques historiques.
     private func region(forMarketCode code: String) -> MKCoordinateRegion {
-        if let entry = model.registryMarket(forCode: code),
-           let lat = entry.defaultCenterLatitude,
-           let lng = entry.defaultCenterLongitude {
-            let zoom = entry.defaultMapZoom ?? 6
-            let lonDelta = min(300.0, max(0.01, 360 / pow(2, zoom)))
-            return MKCoordinateRegion(
-                center: CLLocationCoordinate2D(latitude: lat, longitude: lng),
-                span: MKCoordinateSpan(
-                    latitudeDelta: min(120.0, lonDelta * 0.8),
-                    longitudeDelta: lonDelta
-                )
-            )
-        }
-        return Self.region(for: code)
+        model.defaultMapRegion(forMarketCode: code)
     }
 
     private var controlsLayer: some View {
@@ -1610,14 +1822,7 @@ struct MapExplorerView: View {
                 VStack(spacing: SQSpace.sm + 2) {
                     mapTopControlBar
                         .padding(.horizontal, SQSpace.md)
-                    // Chips de couches : composant transverse déjà restylé
-                    // (capsules casse normale, actif brique plein).
-                    MapFilterBar(filters: $filters)
-                        // Cette barre dense conserve une taille exploitable quand le
-                        // texte système est au maximum. Les libellés restent annoncés
-                        // intégralement par VoiceOver.
-                        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
-                    if filters.contains(.friend) {
+                    if filters.contains(.friend), services.auth.hasStoredCredentials() {
                         friendsStatusPanel
                             .padding(.horizontal, SQSpace.md)
                             .transition(.move(edge: .top))
@@ -1847,7 +2052,7 @@ struct MapExplorerView: View {
     private var coverageControlsOverlay: some View {
         VStack(spacing: SQSpace.sm) {
             Spacer()
-            if filters.contains(.coverage) {
+            if filters.contains(.coverage), model.operatorFilter.uppercased() != "ALL" {
                 coverageFocusBanner
                 coverageColoringToggle
                 coverageLegendCompact
@@ -1861,28 +2066,79 @@ struct MapExplorerView: View {
         .padding(.bottom, mapControlsBottomInset + 50)
     }
 
-    /// Légende couverture COMPACTE : une seule capsule avec des pastilles inline
-    /// (au lieu d'une pastille par bande) — beaucoup moins de « boutons » à l'écran.
-    /// Suit le mode courant (génération ou RSRP).
+    /// Une seule surface ; les grandes tailles de texte passent en grille
+    /// pour garder tous les niveaux dans la largeur disponible.
+    @ViewBuilder
     private var coverageLegendCompact: some View {
-        HStack(spacing: SQSpace.sm + 1) {
-            if coverageByGeneration {
-                ForEach(CoverageGenerationBand.visibleBands) { band in
-                    legendDot(color: band.swiftUIColor, text: band.title)
+        if dynamicTypeSize.isAccessibilitySize {
+            Button { showCoverageLegend = true } label: {
+                Label("Légende", systemImage: "list.bullet")
+                    .font(SQType.subhead)
+                    .foregroundStyle(SQColor.label)
+                    .padding(.horizontal, SQSpace.md)
+                    .padding(.vertical, SQSpace.xs)
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.lg)) }
+            .sqShadowSoft()
+            .accessibilityIdentifier("map.coverage.legend")
+            .sheet(isPresented: $showCoverageLegend) { coverageLegendDetail }
+        } else {
+            coverageLegendInline
+        }
+    }
+
+    private var coverageLegendDetail: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: SQSpace.lg) { coverageLegendEntries }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(SQSpace.xl)
+            }
+            .background(SQColor.surface)
+            .navigationTitle("Légende")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Fermer") { showCoverageLegend = false }
+                        .tint(SQColor.accentInk)
+                        .accessibilityIdentifier("map.coverage.legend.close")
                 }
-            } else {
-                ForEach(CoverageQualityBand.visibleBands) { band in
-                    legendDot(color: band.swiftUIColor, text: band.title)
-                }
+            }
+        }
+    }
+
+    private var coverageLegendInline: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: SQSpace.sm + 1) { coverageLegendEntries }
+                .fixedSize(horizontal: true, vertical: false)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), alignment: .leading)],
+                      alignment: .leading, spacing: SQSpace.sm) {
+                coverageLegendEntries
             }
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.xs + 3)
-        .background { mapGlassBackground(Capsule(style: .continuous)) }
+        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)) }
         .sqShadowSoft()
-        .fixedSize(horizontal: true, vertical: false)
+        .frame(maxWidth: 420)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(coverageByGeneration ? "Légende génération" : "Légende qualité du signal")
+        .accessibilityIdentifier("map.coverage.legend")
+    }
+
+    @ViewBuilder
+    private var coverageLegendEntries: some View {
+        if coverageByGeneration {
+            ForEach(CoverageGenerationBand.visibleBands) { band in
+                legendDot(color: band.swiftUIColor, text: band.title)
+            }
+        } else {
+            ForEach(CoverageQualityBand.visibleBands) { band in
+                legendDot(color: band.swiftUIColor, text: band.title)
+            }
+        }
     }
 
     private func legendDot(color: Color, text: String) -> some View {
@@ -1891,7 +2147,7 @@ struct MapExplorerView: View {
             Text(text)
                 .font(SQFont.body(10.5, .semibold))
                 .foregroundStyle(SQColor.label)
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -2013,6 +2269,7 @@ struct MapExplorerView: View {
     private var filterButton: some View {
         Button {
             Haptics.light()
+            filterSheetDetent = .large
             showFilterSheet = true
         } label: {
             ZStack(alignment: .topTrailing) {
@@ -2021,7 +2278,7 @@ struct MapExplorerView: View {
                     .foregroundStyle(SQColor.label)
                     .frame(width: 44, height: 44)
                     .background { mapGlassBackground(Circle()) }
-                if activeFilterCount > 0 {
+                if activeFilterCount > 0 && !dynamicTypeSize.isAccessibilitySize {
                     Text("\(activeFilterCount)")
                         .font(SQFont.body(10, .bold))
                         .frame(minWidth: 17, minHeight: 17)
@@ -2034,11 +2291,10 @@ struct MapExplorerView: View {
             .sqShadowCard()
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel(
-            activeFilterCount > 0
-                ? "Calques et filtres, \(activeFilterCount) actif\(activeFilterCount > 1 ? "s" : "")"
-                : "Calques et filtres"
-        )
+        .accessibilityLabel(Text("Calques et filtres"))
+        .accessibilityValue(Text("Filtres actifs : \(activeFilterCount)"))
+        .accessibilityIdentifier("map.filters")
+        .disabled(model.registryMarkets.isEmpty)
     }
 
     /// Sélecteur d'opérateur compact (bas-gauche) : menu des opérateurs du marché
@@ -2048,7 +2304,7 @@ struct MapExplorerView: View {
             ForEach(model.operatorOptions, id: \.self) { op in
                 Button {
                     Haptics.selection()
-                    model.operatorFilter = op
+                    model.chooseOperatorManually(op)
                 } label: {
                     Label(
                         model.operatorShortLabel(op),
@@ -2077,6 +2333,7 @@ struct MapExplorerView: View {
             .sqShadowCard()
         }
         .accessibilityLabel("Opérateur affiché : \(model.operatorShortLabel(model.operatorFilter))")
+        .accessibilityIdentifier("map.operator")
     }
 
     /// Pile de 2 boutons flottants (bas-droite) : recentrage GPS + rafraîchissement.
@@ -2140,7 +2397,7 @@ struct MapExplorerView: View {
                     Haptics.light()
                     clearCoverageFocus()
                 } label: {
-                    Text("Tout voir").font(SQFont.body(13, .semibold))
+                    Text("Tout voir").font(SQFont.body(13, .semibold)).frame(minHeight: 44)
                 }
                 .buttonStyle(SQPressButtonStyle())
                 .tint(SQColor.brandRed)
@@ -2157,9 +2414,24 @@ struct MapExplorerView: View {
     @ViewBuilder
     private var mapStatusToast: some View {
         if let error = model.errorMessage {
-            mapToast(error, icon: "exclamationmark.triangle.fill", tint: SQColor.warning)
-        } else if renderedAnnotations.isEmpty && renderedCoverageFeatures.isEmpty && !model.isLoading {
-            mapToast("Aucune donnée dans cette zone", icon: "map", tint: SQColor.labelSecondary)
+            VStack(spacing: SQSpace.xs) {
+                mapToast(error, icon: "exclamationmark.triangle.fill", tint: SQColor.warning)
+                Button("Réessayer") { fetchTask = Task { await reloadCurrentRegion() } }
+                    .buttonStyle(.borderedProminent)
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("map.status.retry")
+            }
+        } else if !model.displayLimitMessages.isEmpty {
+            mapToast(model.displayLimitMessages.joined(separator: "\n"), icon: "info.circle.fill", tint: SQColor.warning)
+        } else if viewportGate.admitted == nil {
+            mapToast(String(localized: "Préparation de la carte…"), icon: "map", tint: SQColor.labelSecondary)
+        } else if filters.contains(.coverage), model.operatorFilter.uppercased() == "ALL" {
+            mapToast(String(localized: "Choisis un opérateur pour afficher la couverture."), icon: "line.3.horizontal.decrease.circle", tint: SQColor.labelSecondary)
+        } else if !model.isLoading && model.hasCurrentResponse && renderedAnnotations.isEmpty
+                    && renderedCoverageFeatures.isEmpty && renderedSpeedtestFeatures.isEmpty {
+            mapToast(String(localized: "Aucun résultat reçu pour cette vue et ces filtres."), icon: "map", tint: SQColor.labelSecondary)
+        } else if !model.isLoading && !model.hasCurrentResponse {
+            mapToast(String(localized: "Chargement interrompu. Déplace la carte pour réessayer."), icon: "arrow.clockwise", tint: SQColor.labelSecondary)
         }
     }
 
@@ -2185,17 +2457,45 @@ struct MapExplorerView: View {
         .accessibilityElement(children: .combine)
     }
 
+    private var filterSelection: MapFilterSelection { model.filterSelection(layers: filters) }
+
+    private func applyFilterSelection(_ selection: MapFilterSelection) -> Bool {
+        // Even an unchanged Apply confirms an explicit choice and invalidates
+        // automatic resolution that might still be waiting from startup.
+        guard let committed = model.applyFilterSelection(selection) else { return false }
+        filters = committed.layers
+        return true
+    }
+
+    private func filtersDidChange(from previous: MapFilterSelection, to current: MapFilterSelection) {
+        if previous.layers != current.layers { MapFilterStore.save(current.layers) }
+        if previous.plannedStatuses != current.plannedStatuses { MapPlannedStatusStore.save(current.plannedStatuses) }
+        if previous.layers != current.layers || previous.azimuthStyle != current.azimuthStyle
+            || previous.plannedStatuses != current.plannedStatuses {
+            refreshMapRender()
+        }
+        guard !model.consumeInitialSelectionObservation(current), !model.initialSelectionInProgress else { return }
+        if previous.market != current.market {
+            Task { await model.alignWithMarket(code: current.market, resetOperator: false) }
+            requestCamera(region: region(forMarketCode: current.market))
+        } else if current.requiresNetworkReload(comparedTo: previous) {
+            scheduleCurrentViewport()
+        }
+        if previous.market != current.market || previous.operatorName != current.operatorName {
+            MapMarketStore.save(market: current.market, operator: current.operatorName)
+        }
+    }
+
     private var activeFilterCount: Int {
         var count = 0
-        // L'opérateur n'est plus compté ici : il n'est plus dans la feuille (section
-        // retirée, source unique = la pilule bas-gauche qui affiche déjà son état +
-        // sa couleur). Le badge ne reflète donc que ce qui est réellement filtrable
-        // dans la feuille.
         if !model.techFilters.isEmpty { count += 1 }
         if !model.bandFilters.isEmpty { count += 1 }
         if !model.sharingFilters.isEmpty { count += 1 }
         if model.speedtestDays != 0 { count += 1 }
         if model.coverageDays != 0 { count += 1 }
+        if model.azimuthStyle != .lines { count += 1 }
+        if !model.includeObservedSites { count += 1 }
+        if filters.contains(.planned), model.plannedStatusFilters != Set(PlannedActivationStatus.allCases) { count += 1 }
         if filters != MapFilterStore.defaultFilters { count += 1 }
         return count
     }
@@ -2204,12 +2504,7 @@ struct MapExplorerView: View {
         Task {
             if let location = await services.location.currentLocation(timeoutSeconds: 8) {
                 let coordinate = location.coordinate
-                mapCenter = coordinate
-                mapZoom = 15
-                scheduleLoad(region: MKCoordinateRegion(
-                    center: coordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
-                ))
+                requestCamera(center: coordinate, zoom: 15)
             } else {
                 // Distinguer le refus d'autorisation (l'utilisateur peut agir) d'une
                 // simple indisponibilité, au lieu d'un message générique opaque (UXP-08).
@@ -3165,12 +3460,9 @@ struct MapExplorerView: View {
         // La couverture n'a de sens que pour UN opérateur donné (superposer tous les
         // opérateurs n'est pas exploitable) → masquée quand l'opérateur est « Tous ».
         guard model.operatorFilter.uppercased() != "ALL" else { return [] }
-        let hasBandFilter = !model.bandFilters.isEmpty
         var features: [CoverageHeatFeature] = []
         for tile in model.coverageTiles {
-            let render = CoverageRenderPolicy.mode(
-                hasPoints: !tile.points.isEmpty, hasClusters: !tile.clusters.isEmpty, hasBandFilter: hasBandFilter
-            )
+            let render = CoverageRenderPolicy.mode(for: tile, selectedBands: model.bandFilters)
             if render.useClusters {
                 // Couche SIGNAL : on exclut les clusters de couverture iOS « génération seule »
                 // (source == "ios", sans RSRP), comme pour les points bruts. La couche
@@ -3201,7 +3493,7 @@ struct MapExplorerView: View {
                 // génération la plus élevée — sinon la 4G (opaque) recouvre la 5G (parité
                 // carte Android). En mode RSRP on garde tous les points (chacun porte son
                 // signal propre) et la séquence reste paresseuse (rien de matérialisé).
-                let filtered = tile.points.lazy.filter { matchesSelectedBand($0.band) }
+                let filtered = tile.points.lazy.filter { CoverageRenderPolicy.matches($0, selectedBands: model.bandFilters) }
                 let cap = CoverageRenderPolicy.pointCapPerTile
                 if coverageByGeneration {
                     features += Self.dominantGenerationPoints(filtered).prefix(cap).map { coverageFeature(from: $0) }
@@ -3662,32 +3954,35 @@ struct MapExplorerView: View {
         }
     }
 
-    private func scheduleLoad(region: MKCoordinateRegion) {
-        // Garde à la source : MapKit livre parfois un centre ou un span NaN
-        // pendant une transition de caméra. Filtrer ici protège d'un coup les 7
-        // points d'entrée de MapSnapshotService, dont les conversions `Int(...)`
-        // trapperaient. On ne mémorise pas non plus une `lastRegion` corrompue,
-        // qui serait rejouée à chaque rechargement.
-        guard region.center.latitude.isFinite, region.center.longitude.isFinite,
-              region.span.latitudeDelta.isFinite, region.span.longitudeDelta.isFinite else { return }
-        lastRegion = region
-        let zoom = zoom(for: region)
-        let bounds = MapBounds(
-            north: region.center.latitude + region.span.latitudeDelta / 2,
-            south: region.center.latitude - region.span.latitudeDelta / 2,
-            east: region.center.longitude + region.span.longitudeDelta / 2,
-            west: region.center.longitude - region.span.longitudeDelta / 2
-        )
-        scheduleLoad(bounds: bounds, zoom: zoom)
+    private func requestCamera(region: MKCoordinateRegion) {
+        let width = viewportGate.latest.map { CGFloat($0.widthPoints) } ?? SQMapProjection.referenceWidth
+        requestCamera(center: region.center, zoom: SQMapProjection.zoom(forRegion: region, width: width))
     }
 
-    private func scheduleLoad(bounds: MapBounds, zoom: Double) {
+    private func requestCamera(center: CLLocationCoordinate2D, zoom: Double) {
+        guard CLLocationCoordinate2DIsValid(center), zoom.isFinite else { return }
+        let changed = abs(mapCenter.latitude - center.latitude) > 0.00005
+            || abs(mapCenter.longitude - center.longitude) > 0.00005 || abs(mapZoom - zoom) > 0.01
+        if changed {
+            fetchTask?.cancel()
+            model.cancelPendingLoad()
+            viewportGate.invalidateCamera()
+            mapCenter = center
+            mapZoom = zoom
+        } else { scheduleCurrentViewport() }
+    }
+
+    private func scheduleCurrentViewport() {
+        guard let viewport = viewportGate.admitted else { return }
         MapRegionStore.save(lastRegion)
         fetchTask?.cancel()
+        let requestedFilters = filters
+        let requestID = model.prepareLoad(filters: requestedFilters)
         fetchTask = Task {
             try? await Task.sleep(nanoseconds: 450_000_000)
             guard !Task.isCancelled else { return }
-            await model.load(bounds: bounds, zoom: zoom, filters: filters, lightweight: true)
+            await model.load(bounds: viewport.bounds, zoom: viewport.zoom, filters: requestedFilters,
+                             lightweight: true, requestID: requestID)
         }
     }
 
@@ -3698,8 +3993,10 @@ struct MapExplorerView: View {
     /// fiche, sinon la couche resterait muette en « Tous ».
     private func isolateCoverage(_ focus: AntennaCoverageFocus) {
         guard focus.isUsable else { return }
-        model.coverageFocus = focus
-        if model.operatorFilter.uppercased() == "ALL" { model.operatorFilter = focus.operatorKey }
+        let key = model.registryMarket(forCode: model.marketFilter)?.operatorEntry(forKey: focus.operatorKey)?.key ?? focus.operatorKey
+        model.chooseOperatorManually(key)
+        guard model.operatorFilter.caseInsensitiveCompare(key) == .orderedSame else { return }
+        model.coverageFocus = AntennaCoverageFocus(siteLabel: focus.siteLabel, operatorKey: key, enb: focus.enb, gnb: focus.gnb)
         filters.insert(.coverage)
         MapFilterStore.save(filters)
         Task { await reloadCurrentRegion() }
@@ -3713,7 +4010,13 @@ struct MapExplorerView: View {
     /// Recharge la zone visible. Appelé après création d'un site pour que le
     /// marqueur apparaisse sans attendre le prochain déplacement de carte.
     private func reloadCurrentRegion() async {
-        await model.load(region: lastRegion, zoom: mapZoom, filters: filters)
+        guard let viewport = viewportGate.admitted else { return }
+        let requestedFilters = filters
+        let requestID = model.prepareLoad(filters: requestedFilters)
+        await model.mapService.invalidateTiles()
+        guard !Task.isCancelled else { return }
+        await model.load(bounds: viewport.bounds, zoom: viewport.zoom, filters: requestedFilters,
+                         requestID: requestID, refresh: true)
     }
 
     /// Fiche d'une cellule observée, avec les autres cellules du même endroit
@@ -3744,10 +4047,6 @@ struct MapExplorerView: View {
     private static func isSameSpot(_ a: AndroidCommunitySiteMarker, _ b: AndroidCommunitySiteMarker) -> Bool {
         CLLocation(latitude: a.lat, longitude: a.lng)
             .distance(from: CLLocation(latitude: b.lat, longitude: b.lng)) <= 150
-    }
-
-    private func zoom(for region: MKCoordinateRegion) -> Double {
-        max(4, min(18, log2(360 / max(region.span.longitudeDelta, 0.001))))
     }
 
     private func icon(for kind: MapDisplayItem.Kind) -> String {
@@ -3800,9 +4099,7 @@ struct MapExplorerView: View {
         }
     }
 
-    static func zoom(forSpan region: MKCoordinateRegion) -> Double {
-        max(4, min(18, log2(360 / max(region.span.longitudeDelta, 0.001))))
-    }
+
 }
 
 // MARK: - Carte MapKit (moteur unique)
