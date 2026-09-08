@@ -1,6 +1,38 @@
 {
   "sourceLanguage": "fr",
   "strings": {
+    "Reconnecte-toi pour modifier le verrouillage de SignalQuest.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in again to change the SignalQuest app lock."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnecte-toi pour modifier le verrouillage de SignalQuest."
+          }
+        }
+      }
+    },
+    "L’authentification n’a pas abouti. Tu peux réessayer pour déverrouiller SignalQuest.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authentication was not completed. You can try again to unlock SignalQuest."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’authentification n’a pas abouti. Tu peux réessayer pour déverrouiller SignalQuest."
+          }
+        }
+      }
+    },
     "Conversations": {
       "localizations": {
         "en": {
@@ -42281,6 +42313,141 @@
           "stringUnit": {
             "state": "translated",
             "value": "View limits of the displayed data"
+          }
+        }
+      }
+    },
+    "Utilise Face ID, Touch ID ou le code de ton appareil pour continuer.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utilise Face ID, Touch ID ou le code de ton appareil pour continuer."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use Face ID, Touch ID, or your device passcode to continue."
+          }
+        }
+      }
+    },
+    "Confirme ton identité pour activer le verrouillage": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirme ton identité pour activer le verrouillage"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verify your identity to enable app lock"
+          }
+        }
+      }
+    },
+    "Le verrouillage n’a pas été activé. Réessaie avec la biométrie ou le code de l’appareil.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le verrouillage n’a pas été activé. Réessaie avec la biométrie ou le code de l’appareil."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App lock wasn’t enabled. Try again with biometrics or your device passcode."
+          }
+        }
+      }
+    },
+    "Verrouiller SignalQuest": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verrouiller SignalQuest"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lock SignalQuest"
+          }
+        }
+      }
+    },
+    "Configure un code pour l’appareil dans les Réglages iOS afin d’activer le verrouillage.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configure un code pour l’appareil dans les Réglages iOS afin d’activer le verrouillage."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up a device passcode in iOS Settings to enable app lock."
+          }
+        }
+      }
+    },
+    "Protège l’ouverture avec la biométrie ou le code de l’appareil après le délai choisi. Le contenu est masqué dans le sélecteur d’apps, même pendant ce délai. La déconnexion automatique efface la session après une inactivité prolongée.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protège l’ouverture avec la biométrie ou le code de l’appareil après le délai choisi. Le contenu est masqué dans le sélecteur d’apps, même pendant ce délai. La déconnexion automatique efface la session après une inactivité prolongée."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Require biometrics or your device passcode after the selected delay. Content stays hidden in the app switcher, including during this delay. Automatic sign-out clears the session after prolonged inactivity."
+          }
+        }
+      }
+    },
+    "Contenu masqué": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contenu masqué"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Content hidden"
+          }
+        }
+      }
+    },
+    "Active un code pour ton appareil dans les Réglages iOS, puis reviens dans SignalQuest pour déverrouiller. Le contenu reste masqué.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up a device passcode in iOS Settings, then return to SignalQuest to unlock. The content stays hidden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active un code pour ton appareil dans les Réglages iOS, puis reviens dans SignalQuest pour déverrouiller. Le contenu reste masqué."
           }
         }
       }

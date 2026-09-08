@@ -1430,6 +1430,8 @@ struct SettingsView: View {
     @State private var showDeleteConfirm = false
     @AppStorage(MapBackdrop.storageKey) private var mapBackdropRaw = MapBackdrop.applePlan.rawValue
     @AppStorage(AppLockSettings.enabledKey) private var appLockEnabled = false
+    @State private var canAuthenticateDeviceOwner = BiometricAuth.canAuthenticateDeviceOwner
+    @StateObject private var appLockSetup = AppLockSetupController()
     @AppStorage(AppLockSettings.lockGraceKey) private var lockGraceSeconds = 0.0
     @AppStorage(SQOledPalette.storageKey) private var pureBlack = false
     @AppStorage(SQFieldMode.storageKey) private var fieldMode = false
@@ -1538,23 +1540,25 @@ struct SettingsView: View {
                 Text("CarPlay")
             }
             .listRowBackground(SQColor.surface)
-            if BiometricAuth.isAvailable {
+            Group {
                 Section {
                     Toggle(isOn: Binding(
                         get: { appLockEnabled },
                         set: { newValue in
-                            guard newValue else { appLockEnabled = false; return }
-                            // Confirme par biométrie avant d'activer (évite de se
-                            // verrouiller dehors si Face ID ne marche pas).
-                            Task {
-                                let ok = await BiometricAuth.authenticate(
-                                    reason: "Confirme \(BiometricAuth.kind.label) pour activer le verrouillage"
-                                )
-                                appLockEnabled = ok
-                            }
+                            appLockSetup.setEnabled(newValue, credentials: services.api.credentials)
                         }
                     )) {
-                        settingsLabel("Verrouiller avec \(BiometricAuth.kind.label)", systemImage: BiometricAuth.kind.systemImage)
+                        settingsLabel("Verrouiller SignalQuest", systemImage: "lock.shield")
+                    }
+                    .accessibilityIdentifier("settings.app-lock")
+                    .disabled(appLockSetup.isConfirming || (!canAuthenticateDeviceOwner && !appLockEnabled))
+                    if !canAuthenticateDeviceOwner && !appLockEnabled {
+                        Text("Configure un code pour l’appareil dans les Réglages iOS afin d’activer le verrouillage.")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    if let appLockError = appLockSetup.errorMessage {
+                        Text(appLockError).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
                     }
                     if appLockEnabled {
                         Picker(selection: $lockGraceSeconds) {
@@ -1586,7 +1590,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Verrouillage")
                 } footer: {
-                    Text("Exige \(BiometricAuth.kind.label) à l’ouverture après le délai d’inactivité choisi. La déconnexion automatique efface la session après une inactivité prolongée.")
+                    Text("Protège l’ouverture avec la biométrie ou le code de l’appareil après le délai choisi. Le contenu est masqué dans le sélecteur d’apps, même pendant ce délai. La déconnexion automatique efface la session après une inactivité prolongée.")
                         .font(SQType.caption)
                 }
                 .tint(SQColor.brandRed)
@@ -1789,6 +1793,16 @@ struct SettingsView: View {
         .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Réglages")
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            canAuthenticateDeviceOwner = BiometricAuth.canAuthenticateDeviceOwner
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            appLockSetup.cancel()
+        }
+        .onChangeCompat(of: session.state) { _, _ in
+            appLockSetup.cancelIfSessionChanged()
+        }
+        .onDisappear { appLockSetup.cancel() }
         .navigationBarTitleDisplayMode(.inline)
         .task(id: PushOwnerScope.current) {
             await model.load()
