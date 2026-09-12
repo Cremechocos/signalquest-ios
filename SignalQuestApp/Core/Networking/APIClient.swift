@@ -160,10 +160,14 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     func performSingleAttempt(
         _ endpoint: APIEndpoint,
         fixedAuthToken: String? = nil,
-        expectedSession: LocalAccountSession? = nil
+        expectedSession: LocalAccountSession? = nil,
+        expectedCredentialSessionID: UUID? = nil
     ) async throws -> (Data, HTTPURLResponse) {
         guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
         let context = credentials.snapshot()
+        guard expectedCredentialSessionID == nil || context.sessionID == expectedCredentialSessionID else { throw APIError.cancelled }
+        try await validateTransmissionAdmission(endpoint, context: context)
+        guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
         var request = try makeURLRequest(endpoint, credentials: context)
         if let fixedAuthToken {
             request.setValue("auth_token=\(fixedAuthToken)", forHTTPHeaderField: "Cookie")
@@ -190,6 +194,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             throw APIError.transport("single-attempt-upload-body-must-be-file")
         }
         let context = credentials.snapshot()
+        try await validateTransmissionAdmission(endpoint, context: context)
         let request = try makeURLRequest(endpoint, credentials: context)
         let result = try await performSingleAttempt(request, context: context,
             startsNewSession: !endpoint.authenticated) { request in
@@ -347,14 +352,10 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             request.setValue(value, forHTTPHeaderField: key)
         }
         endpoint.headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
-        let cacheDirectives = endpoint.headers.first {
-            $0.key.caseInsensitiveCompare("Cache-Control") == .orderedSame
-        }?.value.lowercased().split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } ?? []
-        if cacheDirectives.contains("no-cache") || cacheDirectives.contains("no-store") || cacheDirectives.contains("max-age=0") {
-            // Les caches métier décident déjà de leur fraîcheur. Une lecture
-            // réseau demandée ne doit pas recycler un ancien 200 de URLCache.
-            request.cachePolicy = .reloadIgnoringLocalCacheData
-        }
+        // URLCache n’est pas isolé par compte : même une réponse « private »
+        // peut être réutilisée après un changement de cookie ou une déconnexion.
+        // La fraîcheur est gérée par les caches métier explicitement cloisonnés.
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         if let idempotencyKey = endpoint.idempotencyKey {
             request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
         }
@@ -500,9 +501,22 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         guard credentials.isCurrent(rejected) else { throw APIError.cancelled }
     }
 
-    private func perform(_ endpoint: APIEndpoint, context: CredentialStore.Snapshot) async throws -> Response {
-        try Task.checkCancellation()
+    /// La politique peut attendre un autre acteur : contrôler de nouveau la
+    /// session et l'annulation avant de construire la requête. Un refus local
+    /// n'est jamais un HTTP 503 susceptible de déclencher un retry automatique.
+    private func validateTransmissionAdmission(_ endpoint: APIEndpoint,
+                                               context: CredentialStore.Snapshot) async throws {
+        guard !Task.isCancelled else { throw APIError.cancelled }
         guard credentials.isCurrent(context) else { throw APIError.cancelled }
+        if let admission = endpoint.validateBeforeSend {
+            do { try await admission() } catch { throw APIError.cancelled }
+            guard !Task.isCancelled else { throw APIError.cancelled }
+            guard credentials.isCurrent(context) else { throw APIError.cancelled }
+        }
+    }
+
+    private func perform(_ endpoint: APIEndpoint, context: CredentialStore.Snapshot) async throws -> Response {
+        try await validateTransmissionAdmission(endpoint, context: context)
         let request = try makeURLRequest(endpoint, credentials: context)
         if config.debugLogsEnabled {
             logger.debug("\(request.httpMethod ?? "GET", privacy: .public) \(request.url?.absoluteString ?? "-", privacy: .public)")

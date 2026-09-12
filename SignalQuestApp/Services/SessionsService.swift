@@ -434,84 +434,30 @@ extension SessionsServicing {
     }
 }
 
-final class SessionsService: SessionsServicing, @unchecked Sendable {
-    private struct ImportResponseState {
-        var awaitedIDs = Set<UUID>()
-        var responses: [UUID: CoverageImportResponse] = [:]
+enum CoverageRecordingError: LocalizedError {
+    case retired
+    var errorDescription: String? {
+        String(localized: "L’enregistrement de couverture n’est plus disponible sur iOS.")
     }
-    private let api: APIClient
-    private let queue: CoverageSessionStoring
-    /// Coalesce les drains concurrents (lancement, retour écran, fin de session).
-    private let flushState = OSAllocatedUnfairLock<Task<Void, Error>?>(initialState: nil)
-    private let importResponseState = OSAllocatedUnfairLock<ImportResponseState>(initialState: .init())
+}
 
-    /// Visibilité interne pour verrouiller l'absence d'accumulation lors des
-    /// retries de cycle de vie, qui n'attendent aucune réponse à afficher.
-    var bufferedImportResponseCount: Int {
-        importResponseState.withLock { $0.responses.count }
-    }
+final class SessionsService: SessionsServicing, @unchecked Sendable {
+    private let api: APIClient
+    var bufferedImportResponseCount: Int { 0 }
 
     init(api: APIClient, queueFileURL: URL? = nil) {
         self.api = api
-        // iOS 17+ : vraie base SwiftData ; iOS 16 (ou fileURL de test) : repli JSON durable.
-        self.queue = CoverageSessionStoreFactory.make(fileURL: queueFileURL)
+        // Ne pas ouvrir ni migrer les anciennes files JSON/SwiftData : elles
+        // restent conservées sur l’appareil, sans reprise automatique.
     }
 
-    func persistCoverageDraft(_ session: CoverageSessionUpload) throws {
-        LocalOfflineOwnership.claim(kind: "coverage", id: session.sessionId.uuidString)
-        try queue.upsert(session, state: .recording)
-    }
-
-    func finalizeCoverageDraft(_ session: CoverageSessionUpload) throws {
-        LocalOfflineOwnership.claim(kind: "coverage", id: session.sessionId.uuidString)
-        try queue.upsert(session, state: .queued)
-    }
-
-    func discardCoverageDraft(sessionId: UUID) throws {
-        try queue.discard(sessionId: sessionId)
-        LocalOfflineOwnership.release(kind: "coverage", id: sessionId.uuidString)
-    }
-
+    func persistCoverageDraft(_ session: CoverageSessionUpload) throws { throw CoverageRecordingError.retired }
+    func finalizeCoverageDraft(_ session: CoverageSessionUpload) throws { throw CoverageRecordingError.retired }
+    func discardCoverageDraft(sessionId: UUID) throws { throw CoverageRecordingError.retired }
     func createCoverageSession(_ session: CoverageSessionUpload) async throws -> CoverageImportResponse? {
-        _ = importResponseState.withLock { $0.awaitedIDs.insert(session.sessionId) }
-        defer {
-            importResponseState.withLock {
-                $0.awaitedIDs.remove(session.sessionId)
-                $0.responses.removeValue(forKey: session.sessionId)
-            }
-        }
-        // Idempotent côté client : la même valeur remplace le brouillon, elle ne
-        // crée jamais une seconde entrée locale.
-        try finalizeCoverageDraft(session)
-        do {
-            try await flushPendingCoverageSessions()
-            // F-07 : un flush déjà en vol (coalescé) a pu lire la file AVANT la
-            // finalisation de cette session ; l'await se termine alors sans l'avoir
-            // soumise. Si elle est toujours en file, on relance un flush DÉDIÉ pour
-            // ne pas annoncer « Couverture envoyée » alors qu'elle n'est que mise en file.
-            if (try? queue.contains(sessionId: session.sessionId)) == true {
-                try await flushPendingCoverageSessions()
-            }
-            return importResponseState.withLock { $0.responses.removeValue(forKey: session.sessionId) }
-        } catch {
-            // Une autre entrée de la file peut avoir échoué après que celle demandée
-            // a réussi. Dans ce cas, l'appel courant est bien un succès.
-            if (try? queue.contains(sessionId: session.sessionId)) == false {
-                return importResponseState.withLock { $0.responses.removeValue(forKey: session.sessionId) }
-            }
-            throw error
-        }
+        throw CoverageRecordingError.retired
     }
-
-    func retryPendingCoverageSessions() async {
-        do {
-            try queue.recoverInterruptedRecordings()
-            try await flushPendingCoverageSessions()
-        } catch {
-            // Intentionnel : le prochain lancement/retour sur Drive Test rejouera la
-            // même session, avec le même UUID et la même Idempotency-Key.
-        }
-    }
+    func retryPendingCoverageSessions() async { }
 
     func sessions(offset: Int = 0, limit: Int = 30, mapPoints: Bool = false) async throws -> SessionsListResponse {
         var query = [
@@ -541,53 +487,6 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
         )
     }
 
-    private func submit(_ session: CoverageSessionUpload) async throws {
-        let response: CoverageImportResponse = try await api.requestJSON(
-            "/api/coverage/session/import-ios",
-            body: session,
-            idempotencyKey: session.idempotencyKey
-        )
-        importResponseState.withLock {
-            guard $0.awaitedIDs.contains(session.sessionId) else { return }
-            $0.responses[session.sessionId] = response
-        }
-    }
-
-    private func flushPendingCoverageSessions() async throws {
-        let task: Task<Void, Error> = flushState.withLock { current in
-            if let current { return current }
-            let newTask = Task<Void, Error> { [weak self] in
-                guard let self else { return }
-                try await self.performFlush()
-            }
-            current = newTask
-            return newTask
-        }
-        defer { flushState.withLock { $0 = nil } }
-        try await task.value
-    }
-
-    private func performFlush() async throws {
-        let pending = try queue.pendingUploads()
-        var firstError: Error?
-        for session in pending {
-            guard LocalOfflineOwnership.belongsToCurrentScope(
-                kind: "coverage",
-                id: session.sessionId.uuidString
-            ) else {
-                // Entrée legacy sans propriétaire, ou autre compte : quarantaine.
-                continue
-            }
-            do {
-                try await submit(session)
-                try queue.discard(sessionId: session.sessionId)
-                LocalOfflineOwnership.release(kind: "coverage", id: session.sessionId.uuidString)
-            } catch {
-                if firstError == nil { firstError = error }
-            }
-        }
-        if let firstError { throw firstError }
-    }
 }
 
 // MARK: - Abstraction du store de couverture (SwiftData iOS 17+ / repli JSON iOS 16)

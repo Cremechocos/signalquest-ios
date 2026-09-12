@@ -138,12 +138,12 @@ final class AppServices: ObservableObject {
         comments = CommentsService(api: api)
         stories = StoriesService(api: api)
         reports = ReportsService(api: api)
-        let privacyService = PrivacyService(api: api)
+        let mapService = MapSnapshotService(api: api)
+        map = mapService
+        let privacyService = PrivacyService(api: api, invalidatePublicMap: { await mapService.invalidateTiles() })
         privacy = privacyService
         livePresence = LivePresenceService(api: api, location: location, networkPath: networkPath, privacy: privacyService)
         versionPolicy = VersionPolicyService(api: api)
-        let mapService = MapSnapshotService(api: api)
-        map = mapService
         let marketsService = MarketRegistryService(api: api)
         markets = marketsService
         antennas = AntennasService(api: api)
@@ -159,7 +159,10 @@ final class AppServices: ObservableObject {
         let networkOperatorService = NetworkOperatorService(api: api)
         networkOperator = networkOperatorService
         nearbyQuality = NearbyNetworkQualityService(map: mapService, markets: marketsService, networkOperator: networkOperatorService)
-        speedtest = SpeedtestService(api: api, markets: marketsService, networkOperator: networkOperatorService)
+        speedtest = SpeedtestService(
+            api: api, markets: marketsService, networkOperator: networkOperatorService,
+            invalidatePublicMap: { await mapService.invalidateTiles() }
+        )
         photos = PhotoService(api: api)
         let messagesService = MessagesService(api: api, sse: sseClient)
         messages = messagesService
@@ -225,11 +228,28 @@ final class AppServices: ObservableObject {
     func resetAccountPresentationState() {
         inboxBadgeState.reset()
         unreadConversations = 0
+        favoriteRefreshTask?.cancel()
+        favoriteRefreshTask = nil
+        favoriteAntennas.resetForAccountChange()
+        refreshFavoritesForCurrentAccount()
     }
 
     // MARK: - Amorçage partagé
 
     private var bootstrapTask: Task<Void, Never>?
+    private var favoriteRefreshTask: Task<Void, Never>?
+
+    func refreshFavoritesForCurrentAccount() {
+        favoriteRefreshTask?.cancel()
+        guard let owner = LocalAccountScope.sessionSnapshot() else {
+            favoriteRefreshTask = nil
+            return
+        }
+        favoriteRefreshTask = Task { [favoriteAntennas] in
+            guard owner.isCurrent, !Task.isCancelled else { return }
+            await favoriteAntennas.load()
+        }
+    }
 
     /// Amorçage de session, appelable depuis TOUS les points d'entrée — la
     /// fenêtre SwiftUI comme la scène CarPlay. Idempotent et coalescé : les
@@ -251,9 +271,9 @@ final class AppServices: ObservableObject {
             await session.bootstrap()
             if case .authenticated(let user) = session.state {
                 epochRotations.resume()
+                refreshFavoritesForCurrentAccount()
                 // Le namespace du compte est actif : les files ne peuvent plus être
                 // rejouées avec l'identité d'un autre utilisateur.
-                await sessions.retryPendingCoverageSessions()
                 await speedtest.retryPendingSaves()
                 await liveShare.bootstrap(currentUserId: user.id)
             }
@@ -351,6 +371,7 @@ final class AppServices: ObservableObject {
         if networkPath.isOnline { epochRotations.resume() }
         livePresence.setAppActive(true)
         liveShare.setAppActive(true)
+        refreshFavoritesForCurrentAccount()
     }
 }
 

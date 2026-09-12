@@ -208,7 +208,6 @@ struct AppRootView: View {
                         await services.livePresence.refreshSharingSettings()
                         if case .authenticated(let user) = newState {
                             await services.liveShare.bootstrap(currentUserId: user.id)
-                            await services.sessions.retryPendingCoverageSessions()
                             await services.speedtest.retryPendingSaves()
                         }
                     }
@@ -319,21 +318,17 @@ struct RootView: View {
             SQInAppNotificationHost()
                 .padding(.top, networkPath.isOnline ? SQSpace.sm : 52)
         }
-        // Verrouillage biométrique : masque tout le contenu authentifié tant que
-        // l'utilisateur ne s'est pas déverrouillé par Face ID / Touch ID.
-        .overlay {
-            if isAuthenticated, appLock.isLocked {
-                AppLockScreen(lock: appLock).transition(.opacity)
-            }
-        }
+        // La fenêtre de protection couvre aussi les feuilles présentées, tout
+        // en conservant leurs tâches et les mesures déjà en cours.
+        .background(AppPrivacyShield(lock: appLock, authenticated: isAuthenticated))
         .sqAnimation(SQMotion.smooth, value: versionPolicy.state)
-        .sqAnimation(SQMotion.smooth, value: appLock.isLocked)
         // CALL-VOIP-07 : au retour du réseau (sortie de tunnel/mode avion), si le
         // dernier enregistrement du token VoIP avait échoué, on le rejoue — sinon
         // l'utilisateur resterait injoignable jusqu'au prochain passage foreground.
         .onChangeCompat(of: networkPath.isOnline) { _, online in
             guard online, case .authenticated = session.state else { return }
             services.epochRotations.resume()
+            services.refreshFavoritesForCurrentAccount()
             Task {
                 await callManager.retryVoIPTokenRegistrationIfNeeded()
                 await callManager.retryPendingCallTerminations()

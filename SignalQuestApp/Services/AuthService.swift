@@ -183,6 +183,7 @@ protocol AuthServicing: Sendable {
     func logout() async throws
     func me() async throws -> AuthUser
     func hasStoredCredentials() -> Bool
+    func credentialSessionID() -> UUID?
     func installAuthTokenForDebugQA(_ token: String)
     /// QA `--reset-auth` : efface la session LOCALE (credentials + clés E2EE)
     /// sans révoquer le token côté serveur — contrairement à `logout()`.
@@ -205,6 +206,7 @@ protocol AuthServicing: Sendable {
 }
 
 extension AuthServicing {
+    func credentialSessionID() -> UUID? { nil }
     func installAuthTokenForDebugQA(_ token: String) {}
     func clearLocalSessionForDebugQA() async {}
     func clearLocalSession() async {}
@@ -412,17 +414,25 @@ final class AuthService: AuthServicing {
             let json = try? sessionStore.string(for: Self.cachedUserKey),
             let data = json.data(using: .utf8)
         else { return nil }
-        return try? JSONDecoder.signalQuest.decode(AuthUser.self, from: data)
+        guard let user = try? JSONDecoder.signalQuest.decode(AuthUser.self, from: data) else { return nil }
+        if let token = api.credentials.accessToken(),
+           E2EEV2NotificationSessionClaims.expirationMs(token: token, expectedUserId: user.id, now: Date()) == nil {
+            return nil
+        }
+        return user
     }
 
     func wipeE2EEIfIdentityChanged(to userId: String) async {
         // API conservée : le changement de propriétaire verrouille désormais le coffre,
         // sans effacer son identité approuvée ni ses époques historiques.
+        let account = LocalAccountScope.sessionSnapshot()
+        let credentials = api.credentials.snapshot()
         let store = KeychainStore()
         let last = try? store.string(for: "lastUserId")
         if let last, last != userId {
             await e2ee?.lockLocalKeys(expectedSession: LocalAccountScope.sessionSnapshot())
         }
+        guard LocalAccountScope.sessionSnapshot() == account, api.credentials.isCurrent(credentials) else { return }
         try? store.set(userId, for: "lastUserId")
     }
 
@@ -438,6 +448,8 @@ final class AuthService: AuthServicing {
         }
         return user
     }
+
+    func credentialSessionID() -> UUID? { api.credentials.snapshot().sessionID }
 
     func hasStoredCredentials() -> Bool {
         api.credentials.accessToken() != nil
@@ -461,11 +473,14 @@ final class AuthSessionViewModel: ObservableObject {
         case authenticated(AuthUser)
     }
 
-    @Published private(set) var state: State = .checking
+    @Published private(set) var state: State = .checking {
+        didSet { if oldValue != state { profileRevision = UUID() } }
+    }
     @Published var errorMessage: String?
     @Published var infoMessage: String?
     @Published var isBusy = false
 
+    private var profileRevision = UUID()
     private let service: AuthServicing
     // Écrit une seule fois (init, MainActor), lu une seule fois (deinit, quand plus
     // aucune autre référence n'existe) → `nonisolated(unsafe)` sûr pour permettre le
@@ -523,7 +538,11 @@ final class AuthSessionViewModel: ObservableObject {
     /// (changement de compte sans logout, ex. expiration de session). No-op pour le
     /// même utilisateur → aucune ressaisie du mot de passe E2EE.
     private func setAuthenticated(_ user: AuthUser) async {
+        let revision = profileRevision
+        let credentials = service.credentialSessionID()
         await service.wipeE2EEIfIdentityChanged(to: user.id)
+        guard !Task.isCancelled, profileRevision == revision,
+              service.credentialSessionID() == credentials else { return }
         // Active d'abord le namespace local. Les observers de `state` peuvent lancer
         // immédiatement l'enregistrement push et des reprises de files ; ils doivent
         // tous voir le nouveau propriétaire, jamais le précédent.
@@ -588,10 +607,13 @@ final class AuthSessionViewModel: ObservableObject {
     /// Succès → rafraîchit l'utilisateur affiché ; 401/403 → déconnexion propre ;
     /// réseau/serveur → on conserve l'affichage optimiste (déjà `.authenticated`).
     private func revalidateSession() async {
+        let revision = profileRevision
         do {
             let user = try await service.me()
+            guard profileRevision == revision else { return }
             await setAuthenticated(user)
         } catch let error as APIError {
+            guard profileRevision == revision else { return }
             if case .http(let status, _, _, _, _) = error, status == 401 || status == 403 {
                 state = .loggedOut
                 await AppDelegate.sharedPush?.unregister()
@@ -612,11 +634,41 @@ final class AuthSessionViewModel: ObservableObject {
     /// Utilisé après un changement de @handle pour rafraîchir l'état (et fermer la modale de
     /// choix de handle). Conserve la session en cas d'échec réseau.
     func refreshUser() async {
-        guard case .authenticated = state else { return }
-        if let user = try? await service.me() {
-            state = .authenticated(user)
-            service.cacheUser(user)
+        guard case .authenticated(let current) = state else { return }
+        let account = LocalAccountScope.sessionSnapshot()
+        let generation = service.credentialSessionID()
+        let service = service
+        try? await refreshUser(expectedUserID: current.id, isCurrent: {
+            LocalAccountScope.sessionSnapshot() == account && service.credentialSessionID() == generation
+        }, fetchUser: { try await service.me() })
+    }
+
+    /// Le chargeur est lié à la session capturée par l'action qui a demandé le
+    /// refresh. Ne jamais installer le profil d'une autre connexion après await.
+    func refreshUser(expectedUserID: String, isCurrent: @MainActor () -> Bool,
+                     fetchUser: @Sendable () async throws -> AuthUser) async throws {
+        guard isCurrent(), case .authenticated(let current) = state, current.id == expectedUserID else {
+            throw APIError.cancelled
         }
+        let revision = profileRevision
+        let user = try await fetchUser()
+        guard !Task.isCancelled, isCurrent(), profileRevision == revision, user.id == expectedUserID,
+              case .authenticated(let latest) = state, latest.id == expectedUserID else { throw APIError.cancelled }
+        profileRevision = UUID()
+        service.cacheUser(user)
+        state = .authenticated(user)
+    }
+
+    /// Le reçu d'activation est une preuve serveur : l'afficher immédiatement,
+    /// même si la relecture du profil échoue ensuite. Aucune requête supplémentaire.
+    func acknowledgeTwoFactorState(enabled: Bool = true, expectedUserID: String, isCurrent: @MainActor () -> Bool) throws {
+        guard isCurrent(), case .authenticated(let current) = state, current.id == expectedUserID else {
+            throw APIError.cancelled
+        }
+        let updated = current.withConfirmedTwoFactor(enabled: enabled)
+        profileRevision = UUID()
+        service.cacheUser(updated)
+        state = .authenticated(updated)
     }
 
     func login(email: String, password: String) async {

@@ -287,8 +287,8 @@ private struct GuestMapPreview: View {
     }
 }
 
-/// Speedtest utilisable sans compte. Les choix de publication et de précision
-/// vivent uniquement pendant cette présentation et repartent à false ensuite.
+/// Speedtest utilisable sans compte, avec la même politique de publication
+/// des nouvelles mesures et les reçus personnels de suppression.
 private struct GuestSpeedtestPreview: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showReceipts = false

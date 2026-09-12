@@ -24,6 +24,55 @@ final class APIClientTests: XCTestCase {
         } catch { XCTAssertEqual(error as? APIError, .cancelled) }
     }
 
+    func testSingleAttemptRejectsChangedOrReconnectedCredentialSessionBeforeTransport() async throws {
+        for nextToken in ["account-b", "account-a"] {
+            let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+            try credentials.setAccessToken("account-a")
+            let expected = credentials.snapshot().sessionID
+            credentials.clearAll()
+            try credentials.setAccessToken(nextToken)
+            XCTAssertNotEqual(credentials.snapshot().sessionID, expected)
+            let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+            MockURLProtocol.requestHandler = { _ in
+                XCTFail("Une intention de l’ancienne session ne doit pas atteindre le transport")
+                throw URLError(.unsupportedURL)
+            }
+            do {
+                _ = try await client.performSingleAttempt(
+                    APIEndpoint(path: "/api/android/favorite-antennas", method: .patch),
+                    expectedCredentialSessionID: expected
+                )
+                XCTFail("Une intention a franchi un changement ou une reconnexion de session")
+            } catch { XCTAssertEqual(error as? APIError, .cancelled) }
+        }
+    }
+
+    func testSingleAttemptAllowsCookieRotationWithinExpectedCredentialSession() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("account-a")
+        let expected = credentials.snapshot()
+        let rotation = HTTPURLResponse(
+            url: URL(string: "https://api.signalquest.test/api/auth/refresh")!,
+            statusCode: 200, httpVersion: nil,
+            headerFields: ["Set-Cookie": "auth_token=account-a-rotated; Path=/; HttpOnly"]
+        )!
+        let rotated = try credentials.captureFromResponse(rotation, for: expected)
+        XCTAssertEqual(rotated.sessionID, expected.sessionID)
+        XCTAssertNotEqual(rotated.revision, expected.revision)
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "auth_token=account-a-rotated")
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+        let (data, response) = try await client.performSingleAttempt(
+            APIEndpoint(path: "/api/android/favorite-antennas", method: .patch),
+            expectedCredentialSessionID: expected.sessionID
+        )
+        XCTAssertEqual(response.statusCode, 200)
+        XCTAssertEqual(try JSONDecoder().decode(SuccessResponse.self, from: data).success, true)
+    }
+
     func testNetworkFreshnessHeadersBypassTheURLCacheLayer() async throws {
         let client = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()), session: Self.mockSession())
         MockURLProtocol.requestHandler = { request in

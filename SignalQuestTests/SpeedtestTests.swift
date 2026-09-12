@@ -621,9 +621,11 @@ final class SpeedtestTests: XCTestCase {
         )
     }
 
-    func testSpeedtestPayloadIsPrivateByDefault() {
+    func testSpeedtestPayloadRequestsPublicExactCoordinatesByDefault() {
         let payload = SpeedtestSubmission.iosPayload(from: makeResultForPrivacy(), streams: 4, deviceModel: "iPhone")
-        XCTAssertFalse(payload.isVisibleOnMap, "Une mesure ne doit jamais être publiée sans opt-in explicite")
+        XCTAssertTrue(payload.isVisibleOnMap)
+        XCTAssertTrue(payload.shareExactLocation)
+        XCTAssertEqual(payload.coordinates, makeResultForPrivacy().coordinate)
     }
 
     func testSpeedtestPayloadHonorsPublishOptIn() {
@@ -631,12 +633,13 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertTrue(payload.isVisibleOnMap)
     }
 
-    func testSpeedtestPayloadRequiresSeparateExactLocationOptIn() {
+    func testSpeedtestPayloadKeepsExplicitLegacyPrecisionChoice() {
         let blurred = SpeedtestSubmission.iosPayload(
             from: makeResultForPrivacy(),
             streams: 4,
             deviceModel: "iPhone",
-            isVisibleOnMap: true
+            isVisibleOnMap: true,
+            shareExactLocation: false
         )
         let exact = SpeedtestSubmission.iosPayload(
             from: makeResultForPrivacy(),
@@ -753,11 +756,13 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertTrue(firstStore.all().isEmpty)
     }
 
-    /// Le payload par défaut ne doit JAMAIS porter la position exacte : c'est la
-    /// garantie de minimisation. On vérifie l'appartenance à la grille plutôt
-    /// qu'une valeur figée, pour que le test survive à un changement de pas.
-    func testSpeedtestPayloadMinimizesCoordinates() throws {
-        let payload = SpeedtestSubmission.iosPayload(from: makeResultForPrivacy(), streams: 4, deviceModel: "iPhone")
+    /// Les anciennes intentions privées conservent leur choix de précision.
+    /// Vérifier la grille sans imposer son pas aux nouveaux tests publics exacts.
+    func testSpeedtestPayloadPreservesExplicitLegacyCoordinateMinimization() throws {
+        let payload = SpeedtestSubmission.iosPayload(
+            from: makeResultForPrivacy(), streams: 4, deviceModel: "iPhone",
+            isVisibleOnMap: false, shareExactLocation: false
+        )
         let coords = try XCTUnwrap(payload.coordinates)
         XCTAssertEqual(coords.latitude, CoordinateGrid.snap(coords.latitude), accuracy: 1e-9)
         XCTAssertEqual(coords.longitude, CoordinateGrid.snap(coords.longitude), accuracy: 1e-9)

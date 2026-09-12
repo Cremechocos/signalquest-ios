@@ -1,161 +1,6 @@
 import SwiftUI
 import CoreLocation
 
-/// Ce que la fiche antenne sait de la position de l'utilisateur : les mesures
-/// géométriques immédiates, puis le profil de relief une fois le réseau revenu.
-@MainActor
-final class AntennaSightViewModel: ObservableObject {
-    @Published private(set) var profile: [AntennaSightGeometry.ProfilePoint] = []
-    @Published private(set) var verdict: AntennaSightGeometry.SightVerdict?
-    @Published private(set) var isLoading = false
-    /// Le profil a été demandé et a échoué (réseau, source indisponible) : on le
-    /// dit, plutôt que de laisser un cadre vide qui ressemble à un chargement.
-    @Published private(set) var failed = false
-
-    private let terrain: TerrainServicing
-    private var loadedKey: String?
-    /// Élévations et bâti déjà obtenus pour le trajet en cours.
-    ///
-    /// La fiche s'ouvre AVANT que le détail du site n'arrive : la hauteur
-    /// d'antenne vaut alors 25 m par défaut, et le profil calculé avec cette
-    /// valeur restait figé, puisque la clé de rechargement ne dépend que des
-    /// coordonnées. La ligne de visée pointait donc 14 m trop bas jusqu'au
-    /// prochain déplacement. Conserver les mesures permet de recalculer
-    /// localement dès que la vraie hauteur arrive, sans rappeler le réseau.
-    private var cachedElevations: [Double?] = []
-    private var cachedBuildings: [Double?] = []
-    private var cachedDistance: Double = 0
-    /// Géométrie courante, relue à chaque construction plutôt que capturée.
-    private var antennaHeight: Double = 25
-    private var frequency: Double = 2100
-
-    init(terrain: TerrainServicing) {
-        self.terrain = terrain
-    }
-
-    /// Déclare la hauteur d'antenne et la fréquence à utiliser.
-    ///
-    /// Appelée à chaque fois que la vue en sait davantage — à l'ouverture avec ce
-    /// que porte la tuile, puis quand le détail du site répond. La valeur est
-    /// STOCKÉE et relue au moment de construire le profil : le calcul de relief
-    /// en cours l'utilisera, même s'il a démarré avant. C'est ce qui manquait —
-    /// la hauteur était capturée à l'appel, si bien qu'une réponse arrivée
-    /// pendant le chargement du terrain ne changeait plus rien, et la ligne de
-    /// visée restait fausse jusqu'à ce qu'on actualise à la main.
-    func setGeometry(antennaHeightMeters: Double, frequencyMhz: Double) {
-        guard antennaHeight != antennaHeightMeters || frequency != frequencyMhz else { return }
-        antennaHeight = antennaHeightMeters
-        frequency = frequencyMhz
-        rebuildFromCache()
-    }
-
-    /// Reconstruit le profil sur les mesures déjà en main. Instantané : aucun
-    /// appel réseau. Sans effet tant que le relief n'est pas arrivé — le calcul
-    /// en cours reprendra alors la hauteur courante de lui-même.
-    private func rebuildFromCache() {
-        guard !cachedElevations.isEmpty, cachedDistance > 0 else { return }
-        let points = AntennaSightGeometry.buildProfile(
-            distanceMeters: cachedDistance,
-            groundElevations: cachedElevations,
-            clutterHeights: cachedBuildings,
-            antennaHeightMeters: antennaHeight,
-            frequencyMhz: frequency
-        )
-        guard !points.isEmpty else { return }
-        profile = points
-        verdict = AntennaSightGeometry.verdict(
-            for: points,
-            includesBuildings: cachedBuildings.contains { ($0 ?? 0) > 0 }
-        )
-    }
-
-    /// Altitude du sol sous l'utilisateur et sous l'antenne, telles que lues dans
-    /// le modèle de terrain — pas l'altitude GPS, bien moins fiable en vertical.
-    var userGroundMeters: Double? { profile.first?.groundMeters }
-    var antennaGroundMeters: Double? { profile.last?.groundMeters }
-
-    func load(
-        user: CLLocationCoordinate2D,
-        antenna: CLLocationCoordinate2D,
-        distanceMeters: Double
-    ) async {
-        // Recharger sur un déplacement de quelques mètres ferait un appel réseau
-        // à chaque respiration du GPS : la clé est arrondie à ~100 m.
-        let key = String(
-            format: "%.3f,%.3f→%.5f,%.5f",
-            user.latitude, user.longitude, antenna.latitude, antenna.longitude
-        )
-        guard key != loadedKey, distanceMeters > 20 else { return }
-        loadedKey = key
-        isLoading = true
-        failed = false
-        defer { isLoading = false }
-
-        let path = AntennaSightGeometry.samplePath(from: user, to: antenna, distanceMeters: distanceMeters)
-
-        // Les deux sources partent EN MÊME TEMPS : le relief vient de l'IGN,
-        // rapide, le bâti d'Overpass, souvent bien plus lent. Les enchaîner
-        // faisait attendre le profil entier au rythme du plus lent, alors que le
-        // relief suffit à afficher quelque chose d'utile.
-        async let elevationTask = terrain.elevations(for: path)
-        async let buildingTask: [Double?]? = try? await terrain.buildingHeights(for: path)
-
-        cachedDistance = distanceMeters
-        do {
-            let elevations = try await elevationTask
-            cachedElevations = elevations
-            // `antennaHeight` est relue ICI, pas au démarrage : si le détail du
-            // site a répondu pendant le chargement du relief, sa hauteur est
-            // déjà prise en compte.
-            let relief = AntennaSightGeometry.buildProfile(
-                distanceMeters: distanceMeters,
-                groundElevations: elevations,
-                clutterHeights: [],
-                antennaHeightMeters: antennaHeight,
-                frequencyMhz: frequency
-            )
-            guard !relief.isEmpty else {
-                failed = true
-                loadedKey = nil
-                return
-            }
-            // Premier rendu dès que le relief est là : l'utilisateur voit son
-            // profil pendant qu'Overpass réfléchit encore.
-            profile = relief
-            verdict = AntennaSightGeometry.verdict(for: relief, includesBuildings: false)
-            isLoading = false
-
-            // Puis le bâti vient l'enrichir, sans jamais le remplacer par du vide.
-            guard let buildings = await buildingTask else { return }
-            cachedBuildings = buildings
-            guard buildings.contains(where: { ($0 ?? 0) > 0 }) else { return }
-            let enriched = AntennaSightGeometry.buildProfile(
-                distanceMeters: distanceMeters,
-                groundElevations: elevations,
-                clutterHeights: buildings,
-                antennaHeightMeters: antennaHeight,
-                frequencyMhz: frequency
-            )
-            guard !enriched.isEmpty else { return }
-            profile = enriched
-            verdict = AntennaSightGeometry.verdict(for: enriched, includesBuildings: true)
-        } catch {
-            failed = true
-            // Un échec ne doit pas geler la vue sur cette clé : la prochaine
-            // apparition de la fiche pourra réessayer.
-            loadedKey = nil
-        }
-    }
-
-    /// Force un recalcul, même position et même antenne — après un déplacement
-    /// que le cache aurait considéré comme identique.
-    func invalidate() {
-        loadedKey = nil
-        cachedElevations = []
-        cachedBuildings = []
-    }
-}
-
 /// Le bloc « depuis ta position » de la fiche antenne : distance, cap, secteur
 /// qui couvre, angle d'élévation, et un aperçu du relief entre les deux points.
 struct AntennaSightCard: View {
@@ -175,11 +20,16 @@ struct AntennaSightCard: View {
     /// donc jamais. La flèche de la boussole restait figée, et la distance
     /// gardait la valeur d'ouverture de la fiche même après un relevé GPS.
     @ObservedObject var location: LocationService
+    let origin: AntennaSightOrigin
     let tint: Color
     @EnvironmentObject private var services: AppServices
     @StateObject private var model: AntennaSightViewModel
-    @State private var showsProfile = false
+    @State private var presentedProfile: AntennaProfilePresentation?
+    @State private var gpsSnapshot = AntennaSightGPSSnapshot()
+    @State private var originRevision = UUID()
+    @State private var gpsWasInRange = false
     @State private var isRefreshing = false
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
@@ -187,6 +37,7 @@ struct AntennaSightCard: View {
         details: AntennaDetails?,
         fallbackAzimuths: [Double],
         location: LocationService,
+        origin: AntennaSightOrigin = .device,
         tint: Color,
         terrain: TerrainServicing
     ) {
@@ -194,14 +45,31 @@ struct AntennaSightCard: View {
         self.details = details
         self.fallbackAzimuths = fallbackAzimuths
         self.location = location
+        self.origin = origin
         self.tint = tint
         _model = StateObject(wrappedValue: AntennaSightViewModel(terrain: terrain))
     }
 
-    private var userLocation: CLLocation? { location.lastLocation }
+    private var gpsPolicy: LocationFixPolicy {
+        LocationFixPolicy(maxAge: LocationService.defaultMaxLocationAge, maximumAccuracy: nil)
+    }
+
+    private var currentGPS: CLLocation? { location.cachedLocation() }
+
+    private var userLocation: CLLocation? {
+        if origin.isDevice {
+            guard currentGPS != nil, let fix = gpsSnapshot.location, location.isUsable(fix) else { return nil }
+            return fix
+        }
+        guard let coordinate = origin.coordinate(deviceLocation: nil) else { return nil }
+        return CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+    }
+
+    private var originTimestamp: Date? { origin.isDevice ? userLocation?.timestamp : nil }
 
     private var antennaCoordinate: CLLocationCoordinate2D? {
-        if let core = details?.core, core.lat != 0 || core.lng != 0 {
+        if let core = details?.core, core.lat != 0 || core.lng != 0,
+           CLLocationCoordinate2DIsValid(CLLocationCoordinate2D(latitude: core.lat, longitude: core.lng)) {
             return CLLocationCoordinate2D(latitude: core.lat, longitude: core.lng)
         }
         guard let latitude = site.latitude, let longitude = site.longitude, site.hasValidCoordinate else { return nil }
@@ -242,7 +110,7 @@ struct AntennaSightCard: View {
     private var deltaHeightMeters: Double? {
         guard let antennaHeightMeters else { return nil }
         let groundDelta: Double
-        if let antennaGround = model.antennaGroundMeters, let userGround = model.userGroundMeters {
+        if hasCurrentProfile, let antennaGround = model.antennaGroundMeters, let userGround = model.userGroundMeters {
             groundDelta = antennaGround - userGround
         } else {
             groundDelta = 0
@@ -271,11 +139,21 @@ struct AntennaSightCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
+            if case let .searchedAddress(_, _, title) = origin, !title.isEmpty {
+                Text(title)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            if let originTimestamp {
+                Text("Position relevée à \(originTimestamp.formatted(date: .omitted, time: .standard))")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
             if let distanceMeters, let bearing {
                 HStack(alignment: .center, spacing: SQSpace.lg) {
                     AntennaCompassDial(
                         bearing: bearing,
-                        deviceHeading: location.headingDegrees,
+                        deviceHeading: origin.isDevice ? location.headingDegrees : nil,
                         sectorAzimuth: alignedSector?.azimuth,
                         tint: tint
                     )
@@ -284,6 +162,7 @@ struct AntennaSightCard: View {
 
                     VStack(alignment: .leading, spacing: SQSpace.xs) {
                         Text(SQUnits.distance(meters: distanceMeters))
+                            .accessibilityIdentifier("antenna.sight.distance")
                             .font(SQType.title)
                             .foregroundStyle(SQColor.label)
                         Text("cap \(Int(bearing.rounded()))° \(AntennaSightGeometry.cardinal(for: bearing))")
@@ -296,10 +175,10 @@ struct AntennaSightCard: View {
                         }
                     }
                     Spacer(minLength: 0)
-                    refreshButton
+                    if origin.isDevice { refreshButton }
                 }
                 sectorLine
-                terrainPreview
+                if permitsProfile && model.displayKey == sightTaskKey { terrainPreview }
             } else {
                 unavailableLine
             }
@@ -312,14 +191,42 @@ struct AntennaSightCard: View {
         .onChangeCompat(of: geometryKey) { _, _ in
             model.setGeometry(antennaHeightMeters: antennaHeightMeters ?? 25, frequencyMhz: frequencyMhz)
         }
-        .onAppear { location.startHeadingUpdates() }
+        .onChangeCompat(of: sightTaskKey) { _, key in
+            if presentedProfile?.requestKey != key { presentedProfile = nil }
+        }
+        .onChangeCompat(of: location.lastLocation) { _, _ in reconcileGPSOrigin() }
+        .onChangeCompat(of: antennaKey) { _, _ in reconcileGPSOrigin() }
+        .onChangeCompat(of: origin) { _, _ in
+            originRevision = UUID()
+            gpsSnapshot.clear()
+            reconcileGPSOrigin(force: true)
+        }
+        .onChangeCompat(of: scenePhase) { _, phase in
+            if phase == .active { reconcileGPSOrigin() }
+        }
+        .onAppear {
+            reconcileGPSOrigin()
+            location.startHeadingUpdates()
+        }
         .onDisappear { location.stopHeadingUpdates() }
-        .sheet(isPresented: $showsProfile) {
-            AntennaProfileView(
-                profile: model.profile,
-                verdict: model.verdict,
+        .task(id: gpsExpiryTaskKey) { await expireGPSOrigin() }
+        .sheet(item: $presentedProfile) { presentation in
+            presentation.view
+                .task(id: scenePhase) { await expirePresentation(presentation) }
+        }
+    }
+
+    /// Le profil et ses paramètres sont copiés avant toute transition modale.
+    private func presentProfile() {
+        guard !isRefreshing, hasCurrentProfile, let snapshot = model.snapshot(), snapshot.requestKey == sightTaskKey else { return }
+        presentedProfile = AntennaProfilePresentation(
+            requestKey: snapshot.requestKey,
+            expiresAt: origin.isDevice ? gpsSnapshot.expiresAt(maxAge: gpsPolicy.maxAge) : nil,
+            view: AntennaProfileView(
+                profile: snapshot.profile,
+                verdict: snapshot.verdict,
                 siteLabel: site.siteId ?? site.id,
-                distanceMeters: distanceMeters ?? 0,
+                distanceMeters: snapshot.distanceMeters,
                 antennaHeightMeters: antennaHeightMeters,
                 heightIsEstimated: details?.core?.siteInfo.radiatingHeightIsEstimated ?? false,
                 supportHeightMeters: details?.core?.siteInfo.supportHeightMeters
@@ -328,9 +235,66 @@ struct AntennaSightCard: View {
                 supportLabel: supportLabel,
                 antennaTypes: details?.core?.siteInfo.antennaTypes ?? [],
                 tint: tint,
-                frequencyMhz: frequencyMhz
+                frequencyMhz: frequencyMhz,
+                originLabel: origin.label,
+                isSearchedAddress: !origin.isDevice,
+                originTimestamp: originTimestamp
             )
+        )
+    }
+
+    private var antennaKey: String {
+        guard let antenna = antennaCoordinate else { return "none" }
+        return "\(site.id)|\(antenna.latitude),\(antenna.longitude)"
+    }
+
+    private var currentGPSDistance: Double? {
+        guard let fix = currentGPS, let antenna = antennaCoordinate else { return nil }
+        return fix.distance(from: CLLocation(latitude: antenna.latitude, longitude: antenna.longitude))
+    }
+
+    private func reconcileGPSOrigin(force: Bool = false) {
+        guard origin.isDevice else {
+            gpsSnapshot.clear()
+            return
         }
+        let inRange = currentGPSDistance.map { $0.isFinite && $0 <= 30_000 } ?? false
+        gpsSnapshot.update(current: currentGPS, policy: gpsPolicy, now: Date(), force: force || (inRange && !gpsWasInRange))
+        gpsWasInRange = inRange
+    }
+
+    private var gpsExpiryTaskKey: String {
+        "\(origin.isDevice)|\(contextKey)|\(antennaKey)|\(scenePhase == .active)"
+    }
+
+    /// SwiftUI annule cette attente quand le relevé ou l'activité de scène
+    /// change. À la réapparition et au retour actif, la politique est relue
+    /// immédiatement ; aucune durée restante n'est transportée entre scènes.
+    private func expireGPSOrigin() async {
+        guard scenePhase == .active, origin.isDevice,
+              let deadline = gpsSnapshot.expiresAt(maxAge: gpsPolicy.maxAge) else { return }
+        do { try await waitUntil(deadline) } catch { return }
+        guard !Task.isCancelled else { return }
+        reconcileGPSOrigin()
+    }
+
+    /// La sheet a sa propre expiration si la présentation masque sa vue source.
+    private func expirePresentation(_ presentation: AntennaProfilePresentation) async {
+        guard scenePhase == .active, let deadline = presentation.expiresAt else { return }
+        do { try await waitUntil(deadline) } catch { return }
+        guard !Task.isCancelled, presentedProfile?.id == presentation.id else { return }
+        presentedProfile = nil
+        reconcileGPSOrigin()
+    }
+
+    private func waitUntil(_ deadline: Date) async throws {
+        // L'horloge réelle reste la référence, y compris après une suspension.
+        while deadline.timeIntervalSinceNow > 0 {
+            let seconds = min(deadline.timeIntervalSinceNow, gpsPolicy.maxAge)
+            if seconds <= 0 { break }
+            try await Task.sleep(nanoseconds: UInt64((seconds * 1_000_000_000).rounded(.up)))
+        }
+        try Task.checkCancellation()
     }
 
     /// Redemande un point GPS et recalcule la visée depuis là.
@@ -372,9 +336,10 @@ struct AntennaSightCard: View {
         defer { isRefreshing = false }
         // `maxAge: 0` force un vrai relevé : le service renverrait sinon le fix
         // en cache, qui est précisément celui qu'on cherche à remplacer.
-        _ = await location.currentLocation(timeoutSeconds: 10, maxAge: 0)
-        model.invalidate()
-        await loadProfile()
+        let refreshed = await location.currentLocation(timeoutSeconds: 10, maxAge: 0)
+        // Un timeout ne doit pas transformer le cache en nouveau relevé.
+        // La politique normale peut toujours invalider une origine périmée.
+        reconcileGPSOrigin(force: refreshed != nil)
     }
 
     /// Change dès que la hauteur d'antenne ou la bande de référence évoluent —
@@ -383,22 +348,39 @@ struct AntennaSightCard: View {
         "\(antennaHeightMeters ?? -1)|\(frequencyMhz)"
     }
 
-    /// Recharge quand la position bouge d'environ 100 m ou que le site change.
+    private var permitsProfile: Bool {
+        guard let distanceMeters else { return false }
+        if origin.isDevice {
+            return AntennaSightGPSSnapshot.permitsProfile(snapshotDistance: distanceMeters, currentDistance: currentGPSDistance)
+        }
+        return AntennaSightViewModel.permitsProfile(distanceMeters: distanceMeters)
+    }
+
+    private var hasCurrentProfile: Bool {
+        permitsProfile && model.displayKey == sightTaskKey && !model.profile.isEmpty
+    }
+
+    /// La révision ne contient ni titre ni adresse lisible. Le GPS stabilisé
+    /// garde sa révision ; chaque changement de recherche en reçoit une autre.
+    private var contextKey: String {
+        let revision = origin.isDevice ? gpsSnapshot.revision : originRevision
+        return "\(site.id)|\(revision)"
+    }
+
     private var sightTaskKey: String {
-        guard let userLocation, let antenna = antennaCoordinate else { return "none" }
-        return String(
-            format: "%.3f,%.3f→%.5f,%.5f",
-            userLocation.coordinate.latitude, userLocation.coordinate.longitude,
-            antenna.latitude, antenna.longitude
-        )
+        guard let userLocation, let antenna = antennaCoordinate else { return "none|\(contextKey)" }
+        let key = AntennaSightViewModel.requestKey(user: userLocation.coordinate, antenna: antenna, contextKey: contextKey)
+        // Même un déplacement GPS inférieur à 100 m peut franchir 30 km.
+        return permitsProfile ? key : "excluded|\(key)"
     }
 
     private func loadProfile() async {
-        guard let userLocation, let antenna = antennaCoordinate, let distanceMeters else { return }
-        // La géométrie est déclarée AVANT le chargement, et de nouveau à chaque
-        // fois qu'on en sait plus : le modèle la relit au moment de construire.
+        guard permitsProfile, let userLocation, let antenna = antennaCoordinate, let distanceMeters else {
+            model.invalidate()
+            return
+        }
         model.setGeometry(antennaHeightMeters: antennaHeightMeters ?? 25, frequencyMhz: frequencyMhz)
-        await model.load(user: userLocation.coordinate, antenna: antenna, distanceMeters: distanceMeters)
+        await model.load(user: userLocation.coordinate, antenna: antenna, distanceMeters: distanceMeters, contextKey: contextKey)
     }
 
     private func elevationLabel(_ angle: Double) -> String {
@@ -413,7 +395,7 @@ struct AntennaSightCard: View {
     }
 
     private func formatted(_ value: Double) -> String {
-        String(format: "%.1f", value).replacingOccurrences(of: ".", with: ",")
+        value.formatted(.number.precision(.fractionLength(1)))
     }
 
     @ViewBuilder
@@ -424,7 +406,7 @@ struct AntennaSightCard: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(sector.inSector ? SQColor.success : SQColor.labelTertiary)
                 Text(sector.inSector
-                     ? String(localized: "Tu es dans le lobe du secteur \(Int(sector.azimuth.rounded()))° (écart \(Int(sector.offset.rounded()))°)")
+                     ? String(localized: "Le point de départ est dans le lobe du secteur \(Int(sector.azimuth.rounded()))° (écart \(Int(sector.offset.rounded()))°)")
                      : String(localized: "Hors lobe — le secteur le plus proche pointe à \(Int(sector.azimuth.rounded()))° (écart \(Int(sector.offset.rounded()))°)"))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
@@ -446,7 +428,7 @@ struct AntennaSightCard: View {
         } else if !model.profile.isEmpty {
             Button {
                 Haptics.light()
-                showsProfile = true
+                presentProfile()
             } label: {
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
                     AntennaTerrainPreview(
@@ -480,6 +462,8 @@ struct AntennaSightCard: View {
             }
             .buttonStyle(SQPressButtonStyle())
             .accessibilityHint("Ouvre le profil d'altitude détaillé")
+            .accessibilityIdentifier("antenna.profile.open")
+            .disabled(isRefreshing)
         } else if model.failed {
             Text("Relief indisponible pour ce trajet.")
                 .font(SQType.caption)
@@ -492,12 +476,15 @@ struct AntennaSightCard: View {
             Image(systemName: "location.slash")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(SQColor.labelTertiary)
-            Text(userLocation == nil
-                 ? String(localized: "Active la localisation pour situer ce site par rapport à toi.")
-                 : String(localized: "Ce site n'a pas de coordonnées exploitables."))
+            Text(origin == .unresolved
+                 ? String(localized: "Sélectionne une adresse dans les résultats ou efface la recherche pour utiliser ta position.")
+                 : userLocation == nil
+                    ? String(localized: "Position actuelle indisponible. Actualise la localisation pour situer ce site.")
+                    : String(localized: "Ce site n'a pas de coordonnées exploitables."))
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if origin.isDevice { refreshButton }
         }
     }
 
@@ -695,6 +682,6 @@ struct AntennaTerrainPreview: View {
             )
             context.fill(antennas.panels, with: .color(tint))
         }
-        .accessibilityLabel("Aperçu du relief entre ta position et l'antenne")
+        .accessibilityLabel("Aperçu du relief entre le point de départ et l'antenne")
     }
 }

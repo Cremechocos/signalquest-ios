@@ -54,6 +54,20 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
 
 @MainActor
 final class AuthSessionTests: XCTestCase {
+    private var previousPushService: PushNotificationService?
+
+    override func setUp() async throws {
+        previousPushService = AppDelegate.sharedPush
+        // Ces tests utilisent un AuthService simulé : ils ne doivent pas attendre
+        // une révocation FCM réelle appartenant au processus hôte XCTest.
+        AppDelegate.sharedPush = nil
+    }
+
+    override func tearDown() async throws {
+        AppDelegate.sharedPush = previousPushService
+        previousPushService = nil
+    }
+
 
     private func makeSecondUser() -> AuthUser {
         AuthUser(
@@ -72,6 +86,66 @@ final class AuthSessionTests: XCTestCase {
             if Date().timeIntervalSince(start) > timeout { return }
             try? await Task.sleep(nanoseconds: 10_000_000)
         }
+    }
+
+    func testCachedProfileMustMatchThePresentCredentialOwnerAndExpiry() throws {
+        func token(_ userID: String, expiry: Int = 4_102_444_800) throws -> String {
+            let data = try JSONSerialization.data(withJSONObject: ["userId": userID, "exp": expiry])
+            let payload = data.base64EncodedString().replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+            return "synthetic.\(payload).signature"
+        }
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        let service = AuthService(api: APIClient(config: .test, credentials: credentials), sessionStore: InMemoryTokenStore())
+        let user = makeSecondUser()
+        try credentials.setAccessToken(token(user.id))
+        service.cacheUser(user)
+        XCTAssertEqual(service.cachedUser(), user)
+        try credentials.setAccessToken(token("another-account"))
+        XCTAssertNil(service.cachedUser(), "The previous profile cannot label a different session")
+        try credentials.setAccessToken(token(user.id, expiry: 1))
+        XCTAssertNil(service.cachedUser())
+        try credentials.setAccessToken(token(user.id))
+        XCTAssertEqual(service.cachedUser(), user, "Rejecting stale cache must not erase its data")
+    }
+
+    func testLateProfileCannotUndoAcknowledgedTwoFactorActivation() async throws {
+        let mock = MockAuthService()
+        mock.storedCredentials = true
+        mock.cacheUser(.mock)
+        let model = AuthSessionViewModel(service: mock)
+        await model.bootstrap()
+        await waitUntil { mock.meCallCount >= 1 }
+        let started = expectation(description: "profile read started")
+        let gate = TwoFactorProfileReadGate(started: started)
+        let pending = Task {
+            try await model.refreshUser(expectedUserID: AuthUser.mock.id, isCurrent: { true },
+                fetchUser: { try await gate.wait() })
+        }
+        await fulfillment(of: [started], timeout: 2)
+        try model.acknowledgeTwoFactorState(expectedUserID: AuthUser.mock.id, isCurrent: { true })
+        await gate.resume(.mock)
+        do { try await pending.value; XCTFail("A stale profile overwrote the activation receipt") }
+        catch { XCTAssertTrue(error.isCancellation) }
+        guard case .authenticated(let user) = model.state else { return XCTFail("Account state lost") }
+        XCTAssertEqual(user.twoFactorEnabled, true)
+        XCTAssertEqual(mock.cachedUser()?.twoFactorEnabled, true)
+    }
+
+    func testDisableReceiptUpdatesOnlyItsAccountAndPreservesProfileFields() async throws {
+        let mock = MockAuthService()
+        mock.storedCredentials = true
+        let model = AuthSessionViewModel(service: mock)
+        await model.bootstrap()
+        try model.acknowledgeTwoFactorState(expectedUserID: AuthUser.mock.id, isCurrent: { true })
+        XCTAssertThrowsError(try model.acknowledgeTwoFactorState(enabled: false,
+            expectedUserID: "other", isCurrent: { true }))
+        XCTAssertEqual(mock.cachedUser()?.twoFactorEnabled, true)
+        XCTAssertThrowsError(try model.acknowledgeTwoFactorState(enabled: false,
+            expectedUserID: AuthUser.mock.id, isCurrent: { false }))
+        try model.acknowledgeTwoFactorState(enabled: false,
+            expectedUserID: AuthUser.mock.id, isCurrent: { true })
+        XCTAssertEqual(mock.cachedUser(), AuthUser.mock.withConfirmedTwoFactor(enabled: false))
     }
 
     // MARK: PERF-START-01 — cache SWR
@@ -367,4 +441,14 @@ final class AppRouterAccountSwitchQATests: XCTestCase {
         XCTAssertEqual(AppRouter.qaInitialTab(profile: true, community: true), .profile)
         XCTAssertNil(AppRouter.qaInitialTab(profile: false, community: false))
     }
+}
+
+private actor TwoFactorProfileReadGate {
+    let started: XCTestExpectation
+    private var continuation: CheckedContinuation<AuthUser, Error>?
+    init(started: XCTestExpectation) { self.started = started }
+    func wait() async throws -> AuthUser {
+        try await withCheckedThrowingContinuation { continuation = $0; started.fulfill() }
+    }
+    func resume(_ user: AuthUser) { continuation?.resume(returning: user); continuation = nil }
 }

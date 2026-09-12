@@ -125,6 +125,18 @@ struct PresenceLocationPayload: Encodable, Sendable {
     let accuracy: Double?
     let heading: Double?
     let speed: Double?
+    var observedAt: Date? = nil
+
+    private enum CodingKeys: String, CodingKey { case lat, lng, accuracy, heading, speed, observedAt }
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(lat, forKey: .lat)
+        try values.encode(lng, forKey: .lng)
+        try values.encodeIfPresent(accuracy, forKey: .accuracy)
+        try values.encodeIfPresent(heading, forKey: .heading)
+        try values.encodeIfPresent(speed, forKey: .speed)
+        try values.encodeIfPresent(observedAt.map(ObservationTimestamp.string), forKey: .observedAt)
+    }
 }
 
 /// `POST /api/social/presence`. Le serveur met à jour la présence + `lastSeenAt`,
@@ -135,6 +147,18 @@ struct PresencePublishRequest: Encodable, Sendable {
     let status: String
     let customStatus: String?
     let location: PresenceLocationPayload?
+
+    private enum CodingKeys: String, CodingKey { case status, customStatus, location }
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(status, forKey: .status)
+        // nil signifie un effacement explicite après chargement/choix utilisateur.
+        // Le départ hors ligne conserve le texte enregistré du profil.
+        if status != SocialPresenceStatus.offline.rawValue {
+            try container.encode(customStatus, forKey: .customStatus)
+        }
+        try container.encodeIfPresent(location, forKey: .location)
+    }
 }
 
 /// `POST /api/social/radio-snapshot`. iOS n'expose pas le signal radio brut
@@ -146,13 +170,27 @@ struct RadioSnapshotPublishRequest: Encodable, Sendable {
     let `operator`: String?
     let lat: Double?
     let lng: Double?
+    var observedAt: Date? = nil
+    var locationObservedAt: Date? = nil
 
     enum CodingKeys: String, CodingKey {
         case technology
         case `operator`
         case lat
         case lng
+        case observedAt
+        case locationObservedAt
     }
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encodeIfPresent(technology, forKey: .technology)
+        try values.encodeIfPresent(`operator`, forKey: .operator)
+        try values.encodeIfPresent(lat, forKey: .lat)
+        try values.encodeIfPresent(lng, forKey: .lng)
+        try values.encodeIfPresent(observedAt.map(ObservationTimestamp.string), forKey: .observedAt)
+        try values.encodeIfPresent(locationObservedAt.map(ObservationTimestamp.string), forKey: .locationObservedAt)
+    }
+
 }
 
 /// Réponse de `POST /api/social/presence`. `observed`/`nextIntervalMs` pilotent le
@@ -163,4 +201,10 @@ struct PresenceAck: Decodable, Sendable {
     let ok: Bool?
     let observed: Bool?
     let nextIntervalMs: Int?
+    let locationAccepted: Bool?
+}
+
+struct RadioSnapshotAck: Decodable, Sendable {
+    let ok: Bool?
+    let accepted: Bool?
 }

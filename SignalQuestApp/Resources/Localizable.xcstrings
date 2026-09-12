@@ -1,6 +1,38 @@
 {
   "sourceLanguage": "fr",
   "strings": {
+    "Reconnecte-toi pour modifier le verrouillage de SignalQuest.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in again to change the SignalQuest app lock."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnecte-toi pour modifier le verrouillage de SignalQuest."
+          }
+        }
+      }
+    },
+    "L’authentification n’a pas abouti. Tu peux réessayer pour déverrouiller SignalQuest.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authentication was not completed. You can try again to unlock SignalQuest."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’authentification n’a pas abouti. Tu peux réessayer pour déverrouiller SignalQuest."
+          }
+        }
+      }
+    },
     "Conversations": {
       "localizations": {
         "en": {
@@ -42281,6 +42313,2856 @@
           "stringUnit": {
             "state": "translated",
             "value": "View limits of the displayed data"
+          }
+        }
+      }
+    },
+    "Utilise Face ID, Touch ID ou le code de ton appareil pour continuer.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utilise Face ID, Touch ID ou le code de ton appareil pour continuer."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use Face ID, Touch ID, or your device passcode to continue."
+          }
+        }
+      }
+    },
+    "Confirme ton identité pour activer le verrouillage": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirme ton identité pour activer le verrouillage"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verify your identity to enable app lock"
+          }
+        }
+      }
+    },
+    "Le verrouillage n’a pas été activé. Réessaie avec la biométrie ou le code de l’appareil.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le verrouillage n’a pas été activé. Réessaie avec la biométrie ou le code de l’appareil."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App lock wasn’t enabled. Try again with biometrics or your device passcode."
+          }
+        }
+      }
+    },
+    "Verrouiller SignalQuest": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verrouiller SignalQuest"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lock SignalQuest"
+          }
+        }
+      }
+    },
+    "Configure un code pour l’appareil dans les Réglages iOS afin d’activer le verrouillage.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configure un code pour l’appareil dans les Réglages iOS afin d’activer le verrouillage."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up a device passcode in iOS Settings to enable app lock."
+          }
+        }
+      }
+    },
+    "Protège l’ouverture avec la biométrie ou le code de l’appareil après le délai choisi. Le contenu est masqué dans le sélecteur d’apps, même pendant ce délai. La déconnexion automatique efface la session après une inactivité prolongée.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protège l’ouverture avec la biométrie ou le code de l’appareil après le délai choisi. Le contenu est masqué dans le sélecteur d’apps, même pendant ce délai. La déconnexion automatique efface la session après une inactivité prolongée."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Require biometrics or your device passcode after the selected delay. Content stays hidden in the app switcher, including during this delay. Automatic sign-out clears the session after prolonged inactivity."
+          }
+        }
+      }
+    },
+    "Contenu masqué": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contenu masqué"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Content hidden"
+          }
+        }
+      }
+    },
+    "Active un code pour ton appareil dans les Réglages iOS, puis reviens dans SignalQuest pour déverrouiller. Le contenu reste masqué.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up a device passcode in iOS Settings, then return to SignalQuest to unlock. The content stays hidden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active un code pour ton appareil dans les Réglages iOS, puis reviens dans SignalQuest pour déverrouiller. Le contenu reste masqué."
+          }
+        }
+      }
+    },
+    "Depuis ta position": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Depuis ta position"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From your location"
+          }
+        }
+      }
+    },
+    "Depuis l’adresse recherchée": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Depuis l’adresse recherchée"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From the searched address"
+          }
+        }
+      }
+    },
+    "Origine à préciser": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Origine à préciser"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a starting point"
+          }
+        }
+      }
+    },
+    "départ": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "départ"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "start"
+          }
+        }
+      }
+    },
+    "adresse": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "adresse"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "address"
+          }
+        }
+      }
+    },
+    "l'antenne vise le départ": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "l'antenne vise le départ"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the antenna points toward the start"
+          }
+        }
+      }
+    },
+    "Schéma du dénivelé entre le point de départ et le site": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schéma du dénivelé entre le point de départ et le site"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagram of the elevation difference between the starting point and the site"
+          }
+        }
+      }
+    },
+    "Le point de départ est dans le lobe du secteur %lld° (écart %lld°)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le point de départ est dans le lobe du secteur %lld° (écart %lld°)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The starting point is inside the %lld° sector beam (%lld° offset)"
+          }
+        }
+      }
+    },
+    "Sélectionne une adresse dans les résultats ou efface la recherche pour utiliser ta position.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionne une adresse dans les résultats ou efface la recherche pour utiliser ta position."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select an address from the results or clear the search to use your location."
+          }
+        }
+      }
+    },
+    "Position actuelle indisponible. Actualise la localisation pour situer ce site.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position actuelle indisponible. Actualise la localisation pour situer ce site."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current location unavailable. Refresh your location to locate this site."
+          }
+        }
+      }
+    },
+    "Aperçu du relief entre le point de départ et l'antenne": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aperçu du relief entre le point de départ et l'antenne"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terrain preview between the starting point and the antenna"
+          }
+        }
+      }
+    },
+    "Altitude de départ": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Altitude de départ"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting elevation"
+          }
+        }
+      }
+    },
+    "Tilt vers le départ": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilt vers le départ"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilt toward the start"
+          }
+        }
+      }
+    },
+    "Profil du relief : départ à %lld mètres d'altitude, site %@ à %lld mètres, distants de %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profil du relief : départ à %lld mètres d'altitude, site %@ à %lld mètres, distants de %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terrain profile: starting elevation %lld meters, site %@ at %lld meters, %@ apart"
+          }
+        }
+      }
+    },
+    "La distance à vol d'oiseau entre le point de départ et le pied du support, mesurée sur l'ellipsoïde terrestre. Ce n'est pas la longueur du trajet radio, qui monte jusqu'aux antennes.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La distance à vol d'oiseau entre le point de départ et le pied du support, mesurée sur l'ellipsoïde terrestre. Ce n'est pas la longueur du trajet radio, qui monte jusqu'aux antennes."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The straight-line distance between the starting point and the base of the structure, measured on the Earth's ellipsoid. It is not the length of the radio path, which rises up to the antennas."
+          }
+        }
+      }
+    },
+    "Le point de départ est à %@ du site.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le point de départ est à %@ du site."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The starting point is %@ from the site."
+          }
+        }
+      }
+    },
+    "Le site domine le point de départ de %lld m.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le site domine le point de départ de %lld m."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The site is %lld m above the starting point."
+          }
+        }
+      }
+    },
+    "Le point de départ domine le site de %lld m.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le point de départ domine le site de %lld m."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The starting point is %lld m above the site."
+          }
+        }
+      }
+    },
+    "L'écart d'altitude entre le sol au point de départ et le sol au pied du support. Un site perché voit par-dessus les obstacles ; un site en contrebas se fait masquer par le moindre relief.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'écart d'altitude entre le sol au point de départ et le sol au pied du support. Un site perché voit par-dessus les obstacles ; un site en contrebas se fait masquer par le moindre relief."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The difference in ground elevation between the starting point and the base of the structure. An elevated site can see over obstacles; a lower site can be blocked by even small rises in terrain."
+          }
+        }
+      }
+    },
+    "L'inclinaison d'une antenne vers le bas. Les opérateurs l'utilisent pour concentrer l'énergie sur la zone à couvrir plutôt que de l'envoyer à l'horizon, où elle brouillerait les cellules voisines. Le chiffre donné ici est purement géométrique : c'est l'angle qui pointerait exactement vers le point de départ.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'inclinaison d'une antenne vers le bas. Les opérateurs l'utilisent pour concentrer l'énergie sur la zone à couvrir plutôt que de l'envoyer à l'horizon, où elle brouillerait les cellules voisines. Le chiffre donné ici est purement géométrique : c'est l'angle qui pointerait exactement vers le point de départ."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An antenna's downward tilt. Operators use it to focus energy on the coverage area instead of sending it toward the horizon, where it could interfere with neighboring cells. This value is purely geometric: the angle that would point exactly toward the starting point."
+          }
+        }
+      }
+    },
+    "Une antenne inclinée de %@° vers le bas viserait exactement le point de départ.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une antenne inclinée de %@° vers le bas viserait exactement le point de départ."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An antenna tilted down by %@° would point exactly toward the starting point."
+          }
+        }
+      }
+    },
+    "Le point de départ est au-dessus de l'antenne : il faudrait la relever de %@° pour le viser.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le point de départ est au-dessus de l'antenne : il faudrait la relever de %@° pour le viser."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The starting point is above the antenna: it would need to tilt up by %@° to point toward it."
+          }
+        }
+      }
+    },
+    "Rien ne coupe la droite entre un observateur au point de départ et les antennes.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien ne coupe la droite entre un observateur au point de départ et les antennes."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing blocks the straight line between an observer at the starting point and the antennas."
+          }
+        }
+      }
+    },
+    "La droite entre un observateur au point de départ et les antennes. Quand elle est dégagée, la liaison est dite « en visibilité directe » : c'est le cas le plus favorable. Sinon le signal doit contourner ou traverser, et perd beaucoup.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La droite entre un observateur au point de départ et les antennes. Quand elle est dégagée, la liaison est dite « en visibilité directe » : c'est le cas le plus favorable. Sinon le signal doit contourner ou traverser, et perd beaucoup."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The straight line between an observer at the starting point and the antennas. When clear, the connection has a direct line of sight, which is the most favorable case. Otherwise, the signal must travel around or through obstacles and loses considerable strength."
+          }
+        }
+      }
+    },
+    "Position relevée à %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position relevée à %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location recorded at %@"
+          }
+        }
+      }
+    },
+    "Une modification en attente de synchronisation": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une modification en attente de synchronisation"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One change waiting to sync"
+          }
+        }
+      }
+    },
+    "%lld modifications en attente de synchronisation": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld modifications en attente de synchronisation"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld changes waiting to sync"
+          }
+        }
+      }
+    },
+    "Réessayer la synchronisation": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer la synchronisation"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry sync"
+          }
+        }
+      }
+    },
+    "Les changements en attente restent sur cet appareil. Ils ne sont confirmés sur le compte qu’après synchronisation.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les changements en attente restent sur cet appareil. Ils ne sont confirmés sur le compte qu’après synchronisation."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pending changes stay on this device. They are confirmed on your account only after syncing."
+          }
+        }
+      }
+    },
+    "Chargement des favoris…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chargement des favoris…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading favorites…"
+          }
+        }
+      }
+    },
+    "La liste des favoris n’a pas pu être chargée.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La liste des favoris n’a pas pu être chargée."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The favorites list could not be loaded."
+          }
+        }
+      }
+    },
+    "Synchronisation en attente": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchronisation en attente"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting to sync"
+          }
+        }
+      }
+    },
+    "Charger les favoris": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Charger les favoris"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Load favorites"
+          }
+        }
+      }
+    },
+    "Synchronisation des favoris": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchronisation des favoris"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorites sync"
+          }
+        }
+      }
+    },
+    "Les changements restent en attente sur cet appareil.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les changements restent en attente sur cet appareil."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes remain pending on this device."
+          }
+        }
+      }
+    },
+    "Les favoris enregistrés sur cet appareil sont indisponibles. Réessaie avant de les modifier.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les favoris enregistrés sur cet appareil sont indisponibles. Réessaie avant de les modifier."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorites saved on this device are unavailable. Try again before changing them."
+          }
+        }
+      }
+    },
+    "Cette antenne ne peut pas être ajoutée aux favoris.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette antenne ne peut pas être ajoutée aux favoris."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This antenna cannot be added to favorites."
+          }
+        }
+      }
+    },
+    "Tu peux suivre au maximum 500 antennes. Retire un favori avant d’en ajouter un autre.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu peux suivre au maximum 500 antennes. Retire un favori avant d’en ajouter un autre."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can follow up to 500 antennas. Remove a favorite before adding another."
+          }
+        }
+      }
+    },
+    "Synchronise les modifications en attente avant d’en ajouter d’autres.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchronise les modifications en attente avant d’en ajouter d’autres."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync pending changes before adding more."
+          }
+        }
+      }
+    },
+    "Les derniers changements n’ont pas pu être enregistrés sur cet appareil. Réessaie avant de fermer l’app.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les derniers changements n’ont pas pu être enregistrés sur cet appareil. Réessaie avant de fermer l’app."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The latest changes could not be saved on this device. Try again before closing the app."
+          }
+        }
+      }
+    },
+    "Le compte est supprimé, mais le nettoyage des favoris locaux a échoué sur cet appareil.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le compte est supprimé, mais le nettoyage des favoris locaux a échoué sur cet appareil."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The account has been deleted, but local favorites could not be cleared from this device."
+          }
+        }
+      }
+    },
+    "Chargement des partages…": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chargement des partages…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading sharing settings…"
+          }
+        }
+      }
+    },
+    "Partages": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partages"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sharing"
+          }
+        }
+      }
+    },
+    "Préférences du compte": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Préférences du compte"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account preferences"
+          }
+        }
+      }
+    },
+    "Chargement des préférences…": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chargement des préférences…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading preferences…"
+          }
+        }
+      }
+    },
+    "Chargement des zones…": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chargement des zones…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading zones…"
+          }
+        }
+      }
+    },
+    "Aucune zone privée enregistrée. Ajoute un lieu à protéger.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune zone privée enregistrée. Ajoute un lieu à protéger."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No private zones saved. Add a place to protect."
+          }
+        }
+      }
+    },
+    "Créer une zone privée": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créer une zone privée"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a private zone"
+          }
+        }
+      }
+    },
+    "Les nouveaux speedtests sont protégés lorsqu’une zone est active et que son masquage est activé. Touche un lieu pour modifier son nom, sa position ou son rayon.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les nouveaux speedtests sont protégés lorsqu’une zone est active et que son masquage est activé. Touche un lieu pour modifier son nom, sa position ou son rayon."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New speedtests are protected when a zone is active and hiding is enabled. Tap a place to edit its name, location, or radius."
+          }
+        }
+      }
+    },
+    "Positions publiques exactes": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Positions publiques exactes"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Precise public locations"
+          }
+        }
+      }
+    },
+    "Modifier cette zone": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier cette zone"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit this zone"
+          }
+        }
+      }
+    },
+    "Protection de %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protection de %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protection for %@"
+          }
+        }
+      }
+    },
+    "Dernier état connu conservé.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dernier état connu conservé."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last known settings preserved."
+          }
+        }
+      }
+    },
+    "Cette zone n’est plus disponible. Actualise la liste.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette zone n’est plus disponible. Actualise la liste."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This zone is no longer available. Refresh the list."
+          }
+        }
+      }
+    },
+    "La session a changé. Rouvre les réglages de confidentialité.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La session a changé. Rouvre les réglages de confidentialité."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The session has changed. Reopen privacy settings."
+          }
+        }
+      }
+    },
+    "Nom de la zone": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nom de la zone"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zone name"
+          }
+        }
+      }
+    },
+    "Type de lieu": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type de lieu"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Place type"
+          }
+        }
+      }
+    },
+    "Lieu": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lieu"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Place"
+          }
+        }
+      }
+    },
+    "Carte de la zone privée": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carte de la zone privée"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Private zone map"
+          }
+        }
+      }
+    },
+    "Utiliser ma position": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utiliser ma position"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use my location"
+          }
+        }
+      }
+    },
+    "Saisir les coordonnées": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saisir les coordonnées"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter coordinates"
+          }
+        }
+      }
+    },
+    "Latitude": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latitude"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latitude"
+          }
+        }
+      }
+    },
+    "Longitude": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Longitude"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Longitude"
+          }
+        }
+      }
+    },
+    "Rayon": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rayon"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Radius"
+          }
+        }
+      }
+    },
+    "Rayon de la zone": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rayon de la zone"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zone radius"
+          }
+        }
+      }
+    },
+    "Position et rayon": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position et rayon"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location and radius"
+          }
+        }
+      }
+    },
+    "Touche la carte pour choisir le centre. Le cercle montre la zone à protéger ; vérifie sa position avant d’enregistrer.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Touche la carte pour choisir le centre. Le cercle montre la zone à protéger ; vérifie sa position avant d’enregistrer."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap the map to choose the center. The circle shows the zone to protect; check its location before saving."
+          }
+        }
+      }
+    },
+    "Protéger les nouveaux speedtests": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protéger les nouveaux speedtests"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protect new speedtests"
+          }
+        }
+      }
+    },
+    "Zone active": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zone active"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active zone"
+          }
+        }
+      }
+    },
+    "La protection est en pause tant que la zone est inactive.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La protection est en pause tant que la zone est inactive."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protection is paused while this zone is inactive."
+          }
+        }
+      }
+    },
+    "Protection": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protection"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protection"
+          }
+        }
+      }
+    },
+    "Supprimer cette zone": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer cette zone"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this zone"
+          }
+        }
+      }
+    },
+    "Nouvelle zone privée": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouvelle zone privée"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New private zone"
+          }
+        }
+      }
+    },
+    "Modifier la zone": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier la zone"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit zone"
+          }
+        }
+      }
+    },
+    "Supprimer cette zone privée ?": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer cette zone privée ?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this private zone?"
+          }
+        }
+      }
+    },
+    "Elle sera supprimée de ton compte sur iOS, Android et le web. Les nouveaux speedtests ne seront plus protégés par cette zone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elle sera supprimée de ton compte sur iOS, Android et le web. Les nouveaux speedtests ne seront plus protégés par cette zone."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It will be deleted from your account on iOS, Android, and the web. New speedtests will no longer be protected by this zone."
+          }
+        }
+      }
+    },
+    "Position récente indisponible. Choisis le centre sur la carte ou saisis ses coordonnées.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position récente indisponible. Choisis le centre sur la carte ou saisis ses coordonnées."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A recent location is unavailable. Choose the center on the map or enter its coordinates."
+          }
+        }
+      }
+    },
+    "École": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "École"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "School"
+          }
+        }
+      }
+    },
+    "Lieu fréquent": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lieu fréquent"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frequent place"
+          }
+        }
+      }
+    },
+    "Donne un nom à cette zone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Donne un nom à cette zone."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a name for this zone."
+          }
+        }
+      }
+    },
+    "Choisis une position valide pour cette zone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisis une position valide pour cette zone."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a valid location for this zone."
+          }
+        }
+      }
+    },
+    "Le rayon doit être compris entre 100 et 20 000 mètres.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le rayon doit être compris entre 100 et 20 000 mètres."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The radius must be between 100 and 20,000 meters."
+          }
+        }
+      }
+    },
+    "%lld visite": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld visite"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld visit"
+          }
+        }
+      }
+    },
+    "%lld visites": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld visites"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld visits"
+          }
+        }
+      }
+    },
+    "Lorsqu’une mesure est publiée, sa position disponible est exacte. Les zones privées actives peuvent protéger tes nouveaux speedtests.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lorsqu’une mesure est publiée, sa position disponible est exacte. Les zones privées actives peuvent protéger tes nouveaux speedtests."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When a measurement is published, its available location is exact. Active private zones can protect your new speed tests."
+          }
+        }
+      }
+    },
+    "Une zone active avec le masquage activé protège les nouveaux speedtests réalisés dans son rayon. La création d’une zone ne masque pas rétroactivement les mesures déjà publiées.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une zone active avec le masquage activé protège les nouveaux speedtests réalisés dans son rayon. La création d’une zone ne masque pas rétroactivement les mesures déjà publiées."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An active zone with hiding enabled protects new speed tests taken within its radius. Creating a zone does not retroactively hide measurements that have already been published."
+          }
+        }
+      }
+    },
+    "%@. Le réglage s'applique partout dans l'app et suit ton compte sur le web et Android.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@. Le réglage s'applique partout dans l'app et suit ton compte sur le web et Android."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@. This setting applies throughout the app and follows your account on the web and Android."
+          }
+        }
+      }
+    },
+    "Le statut de présence n’est pas encore chargé.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le statut de présence n’est pas encore chargé."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your presence status has not loaded yet."
+          }
+        }
+      }
+    },
+    "Carte publique": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carte publique"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Public map"
+          }
+        }
+      }
+    },
+    "Ce test ne dispose pas d’une position exploitable pour la carte.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce test ne dispose pas d’une position exploitable pour la carte."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This test has no usable location for the map."
+          }
+        }
+      }
+    },
+    "Ce test n’a pas de référence serveur disponible. Il peut être en attente de synchronisation ou provenir d’une ancienne version.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce test n’a pas de référence serveur disponible. Il peut être en attente de synchronisation ou provenir d’une ancienne version."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This test has no available server reference. It may be waiting to sync or come from an older app version."
+          }
+        }
+      }
+    },
+    "Ce test n’est pas éligible à la carte publique.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce test n’est pas éligible à la carte publique."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This test is not eligible for the public map."
+          }
+        }
+      }
+    },
+    "Ce test se trouve dans une zone privée et reste masqué. Tu peux gérer tes zones dans Confidentialité.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce test se trouve dans une zone privée et reste masqué. Tu peux gérer tes zones dans Confidentialité."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This test is in a private zone and remains hidden. You can manage your zones in Privacy."
+          }
+        }
+      }
+    },
+    "Enregistrement et vérification…": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrement et vérification…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saving and checking…"
+          }
+        }
+      }
+    },
+    "La protection de tes zones privées est indisponible. Réessaie plus tard.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La protection de tes zones privées est indisponible. Réessaie plus tard."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your private zones cannot be checked right now. Try again later."
+          }
+        }
+      }
+    },
+    "La publication est indisponible sous VPN. Le masquage reste possible.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La publication est indisponible sous VPN. Le masquage reste possible."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publishing is unavailable while using a VPN. Hiding a test remains available."
+          }
+        }
+      }
+    },
+    "La visibilité n’a pas pu être confirmée. Réessaie de la vérifier avant de modifier ce test.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La visibilité n’a pas pu être confirmée. Réessaie de la vérifier avant de modifier ce test."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visibility could not be confirmed. Check it again before changing this test."
+          }
+        }
+      }
+    },
+    "Le compte a changé. Rouvre la fiche depuis ton compte pour gérer ce test.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le compte a changé. Rouvre la fiche depuis ton compte pour gérer ce test."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The account has changed. Reopen this test from your account to manage it."
+          }
+        }
+      }
+    },
+    "Les tests invités se gèrent depuis Mes reçus.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les tests invités se gèrent depuis Mes reçus."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage guest tests in My receipts."
+          }
+        }
+      }
+    },
+    "Masquage confirmé. Ce test reste dans ton historique.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquage confirmé. Ce test reste dans ton historique."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hidden from the map. This test remains in your history."
+          }
+        }
+      }
+    },
+    "Masquer de la carte": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquer de la carte"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide from the map"
+          }
+        }
+      }
+    },
+    "Masquer un test le conserve dans ton historique. Sa publication reste soumise aux critères de la carte et à tes zones privées.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquer un test le conserve dans ton historique. Sa publication reste soumise aux critères de la carte et à tes zones privées."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiding a test keeps it in your history. Publishing remains subject to map eligibility and your private zones."
+          }
+        }
+      }
+    },
+    "Masqué de la carte": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masqué de la carte"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hidden from the map"
+          }
+        }
+      }
+    },
+    "Non éligible à la carte": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non éligible à la carte"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not eligible for the map"
+          }
+        }
+      }
+    },
+    "Position indisponible": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position indisponible"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location unavailable"
+          }
+        }
+      }
+    },
+    "Publication confirmée. Ce test est visible sur la carte publique.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publication confirmée. Ce test est visible sur la carte publique."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publication confirmed. This test is visible on the public map."
+          }
+        }
+      }
+    },
+    "Publier ce test": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publier ce test"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publish this test"
+          }
+        }
+      }
+    },
+    "Publier ce test ?": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publier ce test ?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publish this test?"
+          }
+        }
+      }
+    },
+    "Référence serveur indisponible": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Référence serveur indisponible"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server reference unavailable"
+          }
+        }
+      }
+    },
+    "Sa mesure et sa position enregistrée seront visibles sur la carte publique. Tes zones privées restent appliquées.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sa mesure et sa position enregistrée seront visibles sur la carte publique. Tes zones privées restent appliquées."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its measurement and recorded location will be visible on the public map. Your private zones still apply."
+          }
+        }
+      }
+    },
+    "Session modifiée": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session modifiée"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session changed"
+          }
+        }
+      }
+    },
+    "Seul le propriétaire peut modifier la visibilité de ce test.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seul le propriétaire peut modifier la visibilité de ce test."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only the owner can change this test’s visibility."
+          }
+        }
+      }
+    },
+    "Visibilité enregistrée. Ce test reste hors de la carte publique.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visibilité enregistrée. Ce test reste hors de la carte publique."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visibility saved. This test remains off the public map."
+          }
+        }
+      }
+    },
+    "Visibilité à vérifier": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visibilité à vérifier"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visibility needs checking"
+          }
+        }
+      }
+    },
+    "Visible sur la carte": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visible sur la carte"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visible on the map"
+          }
+        }
+      }
+    },
+    "Vérification de la visibilité…": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérification de la visibilité…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking visibility…"
+          }
+        }
+      }
+    },
+    "Vérifier la visibilité": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérifier la visibilité"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check visibility"
+          }
+        }
+      }
+    },
+    "Publication automatique": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publication automatique"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic publication"
+          }
+        }
+      }
+    },
+    "Les nouveaux speedtests cellulaires éligibles, avec une position disponible, sont publiés automatiquement à leur position exacte. La protection de tes zones privées est respectée. Les tests Wi-Fi et sous VPN restent dans l’historique. Les anciennes mesures privées conservent leur visibilité.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les nouveaux speedtests cellulaires éligibles, avec une position disponible, sont publiés automatiquement à leur position exacte. La protection de tes zones privées est respectée. Les tests Wi-Fi et sous VPN restent dans l’historique. Les anciennes mesures privées conservent leur visibilité."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New eligible cellular speedtests with an available location are published automatically at their exact location. Your private zones remain protected. Wi-Fi and VPN tests stay in your history. Existing private measurements keep their visibility."
+          }
+        }
+      }
+    },
+    "L’enregistrement de couverture n’est plus disponible sur iOS.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’enregistrement de couverture n’est plus disponible sur iOS."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coverage recording is no longer available on iOS."
+          }
+        }
+      }
+    },
+    "Des speedtests pendant ton trajet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Des speedtests pendant ton trajet"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speedtests along your route"
+          }
+        }
+      }
+    },
+    "Les tests suivent la distance et le plafond choisis. Les résultats gardent leur position ; aucune collecte de couverture.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les tests suivent la distance et le plafond choisis. Les résultats gardent leur position ; aucune collecte de couverture."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tests follow your chosen distance and data limit. Results keep their location; coverage is not recorded."
+          }
+        }
+      }
+    },
+    "Démarrer le Drive Test": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrer le Drive Test"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Drive Test"
+          }
+        }
+      }
+    },
+    "Le Drive Test a besoin de ta position pour placer les speedtests sur le trajet. Active la localisation dans les Réglages, puis relance.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le Drive Test a besoin de ta position pour placer les speedtests sur le trajet. Active la localisation dans les Réglages, puis relance."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drive Test needs your location to place speedtests along the route. Enable location in Settings, then try again."
+          }
+        }
+      }
+    },
+    "L’opérateur ne peut pas être confirmé. Les résultats restent disponibles dans ton historique.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’opérateur ne peut pas être confirmé. Les résultats restent disponibles dans ton historique."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The operator cannot be confirmed. Results remain available in your history."
+          }
+        }
+      }
+    },
+    "Nombre de tests": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nombre de tests"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Number of tests"
+          }
+        }
+      }
+    },
+    "Trajet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trajet"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Route"
+          }
+        }
+      }
+    },
+    "Serveur et durée": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serveur et durée"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server and duration"
+          }
+        }
+      }
+    },
+    "Un seul test, ou plusieurs tests à la suite. Choisis Trajet pour les espacer selon la distance.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un seul test, ou plusieurs tests à la suite. Choisis Trajet pour les espacer selon la distance."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run one test or several in a row. Choose Route to space tests by distance."
+          }
+        }
+      }
+    },
+    "Mode trajet : les tests continuent selon la distance choisie, jusqu’à l’arrêt ou au plafond de données.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode trajet : les tests continuent selon la distance choisie, jusqu’à l’arrêt ou au plafond de données."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Route mode: tests continue at the chosen distance until you stop or reach the data limit."
+          }
+        }
+      }
+    },
+    "500 Mo": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "500 Mo"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "500 MB"
+          }
+        }
+      }
+    },
+    "2 Go": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2 Go"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2 GB"
+          }
+        }
+      }
+    },
+    "5,12 Go": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5,12 Go"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5.12 GB"
+          }
+        }
+      }
+    },
+    "Le Drive Test enchaîne des tests de débit pendant ton trajet, selon la distance et le plafond de données choisis.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le Drive Test enchaîne des tests de débit pendant ton trajet, selon la distance et le plafond de données choisis."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drive Test runs speed tests along your route using your chosen distance and data limit."
+          }
+        }
+      }
+    },
+    "Des résultats, sans collecte de couverture": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Des résultats, sans collecte de couverture"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Results without coverage recording"
+          }
+        }
+      }
+    },
+    "Chaque speedtest garde ses débits, sa latence et sa position. Le suivi du trajet sert à espacer les tests ; aucun enregistrement de couverture n’est créé.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chaque speedtest garde ses débits, sa latence et sa position. Le suivi du trajet sert à espacer les tests ; aucun enregistrement de couverture n’est créé."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Each speedtest keeps its speeds, latency and location. Route tracking spaces the tests; no coverage recording is created."
+          }
+        }
+      }
+    },
+    "La position exacte de chaque speedtest": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La position exacte de chaque speedtest"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The exact location of each speedtest"
+          }
+        }
+      }
+    },
+    "Les nouveaux speedtests éligibles sont publiés à leur position exacte. Tes zones privées restent protégées ; tu peux masquer un résultat depuis ton historique.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les nouveaux speedtests éligibles sont publiés à leur position exacte. Tes zones privées restent protégées ; tu peux masquer un résultat depuis ton historique."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New eligible speedtests are published at their exact location. Your private zones remain protected; you can hide a result from your history."
+          }
+        }
+      }
+    },
+    "Les anciens brouillons de couverture restent sur cet appareil et ne sont plus envoyés automatiquement.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les anciens brouillons de couverture restent sur cet appareil et ne sont plus envoyés automatiquement."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing coverage drafts stay on this device and are no longer uploaded automatically."
+          }
+        }
+      }
+    },
+    "Un VPN empêche une attribution fiable de l’opérateur. Les mesures sous VPN ne sont pas publiées.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un VPN empêche une attribution fiable de l’opérateur. Les mesures sous VPN ne sont pas publiées."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A VPN prevents reliable operator attribution. Measurements made under a VPN are not published."
+          }
+        }
+      }
+    },
+    "iPerf3 · Amérique du Nord": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPerf3 · Amérique du Nord"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPerf3 · North America"
+          }
+        }
+      }
+    },
+    "Distance entre tests": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distance entre tests"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distance between tests"
+          }
+        }
+      }
+    },
+    "Sans limite": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sans limite"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlimited"
+          }
+        }
+      }
+    },
+    "Ouvrir le Drive Test": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir le Drive Test"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Drive Test"
+          }
+        }
+      }
+    },
+    "La session a changé. Rouvre la configuration depuis les réglages du compte.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La session a changé. Rouvre la configuration depuis les réglages du compte."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your session has changed. Reopen setup from your account settings."
+          }
+        }
+      }
+    },
+    "La configuration reçue est invalide. Réessaie pour obtenir un nouveau secret.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La configuration reçue est invalide. Réessaie pour obtenir un nouveau secret."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The setup received is invalid. Try again to get a new secret."
+          }
+        }
+      }
+    },
+    "Le code est incorrect. Saisis les six chiffres affichés dans ton application d’authentification.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le code est incorrect. Saisis les six chiffres affichés dans ton application d’authentification."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The code is incorrect. Enter the six digits shown in your authenticator app."
+          }
+        }
+      }
+    },
+    "Cette configuration a expiré. Génère un nouveau QR code avant de réessayer.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette configuration a expiré. Génère un nouveau QR code avant de réessayer."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This setup has expired. Generate a new QR code before trying again."
+          }
+        }
+      }
+    },
+    "Cette configuration a été remplacée. Génère un nouveau QR code.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette configuration a été remplacée. Génère un nouveau QR code."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This setup has been replaced. Generate a new QR code."
+          }
+        }
+      }
+    },
+    "La double authentification est déjà activée pour ce compte. Actualise son état.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La double authentification est déjà activée pour ce compte. Actualise son état."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Two-factor authentication is already enabled for this account. Refresh its status."
+          }
+        }
+      }
+    },
+    "L’activation n’a pas pu être confirmée. Réessaie avec un nouveau code.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’activation n’a pas pu être confirmée. Réessaie avec un nouveau code."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activation could not be confirmed. Try again with a new code."
+          }
+        }
+      }
+    },
+    "Le profil ne reflète pas encore l’activation. Réessaie l’actualisation du compte.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le profil ne reflète pas encore l’activation. Réessaie l’actualisation du compte."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The profile does not yet reflect the activation. Try refreshing the account again."
+          }
+        }
+      }
+    },
+    "Préparation de la configuration…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Préparation de la configuration…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing setup…"
+          }
+        }
+      }
+    },
+    "Le secret sera disponible ici pour ton application d’authentification.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le secret sera disponible ici pour ton application d’authentification."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The secret will appear here for your authenticator app."
+          }
+        }
+      }
+    },
+    "Générer un nouveau QR code": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Générer un nouveau QR code"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generate a new QR code"
+          }
+        }
+      }
+    },
+    "Ajoute SignalQuest à ton application d’authentification, puis saisis le code qu’elle affiche.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajoute SignalQuest à ton application d’authentification, puis saisis le code qu’elle affiche."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add SignalQuest to your authenticator app, then enter the code it displays."
+          }
+        }
+      }
+    },
+    "Copier le secret": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copier le secret"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy secret"
+          }
+        }
+      }
+    },
+    "Code de vérification": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code de vérification"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verification code"
+          }
+        }
+      }
+    },
+    "La double authentification est activée.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La double authentification est activée."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Two-factor authentication is enabled."
+          }
+        }
+      }
+    },
+    "La double authentification est déjà active.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La double authentification est déjà active."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Two-factor authentication is already enabled."
+          }
+        }
+      }
+    },
+    "Actualisation du compte…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualisation du compte…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refreshing account…"
+          }
+        }
+      }
+    },
+    "Ton compte reste protégé. Seule l’actualisation de son affichage doit être réessayée.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ton compte reste protégé. Seule l’actualisation de son affichage doit être réessayée."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your account remains protected. Only refreshing its displayed status needs to be retried."
+          }
+        }
+      }
+    },
+    "Actualiser le compte": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualiser le compte"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh account"
+          }
+        }
+      }
+    },
+    "Terminer": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminer"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
+    "La désactivation n’a pas pu être confirmée. Actualise le compte avant de réessayer.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deactivation could not be confirmed. Refresh your account before trying again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La désactivation n’a pas pu être confirmée. Actualise le compte avant de réessayer."
           }
         }
       }

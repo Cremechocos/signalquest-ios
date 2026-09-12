@@ -29,15 +29,6 @@ struct SpeedtestView: View {
     /// part de la cible, comme `libreSpeedHost` : la cible dit QUEL moteur, celui-ci
     /// dit LEQUEL de ses serveurs.
     @AppStorage("speedtest_iperf_server_id") private var iperfServerId = ""
-    /// Publication sur la carte communautaire publique. Opt-in explicite, mémorisé
-    /// localement, et jamais publié sous VPN. La précision publique dépend ensuite
-    /// du réglage global de confidentialité côté serveur.
-    @AppStorage("speedtest_publish_to_map") private var publishToMap = false
-    @AppStorage(MeasurementPrivacySettings.shareExactMeasurementsKey) private var shareExactMeasurements = false
-    /// Les choix invités sont volontairement éphémères : chaque nouvelle session
-    /// redemande le consentement de publication et de précision.
-    @State private var guestPublishToMap = false
-    @State private var guestShareExactLocation = false
     /// Nombre de tests enchaînés en rafale (1 = test simple).
     @AppStorage("speedtest_burst_count") private var burstCount = 1
     /// Distance à parcourir entre deux speedtests d'un Drive Test. Espacer par la
@@ -59,7 +50,6 @@ struct SpeedtestView: View {
     @State private var burstProgress: (index: Int, total: Int)?
     @State private var burstSummary: SpeedtestBurstSummary?
     /// Vrai pendant une session continue (∞) : adapte les libellés (pill, résumé).
-    @State private var sessionIsContinuous = false
     /// Sentinelle `burstCount` = mode continu illimité (drive test).
     private static let continuousBurst = 0
     @State private var history: [SpeedtestRunResult] = []
@@ -69,10 +59,6 @@ struct SpeedtestView: View {
     @State private var runErrorMessage: String?
     /// Test de l'historique ouvert en fiche détaillée.
     @State private var detailResult: SpeedtestRunResult?
-    /// Id serveur du test ouvert : sans lui, pas de publication possible.
-    @State private var detailServerId: String?
-    @State private var isPublishingDetail = false
-    @State private var publishFeedback: String?
     @State private var runTask: Task<Void, Never>?
     /// Identité de la session propriétaire de l'état partagé. Une tâche annulée
     /// peut terminer après qu'une nouvelle session a démarré ; elle ne doit alors
@@ -110,28 +96,6 @@ struct SpeedtestView: View {
 
     init(guestMode: Bool = false) {
         self.guestMode = guestMode
-    }
-
-    private var mapPublicationEnabled: Bool {
-        guestMode ? guestPublishToMap : publishToMap
-    }
-
-    private var exactLocationEnabled: Bool {
-        mapPublicationEnabled && (guestMode ? guestShareExactLocation : shareExactMeasurements)
-    }
-
-    private var mapPublicationBinding: Binding<Bool> {
-        Binding(
-            get: { mapPublicationEnabled },
-            set: { enabled in
-                if guestMode {
-                    guestPublishToMap = enabled
-                    if !enabled { guestShareExactLocation = false }
-                } else {
-                    publishToMap = enabled
-                }
-            }
-        )
     }
 
     /// Fournisseur affiché dans le bandeau, lié au chemin réellement mesuré.
@@ -254,23 +218,10 @@ struct SpeedtestView: View {
                     router.pendingMapFocus = coordinate
                     router.selectedTab = .map
                 },
-                // Publication : uniquement quand elle peut RÉELLEMENT aboutir.
-                // Un compte (la route exige une auth), un id serveur mémorisé,
-                // une position à cartographier, et pas de VPN (l'opérateur du
-                // tunnel n'est pas celui qu'on mesure). Sinon aucun bouton,
-                // plutôt qu'un bouton qui échouerait.
-                onPublish: canPublish(item) ? { publishDetail(item) } : nil,
-                isPublishing: isPublishingDetail
+                visibilityService: services.speedtest,
+                guestMode: guestMode
             )
-            .task { detailServerId = await services.speedtest.serverId(forClientId: item.id) }
-        }
-        .alert("Publication", isPresented: Binding(
-            get: { publishFeedback != nil },
-            set: { if !$0 { publishFeedback = nil } }
-        )) {
-            Button("OK", role: .cancel) { publishFeedback = nil }
-        } message: {
-            Text(publishFeedback ?? "")
+            .id(item.id)
         }
         .sheet(isPresented: $showSettings) { settingsSheet }
         .sheet(isPresented: $showLocationPriming) {
@@ -350,10 +301,12 @@ struct SpeedtestView: View {
                     headerButton(systemImage: "location.north.line.fill", label: "Mode Drive Test") {
                         showDriveTest = true
                     }
+                    .accessibilityIdentifier("speedtest.driveTest")
                     Spacer()
                     headerButton(systemImage: "slider.horizontal.3", label: "Réglages du test") {
                         showSettings = true
                     }
+                    .accessibilityIdentifier("speedtest.settings")
                 }
                 Text("Speedtest")
                     .font(SQType.title)
@@ -410,7 +363,7 @@ struct SpeedtestView: View {
 
     private var primaryButtonTitle: String {
         if burstCount == Self.continuousBurst {
-            return String(localized: "Lancer en continu")
+            return String(localized: "Ouvrir le Drive Test")
         }
         if burstCount > 1 {
             return result == nil ? "Lancer la rafale ×\(burstCount)" : "Relancer la rafale ×\(burstCount)"
@@ -550,8 +503,8 @@ struct SpeedtestView: View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack(alignment: .center) {
                 Label(
-                    "\(sessionIsContinuous ? "Session continue" : "Rafale") — \(s.count) test",
-                    systemImage: sessionIsContinuous ? "infinity" : "bolt.fill"
+                    "\(String(localized: "Rafale")) — \(s.count) test",
+                    systemImage: "bolt.fill"
                 )
                     .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
@@ -604,7 +557,7 @@ struct SpeedtestView: View {
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 chipRow(
                     title: "Plafond de données",
-                    options: [(500, "500 Mo"), (2_000, "2 Go"), (5_120, "5 Go"), (0, "∞")],
+                    options: [(500, String(localized: "500 Mo")), (2_000, String(localized: "2 Go")), (5_120, String(localized: "5,12 Go")), (0, "∞")],
                     selection: $driveDataCapMB
                 )
                 Text("Un speedtest consomme son débit × sa durée : environ 375 Mo à 300 Mb/s sur 10 s. La session s'arrête proprement au plafond et te le dit.")
@@ -669,6 +622,25 @@ struct SpeedtestView: View {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
                     SQSheetHandle()
                     VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+                        VStack(alignment: .leading, spacing: SQSpace.sm) {
+                            Text("Nombre de tests").foregroundStyle(SQColor.label)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: SQSpace.sm) {
+                                    chipButtons(options: [(1, "1"), (3, "3"), (5, "5"), (10, "10"),
+                                        (Self.continuousBurst, String(localized: "Trajet"))], selection: $burstCount)
+                                }
+                            }
+                        }
+                        Text(burstCount == Self.continuousBurst
+                             ? String(localized: "Mode trajet : les tests continuent selon la distance choisie, jusqu’à l’arrêt ou au plafond de données.")
+                             : String(localized: "Un seul test, ou plusieurs tests à la suite. Choisis Trajet pour les espacer selon la distance."))
+                            .font(.caption).foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if burstCount == Self.continuousBurst {
+                            driveTestBudgetSection
+                                .accessibilityIdentifier("speedtest.settings.route")
+                        }
+                        DisclosureGroup("Serveur et durée") {
                         Text("Serveur de test")
                             .font(SQFont.archivo(15, .bold))
                             .foregroundStyle(SQColor.label)
@@ -709,80 +681,20 @@ struct SpeedtestView: View {
                             .tint(SQColor.brandRed)
                         }
 
-                        // Streams et « mode fiabilité » ne sont plus exposés :
-                        // le moteur utilise d'office le multi-stream maximal
-                        // (16 DL / 12 UL) avec reprise automatique — les presets
-                        // manuels (1×/4×) produisaient des mesures faussement
-                        // basses sans bénéfice utilisateur.
-
-                        VStack(alignment: .leading, spacing: SQSpace.xs) {
-                            HStack {
-                                Text("Rafale")
-                                    .foregroundStyle(SQColor.label)
-                                Spacer()
-                                ForEach([1, 3, 5, 10], id: \.self) { value in
-                                    Button {
-                                        burstCount = value
-                                        Haptics.selection()
-                                    } label: {
-                                        Text(value == 1 ? "1" : "×\(value)")
-                                            .font(.caption.weight(.bold))
-                                            .frame(minWidth: 44, minHeight: 44)
-                                            .padding(.vertical, SQSpace.xs + 3)
-                                            .background(burstCount == value ? SQColor.brandRed : SQColor.fill, in: Capsule(style: .continuous))
-                                            .foregroundStyle(burstCount == value ? SQColor.onAccent : SQColor.label)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                // Mode continu illimité (drive test) : sentinelle burstCount == 0.
-                                Button {
-                                    burstCount = Self.continuousBurst
-                                    Haptics.selection()
-                                } label: {
-                                    Image(systemName: "infinity")
-                                        .font(.caption.weight(.bold))
-                                        .frame(minWidth: 44, minHeight: 44)
-                                        .padding(.vertical, SQSpace.xs + 3)
-                                        .background(burstCount == Self.continuousBurst ? SQColor.brandRed : SQColor.fill, in: Capsule(style: .continuous))
-                                        .foregroundStyle(burstCount == Self.continuousBurst ? SQColor.onAccent : SQColor.label)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            Text("Enchaîne plusieurs tests d'affilée. « ∞ » lance un mode continu (drive test) : tests illimités jusqu'à l'arrêt, position suivie en continu, poursuite écran verrouillé.")
-                                .font(.caption)
-                                .foregroundStyle(SQColor.labelSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
                         }
-
-                        Divider().overlay(SQColor.separator)
-
-                        driveTestBudgetSection
+                        .accessibilityIdentifier("speedtest.settings.advanced")
 
                         Divider().overlay(SQColor.separator)
 
                         VStack(alignment: .leading, spacing: SQSpace.xs) {
-                            Toggle(isOn: mapPublicationBinding) {
-                                Text("Publier sur la carte communautaire")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(SQColor.label)
-                            }
-                            .tint(SQColor.brandRed)
-                            // Précision indispensable depuis que le Drive Test
-                            // publie systématiquement : sans elle, ce réglage
-                            // laisserait croire qu'il couvre AUSSI les trajets.
-                            Text(guestMode
-                                 ? "Désactivé par défaut et redemandé à chaque visite invitée. La mesure et l’opérateur deviennent publics. Ne concerne pas le Drive Test, qui publie toujours."
-                                 : "Désactivé par défaut, et ne concerne que les tests lancés depuis cet écran : un Drive Test publie toujours, c'est sa raison d'être. Si tu l’actives, ta mesure et ton opérateur deviennent publics ; la position reste floutée sauf consentement séparé dans Confidentialité.")
+                            Text("Publication automatique")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(SQColor.label)
+                            Text("Les nouveaux speedtests cellulaires éligibles, avec une position disponible, sont publiés automatiquement à leur position exacte. La protection de tes zones privées est respectée. Les tests Wi-Fi et sous VPN restent dans l’historique. Les anciennes mesures privées conservent leur visibilité.")
                                 .font(.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
-                            if guestMode && guestPublishToMap {
-                                Toggle("Partager ma position exacte pour ce test", isOn: $guestShareExactLocation)
-                                    .font(.subheadline.weight(.semibold))
-                                Text("Facultatif et valable uniquement pour ce test. Sans ce choix, le serveur publie une position floutée.")
-                                    .font(.caption)
-                                    .foregroundStyle(SQColor.labelSecondary)
-                            }
+                                .accessibilityIdentifier("speedtest.publication.info")
                         }
                     }
                     .padding(SQSpace.lg)
@@ -791,6 +703,7 @@ struct SpeedtestView: View {
                 }
                 .padding(SQSpace.lg)
             }
+            .accessibilityIdentifier("speedtest.settings.scroll")
             .signalQuestBackground()
             .navigationTitle("Réglages")
             .navigationBarTitleDisplayMode(.inline)
@@ -848,16 +761,10 @@ struct SpeedtestView: View {
         runTask != nil
     }
 
-    /// Badge sous la valeur du cadran une fois le test terminé : confirme la
-    /// publication communautaire quand elle a réellement été demandée (opt-in,
-    /// hors VPN, sans erreur de sync), sinon simple confirmation de fin.
+    /// Le succès de la mesure ne prouve pas sa visibilité publique : zones,
+    /// éligibilité et état serveur sont vérifiés dans la fiche détaillée.
     private var dialCompletionLabel: String? {
         guard case .finished = phase else { return nil }
-        // N'annoncer « publié sur la carte » que si le test a réellement une position
-        // (un test sans coordonnée ne peut PAS être cartographié — TEL-04).
-        if errorMessage == nil, mapPublicationEnabled, !isVPNActive, result?.coordinate != nil {
-            return String(localized: "publié sur la carte ✓")
-        }
         return String(localized: "test terminé ✓")
     }
 
@@ -913,6 +820,10 @@ struct SpeedtestView: View {
     // MARK: - Lifecycle
 
     private func start() {
+        if burstCount == Self.continuousBurst {
+            showDriveTest = true
+            return
+        }
         // Priming des permissions : si la localisation n'a jamais été demandée, on
         // explique POURQUOI avant de déclencher le prompt système (cf. audit UX-01).
         if !AppEnvironment.runsSpeedtestQA, services.location.authorizationStatus == .notDetermined {
@@ -922,13 +833,13 @@ struct SpeedtestView: View {
         }
         // ONB-SEC-01 : localisation refusée + publication carte active → proposer un
         // retour vers les Réglages plutôt que de lancer sans position en silence.
-        if !AppEnvironment.runsSpeedtestQA, mapPublicationEnabled,
+        if !AppEnvironment.runsSpeedtestQA,
            services.location.authorizationStatus == .denied || services.location.authorizationStatus == .restricted {
             primingDenied = true
             showLocationPriming = true
             return
         }
-        let requestLocation = !AppEnvironment.runsSpeedtestQA && (!guestMode || mapPublicationEnabled)
+        let requestLocation = !AppEnvironment.runsSpeedtestQA
         dispatchConfiguredRun(requestLocation: requestLocation)
     }
 
@@ -937,7 +848,7 @@ struct SpeedtestView: View {
     /// `performRun` en dur — ignorant la config rafale/continu au 1er test (UXP-07).
     private func dispatchConfiguredRun(requestLocation: Bool) {
         if burstCount == Self.continuousBurst {
-            performContinuousSession(requestLocation: requestLocation)
+            showDriveTest = true
         } else if burstCount > 1 {
             performBurst(count: burstCount, requestLocation: requestLocation)
         } else {
@@ -1044,8 +955,8 @@ struct SpeedtestView: View {
             try await services.speedtest.save(
                 measured,
                 streams: settings.streams,
-                publishToMap: mapPublicationEnabled && !isVPNActive,
-                shareExactLocation: exactLocationEnabled && !isVPNActive
+                publishToMap: !isVPNActive,
+                shareExactLocation: !isVPNActive
             )
         } catch is CancellationError {
             throw CancellationError()
@@ -1071,35 +982,6 @@ struct SpeedtestView: View {
         return measured
     }
 
-    /// La publication n'est proposée que si elle peut aboutir : compte requis
-    /// (la route PATCH rejette les invités), id serveur mémorisé à l'envoi,
-    /// position à cartographier, et hors VPN.
-    private func canPublish(_ result: SpeedtestRunResult) -> Bool {
-        !guestMode
-            && detailServerId != nil
-            && result.coordinate != nil
-            && !isVPNActive
-    }
-
-    private func publishDetail(_ result: SpeedtestRunResult) {
-        guard !isPublishingDetail else { return }
-        isPublishingDetail = true
-        Task {
-            do {
-                try await services.speedtest.publishOnMap(
-                    clientId: result.id,
-                    shareExactLocation: exactLocationEnabled
-                )
-                Haptics.success()
-                publishFeedback = "Test publié sur la carte."
-            } catch {
-                Haptics.warning()
-                publishFeedback = error.localizedDescription
-            }
-            isPublishingDetail = false
-        }
-    }
-
     private func performRun(requestLocation: Bool) {
         Haptics.light()
         errorMessage = nil
@@ -1107,7 +989,6 @@ struct SpeedtestView: View {
         networkAbortMessage = nil
         burstProgress = nil
         burstSummary = nil
-        sessionIsContinuous = false
         background.begin(name: "speedtest")
         liveActivity.start(serverName: "SignalQuest", network: services.networkPath.status.displayName)
         let sessionID = UUID()
@@ -1159,7 +1040,6 @@ struct SpeedtestView: View {
         runErrorMessage = nil
         networkAbortMessage = nil
         burstSummary = nil
-        sessionIsContinuous = false
         let total = max(2, min(count, 20))
         burstProgress = (1, total)
         background.begin(name: "speedtest-burst")
@@ -1241,78 +1121,6 @@ struct SpeedtestView: View {
         }
     }
 
-    /// Mode continu illimité (drive test) : enchaîne les speedtests jusqu'à l'arrêt
-    /// manuel, en re-géolocalisant à chaque test. Le suivi de localisation continu
-    /// maintient l'app active écran verrouillé. Agrège la session en O(1) (sans
-    /// retenir chaque résultat) et empêche la veille de l'écran au premier plan.
-    private func performContinuousSession(requestLocation: Bool) {
-        Haptics.light()
-        errorMessage = nil
-        runErrorMessage = nil
-        networkAbortMessage = nil
-        burstSummary = nil
-        sessionIsContinuous = true
-        burstProgress = (1, 0) // total = 0 → session illimitée
-        background.begin(name: "speedtest-continuous")
-        if requestLocation { services.location.startTracking() }
-        UIApplication.shared.isIdleTimerDisabled = true
-        liveActivity.start(serverName: "SignalQuest", network: services.networkPath.status.displayName, runIndex: 1, runTotal: 0)
-        let sessionID = UUID()
-        runSessionID = sessionID
-        runTask = Task {
-            var accumulator = ContinuousSessionAccumulator()
-            var index = 0
-            loop: while !Task.isCancelled {
-                index += 1
-                burstProgress = (index, 0)
-                do {
-                    // Drive test : on re-géolocalise à CHAQUE test (pas seulement le 1er).
-                    let measured = try await executeRun(
-                        requestLocation: requestLocation,
-                        runIndex: index,
-                        runTotal: 0,
-                        sessionID: sessionID
-                    )
-                    guard runSessionID == sessionID else { return }
-                    accumulator.add(measured)
-                    burstSummary = accumulator.summary(truncatedAt: nil)
-                } catch is CancellationError {
-                    guard runSessionID == sessionID else { return }
-                    break loop
-                } catch {
-                    guard runSessionID == sessionID else { return }
-                    // Un test raté n'interrompt pas la session : on note et on continue.
-                    errorMessage = error.localizedDescription
-                    Haptics.warning()
-                }
-                // Pause entre tests ; en arrière-plan le suivi de localisation garde
-                // l'app active (on renouvelle l'assertion par sécurité).
-                if scenePhase == .active {
-                    try? await Task.sleep(nanoseconds: 700_000_000)
-                } else {
-                    background.renew(name: "speedtest-continuous")
-                }
-            }
-            guard runSessionID == sessionID else { return }
-            if accumulator.count > 0 {
-                burstSummary = accumulator.summary(truncatedAt: nil)
-            }
-            // Une session continue se termine toujours par un arrêt (manuel/réseau).
-            liveActivity.cancel()
-            handleCancellation()
-            services.location.stopTracking()
-            UIApplication.shared.isIdleTimerDisabled = false
-            background.end()
-            burstProgress = nil
-            runTask = nil
-            runSessionID = nil
-            runStartConnection = nil
-            runStartNetworkDisplayName = nil
-            networkAbortMessage = nil
-            exitAfterQASpeedtestIfNeeded()
-        }
-    }
-
     private func shouldStopBurstForBackgroundLimit() -> Bool {
         guard scenePhase != .active else { return false }
         let remaining = background.remainingSeconds
@@ -1351,11 +1159,6 @@ struct SpeedtestView: View {
         // dernière valeur mesurée au lieu de retomber.
         liveMbps = 0
         burstProgress = nil
-        if sessionIsContinuous {
-            services.location.stopTracking()
-            UIApplication.shared.isIdleTimerDisabled = false
-            sessionIsContinuous = false
-        }
         // `stop()` n'éteignait ni la Live Activity ni la tâche de fond : elles ne
         // s'arrêtaient qu'au `catch is CancellationError` du moteur, c'est-à-dire
         // après que tout le pipeline se soit déroulé. Entre les deux, l'Île
@@ -1392,11 +1195,6 @@ struct SpeedtestView: View {
         liveProgress = SpeedtestLiveProgress(phase: .failed(message))
         liveMbps = 0
         burstProgress = nil
-        if sessionIsContinuous {
-            services.location.stopTracking()
-            UIApplication.shared.isIdleTimerDisabled = false
-            sessionIsContinuous = false
-        }
         liveActivity.cancel()
         background.end()
         Haptics.warning()

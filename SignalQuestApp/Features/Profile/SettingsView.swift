@@ -1378,10 +1378,6 @@ final class SettingsViewModel: ObservableObject {
         do { prefs = try await userService.updateNotificationPreferences(prefs) } catch { errorMessage = error.localizedDescription }
     }
 
-    func disable2FA(code: String) async {
-        do { try await authService.disable2FA(code: code) } catch { errorMessage = error.localizedDescription }
-    }
-
     func loadAccountDeletionPreview() async {
         isDeletionPreviewLoading = true
         deletionError = nil
@@ -1424,12 +1420,16 @@ struct SettingsView: View {
     @StateObject private var model: SettingsViewModel
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var services: AppServices
-    @State private var show2FASetup = false
+    @State private var twoFactorEnrollment: TwoFactorEnrollmentService?
+    @State private var twoFactorDisable: TwoFactorEnrollmentService?
+    @State private var isDisabling2FA = false
     @State private var show2FADisable = false
     @State private var disable2FACode = ""
     @State private var showDeleteConfirm = false
     @AppStorage(MapBackdrop.storageKey) private var mapBackdropRaw = MapBackdrop.applePlan.rawValue
     @AppStorage(AppLockSettings.enabledKey) private var appLockEnabled = false
+    @State private var canAuthenticateDeviceOwner = BiometricAuth.canAuthenticateDeviceOwner
+    @StateObject private var appLockSetup = AppLockSetupController()
     @AppStorage(AppLockSettings.lockGraceKey) private var lockGraceSeconds = 0.0
     @AppStorage(SQOledPalette.storageKey) private var pureBlack = false
     @AppStorage(SQFieldMode.storageKey) private var fieldMode = false
@@ -1467,13 +1467,25 @@ struct SettingsView: View {
             Section {
                 if twoFactorEnabled {
                     Button(role: .destructive) {
+                        guard case .authenticated(let user) = session.state,
+                              let operation = TwoFactorEnrollmentService(api: services.api, userID: user.id) else {
+                            model.errorMessage = TwoFactorEnrollmentError.sessionChanged.localizedDescription
+                            return
+                        }
+                        twoFactorDisable = operation
                         show2FADisable = true
                     } label: {
                         settingsLabel("Désactiver la 2FA", systemImage: "lock.open")
                     }
+                    .disabled(isDisabling2FA)
                 } else {
                     Button {
-                        show2FASetup = true
+                        guard case .authenticated(let user) = session.state,
+                              let enrollment = TwoFactorEnrollmentService(api: services.api, userID: user.id) else {
+                            model.errorMessage = TwoFactorEnrollmentError.sessionChanged.localizedDescription
+                            return
+                        }
+                        twoFactorEnrollment = enrollment
                     } label: {
                         settingsLabel("Activer la 2FA", systemImage: "lock.shield")
                     }
@@ -1538,23 +1550,25 @@ struct SettingsView: View {
                 Text("CarPlay")
             }
             .listRowBackground(SQColor.surface)
-            if BiometricAuth.isAvailable {
+            Group {
                 Section {
                     Toggle(isOn: Binding(
                         get: { appLockEnabled },
                         set: { newValue in
-                            guard newValue else { appLockEnabled = false; return }
-                            // Confirme par biométrie avant d'activer (évite de se
-                            // verrouiller dehors si Face ID ne marche pas).
-                            Task {
-                                let ok = await BiometricAuth.authenticate(
-                                    reason: "Confirme \(BiometricAuth.kind.label) pour activer le verrouillage"
-                                )
-                                appLockEnabled = ok
-                            }
+                            appLockSetup.setEnabled(newValue, credentials: services.api.credentials)
                         }
                     )) {
-                        settingsLabel("Verrouiller avec \(BiometricAuth.kind.label)", systemImage: BiometricAuth.kind.systemImage)
+                        settingsLabel("Verrouiller SignalQuest", systemImage: "lock.shield")
+                    }
+                    .accessibilityIdentifier("settings.app-lock")
+                    .disabled(appLockSetup.isConfirming || (!canAuthenticateDeviceOwner && !appLockEnabled))
+                    if !canAuthenticateDeviceOwner && !appLockEnabled {
+                        Text("Configure un code pour l’appareil dans les Réglages iOS afin d’activer le verrouillage.")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    if let appLockError = appLockSetup.errorMessage {
+                        Text(appLockError).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
                     }
                     if appLockEnabled {
                         Picker(selection: $lockGraceSeconds) {
@@ -1586,7 +1600,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Verrouillage")
                 } footer: {
-                    Text("Exige \(BiometricAuth.kind.label) à l’ouverture après le délai d’inactivité choisi. La déconnexion automatique efface la session après une inactivité prolongée.")
+                    Text("Protège l’ouverture avec la biométrie ou le code de l’appareil après le délai choisi. Le contenu est masqué dans le sélecteur d’apps, même pendant ce délai. La déconnexion automatique efface la session après une inactivité prolongée.")
                         .font(SQType.caption)
                 }
                 .tint(SQColor.brandRed)
@@ -1789,6 +1803,16 @@ struct SettingsView: View {
         .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Réglages")
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            canAuthenticateDeviceOwner = BiometricAuth.canAuthenticateDeviceOwner
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            appLockSetup.cancel()
+        }
+        .onChangeCompat(of: session.state) { _, _ in
+            appLockSetup.cancelIfSessionChanged()
+        }
+        .onDisappear { appLockSetup.cancel() }
         .navigationBarTitleDisplayMode(.inline)
         .task(id: PushOwnerScope.current) {
             await model.load()
@@ -1798,19 +1822,48 @@ struct SettingsView: View {
             let settings = await UNUserNotificationCenter.current().notificationSettings()
             systemNotificationsDenied = settings.authorizationStatus == .denied
         }
-        .sheet(isPresented: $show2FASetup) {
-            NavigationStack { TwoFactorSetupView(service: services.auth) }
+        .sheet(item: $twoFactorEnrollment) { enrollment in
+            NavigationStack {
+                TwoFactorSetupView(service: enrollment, acknowledge: {
+                    try session.acknowledgeTwoFactorState(expectedUserID: enrollment.scope.userID,
+                        isCurrent: enrollment.isCurrent)
+                }, refreshProfile: {
+                    try await session.refreshUser(expectedUserID: enrollment.scope.userID,
+                        isCurrent: enrollment.isCurrent, fetchUser: {
+                            let user = try await enrollment.profile()
+                            guard user.twoFactorEnabled == true else { throw TwoFactorEnrollmentError.profileNotReady }
+                            return user
+                        })
+                })
+            }
+        }
+        .onChangeCompat(of: session.state) { _, _ in
+            if let enrollment = twoFactorEnrollment, !enrollment.isCurrent() { twoFactorEnrollment = nil }
+            if let operation = twoFactorDisable, !operation.isCurrent() {
+                show2FADisable = false
+                disable2FACode = ""
+                twoFactorDisable = nil
+            }
         }
         .alert("Désactiver la 2FA ?", isPresented: $show2FADisable) {
             TextField("Code à 6 chiffres", text: $disable2FACode)
                 .keyboardType(.numberPad)
-            Button("Annuler", role: .cancel) { disable2FACode = "" }
+            Button("Annuler", role: .cancel) { disable2FACode = ""; twoFactorDisable = nil }
             Button("Désactiver", role: .destructive) {
                 let code = disable2FACode
                 disable2FACode = ""
-                Task {
-                    await model.disable2FA(code: code)
-                    await session.refreshUser()
+                guard let operation = twoFactorDisable, !isDisabling2FA else { return }
+                isDisabling2FA = true
+                model.errorMessage = nil
+                Task { @MainActor in
+                    defer { isDisabling2FA = false; twoFactorDisable = nil }
+                    do {
+                        try await operation.disable(code: code)
+                        try session.acknowledgeTwoFactorState(enabled: false,
+                            expectedUserID: operation.scope.userID, isCurrent: operation.isCurrent)
+                    } catch {
+                        if operation.isCurrent() { model.errorMessage = error.localizedDescription }
+                    }
                 }
             }
         } message: {
@@ -1827,10 +1880,20 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showDeleteConfirm) {
             DeleteAccountSheet(model: model) {
-                guard model.deletedOwnerScopeId == LocalAccountScope.currentOwnerScopeId else { return }
+                guard let deletedOwner = model.deletedOwnerScopeId else { return }
+                var cleanupWarning: String?
+                // Le reçu serveur concerne ce propriétaire, même si un autre
+                // compte a été ouvert entre-temps. Ne jamais effacer son voisin.
+                do { try await services.favoriteAntennas.eraseLocalDataForDeletedAccount(ownerScopeID: deletedOwner) }
+                catch {
+                    cleanupWarning = String(localized: "Le compte est supprimé, mais le nettoyage des favoris locaux a échoué sur cet appareil.")
+                    model.deletionError = cleanupWarning
+                }
+                guard deletedOwner == LocalAccountScope.currentOwnerScopeId else { return }
                 await services.push.unregister()
-                guard model.deletedOwnerScopeId == LocalAccountScope.currentOwnerScopeId else { return }
+                guard deletedOwner == LocalAccountScope.currentOwnerScopeId else { return }
                 await session.logout()
+                if case .loggedOut = session.state, let cleanupWarning { session.errorMessage = cleanupWarning }
             }
         }
     }

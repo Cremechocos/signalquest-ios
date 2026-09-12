@@ -253,53 +253,34 @@ final class CoverageSessionQueueTests: XCTestCase {
         XCTAssertFalse(recovered.upload.showOnMap, "Le choix privé doit survivre au relaunch")
     }
 
-    func testFailedUploadKeepsQueueAndRetryReusesStableIdentity() async throws {
+    func testRetiredCoveragePreservesOldDraftsWithoutUploadingOrRecoveringThem() async throws {
+        for state: CoverageSessionQueueState in [.recording, .queued] {
+            let fileURL = try makeTemporaryQueueURL()
+            let upload = makeSession(id: UUID(), startTime: 1_000, endTime: 2_000,
+                showOnMap: false, points: [makePoint(timestamp: 1_000), makePoint(timestamp: 2_000)])
+            try CoverageSessionQueue(fileURL: fileURL).upsert(upload, state: state)
+            LocalOfflineOwnership.claim(kind: "coverage", id: upload.sessionId.uuidString)
+            defer { LocalOfflineOwnership.release(kind: "coverage", id: upload.sessionId.uuidString) }
+            let original = try Data(contentsOf: fileURL)
+            MockURLProtocol.requestHandler = { _ in
+                XCTFail("Retired coverage must never reach the network")
+                throw URLError(.notConnectedToInternet)
+            }
+            let service = SessionsService(api: makeAPIClient(), queueFileURL: fileURL)
+            await service.retryPendingCoverageSessions()
+            await SessionsService(api: makeAPIClient(), queueFileURL: fileURL).retryPendingCoverageSessions()
+            XCTAssertEqual(try Data(contentsOf: fileURL), original, "Legacy data must remain byte-for-byte unchanged")
+        }
+    }
+
+    func testRetiredCoverageRejectsNewDraftsWithoutCreatingAQueue() throws {
         let fileURL = try makeTemporaryQueueURL()
-        let upload = makeSession(
-            id: UUID(),
-            startTime: 1_000,
-            endTime: 2_000,
-            showOnMap: false,
-            points: [makePoint(timestamp: 1_000), makePoint(timestamp: 2_000)]
-        )
+        let upload = makeSession(id: UUID(), startTime: 1_000, endTime: 2_000,
+            showOnMap: false, points: [makePoint(timestamp: 1_000), makePoint(timestamp: 2_000)])
         let service = SessionsService(api: makeAPIClient(), queueFileURL: fileURL)
-        try service.finalizeCoverageDraft(upload)
-
-        var firstKey: String?
-        var firstBody: Data?
-        MockURLProtocol.requestHandler = { request in
-            firstKey = request.value(forHTTPHeaderField: "Idempotency-Key")
-            firstBody = Self.requestBody(request)
-            throw URLError(.notConnectedToInternet)
-        }
-        await service.retryPendingCoverageSessions()
-
-        XCTAssertEqual(firstKey, upload.idempotencyKey)
-        XCTAssertEqual(try CoverageSessionQueue(fileURL: fileURL).allPending().count, 1)
-
-        var retryKey: String?
-        var retryBody: Data?
-        MockURLProtocol.requestHandler = { request in
-            retryKey = request.value(forHTTPHeaderField: "Idempotency-Key")
-            retryBody = Self.requestBody(request)
-            return (
-                HTTPURLResponse(
-                    url: request.url!,
-                    statusCode: 200,
-                    httpVersion: nil,
-                    headerFields: ["Content-Type": "application/json"]
-                )!,
-                Data(#"{"ok":true}"#.utf8)
-            )
-        }
-        await service.retryPendingCoverageSessions()
-
-        XCTAssertEqual(retryKey, firstKey)
-        XCTAssertEqual(try bodySessionId(firstBody), upload.sessionId.uuidString)
-        XCTAssertEqual(try bodySessionId(retryBody), upload.sessionId.uuidString)
-        XCTAssertEqual(try bodyShowOnMap(retryBody), false)
-        XCTAssertTrue(try CoverageSessionQueue(fileURL: fileURL).allPending().isEmpty)
-        XCTAssertEqual(service.bufferedImportResponseCount, 0)
+        XCTAssertThrowsError(try service.persistCoverageDraft(upload))
+        XCTAssertThrowsError(try service.finalizeCoverageDraft(upload))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
     }
 
     func testFinalizedSnapshotCannotBeDowngradedByOlderDraft() throws {

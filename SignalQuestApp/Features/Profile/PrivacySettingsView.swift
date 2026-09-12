@@ -1,166 +1,17 @@
 import SwiftUI
 
-@MainActor
-final class PrivacySettingsViewModel: ObservableObject {
-    @Published var shareLiveLocationWithFriends = false
-    @Published var shareRadioDataWithFriends = false
-    @Published var shareSessionsWithFriends = false
-    @Published var sharePhotosOnFriendMap = false
-    @Published var shareExactMeasurements = false
-    /// Réglage LOCAL (pas backend) : quand publier ma position en direct.
-    @Published var liveShareMode: LiveShareMode = LiveShareModeStore.load()
-    @Published var lastSeenVisibility: LastSeenVisibility = .none
-    @Published var messageRequestPolicy: MessageRequestPolicy = .friendsOnly
-    @Published var isLoading = false
-    @Published var isSaving = false
-    @Published var loaded = false
-    @Published var errorMessage: String?
-    @Published var savedConfirmation = false
-
-    // Préférences de compte et zones privées. Côté serveur elles vivent hors de
-    // `/social/privacy`, mais pour l'utilisateur c'est le même sujet — et elles
-    // n'étaient exposées nulle part dans l'app.
-    @Published var preferences = UserPreferences()
-    @Published var zones: [PrivacyZone] = []
-    @Published var zoneBusyId: String?
-
-    /// Zones posées par l'utilisateur : celles qu'il vient régler ici.
-    var declaredZones: [PrivacyZone] { zones.filter { !$0.isAutoDetected } }
-    /// Hypothèses du système d'apprentissage. Repliées : mesuré sur un compte
-    /// réel, 72 sur 73 — à plat, elles noyaient la seule zone déclarée.
-    var detectedZones: [PrivacyZone] { zones.filter(\.isAutoDetected) }
-    var hiddenDetectedCount: Int { detectedZones.filter(\.hideSpeedtestsOnMap).count }
-
-    private let service: PrivacyServicing
-    init(service: PrivacyServicing) { self.service = service }
-
-    func load() async {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-        // Les trois lectures sont indépendantes : en série, l'écran attendrait
-        // trois allers-retours avant d'afficher quoi que ce soit.
-        async let privacy = service.get()
-        async let prefs = try? service.preferences()
-        async let zoneList = try? service.zones()
-        do {
-            apply(try await privacy)
-            loaded = true
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        if let loadedPrefs = await prefs {
-            preferences = loadedPrefs
-            unitsStore?.apply(loadedPrefs.unitsSystem)
-        }
-        zones = await zoneList ?? []
-    }
-
-    /// Injecté par la vue : le miroir observable de l'unité, pour que le reste de
-    /// l'app suive immédiatement un changement fait ici.
-    weak var unitsStore: SQUnitsStore?
-
-    func setUnits(_ system: SQUnitsSystem) async {
-        let previous = preferences.unitsSystem
-        preferences.unitsSystem = system
-        unitsStore?.apply(system)
-        do {
-            preferences = try await service.updatePreferences(preferences)
-            unitsStore?.apply(preferences.unitsSystem)
-            Haptics.success()
-        } catch {
-            // Retour à l'état précédent : afficher des miles que le serveur n'a
-            // pas enregistrés ferait mentir l'écran au prochain lancement.
-            preferences.unitsSystem = previous
-            unitsStore?.apply(previous)
-            errorMessage = error.localizedDescription
-            Haptics.error()
-        }
-    }
-
-    func setShowHandleOnLeaderboard(_ value: Bool) async {
-        let previous = preferences.showHandleOnLeaderboard
-        preferences.showHandleOnLeaderboard = value
-        do {
-            preferences = try await service.updatePreferences(preferences)
-            Haptics.success()
-        } catch {
-            preferences.showHandleOnLeaderboard = previous
-            errorMessage = error.localizedDescription
-            Haptics.error()
-        }
-    }
-
-    func setZoneHidden(_ zone: PrivacyZone, hidden: Bool) async {
-        zoneBusyId = zone.id
-        defer { zoneBusyId = nil }
-        do {
-            try await service.updateZone(id: zone.id, hideSpeedtestsOnMap: hidden, isActive: nil)
-            if let index = zones.firstIndex(where: { $0.id == zone.id }) {
-                zones[index].hideSpeedtestsOnMap = hidden
-            }
-            Haptics.success()
-        } catch {
-            errorMessage = error.localizedDescription
-            Haptics.error()
-        }
-    }
-
-    /// Renvoie `true` si l'enregistrement serveur a réussi. Le caller ne doit
-    /// démarrer la diffusion locale que dans ce cas (sinon on diffuse une position
-    /// dont l'activation n'a pas été persistée — PRIV-SAVE-UNCOND-05).
-    @discardableResult
-    func save() async -> Bool {
-        isSaving = true
-        errorMessage = nil
-        savedConfirmation = false
-        defer { isSaving = false }
-        let patch = UpdatePrivacyRequest(
-            shareLiveLocationWithFriends: shareLiveLocationWithFriends,
-            shareRadioDataWithFriends: shareRadioDataWithFriends,
-            shareSessionsWithFriends: shareSessionsWithFriends,
-            sharePhotosOnFriendMap: sharePhotosOnFriendMap,
-            shareExactMeasurements: shareExactMeasurements,
-            lastSeenVisibility: lastSeenVisibility,
-            messageRequestPolicy: messageRequestPolicy
-        )
-        do {
-            apply(try await service.update(patch))
-            savedConfirmation = true
-            Haptics.success()
-            return true
-        } catch {
-            errorMessage = error.localizedDescription
-            Haptics.error()
-            return false
-        }
-    }
-
-    private func apply(_ p: SocialPrivacy) {
-        shareLiveLocationWithFriends = p.shareLiveLocationWithFriends
-        shareRadioDataWithFriends = p.shareRadioDataWithFriends
-        shareSessionsWithFriends = p.shareSessionsWithFriends
-        sharePhotosOnFriendMap = p.sharePhotosOnFriendMap
-        shareExactMeasurements = p.shareExactMeasurements
-        UserDefaults.standard.set(
-            p.shareExactMeasurements,
-            forKey: MeasurementPrivacySettings.shareExactMeasurementsKey
-        )
-        lastSeenVisibility = p.lastSeenVisibility
-        messageRequestPolicy = p.messageRequestPolicy
-    }
-}
-
 /// Écran « Confidentialité » : permet à l'utilisateur d'exercer son contrôle et
 /// son droit d'opposition (RGPD art. 7.3 / 21) sur la visibilité de ses contenus
 /// et les interactions le concernant.
 struct PrivacySettingsView: View {
     @StateObject private var model: PrivacySettingsViewModel
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var session: AuthSessionViewModel
     /// Feuille de divulgation présentée quand l'utilisateur ACTIVE lui-même le
     /// partage de position (PRIV-LOC-CONSENT-01) : on explique ce que les amis
     /// verront avant que l'activation ne soit informée puis confirmée.
     @State private var showLiveShareDisclosure = false
+    @State private var zoneEditor: PrivacyZoneEditorRoute?
     @EnvironmentObject private var unitsStore: SQUnitsStore
 
     init(service: PrivacyServicing) {
@@ -169,6 +20,15 @@ struct PrivacySettingsView: View {
 
     var body: some View {
         Form {
+            if model.isLoadingPrivacy && !model.loaded {
+                Section { ProgressView("Chargement des partages…") }.listRowBackground(SQColor.surface)
+            }
+            if let error = model.privacyError {
+                Section("Partages") {
+                    loadError(error, hasPrevious: model.loaded) { await model.loadPrivacy() }
+                }
+                .listRowBackground(SQColor.dangerSoft)
+            }
             Section {
                 // Binding manuel : le setter n'est appelé que sur une action
                 // utilisateur, jamais par `apply()` (qui écrit la @Published
@@ -200,6 +60,17 @@ struct PrivacySettingsView: View {
             }
             .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
+            .disabled(!model.loaded || model.isLoadingPrivacy || model.isSaving || !model.isSessionCurrent)
+
+            if let error = model.preferencesError {
+                Section("Préférences du compte") {
+                    loadError(error, hasPrevious: model.preferencesLoaded) { await model.loadPreferences() }
+                }
+                .listRowBackground(SQColor.dangerSoft)
+            }
+            if model.isLoadingPreferences && !model.preferencesLoaded {
+                Section { ProgressView("Chargement des préférences…") }.listRowBackground(SQColor.surface)
+            }
 
             // ── Classements ──────────────────────────────────────────────────
             Section {
@@ -217,6 +88,7 @@ struct PrivacySettingsView: View {
             }
             .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
+            .disabled(!model.preferencesLoaded || model.isLoadingPreferences || model.isSavingPreferences || !model.isSessionCurrent)
 
             // ── Unités ───────────────────────────────────────────────────────
             Section {
@@ -234,10 +106,11 @@ struct PrivacySettingsView: View {
             } header: {
                 Text("Unités")
             } footer: {
-                Text(model.preferences.unitsSystem.hint + ". Le réglage s'applique partout dans l'app et suit ton compte sur le web et Android.")
+                Text("\(model.preferences.unitsSystem.hint). Le réglage s'applique partout dans l'app et suit ton compte sur le web et Android.")
             }
             .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
+            .disabled(!model.preferencesLoaded || model.isLoadingPreferences || model.isSavingPreferences || !model.isSessionCurrent)
 
             // ── Zones privées ────────────────────────────────────────────────
             //
@@ -248,11 +121,18 @@ struct PrivacySettingsView: View {
             // à plat noyait la seule qui compte et repoussait les réglages
             // suivants hors de portée du défilement.
             Section {
-                if model.declaredZones.isEmpty && model.detectedZones.isEmpty {
-                    Text("Aucune zone privée. Tu peux en créer depuis le site ou l'application Android.")
+                if model.isLoadingZones { ProgressView("Chargement des zones…") }
+                if let error = model.zonesError {
+                    loadError(error, hasPrevious: model.zonesLoaded) { await model.loadZones() }
+                }
+                if let error = model.zoneMutationError {
+                    Text(error).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
+                }
+                if model.zonesLoaded && model.declaredZones.isEmpty && model.detectedZones.isEmpty {
+                    Text("Aucune zone privée enregistrée. Ajoute un lieu à protéger.")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
-                } else {
+                } else if model.zonesLoaded {
                     ForEach(model.declaredZones) { zone in
                         zoneRow(zone)
                     }
@@ -275,20 +155,26 @@ struct PrivacySettingsView: View {
                         }
                     }
                 }
+                Button {
+                    zoneEditor = PrivacyZoneEditorRoute(zone: nil)
+                } label: {
+                    Label("Créer une zone privée", systemImage: "plus.circle.fill")
+                }
+                .disabled(!model.zonesLoaded || model.isLoadingZones || model.zoneBusyId != nil || !model.isSessionCurrent)
             } header: {
                 Text("Zones privées")
             } footer: {
-                Text("Activé, tes speedtests réalisés dans cette zone n'apparaissent pas sur la carte publique. Utile autour de chez toi ou de ton lieu de travail.")
+                Text("Les nouveaux speedtests sont protégés lorsqu’une zone est active et que son masquage est activé. Touche un lieu pour modifier son nom, sa position ou son rayon.")
             }
             .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
 
             Section {
-                Toggle("Partager la position exacte de mes mesures", isOn: $model.shareExactMeasurements)
+                Label("Positions publiques exactes", systemImage: "location.fill")
             } header: {
                 Text("Mesures publiques")
             } footer: {
-                Text("Désactivé par défaut : les coordonnées visibles publiquement sont floutées. Si tu désactives ce réglage, le serveur floute aussi rétroactivement tes mesures déjà publiées.")
+                Text("Lorsqu’une mesure est publiée, sa position disponible est exacte. Les zones privées actives peuvent protéger tes nouveaux speedtests.")
             }
             .tint(SQColor.brandRed)
             .foregroundStyle(SQColor.label)
@@ -304,6 +190,7 @@ struct PrivacySettingsView: View {
             .tint(SQColor.brandRed)
             .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
+            .disabled(!model.loaded || model.isLoadingPrivacy || model.isSaving || !model.isSessionCurrent)
 
             Section {
                 Picker("Qui peut me contacter", selection: $model.messageRequestPolicy) {
@@ -319,6 +206,7 @@ struct PrivacySettingsView: View {
             .tint(SQColor.brandRed)
             .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
+            .disabled(!model.loaded || model.isLoadingPrivacy || model.isSaving || !model.isSessionCurrent)
 
             if let error = model.errorMessage {
                 Section { Text(error).foregroundStyle(SQColor.dangerInk) }
@@ -334,17 +222,20 @@ struct PrivacySettingsView: View {
 
             Section {
                 GradientButton("Enregistrer", systemImage: "checkmark.circle.fill", isBusy: model.isSaving) {
+                    let owner = services.api.credentials.snapshot().sessionID
                     Task {
                         // Ne propager au diffuseur QUE si l'enregistrement serveur a
                         // réussi (PRIV-SAVE-UNCOND-05).
-                        guard await model.save() else { return }
+                        guard await model.save(), model.isSessionCurrent,
+                              services.api.credentials.snapshot().sessionID == owner else { return }
                         services.livePresence.applySharingSettings(
                             shareLocation: model.shareLiveLocationWithFriends,
-                            shareRadio: model.shareRadioDataWithFriends
+                            shareRadio: model.shareRadioDataWithFriends,
+                            expectedSessionID: owner
                         )
                     }
                 }
-                .disabled(!model.loaded)
+                .disabled(!model.canSavePrivacy)
             }
             .listRowBackground(Color.clear)
             .listRowInsets(EdgeInsets())
@@ -353,12 +244,18 @@ struct PrivacySettingsView: View {
         .signalQuestBackground()
         .navigationTitle("Confidentialité")
         .navigationBarTitleDisplayMode(.inline)
-                .task {
+        .task {
             // Le modèle propage l'unité au reste de l'app via ce miroir.
             model.unitsStore = unitsStore
-            if !model.loaded { await model.load() }
+            await model.load()
+        }
+        .refreshable { await model.load() }
+        .onChangeCompat(of: session.state) { _, _ in
+            model.sessionDidChange()
+            if !model.isSessionCurrent { zoneEditor = nil; showLiveShareDisclosure = false }
         }
         .onChangeCompat(of: model.liveShareMode) { _, newMode in
+            guard model.isSessionCurrent else { return }
             services.livePresence.setMode(newMode)
         }
         .sheet(isPresented: $showLiveShareDisclosure) {
@@ -370,57 +267,71 @@ struct PrivacySettingsView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .overlay {
-            if model.isLoading && !model.loaded {
-                ProgressView().tint(SQColor.brandRed)
-            }
+        .sheet(item: $zoneEditor) { route in
+            PrivacyZoneEditorView(model: model, zone: route.zone, location: services.location)
         }
     }
 
     @ViewBuilder
     private func zoneRow(_ zone: PrivacyZone) -> some View {
         HStack(spacing: SQSpace.md) {
-            Image(systemName: zone.typeIcon)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 28)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(zone.name)
-                    .font(SQFont.body(15, .medium))
-                    .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
-                // Le type n'est répété que s'il n'est pas déjà le nom : une zone
-                // « Domicile » de type « Domicile » se lisait « Domicile ·
-                // Domicile · 121 m ».
-                Text([zone.typeLabel == zone.name ? "" : zone.typeLabel, zone.summary]
-                    .filter { !$0.isEmpty }
-                    .joined(separator: " · "))
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(1)
+            Button { zoneEditor = PrivacyZoneEditorRoute(zone: zone) } label: {
+                HStack(spacing: SQSpace.md) {
+                    Image(systemName: zone.typeIcon)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(SQColor.brandRed)
+                        .frame(width: 28)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(zone.name)
+                            .font(SQFont.body(15, .medium))
+                            .foregroundStyle(SQColor.label)
+                            .lineLimit(2)
+                        Text([zone.typeLabel == zone.name ? "" : zone.typeLabel, zone.summary]
+                            .filter { !$0.isEmpty }.joined(separator: " · "))
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").font(.caption).accessibilityHidden(true)
+                }
+                .contentShape(Rectangle())
             }
-            Spacer(minLength: 0)
+            .buttonStyle(.plain)
+            .accessibilityHint("Modifier cette zone")
             if model.zoneBusyId == zone.id {
                 ProgressView()
             } else {
                 Toggle("", isOn: Binding(
-                    get: { zone.hideSpeedtestsOnMap },
+                    get: { zone.isActive && zone.hideSpeedtestsOnMap },
                     set: { hidden in Task { await model.setZoneHidden(zone, hidden: hidden) } }
                 ))
                 .labelsHidden()
+                .accessibilityLabel(Text("Protection de \(zone.name)"))
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(zone.name), masquer mes speedtests")
-        .accessibilityValue(zone.hideSpeedtestsOnMap ? "activé" : "désactivé")
+        .disabled(model.isLoadingZones || model.zoneBusyId != nil || !model.isSessionCurrent)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func loadError(_ error: String, hasPrevious: Bool, retry: @escaping @MainActor () async -> Void) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text(error).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
+            if hasPrevious {
+                Text("Dernier état connu conservé.").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+            }
+            Button("Réessayer") { Task { await retry() } }
+        }
     }
 }
 
 private struct PresencePreferenceControls: View {
     @ObservedObject var service: LivePresenceService
+    @State private var isRetrying = false
 
     var body: some View {
+        if service.presenceLoaded {
         Picker(
             "Mon statut",
             selection: Binding(
@@ -443,6 +354,25 @@ private struct PresencePreferenceControls: View {
             )
         )
         .textInputAutocapitalization(.sentences)
+        } else {
+            Text("Le statut de présence n’est pas encore chargé.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+            Button {
+                guard !isRetrying else { return }
+                isRetrying = true
+                Task {
+                    await service.refreshSharingSettings()
+                    isRetrying = false
+                }
+            } label: {
+                HStack {
+                    Text("Réessayer")
+                    if isRetrying { ProgressView() }
+                }
+            }
+            .disabled(isRetrying)
+        }
     }
 }
 

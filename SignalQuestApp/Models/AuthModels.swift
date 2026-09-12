@@ -14,7 +14,7 @@ struct AuthUser: Codable, Identifiable, Equatable {
     /// `/api/user/profile` pour préremplir l'édition sans l'écraser (EDITPROFILE-BUG-01).
     let bio: String?
     let role: String
-    let twoFactorEnabled: Bool?
+    private(set) var twoFactorEnabled: Bool?
     let notifyMessagesPush: Bool?
     /// Interactions du fil PUBLIC : commentaires, réponses, mentions, réactions, abonnements.
     /// Séparé de `notifyMessagesPush`, qui les portait toutes sous un libellé ne parlant que des
@@ -24,6 +24,12 @@ struct AuthUser: Codable, Identifiable, Equatable {
     let callsDoNotDisturb: Bool?
     /// Vrai si un Apple ID est associé à ce compte (Sign in with Apple).
     let appleLinked: Bool?
+
+    func withConfirmedTwoFactor(enabled: Bool) -> AuthUser {
+        var copy = self
+        copy.twoFactorEnabled = enabled
+        return copy
+    }
 
     var displayName: String {
         name ?? handle.map { "@\($0)" } ?? email.components(separatedBy: "@").first ?? "Utilisateur"
@@ -68,12 +74,20 @@ struct TwoFactorVerifyRequest: Codable {
     let code: String
 }
 
-struct TwoFactorSetupResponse: Codable {
+struct TwoFactorSetupResponse: Codable, Sendable {
     /// Base32 TOTP secret returned by the server, ready for an authenticator app.
     let secret: String
     /// `otpauth://totp/...` URI que l'on rend en QR code. Le backend renvoie la
     /// clé JSON `uri` (et NON `otpauthUrl`) — un mauvais nom laissait le QR vide.
     let uri: String?
+    /// Le challenge serveur est limité dans le temps. Absent sur un ancien backend.
+    let expiresAt: Date?
+
+    init(secret: String, uri: String? = nil, expiresAt: Date? = nil) {
+        self.secret = secret
+        self.uri = uri
+        self.expiresAt = expiresAt
+    }
 }
 
 struct TwoFactorVerifySetupRequest: Codable {
@@ -110,6 +124,9 @@ struct AuthMeResponse: Codable {
 }
 
 struct SuccessResponse: Codable {
+    var isAcknowledged: Bool {
+        (success == true || ok == true) && success != false && ok != false
+    }
     let success: Bool?
     let ok: Bool?
     let requestId: String?
