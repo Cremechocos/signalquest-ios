@@ -36,6 +36,7 @@ struct SpeedtestHistoryRow: View {
         }
         .padding(.horizontal, SQSpace.lg + 2)
         .padding(.vertical, SQSpace.md + 3)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
 
