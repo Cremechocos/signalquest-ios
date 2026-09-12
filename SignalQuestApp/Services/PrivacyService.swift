@@ -1,11 +1,5 @@
 import Foundation
 
-// Compatibilité de compilation avec le parcours Speedtest du candidat.
-// À retirer avec son intégration de la publication automatique, pas isolément.
-enum MeasurementPrivacySettings {
-    static let shareExactMeasurementsKey = "privacy_share_exact_measurements"
-}
-
 enum LastSeenVisibility: String, Codable, CaseIterable, Sendable {
     case friends
     case none

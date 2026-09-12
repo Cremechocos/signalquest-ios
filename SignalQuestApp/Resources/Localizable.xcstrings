@@ -43905,6 +43905,531 @@
           }
         }
       }
+    },
+    "Carte publique": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carte publique"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Public map"
+          }
+        }
+      }
+    },
+    "Ce test ne dispose pas d’une position exploitable pour la carte.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce test ne dispose pas d’une position exploitable pour la carte."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This test has no usable location for the map."
+          }
+        }
+      }
+    },
+    "Ce test n’a pas de référence serveur disponible. Il peut être en attente de synchronisation ou provenir d’une ancienne version.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce test n’a pas de référence serveur disponible. Il peut être en attente de synchronisation ou provenir d’une ancienne version."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This test has no available server reference. It may be waiting to sync or come from an older app version."
+          }
+        }
+      }
+    },
+    "Ce test n’est pas éligible à la carte publique.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce test n’est pas éligible à la carte publique."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This test is not eligible for the public map."
+          }
+        }
+      }
+    },
+    "Ce test se trouve dans une zone privée et reste masqué. Tu peux gérer tes zones dans Confidentialité.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce test se trouve dans une zone privée et reste masqué. Tu peux gérer tes zones dans Confidentialité."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This test is in a private zone and remains hidden. You can manage your zones in Privacy."
+          }
+        }
+      }
+    },
+    "Enregistrement et vérification…": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrement et vérification…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saving and checking…"
+          }
+        }
+      }
+    },
+    "La protection de tes zones privées est indisponible. Réessaie plus tard.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La protection de tes zones privées est indisponible. Réessaie plus tard."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your private zones cannot be checked right now. Try again later."
+          }
+        }
+      }
+    },
+    "La publication est indisponible sous VPN. Le masquage reste possible.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La publication est indisponible sous VPN. Le masquage reste possible."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publishing is unavailable while using a VPN. Hiding a test remains available."
+          }
+        }
+      }
+    },
+    "La visibilité n’a pas pu être confirmée. Réessaie de la vérifier avant de modifier ce test.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La visibilité n’a pas pu être confirmée. Réessaie de la vérifier avant de modifier ce test."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visibility could not be confirmed. Check it again before changing this test."
+          }
+        }
+      }
+    },
+    "Le compte a changé. Rouvre la fiche depuis ton compte pour gérer ce test.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le compte a changé. Rouvre la fiche depuis ton compte pour gérer ce test."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The account has changed. Reopen this test from your account to manage it."
+          }
+        }
+      }
+    },
+    "Les tests invités se gèrent depuis Mes reçus.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les tests invités se gèrent depuis Mes reçus."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage guest tests in My receipts."
+          }
+        }
+      }
+    },
+    "Masquage confirmé. Ce test reste dans ton historique.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquage confirmé. Ce test reste dans ton historique."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hidden from the map. This test remains in your history."
+          }
+        }
+      }
+    },
+    "Masquer de la carte": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquer de la carte"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide from the map"
+          }
+        }
+      }
+    },
+    "Masquer un test le conserve dans ton historique. Sa publication reste soumise aux critères de la carte et à tes zones privées.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquer un test le conserve dans ton historique. Sa publication reste soumise aux critères de la carte et à tes zones privées."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiding a test keeps it in your history. Publishing remains subject to map eligibility and your private zones."
+          }
+        }
+      }
+    },
+    "Masqué de la carte": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masqué de la carte"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hidden from the map"
+          }
+        }
+      }
+    },
+    "Non éligible à la carte": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non éligible à la carte"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not eligible for the map"
+          }
+        }
+      }
+    },
+    "Position indisponible": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position indisponible"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location unavailable"
+          }
+        }
+      }
+    },
+    "Publication confirmée. Ce test est visible sur la carte publique.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publication confirmée. Ce test est visible sur la carte publique."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publication confirmed. This test is visible on the public map."
+          }
+        }
+      }
+    },
+    "Publier ce test": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publier ce test"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publish this test"
+          }
+        }
+      }
+    },
+    "Publier ce test ?": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publier ce test ?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publish this test?"
+          }
+        }
+      }
+    },
+    "Référence serveur indisponible": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Référence serveur indisponible"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server reference unavailable"
+          }
+        }
+      }
+    },
+    "Sa mesure et sa position enregistrée seront visibles sur la carte publique. Tes zones privées restent appliquées.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sa mesure et sa position enregistrée seront visibles sur la carte publique. Tes zones privées restent appliquées."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its measurement and recorded location will be visible on the public map. Your private zones still apply."
+          }
+        }
+      }
+    },
+    "Session modifiée": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session modifiée"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session changed"
+          }
+        }
+      }
+    },
+    "Seul le propriétaire peut modifier la visibilité de ce test.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seul le propriétaire peut modifier la visibilité de ce test."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only the owner can change this test’s visibility."
+          }
+        }
+      }
+    },
+    "Visibilité enregistrée. Ce test reste hors de la carte publique.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visibilité enregistrée. Ce test reste hors de la carte publique."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visibility saved. This test remains off the public map."
+          }
+        }
+      }
+    },
+    "Visibilité à vérifier": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visibilité à vérifier"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visibility needs checking"
+          }
+        }
+      }
+    },
+    "Visible sur la carte": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visible sur la carte"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visible on the map"
+          }
+        }
+      }
+    },
+    "Vérification de la visibilité…": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérification de la visibilité…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking visibility…"
+          }
+        }
+      }
+    },
+    "Vérifier la visibilité": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérifier la visibilité"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check visibility"
+          }
+        }
+      }
+    },
+    "Publication automatique": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publication automatique"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic publication"
+          }
+        }
+      }
+    },
+    "Les nouveaux speedtests cellulaires éligibles, avec une position disponible, sont publiés automatiquement à leur position exacte. La protection de tes zones privées est respectée. Les tests Wi-Fi et sous VPN restent dans l’historique. Les anciennes mesures privées conservent leur visibilité.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les nouveaux speedtests cellulaires éligibles, avec une position disponible, sont publiés automatiquement à leur position exacte. La protection de tes zones privées est respectée. Les tests Wi-Fi et sous VPN restent dans l’historique. Les anciennes mesures privées conservent leur visibilité."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New eligible cellular speedtests with an available location are published automatically at their exact location. Your private zones remain protected. Wi-Fi and VPN tests stay in your history. Existing private measurements keep their visibility."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

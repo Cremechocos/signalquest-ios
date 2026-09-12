@@ -1019,8 +1019,8 @@ struct SpeedtestSubmission: Encodable, Equatable {
         streams: Int,
         deviceModel: String,
         mobileOperator: String? = nil,
-        isVisibleOnMap: Bool = false,
-        shareExactLocation: Bool = false,
+        isVisibleOnMap: Bool = true,
+        shareExactLocation: Bool = true,
         guestDeleteToken: String? = nil,
         sessionId: String? = nil
     ) -> SpeedtestSubmission {

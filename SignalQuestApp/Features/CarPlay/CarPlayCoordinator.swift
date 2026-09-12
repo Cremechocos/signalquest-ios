@@ -1108,15 +1108,14 @@ final class CarPlayCoordinator {
                 )
                 guard !Task.isCancelled else { return }
                 updateSpeedtest(state: .finished(result))
-                // Publié sur la carte comme depuis l'app, mais SANS position
-                // exacte : une mesure prise en roulant n'a pas besoin d'être
-                // rattachée au mètre près, et le point de départ d'un trajet en
-                // dit long sur son auteur.
+                // Même intention que dans l’app : publication exacte demandée.
+                // Le service garde le VPN privé ; le serveur applique les zones
+                // privées et l’éligibilité du réseau.
                 try? await services.speedtest.save(
                     result,
                     streams: SpeedtestRunSettings.androidDefault.streams,
                     publishToMap: true,
-                    shareExactLocation: false
+                    shareExactLocation: true
                 )
             } catch {
                 guard !Task.isCancelled else { return }

@@ -1807,6 +1807,17 @@ struct MapExplorerView: View {
             lastZoomRenderBucket = bucket
             refreshMapRender()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .sqSpeedtestMapVisibilityChanged).receive(on: DispatchQueue.main)) { notification in
+            guard let change = notification.object as? SpeedtestMapVisibilityChange,
+                  change.session == services.speedtest.visibilitySession else { return }
+            fetchTask?.cancel()
+            model.applySpeedtestVisibility(serverID: change.serverID, isSharedOnMap: change.isSharedOnMap)
+            if selectedItem?.kind == .speedtest, selectedItem?.backendId == change.serverID {
+                selectedItem = nil
+            }
+            refreshMapRender()
+            fetchTask = Task { await reloadCurrentRegion() }
+        }
         .onChangeCompat(of: scenePhase) { _, phase in
             guard phase == .active, router.selectedTab == .map else { return }
             fetchTask?.cancel()

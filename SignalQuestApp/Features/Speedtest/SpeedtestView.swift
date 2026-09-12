@@ -29,15 +29,6 @@ struct SpeedtestView: View {
     /// part de la cible, comme `libreSpeedHost` : la cible dit QUEL moteur, celui-ci
     /// dit LEQUEL de ses serveurs.
     @AppStorage("speedtest_iperf_server_id") private var iperfServerId = ""
-    /// Publication sur la carte communautaire publique. Opt-in explicite, mémorisé
-    /// localement, et jamais publié sous VPN. La précision publique dépend ensuite
-    /// du réglage global de confidentialité côté serveur.
-    @AppStorage("speedtest_publish_to_map") private var publishToMap = false
-    @AppStorage(MeasurementPrivacySettings.shareExactMeasurementsKey) private var shareExactMeasurements = false
-    /// Les choix invités sont volontairement éphémères : chaque nouvelle session
-    /// redemande le consentement de publication et de précision.
-    @State private var guestPublishToMap = false
-    @State private var guestShareExactLocation = false
     /// Nombre de tests enchaînés en rafale (1 = test simple).
     @AppStorage("speedtest_burst_count") private var burstCount = 1
     /// Distance à parcourir entre deux speedtests d'un Drive Test. Espacer par la
@@ -69,10 +60,6 @@ struct SpeedtestView: View {
     @State private var runErrorMessage: String?
     /// Test de l'historique ouvert en fiche détaillée.
     @State private var detailResult: SpeedtestRunResult?
-    /// Id serveur du test ouvert : sans lui, pas de publication possible.
-    @State private var detailServerId: String?
-    @State private var isPublishingDetail = false
-    @State private var publishFeedback: String?
     @State private var runTask: Task<Void, Never>?
     /// Identité de la session propriétaire de l'état partagé. Une tâche annulée
     /// peut terminer après qu'une nouvelle session a démarré ; elle ne doit alors
@@ -110,28 +97,6 @@ struct SpeedtestView: View {
 
     init(guestMode: Bool = false) {
         self.guestMode = guestMode
-    }
-
-    private var mapPublicationEnabled: Bool {
-        guestMode ? guestPublishToMap : publishToMap
-    }
-
-    private var exactLocationEnabled: Bool {
-        mapPublicationEnabled && (guestMode ? guestShareExactLocation : shareExactMeasurements)
-    }
-
-    private var mapPublicationBinding: Binding<Bool> {
-        Binding(
-            get: { mapPublicationEnabled },
-            set: { enabled in
-                if guestMode {
-                    guestPublishToMap = enabled
-                    if !enabled { guestShareExactLocation = false }
-                } else {
-                    publishToMap = enabled
-                }
-            }
-        )
     }
 
     /// Fournisseur affiché dans le bandeau, lié au chemin réellement mesuré.
@@ -254,23 +219,10 @@ struct SpeedtestView: View {
                     router.pendingMapFocus = coordinate
                     router.selectedTab = .map
                 },
-                // Publication : uniquement quand elle peut RÉELLEMENT aboutir.
-                // Un compte (la route exige une auth), un id serveur mémorisé,
-                // une position à cartographier, et pas de VPN (l'opérateur du
-                // tunnel n'est pas celui qu'on mesure). Sinon aucun bouton,
-                // plutôt qu'un bouton qui échouerait.
-                onPublish: canPublish(item) ? { publishDetail(item) } : nil,
-                isPublishing: isPublishingDetail
+                visibilityService: services.speedtest,
+                guestMode: guestMode
             )
-            .task { detailServerId = await services.speedtest.serverId(forClientId: item.id) }
-        }
-        .alert("Publication", isPresented: Binding(
-            get: { publishFeedback != nil },
-            set: { if !$0 { publishFeedback = nil } }
-        )) {
-            Button("OK", role: .cancel) { publishFeedback = nil }
-        } message: {
-            Text(publishFeedback ?? "")
+            .id(item.id)
         }
         .sheet(isPresented: $showSettings) { settingsSheet }
         .sheet(isPresented: $showLocationPriming) {
@@ -354,6 +306,7 @@ struct SpeedtestView: View {
                     headerButton(systemImage: "slider.horizontal.3", label: "Réglages du test") {
                         showSettings = true
                     }
+                    .accessibilityIdentifier("speedtest.settings")
                 }
                 Text("Speedtest")
                     .font(SQType.title)
@@ -761,28 +714,14 @@ struct SpeedtestView: View {
                         Divider().overlay(SQColor.separator)
 
                         VStack(alignment: .leading, spacing: SQSpace.xs) {
-                            Toggle(isOn: mapPublicationBinding) {
-                                Text("Publier sur la carte communautaire")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(SQColor.label)
-                            }
-                            .tint(SQColor.brandRed)
-                            // Précision indispensable depuis que le Drive Test
-                            // publie systématiquement : sans elle, ce réglage
-                            // laisserait croire qu'il couvre AUSSI les trajets.
-                            Text(guestMode
-                                 ? "Désactivé par défaut et redemandé à chaque visite invitée. La mesure et l’opérateur deviennent publics. Ne concerne pas le Drive Test, qui publie toujours."
-                                 : "Désactivé par défaut, et ne concerne que les tests lancés depuis cet écran : un Drive Test publie toujours, c'est sa raison d'être. Si tu l’actives, ta mesure et ton opérateur deviennent publics ; la position reste floutée sauf consentement séparé dans Confidentialité.")
+                            Text("Publication automatique")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(SQColor.label)
+                            Text("Les nouveaux speedtests cellulaires éligibles, avec une position disponible, sont publiés automatiquement à leur position exacte. La protection de tes zones privées est respectée. Les tests Wi-Fi et sous VPN restent dans l’historique. Les anciennes mesures privées conservent leur visibilité.")
                                 .font(.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
-                            if guestMode && guestPublishToMap {
-                                Toggle("Partager ma position exacte pour ce test", isOn: $guestShareExactLocation)
-                                    .font(.subheadline.weight(.semibold))
-                                Text("Facultatif et valable uniquement pour ce test. Sans ce choix, le serveur publie une position floutée.")
-                                    .font(.caption)
-                                    .foregroundStyle(SQColor.labelSecondary)
-                            }
+                                .accessibilityIdentifier("speedtest.publication.info")
                         }
                     }
                     .padding(SQSpace.lg)
@@ -791,6 +730,7 @@ struct SpeedtestView: View {
                 }
                 .padding(SQSpace.lg)
             }
+            .accessibilityIdentifier("speedtest.settings.scroll")
             .signalQuestBackground()
             .navigationTitle("Réglages")
             .navigationBarTitleDisplayMode(.inline)
@@ -848,16 +788,10 @@ struct SpeedtestView: View {
         runTask != nil
     }
 
-    /// Badge sous la valeur du cadran une fois le test terminé : confirme la
-    /// publication communautaire quand elle a réellement été demandée (opt-in,
-    /// hors VPN, sans erreur de sync), sinon simple confirmation de fin.
+    /// Le succès de la mesure ne prouve pas sa visibilité publique : zones,
+    /// éligibilité et état serveur sont vérifiés dans la fiche détaillée.
     private var dialCompletionLabel: String? {
         guard case .finished = phase else { return nil }
-        // N'annoncer « publié sur la carte » que si le test a réellement une position
-        // (un test sans coordonnée ne peut PAS être cartographié — TEL-04).
-        if errorMessage == nil, mapPublicationEnabled, !isVPNActive, result?.coordinate != nil {
-            return String(localized: "publié sur la carte ✓")
-        }
         return String(localized: "test terminé ✓")
     }
 
@@ -922,13 +856,13 @@ struct SpeedtestView: View {
         }
         // ONB-SEC-01 : localisation refusée + publication carte active → proposer un
         // retour vers les Réglages plutôt que de lancer sans position en silence.
-        if !AppEnvironment.runsSpeedtestQA, mapPublicationEnabled,
+        if !AppEnvironment.runsSpeedtestQA,
            services.location.authorizationStatus == .denied || services.location.authorizationStatus == .restricted {
             primingDenied = true
             showLocationPriming = true
             return
         }
-        let requestLocation = !AppEnvironment.runsSpeedtestQA && (!guestMode || mapPublicationEnabled)
+        let requestLocation = !AppEnvironment.runsSpeedtestQA
         dispatchConfiguredRun(requestLocation: requestLocation)
     }
 
@@ -1044,8 +978,8 @@ struct SpeedtestView: View {
             try await services.speedtest.save(
                 measured,
                 streams: settings.streams,
-                publishToMap: mapPublicationEnabled && !isVPNActive,
-                shareExactLocation: exactLocationEnabled && !isVPNActive
+                publishToMap: !isVPNActive,
+                shareExactLocation: !isVPNActive
             )
         } catch is CancellationError {
             throw CancellationError()
@@ -1069,35 +1003,6 @@ struct SpeedtestView: View {
             serverName: measured.serverName
         )
         return measured
-    }
-
-    /// La publication n'est proposée que si elle peut aboutir : compte requis
-    /// (la route PATCH rejette les invités), id serveur mémorisé à l'envoi,
-    /// position à cartographier, et hors VPN.
-    private func canPublish(_ result: SpeedtestRunResult) -> Bool {
-        !guestMode
-            && detailServerId != nil
-            && result.coordinate != nil
-            && !isVPNActive
-    }
-
-    private func publishDetail(_ result: SpeedtestRunResult) {
-        guard !isPublishingDetail else { return }
-        isPublishingDetail = true
-        Task {
-            do {
-                try await services.speedtest.publishOnMap(
-                    clientId: result.id,
-                    shareExactLocation: exactLocationEnabled
-                )
-                Haptics.success()
-                publishFeedback = "Test publié sur la carte."
-            } catch {
-                Haptics.warning()
-                publishFeedback = error.localizedDescription
-            }
-            isPublishingDetail = false
-        }
     }
 
     private func performRun(requestLocation: Bool) {

@@ -392,6 +392,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private let guestReceiptStore: GuestSpeedtestReceiptStore
     private let tcpProbe: SpeedtestTCPProbing
     private let cloudflareFallbackPolicy: CloudflareAutoFallbackPolicy
+    private let invalidatePublicMap: @Sendable () async -> Void
+    private let vpnIsActive: @Sendable () -> Bool
     static let pendingSaveKey = "pending-speedtest-saves"
     /// Dossier de la file d'attente durable (partagé entre l'init durable et la migration).
     /// `internal` (pas `private`) : référencé dans une valeur par défaut d'initialiseur.
@@ -416,7 +418,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         guestReceiptStore: GuestSpeedtestReceiptStore = GuestSpeedtestReceiptStore(),
         tcpProbe: SpeedtestTCPProbing = NetworkSpeedtestTCPProbe(),
         cloudflareFallbackPolicy: CloudflareAutoFallbackPolicy = CloudflareAutoFallbackPolicy(),
-        pendingStore: SpeedtestPendingStoring? = nil
+        pendingStore: SpeedtestPendingStoring? = nil,
+        invalidatePublicMap: @escaping @Sendable () async -> Void = {},
+        vpnIsActive: @escaping @Sendable () -> Bool = { VPNDetector.isActive() }
     ) {
         // Migration unique : les sauvegardes en attente vivaient dans Caches (purgeable).
         // On les remonte vers Application Support avant toute lecture, pour ne pas perdre
@@ -432,6 +436,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         self.guestReceiptStore = guestReceiptStore
         self.tcpProbe = tcpProbe
         self.cloudflareFallbackPolicy = cloudflareFallbackPolicy
+        self.invalidatePublicMap = invalidatePublicMap
+        self.vpnIsActive = vpnIsActive
     }
 
     /// Migration unique Caches → Application Support pour la file d'attente durable.
@@ -2326,11 +2332,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     // MARK: Persistence
 
     func save(_ result: SpeedtestRunResult) async throws {
-        try await save(result, streams: 4, publishToMap: false)
+        try await save(result, streams: 4, publishToMap: true)
     }
 
     func save(_ result: SpeedtestRunResult, streams: Int) async throws {
-        try await save(result, streams: streams, publishToMap: false)
+        try await save(result, streams: streams, publishToMap: true)
     }
 
     func save(_ result: SpeedtestRunResult, streams: Int, publishToMap: Bool) async throws {
@@ -2338,7 +2344,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             result,
             streams: streams,
             publishToMap: publishToMap,
-            shareExactLocation: false,
+            shareExactLocation: true,
             driveSessionId: nil
         )
     }
@@ -2357,7 +2363,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             result,
             streams: streams,
             publishToMap: publishToMap,
-            shareExactLocation: false,
+            shareExactLocation: true,
             driveSessionId: driveSessionId
         )
     }
@@ -2408,14 +2414,17 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         } else {
             guestDeleteToken = nil
         }
+        // Capture la garde actuelle seulement pour une nouvelle intention.
+        // Une ancienne entrée trouvée plus haut conserve ses choix et son identité.
+        let requestsPublication = publishToMap && !vpnIsActive()
         let pending = PendingSpeedtestSave(
             id: result.id.uuidString,
             result: result,
             streams: streams,
             deviceModel: await UIDevice.current.modelName,
             createdAt: Date(),
-            isVisibleOnMap: publishToMap,
-            shareExactLocation: publishToMap && shareExactLocation,
+            isVisibleOnMap: requestsPublication,
+            shareExactLocation: requestsPublication && shareExactLocation,
             guestDeleteToken: guestDeleteToken,
             driveSessionId: driveSessionId,
             ownerScopeId: result.ownerScopeId ?? LocalAccountScope.currentOwnerScopeId
@@ -5265,11 +5274,11 @@ struct PendingSpeedtestSave: Codable, Equatable, Sendable {
     let streams: Int
     let deviceModel: String
     let createdAt: Date
-    /// Choix de publication sur la carte communautaire (opt-in). Optionnel pour rester
-    /// compatible avec les sauvegardes sérialisées avant l'ajout du consentement
-    /// (`nil` = non publié).
+    /// Intention de visibilité capturée à la création. Les anciennes entrées
+    /// conservent leur choix (`nil` = non publié), même après le changement de
+    /// valeur par défaut pour les nouvelles mesures.
     let isVisibleOnMap: Bool?
-    /// Opt-in explicite. Optionnel pour décoder les anciennes files locales.
+    /// Précision capturée ; optionnelle pour préserver les anciennes files locales.
     let shareExactLocation: Bool?
     /// Généré et persisté AVANT le POST : le même secret survit à un commit serveur dont
     /// la réponse aurait été perdue.
@@ -5523,4 +5532,164 @@ actor SpeedtestMutationQueue {
         tail = Task { _ = try? await task.value }
         try await task.value
     }
+}
+
+
+// MARK: - Visibilité propriétaire, isolée de la fiche et des caches d’un autre compte
+
+extension SpeedtestService: SpeedtestVisibilityServicing {
+    var visibilitySession: SpeedtestVisibilitySession? {
+        let credentials = api.credentials.snapshot()
+        guard credentials.accessToken != nil, let owner = LocalAccountScope.sessionSnapshot(),
+              api.credentials.isCurrent(credentials), owner.isCurrent else { return nil }
+        return SpeedtestVisibilitySession(
+            credentialSessionID: credentials.sessionID,
+            ownerScopeID: owner.ownerScopeId, localSessionID: owner.sessionId
+        )
+    }
+
+    private func requireVisibilitySession(_ session: SpeedtestVisibilitySession) throws {
+        guard visibilitySession == session else { throw SpeedtestVisibilityError.sessionChanged }
+        try Task.checkCancellation()
+    }
+
+    private func pendingVisibilityKey(serverID: String, session: SpeedtestVisibilitySession) -> String {
+        let scope = "visibility-v1|\(api.config.apiBaseURL.absoluteString)|\(session.ownerScopeID)|\(serverID)"
+        return "visibilityPending-\(LocalAccountScope.storageNamespace(for: scope))"
+    }
+
+    /// Le registre partagé sérialise les écritures entre deux instances du service.
+    /// Aucune requête réseau ni purge de carte ne conserve cette file.
+    private static let visibilityJournal = SpeedtestVisibilityMutationRegistry()
+
+    private func reconcileVisibility(
+        _ pending: PendingSpeedtestVisibilityMutation, key: String,
+        serverID: String, isSharedOnMap: Bool, mapEpoch: Int64?,
+        session: SpeedtestVisibilitySession
+    ) async throws {
+        try requireVisibilitySession(session)
+        // Une lecture démarrée pendant un PATCH ne confirme pas sa valeur finale.
+        guard !Self.visibilityJournal.isActive(key: key),
+              try await historyCache.read(PendingSpeedtestVisibilityMutation.self, for: key) == pending else { return }
+        await invalidatePublicMap()
+        try requireVisibilitySession(session)
+        try await Self.visibilityJournal.mutations.perform { [self] in
+            guard try await historyCache.read(PendingSpeedtestVisibilityMutation.self, for: key) == pending,
+                  !Self.visibilityJournal.isActive(key: key) else { return }
+            try requireVisibilitySession(session)
+            // La génération est revérifiée APRÈS la purge : une intention plus
+            // récente ne doit recevoir ni cet ancien événement ni cet effacement.
+            NotificationCenter.default.post(name: .sqSpeedtestMapVisibilityChanged, object:
+                SpeedtestMapVisibilityChange(serverID: serverID, session: session,
+                                             isSharedOnMap: isSharedOnMap, mapEpoch: mapEpoch))
+            await historyCache.remove(key)
+        }
+    }
+
+    func visibility(forClientID clientID: UUID, session: SpeedtestVisibilitySession) async throws -> SpeedtestVisibilityState? {
+        try requireVisibilitySession(session)
+        // La clé est calculée à partir du propriétaire capturé, jamais relue depuis
+        // le compte global après un await de DiskCache.
+        let key = "serverIds-\(LocalAccountScope.storageNamespace(for: session.ownerScopeID))"
+        let serverID: String?
+        if let independent = try await historyCache.read(String.self, for: "\(key)-\(clientID.uuidString)") {
+            serverID = independent
+        } else {
+            try requireVisibilitySession(session)
+            let ids = try await historyCache.read([String: String].self, for: key) ?? [:]
+            if let durable = ids[clientID.uuidString] {
+                serverID = durable
+            } else {
+                try requireVisibilitySession(session)
+                let legacy = try await legacyHistoryCache.read([String: String].self, for: key) ?? [:]
+                serverID = legacy[clientID.uuidString]
+            }
+        }
+        try requireVisibilitySession(session)
+        guard let serverID, !serverID.isEmpty else { return nil }
+        guard let encodedID = serverID.addingPercentEncoding(withAllowedCharacters:
+            .urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))) else {
+            throw SpeedtestVisibilityError.unconfirmedResponse
+        }
+        let pendingKey = pendingVisibilityKey(serverID: serverID, session: session)
+        // Capturer avant GET évite de traiter sa réponse comme confirmation
+        // d'une intention qui n'existait pas au début de la lecture.
+        let pending = try await historyCache.read(PendingSpeedtestVisibilityMutation.self, for: pendingKey)
+        let pendingWasActive = Self.visibilityJournal.isActive(key: pendingKey)
+        try requireVisibilitySession(session)
+        let detail = try await api.request(
+            APIEndpoint(path: "/api/speedtests/\(encodedID)", headers: ["Cache-Control": "no-cache"]),
+            as: SpeedtestDetail.self, expectedSessionID: session.credentialSessionID
+        )
+        try requireVisibilitySession(session)
+        guard detail.id == serverID,
+              let isOwner = detail.isOwner, let isVisible = detail.isVisibleOnMap,
+              let isPublic = detail.isPublic else {
+            throw SpeedtestVisibilityError.unconfirmedResponse
+        }
+        let hasPosition: Bool
+        if let latitude = detail.latitude, let longitude = detail.longitude {
+            hasPosition = latitude.isFinite && longitude.isFinite
+                && abs(latitude) <= 90 && abs(longitude) <= 180
+        } else { hasPosition = false }
+        let state = SpeedtestVisibilityState(
+            id: serverID, isOwner: isOwner, isVisibleOnMap: isVisible,
+            isPublic: isPublic, hasMapPosition: hasPosition
+        )
+        if isOwner, let pending, !pendingWasActive {
+            try await reconcileVisibility(pending, key: pendingKey, serverID: serverID,
+                                          isSharedOnMap: state.isSharedOnMap, mapEpoch: nil, session: session)
+        }
+        try requireVisibilitySession(session)
+        return state
+    }
+
+    func setVisibility(serverID: String, visible: Bool, session: SpeedtestVisibilitySession) async throws -> SpeedtestVisibilityResponse {
+        try requireVisibilitySession(session)
+        guard !serverID.isEmpty,
+              let encodedID = serverID.addingPercentEncoding(withAllowedCharacters:
+                .urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#"))) else {
+            throw SpeedtestVisibilityError.unconfirmedResponse
+        }
+        let body = try JSONEncoder.signalQuest.encode(
+            ["isVisibleOnMap": visible]
+        )
+        let pending = PendingSpeedtestVisibilityMutation(generation: UUID())
+        let pendingKey = pendingVisibilityKey(serverID: serverID, session: session)
+        Self.visibilityJournal.begin(pending.generation, key: pendingKey)
+        defer { Self.visibilityJournal.end(pending.generation) }
+        // Pas de PATCH sans journal durable : crash ou réponse perdue pourront
+        // être réconciliés par un GET propriétaire, même après relance.
+        try await Self.visibilityJournal.mutations.perform { [self] in
+            try requireVisibilitySession(session)
+            try await historyCache.write(pending, for: pendingKey)
+        }
+        try requireVisibilitySession(session)
+        let response = try await api.request(
+            APIEndpoint(path: "/api/speedtests/\(encodedID)", method: .patch,
+                        headers: ["Content-Type": "application/json"], body: body),
+            as: SpeedtestVisibilityResponse.self, expectedSessionID: session.credentialSessionID
+        )
+        try requireVisibilitySession(session)
+        try response.validate(serverID: serverID, requestedVisibility: visible)
+        Self.visibilityJournal.end(pending.generation)
+        try await reconcileVisibility(pending, key: pendingKey, serverID: serverID,
+                                      isSharedOnMap: response.isSharedOnMap, mapEpoch: response.mapEpoch,
+                                      session: session)
+        return response
+    }
+}
+
+/// Aucune mesure ni coordonnée dans le journal : une génération de réconciliation.
+private struct PendingSpeedtestVisibilityMutation: Codable, Equatable, Sendable {
+    let generation: UUID
+}
+
+private final class SpeedtestVisibilityMutationRegistry: @unchecked Sendable {
+    let mutations = SpeedtestMutationQueue()
+    private let lock = NSLock()
+    private var active: [UUID: String] = [:]
+    func begin(_ id: UUID, key: String) { lock.withLock { active[id] = key } }
+    func end(_ id: UUID) { lock.withLock { _ = active.removeValue(forKey: id) } }
+    func isActive(key: String) -> Bool { lock.withLock { active.values.contains(key) } }
 }

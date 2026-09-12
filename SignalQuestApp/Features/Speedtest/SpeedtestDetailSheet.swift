@@ -8,24 +8,33 @@ struct SpeedtestDetailSheet: View {
     let result: SpeedtestRunResult
     /// Centre la carte sur le lieu du test. `nil` masque le bouton.
     var onShowOnMap: ((Coordinates) -> Void)?
-    /// Publie le test sur la carte publique. `nil` = publication impossible
-    /// (test antérieur sans id serveur, invité, ou VPN actif) → pas de bouton
-    /// plutôt qu'un bouton qui échouerait.
-    var onPublish: (() -> Void)?
-    var isPublishing = false
-
+    @StateObject private var visibility: SpeedtestVisibilityViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
+
+    init(result: SpeedtestRunResult, onShowOnMap: ((Coordinates) -> Void)? = nil,
+         visibilityService: any SpeedtestVisibilityServicing, guestMode: Bool) {
+        self.result = result
+        self.onShowOnMap = onShowOnMap
+        _visibility = StateObject(wrappedValue: SpeedtestVisibilityViewModel(
+            clientID: result.id, service: visibilityService, guestMode: guestMode,
+            vpnIsActive: { VPNDetector.isActive() }
+        ))
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                SpeedtestDetailContent(
-                    result: result,
-                    onShowOnMap: onShowOnMap,
-                    onPublish: onPublish,
-                    isPublishing: isPublishing,
-                    onDismiss: { dismiss() }
-                )
+                VStack(spacing: 0) {
+                    SpeedtestDetailContent(
+                        result: result,
+                        onShowOnMap: onShowOnMap,
+                        onDismiss: { dismiss() }
+                    )
+                    SpeedtestVisibilityControls(model: visibility)
+                        .padding(.horizontal, SQSpace.lg)
+                        .padding(.bottom, SQSpace.xl)
+                }
             }
             .signalQuestBackground()
             .navigationTitle("Détails du test")
@@ -44,6 +53,11 @@ struct SpeedtestDetailSheet: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .task { await visibility.load() }
+        .onDisappear { visibility.deactivate() }
+        .onChangeCompat(of: scenePhase) { _, phase in
+            if phase == .active { visibility.refreshAvailability() }
+        }
     }
 
     static func formatSpeedParts(_ mbps: Double?) -> (value: String, unit: String) {
@@ -57,8 +71,6 @@ struct SpeedtestDetailSheet: View {
 struct SpeedtestDetailContent: View {
     let result: SpeedtestRunResult
     var onShowOnMap: ((Coordinates) -> Void)?
-    var onPublish: (() -> Void)?
-    var isPublishing = false
     var onDismiss: (() -> Void)?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -437,19 +449,7 @@ struct SpeedtestDetailContent: View {
                     onDismiss?()
                 }
             }
-            if let onPublish {
-                GradientButton(
-                    "Publier sur la carte",
-                    systemImage: "antenna.radiowaves.left.and.right",
-                    isBusy: isPublishing,
-                    style: .ghost,
-                    action: onPublish
-                )
-                Text("Ta mesure rejoindra la carte publique, à l'endroit du test.")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .multilineTextAlignment(.center)
-            }
+
         }
     }
 
@@ -518,5 +518,116 @@ private extension String {
     var trimmedNonEmptyDetail: String? {
         let value = trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? nil : value
+    }
+}
+
+
+/// État serveur et actions de cette fiche ; aucun optimisme sur la visibilité.
+private struct SpeedtestVisibilityControls: View {
+    @ObservedObject var model: SpeedtestVisibilityViewModel
+    @State private var publicationConfirmation: SpeedtestVisibilityViewModel.PublicationConfirmation?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            Label("Carte publique", systemImage: "map")
+                .font(SQType.subhead)
+            Text(statusText)
+                .font(SQFont.body(17, .semibold))
+                .accessibilityIdentifier("speedtest.visibility.status")
+            if model.isLoading || model.isSaving {
+                ProgressView(model.isSaving
+                             ? String(localized: "Enregistrement et vérification…")
+                             : String(localized: "Vérification de la visibilité…"))
+                    .font(SQType.caption)
+                    .accessibilityIdentifier("speedtest.visibility.progress")
+            }
+            if let explanation {
+                Text(explanation)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            if let error = model.errorMessage {
+                Text(error)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.dangerInk)
+                    .accessibilityIdentifier("speedtest.visibility.error")
+            }
+            if let message = model.confirmationMessage {
+                Text(message)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.success)
+                    .accessibilityIdentifier("speedtest.visibility.confirmation")
+            }
+            if model.canHide {
+                GradientButton("Masquer de la carte", systemImage: "eye.slash", style: .secondary) {
+                    Task { await model.hide() }
+                }
+                .accessibilityIdentifier("speedtest.visibility.hide")
+            }
+            if model.canPublish {
+                GradientButton("Publier ce test", systemImage: "map", style: .secondary) {
+                    publicationConfirmation = model.requestPublicationConfirmation()
+                }
+                .accessibilityIdentifier("speedtest.visibility.publish")
+            }
+            if !model.isLoading && !model.isSaving && !model.isStateCurrent
+                && model.availability != .guest && model.availability != .sessionChanged {
+                GradientButton("Vérifier la visibilité", systemImage: "arrow.clockwise", style: .ghost) {
+                    Task { await model.load() }
+                }
+                .accessibilityIdentifier("speedtest.visibility.retry")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(SQSpace.md)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .confirmationDialog("Publier ce test ?", isPresented: Binding(
+            get: { publicationConfirmation != nil },
+            set: { if !$0 { publicationConfirmation = nil } }
+        ), titleVisibility: .visible, presenting: publicationConfirmation) { confirmation in
+            Button("Publier ce test") {
+                Task { await model.confirmPublication(confirmation) }
+            }
+            Button("Annuler", role: .cancel) {
+                model.cancelPublicationConfirmation()
+                publicationConfirmation = nil
+            }
+        } message: { _ in
+            Text("Sa mesure et sa position enregistrée seront visibles sur la carte publique. Tes zones privées restent appliquées.")
+        }
+    }
+
+    private var statusText: String {
+        switch model.availability {
+        case .guest: return String(localized: "Test invité")
+        case .noServerReference: return String(localized: "Référence serveur indisponible")
+        case .sessionChanged: return String(localized: "Session modifiée")
+        case .unknown, .loaded: break
+        }
+        guard model.isStateCurrent, let state = model.state else {
+            return String(localized: "Visibilité à vérifier")
+        }
+        if !state.isVisibleOnMap { return String(localized: "Masqué de la carte") }
+        if !state.isPublic { return String(localized: "Non éligible à la carte") }
+        if !state.hasMapPosition { return String(localized: "Position indisponible") }
+        return String(localized: "Visible sur la carte")
+    }
+
+    private var explanation: String? {
+        switch model.availability {
+        case .guest:
+            return String(localized: "Les tests invités se gèrent depuis Mes reçus.")
+        case .noServerReference:
+            return String(localized: "Ce test n’a pas de référence serveur disponible. Il peut être en attente de synchronisation ou provenir d’une ancienne version.")
+        case .sessionChanged: return nil
+        case .unknown, .loaded: break
+        }
+        guard model.isStateCurrent, let state = model.state else { return nil }
+        if !state.isOwner { return String(localized: "Seul le propriétaire peut modifier la visibilité de ce test.") }
+        if model.publicationBlockedByVPN && !state.isVisibleOnMap {
+            return String(localized: "La publication est indisponible sous VPN. Le masquage reste possible.")
+        }
+        return String(localized: "Masquer un test le conserve dans ton historique. Sa publication reste soumise aux critères de la carte et à tes zones privées.")
     }
 }

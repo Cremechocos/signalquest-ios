@@ -1235,9 +1235,9 @@ final class DriveTestViewModel: ObservableObject {
     /// avec des défauts OPPOSÉS — `false` pour le speedtest, `true` pour la
     /// couverture. Sur une installation neuve l'interrupteur des réglages affichait
     /// donc « désactivé » pendant que la trace du trajet, elle, était publiée. Ne
-    /// plus lire cette clé du tout est ce qui supprime la contradiction ; l'onglet
-    /// Speedtest autonome garde son opt-in, un test ponctuel chez soi n'étant pas
-    /// une contribution.
+    /// plus lire cette clé supprime la contradiction. Les nouveaux speedtests
+    /// ponctuels demandent également leur publication ; le serveur applique
+    /// l’éligibilité et les protections des zones privées.
     ///
     /// Le garde VPN reste : sous tunnel l'opérateur détecté est celui de la sortie
     /// du tunnel, donc la mesure serait attribuée au mauvais réseau. C'est une

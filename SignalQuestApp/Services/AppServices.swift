@@ -159,7 +159,10 @@ final class AppServices: ObservableObject {
         let networkOperatorService = NetworkOperatorService(api: api)
         networkOperator = networkOperatorService
         nearbyQuality = NearbyNetworkQualityService(map: mapService, markets: marketsService, networkOperator: networkOperatorService)
-        speedtest = SpeedtestService(api: api, markets: marketsService, networkOperator: networkOperatorService)
+        speedtest = SpeedtestService(
+            api: api, markets: marketsService, networkOperator: networkOperatorService,
+            invalidatePublicMap: { await mapService.invalidateTiles() }
+        )
         photos = PhotoService(api: api)
         let messagesService = MessagesService(api: api, sse: sseClient)
         messages = messagesService
