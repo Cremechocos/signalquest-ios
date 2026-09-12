@@ -44430,6 +44430,406 @@
           }
         }
       }
+    },
+    "L’enregistrement de couverture n’est plus disponible sur iOS.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’enregistrement de couverture n’est plus disponible sur iOS."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coverage recording is no longer available on iOS."
+          }
+        }
+      }
+    },
+    "Des speedtests pendant ton trajet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Des speedtests pendant ton trajet"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speedtests along your route"
+          }
+        }
+      }
+    },
+    "Les tests suivent la distance et le plafond choisis. Les résultats gardent leur position ; aucune collecte de couverture.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les tests suivent la distance et le plafond choisis. Les résultats gardent leur position ; aucune collecte de couverture."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tests follow your chosen distance and data limit. Results keep their location; coverage is not recorded."
+          }
+        }
+      }
+    },
+    "Démarrer le Drive Test": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrer le Drive Test"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Drive Test"
+          }
+        }
+      }
+    },
+    "Le Drive Test a besoin de ta position pour placer les speedtests sur le trajet. Active la localisation dans les Réglages, puis relance.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le Drive Test a besoin de ta position pour placer les speedtests sur le trajet. Active la localisation dans les Réglages, puis relance."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drive Test needs your location to place speedtests along the route. Enable location in Settings, then try again."
+          }
+        }
+      }
+    },
+    "L’opérateur ne peut pas être confirmé. Les résultats restent disponibles dans ton historique.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’opérateur ne peut pas être confirmé. Les résultats restent disponibles dans ton historique."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The operator cannot be confirmed. Results remain available in your history."
+          }
+        }
+      }
+    },
+    "Nombre de tests": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nombre de tests"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Number of tests"
+          }
+        }
+      }
+    },
+    "Trajet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trajet"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Route"
+          }
+        }
+      }
+    },
+    "Serveur et durée": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serveur et durée"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server and duration"
+          }
+        }
+      }
+    },
+    "Un seul test, ou plusieurs tests à la suite. Choisis Trajet pour les espacer selon la distance.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un seul test, ou plusieurs tests à la suite. Choisis Trajet pour les espacer selon la distance."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run one test or several in a row. Choose Route to space tests by distance."
+          }
+        }
+      }
+    },
+    "Mode trajet : les tests continuent selon la distance choisie, jusqu’à l’arrêt ou au plafond de données.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode trajet : les tests continuent selon la distance choisie, jusqu’à l’arrêt ou au plafond de données."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Route mode: tests continue at the chosen distance until you stop or reach the data limit."
+          }
+        }
+      }
+    },
+    "500 Mo": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "500 Mo"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "500 MB"
+          }
+        }
+      }
+    },
+    "2 Go": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2 Go"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2 GB"
+          }
+        }
+      }
+    },
+    "5,12 Go": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5,12 Go"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5.12 GB"
+          }
+        }
+      }
+    },
+    "Le Drive Test enchaîne des tests de débit pendant ton trajet, selon la distance et le plafond de données choisis.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le Drive Test enchaîne des tests de débit pendant ton trajet, selon la distance et le plafond de données choisis."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drive Test runs speed tests along your route using your chosen distance and data limit."
+          }
+        }
+      }
+    },
+    "Des résultats, sans collecte de couverture": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Des résultats, sans collecte de couverture"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Results without coverage recording"
+          }
+        }
+      }
+    },
+    "Chaque speedtest garde ses débits, sa latence et sa position. Le suivi du trajet sert à espacer les tests ; aucun enregistrement de couverture n’est créé.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chaque speedtest garde ses débits, sa latence et sa position. Le suivi du trajet sert à espacer les tests ; aucun enregistrement de couverture n’est créé."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Each speedtest keeps its speeds, latency and location. Route tracking spaces the tests; no coverage recording is created."
+          }
+        }
+      }
+    },
+    "La position exacte de chaque speedtest": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La position exacte de chaque speedtest"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The exact location of each speedtest"
+          }
+        }
+      }
+    },
+    "Les nouveaux speedtests éligibles sont publiés à leur position exacte. Tes zones privées restent protégées ; tu peux masquer un résultat depuis ton historique.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les nouveaux speedtests éligibles sont publiés à leur position exacte. Tes zones privées restent protégées ; tu peux masquer un résultat depuis ton historique."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New eligible speedtests are published at their exact location. Your private zones remain protected; you can hide a result from your history."
+          }
+        }
+      }
+    },
+    "Les anciens brouillons de couverture restent sur cet appareil et ne sont plus envoyés automatiquement.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les anciens brouillons de couverture restent sur cet appareil et ne sont plus envoyés automatiquement."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing coverage drafts stay on this device and are no longer uploaded automatically."
+          }
+        }
+      }
+    },
+    "Un VPN empêche une attribution fiable de l’opérateur. Les mesures sous VPN ne sont pas publiées.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un VPN empêche une attribution fiable de l’opérateur. Les mesures sous VPN ne sont pas publiées."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A VPN prevents reliable operator attribution. Measurements made under a VPN are not published."
+          }
+        }
+      }
+    },
+    "iPerf3 · Amérique du Nord": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPerf3 · Amérique du Nord"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPerf3 · North America"
+          }
+        }
+      }
+    },
+    "Distance entre tests": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distance entre tests"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distance between tests"
+          }
+        }
+      }
+    },
+    "Sans limite": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sans limite"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlimited"
+          }
+        }
+      }
+    },
+    "Ouvrir le Drive Test": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir le Drive Test"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Drive Test"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

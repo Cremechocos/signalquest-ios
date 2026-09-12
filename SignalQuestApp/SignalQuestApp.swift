@@ -208,7 +208,6 @@ struct AppRootView: View {
                         await services.livePresence.refreshSharingSettings()
                         if case .authenticated(let user) = newState {
                             await services.liveShare.bootstrap(currentUserId: user.id)
-                            await services.sessions.retryPendingCoverageSessions()
                             await services.speedtest.retryPendingSaves()
                         }
                     }

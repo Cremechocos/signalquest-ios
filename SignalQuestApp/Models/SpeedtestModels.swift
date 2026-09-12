@@ -165,7 +165,7 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
             ("Scaleway", scalewayCases),
             ("MilkyWan", milkywanCases),
             ("iPerf3 · France & Europe", publicEuropeCases),
-            ("iPerf3 · Amérique du Nord", publicAmericaCases),
+            (String(localized: "iPerf3 · Amérique du Nord"), publicAmericaCases),
         ]
     }
 
@@ -295,7 +295,7 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .mojiParis, .clouviderFra, .clouviderAms, .clouviderLon, .clouviderMan, .leasewebFra, .init7:
             return "iPerf3 · France & Europe"
         case .clouviderAsh, .leasewebMtl:
-            return "iPerf3 · Amérique du Nord"
+            return String(localized: "iPerf3 · Amérique du Nord")
         case .cloudflare, .libreSpeed: return "Mondial"
         // Section propre, alimentée par l'API : son contenu varie d'un lancement à
         // l'autre, il ne peut donc pas être rattaché à un groupe figé.

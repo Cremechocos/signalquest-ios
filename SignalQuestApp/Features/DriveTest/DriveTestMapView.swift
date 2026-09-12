@@ -4,13 +4,10 @@ import CoreLocation
 
 /// Mini-carte MapKit du mode Drive Test (Apple Plan natif) : puck utilisateur (suivi),
 /// antennes proches, cônes de secteur de l'antenne la plus proche (vert = dans le lobe,
-/// orange = hors lobe), trace du parcours, couverture temps réel (par génération) et
-/// points speedtest tappables (par débit).
+/// orange = hors lobe), trace du parcours, points speedtest tappables (par débit).
 struct DriveTestMapView: UIViewRepresentable {
     let antennas: [AntennaSite]
     let trace: [CLLocationCoordinate2D]
-    /// Points de couverture capturés, affichés EN TEMPS RÉEL et colorés par génération.
-    var coverageTrail: [DriveCoveragePoint] = []
     /// Points speedtest capturés, colorés par débit et tappables (→ détails).
     var speedtestTrail: [DriveSpeedtestPoint] = []
     let highlightedSiteId: String?
@@ -49,7 +46,7 @@ struct DriveTestMapView: UIViewRepresentable {
     func updateUIView(_ map: MKMapView, context: Context) {
         context.coordinator.applyBackdrop(backdrop, on: map)
         context.coordinator.sync(
-            antennas: antennas, trace: trace, coverageTrail: coverageTrail, speedtestTrail: speedtestTrail,
+            antennas: antennas, trace: trace, speedtestTrail: speedtestTrail,
             highlightedSiteId: highlightedSiteId, userLocation: userLocation,
             operatorPalette: operatorPalette, displayedKey: displayedOperatorKey, on: map
         )
@@ -61,13 +58,10 @@ struct DriveTestMapView: UIViewRepresentable {
         private var conePolygons: [MKPolygon] = []
         private var coneInSector: [ObjectIdentifier: Bool] = [:]
         private var tracePolyline: MKPolyline?
-        private var coverageOverlay: DriveDotsOverlay?
-        private weak var coverageRenderer: DriveDotsRenderer?
         private var lastAntennaSig = 0
         private var lastConeSig = ""
         private var lastTraceCount = -1
         private var lastSpeedtestCount = -1
-        private var coverageCount = -1
         private var appliedBackdrop: MapBackdrop?
         private var tileOverlay: MKTileOverlay?
         private let onSelectSite: (AntennaSite) -> Void
@@ -97,11 +91,10 @@ struct DriveTestMapView: UIViewRepresentable {
             }
         }
 
-        func sync(antennas: [AntennaSite], trace: [CLLocationCoordinate2D], coverageTrail: [DriveCoveragePoint], speedtestTrail: [DriveSpeedtestPoint], highlightedSiteId: String?, userLocation: CLLocationCoordinate2D?, operatorPalette: [String: UIColor], displayedKey: String?, on map: MKMapView) {
+        func sync(antennas: [AntennaSite], trace: [CLLocationCoordinate2D], speedtestTrail: [DriveSpeedtestPoint], highlightedSiteId: String?, userLocation: CLLocationCoordinate2D?, operatorPalette: [String: UIColor], displayedKey: String?, on map: MKMapView) {
             syncSites(antennas, operatorPalette: operatorPalette, displayedKey: displayedKey, on: map)
             syncCones(antennas: antennas, highlightedSiteId: highlightedSiteId, userLocation: userLocation, on: map)
             syncTrace(trace, on: map)
-            syncCoverage(coverageTrail, on: map)
             syncSpeedtests(speedtestTrail, on: map)
         }
 
@@ -157,39 +150,6 @@ struct DriveTestMapView: UIViewRepresentable {
             map.addOverlay(line, level: .aboveLabels)
         }
 
-        // MARK: Couverture temps réel (overlay Core Graphics, coloré par génération)
-        private func syncCoverage(_ trail: [DriveCoveragePoint], on map: MKMapView) {
-            guard trail.count != coverageCount else { return }
-            coverageCount = trail.count
-            guard !trail.isEmpty else {
-                if let old = coverageOverlay { map.removeOverlay(old); coverageOverlay = nil; coverageRenderer = nil }
-                return
-            }
-            let dots = trail.map { DriveDotsOverlay.Dot(point: MKMapPoint($0.coordinate), color: Self.generationColor(Self.generationKey($0.generation)).cgColor) }
-            // PERF-MAP-02 : mise à jour EN PLACE de l'overlay existant (pas de remove+add
-            // ni de recalcul d'union à chaque fix GPS). Tous les points restent affichés.
-            if let existing = coverageOverlay {
-                existing.dots = dots
-                coverageRenderer?.setNeedsDisplay()
-            } else {
-                let o = DriveDotsOverlay(dots: dots)
-                coverageOverlay = o
-                map.addOverlay(o, level: .aboveRoads)
-            }
-        }
-
-        private static func generationKey(_ tech: String?) -> String {
-            let t = (tech ?? "").uppercased()
-            if t.contains("5G") || t.contains("NR") { return "5g" }
-            if t.contains("4G") || t.contains("LTE") { return "4g" }
-            if t.contains("3G") || t.contains("UMTS") || t.contains("HSPA") || t.contains("WCDMA") { return "3g" }
-            if t.contains("2G") || t.contains("GSM") || t.contains("EDGE") || t.contains("GPRS") { return "2g" }
-            return "none"
-        }
-        private static func generationColor(_ key: String) -> UIColor {
-            SQSignalScale.Generation.from(key).uiColor
-        }
-
         // MARK: Speedtests (annotations tappables colorées par débit)
         private func syncSpeedtests(_ points: [DriveSpeedtestPoint], on map: MKMapView) {
             guard points.count != lastSpeedtestCount else { return }
@@ -205,11 +165,6 @@ struct DriveTestMapView: UIViewRepresentable {
         // MARK: Délégué
         func mapView(_ map: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let tile = overlay as? MKTileOverlay { return MKTileOverlayRenderer(tileOverlay: tile) }
-            if let dots = overlay as? DriveDotsOverlay {
-                let r = DriveDotsRenderer(overlay: dots)
-                coverageRenderer = r
-                return r
-            }
             if let line = overlay as? MKPolyline {
                 let r = MKPolylineRenderer(polyline: line)
                 r.strokeColor = UIColor(SQColor.brandOrange).withAlphaComponent(0.95)
@@ -315,40 +270,4 @@ final class DriveSpeedtestMarkerView: MKAnnotationView {
     }
     required init?(coder: NSCoder) { nil }
     func apply(color: UIColor) { diamond.backgroundColor = color }
-}
-
-/// Overlay « nuage de points » dense (couverture trail) — passe Core Graphics + culling.
-final class DriveDotsOverlay: NSObject, MKOverlay {
-    struct Dot { let point: MKMapPoint; let color: CGColor }
-    var dots: [Dot]
-    // PERF-MAP-02 : `boundingMapRect` figé au monde entier. L'overlay couverture est
-    // mis à jour EN PLACE pendant l'enregistrement (les `dots` changent sans détruire/
-    // recréer l'overlay), ce qui évite (a) le recalcul d'union à chaque fix GPS et
-    // (b) le churn MapKit remove/add ; et garantit que les nouveaux points hors de
-    // l'emprise initiale restent dessinés. Le renderer découpe au viewport.
-    let boundingMapRect: MKMapRect = .world
-    let coordinate = CLLocationCoordinate2D(latitude: 0, longitude: 0)
-    init(dots: [Dot]) {
-        self.dots = dots
-    }
-}
-
-final class DriveDotsRenderer: MKOverlayRenderer {
-    override func draw(_ mapRect: MKMapRect, zoomScale: MKZoomScale, in context: CGContext) {
-        guard let overlay = overlay as? DriveDotsOverlay else { return }
-        let radius = max(2.0, 4.0 / zoomScale)
-        let pad = radius * 3
-        let cull = mapRect.insetBy(dx: -pad, dy: -pad)
-        context.setLineWidth(radius * 0.4)
-        let stroke = UIColor.white.withAlphaComponent(0.7).cgColor
-        for dot in overlay.dots {
-            guard cull.contains(dot.point) else { continue }
-            let p = point(for: dot.point)
-            let r = CGRect(x: p.x - radius, y: p.y - radius, width: radius * 2, height: radius * 2)
-            context.setFillColor(dot.color)
-            context.fillEllipse(in: r)
-            context.setStrokeColor(stroke)
-            context.strokeEllipse(in: r)
-        }
-    }
 }

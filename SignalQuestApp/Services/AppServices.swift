@@ -274,7 +274,6 @@ final class AppServices: ObservableObject {
                 refreshFavoritesForCurrentAccount()
                 // Le namespace du compte est actif : les files ne peuvent plus être
                 // rejouées avec l'identité d'un autre utilisateur.
-                await sessions.retryPendingCoverageSessions()
                 await speedtest.retryPendingSaves()
                 await liveShare.bootstrap(currentUserId: user.id)
             }
