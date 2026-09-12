@@ -5,6 +5,11 @@ struct SignupView: View {
     @EnvironmentObject private var session: AuthSessionViewModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.locale) private var locale
+    @StateObject private var challenge = MobileChallengePresenter()
+    @State private var submission: Task<Void, Never>?
+    @State private var submissionID: UUID?
+    @State private var challengeError: String?
 
     @State private var email = ""
     @State private var name = ""
@@ -27,20 +32,24 @@ struct SignupView: View {
                     TextField("Nom affiché", text: $name)
                         .textContentType(.name)
                         .textFieldStyle(SQTextFieldStyle())
+                        .accessibilityIdentifier("auth.signup.name")
 
                     TextField("Email", text: $email)
                         .textInputAutocapitalization(.never)
                         .keyboardType(.emailAddress)
                         .textContentType(.username)
                         .textFieldStyle(SQTextFieldStyle())
+                        .accessibilityIdentifier("auth.signup.email")
 
                     SecureField("Mot de passe (min. 8 caractères)", text: $password)
                         .textContentType(.newPassword)
                         .textFieldStyle(SQTextFieldStyle())
+                        .accessibilityIdentifier("auth.signup.password")
 
                     SecureField("Confirmer le mot de passe", text: $passwordConfirm)
                         .textContentType(.newPassword)
                         .textFieldStyle(SQTextFieldStyle())
+                        .accessibilityIdentifier("auth.signup.confirmation")
 
                     Toggle(isOn: $acceptedTerms) {
                         Text("J’accepte les conditions d’utilisation et la politique de confidentialité.")
@@ -48,6 +57,7 @@ struct SignupView: View {
                             .foregroundStyle(SQColor.labelSecondary)
                     }
                     .tint(SQColor.brandRed)
+                    .accessibilityIdentifier("auth.signup.terms")
 
                     HStack(spacing: SQSpace.md) {
                         Link("Conditions d’utilisation", destination: Self.termsURL)
@@ -57,8 +67,9 @@ struct SignupView: View {
                     .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
                     .tint(SQColor.brandRed)
 
-                    if let error = session.errorMessage {
+                    if let error = challengeError ?? session.errorMessage {
                         Label(error, systemImage: "exclamationmark.triangle")
+                            .accessibilityIdentifier("auth.signup.error")
                             .font(.footnote)
                             .foregroundStyle(SQColor.danger)
                     } else if let info = passwordIssue {
@@ -67,19 +78,15 @@ struct SignupView: View {
                             .foregroundStyle(SQColor.labelSecondary)
                     }
 
-                    GradientButton("Créer mon compte", systemImage: "person.crop.circle.badge.plus", isBusy: session.isBusy) {
+                    GradientButton("Créer mon compte", systemImage: "person.crop.circle.badge.plus", isBusy: session.isBusy || submissionID != nil) {
                         // `canSubmit` exige déjà `acceptedTerms` : on transmet
                         // la valeur réelle plutôt qu'un `true` littéral, pour
                         // qu'un futur contournement de la validation n'aboutisse
                         // pas à enregistrer un consentement qui n'a pas eu lieu.
-                        Task {
-                            await session.signup(
-                                email: trimmedEmail, password: password,
-                                name: trimmedName, acceptedTerms: acceptedTerms
-                            )
-                        }
+                        submit()
                     }
                     .disabled(!canSubmit)
+                    .accessibilityIdentifier("auth.signup.submit")
                     .opacity(canSubmit ? 1 : 0.5)
                 }
                 .padding(SQSpace.xl)
@@ -103,7 +110,7 @@ struct SignupView: View {
                 .clipShape(Capsule(style: .continuous))
                 // Même exigence contractuelle que le formulaire e-mail : sans
                 // acceptation des CGU, on ne crée pas de compte (UXP-12).
-                .disabled(!acceptedTerms)
+                .disabled(!acceptedTerms || session.isBusy || submissionID != nil || challenge.isBusy)
                 .opacity(acceptedTerms ? 1 : 0.5)
                 .accessibilityLabel("S’inscrire avec Apple")
                 .accessibilityHint(acceptedTerms ? "" : "Accepte d’abord les conditions d’utilisation")
@@ -117,10 +124,45 @@ struct SignupView: View {
                     .sqAuthAppear(appeared, delay: 0.14)
             }
             .padding(SQSpace.xl)
+            .frame(maxWidth: 600)
+            .frame(maxWidth: .infinity)
         }
         .signalQuestHeroBackground()
         .onAppear { appeared = true }
+        .mobileChallenge(using: challenge)
+        .onDisappear { cancelSubmission() }
+        .onChangeCompat(of: session.state) { _, state in
+            guard case .loggedOut = state else { cancelSubmission(); return }
+        }
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func submit() {
+        guard canSubmit else { return }
+        let id = UUID(), email = trimmedEmail, name = trimmedName, password = password, terms = acceptedTerms
+        submissionID = id
+        challengeError = nil
+        submission = Task {
+            defer { if submissionID == id { submissionID = nil; submission = nil } }
+            do {
+                let context = try session.beginPublicForm()
+                let proof = try await challenge.request(origin: AppConfig.current.appBaseURL, action: .signup,
+                    language: locale.language.languageCode?.identifier ?? "en", theme: colorScheme == .dark ? "dark" : "light")
+                guard !Task.isCancelled, submissionID == id else { return }
+                await session.signup(email: email, password: password, name: name, acceptedTerms: terms,
+                                     proof: proof, context: context)
+            } catch {
+                guard !Task.isCancelled, submissionID == id else { return }
+                challengeError = error.localizedDescription
+            }
+        }
+    }
+
+    private func cancelSubmission() {
+        submissionID = nil
+        submission?.cancel()
+        submission = nil
+        challenge.cancel()
     }
 
     private var trimmedEmail: String { email.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -169,7 +211,7 @@ struct SignupView: View {
         password.count >= 8 &&
         password == passwordConfirm &&
         acceptedTerms &&
-        !session.isBusy
+        !session.isBusy && submissionID == nil && !challenge.isBusy
     }
 
     private var header: some View {
@@ -183,7 +225,7 @@ struct SignupView: View {
             Text("Rejoins SignalQuest")
                 .font(SQType.display)
                 .foregroundStyle(SQColor.label)
-            Text("Cartographie la 4G/5G en France avec une communauté de passionnés.")
+            Text("Rejoins la communauté et aide à mieux connaître les réseaux mobiles. Les données d’antennes et de couverture varient selon les pays.")
                 .font(SQType.body)
                 .foregroundStyle(SQColor.labelSecondary)
         }

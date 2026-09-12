@@ -20,6 +20,12 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
 
     var meResult: Result<AuthUser, Error> = .success(.mock)
     var storedCredentials = false
+    var credentialID: UUID?
+    var signupResponse: LoginResponse?
+    var signupCredentialID: UUID?
+    var signupReplacementBeforeReturn: UUID?
+    var wipeIdentity: (@Sendable () async -> Void)?
+    private(set) var identityWipeCalls = 0
     private(set) var cached: AuthUser?
     private(set) var clearLocalSessionCount = 0
     private(set) var cacheUserCalls: [AuthUser] = []
@@ -33,11 +39,19 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
     func cacheUser(_ user: AuthUser) { cacheUserCalls.append(user); cached = user }
     func cachedUser() -> AuthUser? { cached }
     func clearLocalSession() async { clearLocalSessionCount += 1; cached = nil }
-    func wipeE2EEIfIdentityChanged(to userId: String) async {}
+    func credentialSessionID() -> UUID? { credentialID }
+    func wipeE2EEIfIdentityChanged(to userId: String) async {
+        identityWipeCalls += 1
+        await wipeIdentity?()
+    }
 
     // Non exercées.
     func login(email: String, password: String) async throws -> LoginResponse { throw Unused.notImplemented }
-    func signup(email: String, password: String, name: String, acceptedTerms: Bool) async throws -> LoginResponse { throw Unused.notImplemented }
+    func signup(email: String, password: String, name: String, acceptedTerms: Bool, turnstileToken: String?) async throws -> CredentialResponse<LoginResponse> {
+        guard let signupResponse, let signupCredentialID else { throw Unused.notImplemented }
+        credentialID = signupReplacementBeforeReturn ?? signupCredentialID
+        return CredentialResponse(value: signupResponse, credentialSessionID: signupCredentialID)
+    }
     func verify2FA(tempToken: String, code: String) async throws -> LoginResponse { throw Unused.notImplemented }
     func signInWithApple(identityToken: String, fullName: String?) async throws -> LoginResponse { throw Unused.notImplemented }
     func linkApple(identityToken: String) async throws { throw Unused.notImplemented }
@@ -45,7 +59,7 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
     func setup2FA() async throws -> TwoFactorSetupResponse { throw Unused.notImplemented }
     func confirm2FA(secret: String, code: String) async throws { throw Unused.notImplemented }
     func disable2FA(code: String) async throws { throw Unused.notImplemented }
-    func forgotPassword(email: String) async throws { throw Unused.notImplemented }
+    func forgotPassword(email: String, turnstileToken: String?) async throws { throw Unused.notImplemented }
     func resetPassword(token: String, newPassword: String) async throws { throw Unused.notImplemented }
     func changePassword(currentPassword: String, newPassword: String) async throws { throw Unused.notImplemented }
     func refresh() async throws { throw Unused.notImplemented }
@@ -148,12 +162,70 @@ final class AuthSessionTests: XCTestCase {
         XCTAssertEqual(mock.cachedUser(), AuthUser.mock.withConfirmedTwoFactor(enabled: false))
     }
 
+    func testSignupRejectsAResponseWhoseGenerationChangedBeforeTheViewModelResumes() async throws {
+        let mock = MockAuthService()
+        mock.meResult = .failure(APIError.cancelled)
+        mock.credentialID = UUID()
+        mock.signupCredentialID = UUID()
+        mock.signupReplacementBeforeReturn = UUID()
+        mock.signupResponse = LoginResponse(user: .mock, requires2FA: false, tempToken: nil)
+        let vm = AuthSessionViewModel(service: mock)
+        await vm.bootstrap()
+        let context = try vm.beginPublicForm()
+        await vm.signup(email: "synthetic@example.invalid", password: "synthetic-password", name: "Test",
+                        acceptedTerms: true, proof: MobileChallengeProof(action: .signup, token: "synthetic-proof"),
+                        context: context)
+        XCTAssertEqual(vm.state, .loggedOut)
+        XCTAssertTrue(mock.cacheUserCalls.isEmpty)
+        XCTAssertEqual(mock.identityWipeCalls, 0, "A stale response must be refused before E2EE work")
+    }
+
+    func testSignupDoesNotPublishAfterCredentialsAreReplacedDuringIdentityWipe() async throws {
+        try await verifySignupAfterIdentityWipe(replacement: UUID(), shouldAuthenticate: false)
+    }
+
+    func testSignupDoesNotPublishAfterCredentialsAreClearedDuringIdentityWipe() async throws {
+        try await verifySignupAfterIdentityWipe(replacement: nil, shouldAuthenticate: false)
+    }
+
+    func testSignupAcceptsItsNewCredentialGenerationWhenItRemainsCurrent() async throws {
+        try await verifySignupAfterIdentityWipe(replacement: nil, shouldAuthenticate: true)
+    }
+
+    private func verifySignupAfterIdentityWipe(replacement: UUID?, shouldAuthenticate: Bool) async throws {
+        let mock = MockAuthService()
+        mock.meResult = .failure(APIError.cancelled)
+        mock.credentialID = UUID()
+        mock.signupCredentialID = UUID()
+        mock.signupResponse = LoginResponse(user: .mock, requires2FA: false, tempToken: nil)
+        let gate = SignupIdentityWipeGate()
+        mock.wipeIdentity = { await gate.suspend() }
+        let vm = AuthSessionViewModel(service: mock)
+        await vm.bootstrap()
+        let context = try vm.beginPublicForm()
+        let submission = Task {
+            await vm.signup(email: "synthetic@example.invalid", password: "synthetic-password", name: "Test",
+                            acceptedTerms: true, proof: MobileChallengeProof(action: .signup, token: "synthetic-proof"),
+                            context: context)
+        }
+        await gate.waitUntilSuspended()
+        XCTAssertEqual(vm.state, .loggedOut)
+        XCTAssertTrue(mock.cacheUserCalls.isEmpty)
+        if !shouldAuthenticate { mock.credentialID = replacement }
+        await gate.resume()
+        await submission.value
+        XCTAssertEqual(vm.state, shouldAuthenticate ? .authenticated(.mock) : .loggedOut)
+        XCTAssertEqual(mock.cacheUserCalls.count, shouldAuthenticate ? 1 : 0,
+                       "A stale signup must never activate its local account namespace through cacheUser")
+        XCTAssertEqual(mock.cached?.id, shouldAuthenticate ? AuthUser.mock.id : nil)
+    }
+
     // MARK: PERF-START-01 — cache SWR
 
     func testCacheUserRoundTripAndClear() async {
         let store = InMemoryTokenStore()
         let service = AuthService(
-            api: APIClient(config: .test),
+            api: APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore())),
             e2ee: nil,
             sessionStore: store
         )
@@ -451,4 +523,16 @@ private actor TwoFactorProfileReadGate {
         try await withCheckedThrowingContinuation { continuation = $0; started.fulfill() }
     }
     func resume(_ user: AuthUser) { continuation?.resume(returning: user); continuation = nil }
+}
+
+private actor SignupIdentityWipeGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    func suspend() async { await withCheckedContinuation { continuation = $0 } }
+    func waitUntilSuspended() async {
+        while continuation == nil { await Task.yield() }
+    }
+    func resume() {
+        continuation?.resume()
+        continuation = nil
+    }
 }

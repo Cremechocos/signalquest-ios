@@ -164,7 +164,7 @@ enum LocalOfflineOwnership {
 
 protocol AuthServicing: Sendable {
     func login(email: String, password: String) async throws -> LoginResponse
-    func signup(email: String, password: String, name: String, acceptedTerms: Bool) async throws -> LoginResponse
+    func signup(email: String, password: String, name: String, acceptedTerms: Bool, turnstileToken: String?) async throws -> CredentialResponse<LoginResponse>
     func verify2FA(tempToken: String, code: String) async throws -> LoginResponse
     /// Sign in with Apple : envoie le jeton d'identité Apple (JWT) + le nom
     /// (1re autorisation) ; le backend vérifie le jeton et crée/connecte l'utilisateur.
@@ -176,13 +176,14 @@ protocol AuthServicing: Sendable {
     func setup2FA() async throws -> TwoFactorSetupResponse
     func confirm2FA(secret: String, code: String) async throws
     func disable2FA(code: String) async throws
-    func forgotPassword(email: String) async throws
+    func forgotPassword(email: String, turnstileToken: String?) async throws
     func resetPassword(token: String, newPassword: String) async throws
     func changePassword(currentPassword: String, newPassword: String) async throws
     func refresh() async throws
     func logout() async throws
     func me() async throws -> AuthUser
     func hasStoredCredentials() -> Bool
+    /// Identité de la connexion HTTP, indépendante des rotations de son token.
     func credentialSessionID() -> UUID?
     func installAuthTokenForDebugQA(_ token: String)
     /// QA `--reset-auth` : efface la session LOCALE (credentials + clés E2EE)
@@ -241,10 +242,10 @@ final class AuthService: AuthServicing {
         )
     }
 
-    func signup(email: String, password: String, name: String, acceptedTerms: Bool) async throws -> LoginResponse {
-        try await api.requestJSON(
+    func signup(email: String, password: String, name: String, acceptedTerms: Bool, turnstileToken: String? = nil) async throws -> CredentialResponse<LoginResponse> {
+        try await api.requestJSONSingleAttemptWithCredentials(
             "/api/auth/signup",
-            body: SignupRequest(email: email, password: password, name: name, acceptedTerms: acceptedTerms),
+            body: SignupRequest(email: email, password: password, name: name, acceptedTerms: acceptedTerms, turnstileToken: turnstileToken),
             authenticated: false
         )
     }
@@ -294,35 +295,39 @@ final class AuthService: AuthServicing {
     }
 
     func confirm2FA(secret: String, code: String) async throws {
-        let _: SuccessResponse = try await api.requestJSON(
+        let response: SuccessResponse = try await api.requestJSON(
             "/api/auth/2fa/verify-setup",
             body: TwoFactorVerifySetupRequest(secret: secret, code: code)
         )
+        guard response.isAcknowledged else { throw TwoFactorEnrollmentError.unconfirmedResponse }
     }
 
     func disable2FA(code: String) async throws {
-        let _: SuccessResponse = try await api.requestJSON(
+        let response: SuccessResponse = try await api.requestJSON(
             "/api/auth/2fa/disable",
             body: TwoFactorDisableRequest(code: code)
         )
+        guard response.isAcknowledged else { throw APIError.decoding("two-factor-disable-acknowledgement-missing") }
     }
 
     // MARK: Password
 
-    func forgotPassword(email: String) async throws {
-        let _: SuccessResponse = try await api.requestJSON(
+    func forgotPassword(email: String, turnstileToken: String? = nil) async throws {
+        let response: SuccessResponse = try await api.requestJSONSingleAttempt(
             "/api/auth/forgot-password",
-            body: ForgotPasswordRequest(email: email),
+            body: ForgotPasswordRequest(email: email, turnstileToken: turnstileToken),
             authenticated: false
         )
+        guard response.isAcknowledged else { throw APIError.decoding("password-reset-request-acknowledgement-missing") }
     }
 
     func resetPassword(token: String, newPassword: String) async throws {
-        let _: SuccessResponse = try await api.requestJSON(
+        let response: SuccessResponse = try await api.requestJSONSingleAttempt(
             "/api/auth/reset-password",
             body: ResetPasswordRequest(token: token, password: newPassword),
             authenticated: false
         )
+        guard response.isAcknowledged else { throw APIError.decoding("password-reset-acknowledgement-missing") }
     }
 
     func changePassword(currentPassword: String, newPassword: String) async throws {
@@ -464,6 +469,10 @@ final class AuthService: AuthServicing {
 
 @MainActor
 final class AuthSessionViewModel: ObservableObject {
+    struct PublicFormContext: Equatable, Sendable {
+        fileprivate let stateID: UUID
+        fileprivate let credentialID: UUID?
+    }
     enum State: Equatable {
         case checking
         case loggedOut
@@ -474,14 +483,15 @@ final class AuthSessionViewModel: ObservableObject {
     }
 
     @Published private(set) var state: State = .checking {
-        didSet { if oldValue != state { profileRevision = UUID() } }
+        didSet { if oldValue != state { stateID = UUID(); profileRevision = UUID() } }
     }
     @Published var errorMessage: String?
     @Published var infoMessage: String?
     @Published var isBusy = false
 
-    private var profileRevision = UUID()
     private let service: AuthServicing
+    private var stateID = UUID()
+    private var profileRevision = UUID()
     // Écrit une seule fois (init, MainActor), lu une seule fois (deinit, quand plus
     // aucune autre référence n'existe) → `nonisolated(unsafe)` sûr pour permettre le
     // retrait de l'observateur depuis le deinit nonisolé.
@@ -537,12 +547,17 @@ final class AuthSessionViewModel: ObservableObject {
     /// les clés E2EE de l'ancien compte si l'identité a changé sur cet appareil
     /// (changement de compte sans logout, ex. expiration de session). No-op pour le
     /// même utilisateur → aucune ressaisie du mot de passe E2EE.
-    private func setAuthenticated(_ user: AuthUser) async {
-        let revision = profileRevision
+    private func setAuthenticated(_ user: AuthUser, expectedStateID: UUID? = nil,
+                                  expectedCredentialSessionID: UUID? = nil) async {
+        guard !Task.isCancelled, expectedStateID == nil || expectedStateID == stateID,
+              expectedCredentialSessionID == nil || expectedCredentialSessionID == service.credentialSessionID() else { return }
+        let revision = UUID()
+        profileRevision = revision
         let credentials = service.credentialSessionID()
         await service.wipeE2EEIfIdentityChanged(to: user.id)
-        guard !Task.isCancelled, profileRevision == revision,
-              service.credentialSessionID() == credentials else { return }
+        guard !Task.isCancelled, profileRevision == revision, service.credentialSessionID() == credentials,
+              expectedStateID == nil || expectedStateID == stateID,
+              expectedCredentialSessionID == nil || expectedCredentialSessionID == service.credentialSessionID() else { return }
         // Active d'abord le namespace local. Les observers de `state` peuvent lancer
         // immédiatement l'enregistrement push et des reprises de files ; ils doivent
         // tous voir le nouveau propriétaire, jamais le précédent.
@@ -689,22 +704,42 @@ final class AuthSessionViewModel: ObservableObject {
         }
     }
 
-    func signup(email: String, password: String, name: String, acceptedTerms: Bool) async {
+    func beginPublicForm() throws -> PublicFormContext {
+        guard case .loggedOut = state, !isBusy else { throw APIError.cancelled }
+        return PublicFormContext(stateID: stateID, credentialID: service.credentialSessionID())
+    }
+
+    private func acceptsPublicForm(_ context: PublicFormContext, checkCredentials: Bool = true) -> Bool {
+        guard case .loggedOut = state, context.stateID == stateID, !Task.isCancelled else { return false }
+        return !checkCredentials || context.credentialID == service.credentialSessionID()
+    }
+
+    func signup(email: String, password: String, name: String, acceptedTerms: Bool,
+                proof: MobileChallengeProof, context: PublicFormContext) async {
+        guard !isBusy, acceptsPublicForm(context) else { return }
         isBusy = true
         errorMessage = nil
         defer { isBusy = false }
         do {
-            let response = try await service.signup(
-                email: email, password: password, name: name, acceptedTerms: acceptedTerms
+            let token = try proof.consume(for: .signup)
+            let received = try await service.signup(
+                email: email, password: password, name: name, acceptedTerms: acceptedTerms, turnstileToken: token
             )
-            if let user = response.user {
-                await setAuthenticated(user)
-            } else if response.requires2FA == true, let tempToken = response.tempToken {
+            // Le cookie peut ouvrir une nouvelle génération légitime ; vérifier
+            // le reçu de cette réponse, jamais un snapshot relu après son await.
+            guard acceptsPublicForm(context, checkCredentials: false),
+                  received.credentialSessionID == service.credentialSessionID() else { return }
+            let response = received.value
+            if response.requires2FA == true, let tempToken = response.tempToken {
                 state = .requires2FA(tempToken: tempToken)
+            } else if let user = response.user {
+                await setAuthenticated(user, expectedStateID: context.stateID,
+                                       expectedCredentialSessionID: received.credentialSessionID)
             } else {
                 errorMessage = "Compte créé mais session non initialisée"
             }
         } catch {
+            guard acceptsPublicForm(context, checkCredentials: false) else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -744,28 +779,39 @@ final class AuthSessionViewModel: ObservableObject {
         }
     }
 
-    func forgotPassword(email: String) async {
+    func forgotPassword(email: String, proof: MobileChallengeProof, context: PublicFormContext) async -> Bool {
+        guard !isBusy, acceptsPublicForm(context) else { return false }
         isBusy = true
         errorMessage = nil
         infoMessage = nil
         defer { isBusy = false }
         do {
-            try await service.forgotPassword(email: email)
+            let token = try proof.consume(for: .passwordReset)
+            try await service.forgotPassword(email: email, turnstileToken: token)
+            guard acceptsPublicForm(context) else { return false }
             infoMessage = "Si l’adresse existe, un lien de réinitialisation t’a été envoyé."
+            return true
         } catch {
+            guard acceptsPublicForm(context) else { return false }
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
     func resetPassword(token: String, newPassword: String) async -> Bool {
+        guard !isBusy, !Task.isCancelled else { return false }
+        let startingState = stateID
+        let credentials = service.credentialSessionID()
         isBusy = true
         errorMessage = nil
         defer { isBusy = false }
         do {
             try await service.resetPassword(token: token, newPassword: newPassword)
+            guard !Task.isCancelled, stateID == startingState, credentials == service.credentialSessionID() else { return false }
             infoMessage = "Mot de passe mis à jour. Connecte-toi avec le nouveau mot de passe."
             return true
         } catch {
+            guard !Task.isCancelled, stateID == startingState, credentials == service.credentialSessionID() else { return false }
             errorMessage = error.localizedDescription
             return false
         }

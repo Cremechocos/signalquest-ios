@@ -1,6 +1,6 @@
 import Foundation
 
-struct AuthUser: Codable, Identifiable, Equatable {
+struct AuthUser: Codable, Identifiable, Equatable, Sendable {
     let id: String
     let email: String
     let name: String?
@@ -55,13 +55,14 @@ struct SignupRequest: Codable {
     /// et bloquait le bouton. Exigence RGPD, et attendu par la revue App Store
     /// sur la guideline EULA.
     let acceptedTerms: Bool
+    var turnstileToken: String? = nil
 }
 
 struct AppleLinkResponse: Decodable {
     let appleLinked: Bool?
 }
 
-struct LoginResponse: Codable {
+struct LoginResponse: Codable, Sendable {
     let user: AuthUser?
     let requires2FA: Bool?
     let tempToken: String?
@@ -103,6 +104,7 @@ struct TwoFactorDisableRequest: Codable {
 
 struct ForgotPasswordRequest: Codable {
     let email: String
+    var turnstileToken: String? = nil
 }
 
 struct ResetPasswordRequest: Codable {
@@ -117,17 +119,19 @@ struct ChangePasswordRequest: Codable {
 
 // MARK: - Common
 
-struct AuthMeResponse: Codable {
+struct AuthMeResponse: Codable, Sendable {
     /// Optionnel : le backend renvoie `{ user: null }` (HTTP 200) quand la session
     /// est invalide — décoder en non-optionnel faisait planter le bootstrap.
     let user: AuthUser?
 }
 
-struct SuccessResponse: Codable {
-    var isAcknowledged: Bool {
-        (success == true || ok == true) && success != false && ok != false
-    }
+struct SuccessResponse: Codable, Sendable {
     let success: Bool?
     let ok: Bool?
     let requestId: String?
+
+    /// Un corps vide ou contradictoire n'est pas un accusé de mutation.
+    var isAcknowledged: Bool {
+        (success == true || ok == true) && success != false && ok != false
+    }
 }

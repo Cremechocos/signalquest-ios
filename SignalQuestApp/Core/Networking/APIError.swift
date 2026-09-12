@@ -102,6 +102,11 @@ enum APIError: Error, LocalizedError, Equatable {
         "INVALID_OPERATOR": String(localized: "Opérateur invalide."),
         "RATE_LIMITED": String(localized: "Trop de requêtes. Patiente un instant avant de réessayer."),
         "UNAUTHORIZED": String(localized: "Session expirée. Reconnecte-toi."),
+        "CAPTCHA_FAILED": String(localized: "La vérification a été refusée. Recommence-la pour continuer."),
+        "INVALID_RESET_LINK": String(localized: "Ce lien est invalide ou déjà utilisé. Demande un nouveau lien."),
+        "RESET_LINK_ALREADY_USED": String(localized: "Ce lien est invalide ou déjà utilisé. Demande un nouveau lien."),
+        "RESET_LINK_EXPIRED": String(localized: "Ce lien a expiré. Demande un nouveau lien."),
+        "EMAIL_ALREADY_USED": String(localized: "Cette adresse est déjà utilisée. Connecte-toi ou réinitialise ton mot de passe."),
 
         // Identification d'un site (`/api/android/map/identify/direct`). Le serveur
         // renvoie déjà un message FR pour la plupart ; ceux-ci n'en portent qu'un

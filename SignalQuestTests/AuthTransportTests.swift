@@ -10,6 +10,237 @@ import UIKit
 /// désormais sa session, sans cookie jar — l'identité ne circule plus que par
 /// l'en-tête posé volontairement.
 final class AuthTransportTests: XCTestCase {
+    func testSingleAttemptJSONRejects307WithoutReplayingTheBody() async throws {
+        try await verifyRealHTTPSRedirectIsRejected(status: 307)
+    }
+
+    func testSingleAttemptJSONRejects308WithoutReplayingTheBody() async throws {
+        try await verifyRealHTTPSRedirectIsRejected(status: 308)
+    }
+
+    func testSingleAttemptDataReturns307WithoutFollowingIt() async throws {
+        try await verifyRealHTTPSRedirectIsRejected(status: 307, mode: .data)
+    }
+
+    func testSingleAttemptFileReturns308WithoutReplayingTheUpload() async throws {
+        try await verifyRealHTTPSRedirectIsRejected(status: 308, mode: .file)
+    }
+
+    private enum SingleAttemptMode { case json, data, file }
+
+    private func verifyRealHTTPSRedirectIsRejected(status: Int, mode: SingleAttemptMode = .json) async throws {
+        let env = ProcessInfo.processInfo.environment
+        guard (env["SQ_WK_CHALLENGE_QA"] ?? env["TEST_RUNNER_SQ_WK_CHALLENGE_QA"]) == "1" else {
+            throw XCTSkip("Recette URLSession HTTPS locale non demandée")
+        }
+        let origin = try XCTUnwrap(URL(string: "https://127.0.0.1:4325"))
+        let config = AppConfig(appBaseURL: origin, apiBaseURL: origin, debugLogsEnabled: false)
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        let client = APIClient(config: config, credentials: credentials)
+        let id = UUID().uuidString
+        struct Body: Encodable { let token = "synthetic-one-time-token"; let password = "synthetic-password" }
+        struct Reply: Decodable { let ok: Bool }
+        let path = "/qa/redirect-start/\(status)/\(id)"
+        if mode == .json {
+            do {
+                let _: Reply = try await client.requestJSONSingleAttempt(path, body: Body(), authenticated: false)
+                XCTFail("A one-time mutation must expose the redirect instead of following it")
+            } catch APIError.http(let actual, _, _, _, _) {
+                XCTAssertEqual(actual, status)
+            } catch { XCTFail("Expected the original HTTP redirect, got \(error)") }
+        } else if mode == .data {
+            let (_, response) = try await client.performSingleAttempt(APIEndpoint(path: path, method: .post,
+                body: try JSONEncoder().encode(Body()), authenticated: false))
+            XCTAssertEqual(response.statusCode, status)
+        } else {
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent("synthetic-redirect-\(id).json")
+            try JSONEncoder().encode(Body()).write(to: file)
+            defer { try? FileManager.default.removeItem(at: file) }
+            let (_, response) = try await client.uploadFileSingleAttempt(
+                APIEndpoint(path: path, method: .post, authenticated: false), fromFile: file)
+            XCTAssertEqual(response.statusCode, status)
+        }
+        struct Stats: Decodable {
+            let starts: Int
+            let targets: Int
+            let startCookie: Bool
+            let targetCookie: Bool
+            let startBody: Bool
+            let targetBody: Bool
+        }
+        let stats: Stats = try await client.request(APIEndpoint(path: "/qa/redirect-stats/\(id)", authenticated: false), as: Stats.self)
+        XCTAssertEqual(stats.starts, 1)
+        XCTAssertEqual(stats.targets, 0, "URLSession must never reach the other origin")
+        XCTAssertTrue(stats.startBody)
+        XCTAssertFalse(stats.targetBody)
+        XCTAssertFalse(stats.startCookie)
+        XCTAssertFalse(stats.targetCookie)
+        XCTAssertNil(credentials.accessToken(), "A redirect target cannot install its credentials")
+    }
+
+    func testSignupReturnsTheGenerationCapturedWithItsCookieAndAllowsTokenRotation() async throws {
+        let (client, _) = makeClient(token: nil)
+        let before = client.credentials.snapshot().sessionID
+        MockURLProtocol.requestHandler = { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                headerFields: ["Set-Cookie": "auth_token=synthetic-signup; Path=/"])!,
+             Data("{\"requires2FA\":false}".utf8))
+        }
+        let service = AuthService(api: client, sessionStore: InMemoryTokenStore())
+        let received = try await service.signup(email: "synthetic@example.invalid", password: "synthetic-password",
+                                                name: "Test", acceptedTerms: true)
+        XCTAssertNotEqual(received.credentialSessionID, before)
+        XCTAssertEqual(received.credentialSessionID, service.credentialSessionID())
+        let accepted = client.credentials.snapshot()
+        let rotated = try XCTUnwrap(HTTPURLResponse(url: client.config.apiBaseURL, statusCode: 200,
+            httpVersion: nil, headerFields: ["Set-Cookie": "auth_token=synthetic-rotation; Path=/"]))
+        try client.credentials.captureFromResponse(rotated, for: accepted)
+        XCTAssertEqual(received.credentialSessionID, service.credentialSessionID(), "Refresh may rotate a token within this connection")
+        XCTAssertEqual(client.credentials.accessToken(), "synthetic-rotation")
+        client.credentials.clearAll()
+        XCTAssertNotEqual(received.credentialSessionID, service.credentialSessionID(), "The receipt must not adopt a later generation")
+    }
+
+    func testSingleAttemptJSONRejectsCredentialsChangedDuringDecoding() async throws {
+        let decoder = JSONDecoder.signalQuest
+        let (client, _) = makeClient(token: nil, decoder: decoder)
+        decoder.userInfo[CredentialsChangedDuringDecoding.key] = client.credentials
+        do {
+            let _: CredentialsChangedDuringDecoding = try await client.requestJSONSingleAttempt(
+                "/synthetic", body: ["token": "synthetic-token"], authenticated: false)
+            XCTFail("Decoded values cannot outlive the credential generation of their transport response")
+        } catch APIError.cancelled {} catch { XCTFail("Unexpected error: \(error)") }
+    }
+
+    private struct CredentialsChangedDuringDecoding: Decodable {
+        static let key = CodingUserInfoKey(rawValue: "synthetic-credentials")!
+        init(from decoder: Decoder) throws {
+            let credentials = try XCTUnwrap(decoder.userInfo[Self.key] as? CredentialStore)
+            credentials.clearAll()
+        }
+    }
+
+    func testPublicAuthErrorsUseLocalizedCopyInsteadOfTheServerLanguage() {
+        let raw = "server supplied unlocalized recovery message"
+        for code in ["CAPTCHA_FAILED", "INVALID_RESET_LINK", "RESET_LINK_ALREADY_USED", "RESET_LINK_EXPIRED", "EMAIL_ALREADY_USED"] {
+            let shown = APIError.userFacingMessage(status: code == "CAPTCHA_FAILED" ? 403 : 400, code: code, serverMessage: raw)
+            XCTAssertNotEqual(shown, raw, code)
+            XCTAssertFalse(shown.isEmpty, code)
+            XCTAssertFalse(shown.contains(code), code)
+        }
+    }
+
+    func testSignupSendsTheChallengeOnlyInJSONAndPreservesConsent() async throws {
+        let (client, log) = makeClient(token: "synthetic-existing-session")
+        MockURLProtocol.requestHandler = { request in
+            log.append(request)
+            let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Self.bodyData(request)) as? [String: Any])
+            XCTAssertEqual(payload["turnstileToken"] as? String, "synthetic-signup-challenge")
+            XCTAssertEqual(payload["email"] as? String, "signup@example.invalid")
+            XCTAssertEqual(payload["acceptedTerms"] as? Bool, true)
+            XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
+            XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+            XCTAssertNil(request.url?.query)
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"])!, Data("{\"requires2FA\":false}".utf8))
+        }
+        let service = AuthService(api: client, sessionStore: InMemoryTokenStore())
+        _ = try await service.signup(email: "signup@example.invalid", password: "synthetic-password", name: "Test",
+                                     acceptedTerms: true, turnstileToken: "synthetic-signup-challenge")
+        XCTAssertEqual(log.count, 1)
+    }
+
+    func testForgotPasswordSendsTheChallengeOnlyInItsRequestBody() async throws {
+        let (client, log) = makeClient(token: "synthetic-existing-session")
+        MockURLProtocol.requestHandler = { request in
+            log.append(request)
+            let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Self.bodyData(request)) as? [String: Any])
+            XCTAssertEqual(payload["turnstileToken"] as? String, "synthetic-reset-challenge")
+            XCTAssertEqual(payload["email"] as? String, "reset@example.invalid")
+            XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
+            XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+            XCTAssertNil(request.url?.query)
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"])!, Data("{\"ok\":true}".utf8))
+        }
+        let service = AuthService(api: client, sessionStore: InMemoryTokenStore())
+        try await service.forgotPassword(email: "reset@example.invalid", turnstileToken: "synthetic-reset-challenge")
+        XCTAssertEqual(log.count, 1)
+    }
+
+    private static func bodyData(_ request: URLRequest) throws -> Data {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return Data() }
+        stream.open(); defer { stream.close() }
+        var result = Data(), buffer = [UInt8](repeating: 0, count: 1024)
+        while true {
+            let read = stream.read(&buffer, maxLength: buffer.count)
+            if read < 0 { throw stream.streamError ?? URLError(.cannotDecodeRawData) }
+            if read == 0 { return result }
+            result.append(contentsOf: buffer.prefix(read))
+        }
+    }
+
+    func testSignupDoesNotReplayAfterAnUncertainServerFailure() async throws {
+        let (client, log) = makeClient(token: nil)
+        rejectEveryAttempt(log: log, status: 503)
+        let service = AuthService(api: client, sessionStore: InMemoryTokenStore())
+        do {
+            _ = try await service.signup(email: "signup@example.invalid", password: "synthetic-password", name: "Test", acceptedTerms: true)
+            XCTFail("A failed signup must not be reported as success")
+        } catch { XCTAssertTrue(error is APIError) }
+        XCTAssertEqual(log.count, 1, "A challenge token or account creation must not be replayed automatically")
+    }
+
+    func testForgotPasswordDoesNotSendAnotherRequestAfterBackpressure() async throws {
+        let (client, log) = makeClient(token: nil)
+        rejectEveryAttempt(log: log, status: 429)
+        let service = AuthService(api: client, sessionStore: InMemoryTokenStore())
+        do {
+            try await service.forgotPassword(email: "reset@example.invalid")
+            XCTFail("Backpressure is not an acknowledged email request")
+        } catch { XCTAssertTrue(error is APIError) }
+        XCTAssertEqual(log.count, 1, "The next attempt requires a new explicit verification")
+    }
+
+    func testResetPasswordDoesNotReplayTheOneTimeResetToken() async throws {
+        let (client, log) = makeClient(token: nil)
+        rejectEveryAttempt(log: log, status: 503)
+        let service = AuthService(api: client, sessionStore: InMemoryTokenStore())
+        do {
+            try await service.resetPassword(token: "synthetic-reset-token", newPassword: "synthetic-new-password")
+            XCTFail("A server failure is not an acknowledged reset")
+        } catch { XCTAssertTrue(error is APIError) }
+        XCTAssertEqual(log.count, 1)
+    }
+
+    func testForgotPasswordRequiresAnExplicitSuccessAcknowledgement() async throws {
+        let (client, _) = makeClient(token: nil) // Real transport returns {}.
+        let service = AuthService(api: client, sessionStore: InMemoryTokenStore())
+        do {
+            try await service.forgotPassword(email: "reset@example.invalid")
+            XCTFail("An empty response must not claim that the email request succeeded")
+        } catch { XCTAssertTrue(error is APIError) }
+    }
+
+    func testResetPasswordRequiresAnExplicitSuccessAcknowledgement() async throws {
+        let (client, _) = makeClient(token: nil)
+        let service = AuthService(api: client, sessionStore: InMemoryTokenStore())
+        do {
+            try await service.resetPassword(token: "synthetic-reset-token", newPassword: "synthetic-new-password")
+            XCTFail("An empty response must not claim that the password changed")
+        } catch { XCTAssertTrue(error is APIError) }
+    }
+
+    private func rejectEveryAttempt(log: RequestLog, status: Int) {
+        MockURLProtocol.requestHandler = { request in
+            log.append(request)
+            return (HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json", "Retry-After": "0"])!,
+                Data("{\"error\":\"synthetic-unavailable\"}".utf8))
+        }
+    }
+
     func testSSETransportDoesNotPersistCookiesOrCacheAcrossAccounts() {
         let configuration = SSEClient.makeSessionConfiguration()
 
@@ -34,7 +265,7 @@ final class AuthTransportTests: XCTestCase {
     }
 
 
-    private func makeClient(token: String?) -> (APIClient, RequestLog) {
+    private func makeClient(token: String?, decoder: JSONDecoder = .signalQuest) -> (APIClient, RequestLog) {
         let store = InMemoryTokenStore()
         let credentials = CredentialStore(tokenStore: store)
         if let token { try? credentials.setAccessToken(token) }
@@ -52,7 +283,8 @@ final class AuthTransportTests: XCTestCase {
         let client = APIClient(
             config: .test,
             credentials: credentials,
-            session: URLSession(configuration: configuration)
+            session: URLSession(configuration: configuration),
+            decoder: decoder
         )
         return (client, log)
     }

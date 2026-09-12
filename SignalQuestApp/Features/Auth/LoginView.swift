@@ -57,13 +57,16 @@ struct LoginView: View {
                             GradientButton("Se connecter", systemImage: "arrow.right.circle", isBusy: session.isBusy) {
                                 Task { await session.login(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password) }
                             }
+                            .accessibilityIdentifier("login.submit")
 
                             HStack {
                                 Button("Mot de passe oublié ?") { showForgotPassword = true }
+                                    .accessibilityIdentifier("login.recovery")
                                     .font(SQType.caption)
                                     .foregroundStyle(SQColor.brandRed)
                                 Spacer()
                                 Button("Créer un compte") { showSignup = true }
+                                    .accessibilityIdentifier("login.signup")
                                     .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
                                     .foregroundStyle(SQColor.brandRed)
                             }
@@ -77,6 +80,8 @@ struct LoginView: View {
                         }
                     }
                     .padding(SQSpace.xl)
+                .frame(maxWidth: 600)
+                .frame(maxWidth: .infinity)
                     .sqSoftCard()
                     .sqAuthAppear(appeared, delay: 0.08)
 

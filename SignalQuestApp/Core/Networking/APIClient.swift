@@ -36,6 +36,24 @@ protocol APIClientProtocol: Sendable {
     ) async throws -> T
 }
 
+/// Reçu local du transport : la génération appartient à la réponse acceptée,
+/// même si une autre connexion commence avant que son appelant reprenne.
+struct CredentialResponse<Value> {
+    let value: Value
+    let credentialSessionID: UUID
+}
+
+extension CredentialResponse: Sendable where Value: Sendable {}
+
+private final class SingleAttemptTaskDelegate: NSObject, URLSessionTaskDelegate, Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+                    completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+        // nil rend la réponse 3xx initiale, sans réémettre le corps/nonce.
+        completionHandler(nil)
+    }
+}
+
 final class APIClient: APIClientProtocol, @unchecked Sendable {
     let config: AppConfig
     let credentials: CredentialStore
@@ -139,7 +157,14 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     }
 
     func request(_ endpoint: APIEndpoint) async throws {
-        let result = try await performWithRefresh(endpoint, context: credentials.snapshot())
+        let expected = credentials.snapshot().sessionID
+        try await request(endpoint, expectedSessionID: expected)
+    }
+
+    func request(_ endpoint: APIEndpoint, expectedSessionID: UUID?) async throws {
+        let context = credentials.snapshot()
+        guard expectedSessionID == nil || context.sessionID == expectedSessionID else { throw APIError.cancelled }
+        let result = try await performWithRefresh(endpoint, context: context)
         guard credentials.isCurrent(result.context) else { throw APIError.cancelled }
     }
 
@@ -163,6 +188,18 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         expectedSession: LocalAccountSession? = nil,
         expectedCredentialSessionID: UUID? = nil
     ) async throws -> (Data, HTTPURLResponse) {
+        let result = try await singleAttemptResponse(endpoint, fixedAuthToken: fixedAuthToken,
+            expectedSession: expectedSession, expectedCredentialSessionID: expectedCredentialSessionID)
+        guard expectedSession?.isCurrent != false, credentials.isCurrent(result.context) else { throw APIError.cancelled }
+        return (result.data, result.response)
+    }
+
+    private func singleAttemptResponse(
+        _ endpoint: APIEndpoint,
+        fixedAuthToken: String? = nil,
+        expectedSession: LocalAccountSession? = nil,
+        expectedCredentialSessionID: UUID? = nil
+    ) async throws -> SingleAttemptResponse {
         guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
         let context = credentials.snapshot()
         guard expectedCredentialSessionID == nil || context.sessionID == expectedCredentialSessionID else { throw APIError.cancelled }
@@ -176,11 +213,11 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
         let result = try await performSingleAttempt(request, context: context,
             captureCredentials: expectedSession == nil, startsNewSession: !endpoint.authenticated) { request in
-            try await self.session.data(for: request)
+            try await self.session.data(for: request, delegate: SingleAttemptTaskDelegate())
         }
         guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
         guard credentials.isCurrent(result.context) else { throw APIError.cancelled }
-        return (result.data, result.response)
+        return result
     }
 
     /// Variante fichier de la tentative unique. Le corps doit être absent de
@@ -198,10 +235,38 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         let request = try makeURLRequest(endpoint, credentials: context)
         let result = try await performSingleAttempt(request, context: context,
             startsNewSession: !endpoint.authenticated) { request in
-            try await self.session.upload(for: request, fromFile: fileURL)
+            try await self.session.upload(for: request, fromFile: fileURL, delegate: SingleAttemptTaskDelegate())
         }
         guard credentials.isCurrent(result.context) else { throw APIError.cancelled }
         return (result.data, result.response)
+    }
+
+    /// Contrat JSON à tentative unique, pour les jetons de challenge/reset qui
+    /// ne peuvent pas être rejoués après un résultat serveur incertain.
+    func requestJSONSingleAttempt<T: Decodable, Body: Encodable>(
+        _ path: String, body: Body, authenticated: Bool = true
+    ) async throws -> T {
+        let result: CredentialResponse<T> = try await requestJSONSingleAttemptWithCredentials(
+            path, body: body, authenticated: authenticated)
+        guard credentials.snapshot().sessionID == result.credentialSessionID else { throw APIError.cancelled }
+        return result.value
+    }
+
+    func requestJSONSingleAttemptWithCredentials<T: Decodable, Body: Encodable>(
+        _ path: String, body: Body, authenticated: Bool = true
+    ) async throws -> CredentialResponse<T> {
+        let endpoint = APIEndpoint(path: path, method: .post,
+            headers: ["Content-Type": "application/json"], body: try encoder.encode(body),
+            authenticated: authenticated, skipsAutoRefresh: true)
+        let result = try await singleAttemptResponse(endpoint)
+        guard (200..<300).contains(result.response.statusCode) else {
+            throw decodeHTTPError(data: result.data, response: result.response)
+        }
+        let value: T
+        do { value = try decoder.decode(T.self, from: result.data) }
+        catch { throw APIError.decoding("single-attempt-json-response") }
+        guard !Task.isCancelled, credentials.isCurrent(result.context) else { throw APIError.cancelled }
+        return CredentialResponse(value: value, credentialSessionID: result.context.sessionID)
     }
 
     func requestJSON<T: Decodable, Body: Encodable>(

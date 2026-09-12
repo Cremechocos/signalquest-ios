@@ -100,6 +100,8 @@ struct AppRootView: View {
     @ObservedObject var session: AuthSessionViewModel
     @ObservedObject var appLock: AppLockController
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.locale) private var locale
+    @State private var passwordResetRoute: PasswordResetRoute?
     @AppStorage("sq.hasCompletedOnboarding") private var hasCompletedOnboarding = false
     /// Miroir observable de l'unité de distance. Détenu ICI, là où se fait
     /// l'injection : les vues s'y abonnent pour se rafraîchir au changement,
@@ -157,6 +159,13 @@ struct AppRootView: View {
             .environmentObject(inAppNotifications)
             .environment(\.legibilityWeight, fieldMode ? .bold : nil)
             .controlSize(fieldMode ? .large : .regular)
+            .background(PasswordResetPresentation(route: passwordResetRoute,
+                canPresent: canPresentPasswordReset, mustDismiss: mustDismissPasswordReset,
+                session: session, locale: locale, onClose: closePasswordReset, onSuccess: completePasswordReset))
+            .onOpenURL(perform: receivePasswordResetURL)
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                if let url = activity.webpageURL { receivePasswordResetURL(url) }
+            }
             .task {
                 // `networkPath.start()` et `session.bootstrap()` ont migré dans
                 // `bootstrapIfNeeded` : la scène CarPlay a besoin des deux, et
@@ -271,6 +280,36 @@ struct AppRootView: View {
                     break
                 }
             }
+    }
+    private var mustDismissPasswordReset: Bool {
+        if services.versionPolicy.state.blocksApp || !hasCompletedOnboarding { return true }
+        if case .requires2FA = session.state { return true }
+        return false
+    }
+
+    private var canPresentPasswordReset: Bool {
+        guard !mustDismissPasswordReset, !appLock.isLocked, scenePhase == .active else { return false }
+        if case .checking = session.state { return false }
+        return true
+    }
+
+    private func receivePasswordResetURL(_ url: URL) {
+        switch PasswordResetLink.parse(url, origin: AppConfig.current.appBaseURL) {
+        case .unrelated: break
+        case .invalid: passwordResetRoute = PasswordResetRoute(content: .invalid)
+        case .request(let request):
+            if passwordResetRoute?.contains(request) != true { passwordResetRoute = PasswordResetRoute(request: request) }
+        }
+    }
+
+    private func closePasswordReset(_ id: UUID) {
+        if passwordResetRoute?.id == id { passwordResetRoute = nil }
+    }
+
+    private func completePasswordReset(_ id: UUID) {
+        guard passwordResetRoute?.id == id else { return }
+        // Remplacer la route retire son jeton du modèle pendant la confirmation.
+        passwordResetRoute = PasswordResetRoute(id: id, content: .completed)
     }
 }
 

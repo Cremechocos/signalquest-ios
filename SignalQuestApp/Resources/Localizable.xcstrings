@@ -45166,6 +45166,310 @@
           }
         }
       }
+    },
+    "Rejoins la communauté et aide à mieux connaître les réseaux mobiles. Les données d’antennes et de couverture varient selon les pays.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rejoins la communauté et aide à mieux connaître les réseaux mobiles. Les données d’antennes et de couverture varient selon les pays."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Join the community and help people understand mobile networks. Cell-site and coverage data varies by country."
+          }
+        }
+      }
+    },
+    "Vérification": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérification"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verification"
+          }
+        }
+      }
+    },
+    "La vérification n’a pas pu aboutir. Réessaie sans modifier ta saisie.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La vérification n’a pas pu aboutir. Réessaie sans modifier ta saisie."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The verification could not be completed. Try again; your input is preserved."
+          }
+        }
+      }
+    },
+    "La vérification a expiré. Recommence-la pour continuer.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La vérification a expiré. Recommence-la pour continuer."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The verification expired. Start a new check to continue."
+          }
+        }
+      }
+    },
+    "Vérification annulée. Ta saisie est conservée.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérification annulée. Ta saisie est conservée."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verification cancelled. Your input is preserved."
+          }
+        }
+      }
+    },
+    "Consulte tes e-mails": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consulte tes e-mails"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check your email"
+          }
+        }
+      }
+    },
+    "Si un compte correspond à cette adresse, un lien de réinitialisation t’a été envoyé. Ouvre ce lien pour choisir ton nouveau mot de passe.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si un compte correspond à cette adresse, un lien de réinitialisation t’a été envoyé. Ouvre ce lien pour choisir ton nouveau mot de passe."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If an account matches this address, a reset link has been sent. Open that link to choose your new password."
+          }
+        }
+      }
+    },
+    "Utiliser une autre adresse": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utiliser une autre adresse"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use another email address"
+          }
+        }
+      }
+    },
+    "Saisis ton adresse e-mail. Tu recevras un lien pour choisir un nouveau mot de passe.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saisis ton adresse e-mail. Tu recevras un lien pour choisir un nouveau mot de passe."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter your email address. You will receive a link to choose a new password."
+          }
+        }
+      }
+    },
+    "Ce lien est invalide": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce lien est invalide"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This link is invalid"
+          }
+        }
+      }
+    },
+    "Demande un nouveau lien depuis Mot de passe oublié, puis ouvre-le depuis ton e-mail.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demande un nouveau lien depuis Mot de passe oublié, puis ouvre-le depuis ton e-mail."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Request a new link from Forgot your password, then open it from your email."
+          }
+        }
+      }
+    },
+    "Mot de passe mis à jour": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mot de passe mis à jour"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Password updated"
+          }
+        }
+      }
+    },
+    "Tu peux maintenant te connecter avec ton nouveau mot de passe.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu peux maintenant te connecter avec ton nouveau mot de passe."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can now sign in with your new password."
+          }
+        }
+      }
+    },
+    "Choisis ton nouveau mot de passe": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisis ton nouveau mot de passe"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose your new password"
+          }
+        }
+      }
+    },
+    "Ce changement concerne le compte associé au lien reçu par e-mail.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce changement concerne le compte associé au lien reçu par e-mail."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This change applies to the account associated with the link you received by email."
+          }
+        }
+      }
+    },
+    "La vérification a été refusée. Recommence-la pour continuer.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La vérification a été refusée. Recommence-la pour continuer."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The verification was rejected. Start a new check to continue."
+          }
+        }
+      }
+    },
+    "Ce lien est invalide ou déjà utilisé. Demande un nouveau lien.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce lien est invalide ou déjà utilisé. Demande un nouveau lien."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This link is invalid or has already been used. Request a new link."
+          }
+        }
+      }
+    },
+    "Ce lien a expiré. Demande un nouveau lien.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce lien a expiré. Demande un nouveau lien."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This link has expired. Request a new link."
+          }
+        }
+      }
+    },
+    "Cette adresse est déjà utilisée. Connecte-toi ou réinitialise ton mot de passe.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette adresse est déjà utilisée. Connecte-toi ou réinitialise ton mot de passe."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This email address is already in use. Sign in or reset your password."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
