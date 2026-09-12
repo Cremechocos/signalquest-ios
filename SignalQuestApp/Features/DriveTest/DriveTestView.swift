@@ -119,6 +119,7 @@ final class DriveTestViewModel: ObservableObject {
 
     private let services: AppServices
     private var sessionTask: Task<Void, Never>?
+    private var measurementRunID = UUID()
     private var accumulator = ContinuousSessionAccumulator()
 
     // MARK: Cadence et plafond de données
@@ -246,6 +247,7 @@ final class DriveTestViewModel: ObservableObject {
         default:
             locationDenied = false
         }
+        measurementRunID = UUID()
         accumulator = ContinuousSessionAccumulator()
         summary = nil
         testCount = 0
@@ -758,6 +760,7 @@ final class DriveTestViewModel: ObservableObject {
     }
 
     private func runOneTest() async throws -> SpeedtestRunResult {
+        let groupID = measurementRunID
         let index = testCount
         // Réinitialise les valeurs du test PRÉCÉDENT au démarrage de ce test.
         livePing = 0
@@ -779,7 +782,7 @@ final class DriveTestViewModel: ObservableObject {
             )
         }
         let settings = makeSettings()
-        let measured = try await services.speedtest.run(
+        let rawMeasurement = try await services.speedtest.run(
             pathStatus: status,
             location: location,
             settings: settings,
@@ -788,10 +791,10 @@ final class DriveTestViewModel: ObservableObject {
             }
         )
         try Task.checkCancellation()
+        let measured = rawMeasurement.withDriveTestContext(runID: groupID)
         do {
-            // Rattache le speedtest à la session Drive Test en cours (id local) : le
-            // backend le reliera à la session de couverture (rattachement direct si déjà
-            // importée, sinon backfill à l'import). nil hors enregistrement de couverture.
+            // Provenance et groupe sont portés par la mesure ; aucune session
+            // de couverture n’est nécessaire pour retrouver le trajet.
             try await services.speedtest.save(
                 measured,
                 streams: settings.streams,

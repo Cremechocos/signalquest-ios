@@ -139,6 +139,40 @@ final class SpeedtestPublicationDefaultsTests: XCTestCase {
         XCTAssertTrue(pending.isEmpty)
     }
 
+    func testDriveMetadataSurvivesQueuedRetryWithoutCreatingCoverageAssociation() async throws {
+        let f = try fixture(user: "drive-origin-owner")
+        let original = result()
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as? [String: Any])
+        let group = UUID().uuidString.lowercased()
+        json["runOrigin"] = "drive_test"
+        json["automationId"] = group
+        let tagged = try JSONDecoder().decode(SpeedtestRunResult.self, from: JSONSerialization.data(withJSONObject: json))
+        await requireQueuedFailure { try await f.service.save(tagged) }
+        await requireQueuedFailure { try await f.recreatedService().save(original) }
+        let body = try f.recorder.lastBody()
+        XCTAssertEqual(body["runOrigin"] as? String, "drive_test")
+        XCTAssertEqual(body["automationId"] as? String, group)
+        XCTAssertNil(body["sessionId"], "A Drive Test must not recreate a coverage session")
+        let history = await f.recreatedService().history()
+        let stored = try XCTUnwrap(history.first { $0.id == original.id })
+        let storedJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(stored)) as? [String: Any])
+        XCTAssertEqual(storedJSON["automationId"] as? String, group)
+    }
+
+    func testRetryCannotReclassifyAnExistingManualMeasurementAsDriveTest() async throws {
+        let f = try fixture(user: "drive-origin-owner")
+        let original = result()
+        await requireQueuedFailure { try await f.service.save(original) }
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as? [String: Any])
+        json["runOrigin"] = "drive_test"
+        json["automationId"] = UUID().uuidString.lowercased()
+        let changed = try JSONDecoder().decode(SpeedtestRunResult.self, from: JSONSerialization.data(withJSONObject: json))
+        await requireQueuedFailure { try await f.recreatedService().save(changed) }
+        let body = try f.recorder.lastBody()
+        XCTAssertNil(body["runOrigin"])
+        XCTAssertNil(body["automationId"])
+    }
+
     func testMissingPositionIsNotInventedByAutomaticPublication() async throws {
         let f = try fixture()
         await requireQueuedFailure { try await f.service.save(result(coordinate: nil)) }

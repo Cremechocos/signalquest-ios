@@ -2551,6 +2551,11 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             // pour son propriétaire, sans l'attribuer au compte désormais actif.
             throw CancellationError()
         }
+        // Reprendre la provenance capturée avec la mesure, jamais celle du
+        // mode ou du trajet actuellement affiché. Une panne conserve la file.
+        if pending.result.runOrigin != nil {
+            try await appendHistory(pending.result)
+        }
         let payload = SpeedtestSubmission.iosPayload(
             from: pending.result,
             streams: pending.streams,

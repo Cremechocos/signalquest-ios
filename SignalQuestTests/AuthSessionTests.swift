@@ -54,6 +54,20 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
 
 @MainActor
 final class AuthSessionTests: XCTestCase {
+    private var previousPushService: PushNotificationService?
+
+    override func setUp() async throws {
+        previousPushService = AppDelegate.sharedPush
+        // Ces tests utilisent un AuthService simulé : ils ne doivent pas attendre
+        // une révocation FCM réelle appartenant au processus hôte XCTest.
+        AppDelegate.sharedPush = nil
+    }
+
+    override func tearDown() async throws {
+        AppDelegate.sharedPush = previousPushService
+        previousPushService = nil
+    }
+
 
     private func makeSecondUser() -> AuthUser {
         AuthUser(

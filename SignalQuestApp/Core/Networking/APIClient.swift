@@ -352,14 +352,10 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             request.setValue(value, forHTTPHeaderField: key)
         }
         endpoint.headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
-        let cacheDirectives = endpoint.headers.first {
-            $0.key.caseInsensitiveCompare("Cache-Control") == .orderedSame
-        }?.value.lowercased().split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } ?? []
-        if cacheDirectives.contains("no-cache") || cacheDirectives.contains("no-store") || cacheDirectives.contains("max-age=0") {
-            // Les caches métier décident déjà de leur fraîcheur. Une lecture
-            // réseau demandée ne doit pas recycler un ancien 200 de URLCache.
-            request.cachePolicy = .reloadIgnoringLocalCacheData
-        }
+        // URLCache n’est pas isolé par compte : même une réponse « private »
+        // peut être réutilisée après un changement de cookie ou une déconnexion.
+        // La fraîcheur est gérée par les caches métier explicitement cloisonnés.
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         if let idempotencyKey = endpoint.idempotencyKey {
             request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
         }

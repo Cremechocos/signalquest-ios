@@ -108,6 +108,31 @@ final class SpeedtestBackendInteropTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(after.measurements.first).measurementTrace?.payload, result.measurementTrace)
     }
 
+    func testDriveTestGroupingReachesOwnerHistoryWithoutCoverageSessions() async throws {
+        let h = try await SpeedtestHTTPHarness.create()
+        defer { h.close() }
+        let group = UUID()
+        let first = h.result().withDriveTestContext(runID: group)
+        let second = h.result().withDriveTestContext(runID: group)
+        try await h.service.save(first)
+        try await h.service.save(second)
+        let history = try await h.personalHistory(group: group.uuidString.lowercased())
+        XCTAssertEqual(history.count, 2)
+        XCTAssertTrue(history.speedtests.allSatisfy { $0.runOrigin == "drive_test" && $0.automationId == group.uuidString.lowercased() })
+        let state = try await h.state()
+        XCTAssertEqual(state.coverageSessionsCount, 0)
+        XCTAssertEqual(Set(state.measurements.map(\.automationId)), [group.uuidString.lowercased()])
+        XCTAssertTrue(state.measurements.allSatisfy { $0.runOrigin == "drive_test" })
+        try h.activate(h.scenario.B)
+        let other = try await h.personalHistory(group: group.uuidString.lowercased())
+        XCTAssertEqual(other.count, 0)
+        XCTAssertTrue(other.speedtests.isEmpty)
+        do {
+            _ = try await h.personalHistory(group: group.uuidString.lowercased(), authenticated: false)
+            XCTFail("An anonymous read must not reuse the authenticated history")
+        } catch { Self.expectHTTP(error, status: 403) }
+    }
+
     private static func expectHTTP(_ error: Error, status: Int) {
         guard case APIError.http(let actual, _, _, _, _) = error else {
             return XCTFail("Expected a scoped HTTP rejection")
@@ -160,11 +185,19 @@ private struct SpeedtestHTTPRow: Decodable {
     let methodologyVersion: Int?
     let averageSpeed: Double
     let measurementTrace: Trace?
+    let runOrigin: String?
+    let automationId: String?
 }
 private struct SpeedtestHTTPState: Decodable {
     struct Event: Decodable { let method: String; let status: Int; let responseDropped: Bool }
     let measurements: [SpeedtestHTTPRow]
     let events: [Event]
+    let coverageSessionsCount: Int?
+}
+private struct SpeedtestHTTPHistory: Decodable {
+    struct Row: Decodable { let id: String; let runOrigin: String?; let automationId: String? }
+    let count: Int
+    let speedtests: [Row]
 }
 private struct SpeedtestHTTPAck: Decodable {}
 
@@ -230,6 +263,13 @@ private final class SpeedtestHTTPHarness {
     func recreate(_ invalidate: @escaping @Sendable () async -> Void) -> SpeedtestService {
         SpeedtestService(api: api, historyCache: cache, pendingCache: cache,
             guestReceiptStore: GuestSpeedtestReceiptStore(store: InMemoryTokenStore()), invalidatePublicMap: invalidate, vpnIsActive: { false })
+    }
+    func personalHistory(group: String, authenticated: Bool = true) async throws -> SpeedtestHTTPHistory {
+        try await api.request(APIEndpoint(path: "/api/user/speedtests", query: [
+            URLQueryItem(name: "runOrigin", value: "drive_test"),
+            URLQueryItem(name: "automationId", value: group),
+            URLQueryItem(name: "period", value: "all")
+        ], authenticated: authenticated), as: SpeedtestHTTPHistory.self, expectedSessionID: credentials.snapshot().sessionID)
     }
     func state() async throws -> SpeedtestHTTPState {
         try await Self.control(config, session, "state", scenarioID: scenario.id)

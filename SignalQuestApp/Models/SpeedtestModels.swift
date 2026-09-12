@@ -513,6 +513,16 @@ struct SpeedtestPhysicalSiteAssociation: Codable, Equatable, Sendable {
 }
 
 struct SpeedtestRunResult: Codable, Identifiable, Equatable {
+    private(set) var runOrigin: String? = nil
+    private(set) var automationId: String? = nil
+
+    func withDriveTestContext(runID: UUID) -> Self {
+        var copy = self
+        copy.runOrigin = "drive_test"
+        copy.automationId = runID.uuidString.lowercased()
+        return copy
+    }
+
     let id: UUID
     let label: String
     let downloadMbps: Double
@@ -952,6 +962,8 @@ struct SpeedtestSubmission: Encodable, Equatable {
     /// cet id (résolu par `CoverageSession.sourceSessionId`, ou backfill à l'import).
     /// `nil` pour un speedtest manuel hors drive.
     let sessionId: String?
+    let runOrigin: String?
+    let automationId: String?
     let server: String?
     let downloadServerName: String?
     let downloadServerId: String?
@@ -994,7 +1006,7 @@ struct SpeedtestSubmission: Encodable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case measurementTrace, pingServerHost, pingServerPort, uploadServerHost, uploadServerPort
-        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, observedPlmn, simPlmn, isRoaming, networkIdentitySource, radioEvidence, marketCode, operatorKey, carrierName, mvnoKey, mvnoName, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort, methodologyVersion, engine, engineFallbackReason, requestedServerId
+        case clientSubmissionId, downloadSpeed, averageSpeed, maxSpeed, uploadSpeed, uploadAvg, uploadMax, downloadAvg, downloadP90, downloadP95, downloadPeakMbps, downloadMax, uploadP90, uploadP95, uploadPeakMbps, ping, pingAvg, pingMedian, pingMin, pingMax, pingProtocol, jitter, testDuration, streams, connectionType, networkType, coordinates, city, address, mobileOperator, mcc, mnc, observedPlmn, simPlmn, isRoaming, networkIdentitySource, radioEvidence, marketCode, operatorKey, carrierName, mvnoKey, mvnoName, device, deviceType, deviceModel, isVisibleOnMap, shareExactLocation, guestDeleteToken, sessionId, runOrigin, automationId, server, downloadServerName, downloadServerId, downloadServerCode, downloadServerHost, downloadServerPort, methodologyVersion, engine, engineFallbackReason, requestedServerId
         case rsrp, rsrq, snr, cellId, pci, tac, enb, gnb, earfcn, nrarfcn, timingAdvance, timingAdvanceSourceTechnology, timingAdvanceSourceCellId, radioSnapshots
         case pingDl, jitterDl, pingUl, jitterUl
     }
@@ -1089,6 +1101,8 @@ struct SpeedtestSubmission: Encodable, Equatable {
             shareExactLocation: shareExactLocation,
             guestDeleteToken: guestDeleteToken,
             sessionId: sessionId,
+            runOrigin: result.runOrigin,
+            automationId: result.automationId,
             server: result.serverName,
             downloadServerName: result.downloadServerName ?? result.serverName,
             downloadServerId: result.downloadServerId,
@@ -1163,6 +1177,8 @@ struct SpeedtestSubmission: Encodable, Equatable {
         try c.encode(shareExactLocation, forKey: .shareExactLocation)
         try c.encodeIfPresent(guestDeleteToken, forKey: .guestDeleteToken)
         try c.encodeIfPresent(sessionId, forKey: .sessionId)
+        try c.encodeIfPresent(runOrigin, forKey: .runOrigin)
+        try c.encodeIfPresent(automationId, forKey: .automationId)
         try c.encodeIfPresent(server, forKey: .server)
         try c.encodeIfPresent(downloadServerName, forKey: .downloadServerName)
         try c.encodeIfPresent(downloadServerId, forKey: .downloadServerId)

@@ -54,6 +54,7 @@ struct SpeedtestHistoryRow: View {
     /// l'adresse ou la commune quand elles sont connues (contexte de la mesure).
     var subtitleLine: String {
         var parts = [result.networkDisplayName]
+        if result.runOrigin == "drive_test" { parts.insert(String(localized: "Drive Test"), at: 0) }
         if let op = result.networkOperatorName?.trimmingCharacters(in: .whitespacesAndNewlines), !op.isEmpty {
             parts.append(op)
         }
