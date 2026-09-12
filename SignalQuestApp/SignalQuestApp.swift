@@ -329,6 +329,7 @@ struct RootView: View {
         .onChangeCompat(of: networkPath.isOnline) { _, online in
             guard online, case .authenticated = session.state else { return }
             services.epochRotations.resume()
+            services.refreshFavoritesForCurrentAccount()
             Task {
                 await callManager.retryVoIPTokenRegistrationIfNeeded()
                 await callManager.retryPendingCallTerminations()

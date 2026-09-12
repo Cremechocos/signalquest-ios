@@ -160,10 +160,12 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     func performSingleAttempt(
         _ endpoint: APIEndpoint,
         fixedAuthToken: String? = nil,
-        expectedSession: LocalAccountSession? = nil
+        expectedSession: LocalAccountSession? = nil,
+        expectedCredentialSessionID: UUID? = nil
     ) async throws -> (Data, HTTPURLResponse) {
         guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
         let context = credentials.snapshot()
+        guard expectedCredentialSessionID == nil || context.sessionID == expectedCredentialSessionID else { throw APIError.cancelled }
         var request = try makeURLRequest(endpoint, credentials: context)
         if let fixedAuthToken {
             request.setValue("auth_token=\(fixedAuthToken)", forHTTPHeaderField: "Cookie")

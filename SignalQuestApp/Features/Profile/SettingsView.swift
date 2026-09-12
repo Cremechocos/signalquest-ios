@@ -1841,10 +1841,20 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showDeleteConfirm) {
             DeleteAccountSheet(model: model) {
-                guard model.deletedOwnerScopeId == LocalAccountScope.currentOwnerScopeId else { return }
+                guard let deletedOwner = model.deletedOwnerScopeId else { return }
+                var cleanupWarning: String?
+                // Le reçu serveur concerne ce propriétaire, même si un autre
+                // compte a été ouvert entre-temps. Ne jamais effacer son voisin.
+                do { try await services.favoriteAntennas.eraseLocalDataForDeletedAccount(ownerScopeID: deletedOwner) }
+                catch {
+                    cleanupWarning = String(localized: "Le compte est supprimé, mais le nettoyage des favoris locaux a échoué sur cet appareil.")
+                    model.deletionError = cleanupWarning
+                }
+                guard deletedOwner == LocalAccountScope.currentOwnerScopeId else { return }
                 await services.push.unregister()
-                guard model.deletedOwnerScopeId == LocalAccountScope.currentOwnerScopeId else { return }
+                guard deletedOwner == LocalAccountScope.currentOwnerScopeId else { return }
                 await session.logout()
+                if case .loggedOut = session.state, let cleanupWarning { session.errorMessage = cleanupWarning }
             }
         }
     }

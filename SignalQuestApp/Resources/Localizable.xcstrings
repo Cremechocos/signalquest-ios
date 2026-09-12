@@ -42851,6 +42851,262 @@
           }
         }
       }
+    },
+    "Une modification en attente de synchronisation": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une modification en attente de synchronisation"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One change waiting to sync"
+          }
+        }
+      }
+    },
+    "%lld modifications en attente de synchronisation": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld modifications en attente de synchronisation"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld changes waiting to sync"
+          }
+        }
+      }
+    },
+    "Réessayer la synchronisation": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer la synchronisation"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry sync"
+          }
+        }
+      }
+    },
+    "Les changements en attente restent sur cet appareil. Ils ne sont confirmés sur le compte qu’après synchronisation.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les changements en attente restent sur cet appareil. Ils ne sont confirmés sur le compte qu’après synchronisation."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pending changes stay on this device. They are confirmed on your account only after syncing."
+          }
+        }
+      }
+    },
+    "Chargement des favoris…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chargement des favoris…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading favorites…"
+          }
+        }
+      }
+    },
+    "La liste des favoris n’a pas pu être chargée.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La liste des favoris n’a pas pu être chargée."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The favorites list could not be loaded."
+          }
+        }
+      }
+    },
+    "Synchronisation en attente": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchronisation en attente"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting to sync"
+          }
+        }
+      }
+    },
+    "Charger les favoris": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Charger les favoris"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Load favorites"
+          }
+        }
+      }
+    },
+    "Synchronisation des favoris": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchronisation des favoris"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorites sync"
+          }
+        }
+      }
+    },
+    "Les changements restent en attente sur cet appareil.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les changements restent en attente sur cet appareil."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes remain pending on this device."
+          }
+        }
+      }
+    },
+    "Les favoris enregistrés sur cet appareil sont indisponibles. Réessaie avant de les modifier.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les favoris enregistrés sur cet appareil sont indisponibles. Réessaie avant de les modifier."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorites saved on this device are unavailable. Try again before changing them."
+          }
+        }
+      }
+    },
+    "Cette antenne ne peut pas être ajoutée aux favoris.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette antenne ne peut pas être ajoutée aux favoris."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This antenna cannot be added to favorites."
+          }
+        }
+      }
+    },
+    "Tu peux suivre au maximum 500 antennes. Retire un favori avant d’en ajouter un autre.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu peux suivre au maximum 500 antennes. Retire un favori avant d’en ajouter un autre."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can follow up to 500 antennas. Remove a favorite before adding another."
+          }
+        }
+      }
+    },
+    "Synchronise les modifications en attente avant d’en ajouter d’autres.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchronise les modifications en attente avant d’en ajouter d’autres."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync pending changes before adding more."
+          }
+        }
+      }
+    },
+    "Les derniers changements n’ont pas pu être enregistrés sur cet appareil. Réessaie avant de fermer l’app.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les derniers changements n’ont pas pu être enregistrés sur cet appareil. Réessaie avant de fermer l’app."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The latest changes could not be saved on this device. Try again before closing the app."
+          }
+        }
+      }
+    },
+    "Le compte est supprimé, mais le nettoyage des favoris locaux a échoué sur cet appareil.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le compte est supprimé, mais le nettoyage des favoris locaux a échoué sur cet appareil."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The account has been deleted, but local favorites could not be cleared from this device."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
