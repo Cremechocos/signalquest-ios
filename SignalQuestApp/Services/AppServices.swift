@@ -138,12 +138,12 @@ final class AppServices: ObservableObject {
         comments = CommentsService(api: api)
         stories = StoriesService(api: api)
         reports = ReportsService(api: api)
-        let privacyService = PrivacyService(api: api)
+        let mapService = MapSnapshotService(api: api)
+        map = mapService
+        let privacyService = PrivacyService(api: api, invalidatePublicMap: { await mapService.invalidateTiles() })
         privacy = privacyService
         livePresence = LivePresenceService(api: api, location: location, networkPath: networkPath, privacy: privacyService)
         versionPolicy = VersionPolicyService(api: api)
-        let mapService = MapSnapshotService(api: api)
-        map = mapService
         let marketsService = MarketRegistryService(api: api)
         markets = marketsService
         antennas = AntennasService(api: api)
