@@ -44830,6 +44830,342 @@
           }
         }
       }
+    },
+    "La session a changé. Rouvre la configuration depuis les réglages du compte.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La session a changé. Rouvre la configuration depuis les réglages du compte."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your session has changed. Reopen setup from your account settings."
+          }
+        }
+      }
+    },
+    "La configuration reçue est invalide. Réessaie pour obtenir un nouveau secret.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La configuration reçue est invalide. Réessaie pour obtenir un nouveau secret."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The setup received is invalid. Try again to get a new secret."
+          }
+        }
+      }
+    },
+    "Le code est incorrect. Saisis les six chiffres affichés dans ton application d’authentification.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le code est incorrect. Saisis les six chiffres affichés dans ton application d’authentification."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The code is incorrect. Enter the six digits shown in your authenticator app."
+          }
+        }
+      }
+    },
+    "Cette configuration a expiré. Génère un nouveau QR code avant de réessayer.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette configuration a expiré. Génère un nouveau QR code avant de réessayer."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This setup has expired. Generate a new QR code before trying again."
+          }
+        }
+      }
+    },
+    "Cette configuration a été remplacée. Génère un nouveau QR code.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette configuration a été remplacée. Génère un nouveau QR code."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This setup has been replaced. Generate a new QR code."
+          }
+        }
+      }
+    },
+    "La double authentification est déjà activée pour ce compte. Actualise son état.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La double authentification est déjà activée pour ce compte. Actualise son état."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Two-factor authentication is already enabled for this account. Refresh its status."
+          }
+        }
+      }
+    },
+    "L’activation n’a pas pu être confirmée. Réessaie avec un nouveau code.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’activation n’a pas pu être confirmée. Réessaie avec un nouveau code."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activation could not be confirmed. Try again with a new code."
+          }
+        }
+      }
+    },
+    "Le profil ne reflète pas encore l’activation. Réessaie l’actualisation du compte.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le profil ne reflète pas encore l’activation. Réessaie l’actualisation du compte."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The profile does not yet reflect the activation. Try refreshing the account again."
+          }
+        }
+      }
+    },
+    "Préparation de la configuration…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Préparation de la configuration…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing setup…"
+          }
+        }
+      }
+    },
+    "Le secret sera disponible ici pour ton application d’authentification.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le secret sera disponible ici pour ton application d’authentification."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The secret will appear here for your authenticator app."
+          }
+        }
+      }
+    },
+    "Générer un nouveau QR code": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Générer un nouveau QR code"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generate a new QR code"
+          }
+        }
+      }
+    },
+    "Ajoute SignalQuest à ton application d’authentification, puis saisis le code qu’elle affiche.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajoute SignalQuest à ton application d’authentification, puis saisis le code qu’elle affiche."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add SignalQuest to your authenticator app, then enter the code it displays."
+          }
+        }
+      }
+    },
+    "Copier le secret": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copier le secret"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy secret"
+          }
+        }
+      }
+    },
+    "Code de vérification": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code de vérification"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verification code"
+          }
+        }
+      }
+    },
+    "La double authentification est activée.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La double authentification est activée."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Two-factor authentication is enabled."
+          }
+        }
+      }
+    },
+    "La double authentification est déjà active.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La double authentification est déjà active."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Two-factor authentication is already enabled."
+          }
+        }
+      }
+    },
+    "Actualisation du compte…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualisation du compte…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refreshing account…"
+          }
+        }
+      }
+    },
+    "Ton compte reste protégé. Seule l’actualisation de son affichage doit être réessayée.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ton compte reste protégé. Seule l’actualisation de son affichage doit être réessayée."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your account remains protected. Only refreshing its displayed status needs to be retried."
+          }
+        }
+      }
+    },
+    "Actualiser le compte": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualiser le compte"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh account"
+          }
+        }
+      }
+    },
+    "Terminer": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminer"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
+    "La désactivation n’a pas pu être confirmée. Actualise le compte avant de réessayer.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deactivation could not be confirmed. Refresh your account before trying again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La désactivation n’a pas pu être confirmée. Actualise le compte avant de réessayer."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
