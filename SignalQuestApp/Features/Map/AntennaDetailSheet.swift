@@ -69,6 +69,7 @@ final class AntennaDetailViewModel: ObservableObject {
 struct AntennaDetailSheet: View {
     let site: AntennaSite
     let market: String
+    let sightOrigin: AntennaSightOrigin
     /// Marqueur d'origine quand la fiche est ouverte depuis la couche « Sites
     /// ajoutés ». La route de détail sert les deux types de sites, mais elle ne
     /// renvoie ni l'auteur ni la date d'ajout : ils viennent de la tuile.
@@ -128,11 +129,13 @@ struct AntennaDetailSheet: View {
         operatorName: String = "ALL",
         service: AntennasServicing,
         customSite: AndroidCustomSiteMarker? = nil,
+        sightOrigin: AntennaSightOrigin = .device,
         onIsolateCoverage: ((AntennaCoverageFocus) -> Void)? = nil
     ) {
         self.site = site
         self.market = market
         self.customSite = customSite
+        self.sightOrigin = sightOrigin
         self.onIsolateCoverage = onIsolateCoverage
         // Aucun repli SFR : un site étranger ou communautaire ne doit jamais être
         // ouvert sous une facette française inventée. On conserve le choix reçu
@@ -171,6 +174,7 @@ struct AntennaDetailSheet: View {
                 }
                 .padding(SQSpace.lg + 2)
             }
+            .accessibilityIdentifier("antenna.detail.scroll")
             .signalQuestBackground()
             .navigationTitle(headerTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -191,6 +195,7 @@ struct AntennaDetailSheet: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fermer") { dismiss() }
+                        .accessibilityIdentifier("antenna.detail.close")
                         .tint(SQColor.brandRed)
                 }
             }
@@ -788,12 +793,14 @@ struct AntennaDetailSheet: View {
     /// première question qu'on se pose devant un pylône, pas la dernière.
     private var sightCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            AntennaSectionHeader(kicker: "Repérage", title: "Depuis ta position", systemImage: "location.north.line")
+            AntennaSectionHeader(kicker: "Repérage", title: sightOrigin.label, systemImage: "location.north.line")
+                .accessibilityIdentifier("antenna.profile.origin")
             AntennaSightCard(
                 site: site,
                 details: model.details,
                 fallbackAzimuths: operatorAzimuths,
                 location: services.location,
+                origin: sightOrigin,
                 tint: operatorColor,
                 terrain: services.terrain
             )

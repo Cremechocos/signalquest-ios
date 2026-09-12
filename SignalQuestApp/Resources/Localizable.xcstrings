@@ -42451,6 +42451,406 @@
           }
         }
       }
+    },
+    "Depuis ta position": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Depuis ta position"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From your location"
+          }
+        }
+      }
+    },
+    "Depuis l’adresse recherchée": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Depuis l’adresse recherchée"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From the searched address"
+          }
+        }
+      }
+    },
+    "Origine à préciser": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Origine à préciser"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a starting point"
+          }
+        }
+      }
+    },
+    "départ": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "départ"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "start"
+          }
+        }
+      }
+    },
+    "adresse": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "adresse"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "address"
+          }
+        }
+      }
+    },
+    "l'antenne vise le départ": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "l'antenne vise le départ"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the antenna points toward the start"
+          }
+        }
+      }
+    },
+    "Schéma du dénivelé entre le point de départ et le site": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schéma du dénivelé entre le point de départ et le site"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagram of the elevation difference between the starting point and the site"
+          }
+        }
+      }
+    },
+    "Le point de départ est dans le lobe du secteur %lld° (écart %lld°)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le point de départ est dans le lobe du secteur %lld° (écart %lld°)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The starting point is inside the %lld° sector beam (%lld° offset)"
+          }
+        }
+      }
+    },
+    "Sélectionne une adresse dans les résultats ou efface la recherche pour utiliser ta position.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionne une adresse dans les résultats ou efface la recherche pour utiliser ta position."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select an address from the results or clear the search to use your location."
+          }
+        }
+      }
+    },
+    "Position actuelle indisponible. Actualise la localisation pour situer ce site.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position actuelle indisponible. Actualise la localisation pour situer ce site."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current location unavailable. Refresh your location to locate this site."
+          }
+        }
+      }
+    },
+    "Aperçu du relief entre le point de départ et l'antenne": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aperçu du relief entre le point de départ et l'antenne"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terrain preview between the starting point and the antenna"
+          }
+        }
+      }
+    },
+    "Altitude de départ": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Altitude de départ"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting elevation"
+          }
+        }
+      }
+    },
+    "Tilt vers le départ": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilt vers le départ"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilt toward the start"
+          }
+        }
+      }
+    },
+    "Profil du relief : départ à %lld mètres d'altitude, site %@ à %lld mètres, distants de %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profil du relief : départ à %lld mètres d'altitude, site %@ à %lld mètres, distants de %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terrain profile: starting elevation %lld meters, site %@ at %lld meters, %@ apart"
+          }
+        }
+      }
+    },
+    "La distance à vol d'oiseau entre le point de départ et le pied du support, mesurée sur l'ellipsoïde terrestre. Ce n'est pas la longueur du trajet radio, qui monte jusqu'aux antennes.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La distance à vol d'oiseau entre le point de départ et le pied du support, mesurée sur l'ellipsoïde terrestre. Ce n'est pas la longueur du trajet radio, qui monte jusqu'aux antennes."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The straight-line distance between the starting point and the base of the structure, measured on the Earth's ellipsoid. It is not the length of the radio path, which rises up to the antennas."
+          }
+        }
+      }
+    },
+    "Le point de départ est à %@ du site.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le point de départ est à %@ du site."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The starting point is %@ from the site."
+          }
+        }
+      }
+    },
+    "Le site domine le point de départ de %lld m.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le site domine le point de départ de %lld m."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The site is %lld m above the starting point."
+          }
+        }
+      }
+    },
+    "Le point de départ domine le site de %lld m.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le point de départ domine le site de %lld m."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The starting point is %lld m above the site."
+          }
+        }
+      }
+    },
+    "L'écart d'altitude entre le sol au point de départ et le sol au pied du support. Un site perché voit par-dessus les obstacles ; un site en contrebas se fait masquer par le moindre relief.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'écart d'altitude entre le sol au point de départ et le sol au pied du support. Un site perché voit par-dessus les obstacles ; un site en contrebas se fait masquer par le moindre relief."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The difference in ground elevation between the starting point and the base of the structure. An elevated site can see over obstacles; a lower site can be blocked by even small rises in terrain."
+          }
+        }
+      }
+    },
+    "L'inclinaison d'une antenne vers le bas. Les opérateurs l'utilisent pour concentrer l'énergie sur la zone à couvrir plutôt que de l'envoyer à l'horizon, où elle brouillerait les cellules voisines. Le chiffre donné ici est purement géométrique : c'est l'angle qui pointerait exactement vers le point de départ.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'inclinaison d'une antenne vers le bas. Les opérateurs l'utilisent pour concentrer l'énergie sur la zone à couvrir plutôt que de l'envoyer à l'horizon, où elle brouillerait les cellules voisines. Le chiffre donné ici est purement géométrique : c'est l'angle qui pointerait exactement vers le point de départ."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An antenna's downward tilt. Operators use it to focus energy on the coverage area instead of sending it toward the horizon, where it could interfere with neighboring cells. This value is purely geometric: the angle that would point exactly toward the starting point."
+          }
+        }
+      }
+    },
+    "Une antenne inclinée de %@° vers le bas viserait exactement le point de départ.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une antenne inclinée de %@° vers le bas viserait exactement le point de départ."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An antenna tilted down by %@° would point exactly toward the starting point."
+          }
+        }
+      }
+    },
+    "Le point de départ est au-dessus de l'antenne : il faudrait la relever de %@° pour le viser.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le point de départ est au-dessus de l'antenne : il faudrait la relever de %@° pour le viser."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The starting point is above the antenna: it would need to tilt up by %@° to point toward it."
+          }
+        }
+      }
+    },
+    "Rien ne coupe la droite entre un observateur au point de départ et les antennes.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien ne coupe la droite entre un observateur au point de départ et les antennes."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing blocks the straight line between an observer at the starting point and the antennas."
+          }
+        }
+      }
+    },
+    "La droite entre un observateur au point de départ et les antennes. Quand elle est dégagée, la liaison est dite « en visibilité directe » : c'est le cas le plus favorable. Sinon le signal doit contourner ou traverser, et perd beaucoup.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La droite entre un observateur au point de départ et les antennes. Quand elle est dégagée, la liaison est dite « en visibilité directe » : c'est le cas le plus favorable. Sinon le signal doit contourner ou traverser, et perd beaucoup."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The straight line between an observer at the starting point and the antennas. When clear, the connection has a direct line of sight, which is the most favorable case. Otherwise, the signal must travel around or through obstacles and loses considerable strength."
+          }
+        }
+      }
+    },
+    "Position relevée à %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position relevée à %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location recorded at %@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
