@@ -2423,6 +2423,8 @@ struct MapExplorerView: View {
                 mapToast(error, icon: "exclamationmark.triangle.fill", tint: SQColor.warning)
                 Button("Réessayer") { fetchTask = Task { await reloadCurrentRegion() } }
                     .buttonStyle(.borderedProminent)
+                    .tint(SQColor.brandRed)
+                    .foregroundStyle(SQColor.onAccent)
                     .frame(minHeight: 44)
                     .accessibilityIdentifier("map.status.retry")
             }
