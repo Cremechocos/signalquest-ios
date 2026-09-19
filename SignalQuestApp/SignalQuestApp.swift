@@ -18,6 +18,9 @@ struct SignalQuestApp: App {
 
     init() {
         MapBackdrop.migrateLegacyPreference()
+        if AppEnvironment.resetsAuthOnLaunch {
+            UserDefaults.standard.set(false, forKey: RootView.guestPreferenceKey)
+        }
         // Le test UI d'onboarding doit pouvoir repartir d'une première
         // ouverture, même après les autres parcours de la même suite. Ce flag
         // est éliminé des binaires Release par AppEnvironment.
@@ -324,8 +327,14 @@ struct AppRootView: View {
 }
 
 struct RootView: View {
+    static let guestPreferenceKey = "sq.browseAsGuest"
     let onboardingSceneID: UUID
     let hasPriorityAuthRoute: Bool
+    @AppStorage(RootView.guestPreferenceKey) private var guestBrowsing = false
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var guestLease: OnboardingGuestLease?
+    @State private var guestEntryInFlight = false
+    @State private var mainApplicationAppeared = false
     @EnvironmentObject private var onboardingEntry: OnboardingEntryState
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var session: AuthSessionViewModel
@@ -347,14 +356,19 @@ struct RootView: View {
             // l'objet de ce kill-switch.
             if case .updateRequired(let message, let storeURL) = versionPolicy.state {
                 ForcedUpdateView(message: message, storeURL: storeURL)
+            } else if isAuthenticated || isGuestApplicationAllowed {
+                MainTabView(user: authenticatedUser)
+                    .onAppear {
+                        mainApplicationAppeared = true
+                        acknowledgeGuestPresentation()
+                    }
+                    .onDisappear { mainApplicationAppeared = false }
             } else {
                 switch session.state {
                 case .checking:
                     LaunchLoadingView()
                 case .loggedOut, .requires2FA:
-                    LoginView(onboardingRequest: onboardingGuestRequest,
-                              onOnboardingReserve: reserveOnboardingGuest,
-                              onOnboardingPresented: acknowledgeOnboardingGuest)
+                    LoginView(onContinueAsGuest: { enterGuestApplication() })
                 case .offline:
                     OfflineRetryView()
                 case .authenticated(let user):
@@ -379,6 +393,15 @@ struct RootView: View {
         .sqAnimation(SQMotion.smooth, value: versionPolicy.state)
         .onAppear { consumeOnboardingDestination() }
         .onChangeCompat(of: onboardingResolution) { _, _ in consumeOnboardingDestination() }
+        .onChangeCompat(of: onboardingEntry.guestPresentationRevision) { _, _ in consumeOnboardingDestination() }
+        .onChangeCompat(of: session.isBusy) { _, busy in if !busy { consumeOnboardingDestination() } }
+        .onChangeCompat(of: scenePhase) { _, phase in
+            if phase == .active { consumeOnboardingDestination(); acknowledgeGuestPresentation() }
+            else if let lease = guestLease, !lease.didPresent { lease.release(); guestLease = nil }
+        }
+        .onChangeCompat(of: isAuthenticated) { _, authenticated in
+            if authenticated { guestBrowsing = false; guestLease?.release(); guestLease = nil }
+        }
         // CALL-VOIP-07 : au retour du réseau (sortie de tunnel/mode avion), si le
         // dernier enregistrement du token VoIP avait échoué, on le rejoue — sinon
         // l'utilisateur resterait injoignable jusqu'au prochain passage foreground.
@@ -397,6 +420,16 @@ struct RootView: View {
     private var isAuthenticated: Bool {
         if case .authenticated = session.state { return true }
         return false
+    }
+
+    private var authenticatedUser: AuthUser? {
+        if case .authenticated(let user) = session.state { return user }
+        return nil
+    }
+
+    private var isGuestApplicationAllowed: Bool {
+        guard guestBrowsing, case .loggedOut = session.state else { return false }
+        return session.canBrowseAsGuest || (mainApplicationAppeared && session.isBusy)
     }
 
     private var onboardingResolution: OnboardingEntryState.Resolution {
@@ -427,8 +460,45 @@ struct RootView: View {
             onboardingEntry.consume(request)
         case .superseded(let request):
             onboardingEntry.consume(request)
-        case .guest, .wait: break // le preview invité confirme son apparition
+        case .guest(let request):
+            guard scenePhase == .active, !session.isBusy, !guestEntryInFlight,
+                  guestLease?.isValid != true,
+                  let lease = reserveOnboardingGuest(request) else { return }
+            enterGuestApplication(lease: lease)
+        case .wait: break
         }
+    }
+
+    private func enterGuestApplication(lease: OnboardingGuestLease? = nil) {
+        guard !session.isBusy, !guestEntryInFlight else { return }
+        guestEntryInFlight = true
+        guestLease = lease
+        Task {
+            defer { guestEntryInFlight = false }
+            let allowed: Bool
+            if session.canBrowseAsGuest { allowed = true }
+            else { allowed = await session.prepareGuestAccess() }
+            guard allowed, scenePhase == .active else { lease?.release(); return }
+            if case .updateRequired = versionPolicy.state { lease?.release(); return }
+            if let lease {
+                guard lease.isValid else { return }
+                router.routeFromOnboarding(to: lease.request.destination)
+            } else {
+                if let pending = onboardingEntry.pending { onboardingEntry.consume(pending) }
+                router.selectedTab = .home
+            }
+            router.isDockHidden = false
+            router.isDockMinimized = false
+            guestBrowsing = true
+            acknowledgeGuestPresentation()
+        }
+    }
+
+    private func acknowledgeGuestPresentation() {
+        guard mainApplicationAppeared, scenePhase == .active,
+              let lease = guestLease, !lease.didPresent else { return }
+        if !acknowledgeOnboardingGuest(lease) { lease.release() }
+        guestLease = nil
     }
 
     private func reserveOnboardingGuest(_ request: OnboardingEntryRequest) -> OnboardingGuestLease? {
@@ -513,34 +583,39 @@ struct MainTabView: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var session: AuthSessionViewModel
     @Environment(\.scenePhase) private var scenePhase
-    let user: AuthUser
+    let user: AuthUser?
     @State private var showHandleGate = false
+    @State private var showGuestReceipts = false
 
-    init(user: AuthUser) {
+    init(user: AuthUser?) {
         self.user = user
     }
 
     var body: some View {
         tabContainer
-        .task {
-            await services.refreshInboxBadge()
+        .task(id: user?.id) {
             consumeIntentRoutes()
+            guard let user else { return }
+            await services.refreshInboxBadge()
             // À l'arrivée (Feed = onglet par défaut) sans @handle : inviter à en choisir un.
             if (user.handle ?? "").isEmpty { showHandleGate = true }
         }
         .sheet(isPresented: $showHandleGate) {
             ChooseHandleSheet(onSuccess: { _ in Task { await session.refreshUser() } })
         }
+        .sheet(isPresented: $showGuestReceipts) {
+            NavigationStack { GuestSpeedtestReceiptsView() }
+        }
         .onChangeCompat(of: scenePhase) { _, phase in
             if phase == .active {
-                Task { await services.refreshInboxBadge() }
+                if user != nil { Task { await services.refreshInboxBadge() } }
                 consumeIntentRoutes()
             }
         }
         .onChangeCompat(of: router.selectedTab) { _, _ in
             // Changement d'onglet (tap, deep-link, intent) : dock redéployé.
             withAnimation(SQMotion.snappy) { router.isDockMinimized = false }
-            Task { await services.refreshInboxBadge() }
+            if user != nil { Task { await services.refreshInboxBadge() } }
         }
         .onChangeCompat(of: router.isDockHidden) { _, hidden in
             // Retour de conversation : le dock réapparaît toujours déployé
@@ -581,6 +656,37 @@ struct MainTabView: View {
 #endif
     }
 
+    private var speedtestTab: some View {
+        NavigationStack {
+            SpeedtestView(guestMode: user == nil)
+                .toolbar {
+                    if user == nil {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Mes reçus") { showGuestReceipts = true }
+                        }
+                    }
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var communityTab: some View {
+        if user != nil {
+            NavigationStack { FeedView(service: services.feed, location: services.location) }
+        } else {
+            LoginView()
+        }
+    }
+
+    @ViewBuilder
+    private var profileTab: some View {
+        if let user {
+            NavigationStack { ProfileView(user: user) }
+        } else {
+            LoginView()
+        }
+    }
+
     // MARK: Tab bar Liquid Glass native (iOS 26+)
 
     @available(iOS 26.0, *)
@@ -604,19 +710,19 @@ struct MainTabView: View {
                 .tabItem { Label("Carte", systemImage: "map") }
                 .tag(AppRouter.AppTab.map)
 
-            NavigationStack { SpeedtestView() }
+            speedtestTab
                 .tabItem { Label("Tester", systemImage: "speedometer") }
                 .tag(AppRouter.AppTab.speed)
 
-            NavigationStack { FeedView(service: services.feed, location: services.location) }
+            communityTab
                 // La conversation pose isDockHidden : on masque aussi la barre
                 // système pour laisser le composer prendre le bas de l'écran.
                 .toolbar(router.isDockHidden ? .hidden : .automatic, for: .tabBar)
                 .tabItem { Label("Communauté", systemImage: "person.2") }
                 .tag(AppRouter.AppTab.community)
-                .badge(services.unreadConversations)
+                .badge(user == nil ? 0 : services.unreadConversations)
 
-            NavigationStack { ProfileView(user: user) }
+            profileTab
             .tabItem { Label("Profil", systemImage: "person.crop.circle") }
             .tag(AppRouter.AppTab.profile)
         }
@@ -651,15 +757,15 @@ struct MainTabView: View {
             }
                 .tag(AppRouter.AppTab.map)
 
-            NavigationStack { SpeedtestView().toolbar(.hidden, for: .tabBar) }
+            speedtestTab.toolbar(.hidden, for: .tabBar)
                 .sqDockSafeArea()
                 .tag(AppRouter.AppTab.speed)
 
-            NavigationStack { FeedView(service: services.feed, location: services.location).toolbar(.hidden, for: .tabBar) }
+            communityTab.toolbar(.hidden, for: .tabBar)
                 .sqDockSafeArea(!router.isDockHidden)
                 .tag(AppRouter.AppTab.community)
 
-            NavigationStack { ProfileView(user: user).toolbar(.hidden, for: .tabBar) }
+            profileTab.toolbar(.hidden, for: .tabBar)
             .sqDockSafeArea()
             .tag(AppRouter.AppTab.profile)
         }
@@ -671,7 +777,7 @@ struct MainTabView: View {
             if !router.isDockHidden {
                 SQDock(
                     selection: $router.selectedTab,
-                    communityBadge: services.unreadConversations,
+                    communityBadge: user == nil ? 0 : services.unreadConversations,
                     minimized: router.isDockMinimized,
                     onExpand: {
                         withAnimation(SQMotion.snappy) { router.isDockMinimized = false }

@@ -68,6 +68,42 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
 
 @MainActor
 final class AuthSessionTests: XCTestCase {
+    func testGuestAccessClearsAnOldCachedIdentityWithoutAuthenticating() async {
+        let service = MockAuthService()
+        service.meResult = .failure(APIError.http(status: 401, code: nil, message: "", requestId: nil, retryAfter: nil))
+        let session = AuthSessionViewModel(service: service)
+        await session.bootstrap()
+        service.cacheUser(.mock)
+        XCTAssertFalse(session.canBrowseAsGuest)
+        let allowed = await session.prepareGuestAccess()
+        XCTAssertTrue(allowed)
+        XCTAssertNil(service.cachedUser())
+        XCTAssertEqual(session.state, .loggedOut)
+        XCTAssertFalse(session.isBusy)
+    }
+
+    func testGuestAccessCannotBypassCheckingBusyOrAuthenticatedState() async {
+        let service = MockAuthService()
+        let session = AuthSessionViewModel(service: service)
+        let duringChecking = await session.prepareGuestAccess()
+        XCTAssertFalse(duringChecking)
+        await session.bootstrap()
+        let whileAuthenticated = await session.prepareGuestAccess()
+        XCTAssertFalse(whileAuthenticated)
+        XCTAssertEqual(service.clearLocalSessionCount, 0)
+        XCTAssertEqual(session.state, .authenticated(.mock))
+
+        let loggedOutService = MockAuthService()
+        loggedOutService.meResult = .failure(APIError.missingAuthToken)
+        let loggedOut = AuthSessionViewModel(service: loggedOutService)
+        await loggedOut.bootstrap()
+        loggedOut.isBusy = true
+        let duringLogin = await loggedOut.prepareGuestAccess()
+        XCTAssertFalse(duringLogin)
+        XCTAssertTrue(loggedOut.isBusy)
+        XCTAssertEqual(loggedOutService.clearLocalSessionCount, 0)
+    }
+
     private var previousPushService: PushNotificationService?
 
     override func setUp() async throws {

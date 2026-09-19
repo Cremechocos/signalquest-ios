@@ -1,6 +1,40 @@
 {
   "sourceLanguage": "fr",
   "strings": {
+    "Bienvenue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bienvenue"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Welcome"
+          }
+        }
+      }
+    },
+    "Continuer sans compte" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuer sans compte"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue without an account"
+          }
+        }
+      }
+    },
     "Reconnecte-toi pour modifier le verrouillage de SignalQuest.": {
       "localizations": {
         "en": {

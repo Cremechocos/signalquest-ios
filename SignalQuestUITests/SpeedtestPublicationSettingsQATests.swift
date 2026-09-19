@@ -82,11 +82,8 @@ final class SpeedtestPublicationSettingsQATests: XCTestCase {
             "SQ_QA_SPEEDTEST_AUTORUN": "0",
             "SQ_QA_SPEEDTEST_EXIT": "0"
         ], locale: locale)
-        let guest = app.buttons["login.guestMeasure"].firstMatch
-        XCTAssertTrue(guest.waitForExistence(timeout: 10), "Guest entry absent in expected language")
-        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(guest, in: app))
         capture(app, name: "publication-\(locale)-login")
-        guest.tap() // Opens the guest screen; does not start a measurement.
+        SignalQuestUITestSupport.enterGuestApplication(app, tab: "speed", locale: locale)
         XCTAssertTrue(app.buttons["speedtest.settings"].waitForExistence(timeout: 15))
         capture(app, name: "publication-\(locale)-guest-idle")
         return app

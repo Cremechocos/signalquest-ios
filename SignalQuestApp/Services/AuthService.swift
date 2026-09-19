@@ -709,6 +709,25 @@ final class AuthSessionViewModel: ObservableObject {
         return PublicFormContext(stateID: stateID, credentialID: service.credentialSessionID())
     }
 
+    var canBrowseAsGuest: Bool {
+        guard case .loggedOut = state else { return false }
+        return !service.hasStoredCredentials() && service.cachedUser() == nil
+            && LocalAccountScope.currentUserId == nil
+    }
+
+    /// Guest browsing never installs a synthetic authenticated identity and
+    /// must not expose an old account's local namespace after expiration.
+    func prepareGuestAccess() async -> Bool {
+        guard case .loggedOut = state, !isBusy else { return false }
+        let expected = stateID
+        isBusy = true
+        defer { if stateID == expected { isBusy = false } }
+        errorMessage = nil
+        await service.clearLocalSession()
+        guard stateID == expected, !Task.isCancelled else { return false }
+        return canBrowseAsGuest
+    }
+
     private func acceptsPublicForm(_ context: PublicFormContext, checkCredentials: Bool = true) -> Bool {
         guard case .loggedOut = state, context.stateID == stateID, !Task.isCancelled else { return false }
         return !checkCredentials || context.credentialID == service.credentialSessionID()

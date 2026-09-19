@@ -30,29 +30,91 @@ final class OnboardingAnimationQATests: XCTestCase {
         try checkLocalizedTour(locale: "en", destination: "map")
     }
 
-    private struct RecipeLogin: Decodable {
-        let password: String
-        let appBundlePath: String
+    func testGuestApplicationFrenchNavigationAndPersistence() throws {
+        try checkGuestApplication(locale: "fr")
     }
 
-    func testRealLoginAfterGuestMeasureKeepsMeasureTab() throws {
+    func testGuestApplicationEnglishLegacyDockAndPersistence() throws {
+        try checkGuestApplication(locale: "en", legacyDock: true)
+    }
+
+    private func checkGuestApplication(locale: String, legacyDock: Bool = false) throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        let extras = legacyDock ? ["--qa-legacy-dock"] : []
+        SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth", "--reset-onboarding"] + extras,
+            environment: ["SQ_QA_SPEEDTEST_AUTORUN": "0", "SQ_QA_SPEEDTEST_EXIT": "0"], locale: locale)
+        XCTAssertFalse(app.buttons["login.guestMap"].exists)
+        XCTAssertFalse(app.buttons["login.guestMeasure"].exists)
+        SignalQuestUITestSupport.enterGuestApplication(app, tab: "home", locale: locale)
+        XCTAssertTrue(app.staticTexts[locale == "fr" ? "Bienvenue" : "Welcome"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons[locale == "fr" ? "Notifications" : "Notifications"].exists)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "guest-application-\(locale)-home"; shot.lifetime = .keepAlways; add(shot)
+        for (title, identifier) in [(locale == "fr" ? "Carte" : "Map", "map.filters"),
+                                     (locale == "fr" ? "Tester" : "Test", "speedtest.settings")] {
+            let tab = SignalQuestUITestSupport.tab(named: title, in: app)
+            XCTAssertTrue(tab.waitForExistence(timeout: 10)); tab.tap()
+            XCTAssertTrue(app.buttons[identifier].waitForExistence(timeout: 20))
+            XCTAssertFalse(app.buttons["guest.close"].exists)
+        }
+        XCTAssertTrue(app.buttons[locale == "fr" ? "Mes reçus" : "My receipts"].exists)
+        for title in [locale == "fr" ? "Profil" : "Profile", locale == "fr" ? "Communauté" : "Community"] {
+            SignalQuestUITestSupport.tab(named: title, in: app).tap()
+            XCTAssertTrue(app.buttons["login.submit"].waitForExistence(timeout: 15))
+            XCTAssertTrue(app.textFields["Email"].exists)
+            XCTAssertFalse(app.buttons["login.continueGuest"].exists)
+        }
+        SignalQuestUITestSupport.tab(named: locale == "fr" ? "Carte" : "Map", in: app).tap()
+        XCTAssertTrue(app.buttons["map.filters"].waitForExistence(timeout: 15))
+        app.terminate()
+        app.launchArguments = extras
+        app.sqLaunch(locale: locale)
+        XCTAssertTrue(SignalQuestUITestSupport.tab(named: locale == "fr" ? "Accueil" : "Home", in: app)
+            .waitForExistence(timeout: 20))
+        XCTAssertFalse(app.buttons["onboarding.page.0"].exists)
+        SignalQuestUITestSupport.tab(named: locale == "fr" ? "Profil" : "Profile", in: app).tap()
+        XCTAssertTrue(app.buttons["login.submit"].waitForExistence(timeout: 15))
+    }
+
+    private struct RecipeLogin: Decodable {
+        let password: String
+        let appBundlePath: String?
+        let apiBaseURL: String?
+    }
+
+    func testRealLoginFromGuestProfileCanReturnToMeasure() throws {
         try checkRealLogin(destination: "measure", account: "a")
     }
 
-    func testRealLoginAfterGuestMapKeepsMapTab() throws {
+    func testRealLoginFromGuestProfileCanReturnToMap() throws {
         try checkRealLogin(destination: "map", account: "b")
     }
 
     private func checkRealLogin(destination: String, account: String) throws {
-        guard let path = ProcessInfo.processInfo.environment["SQ_ONBOARDING_LOGIN_FIXTURE"] else {
-            throw XCTSkip("Requires the isolated recipe and SQ_ONBOARDING_LOGIN_FIXTURE")
-        }
-        let fixture = try JSONDecoder().decode(RecipeLogin.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
-        let bundle = try XCTUnwrap(Bundle(path: fixture.appBundlePath))
-        for key in ["SQ_API_BASE_URL", "SQ_APP_BASE_URL"] {
-            guard bundle.object(forInfoDictionaryKey: key) as? String == "http://127.0.0.1:49141" else {
-                XCTFail("Refusing an application outside the isolated recipe")
+        let environment = ProcessInfo.processInfo.environment
+        let fixture: RecipeLogin
+        if let encoded = environment["SQ_ONBOARDING_LOGIN_FIXTURE_B64"], let data = Data(base64Encoded: encoded) {
+            fixture = try JSONDecoder().decode(RecipeLogin.self, from: data)
+            guard environment["SQ_ONBOARDING_PHYSICAL_LOGIN"] == "beta-usb-verified",
+                  let raw = fixture.apiBaseURL, let origin = URL(string: raw),
+                  origin.scheme == "http", origin.port == 49144,
+                  (origin.host ?? "").contains(":") else {
+                XCTFail("Physical login requires the independently verified paired USB Beta recipe")
                 return
+            }
+        } else {
+            guard let path = environment["SQ_ONBOARDING_LOGIN_FIXTURE"] else {
+                throw XCTSkip("Requires an explicitly verified isolated login recipe")
+            }
+            fixture = try JSONDecoder().decode(RecipeLogin.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+            let bundle = try XCTUnwrap(Bundle(path: try XCTUnwrap(fixture.appBundlePath)))
+            for key in ["SQ_API_BASE_URL", "SQ_APP_BASE_URL"] {
+                guard bundle.object(forInfoDictionaryKey: key) as? String == "http://127.0.0.1:49141" else {
+                    XCTFail("Refusing an application outside the isolated recipe")
+                    return
+                }
             }
         }
         let app = XCUIApplication()
@@ -66,8 +128,8 @@ final class OnboardingAnimationQATests: XCTestCase {
         XCTAssertTrue(choice.waitForExistence(timeout: 5))
         for _ in 0..<6 where !choice.isHittable { app.swipeUp() }
         choice.tap()
-        let close = app.buttons["guest.close"]
-        XCTAssertTrue(close.waitForExistence(timeout: 20)); close.tap()
+        let profile = SignalQuestUITestSupport.tab(named: "Profil", in: app)
+        XCTAssertTrue(profile.waitForExistence(timeout: 20)); profile.tap()
         let email = app.textFields.firstMatch
         XCTAssertTrue(email.waitForExistence(timeout: 20))
         for _ in 0..<4 where !email.isHittable { app.swipeUp() }
@@ -81,7 +143,10 @@ final class OnboardingAnimationQATests: XCTestCase {
         let icon = destination == "map" ? "map" : "speedometer"
         let labels = destination == "map" ? ["Carte", "Map"] : ["Tester", "Test"]
         let selected = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label IN %@", icon, labels)).firstMatch
-        XCTAssertTrue(selected.waitForExistence(timeout: 60), "Real authentication did not reach the chosen tab")
+        XCTAssertTrue(app.staticTexts["profile.displayName"].waitForExistence(timeout: 60),
+                      "Real authentication must reveal the account profile")
+        XCTAssertTrue(submit.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(selected.exists)
         let later = app.buttons["Plus tard"]
         let systemLater = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Plus tard"]
         for _ in 0..<8 {
@@ -90,7 +155,20 @@ final class OnboardingAnimationQATests: XCTestCase {
             if selected.isHittable { break }
             RunLoop.current.run(until: Date().addingTimeInterval(0.3))
         }
-        XCTAssertTrue(selected.isSelected, "Authentication lost the chosen destination")
+        XCTAssertFalse(app.buttons["login.submit"].exists, "Authentication must leave the protected login screen")
+        XCTAssertTrue(profile.isSelected, "Authentication must preserve the Profile destination used to sign in")
+        func declineRecipeNotificationsIfPresented() {
+            let system = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            let prompt = system.alerts.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "notifications")).firstMatch
+            if prompt.exists && system.buttons["Refuser"].exists { system.buttons["Refuser"].tap() }
+        }
+        declineRecipeNotificationsIfPresented()
+        selected.tap()
+        if !selected.isSelected {
+            declineRecipeNotificationsIfPresented()
+            selected.tap()
+        }
+        XCTAssertTrue(selected.isSelected)
         let interactive = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: selected)
         XCTAssertEqual(XCTWaiter.wait(for: [interactive], timeout: TimeInterval(ProcessInfo.processInfo.environment["SQ_ONBOARDING_SYSTEM_PROMPT_WAIT"] ?? "10") ?? 10), .completed)
         if destination == "measure" {
@@ -158,18 +236,23 @@ final class OnboardingAnimationQATests: XCTestCase {
         XCTAssertEqual(map.label, locale == "fr" ? "Explorer la carte" : "Explore the map")
         XCTAssertEqual(measure.label, locale == "fr" ? "Mesurer mon réseau" : "Measure my network")
         (destination == "map" ? map : measure).tap()
-        let close = app.buttons["guest.close"]
-        XCTAssertTrue(close.waitForExistence(timeout: 20))
-        XCTAssertFalse(app.textFields["Email"].isHittable, "Login must not be interactive under the guest map")
+        let selected = SignalQuestUITestSupport.tab(named: destination == "map"
+            ? (locale == "fr" ? "Carte" : "Map") : (locale == "fr" ? "Tester" : "Test"), in: app)
+        XCTAssertTrue(selected.waitForExistence(timeout: 20))
+        XCTAssertTrue(selected.isSelected)
+        XCTAssertFalse(app.textFields["Email"].isHittable)
+        XCTAssertFalse(app.buttons["guest.close"].exists)
         XCTAssertFalse(app.alerts.firstMatch.exists, "A destination must not request a permission by itself")
-        close.tap()
-        XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 20))
-        XCTAssertTrue(app.buttons["login.guestMap"].isHittable)
-        XCTAssertTrue(app.buttons["login.guestMeasure"].isHittable)
+        let profile = SignalQuestUITestSupport.tab(named: locale == "fr" ? "Profil" : "Profile", in: app)
+        profile.tap()
+        XCTAssertTrue(app.buttons["login.submit"].waitForExistence(timeout: 20))
+        XCTAssertFalse(app.buttons["login.guestMap"].exists)
+        XCTAssertFalse(app.buttons["login.guestMeasure"].exists)
         app.terminate()
-        app.launchArguments = ["--reset-auth"]
+        app.launchArguments = []
         app.sqLaunch(locale: locale)
-        XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(SignalQuestUITestSupport.tab(named: locale == "fr" ? "Carte" : "Map", in: app)
+            .waitForExistence(timeout: 20), "Guest access must persist after relaunch")
         XCTAssertFalse(app.buttons["onboarding.page.0"].exists)
     }
 
@@ -231,7 +314,7 @@ final class OnboardingAnimationQATests: XCTestCase {
         // Le bootstrap de session (.checking) peut durer plusieurs secondes au
         // premier démarrage : on attend l'écran de connexion largement.
         XCTAssertTrue(
-            button("Explorer").waitForExistence(timeout: 30),
+            app.buttons["login.continueGuest"].waitForExistence(timeout: 30),
             "L'écran de connexion n'apparaît pas après la fin de l'onboarding"
         )
         print("QA_FINISHED_TO_LOGIN")

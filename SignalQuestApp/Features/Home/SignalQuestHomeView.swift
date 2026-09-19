@@ -10,7 +10,7 @@ struct SignalQuestHomeView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    let user: AuthUser
+    let user: AuthUser?
 
     @State private var latestMeasurement: SpeedtestRunResult?
     @State private var networkStatus: NetworkPathStatus = .unknown
@@ -90,19 +90,19 @@ struct SignalQuestHomeView: View {
     }
 
     private var firstName: String {
-        user.name?.split(separator: " ").first.map(String.init) ?? "à toi"
+        user?.name?.split(separator: " ").first.map(String.init) ?? (user == nil ? "SignalQuest" : "à toi")
     }
 
     // MARK: Header — avatar + salutation + cloche
 
     private var header: some View {
         HStack(spacing: SQSpace.md + 2) {
-            SQAvatar(url: user.avatarUrl, name: user.name ?? "S", size: 54)
+            SQAvatar(url: user?.avatarUrl, name: user?.name ?? "SignalQuest", size: 54)
                 // Le nom est annoncé juste à droite ; relire aussi l'image
                 // produit un élément sans description utile dans VoiceOver.
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
-                Text("Bonjour,")
+                Text(user == nil ? String(localized: "Bienvenue") : String(localized: "Bonjour,"))
                     .font(SQFont.body(14))
                     .foregroundStyle(SQColor.labelSecondary)
                 Text(firstName)
@@ -110,7 +110,7 @@ struct SignalQuestHomeView: View {
                     .foregroundStyle(SQColor.label)
             }
             Spacer()
-            NavigationLink {
+            if user != nil { NavigationLink {
                 NotificationsCenterView(service: services.notifications)
             } label: {
                 Image(systemName: "bell")
@@ -122,6 +122,7 @@ struct SignalQuestHomeView: View {
             }
             .buttonStyle(SQPressButtonStyle())
             .accessibilityLabel("Notifications")
+            }
         }
         .accessibilityElement(children: .contain)
     }
@@ -347,12 +348,13 @@ struct SignalQuestHomeView: View {
                 title: "Messages",
                 subtitle: messagesSubtitle,
                 systemImage: "bubble.left.and.bubble.right",
-                badgeCount: services.unreadConversations
+                badgeCount: user == nil ? 0 : services.unreadConversations
             ) { router.route(toConversation: nil) }
         }
     }
 
     private var messagesSubtitle: String {
+        guard user != nil else { return String(localized: "Connexion requise") }
         let unread = services.unreadConversations
         if unread <= 0 { return String(localized: "Conversations") }
         return unread == 1 ? "1 non lu" : "\(unread) non lus"

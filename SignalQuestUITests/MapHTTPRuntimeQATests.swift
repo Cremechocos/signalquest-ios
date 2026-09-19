@@ -410,7 +410,7 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         if let panTo { environment["SQ_QA_PAN_TO"] = panTo }
         SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth", "--reset-map", "--reset-onboarding"] + extraArguments,
                                        environment: environment, locale: locale)
-        try tap(app.buttons["login.guestMap"], in: app)
+        SignalQuestUITestSupport.enterGuestApplication(app, tab: "map", locale: locale)
         guard app.buttons["map.filters"].waitForExistence(timeout: 30) else {
             capture(app, name: "map-entry-not-presented")
             attach(app.debugDescription, name: "map-entry-hierarchy")

@@ -59,6 +59,22 @@ enum SignalQuestUITestSupport {
         }
     }
 
+    static func enterGuestApplication(_ app: XCUIApplication, tab: String, locale: String = "fr") {
+        let entry = app.buttons["login.continueGuest"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 20))
+        XCTAssertTrue(scrollToHittable(entry, in: app))
+        entry.tap()
+        let title: String
+        switch tab {
+        case "map": title = locale == "fr" ? "Carte" : "Map"
+        case "speed": title = locale == "fr" ? "Tester" : "Test"
+        default: title = locale == "fr" ? "Accueil" : "Home"
+        }
+        let destination = Self.tab(named: title, in: app)
+        XCTAssertTrue(destination.waitForExistence(timeout: 20))
+        destination.tap()
+    }
+
     /// Sur iPad, le style SwiftUI `sidebarAdaptable` peut exposer une barre
     /// latérale plutôt qu'un `XCUIElementTypeTabBar`. Le fallback conserve le
     /// même test fonctionnel dans les deux présentations.

@@ -69,7 +69,7 @@ final class MapAntennaProfileQATests: XCTestCase {
         SignalQuestUITestSupport.launch(app,
             arguments: ["--reset-auth", "--reset-map", "--reset-onboarding"],
             environment: ["SQ_MAP_PROFILE_QA": "1"], locale: locale)
-        try tap(app.buttons["login.guestMap"], in: app)
+        SignalQuestUITestSupport.enterGuestApplication(app, tab: "map", locale: locale)
         guard app.buttons["map.filters"].waitForExistence(timeout: 30) else {
             capture(app, name: "profile-map-entry-missing")
             throw RecipeFailure.missingControl
