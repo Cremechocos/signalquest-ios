@@ -45572,6 +45572,57 @@
           }
         }
       }
+    },
+    "Explorer la carte": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Explorer la carte"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Explore the map"
+          }
+        }
+      }
+    },
+    "Mesurer mon réseau": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesurer mon réseau"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Measure my network"
+          }
+        }
+      }
+    },
+    "Tu peux commencer sans créer de compte.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu peux commencer sans créer de compte."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can start without creating an account."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

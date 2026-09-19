@@ -9,6 +9,7 @@ struct SignalQuestApp: App {
     @StateObject private var services: AppServices
     @StateObject private var session: AuthSessionViewModel
     @StateObject private var appLock = AppLockController()
+    @StateObject private var onboardingEntry: OnboardingEntryState
     /// Observé À LA RACINE, et nulle part ailleurs : les jetons de surface lisent
     /// ce réglage au moment du rendu, mais rien ne les ferait ré-évaluer si
     /// personne ne l'observait. Sans cette ligne, activer le mode OLED ne
@@ -28,6 +29,7 @@ struct SignalQuestApp: App {
         // arrière-plan au branchement du véhicule) et doit partager exactement
         // le même `AppServices` — deux graphes signifieraient deux `APIClient`,
         // donc deux jeux de cookies et deux refresh concurrents sur 401.
+        _onboardingEntry = StateObject(wrappedValue: OnboardingEntryState())
         _services = StateObject(wrappedValue: AppServicesHolder.services)
         _session = StateObject(wrappedValue: AppServicesHolder.session)
         Self.configureNavigationTypography()
@@ -55,6 +57,7 @@ struct SignalQuestApp: App {
         let services = self.services
         let session = self.session
         let appLock = self.appLock
+        let onboardingEntry = self.onboardingEntry
         // `@Sendable` n'est PAS décoratif et ne doit pas être retiré : sans lui,
         // cette fermeture hérite de l'isolation `@MainActor` d'`App.body` et le
         // mode langage Swift 6 lui greffe une vérification d'exécuteur qui piège
@@ -62,7 +65,7 @@ struct SignalQuestApp: App {
         // Une fermeture `@Sendable` n'hérite d'aucune isolation, donc plus de
         // vérification. Voir la note d'en-tête d'`AppRootView`.
         return WindowGroup { @Sendable in
-            AppRootView(services: services, session: session, appLock: appLock)
+            AppRootView(services: services, session: session, appLock: appLock, onboardingEntry: onboardingEntry)
         }
     }
 }
@@ -99,6 +102,8 @@ struct AppRootView: View {
     @ObservedObject var services: AppServices
     @ObservedObject var session: AuthSessionViewModel
     @ObservedObject var appLock: AppLockController
+    @ObservedObject var onboardingEntry: OnboardingEntryState
+    @StateObject private var onboardingScene = OnboardingSceneContext()
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.locale) private var locale
     @State private var passwordResetRoute: PasswordResetRoute?
@@ -143,7 +148,11 @@ struct AppRootView: View {
         // présentation. C'est ce qui remplace le garde `set: { _ in }` de
         // l'ancien cover (UXP-06), et ce qui permet à la transition de sortie
         // d'être animée au lieu d'être coupée par la fermeture du cover.
-        OnboardingHost { RootView() }
+        OnboardingHost(sceneID: onboardingScene.id) {
+            RootView(onboardingSceneID: onboardingScene.id, hasPriorityAuthRoute: passwordResetRoute != nil)
+        }
+            .onAppear { onboardingScene.attach(to: onboardingEntry) }
+            .environmentObject(onboardingEntry)
             .environmentObject(services)
             .environmentObject(session)
             .environmentObject(services.router)
@@ -242,6 +251,7 @@ struct AppRootView: View {
                 services.epochRotations.resume()
             }
             .onChangeCompat(of: scenePhase) { _, phase in
+                if phase != .active { onboardingEntry.releaseGuestScene(onboardingScene.id) }
                 switch phase {
                 case .active:
                     UNUserNotificationCenter.current().setBadgeCountCompat(0)
@@ -314,6 +324,10 @@ struct AppRootView: View {
 }
 
 struct RootView: View {
+    let onboardingSceneID: UUID
+    let hasPriorityAuthRoute: Bool
+    @EnvironmentObject private var onboardingEntry: OnboardingEntryState
+    @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var callManager: CallManager
     @EnvironmentObject private var networkPath: NetworkPathMonitor
@@ -338,7 +352,9 @@ struct RootView: View {
                 case .checking:
                     LaunchLoadingView()
                 case .loggedOut, .requires2FA:
-                    LoginView()
+                    LoginView(onboardingRequest: onboardingGuestRequest,
+                              onOnboardingReserve: reserveOnboardingGuest,
+                              onOnboardingPresented: acknowledgeOnboardingGuest)
                 case .offline:
                     OfflineRetryView()
                 case .authenticated(let user):
@@ -361,6 +377,8 @@ struct RootView: View {
         // en conservant leurs tâches et les mesures déjà en cours.
         .background(AppPrivacyShield(lock: appLock, authenticated: isAuthenticated))
         .sqAnimation(SQMotion.smooth, value: versionPolicy.state)
+        .onAppear { consumeOnboardingDestination() }
+        .onChangeCompat(of: onboardingResolution) { _, _ in consumeOnboardingDestination() }
         // CALL-VOIP-07 : au retour du réseau (sortie de tunnel/mode avion), si le
         // dernier enregistrement du token VoIP avait échoué, on le rejoue — sinon
         // l'utilisateur resterait injoignable jusqu'au prochain passage foreground.
@@ -379,6 +397,51 @@ struct RootView: View {
     private var isAuthenticated: Bool {
         if case .authenticated = session.state { return true }
         return false
+    }
+
+    private var onboardingResolution: OnboardingEntryState.Resolution {
+        let access: OnboardingEntryState.Access
+        switch session.state {
+        case .checking: access = .checking
+        case .loggedOut: access = .loggedOut
+        case .requires2FA: access = .twoFactor
+        case .offline: access = .offline
+        case .authenticated: access = .authenticated
+        }
+        let updateRequired: Bool
+        if case .updateRequired = versionPolicy.state { updateRequired = true }
+        else { updateRequired = false }
+        return onboardingEntry.resolve(access: access, updateRequired: updateRequired,
+            locked: appLock.isLocked, hasExternalRoute: router.hasPendingContentRoute || hasPriorityAuthRoute)
+    }
+
+    private var onboardingGuestRequest: OnboardingEntryRequest? {
+        if case .guest(let request) = onboardingResolution { return request }
+        return nil
+    }
+
+    private func consumeOnboardingDestination() {
+        switch onboardingResolution {
+        case .authenticated(let request):
+            router.routeFromOnboarding(to: request.destination)
+            onboardingEntry.consume(request)
+        case .superseded(let request):
+            onboardingEntry.consume(request)
+        case .guest, .wait: break // le preview invité confirme son apparition
+        }
+    }
+
+    private func reserveOnboardingGuest(_ request: OnboardingEntryRequest) -> OnboardingGuestLease? {
+        guard case .guest(let current) = onboardingResolution, current.id == request.id else { return nil }
+        return onboardingEntry.reserveGuestPresentation(request, sceneID: onboardingSceneID)
+    }
+
+    private func acknowledgeOnboardingGuest(_ lease: OnboardingGuestLease) -> Bool {
+        guard case .guest(let current) = onboardingResolution, current.id == lease.request.id else {
+            lease.release()
+            return false
+        }
+        return router.acknowledgeOnboardingGuest(lease)
     }
 }
 

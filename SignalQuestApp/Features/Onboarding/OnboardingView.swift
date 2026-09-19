@@ -10,20 +10,23 @@ import SwiftUI
 /// au premier lancement). Ici, seul le geste explicite de l'utilisateur
 /// (« Commencer » / « Passer ») écrit le flag.
 struct OnboardingHost<Content: View>: View {
-    @AppStorage("sq.hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @EnvironmentObject private var entry: OnboardingEntryState
+    @EnvironmentObject private var versionPolicy: VersionPolicyService
+    let sceneID: UUID
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let content: Content
 
-    init(@ViewBuilder content: () -> Content) {
+    init(sceneID: UUID, @ViewBuilder content: () -> Content) {
+        self.sceneID = sceneID
         self.content = content()
     }
 
     var body: some View {
         ZStack {
-            if !hasCompletedOnboarding {
-                OnboardingView {
+            if !entry.hasCompleted && !versionPolicy.state.blocksApp {
+                OnboardingView { destination in
                     withAnimation(reduceMotion ? .easeOut(duration: 0.2) : SQMotion.smooth) {
-                        hasCompletedOnboarding = true
+                        entry.finish(destination: destination, sceneID: sceneID)
                     }
                 }
                 .transition(
@@ -50,9 +53,10 @@ struct OnboardingHost<Content: View>: View {
 /// sélection programmatiques (bug « animation tronquée », juil. 2026) — ici le
 /// bouton et le swipe passent par le même offset animé au ressort.
 struct OnboardingView: View {
-    let onFinish: () -> Void
+    let onFinish: (OnboardingEntryDestination?) -> Void
 
     @Environment(\.locale) private var locale
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var page = 0
     /// Translation du doigt pendant le drag ; ramenée à 0 dans la même
     /// transaction animée que le changement de page pour un mouvement continu.
@@ -63,6 +67,38 @@ struct OnboardingView: View {
     private var isLastPage: Bool { page == pages.count - 1 }
 
     var body: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize || isLastPage {
+                scrollingPage
+            } else {
+                pagedBody
+            }
+        }
+    }
+
+    private var scrollingPage: some View {
+        GeometryReader { geometry in
+            ScrollViewReader { scroll in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        header
+                        OnboardingSlideView(page: pages[page], isActive: true)
+                        footer
+                    }
+                    .frame(minHeight: geometry.size.height, alignment: .top)
+                    .id("onboarding.top")
+                }
+                .accessibilityIdentifier("onboarding.scroll")
+                .simultaneousGesture(dragGesture(width: geometry.size.width))
+                .onChangeCompat(of: page) { _, _ in
+                    scroll.scrollTo("onboarding.top", anchor: .top)
+                }
+            }
+        }
+        .signalQuestHeroBackground()
+    }
+
+    private var pagedBody: some View {
         ZStack {
             Color.clear.signalQuestHeroBackground().ignoresSafeArea()
 
@@ -97,9 +133,7 @@ struct OnboardingView: View {
                 footer
             }
         }
-        // Rendu stable voulu : l'écran suit la taille de texte de l'utilisateur
-        // jusqu'à xxLarge puis plafonne — jamais les tailles accessibilité
-        // géantes qui explosaient la composition (choix produit, juil. 2026).
+        // Les tailles accessibilité et le choix final utilisent scrollingPage.
     }
 
     // MARK: Header
@@ -112,7 +146,7 @@ struct OnboardingView: View {
                 .foregroundStyle(SQColor.label)
                 .accessibilityHidden(true)
             Spacer()
-            Button { onFinish() } label: { Text(verbatim: OnboardingCopy.skip.localized(locale)) }
+            Button { onFinish(nil) } label: { Text(verbatim: OnboardingCopy.skip.localized(locale)) }
                 .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
                 .tint(SQColor.labelSecondary)
                 // Sur la dernière slide le CTA « Commencer » fait ce travail :
@@ -131,12 +165,23 @@ struct OnboardingView: View {
     private var footer: some View {
         VStack(spacing: SQSpace.xl) {
             OnboardingPageIndicator(count: pages.count, current: page) { goTo($0) }
-            OnboardingCTA(isLastPage: isLastPage) {
-                if isLastPage {
-                    onFinish()
-                } else {
-                    goTo(page + 1)
+            if isLastPage {
+                VStack(spacing: SQSpace.sm) {
+                    GradientButton(OnboardingCopy.openMap.localized(locale), systemImage: "map", allowsMultiline: true) {
+                        onFinish(.map)
+                    }
+                    .accessibilityIdentifier("onboarding.openMap")
+                    GradientButton(OnboardingCopy.openMeasure.localized(locale), systemImage: "speedometer", style: .secondary, allowsMultiline: true) {
+                        onFinish(.measure)
+                    }
+                    .accessibilityIdentifier("onboarding.openMeasure")
+                    Text(verbatim: OnboardingCopy.guestHint.localized(locale))
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .multilineTextAlignment(.center)
                 }
+            } else {
+                OnboardingCTA(isLastPage: false) { goTo(page + 1) }
             }
         }
         .padding(.horizontal, SQSpace.xl)
@@ -197,6 +242,9 @@ private enum OnboardingCopy: String {
     case measureBody = "Les speedtests cellulaires compatibles sont publiés automatiquement à leur position exacte, si elle est disponible. Tes zones privées restent protégées."
     case internationalTitle = "Une carte qui se construit ensemble"
     case internationalBody = "D’un pays à l’autre, les données varient. Antennes officielles et contributions se complètent lorsqu’elles sont disponibles. Une zone sans données peut afficher une carte vide."
+    case openMap = "Explorer la carte"
+    case openMeasure = "Mesurer mon réseau"
+    case guestHint = "Tu peux commencer sans créer de compte."
     case skip = "Passer"
     case next = "Suivant"
     case start = "Commencer"

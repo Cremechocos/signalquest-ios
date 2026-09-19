@@ -11,7 +11,7 @@ import XCTest
 @MainActor
 final class OnboardingAnimationQATests: XCTestCase {
     func testCurrentOnboardingFrenchCopyAndCompletion() throws {
-        try checkLocalizedTour(locale: "fr")
+        try checkLocalizedTour(locale: "fr", destination: "map")
     }
 
     func testCurrentOnboardingEnglishCopyAndCompletion() throws {
@@ -22,7 +22,88 @@ final class OnboardingAnimationQATests: XCTestCase {
         try checkLocalizedTour(locale: "en", largeText: true)
     }
 
-    private func checkLocalizedTour(locale: String, largeText: Bool = false) throws {
+    func testFirstChoiceFrenchMeasure() throws {
+        try checkLocalizedTour(locale: "fr", destination: "measure")
+    }
+
+    func testFirstChoiceEnglishMap() throws {
+        try checkLocalizedTour(locale: "en", destination: "map")
+    }
+
+    private struct RecipeLogin: Decodable {
+        let password: String
+        let appBundlePath: String
+    }
+
+    func testRealLoginAfterGuestMeasureKeepsMeasureTab() throws {
+        try checkRealLogin(destination: "measure", account: "a")
+    }
+
+    func testRealLoginAfterGuestMapKeepsMapTab() throws {
+        try checkRealLogin(destination: "map", account: "b")
+    }
+
+    private func checkRealLogin(destination: String, account: String) throws {
+        guard let path = ProcessInfo.processInfo.environment["SQ_ONBOARDING_LOGIN_FIXTURE"] else {
+            throw XCTSkip("Requires the isolated recipe and SQ_ONBOARDING_LOGIN_FIXTURE")
+        }
+        let fixture = try JSONDecoder().decode(RecipeLogin.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+        let bundle = try XCTUnwrap(Bundle(path: fixture.appBundlePath))
+        for key in ["SQ_API_BASE_URL", "SQ_APP_BASE_URL"] {
+            guard bundle.object(forInfoDictionaryKey: key) as? String == "http://127.0.0.1:49141" else {
+                XCTFail("Refusing an application outside the isolated recipe")
+                return
+            }
+        }
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        app.launchArguments = ["--reset-auth", "--reset-onboarding"]
+        app.sqLaunch(locale: "fr")
+        let next = app.buttons["Suivant"]
+        XCTAssertTrue(next.waitForExistence(timeout: 20))
+        next.tap(); next.tap()
+        let choice = app.buttons[destination == "map" ? "onboarding.openMap" : "onboarding.openMeasure"]
+        XCTAssertTrue(choice.waitForExistence(timeout: 5))
+        for _ in 0..<6 where !choice.isHittable { app.swipeUp() }
+        choice.tap()
+        let close = app.buttons["guest.close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 20)); close.tap()
+        let email = app.textFields.firstMatch
+        XCTAssertTrue(email.waitForExistence(timeout: 20))
+        for _ in 0..<4 where !email.isHittable { app.swipeUp() }
+        email.tap(); email.typeText("\(account)@recipe.invalid")
+        let password = app.secureTextFields.firstMatch
+        for _ in 0..<4 where !password.isHittable { app.swipeUp() }
+        password.tap(); password.typeText(fixture.password)
+        let submit = app.buttons["login.submit"]
+        for _ in 0..<4 where !submit.isHittable { app.swipeUp() }
+        submit.tap()
+        let icon = destination == "map" ? "map" : "speedometer"
+        let labels = destination == "map" ? ["Carte", "Map"] : ["Tester", "Test"]
+        let selected = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label IN %@", icon, labels)).firstMatch
+        XCTAssertTrue(selected.waitForExistence(timeout: 60), "Real authentication did not reach the chosen tab")
+        let later = app.buttons["Plus tard"]
+        let systemLater = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Plus tard"]
+        for _ in 0..<8 {
+            if later.exists { later.tap() }
+            else if systemLater.exists { systemLater.tap() }
+            if selected.isHittable { break }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+        }
+        XCTAssertTrue(selected.isSelected, "Authentication lost the chosen destination")
+        let interactive = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: selected)
+        XCTAssertEqual(XCTWaiter.wait(for: [interactive], timeout: TimeInterval(ProcessInfo.processInfo.environment["SQ_ONBOARDING_SYSTEM_PROMPT_WAIT"] ?? "10") ?? 10), .completed)
+        if destination == "measure" {
+            XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Prêt à mesurer")).firstMatch.exists)
+            XCTAssertFalse(app.buttons["Arrêter"].exists)
+        }
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = "onboarding-real-login-\(destination)"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    private func checkLocalizedTour(locale: String, largeText: Bool = false, destination: String = "measure") throws {
         let app = XCUIApplication()
         defer { app.terminate() }
         app.launchArguments = ["--reset-auth", "--reset-onboarding"]
@@ -51,17 +132,40 @@ final class OnboardingAnimationQATests: XCTestCase {
                 XCTAssertTrue(slide.label.contains(locale == "fr" ? "carte vide" : "empty map"))
             }
             if largeText { app.swipeUp() }
+            if index < 2 {
+                for _ in 0..<6 where !next.isHittable { app.swipeUp() }
+            } else {
+                let lastChoice = app.buttons["onboarding.openMeasure"]
+                for _ in 0..<6 where !lastChoice.isHittable || lastChoice.frame.maxY > app.frame.maxY - 8 { app.swipeUp() }
+            }
             let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             shot.name = "onboarding-\(locale)-\(largeText ? "large" : "normal")-\(index + 1)"
             shot.lifetime = .keepAlways
             add(shot)
             if index < 2 { XCTAssertTrue(next.isHittable); next.tap() }
         }
-        let start = app.buttons[locale == "fr" ? "Commencer" : "Get started"]
-        XCTAssertTrue(start.waitForExistence(timeout: 5))
-        XCTAssertTrue(start.isHittable)
-        start.tap()
+        let map = app.buttons["onboarding.openMap"]
+        let measure = app.buttons["onboarding.openMeasure"]
+        XCTAssertTrue(map.waitForExistence(timeout: 5))
+        XCTAssertTrue(measure.isHittable)
+        XCTAssertLessThanOrEqual(map.frame.maxY, measure.frame.minY, "Discovery actions must not overlap")
+        XCTAssertGreaterThanOrEqual(map.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(measure.frame.height, 44)
+        if largeText && app.frame.width <= 400 {
+            XCTAssertGreaterThan(map.frame.height, 80, "Large multiline labels need an expanded action frame")
+            XCTAssertGreaterThan(measure.frame.height, 80)
+        }
+        XCTAssertEqual(map.label, locale == "fr" ? "Explorer la carte" : "Explore the map")
+        XCTAssertEqual(measure.label, locale == "fr" ? "Mesurer mon réseau" : "Measure my network")
+        (destination == "map" ? map : measure).tap()
+        let close = app.buttons["guest.close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 20))
+        XCTAssertFalse(app.textFields["Email"].isHittable, "Login must not be interactive under the guest map")
+        XCTAssertFalse(app.alerts.firstMatch.exists, "A destination must not request a permission by itself")
+        close.tap()
         XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["login.guestMap"].isHittable)
+        XCTAssertTrue(app.buttons["login.guestMeasure"].isHittable)
         app.terminate()
         app.launchArguments = ["--reset-auth"]
         app.sqLaunch(locale: locale)
@@ -108,7 +212,7 @@ final class OnboardingAnimationQATests: XCTestCase {
         print("QA_SWIPE_TO_SLIDE3")
         sleep(4)
 
-        let start = button("Commencer")
+        let start = app.buttons["onboarding.openMap"]
         XCTAssertTrue(start.waitForExistence(timeout: 5), "Bouton final absent sur la 3e slide")
 
         // Kill sans terminer : au relancement l'onboarding doit ENCORE être là

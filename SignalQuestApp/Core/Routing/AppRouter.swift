@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 /// App-wide navigation coordinator. Push notifications (and, later, universal
 /// links) write an intent here; the SwiftUI tree observes it to switch tab and
@@ -54,6 +55,32 @@ final class AppRouter: ObservableObject {
     /// Dock rétracté en pastille après un scroll vers le bas ; redéployé en
     /// remontant, en changeant d'onglet ou en tapant la pastille.
     @Published var isDockMinimized = false
+
+    /// Une destination reçue de l'extérieur garde la priorité sur le choix
+    /// générique de fin d'introduction, notamment après une connexion.
+    var hasPendingContentRoute: Bool {
+        openConversationId != nil || openMessagesInbox || openPostId != nil
+            || openUserProfileId != nil || openSiteId != nil || openCommunityOutage != nil
+            || openCommunityOutageId != nil || openAntennaReportId != nil
+            || openE2EEDeviceApprovalId != nil || openSentinelleTargetId != nil
+            || openSentinelle || openSentinelleShareSlug != nil
+            || pendingMapFocus != nil || pendingDriveTest
+    }
+
+    @discardableResult
+    func routeFromOnboarding(to destination: OnboardingEntryDestination) -> Bool {
+        guard !hasPendingContentRoute else { return false }
+        selectedTab = destination == .map ? .map : .speed
+        return true
+    }
+
+    /// Le preview invité consomme l'intention de présentation, tout en gardant
+    /// l'onglet choisi pour l'arrivée dans MainTabView après connexion.
+    func acknowledgeOnboardingGuest(_ lease: OnboardingGuestLease) -> Bool {
+        guard !hasPendingContentRoute, lease.acknowledge() else { return false }
+        selectedTab = lease.request.destination == .map ? .map : .speed
+        return true
+    }
 
     init() {
         // Tous les drapeaux passent par AppEnvironment : en Release ce sont des

@@ -2,18 +2,32 @@ import SwiftUI
 import AuthenticationServices
 
 struct LoginView: View {
+    let onboardingRequest: OnboardingEntryRequest?
+    let onOnboardingReserve: (OnboardingEntryRequest) -> OnboardingGuestLease?
+    let onOnboardingPresented: (OnboardingGuestLease) -> Bool
+
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var onboardingEntry: OnboardingEntryState
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
     @State private var email = ""
     @State private var password = ""
     @State private var code = ""
     @State private var showSignup = false
     @State private var showForgotPassword = false
-    @State private var showGuestMap = false
-    @State private var showGuestSpeedtest = false
+    @State private var guestPresentation: OnboardingEntryRequest?
+    @State private var onboardingLease: OnboardingGuestLease?
     @State private var appeared = false
+
+    init(onboardingRequest: OnboardingEntryRequest? = nil,
+         onOnboardingReserve: @escaping (OnboardingEntryRequest) -> OnboardingGuestLease? = { _ in nil },
+         onOnboardingPresented: @escaping (OnboardingGuestLease) -> Bool = { _ in false }) {
+        self.onboardingRequest = onboardingRequest
+        self.onOnboardingReserve = onOnboardingReserve
+        self.onOnboardingPresented = onOnboardingPresented
+    }
 
     var body: some View {
         NavigationStack {
@@ -21,6 +35,22 @@ struct LoginView: View {
                 VStack(alignment: .leading, spacing: SQSpace.xxl) {
                     header
                         .sqAuthAppear(appeared)
+
+                    if !isTwoFactor {
+                        GradientButton(String(localized: "Explorer sans compte"), systemImage: "map", style: .secondary) {
+                            openGuest(.map)
+                        }
+                        .accessibilityLabel("Explorer la carte sans compte")
+                        .accessibilityIdentifier("login.guestMap")
+                        .sqAuthAppear(appeared, delay: 0.11)
+
+                        GradientButton(String(localized: "Tester sans compte"), systemImage: "speedometer", style: .secondary) {
+                            openGuest(.measure)
+                        }
+                        .accessibilityLabel("Lancer un speedtest sans compte")
+                        .accessibilityIdentifier("login.guestMeasure")
+                        .sqAuthAppear(appeared, delay: 0.12)
+                    }
 
                     VStack(alignment: .leading, spacing: SQSpace.lg) {
                         Text(isTwoFactor ? "Validation 2FA" : "Connexion")
@@ -98,42 +128,83 @@ struct LoginView: View {
                         .sqAuthAppear(appeared, delay: 0.10)
                     }
 
-                    GradientButton(String(localized: "Explorer sans compte"), systemImage: "map", style: .secondary) {
-                        showGuestMap = true
-                    }
-                    .accessibilityLabel("Explorer la carte sans compte")
-                    .accessibilityIdentifier("login.guestMap")
-                    .sqAuthAppear(appeared, delay: 0.11)
-
-                    GradientButton(String(localized: "Tester sans compte"), systemImage: "speedometer", style: .secondary) {
-                        showGuestSpeedtest = true
-                    }
-                    .accessibilityLabel("Lancer un speedtest sans compte")
-                    .sqAuthAppear(appeared, delay: 0.12)
-
                     legalFooter
                         .sqAuthAppear(appeared, delay: 0.14)
                 }
                 .padding(SQSpace.xl)
+                .frame(maxWidth: 600)
+                .frame(maxWidth: .infinity)
             }
             .signalQuestHeroBackground()
-            .onAppear { appeared = true }
-            .sheet(isPresented: $showSignup) {
+            .onAppear {
+                appeared = true
+                offerOnboardingDestination()
+            }
+            .onChangeCompat(of: onboardingRequest) { _, _ in offerOnboardingDestination() }
+            .onChangeCompat(of: onboardingEntry.guestPresentationRevision) { _, _ in offerOnboardingDestination() }
+            .onChangeCompat(of: scenePhase) { _, _ in offerOnboardingDestination() }
+            .onChangeCompat(of: isTwoFactor) { _, _ in offerOnboardingDestination() }
+            .sheet(isPresented: $showSignup, onDismiss: offerOnboardingDestination) {
                 NavigationStack { SignupView() }
             }
-            .sheet(isPresented: $showForgotPassword) {
+            .sheet(isPresented: $showForgotPassword, onDismiss: offerOnboardingDestination) {
                 NavigationStack { ForgotPasswordView() }
             }
-            .fullScreenCover(isPresented: $showGuestMap) {
-                GuestMapPreview()
-                    .environmentObject(services)
-                    .environmentObject(router)
-            }
-            .fullScreenCover(isPresented: $showGuestSpeedtest) {
-                GuestSpeedtestPreview()
-                    .environmentObject(services)
+            .fullScreenCover(item: $guestPresentation, onDismiss: {
+                onboardingLease?.release()
+                onboardingLease = nil
+                offerOnboardingDestination()
+            }) { request in
+                Group {
+                    switch request.destination {
+                    case .map: GuestMapPreview()
+                    case .measure: GuestSpeedtestPreview()
+                    }
+                }
+                .environmentObject(services)
+                .environmentObject(router)
+                .onAppear {
+                    // Le disque n'est acquitté qu'après apparition, par la
+                    // seule réservation encore valide et sa scène active.
+                    if let lease = onboardingLease, !lease.didPresent, lease.request.id == request.id {
+                        guard scenePhase == .active, onOnboardingPresented(lease) else {
+                            lease.release()
+                            onboardingLease = nil
+                            guestPresentation = nil
+                            return
+                        }
+                    }
+                }
             }
         }
+    }
+
+    private func offerOnboardingDestination() {
+        let eligible = scenePhase == .active && !isTwoFactor && !showSignup && !showForgotPassword
+        if let lease = onboardingLease {
+            // La consommation du pending après apparition ne referme pas le
+            // preview affiché. Seule une réservation non acquittée est révoquée.
+            if lease.didPresent { return }
+            if !eligible || onboardingRequest?.id != lease.request.id || !lease.isValid {
+                lease.release()
+                onboardingLease = nil
+                if guestPresentation?.id == lease.request.id { guestPresentation = nil }
+            } else { return }
+        }
+        guard eligible, guestPresentation == nil, let onboardingRequest,
+              let lease = onOnboardingReserve(onboardingRequest) else { return }
+        onboardingLease = lease
+        guestPresentation = onboardingRequest
+    }
+
+    private func openGuest(_ destination: OnboardingEntryDestination) {
+        // Un nouveau geste explicite remplace une intention automatique encore
+        // en attente, y compris une réservation dans une autre fenêtre.
+        onboardingLease?.release()
+        onboardingLease = nil
+        if let pending = onboardingEntry.pending { onboardingEntry.consume(pending) }
+        router.routeFromOnboarding(to: destination)
+        guestPresentation = OnboardingEntryRequest(destination: destination)
     }
 
     /// Liens légaux discrets (FOCUS « lien légal sur login » — LOGIN-LEGAL-01),
@@ -279,6 +350,7 @@ private struct GuestMapPreview: View {
 
     private var closeButton: some View {
         Button("Fermer") { dismiss() }
+            .accessibilityIdentifier("guest.close")
             .font(SQFont.archivo(15, .semibold))
             .fixedSize(horizontal: true, vertical: false)
             .frame(minHeight: 44)
@@ -286,6 +358,7 @@ private struct GuestMapPreview: View {
 
     private var signInButton: some View {
         Button("Se connecter") { dismiss() }
+            .accessibilityIdentifier("guest.signIn")
             .font(SQFont.archivo(14, .bold))
             .fixedSize(horizontal: true, vertical: false)
             .frame(minHeight: 44)
@@ -306,6 +379,7 @@ private struct GuestSpeedtestPreview: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Fermer") { dismiss() }.tint(SQColor.brandRed)
+                            .accessibilityIdentifier("guest.close")
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Mes reçus") { showReceipts = true }
