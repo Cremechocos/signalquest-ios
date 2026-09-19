@@ -99,7 +99,12 @@ if [ "$configuration" != "Debug" ]; then
   [ -z "$leaks" ] || fail "URL S3 de production hors #if DEBUG : $(echo "$leaks" | tr '\n' ' ')"
 fi
 
-if [ "$environment" = "staging" ] && [ -f "${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist" ]; then
+if [ "${SQ_ISOLATED_HOST_TEST:-NO}" = "YES" ]; then
+  [ "${PLATFORM_NAME:-}" = "iphonesimulator" ] && [ "${ENABLE_TESTABILITY:-NO}" = "YES" ] \
+    || fail "isolated host tests require a testable simulator build"
+fi
+
+if [ "${SQ_ISOLATED_HOST_TEST:-NO}" != "YES" ] && [ "$environment" = "staging" ] && [ -f "${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist" ]; then
   firebase_bundle="$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' "${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist" 2>/dev/null || true)"
   [ "$firebase_bundle" = "$bundle_id" ] || fail "Firebase BUNDLE_ID does not match the Beta bundle identifier"
 fi

@@ -14,9 +14,9 @@ DERIVED_DATA="${SQ_DERIVED_DATA:-$RESULT_ROOT/$RUN_ID/DerivedData}"
 UI_SCOPE="${SQ_UI_SCOPE:-$([[ "$MODE" == "all" ]] && echo full || echo fast)}"
 
 case "$MODE" in
-  debug|staging|release|all) ;;
+  debug|staging|release|host|all) ;;
   *)
-    echo "usage: $0 [debug|staging|release|all]" >&2
+    echo "usage: $0 [debug|staging|release|host|all]" >&2
     exit 2
     ;;
 esac
@@ -35,7 +35,54 @@ if [[ -z "${DEVELOPER_DIR:-}" ]]; then
   fi
 fi
 
+# XcodeGen embeds script contents in the project. Reject stale generated phases
+# before spending time compiling with a different guard than the source file.
+python3 - "$ROOT" <<'PY_CHECK'
+import json, subprocess, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+project = json.loads(subprocess.check_output(['plutil', '-convert', 'json', '-o', '-', str(root / 'SignalQuest.xcodeproj/project.pbxproj')]))
+for name, file in [('Validate Build Environment', 'validate_build_environment.sh'), ('Embed Firebase Config When Available', 'embed_firebase_config.sh'), ('Upload Crashlytics dSYM', 'upload_crashlytics_dsym.sh')]:
+    phases = [v for v in project['objects'].values() if v.get('isa') == 'PBXShellScriptBuildPhase' and v.get('name') == name]
+    if len(phases) != 1 or phases[0].get('shellScript', '').strip() != (root / 'ci_scripts' / file).read_text().strip():
+        raise SystemExit('error: generated build phase is stale: ' + name + '; run xcodegen generate')
+PY_CHECK
+
 mkdir -p "$RESULT_ROOT/$RUN_ID"
+
+run_xcodebuild() {
+  local -a package_args=()
+  if [[ -n "${SQ_SPM_CACHE:-}" ]]; then
+    package_args=(-clonedSourcePackagesDirPath "$SQ_SPM_CACHE" -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile)
+  fi
+  xcodebuild "$@" -jobs "${SQ_BUILD_JOBS:-4}" ${package_args[@]+"${package_args[@]}"}
+}
+
+run_host() {
+  # Optimized tests get testability only for this invocation. Distribution
+  # settings and staging environment validation remain unchanged.
+  [[ "$IPHONE_DESTINATION" == *"platform=iOS Simulator"* ]] || {
+    echo "error: host exige un simulateur de recette dédié." >&2; exit 2;
+  }
+  local configuration scheme
+  for configuration in ${SQ_HOST_CONFIGURATIONS:-Debug Staging Release}; do
+    case "$configuration" in Debug|Staging|Release) ;; *) echo "error: invalid host configuration: $configuration" >&2; exit 2 ;; esac
+    scheme=SignalQuest
+    [[ "$configuration" != Staging ]] || scheme="SignalQuest Beta"
+    echo "== Hôte signé et Keychain : $configuration =="
+    run_xcodebuild test \
+      -project "$ROOT/SignalQuest.xcodeproj" -scheme "$scheme" \
+      -configuration "$configuration" -destination "$IPHONE_DESTINATION" \
+      -derivedDataPath "$DERIVED_DATA" \
+      -resultBundlePath "$RESULT_ROOT/$RUN_ID/Host-$configuration.xcresult" \
+      -parallel-testing-enabled NO -collect-test-diagnostics never \
+      -only-testing:SignalQuestTests/APIClientTests/testSignedSimulatorHostCanRoundTripAuthKeychain \
+      CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES CODE_SIGN_IDENTITY=- \
+      ENABLE_TESTABILITY=YES ONLY_ACTIVE_ARCH=YES SQ_ISOLATED_HOST_TEST=YES \
+      SQ_API_BASE_URL=http://127.0.0.1:9 SQ_APP_BASE_URL=http://127.0.0.1:9
+  done
+  echo "Hôtes validés ; ce contrôle ciblé ne valide ni couverture globale ni distribution."
+}
 
 run_debug() {
   local result="$RESULT_ROOT/$RUN_ID/Debug-P0.xcresult"
@@ -50,7 +97,7 @@ run_debug() {
     fast)
       scope_args=(-only-testing:SignalQuestTests -only-testing:SignalQuestUITests/SignalQuestUITests)
       echo "== Debug: unitaires + parcours UI P0 sur iPhone (scope=fast) =="
-      echo "   NOTE: 11 classes UI sur 12 ne sont PAS exécutées. SQ_UI_SCOPE=full pour la suite complète."
+      echo "   NOTE: les autres classes UI ne sont pas exécutées. SQ_UI_SCOPE=full pour la suite complète."
       ;;
     full)
       scope_args=()
@@ -62,7 +109,7 @@ run_debug() {
       ;;
   esac
 
-  xcodebuild test \
+  run_xcodebuild test \
     -project "$ROOT/SignalQuest.xcodeproj" \
     -scheme SignalQuest \
     -configuration Debug \
@@ -72,11 +119,11 @@ run_debug() {
     -enableCodeCoverage YES \
     -parallel-testing-enabled NO \
     ${scope_args[@]+"${scope_args[@]}"} \
-    CODE_SIGNING_ALLOWED=NO
+    CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES CODE_SIGN_IDENTITY=-
 
   echo "== Debug: rotation et navigation iPad =="
   local ipad_result="$RESULT_ROOT/$RUN_ID/Debug-iPad.xcresult"
-  xcodebuild test-without-building \
+  run_xcodebuild test-without-building \
     -project "$ROOT/SignalQuest.xcodeproj" \
     -scheme SignalQuest \
     -configuration Debug \
@@ -85,7 +132,7 @@ run_debug() {
     -resultBundlePath "$ipad_result" \
     -parallel-testing-enabled NO \
     -only-testing:SignalQuestUITests/SignalQuestUITests/testIPadLandscapeKeepsPrimaryNavigationUsable \
-    CODE_SIGNING_ALLOWED=NO
+    CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES CODE_SIGN_IDENTITY=-
 
   "$ROOT/ci_scripts/check_coverage.sh" "$result"
   echo "Debug result bundle: $result"
@@ -94,7 +141,7 @@ run_debug() {
 
 run_staging() {
   echo "== Staging: build Beta isolée =="
-  xcodebuild build \
+  run_xcodebuild build \
     -project "$ROOT/SignalQuest.xcodeproj" \
     -scheme "SignalQuest Beta" \
     -configuration Staging \
@@ -105,7 +152,7 @@ run_staging() {
 
 run_release() {
   echo "== Release: build optimisée sans signature =="
-  xcodebuild build \
+  run_xcodebuild build \
     -project "$ROOT/SignalQuest.xcodeproj" \
     -scheme SignalQuest \
     -configuration Release \
@@ -115,6 +162,7 @@ run_release() {
 }
 
 case "$MODE" in
+  host) run_host ;;
   debug) run_debug ;;
   staging) run_staging ;;
   release) run_release ;;

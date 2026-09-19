@@ -485,7 +485,7 @@ private final class PresenceRetryURLProtocol: URLProtocol, @unchecked Sendable {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         let respond = Self.handlerLock.withLock { Self.handler }
-        Task {
+        Task { @Sendable [self] in
             do {
                 guard let respond else { throw URLError(.unsupportedURL) }
                 let (response, data) = try await respond(request)
