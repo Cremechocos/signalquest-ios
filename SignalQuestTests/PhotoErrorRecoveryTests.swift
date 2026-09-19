@@ -16,6 +16,27 @@ final class PhotoErrorRecoveryTests: XCTestCase {
         XCTAssertNil(model.errorMessage)
     }
 
+    func testPaginationRetryKeepsEarlierPhotosAndRetriesTheFailedPage() async {
+        let service = PhotoRecoveryFixture()
+        let first = Photo.demoList[0], second = Photo.demoList[1]
+        service.gallery = .success(PhotoListResponse(photos: [first],
+            meta: PhotoPaginationMeta(page: 1, limit: 30, total: nil, hasMore: true)))
+        let model = PhotosViewModel(service: service)
+        await model.load()
+        service.gallery = .failure(PhotoRecoveryFixture.Failure.unavailable)
+        await model.loadMore()
+        XCTAssertEqual(model.photos.map(\.id), [first.id])
+        XCTAssertNotNil(model.errorMessage)
+        service.gallery = .success(PhotoListResponse(photos: [first, second],
+            meta: PhotoPaginationMeta(page: 2, limit: 30, total: 2, hasMore: false)))
+        await model.retryGallery()
+        XCTAssertEqual(service.requestedPages, [1, 2, 2])
+        XCTAssertEqual(model.photos.map(\.id), [first.id, second.id])
+        XCTAssertNil(model.errorMessage)
+        XCTAssertFalse(model.hasMore)
+        XCTAssertFalse(model.isLoadingMore)
+    }
+
     func testCommentsFailureKeepsContentAndRetryCanReturnAnAuthoritativeEmpty() async {
         let service = PhotoRecoveryFixture()
         let model = PhotosViewModel(service: service)
@@ -163,11 +184,13 @@ private final class PhotoRecoveryFixture: PhotoServicing, @unchecked Sendable {
     enum Failure: Error { case unavailable }
     var gallery: Result<PhotoListResponse, Error> = .failure(Failure.unavailable)
     var galleryHandler: (@Sendable () async throws -> PhotoListResponse)?
+    private(set) var requestedPages: [Int] = []
     var commentResult: Result<[PhotoComment], Error> = .failure(Failure.unavailable)
     var commentHandler: (@Sendable (String) async throws -> [PhotoComment])?
     var sendResult: Result<PhotoComment?, Error> = .failure(Failure.unavailable)
     var sendHandler: (@Sendable () async throws -> PhotoComment?)?
     func listPhotos(filter: String, sortBy: String, page: Int, limit: Int) async throws -> PhotoListResponse {
+        requestedPages.append(page)
         if let galleryHandler { return try await galleryHandler() }
         return try gallery.get()
     }

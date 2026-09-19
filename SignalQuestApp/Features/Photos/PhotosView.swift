@@ -28,6 +28,7 @@ final class PhotosViewModel: ObservableObject {
     private var galleryRequest = UUID()
     private var commentsRequest = UUID()
     private var commentContext = UUID()
+    private var retryPagination = false
 
     init(service: PhotoServicing) {
         self.service = service
@@ -41,6 +42,7 @@ final class PhotosViewModel: ObservableObject {
             photos = Photo.demoList
             hasMore = false
             errorMessage = nil
+            retryPagination = false
             return
         }
         isLoading = true
@@ -52,8 +54,12 @@ final class PhotosViewModel: ObservableObject {
             page = 1
             hasMore = response.meta?.hasMore ?? (response.photos.count >= pageSize)
             errorMessage = nil
+            retryPagination = false
         } catch {
-            if galleryRequest == request, !error.isCancellation { errorMessage = error.localizedDescription }
+            if galleryRequest == request, !error.isCancellation {
+                errorMessage = error.localizedDescription
+                retryPagination = false
+            }
         }
     }
 
@@ -74,9 +80,18 @@ final class PhotosViewModel: ObservableObject {
             page += 1
             hasMore = response.meta?.hasMore ?? (response.photos.count >= pageSize)
             errorMessage = nil
+            retryPagination = false
         } catch {
-            if galleryRequest == request, !error.isCancellation { errorMessage = error.localizedDescription }
+            if galleryRequest == request, !error.isCancellation {
+                errorMessage = error.localizedDescription
+                retryPagination = true
+            }
         }
+    }
+
+    func retryGallery() async {
+        if retryPagination { await loadMore() }
+        else { await load() }
     }
 
     func open(_ photo: Photo) async {
@@ -299,7 +314,8 @@ struct PhotosView: View {
                     galleryContent
                 }
                 if let error = model.errorMessage {
-                    ErrorStateView(title: "Photos indisponibles", message: error, retry: { Task { await model.load() } })
+                    ErrorStateView(title: "Photos indisponibles", message: error, retry: { Task { await model.retryGallery() } })
+                        .disabled(model.isLoading || model.isLoadingMore)
                 }
             }
             .padding(.horizontal, SQSpace.lg)
