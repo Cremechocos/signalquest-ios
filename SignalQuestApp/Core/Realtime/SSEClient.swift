@@ -69,33 +69,12 @@ final class SSEClient: Sendable {
                         }
 
                         backoff = 1.5
-                        var eventName: String?
-                        var sawData = false
-                        for try await line in bytes.lines {
+                        var parser = SSEFrameParser()
+                        for try await byte in bytes {
                             if Task.isCancelled { break }
-                            if line.lowercased().hasPrefix("event:") {
-                                eventName = String(line.dropFirst("event:".count))
-                                    .trimmingCharacters(in: .whitespaces)
-                                    .lowercased()
-                            } else if line.lowercased().hasPrefix("data:") {
-                                // On mémorise seulement qu'un payload est présent ;
-                                // l'émission a lieu à la fin de l'événement, pas ici.
-                                sawData = true
-                            } else if line.isEmpty {
-                                // Fin d'événement SSE (ligne vide) : on émet le nom
-                                // UNE fois, quel que soit l'ordre event:/data: ou le
-                                // nombre de lignes data:, et seulement si un payload a
-                                // été reçu. Robuste aux variations de format. (SSE-BUG-08)
-                                if sawData {
-                                    let name = eventName ?? "update"
-                                    if Self.knownEvents.contains(name) {
-                                        continuation.yield(name)
-                                    } else {
-                                        logger.debug("SSE événement hors contrat: \(name, privacy: .public)")
-                                    }
-                                }
-                                eventName = nil
-                                sawData = false
+                            if let frame = try parser.append(byte) {
+                                let name = frame.event.lowercased()
+                                if Self.knownEvents.contains(name) { continuation.yield(name) }
                             }
                         }
                     } catch is CancellationError {
@@ -132,9 +111,10 @@ final class SSEClient: Sendable {
     func dataStream(
         path: String,
         query: [URLQueryItem] = [],
-        keep: Set<String>
+        keep: Set<String>,
+        bufferingPolicy: AsyncStream<(event: String, data: String)>.Continuation.BufferingPolicy = .unbounded
     ) -> AsyncStream<(event: String, data: String)> {
-        AsyncStream { continuation in
+        AsyncStream(bufferingPolicy: bufferingPolicy) { continuation in
             let task = Task { [api, session, logger] in
                 var backoff: Double = 1.5
                 while !Task.isCancelled {
@@ -154,27 +134,14 @@ final class SSEClient: Sendable {
                         }
 
                         backoff = 1.5
-                        var eventName: String?
-                        var dataBuffer = ""
-                        for try await line in bytes.lines {
+                        var parser = SSEFrameParser()
+                        for try await byte in bytes {
                             if Task.isCancelled { break }
-                            if line.hasPrefix(":") {
-                                continue // commentaire SSE (heartbeat) : ignoré
-                            } else if line.lowercased().hasPrefix("event:") {
-                                eventName = String(line.dropFirst("event:".count))
-                                    .trimmingCharacters(in: .whitespaces)
-                                    .lowercased()
-                            } else if line.lowercased().hasPrefix("data:") {
-                                let chunk = String(line.dropFirst("data:".count))
-                                    .trimmingCharacters(in: .whitespaces)
-                                dataBuffer = dataBuffer.isEmpty ? chunk : dataBuffer + "\n" + chunk
-                            } else if line.isEmpty {
-                                let name = eventName ?? "message"
-                                if !dataBuffer.isEmpty, keep.contains(name) {
-                                    continuation.yield((event: name, data: dataBuffer))
+                            if let frame = try parser.append(byte) {
+                                let name = frame.event.lowercased()
+                                if !frame.data.isEmpty, keep.contains(name) {
+                                    continuation.yield((event: name, data: frame.data))
                                 }
-                                eventName = nil
-                                dataBuffer = ""
                             }
                         }
                     } catch is CancellationError {
@@ -197,5 +164,48 @@ final class SSEClient: Sendable {
                 task.cancel()
             }
         }
+    }
+}
+
+/// SSE framing must retain empty lines; AsyncBytes.lines omits them.
+/// The limit bounds both an unterminated line and accumulated event data.
+struct SSEFrameParser {
+    struct Frame: Equatable, Sendable { let event: String; let data: String }
+    enum Failure: Error { case oversizedFrame }
+    private var line: [UInt8] = []
+    private var data: [String] = []
+    private var event: String?
+    private var wasCR = false
+    private var firstLine = true
+    private var size = 0
+    private let limit: Int
+
+    init(limit: Int = 1_048_576) { self.limit = limit }
+
+    mutating func append(_ byte: UInt8) throws -> Frame? {
+        if wasCR && byte == 10 { wasCR = false; return nil }
+        wasCR = byte == 13
+        size += 1
+        guard size <= limit else { throw Failure.oversizedFrame }
+        guard byte == 10 || byte == 13 else { line.append(byte); return nil }
+        var text = String(decoding: line, as: UTF8.self)
+        line.removeAll(keepingCapacity: true)
+        if firstLine {
+            firstLine = false
+            if text.hasPrefix("\u{FEFF}") { text.removeFirst() }
+        }
+        if text.isEmpty {
+            let result = data.isEmpty ? nil : Frame(event: event?.isEmpty == false ? event! : "message", data: data.joined(separator: "\n"))
+            data.removeAll(keepingCapacity: true); event = nil; size = 0
+            return result
+        }
+        if text.hasPrefix(":") { return nil }
+        let colon = text.firstIndex(of: ":")
+        let field = colon.map { String(text[..<$0]) } ?? text
+        var value = colon.map { String(text[text.index(after: $0)...]) } ?? ""
+        if value.first == " " { value.removeFirst() }
+        if field == "event" { event = value }
+        else if field == "data" { data.append(value) }
+        return nil
     }
 }

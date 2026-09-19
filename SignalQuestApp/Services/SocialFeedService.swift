@@ -178,7 +178,7 @@ final class SocialFeedService: SocialFeedServicing {
         ]
         if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
         if let hashtag, !hashtag.isEmpty { query.append(URLQueryItem(name: "hashtag", value: hashtag)) }
-        return try await api.request(APIEndpoint(path: "/api/social/feed", query: query), as: SocialFeedPage.self)
+        return try await api.request(APIEndpoint(path: "/api/social/feed", query: query, responseDeadline: .seconds(30)), as: SocialFeedPage.self)
     }
 
     func post(id: String) async throws -> UnifiedSocialFeedItem? {
