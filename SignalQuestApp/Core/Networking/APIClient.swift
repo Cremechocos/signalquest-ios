@@ -589,7 +589,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await session.data(for: request)
+            (data, response) = try await responseData(for: request, deadline: endpoint.responseDeadline)
             try Task.checkCancellation()
             guard credentials.isCurrent(context) else { throw APIError.cancelled }
         } catch is CancellationError {
@@ -613,6 +613,21 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         // faux succès auth ni une panne réseau (contrat de connexion existant).
         let captured = try credentials.captureFromResponse(response, for: context, startsNewSession: !endpoint.authenticated)
         return Response(data: data, context: captured)
+    }
+
+    private func responseData(for request: URLRequest, deadline: Duration?) async throws -> (Data, URLResponse) {
+        guard let deadline else { return try await session.data(for: request) }
+        let session = self.session
+        return try await withThrowingTaskGroup(of: (Data, URLResponse).self) { group in
+            group.addTask { try await session.data(for: request) }
+            group.addTask {
+                try await Task.sleep(for: deadline)
+                throw URLError(.timedOut)
+            }
+            defer { group.cancelAll() }
+            guard let result = try await group.next() else { throw CancellationError() }
+            return result
+        }
     }
 
     private func performSingleAttempt(

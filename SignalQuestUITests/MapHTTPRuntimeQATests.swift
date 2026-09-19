@@ -294,15 +294,24 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         app.terminate()
     }
     func testPartialSpeedtestLayerRemainsVisibleAndRecoversThroughRetry() async throws {
+        try await checkPartialSpeedtestRecovery(scenario: "error-one")
+    }
+
+    func testTimedOutSpeedtestTilePreservesOtherPointsAndRecoversThroughRetry() async throws {
+        try await checkPartialSpeedtestRecovery(scenario: "timeout-one")
+    }
+
+    private func checkPartialSpeedtestRecovery(scenario: String) async throws {
         try requireFixture()
-        let failedRevision = try await configure("error-one")
+        let failedRevision = try await configure(scenario)
         let app = try launchGuest()
+        defer { app.terminate() }
         try tap(app.buttons["map.filters"], in: app)
         for layer in ["antenna", "customSite", "friend", "coverage"] { try setLayer(layer, selected: false, in: app) }
         try setLayer("speedtest", selected: true, in: app)
         try tap(app.buttons["map.filters.done"], in: app)
         try selectSFR(in: app)
-        guard app.buttons["map.status.retry"].waitForExistence(timeout: 45) else {
+        guard app.buttons["map.status.retry"].waitForExistence(timeout: scenario == "timeout-one" ? 130 : 45) else {
             capture(app, name: "map-partial-error-not-presented")
             XCTFail("The controlled tile failure must expose a retry action")
             throw RecipeError.missingControl
@@ -310,7 +319,18 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         XCTAssertTrue(app.buttons["map.operator"].label.contains("SFR"))
         let before = try await state()
         let failedEvents = before.events.filter { $0.scenario.revision == failedRevision && $0.event == "sent" && $0.path.contains("/tiles/speedtests/") && $0.query["operator"] == ["SFR"] }
-        XCTAssertTrue(failedEvents.contains { $0.status == 503 })
+        if scenario == "timeout-one" {
+            let timedOut = before.events.filter {
+                $0.scenario.revision == failedRevision && $0.path.contains("/tiles/speedtests/")
+                    && $0.query["operator"] == ["SFR"] && $0.event == "client-disconnected"
+                    && $0.status == 0 && ($0.elapsedSeconds ?? 0) >= 25
+            }
+            XCTAssertFalse(timedOut.isEmpty, "The native client must close a silent tile at its network deadline")
+            XCTAssertFalse(failedEvents.contains { $0.status >= 400 }, "This campaign must inject silence, not an HTTP error")
+            attach(try String(decoding: JSONEncoder().encode(timedOut), as: UTF8.self), name: "map-explicit-transport-timeout")
+        } else {
+            XCTAssertTrue(failedEvents.contains { $0.status == 503 })
+        }
         guard failedEvents.contains(where: { $0.status == 200 && !($0.syntheticIDs ?? []).isEmpty }) else {
             capture(app, name: "map-no-successful-fixture-tile")
             XCTFail("The received viewport does not contain a nonempty successful fixture tile")
@@ -369,6 +389,15 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         guard ProcessInfo.processInfo.environment["SQ_MAP_HTTP_QA"] == "1" else {
             throw XCTSkip("Requires the loopback map fixture and matching compiled API URLs")
         }
+        if origin != URL(string: "http://127.0.0.1:8769")! {
+            let host = (origin.host ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+            guard ProcessInfo.processInfo.environment["SQ_MAP_PHYSICAL_QA"] == "paired-usb-verified",
+                  origin.scheme == "http", origin.port == 49144, host.contains(":"),
+                  host.hasPrefix("fd") || host.hasPrefix("fc") else {
+                XCTFail("Refusing a map fixture outside the verified loopback or paired USB recipe")
+                throw RecipeError.missingControl
+            }
+        }
         continueAfterFailure = false
         if ProcessInfo.processInfo.environment["SQ_MAP_LANDSCAPE_QA"] == "1" {
             XCUIDevice.shared.orientation = .landscapeLeft
@@ -377,7 +406,7 @@ final class MapHTTPRuntimeQATests: XCTestCase {
 
     private func launchGuest(locale: String = "fr", panTo: String? = "45.188,5.7129,14.5", extraArguments: [String] = []) throws -> XCUIApplication {
         let app = XCUIApplication()
-        var environment = ["SQ_MAP_VIEWPORT_QA": "1"]
+        var environment = ["SQ_MAP_VIEWPORT_QA": "1", "SQ_MAP_CACHE_QA": UUID().uuidString]
         if let panTo { environment["SQ_QA_PAN_TO"] = panTo }
         SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth", "--reset-map", "--reset-onboarding"] + extraArguments,
                                        environment: environment, locale: locale)
@@ -503,14 +532,17 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         item.name = name; item.lifetime = .keepAlways; add(item)
     }
 
-    private struct Scenario: Decodable { let revision: String?; let gridRevision: Int? }
-    private struct Event: Decodable {
+    private struct Scenario: Codable { let revision: String?; let gridRevision: Int? }
+    private struct Event: Codable {
         let event: String, path: String, status: Int, scenario: Scenario
         let query: [String: [String]]
         let syntheticIDs: [String]?
+        let elapsedSeconds: Double?
     }
     private struct State: Decodable { let events: [Event] }
-    private let origin = URL(string: "http://127.0.0.1:8769")!
+    private var origin: URL {
+        URL(string: ProcessInfo.processInfo.environment["SQ_MAP_FIXTURE_ORIGIN"] ?? "http://127.0.0.1:8769")!
+    }
     private func configure(_ scenario: String) async throws -> String {
         var request = URLRequest(url: origin.appendingPathComponent("__qa/scenario"))
         request.httpMethod = "POST"

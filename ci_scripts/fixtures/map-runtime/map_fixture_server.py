@@ -10,6 +10,7 @@ import json
 import math
 from pathlib import Path
 import re
+import socket
 import threading
 import time
 import uuid
@@ -21,7 +22,7 @@ STATE_ROOT = ROOT
 PROFILE_QA_ENABLED = False
 PROFILE_SCENARIO = "profile-origin"
 LAYERS = ("antennas", "speedtests", "coverage", "community-sites", "custom-sites")
-SCENARIOS = ("baseline", "empty", "error-all", "error-one", "partial", "invalid-json",
+SCENARIOS = ("baseline", "empty", "error-all", "error-one", "timeout-one", "partial", "invalid-json",
              "wrong-tile", "legacy-degraded", "out-of-order", "out-of-order-b-error", PROFILE_SCENARIO)
 SAFE_QUERY = {"market", "operator", "marketCode", "operatorKey", "north", "south", "east", "west",
               "zoom", "lightweight", "only", "full", "days", "limit", "offset", "detail", "bands",
@@ -293,6 +294,10 @@ def response_for(path, query, state):
         fails = active and (mode == "error-all" or (mode == "error-one" and tile == center_tile)
                            or (mode == "out-of-order-b-error" and query.get("operator") == ["SFR"]))
         delay = 8 if active and mode.startswith("out-of-order") and query.get("operator") == ["ORANGE"] else 0
+        if active and mode == "timeout-one" and tile == center_tile:
+            # Hold the socket without sending headers or a body. The native
+            # URLSession deadline must fire before this bounded fixture limit.
+            return 200, {}, headers, 180
         if fails:
             headers["Retry-After"] = "15"  # APIClient surfaces >3s rather than automatic retry.
             return 503, {"error": "SYNTHETIQUE donnees indisponibles", "code": "DATABASE_UNAVAILABLE"}, headers, delay
@@ -473,6 +478,21 @@ class Handler(BaseHTTPRequestHandler):
             entry["syntheticIDs"] = [item["id"] for k in ("markers", "points", "clusters", "antennas")
                                      for item in body.get(k, []) if isinstance(item, dict) and str(item.get("id", "")).startswith("qa-")]
         record({**entry, "event": "received"})
+        if state.get("scenario") == "timeout-one" and delay == 180:
+            previous_timeout = self.connection.gettimeout()
+            try:
+                self.connection.settimeout(180)
+                closed = self.connection.recv(1, socket.MSG_PEEK) == b""
+                record({**entry, "status": 0, "event": "client-disconnected" if closed else "unexpected-client-data",
+                        "time": time.time(), "elapsedSeconds": time.time() - entry["time"], "bytes": 0})
+            except socket.timeout:
+                record({**entry, "status": 0, "event": "fixture-timeout-limit", "time": time.time(), "bytes": 0})
+            except ConnectionResetError:
+                record({**entry, "status": 0, "event": "client-disconnected", "time": time.time(),
+                        "elapsedSeconds": time.time() - entry["time"], "bytes": 0})
+            finally:
+                self.connection.settimeout(previous_timeout)
+            return
         time.sleep(delay)
         payload = body if isinstance(body, bytes) else json.dumps(body).encode()
         try:
@@ -515,7 +535,7 @@ def check():
             status, body, headers, delay = response_for(f"/api/android/map/tiles/{layer}/14/{center['x']}/{center['y']}",
                 {"operator": ["ORANGE"]}, {"scenario": scenario})
             assert status in (200, 503)
-            assert delay == (8 if scenario.startswith("out-of-order") else 0)
+            assert delay == (180 if scenario == "timeout-one" else 8 if scenario.startswith("out-of-order") else 0)
             if scenario in ("error-all", "error-one"):
                 assert status == 503 and headers["Retry-After"] == "15"
             elif scenario == "invalid-json":

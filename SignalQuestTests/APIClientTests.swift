@@ -2,6 +2,42 @@ import XCTest
 @testable import SignalQuest
 
 final class APIClientTests: XCTestCase {
+    func testPhysicalSilentMapTransportRespectsRequestDeadline() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["SQ_MAP_TRANSPORT_QA"] == "paired-usb-verified",
+              let raw = environment["SQ_MAP_FIXTURE_ORIGIN"], let origin = URL(string: raw) else {
+            throw XCTSkip("Requires the isolated physical map timeout fixture")
+        }
+        guard Bundle.main.bundleIdentifier == "fr.signalquest.ios.beta",
+              origin == AppConfig.current.apiBaseURL,
+              origin.scheme == "http", origin.port == 49144 else {
+            XCTFail("Refusing a transport probe outside the separate Beta recipe")
+            return
+        }
+        let client = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()))
+        let start = ContinuousClock.now
+        let request = Task {
+            try await client.requestData(APIEndpoint(path: "/api/android/map/tiles/speedtests/14/8452/5881",
+                query: [URLQueryItem(name: "operator", value: "SFR")], authenticated: false, baseURL: origin,
+                responseDeadline: .seconds(30)))
+        }
+        let limit = Task {
+            try await Task.sleep(for: .seconds(45))
+            request.cancel()
+        }
+        defer { limit.cancel() }
+        do {
+            _ = try await request.value
+            XCTFail("A silent fixture must not produce a successful response")
+        } catch {
+            guard case APIError.transport = error else {
+                XCTFail("The network deadline did not finish the request before the 45-second test limit: \(error)")
+                return
+            }
+            XCTAssertLessThan(start.duration(to: .now), .seconds(40))
+        }
+    }
+
     override func tearDown() {
         MockURLProtocol.requestHandler = nil
         super.tearDown()
