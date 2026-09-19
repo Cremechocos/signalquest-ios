@@ -511,6 +511,7 @@
 		DE7E761954A694D48D39BE98 /* NearbyNetworkQualityDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD92F7CAEF5CE9D9F233D172 /* NearbyNetworkQualityDetailSheet.swift */; };
 		DF096DA80BE358FA48F3E8C4 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71F03A270597876371BF433F /* APIClient.swift */; };
 		DF9D71B9F79972D1DB15456F /* OutageNotificationReceiptContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA37D9C160F3F6937A793448 /* OutageNotificationReceiptContract.swift */; };
+		DFBBB03368E73DD9FE23DBCC /* RecipeBackendPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F698B1964EB775ACCA35C3 /* RecipeBackendPersistenceTests.swift */; };
 		E019B26570467E84671F0C9E /* ObservationTimestamp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26F1073C29A755ED09EDDE94 /* ObservationTimestamp.swift */; };
 		E041B970C5ECFC01BF35E64F /* E2EEV2NotificationContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFC069610DDF030B6E30662A /* E2EEV2NotificationContracts.swift */; };
 		E0437A9ADD5EBC3A4C80A612 /* OutageNotificationReceiptContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA37D9C160F3F6937A793448 /* OutageNotificationReceiptContract.swift */; };
@@ -796,6 +797,7 @@
 		48863C421024F2F856B8E0EE /* CarPlayTabBarBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayTabBarBuilder.swift; sourceTree = "<group>"; };
 		4886511AB14489C9F2B2CD6B /* ProfileCardQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileCardQATests.swift; sourceTree = "<group>"; };
 		48B0A1DB2B40E7DCA6398C55 /* ValidationCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationCardView.swift; sourceTree = "<group>"; };
+		49F698B1964EB775ACCA35C3 /* RecipeBackendPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeBackendPersistenceTests.swift; sourceTree = "<group>"; };
 		4A30FBE643735E6E375B3948 /* NewModelDecodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewModelDecodeTests.swift; sourceTree = "<group>"; };
 		4A392F27A37DB201C942F22D /* MessageSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageSyncEngine.swift; sourceTree = "<group>"; };
 		4A82FDDDBCE3DAE2BB286C11 /* AntennaSightOriginTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaSightOriginTests.swift; sourceTree = "<group>"; };
@@ -2190,6 +2192,7 @@
 				0EC633C9F535F07BBC79CB8E /* PollDecodingTests.swift */,
 				45C74FCE985C39D989DD7AC5 /* PrivacyZonesTests.swift */,
 				4346B0324DBC983FC6001FF7 /* RadioLogsTests.swift */,
+				49F698B1964EB775ACCA35C3 /* RecipeBackendPersistenceTests.swift */,
 				ED23939334EC481F2A096590 /* ReportsRoutingTests.swift */,
 				1CC2679B071BC850638B4DB5 /* SectorNumberingTests.swift */,
 				3B9DCCD7740AD051F1829F43 /* SentinelleTests.swift */,
@@ -3178,6 +3181,7 @@
 				50E49C94546FE494CB10E1F4 /* PollDecodingTests.swift in Sources */,
 				B977D4399EE21E562B686269 /* PrivacyZonesTests.swift in Sources */,
 				E1B2D16B328B500C0B3E1E1E /* RadioLogsTests.swift in Sources */,
+				DFBBB03368E73DD9FE23DBCC /* RecipeBackendPersistenceTests.swift in Sources */,
 				FA1FA3B1FB3F9621CC897800 /* ReportsRoutingTests.swift in Sources */,
 				281E03A4709C9B5885EC9E07 /* SQShareCardBuilderTests.swift in Sources */,
 				77296AC47C010924CDD13008 /* SQShareCardRenderTests.swift in Sources */,
