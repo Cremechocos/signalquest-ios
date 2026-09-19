@@ -20,7 +20,6 @@ struct OnboardingHost<Content: View>: View {
 
     var body: some View {
         ZStack {
-            content
             if !hasCompletedOnboarding {
                 OnboardingView {
                     withAnimation(reduceMotion ? .easeOut(duration: 0.2) : SQMotion.smooth) {
@@ -36,6 +35,8 @@ struct OnboardingHost<Content: View>: View {
                         )
                 )
                 .zIndex(1)
+            } else {
+                content
             }
         }
     }
@@ -51,6 +52,7 @@ struct OnboardingHost<Content: View>: View {
 struct OnboardingView: View {
     let onFinish: () -> Void
 
+    @Environment(\.locale) private var locale
     @State private var page = 0
     /// Translation du doigt pendant le drag ; ramenée à 0 dans la même
     /// transaction animée que le changement de page pour un mouvement continu.
@@ -110,7 +112,7 @@ struct OnboardingView: View {
                 .foregroundStyle(SQColor.label)
                 .accessibilityHidden(true)
             Spacer()
-            Button("Passer") { onFinish() }
+            Button { onFinish() } label: { Text(verbatim: OnboardingCopy.skip.localized(locale)) }
                 .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
                 .tint(SQColor.labelSecondary)
                 // Sur la dernière slide le CTA « Commencer » fait ce travail :
@@ -154,7 +156,7 @@ struct OnboardingView: View {
         }
         UIAccessibility.post(
             notification: .pageScrolled,
-            argument: "Étape \(clamped + 1) sur \(pages.count)"
+            argument: OnboardingCopy.stepLabel(clamped + 1, total: pages.count, locale: locale)
         )
     }
 
@@ -188,32 +190,58 @@ struct OnboardingView: View {
 
 // MARK: - Modèle
 
+private enum OnboardingCopy: String {
+    case exploreTitle = "Comprends ton réseau"
+    case exploreBody = "Antennes, couverture, mesures : retrouve les données disponibles autour de toi et découvre leur origine."
+    case measureTitle = "Mesure et partage"
+    case measureBody = "Les speedtests cellulaires compatibles sont publiés automatiquement à leur position exacte, si elle est disponible. Tes zones privées restent protégées."
+    case internationalTitle = "Une carte qui se construit ensemble"
+    case internationalBody = "D’un pays à l’autre, les données varient. Antennes officielles et contributions se complètent lorsqu’elles sont disponibles. Une zone sans données peut afficher une carte vide."
+    case skip = "Passer"
+    case next = "Suivant"
+    case start = "Commencer"
+    case stepFormat = "Étape %lld sur %lld"
+
+    func localized(_ locale: Locale, bundle: Bundle = .main) -> String {
+        // Une seule résolution pour SwiftUI et les annonces UIKit/VoiceOver.
+        let language = locale.language.languageCode?.identifier == "fr" ? "fr" : "en"
+        let localizedBundle = bundle.path(forResource: language, ofType: "lproj")
+            .flatMap(Bundle.init(path:)) ?? bundle
+        return localizedBundle.localizedString(forKey: rawValue, value: rawValue, table: nil)
+    }
+
+    static func stepLabel(_ current: Int, total: Int, locale: Locale) -> String {
+        String(format: stepFormat.localized(locale), locale: locale,
+               arguments: [Int64(current), Int64(total)])
+    }
+}
+
 private struct OnboardingPage: Identifiable {
-    enum Scene { case radioWaves, speedDial, liveMap }
+    enum Scene: String { case radioWaves, speedDial, liveMap }
 
     let id: Scene
     let scene: Scene
-    let title: String
-    let body: String
+    let title: OnboardingCopy
+    let body: OnboardingCopy
 
     static let all: [OnboardingPage] = [
         OnboardingPage(
             id: .radioWaves,
             scene: .radioWaves,
-            title: "Comprends ton réseau",
-            body: "Explore la couverture mobile autour de toi : antennes, opérateurs et qualité réelle mesurée par la communauté."
+            title: .exploreTitle,
+            body: .exploreBody
         ),
         OnboardingPage(
             id: .speedDial,
             scene: .speedDial,
-            title: "Mesure et partage",
-            body: "Lance un speedtest fiable en quelques secondes, garde ton historique et contribue à la carte — uniquement si tu le décides."
+            title: .measureTitle,
+            body: .measureBody
         ),
         OnboardingPage(
             id: .liveMap,
             scene: .liveMap,
-            title: "Cartographie la couverture",
-            body: "Tes contributions, et celles des autres, dessinent une carte vivante de la 4G/5G partout en France."
+            title: .internationalTitle,
+            body: .internationalBody
         ),
     ]
 }
@@ -223,6 +251,7 @@ private struct OnboardingPage: Identifiable {
 private struct OnboardingSlideView: View {
     let page: OnboardingPage
     let isActive: Bool
+    @Environment(\.locale) private var locale
 
     /// Chorégraphie d'entrée jouée une seule fois, à la première activation :
     /// scène puis titre puis corps. Les visites suivantes montrent la slide posée.
@@ -241,7 +270,8 @@ private struct OnboardingSlideView: View {
             if active { reveal() }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(page.title). \(page.body)")
+        .accessibilityLabel(Text(verbatim: "\(page.title.localized(locale)). \(page.body.localized(locale))"))
+        .accessibilityIdentifier("onboarding.slide.\(page.scene.rawValue)")
     }
 
     private var stack: some View {
@@ -258,14 +288,14 @@ private struct OnboardingSlideView: View {
             Spacer(minLength: SQSpace.xxl)
 
             VStack(spacing: SQSpace.md) {
-                Text(page.title)
+                Text(verbatim: page.title.localized(locale))
                     .font(SQType.display)
                     .foregroundStyle(SQColor.label)
                     .multilineTextAlignment(.center)
                     .opacity(revealed ? 1 : 0)
                     .offset(y: revealed || reduceMotion ? 0 : 12)
                     .animation(entrance(delay: 0.07), value: revealed)
-                Text(page.body)
+                Text(verbatim: page.body.localized(locale))
                     .font(SQType.body)
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)
@@ -355,7 +385,7 @@ private struct RadioWavesScene: View {
                 .shadow(color: SQColor.brandRed.opacity(0.35), radius: 18, x: 0, y: 8)
             Image(systemName: "antenna.radiowaves.left.and.right")
                 .font(.system(size: 42, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(SQColor.onAccent)
         }
         .onChangeCompat(of: active) { _, isOn in
             // (Re)démarre la propagation à chaque activation de la slide.
@@ -593,6 +623,7 @@ private struct LiveMapScene: View {
 // MARK: - Indicateur de pages
 
 private struct OnboardingPageIndicator: View {
+    @Environment(\.locale) private var locale
     let count: Int
     let current: Int
     let onTap: (Int) -> Void
@@ -607,9 +638,12 @@ private struct OnboardingPageIndicator: View {
                     Capsule()
                         .fill(index == current ? SQColor.brandRed : SQColor.labelTertiary.opacity(0.5))
                         .frame(width: index == current ? 24 : 7, height: 7)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Étape \(index + 1) sur \(count)")
+                .accessibilityLabel(Text(verbatim: OnboardingCopy.stepLabel(index + 1, total: count, locale: locale)))
+                .accessibilityIdentifier("onboarding.page.\(index)")
                 .accessibilityAddTraits(index == current ? .isSelected : [])
             }
         }
@@ -624,6 +658,7 @@ private struct OnboardingPageIndicator: View {
 /// « Commencer » change via une vraie transition — l'ancien morphing dans la
 /// transaction du TabView superposait les deux textes en un état illisible.
 private struct OnboardingCTA: View {
+    @Environment(\.locale) private var locale
     let isLastPage: Bool
     let action: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -635,27 +670,27 @@ private struct OnboardingCTA: View {
         } label: {
             ZStack {
                 if isLastPage {
-                    label("Commencer", systemImage: "arrow.right.circle.fill")
+                    label(.start, systemImage: "arrow.right.circle.fill")
                         .transition(labelTransition(entering: true))
                 } else {
-                    label("Suivant", systemImage: "arrow.right")
+                    label(.next, systemImage: "arrow.right")
                         .transition(labelTransition(entering: false))
                 }
             }
             .animation(reduceMotion ? .easeOut(duration: 0.15) : SQMotion.snappy, value: isLastPage)
             .frame(maxWidth: .infinity)
             .padding(.vertical, SQSpace.md + 3)
-            .foregroundStyle(.white)
+            .foregroundStyle(SQColor.onAccent)
             .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
         }
         .buttonStyle(SQPressButtonStyle())
     }
 
-    private func label(_ title: String, systemImage: String) -> some View {
+    private func label(_ title: OnboardingCopy, systemImage: String) -> some View {
         HStack(spacing: SQSpace.sm + 2) {
             Image(systemName: systemImage)
                 .font(.system(size: 16, weight: .bold))
-            Text(title)
+            Text(verbatim: title.localized(locale))
                 .font(SQType.button)
                 .lineLimit(1)
         }

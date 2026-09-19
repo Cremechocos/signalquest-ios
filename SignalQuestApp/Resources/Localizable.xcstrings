@@ -45470,6 +45470,108 @@
           }
         }
       }
+    },
+    "Antennes, couverture, mesures : retrouve les données disponibles autour de toi et découvre leur origine.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antennes, couverture, mesures : retrouve les données disponibles autour de toi et découvre leur origine."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cell sites, coverage and measurements: explore the data available around you and learn where it comes from."
+          }
+        }
+      }
+    },
+    "Les speedtests cellulaires compatibles sont publiés automatiquement à leur position exacte, si elle est disponible. Tes zones privées restent protégées.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les speedtests cellulaires compatibles sont publiés automatiquement à leur position exacte, si elle est disponible. Tes zones privées restent protégées."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eligible cellular speedtests are published automatically at their exact location when available. Your private zones remain protected."
+          }
+        }
+      }
+    },
+    "Une carte qui se construit ensemble": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une carte qui se construit ensemble"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A map we build together"
+          }
+        }
+      }
+    },
+    "D’un pays à l’autre, les données varient. Antennes officielles et contributions se complètent lorsqu’elles sont disponibles. Une zone sans données peut afficher une carte vide.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "D’un pays à l’autre, les données varient. Antennes officielles et contributions se complètent lorsqu’elles sont disponibles. Une zone sans données peut afficher une carte vide."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data varies by country. Official cell sites and community contributions complement each other where available. Areas without data may show an empty map."
+          }
+        }
+      }
+    },
+    "Suivant": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suivant"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next"
+          }
+        }
+      }
+    },
+    "Commencer": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commencer"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get started"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

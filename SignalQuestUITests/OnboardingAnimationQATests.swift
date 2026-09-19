@@ -10,6 +10,65 @@ import XCTest
 /// Nécessite une installation fraîche (sq.hasCompletedOnboarding absent/false).
 @MainActor
 final class OnboardingAnimationQATests: XCTestCase {
+    func testCurrentOnboardingFrenchCopyAndCompletion() throws {
+        try checkLocalizedTour(locale: "fr")
+    }
+
+    func testCurrentOnboardingEnglishCopyAndCompletion() throws {
+        try checkLocalizedTour(locale: "en")
+    }
+
+    func testCurrentOnboardingEnglishAtLargestTextSize() throws {
+        try checkLocalizedTour(locale: "en", largeText: true)
+    }
+
+    private func checkLocalizedTour(locale: String, largeText: Bool = false) throws {
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        app.launchArguments = ["--reset-auth", "--reset-onboarding"]
+        if largeText {
+            app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        }
+        app.sqLaunch(locale: locale)
+        let next = app.buttons[locale == "fr" ? "Suivant" : "Next"]
+        XCTAssertTrue(next.waitForExistence(timeout: 20))
+        XCTAssertFalse(app.textFields.firstMatch.exists, "Login must not remain under the introduction")
+        let scenes = ["radioWaves", "speedDial", "liveMap"]
+        let expected = locale == "fr"
+            ? ["données disponibles", "publiés automatiquement", "les données varient"]
+            : ["data available", "published automatically", "Data varies"]
+        for index in scenes.indices {
+            let slide = app.descendants(matching: .any)["onboarding.slide.\(scenes[index])"].firstMatch
+            XCTAssertTrue(slide.waitForExistence(timeout: 5))
+            XCTAssertTrue(slide.label.contains(expected[index]), slide.label)
+            XCTAssertFalse(slide.label.contains("partout en France"))
+            XCTAssertFalse(slide.label.contains("uniquement si tu le décides"))
+            let indicator = app.buttons["onboarding.page.\(index)"]
+            XCTAssertEqual(indicator.label, locale == "fr" ? "Étape \(index + 1) sur 3" : "Step \(index + 1) of 3")
+            XCTAssertGreaterThanOrEqual(indicator.frame.height, 44)
+            XCTAssertGreaterThanOrEqual(indicator.frame.width, 44)
+            if index == 2 {
+                XCTAssertTrue(slide.label.contains(locale == "fr" ? "carte vide" : "empty map"))
+            }
+            if largeText { app.swipeUp() }
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = "onboarding-\(locale)-\(largeText ? "large" : "normal")-\(index + 1)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            if index < 2 { XCTAssertTrue(next.isHittable); next.tap() }
+        }
+        let start = app.buttons[locale == "fr" ? "Commencer" : "Get started"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        XCTAssertTrue(start.isHittable)
+        start.tap()
+        XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 20))
+        app.terminate()
+        app.launchArguments = ["--reset-auth"]
+        app.sqLaunch(locale: locale)
+        XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertFalse(app.buttons["onboarding.page.0"].exists)
+    }
+
     func testTourThroughThirdSlide() throws {
         let app = XCUIApplication()
         // La suite complète partage le même simulateur : partir explicitement
