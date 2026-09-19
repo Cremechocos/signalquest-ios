@@ -1,9 +1,44 @@
 import XCTest
 
-/// Native settings-only proof. Requires an independently verified loopback:9
-/// Debug app and dedicated QA simulators; never starts a throughput measurement.
+/// Settings-only checks. Simulator cases require the verified loopback:9 app;
+/// physical cases require the separate Beta recipe on the paired USB backend.
+/// No case starts a throughput measurement or an active Drive Test.
 @MainActor
 final class SpeedtestPublicationSettingsQATests: XCTestCase {
+    func testPhysicalFrenchSettingsAndIdleBackgroundReturn() throws {
+        try checkPhysicalSettings(locale: "fr")
+    }
+
+    func testPhysicalEnglishSettingsAndIdleBackgroundReturn() throws {
+        try checkPhysicalSettings(locale: "en")
+    }
+
+    private func checkPhysicalSettings(locale: String) throws {
+        #if targetEnvironment(simulator)
+        throw XCTSkip("Requires the separate physical Beta recipe")
+        #else
+        guard ProcessInfo.processInfo.environment["SQ_PHYSICAL_SETTINGS_QA"] == "beta-usb-verified" else {
+            throw XCTSkip("First verify the Beta signature, isolated USB origins and synthetic backend")
+        }
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        let app = launchGuest(locale: locale)
+        defer { app.terminate() }
+        try openAndInspectSettings(app, locale: locale)
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
+        app.activate()
+        let start = app.buttons[locale == "fr" ? "Démarrer le Drive Test" : "Start Drive Test"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        for (identifier, value) in [("drivetest.interval", "1 km"),
+                                    ("drivetest.dataCap", locale == "fr" ? "2 Go" : "2 GB")] {
+            XCTAssertTrue(app.descendants(matching: .any)[identifier].firstMatch.label.contains(value))
+        }
+        XCTAssertFalse(app.buttons["Arrêter le drive test"].exists)
+        capture(app, name: "physical-\(locale)-idle-background-return")
+        #endif
+    }
+
     func testFrenchGuestPublicationNoticeOnSmallIPhoneWithLegacyOptOuts() throws {
         try checkRecipeOptIn()
         let app = launchGuest(locale: "fr")
@@ -47,9 +82,7 @@ final class SpeedtestPublicationSettingsQATests: XCTestCase {
             "SQ_QA_SPEEDTEST_AUTORUN": "0",
             "SQ_QA_SPEEDTEST_EXIT": "0"
         ], locale: locale)
-        let guestLabel = locale == "fr"
-            ? "Lancer un speedtest sans compte" : "Run a speedtest without an account"
-        let guest = app.buttons[guestLabel].firstMatch
+        let guest = app.buttons["login.guestMeasure"].firstMatch
         XCTAssertTrue(guest.waitForExistence(timeout: 10), "Guest entry absent in expected language")
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(guest, in: app))
         capture(app, name: "publication-\(locale)-login")
@@ -70,24 +103,8 @@ final class SpeedtestPublicationSettingsQATests: XCTestCase {
         app.buttons["1"].firstMatch.tap()
         capture(app, name: "publication-\(locale)-settings-top")
 
-        let notice = app.staticTexts["speedtest.publication.info"].firstMatch
-        for index in 0..<12 {
-            assertNoPublicationSwitches(app)
-            if notice.exists && notice.isHittable { break }
-            let scrollView = app.scrollViews["speedtest.settings.scroll"]
-            if scrollView.exists { scrollView.swipeUp() } else { app.swipeUp() }
-            if index == 11 { capture(app, name: "publication-\(locale)-notice-missing") }
-        }
-        XCTAssertTrue(notice.exists && notice.isHittable, "Publication notice must be readable in the sheet")
-        let text = notice.label.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
-        let expected = locale == "fr"
-            ? ["automatique", "cellulaire", "exacte", "zones privees", "wi-fi", "vpn", "historique"]
-            : ["automatic", "cellular", "exact", "private zones", "wi-fi", "vpn", "history"]
-        for fragment in expected {
-            XCTAssertTrue(text.contains(fragment), "Notice missing expected \(locale) meaning: \(fragment)")
-        }
+        XCTAssertFalse(app.staticTexts["speedtest.publication.info"].exists)
         assertNoPublicationSwitches(app)
-        capture(app, name: "publication-\(locale)-settings-notice")
 
         // Les réglages du trajet ne doivent pas apparaître pour un test ponctuel.
         let cap = app.staticTexts[locale == "fr" ? "Plafond de données" : "Data cap"]

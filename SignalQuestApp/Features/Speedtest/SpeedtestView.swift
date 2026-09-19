@@ -12,6 +12,7 @@ struct SpeedtestView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .subheadline) private var settingsOptionSize: CGFloat = 44
     // Défaut « Auto » : préflight hybride iPerf3 (OVH/Bouygues/Scaleway/MilkyWan)
     // + Cloudflare, le plus rapide gagne.
     @AppStorage("speedtest_download_target") private var downloadTargetRaw = SpeedtestDownloadTarget.hybridAuto.rawValue
@@ -568,26 +569,16 @@ struct SpeedtestView: View {
         }
     }
 
-    /// Rangée de puces à sélection unique — même grammaire visuelle que « Rafale ».
+    /// Les libellés restent au-dessus des choix pour ne pas comprimer les capsules.
     private func chipRow(
         title: LocalizedStringKey,
         options: [(value: Int, label: String)],
         selection: Binding<Int>
     ) -> some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: SQSpace.sm) {
-                    Text(title).foregroundStyle(SQColor.label)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: SQSpace.sm) { chipButtons(options: options, selection: selection) }
-                    }
-                }
-            } else {
-                HStack {
-                    Text(title).foregroundStyle(SQColor.label)
-                    Spacer()
-                    chipButtons(options: options, selection: selection)
-                }
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text(title).foregroundStyle(SQColor.label)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: SQSpace.sm) { chipButtons(options: options, selection: selection) }
             }
         }
     }
@@ -600,9 +591,10 @@ struct SpeedtestView: View {
                     Haptics.selection()
                 } label: {
                     Text(option.label)
-                        .font(.caption.weight(.bold))
-                        .frame(minWidth: 44, minHeight: 44)
-                        .padding(.vertical, SQSpace.xs + 3)
+                        .font(.subheadline.weight(.semibold))
+                        .fixedSize()
+                        .padding(.horizontal, SQSpace.md)
+                        .frame(minWidth: max(44, settingsOptionSize), minHeight: max(44, settingsOptionSize))
                         .background(
                             selection.wrappedValue == option.value ? SQColor.brandRed : SQColor.fill,
                             in: Capsule(style: .continuous)
@@ -684,18 +676,6 @@ struct SpeedtestView: View {
                         }
                         .accessibilityIdentifier("speedtest.settings.advanced")
 
-                        Divider().overlay(SQColor.separator)
-
-                        VStack(alignment: .leading, spacing: SQSpace.xs) {
-                            Text("Publication automatique")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(SQColor.label)
-                            Text("Les nouveaux speedtests cellulaires éligibles, avec une position disponible, sont publiés automatiquement à leur position exacte. La protection de tes zones privées est respectée. Les tests Wi-Fi et sous VPN restent dans l’historique. Les anciennes mesures privées conservent leur visibilité.")
-                                .font(.caption)
-                                .foregroundStyle(SQColor.labelSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .accessibilityIdentifier("speedtest.publication.info")
-                        }
                     }
                     .padding(SQSpace.lg)
                     .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
