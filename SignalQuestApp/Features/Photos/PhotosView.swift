@@ -16,18 +16,27 @@ final class PhotosViewModel: ObservableObject {
     @Published var isLoadingMore = false
     @Published var hasMore = false
     @Published var errorMessage: String?
+    @Published var commentsErrorMessage: String?
+    @Published var commentSendErrorMessage: String?
+    @Published var isLoadingComments = false
     @Published var draft: String = ""
     @Published var isSending = false
 
     private let service: PhotoServicing
     private var page = 1
     private let pageSize = 30
+    private var galleryRequest = UUID()
+    private var commentsRequest = UUID()
+    private var commentContext = UUID()
 
     init(service: PhotoServicing) {
         self.service = service
     }
 
     func load() async {
+        let request = UUID()
+        galleryRequest = request
+        isLoadingMore = false
         if AppEnvironment.usesDemoData {
             photos = Photo.demoList
             hasMore = false
@@ -35,14 +44,16 @@ final class PhotosViewModel: ObservableObject {
             return
         }
         isLoading = true
-        defer { isLoading = false }
-        page = 1
+        defer { if galleryRequest == request { isLoading = false } }
         do {
-            let response = try await service.listPhotos(filter: "approved", sortBy: "recent", page: page, limit: pageSize)
+            let response = try await service.listPhotos(filter: "approved", sortBy: "recent", page: 1, limit: pageSize)
+            guard galleryRequest == request, !Task.isCancelled else { return }
             photos = response.photos
+            page = 1
             hasMore = response.meta?.hasMore ?? (response.photos.count >= pageSize)
+            errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            if galleryRequest == request, !error.isCancellation { errorMessage = error.localizedDescription }
         }
     }
 
@@ -53,30 +64,51 @@ final class PhotosViewModel: ObservableObject {
     func loadMore() async {
         guard hasMore, !isLoading, !isLoadingMore, !AppEnvironment.usesDemoData else { return }
         isLoadingMore = true
-        defer { isLoadingMore = false }
+        let request = galleryRequest
+        defer { if galleryRequest == request { isLoadingMore = false } }
         do {
             let response = try await service.listPhotos(filter: "approved", sortBy: "recent", page: page + 1, limit: pageSize)
-            let known = Set(photos.map(\.id))
-            photos.append(contentsOf: response.photos.filter { !known.contains($0.id) })
+            guard galleryRequest == request, !Task.isCancelled else { return }
+            var known = Set(photos.map(\.id))
+            photos.append(contentsOf: response.photos.filter { known.insert($0.id).inserted })
             page += 1
             hasMore = response.meta?.hasMore ?? (response.photos.count >= pageSize)
+            errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            if galleryRequest == request, !error.isCancellation { errorMessage = error.localizedDescription }
         }
     }
 
     func open(_ photo: Photo) async {
+        commentContext = UUID()
         selectedPhoto = photo
         comments = []
         draft = ""
+        isSending = false
+        commentSendErrorMessage = nil
+        commentsErrorMessage = nil
+        await reloadComments()
+    }
+
+    func reloadComments() async {
+        guard let photo = selectedPhoto else { return }
+        let request = UUID()
+        commentsRequest = request
+        isLoadingComments = true
+        defer { if commentsRequest == request { isLoadingComments = false } }
         if AppEnvironment.usesDemoData {
             comments = PhotoComment.demo
+            commentsErrorMessage = nil
             return
         }
         do {
-            comments = try await service.comments(photoId: photo.id)
+            let loaded = try await service.comments(photoId: photo.id)
+            guard commentsRequest == request, selectedPhoto?.id == photo.id, !Task.isCancelled else { return }
+            comments = loaded
+            commentsErrorMessage = nil
         } catch {
-            comments = []
+            guard commentsRequest == request, selectedPhoto?.id == photo.id, !error.isCancellation else { return }
+            commentsErrorMessage = error.localizedDescription
         }
     }
 
@@ -109,14 +141,18 @@ final class PhotosViewModel: ObservableObject {
     }
 
     func sendComment() async {
-        guard let photo = selectedPhoto else { return }
-        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let photo = selectedPhoto, !isSending else { return }
+        let context = commentContext
+        let submittedDraft = draft
+        let trimmed = submittedDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         isSending = true
-        defer { isSending = false }
+        commentSendErrorMessage = nil
+        defer { if commentContext == context { isSending = false } }
         do {
             if AppEnvironment.usesDemoData {
                 try? await Task.sleep(nanoseconds: 200_000_000)
+                guard commentContext == context, selectedPhoto?.id == photo.id, !Task.isCancelled else { return }
                 let comment = PhotoComment(
                     id: "demo-comment-\(UUID().uuidString)",
                     photoId: photo.id,
@@ -130,18 +166,24 @@ final class PhotosViewModel: ObservableObject {
                 )
                 comments.insert(comment, at: 0)
                 updatePhotoInState(photo.updatingCommentCount(count: (photo.commentCount ?? 0) + 1))
-                draft = ""
+                if draft == submittedDraft { draft = "" }
                 Haptics.success()
                 return
             }
-            if let comment = try await service.addComment(photoId: photo.id, content: trimmed) {
+            let saved = try await service.addComment(photoId: photo.id, content: trimmed)
+            guard commentContext == context, selectedPhoto?.id == photo.id, !Task.isCancelled else { return }
+            commentsRequest = UUID()
+            isLoadingComments = false
+            if let comment = saved {
                 comments.insert(comment, at: 0)
-                updatePhotoInState(photo.updatingCommentCount(count: (photo.commentCount ?? 0) + 1))
+                let current = selectedPhoto ?? photo
+                updatePhotoInState(current.updatingCommentCount(count: (current.commentCount ?? 0) + 1))
             }
-            draft = ""
+            if draft == submittedDraft { draft = "" }
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            guard commentContext == context, selectedPhoto?.id == photo.id, !error.isCancellation else { return }
+            commentSendErrorMessage = error.localizedDescription
             Haptics.error()
         }
     }
@@ -247,7 +289,7 @@ struct PhotosView: View {
                 galleryHeader
                 if model.isLoading && model.photos.isEmpty {
                     gallerySkeleton
-                } else if model.photos.isEmpty {
+                } else if model.photos.isEmpty && model.errorMessage == nil {
                     EmptyStateView(
                         title: "Aucune photo",
                         message: "Les photos validées apparaîtront ici.",
@@ -257,7 +299,7 @@ struct PhotosView: View {
                     galleryContent
                 }
                 if let error = model.errorMessage {
-                    ErrorStateView(title: "Photos indisponibles", message: error)
+                    ErrorStateView(title: "Photos indisponibles", message: error, retry: { Task { await model.load() } })
                 }
             }
             .padding(.horizontal, SQSpace.lg)
@@ -287,6 +329,10 @@ struct PhotosView: View {
                         set: { model.selectedPhoto = $0 }
                     ),
                     comments: model.comments,
+                    isLoadingComments: model.isLoadingComments,
+                    commentsError: model.commentsErrorMessage,
+                    commentSendError: model.commentSendErrorMessage,
+                    onRetryComments: { Task { await model.reloadComments() } },
                     draft: $model.draft,
                     isSending: model.isSending,
                     onLike: { Task { await model.like(model.selectedPhoto ?? selected) } },
@@ -503,9 +549,40 @@ struct PhotosView: View {
 // MARK: - PhotoDetailView
 // ════════════════════════════════════════════════════════════════
 
+struct PhotoCommentsFeedback: View {
+    let isLoading: Bool
+    let error: String?
+    let isEmpty: Bool
+    let onRetry: () -> Void
+
+    var body: some View {
+        VStack(spacing: SQSpace.md) {
+            if isLoading && isEmpty {
+                ProgressView("Chargement des commentaires…")
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .tint(SQColor.accentInk)
+                    .accessibilityIdentifier("photo.comments.loading")
+            } else if let error {
+                ErrorStateView(title: "Commentaires indisponibles", message: error, retry: onRetry)
+                    .disabled(isLoading)
+                    .accessibilityIdentifier("photo.comments.error")
+            } else if isEmpty {
+                EmptyStateView(title: "Aucun commentaire", message: "Sois le premier à commenter cette photo.",
+                               systemImage: "bubble.right")
+                    .accessibilityIdentifier("photo.comments.empty")
+            }
+            if isLoading && !isEmpty { ProgressView().accessibilityIdentifier("photo.comments.loading") }
+        }
+    }
+}
+
 struct PhotoDetailView: View {
     @Binding var photo: Photo
     let comments: [PhotoComment]
+    let isLoadingComments: Bool
+    let commentsError: String?
+    let commentSendError: String?
+    let onRetryComments: () -> Void
     @Binding var draft: String
     let isSending: Bool
     let onLike: () -> Void
@@ -824,13 +901,13 @@ struct PhotoDetailView: View {
             SQSectionHeader("Commentaires") {
                 EmptyView()
             }
-            if comments.isEmpty {
-                EmptyStateView(
-                    title: "Aucun commentaire",
-                    message: "Sois le premier à commenter cette photo.",
-                    systemImage: "bubble.right"
-                )
-            } else {
+            PhotoCommentsFeedback(isLoading: isLoadingComments, error: commentsError,
+                                  isEmpty: comments.isEmpty, onRetry: onRetryComments)
+            if let commentSendError {
+                ErrorStateView(title: "Commentaire non envoyé", message: commentSendError)
+                    .accessibilityIdentifier("photo.comments.sendError")
+            }
+            if !comments.isEmpty {
                 VStack(spacing: SQSpace.sm) {
                     ForEach(comments) { comment in
                         commentBubble(comment)

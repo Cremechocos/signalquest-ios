@@ -1,6 +1,57 @@
 {
   "sourceLanguage": "fr",
   "strings": {
+    "Chargement des commentaires…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement des commentaires…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading comments…"
+          }
+        }
+      }
+    },
+    "Commentaires indisponibles" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commentaires indisponibles"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comments unavailable"
+          }
+        }
+      }
+    },
+    "Commentaire non envoyé" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commentaire non envoyé"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comment not sent"
+          }
+        }
+      }
+    },
     "Bienvenue" : {
       "extractionState" : "manual",
       "localizations" : {

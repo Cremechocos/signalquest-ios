@@ -530,6 +530,7 @@ struct ErrorStateView: View {
                     Button("Réessayer", action: retry)
                         .buttonStyle(.borderedProminent)
                         .tint(SQColor.brandRed)
+                        .foregroundStyle(SQColor.onAccent)
                 }
             }
             .frame(maxWidth: .infinity)
