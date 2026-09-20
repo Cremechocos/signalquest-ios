@@ -145,6 +145,7 @@
 		36FF321ACD77EF48280ACD2A /* SQViewportMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2ACDAB840092E2F8A11454 /* SQViewportMapView.swift */; };
 		372D167F0B48A125051CD026 /* SignatureSpeedDial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D454E35F1134B2689C8BF45 /* SignatureSpeedDial.swift */; };
 		3817114389C995BBD5971D41 /* RadioLogIdentifySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCDE3C255B3CDE0E30DC180A /* RadioLogIdentifySheet.swift */; };
+		3817D42225B030A228C581D5 /* OutageContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B1A5B76D33ECAD240F471C5 /* OutageContextTests.swift */; };
 		3866C1CA8EEC2E696EAE8C8E /* SentinelleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 430454E901BFB79E1C37A0E2 /* SentinelleView.swift */; };
 		38B3BCD193F87AF57A825082 /* MapFeedAvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16374DCA26753933414E679A /* MapFeedAvailabilityTests.swift */; };
 		38D0EA9A66A425D012948A8E /* SpeedtestShareImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C011703B46C9CCF1394D3BA4 /* SpeedtestShareImageRenderer.swift */; };
@@ -692,6 +693,7 @@
 		19FA544154E6FF447F4F8F30 /* MobileChallengeWebKitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileChallengeWebKitTests.swift; sourceTree = "<group>"; };
 		1A5D2DCFD4D9B4C849B3BD4C /* SentinelleAlertSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleAlertSettingsSheet.swift; sourceTree = "<group>"; };
 		1AA0F72C82A77725FACCD301 /* SQDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQDock.swift; sourceTree = "<group>"; };
+		1B1A5B76D33ECAD240F471C5 /* OutageContextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutageContextTests.swift; sourceTree = "<group>"; };
 		1B6A09B51D17D8BEFBF8E501 /* SentinelleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleService.swift; sourceTree = "<group>"; };
 		1B7D91FD53A512C0A154BCFB /* AutoRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoRefreshTests.swift; sourceTree = "<group>"; };
 		1BA27C4F6CA354680172A364 /* TwoFactorSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFactorSetupView.swift; sourceTree = "<group>"; };
@@ -2202,6 +2204,7 @@
 				4A30FBE643735E6E375B3948 /* NewModelDecodeTests.swift */,
 				440E878D61BA0300BB278A3A /* OnboardingEntryStateTests.swift */,
 				57D22679EFB8F1BAF06D20F4 /* OnboardingRoutingTests.swift */,
+				1B1A5B76D33ECAD240F471C5 /* OutageContextTests.swift */,
 				EFE20C5C158D1152BD31B74A /* OutageNotificationReceiptTests.swift */,
 				24A015456C34BD38CF95EBF3 /* OutageReportDraftStoreTests.swift */,
 				B4206EF6BFCD2CCF04B359CA /* PasswordResetLinkTests.swift */,
@@ -3199,6 +3202,7 @@
 				8027C2DE7425912942340D4B /* NewModelDecodeTests.swift in Sources */,
 				F4149C49F813EAD60AA866FB /* OnboardingEntryStateTests.swift in Sources */,
 				7E9DA29256BAF310712427D3 /* OnboardingRoutingTests.swift in Sources */,
+				3817D42225B030A228C581D5 /* OutageContextTests.swift in Sources */,
 				FD138DC8B007C51B00E95A22 /* OutageNotificationReceiptTests.swift in Sources */,
 				F79845E2A174240210426EF9 /* OutageReportDraftStoreTests.swift in Sources */,
 				B9EF819D7C25F55340BA9BCB /* PasswordResetLinkTests.swift in Sources */,
