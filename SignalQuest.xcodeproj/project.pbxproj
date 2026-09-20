@@ -370,6 +370,7 @@
 		97024B7E216A3779D06D6075 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FC8EF017841F78C280399C /* PrivacySettingsView.swift */; };
 		9840E5D22D0D29431DB0A3E3 /* SentinelleFollowing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B975ADACD15B14BF001583 /* SentinelleFollowing.swift */; };
 		989DD213B201095FFA84F05D /* CallReliabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B070C4F0FF01A239CDF93570 /* CallReliabilityTests.swift */; };
+		98F094F8C9ECBFF7928001B1 /* ActiveCellularServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4BD349142FA1277F0D1ADC5 /* ActiveCellularServiceTests.swift */; };
 		9919D198453EFF9D37F58197 /* QuickIdentifyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C57A60CEC0CC1678EB3A77 /* QuickIdentifyModels.swift */; };
 		997C6C270FA23C242ED9CE63 /* BiometricAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1907E549B13F0B983DD9CCC8 /* BiometricAuth.swift */; };
 		9AE53698DBD1BBD4EC68EFBA /* StoryTypedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10228EB5F8E1022D2A64E804 /* StoryTypedTests.swift */; };
@@ -1164,6 +1165,7 @@
 		E39D8D7ADDF4C4A7FF55C92C /* PhotoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoModels.swift; sourceTree = "<group>"; };
 		E3C35085148C3D31C62F37F3 /* AzimuthBeamGroupingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzimuthBeamGroupingTests.swift; sourceTree = "<group>"; };
 		E3E33D670CB07FB413E537F1 /* SpeedtestDetailSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestDetailSheetTests.swift; sourceTree = "<group>"; };
+		E4BD349142FA1277F0D1ADC5 /* ActiveCellularServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveCellularServiceTests.swift; sourceTree = "<group>"; };
 		E4D38E0CB180E8E0F533A27D /* MapBands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapBands.swift; sourceTree = "<group>"; };
 		E53BD18D08BED09E80348163 /* AppLockSetupController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLockSetupController.swift; sourceTree = "<group>"; };
 		E5F08F6ECE4166CBD8CCC080 /* MapFeatures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapFeatures.swift; sourceTree = "<group>"; };
@@ -2116,6 +2118,7 @@
 		DFEE52FF944D70A5C57A7E12 /* SignalQuestTests */ = {
 			isa = PBXGroup;
 			children = (
+				E4BD349142FA1277F0D1ADC5 /* ActiveCellularServiceTests.swift */,
 				B4EBB8F2A133C7E7E8BFE147 /* AntennaMarkerDecodeTests.swift */,
 				FCC9C691A3F3F1874DAD506F /* AntennaMarkerRenderTests.swift */,
 				5D7C53B1F380E7089AC55E11 /* AntennaMarketAdaptationTests.swift */,
@@ -3116,6 +3119,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FD8C8A4E55F6F7F937636C0E /* APIClientTests.swift in Sources */,
+				98F094F8C9ECBFF7928001B1 /* ActiveCellularServiceTests.swift in Sources */,
 				2D45A38C6DD966DDBFB53451 /* AntennaMarkerDecodeTests.swift in Sources */,
 				2D7B3DBF75B6EA5D1E059052 /* AntennaMarkerRenderTests.swift in Sources */,
 				2BAECD527A7C4A4229830ED6 /* AntennaMarketAdaptationTests.swift in Sources */,

@@ -1,6 +1,40 @@
 {
   "sourceLanguage": "fr",
   "strings": {
+    "Information SIM" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Information SIM"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SIM information"
+          }
+        }
+      }
+    },
+    "Accès Internet (IP/ASN)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accès Internet (IP/ASN)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Internet access (IP/ASN)"
+          }
+        }
+      }
+    },
     "Chargement des commentaires…" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -298,39 +298,31 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
     }
 
     private func currentCellularTechnology() -> CellularRadioTechnology? {
-        guard let serviceTechnologies = telephony.serviceCurrentRadioAccessTechnology else {
-            return nil
+        Self.activeServiceValue(in: telephony.serviceCurrentRadioAccessTechnology,
+                                dataServiceIdentifier: telephony.dataServiceIdentifier) {
+            CellularRadioTechnology.map($0)
         }
-
-        if let dataServiceIdentifier = telephony.dataServiceIdentifier,
-           let technology = CellularRadioTechnology.map(serviceTechnologies[dataServiceIdentifier]) {
-            return technology
-        }
-
-        for serviceIdentifier in serviceTechnologies.keys.sorted() {
-            if let technology = CellularRadioTechnology.map(serviceTechnologies[serviceIdentifier]) {
-                return technology
-            }
-        }
-        return nil
     }
 
     private func currentCarrierName() -> String? {
-        guard let providers = telephony.serviceSubscriberCellularProviders else {
-            return nil
+        Self.activeServiceValue(in: telephony.serviceSubscriberCellularProviders,
+                                dataServiceIdentifier: telephony.dataServiceIdentifier) {
+            Self.normalizedCarrierName($0.carrierName)
         }
+    }
 
-        if let dataServiceIdentifier = telephony.dataServiceIdentifier,
-           let carrierName = Self.normalizedCarrierName(providers[dataServiceIdentifier]?.carrierName) {
-            return carrierName
+    static func activeServiceValue<Raw, Value>(
+        in services: [String: Raw]?, dataServiceIdentifier: String?,
+        transform: (Raw) -> Value?
+    ) -> Value? {
+        guard let services else { return nil }
+        // CoreTelephony identifies the data line explicitly. Missing/unexposed
+        // metadata for that line must not be replaced with another SIM's data.
+        if let identifier = dataServiceIdentifier, !identifier.isEmpty {
+            return services[identifier].flatMap(transform)
         }
-
-        for serviceIdentifier in providers.keys.sorted() {
-            if let carrierName = Self.normalizedCarrierName(providers[serviceIdentifier]?.carrierName) {
-                return carrierName
-            }
-        }
-        return nil
+        guard services.count == 1, let only = services.values.first else { return nil }
+        return transform(only)
     }
 
     /// Diagnostic (debug uniquement) : trace les valeurs BRUTES renvoyées par
@@ -360,20 +352,8 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
     }
 
     private func currentCellularProvider() -> CTCarrier? {
-        guard let providers = telephony.serviceSubscriberCellularProviders else {
-            return nil
-        }
-        if let dataServiceIdentifier = telephony.dataServiceIdentifier,
-           let provider = providers[dataServiceIdentifier] {
-            return provider
-        }
-
-        for serviceIdentifier in providers.keys.sorted() {
-            if let provider = providers[serviceIdentifier] {
-                return provider
-            }
-        }
-        return nil
+        Self.activeServiceValue(in: telephony.serviceSubscriberCellularProviders,
+                                dataServiceIdentifier: telephony.dataServiceIdentifier) { $0 }
     }
 
     private static func normalizedCarrierName(_ value: String?) -> String? {

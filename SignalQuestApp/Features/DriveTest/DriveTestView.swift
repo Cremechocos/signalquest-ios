@@ -57,6 +57,8 @@ final class DriveTestViewModel: ObservableObject {
     /// Libellé de l'opérateur de la SIM dont on affiche les antennes (ex « Orange »),
     /// ou nil si indéterminable (WiFi / VPN) → on retombe sur tous les opérateurs.
     @Published private(set) var simOperatorLabel: String?
+    enum OperatorSource { case sim, internetAccess }
+    @Published private(set) var operatorSource: OperatorSource?
 
     /// VPN actif : sous tunnel, l'opérateur réel n'est pas détectable et les tests
     /// ne sont pas publiés sur la carte. Pilote la bannière d'avertissement.
@@ -93,11 +95,8 @@ final class DriveTestViewModel: ObservableObject {
     var antennaDetailMarket: String { resolvedSim?.market ?? MapMarketStore.lastMarket() ?? MapMarketStore.localeMarketCode() }
     var antennaDetailOperator: String { displayedOperatorKey ?? "ALL" }
 
-    /// Opérateur TOUJOURS automatique (SIM / IP-ASN / marché GPS). Il a existé un
-    /// override manuel : il écrivait une propriété que ni cette ligne ni
-    /// `refreshAntennasIfNeeded` ne lisaient — choisir un opérateur ne faisait
-    /// donc rien du tout. Retiré plutôt que rebranché : la couverture doit être
-    /// taguée avec l'opérateur RÉEL, pas avec celui qu'on aurait choisi.
+    /// Information issue de la SIM ou de l'accès Internet, avec sa source.
+    /// Un filtre de carte ou un pays GPS ne constitue jamais une détection réseau.
     var displayedOperatorKey: String? { resolvedSim?.operatorKey }
 
     /// Libellé court de l'opérateur affiché, ou nil si indéterminé (→ feedback UI).
@@ -512,10 +511,15 @@ final class DriveTestViewModel: ObservableObject {
 
         // 2. Opérateur le plus fiable : resolve() (IP/ASN) en cellulaire hors VPN.
         var operatorKey: String?
+        var source: OperatorSource?
+        let viaVpn = VPNDetector.isActive()
         if status.connection == .cellular,
-           let detected = await services.networkOperator.resolve(viaVpn: VPNDetector.isActive()),
+           !viaVpn,
+           let detected = await services.networkOperator.resolve(viaVpn: false),
+           detected.viaVpn != true,
            let key = detected.operatorKey {
             operatorKey = key
+            source = .internetAccess
             if entry == nil { entry = payload.markets.first { $0.operatorEntry(forKey: key) != nil } }
         }
         // 3. Repli opérateur via le PLMN de la SIM.
@@ -525,14 +529,7 @@ final class DriveTestViewModel: ObservableObject {
         if operatorKey == nil, let mcc = plmn.mcc, let mnc = plmn.mnc, let entry,
            let key = entry.radioOperatorKey(mcc: mcc, mnc: mnc) {
             operatorKey = key
-        }
-        // 4. Repli : opérateur/marché persistés de la carte (déjà détectés au Lot 1A).
-        if operatorKey == nil,
-           let persistedOp = MapMarketStore.lastOperator(), persistedOp.uppercased() != "ALL",
-           let persistedEntry = payload.market(forCode: MapMarketStore.lastMarket()),
-           persistedEntry.operatorEntry(forKey: persistedOp) != nil {
-            entry = persistedEntry
-            operatorKey = persistedOp
+            source = .sim
         }
 
         // Renseigne le sélecteur manuel + la palette à partir du meilleur marché
@@ -557,6 +554,7 @@ final class DriveTestViewModel: ObservableObject {
         }
         let market = entry.marketCode.isEmpty ? entry.code : entry.marketCode
         resolvedSim = (market, operatorKey)
+        operatorSource = source
         simOperatorLabel = entry.operatorEntry(forKey: operatorKey)?.shortLabel ?? operatorKey
         simResolveFailures = 0
         lastSimResolveFailureAt = nil
@@ -573,6 +571,7 @@ final class DriveTestViewModel: ObservableObject {
         // Nouvelle SIM : on oublie l'ancienne résolution et on relance la détection + le
         // refetch des antennes (la session continue, rien n'est arrêté).
         resolvedSim = nil
+        operatorSource = nil
         simOperatorLabel = nil
         lastFetchOperator = nil
         await resolveSimOperatorIfNeeded()
@@ -1333,9 +1332,8 @@ struct DriveTestView: View {
         }
     }
 
-    /// Opérateur détecté AUTOMATIQUEMENT (SIM / IP-ASN / marché GPS). Affichage seul :
-    /// plus de sélecteur manuel — la couverture est toujours taguée avec l'opérateur réel,
-    /// pour tous les utilisateurs et tous les pays.
+    /// L'origine de l'information reste visible ; ni la SIM ni l'IP ne prouvent
+    /// à elles seules le réseau radio servant en itinérance.
     private var operatorRow: some View {
         HStack(spacing: SQSpace.sm) {
             Circle()
@@ -1359,7 +1357,7 @@ struct DriveTestView: View {
         .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Opérateur détecté")
-        .accessibilityValue(model.displayedOperatorLabel ?? "en cours de détection")
+        .accessibilityValue(model.displayedOperatorLabel.map { "\($0), \(operatorRowSubtitle)" } ?? operatorRowTitle)
     }
 
     private var operatorRowTitle: String {
@@ -1374,7 +1372,13 @@ struct DriveTestView: View {
     /// plusieurs échecs on annonce le résultat et ses conséquences, plutôt que de
     /// laisser tourner un message d'attente qui n'attend plus rien.
     private var operatorRowSubtitle: String {
-        if model.displayedOperatorLabel != nil { return String(localized: "Détecté automatiquement") }
+        if model.displayedOperatorLabel != nil {
+            switch model.operatorSource {
+            case .sim: return String(localized: "Information SIM")
+            case .internetAccess: return String(localized: "Accès Internet (IP/ASN)")
+            case nil: return String(localized: "Opérateur non détecté")
+            }
+        }
         guard model.operatorDetectionGaveUp else { return String(localized: "Détection en cours…") }
         return String(localized: "L’opérateur ne peut pas être confirmé. Les résultats restent disponibles dans ton historique.")
     }
