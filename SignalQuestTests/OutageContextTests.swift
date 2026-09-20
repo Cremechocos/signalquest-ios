@@ -76,6 +76,27 @@ final class OutageContextTests: XCTestCase {
         XCTAssertFalse(model.isLoadingMore)
     }
 
+    func testLatePaginationSuccessCannotAppendOrRestoreHasMoreInAnotherScope() async throws {
+        let service = VMOutageService()
+        let model = CommunityOutagesListViewModel(service: service, markets: VMMarketsService())
+        let initial = Task { await model.reload() }
+        try await waitForRequests(service.loads, 1)
+        let item = try outage("all")
+        await service.loads.succeed(0, (outages: [item], hasMore: true))
+        await initial.value
+        let more = Task { await model.loadMoreIfNeeded(after: item) }
+        try await waitForRequests(service.loads, 2)
+        model.scope = .mine
+        try await waitForRequests(service.loads, 3)
+        await service.loads.succeed(2, (outages: [try outage("mine")], hasMore: false))
+        try await waitForIdle(model)
+        await service.loads.succeed(1, (outages: [try outage("all-next")], hasMore: true))
+        await more.value
+        XCTAssertEqual(model.outages.map(\.id), ["mine"])
+        XCTAssertFalse(model.hasMore)
+        XCTAssertFalse(model.isLoadingMore)
+    }
+
     func testLateVoteFailureDoesNotPolluteAnotherScope() async throws {
         let service = VMOutageService()
         let model = CommunityOutagesListViewModel(service: service, markets: VMMarketsService())
