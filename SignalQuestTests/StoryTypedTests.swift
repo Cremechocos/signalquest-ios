@@ -107,3 +107,72 @@ final class StoryTypedTests: XCTestCase {
         )
     }
 }
+
+@MainActor
+final class StoryReplySubmissionTests: XCTestCase {
+    private enum NetworkFailure: Error { case lostResponse }
+
+    @MainActor
+    private final class SendGate {
+        private var continuation: CheckedContinuation<Void, Error>?
+
+        func wait() async throws {
+            try await withCheckedThrowingContinuation { continuation = $0 }
+        }
+
+        func finish() {
+            continuation?.resume()
+            continuation = nil
+        }
+    }
+
+    func testFailureKeepsDraftAndRetryUsesTheSameRequestIDUntilAcknowledged() async {
+        let submission = StoryReplySubmission()
+        submission.draft = "Bonjour"
+        var firstRequestID: String?
+
+        let failed = await submission.submit(storyID: "story-1", text: submission.draft) { requestID in
+            firstRequestID = requestID
+            XCTAssertNil(submission.sentStoryID, "A pending message must never show as sent")
+            throw NetworkFailure.lostResponse
+        }
+        XCTAssertFalse(failed)
+        XCTAssertEqual(submission.draft, "Bonjour")
+        XCTAssertEqual(submission.failedStoryID, "story-1")
+        XCTAssertNil(submission.sentStoryID)
+        XCTAssertFalse(submission.isSending)
+
+        let delivered = await submission.submit(storyID: "story-1", text: submission.draft) { requestID in
+            XCTAssertEqual(requestID, firstRequestID, "Retry must not create a duplicate message")
+        }
+        XCTAssertTrue(delivered)
+        XCTAssertNil(submission.failedStoryID)
+        XCTAssertEqual(submission.sentStoryID, "story-1")
+        XCTAssertFalse(submission.isSending)
+    }
+
+    func testPendingReplyCannotBeSubmittedTwiceOrConfirmedEarly() async {
+        let submission = StoryReplySubmission()
+        let gate = SendGate()
+        let started = expectation(description: "Network request started")
+
+        let first = Task {
+            await submission.submit(storyID: "story-1", text: "👏") { _ in
+                started.fulfill()
+                try await gate.wait()
+            }
+        }
+        await fulfillment(of: [started], timeout: 5)
+        XCTAssertTrue(submission.isSending)
+        XCTAssertNil(submission.sentStoryID)
+
+        let duplicate = await submission.submit(storyID: "story-1", text: "👏") { _ in
+            XCTFail("A second request must not begin while the first is pending")
+        }
+        XCTAssertFalse(duplicate)
+        gate.finish()
+        let delivered = await first.value
+        XCTAssertTrue(delivered)
+        XCTAssertEqual(submission.sentStoryID, "story-1")
+    }
+}

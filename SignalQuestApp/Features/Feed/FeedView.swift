@@ -728,8 +728,8 @@ struct FeedView: View {
                                 presentedStoryStart = nil
                                 pushProfileAfterDismiss(story.author)
                             },
-                            onSendReply: { story, text in
-                                sendStoryReply(story, text: text)
+                            onSendReply: { story, text, requestID in
+                                try await sendStoryReply(story, text: text, requestID: requestID)
                             },
                             onDelete: { story in
                                 Task {
@@ -810,21 +810,25 @@ struct FeedView: View {
     /// Il n'existe pas d'endpoint de réaction de story : on résout/crée la
     /// conversation directe puis on envoie le texte (ou l'emoji). En non-E2EE pour
     /// que la réponse parte sans déverrouillage de la messagerie.
-    private func sendStoryReply(_ story: SocialStory, text: String) {
+    /// Le viewer ne confirme qu'après le reçu du serveur de messagerie.
+    private func sendStoryReply(_ story: SocialStory, text: String, requestID: String) async throws {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        Task {
-            do {
-                let created = try await services.messages.createConversation(
-                    participantIds: [story.author.id], title: nil, e2ee: false
-                )
-                let conversations = try await services.messages.conversations()
-                guard let conversation = conversations.first(where: { $0.id == created.conversationId }) else { return }
-                _ = try await services.messages.sendText(trimmed, in: conversation, replyToId: nil, e2ee: services.e2ee, idempotencyKey: nil, ttlSeconds: 0)
-            } catch {
-                // Best-effort : la confirmation « Envoyé » du viewer est optimiste.
-            }
+        guard !trimmed.isEmpty else { throw StoryReplyDeliveryError.unavailable }
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else {
+            throw CancellationError()
         }
+        let created = try await services.messages.createConversation(
+            participantIds: [story.author.id], title: nil, e2ee: false
+        )
+        guard session.isCurrent else { throw CancellationError() }
+        let conversations = try await services.messages.conversations()
+        guard session.isCurrent else { throw CancellationError() }
+        guard let conversation = conversations.first(where: { $0.id == created.conversationId }) else {
+            throw StoryReplyDeliveryError.conversationUnavailable
+        }
+        _ = try await services.messages.sendText(trimmed, in: conversation, replyToId: nil,
+            e2ee: services.e2ee, idempotencyKey: requestID, ttlSeconds: 0)
+        guard session.isCurrent else { throw CancellationError() }
     }
 
     // MARK: Header custom — titre, menu secondaire, actions nommées

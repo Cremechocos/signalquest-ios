@@ -19,15 +19,16 @@ struct StoryViewer: View {
     var onAuthorTap: (SocialStory) -> Void = { _ in }
     /// Réponse / réaction à une story = message privé à l'auteur (façon Instagram).
     /// Le parent résout/crée la conversation DM et envoie le texte/emoji.
-    var onSendReply: (SocialStory, String) -> Void = { _, _ in }
+    var onSendReply: (SocialStory, String, String) async throws -> Void = { _, _, _ in
+        throw StoryReplyDeliveryError.unavailable
+    }
     /// Suppression d'une story (auteur) — le parent supprime côté serveur + rafraîchit.
     var onDelete: (SocialStory) -> Void = { _ in }
     /// Fournit la liste « Vu par » d'une story (auteur uniquement).
     var viewersProvider: (SocialStory) async -> [StoryViewerEntry] = { _ in [] }
 
-    @State private var replyText = ""
+    @StateObject private var replySubmission = StoryReplySubmission()
     @FocusState private var replyFocused: Bool
-    @State private var sentConfirmation = false
     @State private var showViewers = false
     @State private var viewers: [StoryViewerEntry] = []
     @State private var loadingViewers = false
@@ -91,7 +92,10 @@ struct StoryViewer: View {
         .accessibilityAction(named: Text("Story suivante")) { forward() }
         .accessibilityAction(named: Text("Story précédente")) { back() }
         .onAppear { startStory() }
-        .onChange(of: index) { _ in startStory() }
+        .onChange(of: index) { _ in
+            replySubmission.clearFeedback()
+            startStory()
+        }
         // Pause/reprise du minuteur : saisie clavier, feuille « Vu par… », dialogue
         // de suppression, ou VoiceOver actif (auto-avancement suspendu, cf. A11Y-04).
         .onChange(of: shouldPause) { paused in
@@ -196,7 +200,7 @@ struct StoryViewer: View {
 
     private var replyAffordance: some View {
         VStack(spacing: SQSpace.sm + 2) {
-            if sentConfirmation {
+            if replySubmission.sentStoryID == currentStory?.id {
                 Label("Envoyé", systemImage: "checkmark.circle.fill")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.white)
@@ -205,24 +209,40 @@ struct StoryViewer: View {
                     .background(.ultraThinMaterial, in: Capsule())
                     .transition(.opacity.combined(with: .scale))
             }
+            if replySubmission.failedStoryID == currentStory?.id {
+                Label("Échec de l'envoi. Réessaie.", systemImage: "exclamationmark.circle.fill")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, SQSpace.md)
+                    .padding(.vertical, SQSpace.sm)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .accessibilityIdentifier("story.reply.error")
+            }
+            if replySubmission.isSending {
+                ProgressView("Envoi…")
+                    .tint(.white)
+                    .foregroundStyle(.white)
+                    .accessibilityIdentifier("story.reply.sending")
+            }
             // Réactions rapides — envoyées comme message privé à l'auteur.
             HStack(spacing: SQSpace.md) {
                 ForEach(quickReactions, id: \.self) { emoji in
                     Button {
                         Haptics.light()
-                        if let story = currentStory { onSendReply(story, emoji) }
-                        confirmSent()
+                        submitReply(emoji, clearDraftOnSuccess: false)
                     } label: {
                         Text(emoji).font(.system(size: 30))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Réagir avec \(emoji)")
+                    .disabled(replySubmission.isSending)
                 }
             }
             // Champ de réponse texte.
             HStack(spacing: SQSpace.sm) {
-                TextField("", text: $replyText, prompt: Text("Répondre…").foregroundColor(.white.opacity(0.7)))
+                TextField("", text: $replySubmission.draft, prompt: Text("Répondre…").foregroundColor(.white.opacity(0.7)))
                     .focused($replyFocused)
+                    .disabled(replySubmission.isSending)
                     .foregroundStyle(.white)
                     .tint(.white)
                     .submitLabel(.send)
@@ -231,7 +251,7 @@ struct StoryViewer: View {
                     .padding(.vertical, SQSpace.sm + 2)
                     .frame(minHeight: 44)
                     .background(.ultraThinMaterial, in: Capsule())
-                if !replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if !replySubmission.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Button(action: sendReply) {
                         Image(systemName: "paperplane.fill")
                             .font(.system(size: 17, weight: .semibold))
@@ -240,14 +260,16 @@ struct StoryViewer: View {
                             .background(SQColor.brandRed, in: Circle())
                     }
                     .accessibilityLabel("Envoyer")
+                    .accessibilityIdentifier("story.reply.send")
+                    .disabled(replySubmission.isSending)
                     .transition(.scale.combined(with: .opacity))
                 }
             }
         }
         .padding(.horizontal, SQSpace.lg)
         .padding(.bottom, SQSpace.lg)
-        .sqAnimation(SQMotion.snappy, value: replyText.isEmpty)
-        .sqAnimation(SQMotion.snappy, value: sentConfirmation)
+        .sqAnimation(SQMotion.snappy, value: replySubmission.draft.isEmpty)
+        .sqAnimation(SQMotion.snappy, value: replySubmission.sentStoryID)
     }
 
     /// Pied affiché sur ses PROPRES stories : « Vu par… » + suppression.
@@ -290,19 +312,23 @@ struct StoryViewer: View {
     }
 
     private func sendReply() {
-        let text = replyText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, let story = currentStory else { return }
-        onSendReply(story, text)
-        replyText = ""
-        replyFocused = false
-        confirmSent()
+        submitReply(replySubmission.draft, clearDraftOnSuccess: true)
     }
 
-    private func confirmSent() {
-        sentConfirmation = true
+    private func submitReply(_ rawText: String, clearDraftOnSuccess: Bool) {
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, let story = currentStory, !replySubmission.isSending else { return }
         Task {
+            let delivered = await replySubmission.submit(storyID: story.id, text: text) { requestID in
+                try await onSendReply(story, text, requestID)
+            }
+            guard delivered else { return }
+            if clearDraftOnSuccess, currentStory?.id == story.id {
+                replySubmission.draft = ""
+                replyFocused = false
+            }
             try? await Task.sleep(nanoseconds: 1_400_000_000)
-            await MainActor.run { sentConfirmation = false }
+            replySubmission.clearSuccess(storyID: story.id)
         }
     }
 
@@ -319,7 +345,9 @@ struct StoryViewer: View {
     /// Conditions qui suspendent le minuteur : saisie clavier, feuilles/dialogues
     /// ouverts, ou VoiceOver actif (l'utilisateur avance manuellement, cf. A11Y-04).
     private var shouldPause: Bool {
-        replyFocused || showViewers || showDeleteConfirm || voiceOverOn
+        replyFocused || replySubmission.isSending
+            || replySubmission.failedStoryID == currentStory?.id
+            || showViewers || showDeleteConfirm || voiceOverOn
     }
 
     /// Secondes écoulées sur la story courante à l'instant `now`.
@@ -428,5 +456,61 @@ private struct StoryViewersSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+enum StoryReplyDeliveryError: Error {
+    case unavailable
+    case conversationUnavailable
+}
+
+/// Garde le même identifiant lors d'un réessai si le serveur a pu accepter le
+/// message avant qu'une réponse réseau soit perdue. « Envoyé » exige un ACK.
+@MainActor
+final class StoryReplySubmission: ObservableObject {
+    @Published var draft = ""
+    @Published private(set) var isSending = false
+    @Published private(set) var sentStoryID: String?
+    @Published private(set) var failedStoryID: String?
+
+    private var pending: (storyID: String, text: String, requestID: String)?
+
+    func submit(
+        storyID: String,
+        text: String,
+        send: @MainActor (String) async throws -> Void
+    ) async -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !isSending else { return false }
+        let requestID: String
+        if let pending, pending.storyID == storyID, pending.text == trimmed {
+            requestID = pending.requestID
+        } else {
+            requestID = "ios-story-reply-\(UUID().uuidString.lowercased())"
+        }
+        pending = (storyID, trimmed, requestID)
+        isSending = true
+        sentStoryID = nil
+        failedStoryID = nil
+        defer { isSending = false }
+
+        do {
+            try await send(requestID)
+            pending = nil
+            sentStoryID = storyID
+            return true
+        } catch {
+            failedStoryID = storyID
+            return false
+        }
+    }
+
+    func clearSuccess(storyID: String) {
+        if sentStoryID == storyID { sentStoryID = nil }
+    }
+
+    func clearFeedback() {
+        sentStoryID = nil
+        failedStoryID = nil
     }
 }
