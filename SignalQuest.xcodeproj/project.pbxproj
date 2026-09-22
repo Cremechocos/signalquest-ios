@@ -336,6 +336,7 @@
 		8A731C079D449D10B1E7ADD3 /* DockMinimizeQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E978EE2EBFDAD88C880B9C9 /* DockMinimizeQATests.swift */; };
 		8A9BA3041BDCFBAA5AB6FB82 /* SSEFrameParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D44DAFE7F9710386A49F29C /* SSEFrameParserTests.swift */; };
 		8A9E4F0BAF7ACD8DDD8B61FA /* DromRegion.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB55790C931377A64C3D3477 /* DromRegion.swift */; };
+		8AFF1F02B919852DDF269451 /* SessionsListPaginationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FBFAA91C0353BEF6068A368 /* SessionsListPaginationTests.swift */; };
 		8B49B9EE95316289B9D6DCDE /* CarPlayPOIBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33AC6BE683573C262D04CC10 /* CarPlayPOIBuilder.swift */; };
 		8B4B7237C50797C343E06242 /* RouteProgressTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC493FF44AA6DF900C9676B /* RouteProgressTracker.swift */; };
 		8B4D481EAB5B3A87D1416B21 /* SentinelleAlertSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A5D2DCFD4D9B4C849B3BD4C /* SentinelleAlertSettingsSheet.swift */; };
@@ -854,6 +855,7 @@
 		5F24B90CDD67FFE038702151 /* SocialPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialPreferences.swift; sourceTree = "<group>"; };
 		5F2A0E97DFC60C614901475E /* OutageRadioCaptureBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutageRadioCaptureBuilder.swift; sourceTree = "<group>"; };
 		5F7E0F4D02DD259C54604627 /* ManeuverMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManeuverMapper.swift; sourceTree = "<group>"; };
+		5FBFAA91C0353BEF6068A368 /* SessionsListPaginationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsListPaginationTests.swift; sourceTree = "<group>"; };
 		6084B2D45D82902EB5C8D3B8 /* MapTileBatchFailure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTileBatchFailure.swift; sourceTree = "<group>"; };
 		610EE8D2CB67E2741D6E1701 /* PlannedDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannedDetailSheet.swift; sourceTree = "<group>"; };
 		61474C1113C1F3A1A7D73011 /* MapLegacySelectionFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapLegacySelectionFixture.swift; sourceTree = "<group>"; };
@@ -2221,6 +2223,7 @@
 				ED23939334EC481F2A096590 /* ReportsRoutingTests.swift */,
 				1CC2679B071BC850638B4DB5 /* SectorNumberingTests.swift */,
 				3B9DCCD7740AD051F1829F43 /* SentinelleTests.swift */,
+				5FBFAA91C0353BEF6068A368 /* SessionsListPaginationTests.swift */,
 				2B145AC2EAF68345B76749E7 /* SharedSiteOperatorSheetTests.swift */,
 				6E309C5B2B935EA2E5944068 /* SignupConsentTests.swift */,
 				BB22F935961B1EAA5F431E59 /* SocialPreferencesTests.swift */,
@@ -3224,6 +3227,7 @@
 				8A9BA3041BDCFBAA5AB6FB82 /* SSEFrameParserTests.swift in Sources */,
 				1634EFD5E0F2C9E8D7DDC258 /* SectorNumberingTests.swift in Sources */,
 				C4BBA38BBA0DEB83A1A3620F /* SentinelleTests.swift in Sources */,
+				8AFF1F02B919852DDF269451 /* SessionsListPaginationTests.swift in Sources */,
 				C4BB0EF900E61BFF5D95B959 /* SharedSiteOperatorSheetTests.swift in Sources */,
 				C47BAA50DD2B3D902FBF08B0 /* SignupConsentTests.swift in Sources */,
 				95216E4A0102A356C727DD52 /* SocialPreferencesTests.swift in Sources */,

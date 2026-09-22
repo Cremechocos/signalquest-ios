@@ -45742,6 +45742,40 @@
           }
         }
       }
+    },
+    "Charger la suite": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Charger la suite"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Load more"
+          }
+        }
+      }
+    },
+    "Aucune session ne correspond à ce filtre dans l’historique complet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune session ne correspond à ce filtre dans l’historique complet."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No sessions match this filter in your complete history."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
