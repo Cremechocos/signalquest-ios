@@ -15,7 +15,10 @@ final class SessionsListPaginationTests: XCTestCase {
 
     func testFilteredHistoryCanReachAMatchBeyondTheFirstPage() async throws {
         let first = try page((0..<15).map { ("coverage-\($0)", "manual") }, hasMore: true)
-        let second = try page([("drive-later", "drive_test")], hasMore: false)
+        let second = try page([
+            ("coverage-14", "manual"), // same row repeated after a concurrent insertion
+            ("drive-later", "drive_test"),
+        ], hasMore: false)
         let model = SessionsListViewModel { offset, _ in
             let data: Data
             switch offset {
@@ -36,6 +39,11 @@ final class SessionsListPaginationTests: XCTestCase {
         XCTAssertEqual(model.filtered.map(\.id), ["drive-later"])
         XCTAssertFalse(model.hasMore)
         XCTAssertFalse(model.isExhaustedEmpty)
+        XCTAssertEqual(model.sessions.count, 16, "A shifted page must not duplicate a row")
+        model.filter = .coverage
+        XCTAssertEqual(model.filtered.count, 15)
+        model.filter = .all
+        XCTAssertEqual(model.filtered.count, 16)
     }
 
     func testEmptyFilteredStateAppearsOnlyAfterTheLastPage() async throws {
