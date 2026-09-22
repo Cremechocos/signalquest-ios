@@ -45776,6 +45776,28 @@
           }
         }
       }
+    },
+    "Impossible de charger les territoires. Réessaie.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": { "state": "translated", "value": "Impossible de charger les territoires. Réessaie." }
+        },
+        "en": {
+          "stringUnit": { "state": "translated", "value": "Couldn't load territories. Try again." }
+        }
+      }
+    },
+    "Aucun territoire dans cette zone": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": { "state": "translated", "value": "Aucun territoire dans cette zone" }
+        },
+        "en": {
+          "stringUnit": { "state": "translated", "value": "No territories in this area" }
+        }
+      }
     }
   },
   "version": "1.0"
