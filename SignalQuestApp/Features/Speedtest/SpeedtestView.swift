@@ -358,6 +358,7 @@ struct SpeedtestView: View {
                 GradientButton("Arrêter", systemImage: "stop.fill", style: .accent, action: stop)
             } else {
                 GradientButton(primaryButtonTitle, systemImage: primaryButtonIcon, action: start)
+                    .accessibilityIdentifier("speedtest.start")
             }
         }
     }

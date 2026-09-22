@@ -116,6 +116,20 @@ final class MobileChallengeTests: XCTestCase {
 
 @MainActor
 final class MobileChallengePresenterTests: XCTestCase {
+    private var previousPushService: PushNotificationService?
+
+    override func setUp() async throws {
+        previousPushService = AppDelegate.sharedPush
+        // These tests use a synthetic auth service. No real FCM revocation
+        // should be awaited while exercising the public form state machine.
+        AppDelegate.sharedPush = nil
+    }
+
+    override func tearDown() async throws {
+        AppDelegate.sharedPush = previousPushService
+        previousPushService = nil
+    }
+
     func testWebKitNavigationPoliciesAreRegisteredAsObjectiveCDelegateMethods() throws {
         let attempt = try MobileChallengeAttempt(origin: URL(string: "https://app.example.invalid")!,
             action: .signup, language: "en", theme: "light")

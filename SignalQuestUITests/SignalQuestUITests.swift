@@ -145,8 +145,9 @@ final class SignalQuestUITests: XCTestCase {
         SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth"])
         XCTAssertTrue(app.staticTexts["SignalQuest"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["Se connecter"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Explorer la carte sans compte"].exists)
-        XCTAssertTrue(app.buttons["Lancer un speedtest sans compte"].exists)
+        XCTAssertTrue(app.buttons["login.continueGuest"].exists)
+        XCTAssertFalse(app.buttons["Explorer la carte sans compte"].exists)
+        XCTAssertFalse(app.buttons["Lancer un speedtest sans compte"].exists)
     }
 
     func testFiveTabsAndPrimaryStatesWithMockAuth() {
@@ -172,7 +173,7 @@ final class SignalQuestUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Calques et filtres"].waitForExistence(timeout: 10))
 
         SignalQuestUITestSupport.tab(named: "Tester", in: app).tap()
-        XCTAssertTrue(app.buttons["Lancer le test"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["speedtest.start"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["speedtest.history"].firstMatch.exists)
 
         SignalQuestUITestSupport.tab(named: "Communauté", in: app).tap()
@@ -231,7 +232,7 @@ final class SignalQuestUITests: XCTestCase {
         attachScreenshot(app, name: "updated-home")
 
         SignalQuestUITestSupport.tab(named: "Tester", in: app).tap()
-        XCTAssertTrue(app.buttons["Lancer le test"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["speedtest.start"].waitForExistence(timeout: 10))
         attachScreenshot(app, name: "updated-speedtest-idle")
 
         SignalQuestUITestSupport.tab(named: "Communauté", in: app).tap()
@@ -260,36 +261,24 @@ final class SignalQuestUITests: XCTestCase {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])
         SignalQuestUITestSupport.tab(named: "Tester", in: app).tap()
-        XCTAssertTrue(app.buttons["Lancer le test"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["speedtest.start"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["speedtest.history"].firstMatch.exists)
     }
 
     func testGuestCanExploreMapWithoutAccount() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth"])
-
-        let guestMap = app.buttons["Explorer la carte sans compte"]
-        XCTAssertTrue(guestMap.waitForExistence(timeout: 10))
-        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(guestMap, in: app))
-        guestMap.tap()
-
-        XCTAssertTrue(app.staticTexts["Explorer"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Fermer"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Se connecter"].exists)
+        SignalQuestUITestSupport.enterGuestApplication(app, tab: "map")
         XCTAssertTrue(app.buttons["Calques et filtres"].waitForExistence(timeout: 10))
+        SignalQuestUITestSupport.tab(named: "Profil", in: app).tap()
+        XCTAssertTrue(app.buttons["Se connecter"].waitForExistence(timeout: 10))
     }
 
     func testGuestCanOpenSpeedtestAndReceiptsWithoutAccount() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth"])
-
-        let guestSpeedtest = app.buttons["Lancer un speedtest sans compte"]
-        XCTAssertTrue(guestSpeedtest.waitForExistence(timeout: 10))
-        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(guestSpeedtest, in: app))
-        guestSpeedtest.tap()
-
-        XCTAssertTrue(app.buttons["Lancer le test"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Fermer"].exists)
+        SignalQuestUITestSupport.enterGuestApplication(app, tab: "speed")
+        XCTAssertTrue(app.buttons["speedtest.start"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["Mes reçus"].exists)
         app.buttons["Mes reçus"].tap()
         XCTAssertTrue(app.navigationBars["Reçus invités"].waitForExistence(timeout: 10))
@@ -331,7 +320,7 @@ final class SignalQuestUITests: XCTestCase {
         XCTAssertTrue(tester.waitForExistence(timeout: 20))
         tester.tap()
 
-        let startButton = app.buttons["Lancer le test"]
+        let startButton = app.buttons["speedtest.start"]
         XCTAssertTrue(startButton.waitForExistence(timeout: 10))
         startButton.tap()
 
@@ -400,10 +389,12 @@ final class SignalQuestUITests: XCTestCase {
         speedShot.lifetime = .keepAlways
         add(speedShot)
 
-        // Onglet Points : pastilles de niveau dans les rangées du classement.
+        // Onglet Points : le niveau fait partie de la ligne accessible combinée.
+        // Les rangées sous le podium sont matérialisées après défilement.
         app.buttons["Points"].tap()
-        let levelBadge = app.descendants(matching: .any)["leaderboard.levelPill"].firstMatch
-        XCTAssertTrue(levelBadge.waitForExistence(timeout: 5))
+        let fourthRow = app.descendants(matching: .any)["leaderboard.row.4"].firstMatch
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(fourthRow, in: app))
+        XCTAssertTrue(fourthRow.label.contains("Niv."))
         let pointsShot = XCTAttachment(screenshot: app.screenshot())
         pointsShot.name = "Leaderboards — onglet Points"
         pointsShot.lifetime = .keepAlways
