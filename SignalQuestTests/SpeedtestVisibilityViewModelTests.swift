@@ -1,3 +1,5 @@
+import SwiftUI
+import UIKit
 import XCTest
 @testable import SignalQuest
 
@@ -6,6 +8,51 @@ final class SpeedtestVisibilityViewModelTests: XCTestCase {
     private func model(_ service: VisibilityTestService, guest: Bool = false) -> SpeedtestVisibilityViewModel {
         SpeedtestVisibilityViewModel(clientID: UUID(), service: service, guestMode: guest,
                                      vpnIsActive: { service.context.vpn })
+    }
+
+    func testOwnerVisibilityControlsRenderOnSmallEnglishPhone() async throws {
+        let graphLabel = SpeedtestDetailContent.graphAccessibilityLabel(
+            title: "Réception", average: 100, maxValue: 120)
+        XCTAssertTrue(graphLabel.contains("average"), graphLabel)
+        XCTAssertTrue(graphLabel.contains("peak"), graphLabel)
+        XCTAssertFalse(graphLabel.contains("moyenne"), graphLabel)
+        let service = VisibilityTestService()
+        let result = SpeedtestRunResult(label: "QA", downloadMbps: 100,
+            downloadAverageMbps: 100, downloadMaxMbps: 120, durationSeconds: 10,
+            connectionType: .cellular, coordinate: Coordinates(latitude: 48.86, longitude: 2.35))
+        XCTAssertEqual(result.networkDisplayName, "Cellular")
+        XCTAssertEqual(result.networkShareDisplayName, "Cellular")
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let size = CGSize(width: 320, height: 568)
+        let view = SpeedtestDetailSheet(result: result, visibilityService: service, guestMode: false)
+            .environment(\.locale, Locale(identifier: "en"))
+            .environment(\.colorScheme, .light)
+        let host = UIHostingController(rootView: view)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(origin: .zero, size: size)
+        window.rootViewController = host
+        window.windowLevel = .normal + 1
+        window.isHidden = false
+        host.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(180))
+        host.view.layoutIfNeeded()
+        func scrollViews(in view: UIView) -> [UIScrollView] {
+            let current = (view as? UIScrollView).map { [$0] } ?? []
+            return current + view.subviews.flatMap { scrollViews(in: $0) }
+        }
+        let scroll = try XCTUnwrap(scrollViews(in: host.view)
+            .max(by: { $0.contentSize.height < $1.contentSize.height }))
+        XCTAssertGreaterThan(scroll.contentSize.height, scroll.bounds.height)
+        scroll.setContentOffset(CGPoint(x: 0, y: scroll.contentSize.height - scroll.bounds.height), animated: false)
+        host.view.layoutIfNeeded()
+        let image = UIGraphicsImageRenderer(size: size).image { _ in
+            XCTAssertTrue(host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true))
+        }
+        let attachment = XCTAttachment(image: image)
+        attachment.name = "masking-owner-en-small-phone"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        window.isHidden = true
     }
 
     func testGuestNeverLooksUpOrMutatesAnOwnerMeasurement() async {

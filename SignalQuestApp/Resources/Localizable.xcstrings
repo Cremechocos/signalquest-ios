@@ -45875,6 +45875,34 @@
         "fr": { "stringUnit": { "state": "translated", "value": "Réponse à" } },
         "en": { "stringUnit": { "state": "translated", "value": "Replying to" } }
       }
+    },
+    "moyenne": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "moyenne" } },
+        "en": { "stringUnit": { "state": "translated", "value": "average" } }
+      }
+    },
+    "pic": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "pic" } },
+        "en": { "stringUnit": { "state": "translated", "value": "peak" } }
+      }
+    },
+    "indisponible": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "indisponible" } },
+        "en": { "stringUnit": { "state": "translated", "value": "unavailable" } }
+      }
+    },
+    "mesuré en": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "mesuré en" } },
+        "en": { "stringUnit": { "state": "translated", "value": "measured using" } }
+      }
     }
   },
   "version": "1.0"

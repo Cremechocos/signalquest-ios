@@ -128,7 +128,7 @@ struct SpeedtestDetailContent: View {
     private var generation: String? {
         switch result.connectionType {
         case .wifi: return "Wi‑Fi"
-        case .cellular: return result.cellularTechnology?.displayName ?? "Cellulaire"
+        case .cellular: return result.cellularTechnology?.displayName ?? String(localized: "Cellulaire")
         case .wired: return "Ethernet"
         case .other: return nil
         }
@@ -262,9 +262,12 @@ struct SpeedtestDetailContent: View {
             spacing: SQSpace.sm
         ) {
             latencyTile("Ping", value: Self.msText(result.primaryPingMs), tint: SQColor.labelSecondary, sub: pingSub)
-            latencyTile("Jitter", value: Self.decimalText(result.jitterMs), tint: SQColor.labelSecondary, sub: "au repos")
-            latencyTile("Ping chargé ↓", value: Self.msText(result.pingDlMs), tint: SQColor.success, sub: gigue(result.jitterDlMs))
-            latencyTile("Ping chargé ↑", value: Self.msText(result.pingUlMs), tint: SQColor.warning, sub: gigue(result.jitterUlMs))
+            latencyTile("Jitter", value: Self.decimalText(result.jitterMs), tint: SQColor.labelSecondary,
+                sub: String(localized: "au repos"))
+            latencyTile(String(localized: "Ping chargé ↓"), value: Self.msText(result.pingDlMs),
+                tint: SQColor.success, sub: gigue(result.jitterDlMs))
+            latencyTile(String(localized: "Ping chargé ↑"), value: Self.msText(result.pingUlMs),
+                tint: SQColor.warning, sub: gigue(result.jitterUlMs))
         }
     }
 
@@ -274,8 +277,9 @@ struct SpeedtestDetailContent: View {
     }
 
     private func gigue(_ jitter: Double?) -> String {
-        guard let jitter, jitter.isFinite else { return "gigue —" }
-        return "gigue ±\(Self.decimalText(jitter))"
+        let label = String(localized: "gigue")
+        guard let jitter, jitter.isFinite else { return "\(label) —" }
+        return "\(label) ±\(Self.decimalText(jitter))"
     }
 
     private func latencyTile(_ label: String, value: String, tint: Color, sub: String) -> some View {
@@ -345,7 +349,7 @@ struct SpeedtestDetailContent: View {
             }
             if let proto = result.pingProtocol?.trimmedNonEmptyDetail {
                 Divider().overlay(SQColor.separator)
-                metaRow("Ping", "mesuré en \(proto)", icon: "timer")
+                metaRow("Ping", "\(String(localized: "mesuré en")) \(proto)", icon: "timer")
             }
         }
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
@@ -480,21 +484,26 @@ struct SpeedtestDetailContent: View {
     /// Résumé textuel de la courbe de débit pour VoiceOver : direction (Réception /
     /// Envoi), débit moyen et pic, à partir des valeurs déjà affichées dans la carte.
     static func graphAccessibilityLabel(title: String, average: Double?, maxValue: Double?) -> String {
+        let direction = title == "Réception" ? String(localized: "Réception")
+            : title == "Envoi" ? String(localized: "Envoi") : title
+        let averageLabel = String(localized: "moyenne")
+        let peakLabel = String(localized: "pic")
+        let unavailable = String(localized: "indisponible")
         let avgText: String
         if let average, average.isFinite, average > 0 {
             let parts = formatSpeedParts(average)
-            avgText = "moyenne \(parts.value) \(parts.unit)"
+            avgText = "\(averageLabel) \(parts.value) \(parts.unit)"
         } else {
-            avgText = "moyenne indisponible"
+            avgText = "\(averageLabel) \(unavailable)"
         }
         let maxText: String
         if let maxValue, maxValue.isFinite, maxValue > 0 {
             let parts = formatSpeedParts(maxValue)
-            maxText = "pic \(parts.value) \(parts.unit)"
+            maxText = "\(peakLabel) \(parts.value) \(parts.unit)"
         } else {
-            maxText = "pic indisponible"
+            maxText = "\(peakLabel) \(unavailable)"
         }
-        return String(localized: "Courbe de débit \(title) : \(avgText), \(maxText).")
+        return String(localized: "Courbe de débit \(direction) : \(avgText), \(maxText).")
     }
 
     private static func decimal(_ value: Double, digits: Int) -> String {
