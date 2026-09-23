@@ -11,6 +11,7 @@ final class MyMeasurementsViewModel: ObservableObject {
     @Published private(set) var hasMore = false
     @Published private(set) var hasLoaded = false
     @Published private(set) var pointSummary: SessionMapPointSummary?
+    @Published private(set) var renderVersion = UUID()
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
 
@@ -73,6 +74,7 @@ final class MyMeasurementsViewModel: ObservableObject {
             nextOffset = offset + list.sessions.count
             points = list.mapPoints.filter(\.hasValidCoordinate)
             pointSummary = list.mapPointSummary
+            renderVersion = UUID()
             hasLoaded = true
         } catch {
             guard requestGeneration == generation, !error.isCancellation else { return }
@@ -99,7 +101,8 @@ struct MyMeasurementsView: View {
             if model.points.isEmpty && !model.isLoading {
                 emptyState
             } else {
-                SessionTraceMapView(points: model.points, antennas: [], drawPath: false, coloring: coloring)
+                SessionTraceMapView(points: model.points, antennas: [], drawPath: false,
+                    coloring: coloring, renderID: model.renderVersion)
                     .ignoresSafeArea(edges: .bottom)
             }
             if model.isLoading {

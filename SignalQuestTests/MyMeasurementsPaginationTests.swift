@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import XCTest
 @testable import SignalQuest
 
@@ -55,6 +56,7 @@ final class MyMeasurementsPaginationTests: XCTestCase {
         XCTAssertEqual(model.totalSessions, 41)
         XCTAssertTrue(model.canGoForward)
         XCTAssertFalse(model.canGoBack)
+        let firstRender = model.renderVersion
 
         await model.nextPage()
         XCTAssertEqual(model.points.map(\.id), ["last-point"])
@@ -63,6 +65,7 @@ final class MyMeasurementsPaginationTests: XCTestCase {
         XCTAssertTrue(model.pointSummary?.isSampled == true)
         XCTAssertFalse(model.canGoForward)
         XCTAssertTrue(model.canGoBack)
+        XCTAssertNotEqual(model.renderVersion, firstRender)
 
         await model.previousPage()
         XCTAssertEqual(model.points.map(\.id), ["first-point"])
@@ -82,11 +85,13 @@ final class MyMeasurementsPaginationTests: XCTestCase {
 
         await model.load()
         XCTAssertNil(model.pointSummary, "An older API response must remain decodable")
+        let firstRender = model.renderVersion
         await model.nextPage()
         XCTAssertEqual(model.points.map(\.id), ["first-point"])
         XCTAssertEqual(model.pageOffset, 0)
         XCTAssertNotNil(model.errorMessage)
         XCTAssertTrue(model.canGoForward)
+        XCTAssertEqual(model.renderVersion, firstRender, "A failed page must not redraw the previous map")
 
         failNext = false
         await model.nextPage()
@@ -94,6 +99,24 @@ final class MyMeasurementsPaginationTests: XCTestCase {
         XCTAssertTrue(model.points.isEmpty, "A page with no locations must not borrow the previous map")
         XCTAssertEqual(model.sessionCount, 1)
         XCTAssertNil(model.errorMessage)
+    }
+
+    func testMapRendererIgnoresInterfaceOnlyUpdatesButRebuildsForPageAndStyle() {
+        let coordinator = SessionTraceMapView.Coordinator()
+        let page = UUID()
+        let initial = SessionTraceRenderSignature(id: page, coloring: .generation,
+            colorScheme: .light, contrast: .standard)
+
+        XCTAssertTrue(coordinator.shouldRender(initial))
+        XCTAssertFalse(coordinator.shouldRender(initial), "Loading and error UI changes must not rebuild the point cloud")
+        XCTAssertTrue(coordinator.shouldRender(.init(id: page, coloring: .rsrp,
+            colorScheme: .light, contrast: .standard)))
+        let nextPage = UUID()
+        XCTAssertTrue(coordinator.shouldRender(.init(id: nextPage, coloring: .rsrp,
+            colorScheme: .light, contrast: .standard)))
+        XCTAssertTrue(coordinator.shouldRender(.init(id: nextPage, coloring: .rsrp,
+            colorScheme: .dark, contrast: .standard)))
+        XCTAssertTrue(coordinator.shouldRender(nil), "Existing map callers keep their prior behavior")
     }
 
     func testInitialFailureIsNotReportedAsARealEmptyHistory() async {
