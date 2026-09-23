@@ -16591,6 +16591,22 @@
         }
       }
     },
+    "Impossible de démarrer le Drive Test": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de démarrer le Drive Test"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't start Drive Test"
+          }
+        }
+      }
+    },
     "Enregistrer": {
       "localizations": {
         "en": {

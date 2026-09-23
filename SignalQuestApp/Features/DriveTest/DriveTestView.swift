@@ -1121,9 +1121,8 @@ struct DriveTestView: View {
             }
             operatorRow
             if model.isRunning {
-                // Panneau COMPACT pendant l'enregistrement : opérateur + résultats
-                // (speedtest) ou nombre de points (couverture) + arrêt. Pas de secteur
-                // ni de sélecteur de mode (figé au démarrage).
+                // Panneau compact pendant le trajet : opérateur, résultats des
+                // speedtests et arrêt, y compris pendant la pause WiFi.
                 if model.isPausedForWiFi { pauseBanner }
                 if !model.isPausedForWiFi {
                     liveReadout
@@ -1504,9 +1503,7 @@ struct DriveTestView: View {
             isCharging: battery.isCharging,
             isOnline: services.networkPath.isOnline,
             connection: status.connection,
-            isConstrained: status.isConstrained,
-            recordsCoverage: false,
-            runsSpeedtest: true
+            isConstrained: status.isConstrained
         )
     }
 

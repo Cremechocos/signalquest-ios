@@ -165,18 +165,11 @@ final class DriveTestPreflightPolicyTests: XCTestCase {
         XCTAssertFalse(report.isBlocked)
     }
 
-    func testOfflineSpeedtestOnlyBlocksButCoverageCanStillBeRecorded() {
-        let speedtestOnly = DriveTestPreflightPolicy.evaluate(
-            snapshot(isOnline: false, recordsCoverage: false, runsSpeedtest: true)
-        )
-        let coverageAndSpeedtest = DriveTestPreflightPolicy.evaluate(
-            snapshot(isOnline: false, recordsCoverage: true, runsSpeedtest: true)
-        )
+    func testOfflineDriveTestBlocksWithoutCoverageFallback() {
+        let report = DriveTestPreflightPolicy.evaluate(snapshot(isOnline: false))
 
-        XCTAssertEqual(speedtestOnly.issues.first?.id, .connectivity)
-        XCTAssertTrue(speedtestOnly.isBlocked)
-        XCTAssertEqual(coverageAndSpeedtest.issues.first?.id, .connectivity)
-        XCTAssertFalse(coverageAndSpeedtest.isBlocked)
+        XCTAssertEqual(report.issues.first?.id, .connectivity)
+        XCTAssertTrue(report.isBlocked)
     }
 
     func testMissingOrStaleGpsFixWarnsWithoutInventingASimProblem() {
@@ -197,9 +190,7 @@ final class DriveTestPreflightPolicyTests: XCTestCase {
         isCharging: Bool = false,
         isOnline: Bool = true,
         connection: NetworkConnectionKind = .cellular,
-        isConstrained: Bool = false,
-        recordsCoverage: Bool = true,
-        runsSpeedtest: Bool = true
+        isConstrained: Bool = false
     ) -> DriveTestPreflightSnapshot {
         DriveTestPreflightSnapshot(
             locationAuthorization: locationAuthorization,
@@ -210,9 +201,7 @@ final class DriveTestPreflightPolicyTests: XCTestCase {
             isCharging: isCharging,
             isOnline: isOnline,
             connection: connection,
-            isConstrained: isConstrained,
-            recordsCoverage: recordsCoverage,
-            runsSpeedtest: runsSpeedtest
+            isConstrained: isConstrained
         )
     }
 }
