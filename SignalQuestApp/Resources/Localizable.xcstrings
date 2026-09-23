@@ -4485,6 +4485,24 @@
         "fr": { "stringUnit": { "state": "translated", "value": "Actualisation impossible. Dernières mesures conservées." } }
       }
     },
+    "Adresse de webhook invalide. Utilise une URL http(s) complète.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Invalid webhook address. Enter a full http(s) URL." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Adresse de webhook invalide. Utilise une URL http(s) complète." } }
+      }
+    },
+    "Enregistre l’adresse avant de tester le webhook.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Save the address before testing the webhook." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Enregistre l’adresse avant de tester le webhook." } }
+      }
+    },
+    "Enregistrement non confirmé. Vérifie les valeurs et réessaie.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Could not confirm the save. Check the values and try again." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Enregistrement non confirmé. Vérifie les valeurs et réessaie." } }
+      }
+    },
     "Actualisation impossible": {
       "extractionState": "stale",
       "localizations": {

@@ -1,6 +1,54 @@
 import XCTest
 @testable import SignalQuest
 
+@MainActor
+final class SentinelleAlertSettingsTests: XCTestCase {
+    func testWebhookAddressRequiresAnHttpUrlWithinServerLimit() {
+        XCTAssertTrue(SentinelleAlertSettingsSheet.validWebhookURL("https://example.org/hook"))
+        XCTAssertTrue(SentinelleAlertSettingsSheet.validWebhookURL("http://example.org/hook"))
+        XCTAssertFalse(SentinelleAlertSettingsSheet.validWebhookURL("example.org/hook"))
+        XCTAssertFalse(SentinelleAlertSettingsSheet.validWebhookURL("ftp://example.org/hook"))
+        XCTAssertFalse(SentinelleAlertSettingsSheet.validWebhookURL("https://example.org/bad path"))
+        XCTAssertFalse(SentinelleAlertSettingsSheet.validWebhookURL("https://example.org/" + String(repeating: "x", count: 500)))
+    }
+
+    func testSaveUsesTheAcknowledgedPatchResponseWithoutASecondRead() async throws {
+        let api = SentinellePreferencesAPIStub()
+        let service = SentinelleService(api: api)
+        let result = try await service.savePreferences(
+            SentinellePreferencesPatch(webhookUrl: .some("https://example.org/hook"))
+        )
+        XCTAssertEqual(result.preferences.webhookUrl, "https://example.org/hook")
+        XCTAssertTrue(result.preferences.notifyDown)
+        let requestCount = api.requestCount()
+        XCTAssertEqual(requestCount, 1)
+    }
+}
+
+private final class SentinellePreferencesAPIStub: APIClientProtocol, @unchecked Sendable {
+    enum StubError: Error { case unexpectedRequest }
+    private let lock = NSLock()
+    private var calls = 0
+
+    func request<T: Decodable>(_ endpoint: APIEndpoint, as type: T.Type) async throws -> T {
+        guard endpoint.path == "/api/sentinelle/preferences", endpoint.method.rawValue == "PATCH" else {
+            throw StubError.unexpectedRequest
+        }
+        lock.withLock { calls += 1 }
+        let body = #"{"preferences":{"notifyDown":true,"notifyUp":false,"downThresholdSec":30,"webhookUrl":"https://example.org/hook"}}"#
+        return try JSONDecoder().decode(type, from: Data(body.utf8))
+    }
+
+    func request(_ endpoint: APIEndpoint) async throws { throw StubError.unexpectedRequest }
+
+    func uploadMultipart<T: Decodable>(
+        path: String, fields: [String: String], fileField: String,
+        fileName: String, mimeType: String, data: Data, as type: T.Type
+    ) async throws -> T { throw StubError.unexpectedRequest }
+
+    func requestCount() -> Int { lock.withLock { calls } }
+}
+
 final class SentinelleSeriesLoadStateTests: XCTestCase {
     func testFailedFirstReadCanRetryWithoutClaimingAnEmptyPeriod() {
         var state = SentinelleSeriesLoadState()

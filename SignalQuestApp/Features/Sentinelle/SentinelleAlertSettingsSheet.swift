@@ -17,6 +17,7 @@ struct SentinelleAlertSettingsSheet: View {
     @State private var isTesting = false
     @State private var verdict: SentinelleWebhookTest?
     @State private var loadFailed = false
+    @State private var saveError: String?
 
     var body: some View {
         NavigationStack {
@@ -50,6 +51,16 @@ struct SentinelleAlertSettingsSheet: View {
     @ViewBuilder
     private func form(_ current: SentinellePreferences) -> some View {
         Form {
+            if isSaving {
+                Section { ProgressView("Enregistrement en cours") }
+            }
+            if let saveError {
+                Section {
+                    Text(saveError)
+                        .foregroundStyle(SQColor.dangerInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             Section {
                 Toggle("Me prévenir en cas de coupure", isOn: Binding(
                     get: { current.notifyDown },
@@ -87,10 +98,18 @@ struct SentinelleAlertSettingsSheet: View {
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
                     .font(SQFont.body(14))
+                    .onChangeCompat(of: webhookDraft) { _, _ in
+                        saveError = nil
+                        verdict = nil
+                    }
 
                 Button(webhookDraft.trimmingCharacters(in: .whitespaces).isEmpty
                        ? "Retirer le webhook" : "Enregistrer") {
                     let value = webhookDraft.trimmingCharacters(in: .whitespaces)
+                    guard value.isEmpty || Self.validWebhookURL(value) else {
+                        saveError = "Adresse de webhook invalide. Utilise une URL http(s) complète."
+                        return
+                    }
                     verdict = nil
                     save(SentinellePreferencesPatch(webhookUrl: .some(value.isEmpty ? nil : value)))
                 }
@@ -100,7 +119,12 @@ struct SentinelleAlertSettingsSheet: View {
                     Button(isTesting ? "Envoi…" : "Envoyer un message d’essai") {
                         Task { await test() }
                     }
-                    .disabled(isTesting)
+                    .disabled(isTesting || webhookDraft.trimmingCharacters(in: .whitespaces) != current.webhookUrl)
+                    if webhookDraft.trimmingCharacters(in: .whitespaces) != current.webhookUrl {
+                        Text("Enregistre l’adresse avant de tester le webhook.")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
                 }
 
                 if let verdict {
@@ -117,6 +141,7 @@ struct SentinelleAlertSettingsSheet: View {
                      + "Les autres destinataires reçoivent un appel signé.")
             }
         }
+        .disabled(isSaving)
     }
 
     private func load() async {
@@ -131,22 +156,41 @@ struct SentinelleAlertSettingsSheet: View {
     }
 
     private func save(_ changes: SentinellePreferencesPatch) {
+        guard !isSaving else { return }
+        isSaving = true
+        saveError = nil
         Task {
-            isSaving = true
             defer { isSaving = false }
-            // On relit après écriture plutôt que de supposer : c'est le serveur
-            // qui valide, et une URL refusée ne doit pas rester à l'écran comme
-            // si elle avait été acceptée.
-            try? await service.savePreferences(changes)
-            await load()
+            do {
+                // PATCH retourne les valeurs réellement acceptées. Une relecture
+                // GET séparée pouvait effacer le brouillon même après un refus.
+                let response = try await service.savePreferences(changes)
+                preferences = response.preferences
+                if changes.webhookUrl != nil {
+                    webhookDraft = response.preferences.webhookUrl ?? ""
+                }
+            } catch {
+                // Ni les préférences confirmées ni la saisie ne changent.
+                saveError = "Enregistrement non confirmé. Vérifie les valeurs et réessaie."
+            }
         }
+    }
+
+    static func validWebhookURL(_ value: String) -> Bool {
+        guard value.count <= 500, !value.contains(where: { $0.isWhitespace }),
+              let components = URLComponents(string: value),
+              let scheme = components.scheme?.lowercased(),
+              scheme == "https" || scheme == "http",
+              let host = components.host, !host.isEmpty else { return false }
+        return true
     }
 
     private func test() async {
         isTesting = true
         defer { isTesting = false }
-        verdict = try? await service.testWebhook()
-        if verdict == nil {
+        do {
+            verdict = try await service.testWebhook()
+        } catch {
             verdict = SentinelleWebhookTest(
                 ok: false, status: nil, destination: nil,
                 message: "L’essai n’a pas pu être lancé."

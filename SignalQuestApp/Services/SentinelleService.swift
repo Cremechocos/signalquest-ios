@@ -70,7 +70,7 @@ protocol SentinelleServicing: Sendable {
     func delete(targetId: String) async throws
     func currentIp() async throws -> SentinelleCurrentIp
     func preferences() async throws -> SentinellePreferencesResponse
-    func savePreferences(_ changes: SentinellePreferencesPatch) async throws
+    func savePreferences(_ changes: SentinellePreferencesPatch) async throws -> SentinellePreferencesResponse
     func testWebhook() async throws -> SentinelleWebhookTest
     func followers(targetId: String) async throws -> SentinelleFollowersResponse
     func following() async throws -> SentinelleFollowingResponse
@@ -190,12 +190,12 @@ final class SentinelleService: SentinelleServicing, @unchecked Sendable {
         try await get(APIEndpoint(path: "/api/sentinelle/preferences"))
     }
 
-    func savePreferences(_ changes: SentinellePreferencesPatch) async throws {
+    func savePreferences(_ changes: SentinellePreferencesPatch) async throws -> SentinellePreferencesResponse {
         do {
             var endpoint = APIEndpoint(path: "/api/sentinelle/preferences", method: .patch)
             endpoint.headers = ["Content-Type": "application/json"]
             endpoint.body = try JSONEncoder.signalQuest.encode(changes)
-            try await api.request(endpoint)
+            return try await api.request(endpoint, as: SentinellePreferencesResponse.self)
         } catch {
             throw Self.mapping(error)
         }
