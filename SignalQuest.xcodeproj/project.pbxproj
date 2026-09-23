@@ -231,6 +231,7 @@
 		5BBE37508A92351F84B12D70 /* LayersGridBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF9C1283557A05B7D11B8231 /* LayersGridBuilder.swift */; };
 		5BFB003C0D28FAE111D9D739 /* PresenceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4710561B73DB096826FAEEDE /* PresenceModels.swift */; };
 		5C55F01FFB08015438F91B91 /* AntennaSupportSilhouette.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEC8C52D6E947CD2FC669EFE /* AntennaSupportSilhouette.swift */; };
+		5CDD6292D24E705BDB251D86 /* privacy-current-contract.json in Resources */ = {isa = PBXBuildFile; fileRef = B00505763DEC4E4F66E41B76 /* privacy-current-contract.json */; };
 		5D4E6FA318972C48443A9F8A /* AntennaDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF3CB12A75C5483284BC5C7 /* AntennaDetailSheet.swift */; };
 		5D7466C54936C9FAEC120C2D /* DesignTokenContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A84A348D80B0B5882E1A9AC9 /* DesignTokenContrastTests.swift */; };
 		5DAFF235085F8497FC489578 /* SpeedtestControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 688909AB965601A75F6DC348 /* SpeedtestControl.swift */; };
@@ -1054,6 +1055,7 @@
 		AEB3FB0048F8A13762D3E9A7 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
 		AEC8C52D6E947CD2FC669EFE /* AntennaSupportSilhouette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaSupportSilhouette.swift; sourceTree = "<group>"; };
 		AEF301566BC00073B5C158FA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B00505763DEC4E4F66E41B76 /* privacy-current-contract.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "privacy-current-contract.json"; sourceTree = "<group>"; };
 		B0078226636E735A7665D8A3 /* SQComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQComponents.swift; sourceTree = "<group>"; };
 		B011EA71E876281201D74D11 /* OutageCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutageCardView.swift; sourceTree = "<group>"; };
 		B011EC6077C3E8E806D4F94C /* SpeedtestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestView.swift; sourceTree = "<group>"; };
@@ -1509,6 +1511,7 @@
 			isa = PBXGroup;
 			children = (
 				BE36E5E28521B4EE522771A1 /* nci-provenance-v1.json */,
+				B00505763DEC4E4F66E41B76 /* privacy-current-contract.json */,
 				2B232040433517E5FB6B7A30 /* radio-world-scenarios-v1.json */,
 				766FB16A823E5BAC3F99F9E7 /* runtime-plmn-cases-v1.json */,
 				527D687BC482DC4BA0BCE648 /* speedtest-v6-vectors.json */,
@@ -2600,6 +2603,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D7FC5454189D8C3F20258AD3 /* nci-provenance-v1.json in Resources */,
+				5CDD6292D24E705BDB251D86 /* privacy-current-contract.json in Resources */,
 				31FE6BC4EA3921349E7C0909 /* radio-world-scenarios-v1.json in Resources */,
 				CF75B90E565F83CD57C5323C /* runtime-plmn-cases-v1.json in Resources */,
 				6F61DCEF767A5C453736AC7D /* speedtest-v6-vectors.json in Resources */,

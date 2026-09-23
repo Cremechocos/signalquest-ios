@@ -89,6 +89,36 @@ final class PrivacyZoneDraftTests: XCTestCase {
         XCTAssertThrowsError(try JSONDecoder().decode(SocialPrivacy.self, from: Data("{}".utf8)))
     }
 
+    func testCurrentAuthenticatedPrivacyContractDecodesWithoutEchoingLegacyPrecision() throws {
+        struct Wire: Decodable {
+            struct Policy: Decodable {
+                let publicCoordinates: String
+                let publicationDefault: String
+                let privateZones: String
+                let existingPrivateMeasurements: String
+            }
+            let settings: SocialPrivacy
+            let measurementPolicy: Policy
+        }
+        let bundle = Bundle(for: Self.self)
+        let url = try XCTUnwrap(bundle.url(forResource: "privacy-current-contract", withExtension: "json")
+            ?? bundle.url(forResource: "privacy-current-contract", withExtension: "json", subdirectory: "Fixtures"))
+        let wire = try JSONDecoder().decode(Wire.self, from: Data(contentsOf: url))
+        XCTAssertTrue(wire.settings.shareExactMeasurements)
+        XCTAssertFalse(wire.settings.shareLiveLocationWithFriends)
+        XCTAssertFalse(wire.settings.shareRadioDataWithFriends)
+        XCTAssertEqual(wire.settings.messageRequestPolicy, .friendsOnly)
+        XCTAssertEqual(wire.measurementPolicy.publicCoordinates, "exact_when_available")
+        XCTAssertEqual(wire.measurementPolicy.publicationDefault, "automatic")
+        XCTAssertEqual(wire.measurementPolicy.privateZones, "exclude_from_publication")
+        XCTAssertEqual(wire.measurementPolicy.existingPrivateMeasurements, "unchanged")
+
+        let patch = UpdatePrivacyRequest(shareLiveLocationWithFriends: true)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(patch)) as? [String: Any])
+        XCTAssertNil(payload["shareExactMeasurements"])
+        XCTAssertEqual(payload["shareLiveLocationWithFriends"] as? Bool, true)
+    }
+
     func testMalformedOptionalZoneGeometryDoesNotBecomeAnUnpositionedZone() throws {
         let json = #"{"zones":[{"id":"a","name":"Home","isActive":true,"hideSpeedtestsOnMap":true,"latitude":"invalid"}]}"#
         XCTAssertThrowsError(try JSONDecoder().decode(PrivacyZonesResponse.self, from: Data(json.utf8)))
