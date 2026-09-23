@@ -69,18 +69,6 @@ enum SignalQuestSubscriptionProduct: String, CaseIterable, Identifiable, Sendabl
         }
     }
 
-    /// Prix produit retenu. StoreKit reste la source d'affichage dès qu'un
-    /// produit App Store Connect est chargé ; cette valeur sert seulement à
-    /// présenter honnêtement l'offre planifiée avant activation du catalogue.
-    var plannedDisplayPrice: String {
-        switch self {
-        case .basicMonthly: return "2,99 € / mois"
-        case .basicAnnual: return "29,99 € / an"
-        case .premiumMonthly: return "7,99 € / mois"
-        case .premiumAnnual: return "79,99 € / an"
-        }
-    }
-
     static func product(tier: SupporterTier, period: SubscriptionBillingPeriod) -> Self? {
         allCases.first { $0.tier == tier && $0.period == period }
     }

@@ -15,6 +15,68 @@ enum PaywallEntryPoint: Equatable, Sendable {
     }
 }
 
+/// Le montant facturé vient directement de StoreKit. L'équivalent mensuel est
+/// une simple comparaison, jamais le prix que l'App Store débitera.
+enum SubscriptionPriceCopy {
+    static func priceLine(product: Product?) -> String {
+        guard let product, let period = periodDescription(product) else {
+            return String(localized: "Offre indisponible")
+        }
+        return String(format: String(localized: "%1$@ pour %2$@"), product.displayPrice, period)
+    }
+
+    static func monthlyEquivalent(product: Product) -> String? {
+        guard let subscriptionPeriod = product.subscription?.subscriptionPeriod,
+              let period = periodDescription(product),
+              let amount = monthlyAmount(
+                price: product.price,
+                unit: subscriptionPeriod.unit,
+                value: subscriptionPeriod.value
+              ) else { return nil }
+        let formatted = amount.formatted(product.priceFormatStyle)
+        return String(format: String(localized: "Environ %1$@ par mois, facturé %2$@ pour %3$@."),
+                      formatted, product.displayPrice, period)
+    }
+
+    static func monthlyAmount(
+        price: Decimal,
+        unit: Product.SubscriptionPeriod.Unit,
+        value: Int
+    ) -> Decimal? {
+        guard value > 0 else { return nil }
+        let months: Int
+        switch unit {
+        case .month: months = value
+        case .year:
+            guard value <= Int.max / 12 else { return nil }
+            months = value * 12
+        case .day, .week: return nil // un mois civil n'a pas une durée fixe
+        @unknown default: return nil
+        }
+        guard months > 1 else { return nil }
+        return price / Decimal(months)
+    }
+
+    static func matchesSelection(
+        _ unit: Product.SubscriptionPeriod.Unit,
+        value: Int,
+        selection: SubscriptionBillingPeriod
+    ) -> Bool {
+        switch selection {
+        case .monthly: return unit == .month && value == 1
+        case .annual: return unit == .year && value == 1
+        }
+    }
+
+    private static func periodDescription(_ product: Product) -> String? {
+        guard let period = product.subscription?.subscriptionPeriod, period.value > 0 else { return nil }
+        return period.formatted(
+            product.subscriptionPeriodFormatStyle.locale(Locale.current),
+            referenceDate: Date(timeIntervalSince1970: 0)
+        )
+    }
+}
+
 struct PaywallView: View {
     @ObservedObject private var store: EntitlementsStore
     private let entryPoint: PaywallEntryPoint
@@ -120,6 +182,9 @@ struct PaywallView: View {
     private func planCard(tier: SupporterTier) -> some View {
         let identifier = SignalQuestSubscriptionProduct.product(tier: tier, period: selectedPeriod)
         let product = store.product(for: tier, period: selectedPeriod)
+        let periodMatchesOffer = product.flatMap { product in
+            product.subscription?.subscriptionPeriod
+        }.map { SubscriptionPriceCopy.matchesSelection($0.unit, value: $0.value, selection: selectedPeriod) } ?? false
         let isCurrentOrLower = store.activeTier.rank >= tier.rank
         let isPremium = tier == .premium
         let primaryText = isPremium ? SQColor.onAccent : SQColor.label
@@ -131,7 +196,7 @@ struct PaywallView: View {
                     Text(tier.displayName)
                         .font(SQType.title)
                         .foregroundStyle(primaryText)
-                    Text(priceText(product: product, identifier: identifier))
+                    Text(SubscriptionPriceCopy.priceLine(product: product))
                         .font(SQFont.display(18, .bold))
                         .foregroundStyle(primaryText)
                 }
@@ -154,14 +219,15 @@ struct PaywallView: View {
                 }
             }
 
-            if tier == .premium, selectedPeriod == .annual {
-                Text("Environ 6,67 € / mois, facturé annuellement.")
+            if let product, let equivalent = SubscriptionPriceCopy.monthlyEquivalent(product: product) {
+                Text(equivalent)
                     .font(SQType.caption)
                     .foregroundStyle(secondaryText)
-            } else if tier == .basic, selectedPeriod == .annual {
-                Text("Environ 2,50 € / mois, facturé annuellement.")
+            }
+            if product != nil && !periodMatchesOffer {
+                Text("Période de l’App Store différente de l’offre choisie. Achat indisponible.")
                     .font(SQType.caption)
-                    .foregroundStyle(secondaryText)
+                    .foregroundStyle(primaryText)
             }
 
             GradientButton(
@@ -173,8 +239,8 @@ struct PaywallView: View {
                 guard let identifier else { return }
                 Task { await store.purchase(identifier) }
             }
-            .disabled(isCurrentOrLower || identifier == nil || !store.eligibility.canPurchase || product == nil)
-            .opacity(isCurrentOrLower || !store.eligibility.canPurchase || product == nil ? 0.62 : 1)
+            .disabled(isCurrentOrLower || identifier == nil || !store.eligibility.canPurchase || !periodMatchesOffer)
+            .opacity(isCurrentOrLower || !store.eligibility.canPurchase || !periodMatchesOffer ? 0.62 : 1)
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -320,13 +386,6 @@ struct PaywallView: View {
     private func isPurchasing(_ tier: SupporterTier) -> Bool {
         guard case .purchasing(let product) = store.operation else { return false }
         return product.tier == tier
-    }
-
-    private func priceText(product: Product?, identifier: SignalQuestSubscriptionProduct?) -> String {
-        if let product {
-            return "\(product.displayPrice) / \(selectedPeriod == .monthly ? "mois" : "an")"
-        }
-        return identifier?.plannedDisplayPrice ?? "Offre indisponible"
     }
 
     private func purchaseButtonTitle(tier: SupporterTier, isCurrentOrLower: Bool) -> String {

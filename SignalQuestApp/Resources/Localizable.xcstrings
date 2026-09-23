@@ -4503,6 +4503,30 @@
         "fr": { "stringUnit": { "state": "translated", "value": "Enregistrement non confirmé. Vérifie les valeurs et réessaie." } }
       }
     },
+    "Offre indisponible": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Offer unavailable" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Offre indisponible" } }
+      }
+    },
+    "%1$@ pour %2$@": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%1$@ for %2$@" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "%1$@ pour %2$@" } }
+      }
+    },
+    "Environ %1$@ par mois, facturé %2$@ pour %3$@.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "About %1$@ per month, billed %2$@ for %3$@." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Environ %1$@ par mois, facturé %2$@ pour %3$@." } }
+      }
+    },
+    "Période de l’App Store différente de l’offre choisie. Achat indisponible.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The App Store billing period differs from this offer. Purchase unavailable." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Période de l’App Store différente de l’offre choisie. Achat indisponible." } }
+      }
+    },
     "Actualisation impossible": {
       "extractionState": "stale",
       "localizations": {
