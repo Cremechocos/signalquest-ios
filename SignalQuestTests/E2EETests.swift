@@ -5935,6 +5935,52 @@ final class MessageAttachmentOutboxTests: XCTestCase {
 }
 
 final class SocialPostOutboxTests: XCTestCase {
+    @MainActor
+    func testEmailVerification403KeepsComposerDraftWithoutAutomaticReplay() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("social-email-gate-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            MockURLProtocol.requestHandler = nil
+            LocalAccountScope.deactivate()
+            try? FileManager.default.removeItem(at: root)
+        }
+        LocalAccountScope.activate(userId: "email-gate-\(UUID().uuidString)")
+        let session = try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-email-gate-token")
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: config))
+        let outbox = SocialPostOutboxStore(
+            baseDirectory: root,
+            currentSession: { _ in true },
+            publisher: { _, write in try write() }
+        )
+        let service = SocialFeedService(api: api, postOutbox: outbox)
+        var submissions = 0
+        MockURLProtocol.requestHandler = { request in
+            submissions += 1
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 403,
+                                           httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"code":"EMAIL_NOT_VERIFIED","error":"Confirme ton adresse."}"#.utf8))
+        }
+
+        let composer = ComposerViewModel(service: service)
+        composer.text = "Brouillon à reprendre après confirmation"
+        await composer.publish()
+        XCTAssertEqual(submissions, 1, "Le refus doit venir du vrai transport HTTP simulé")
+        XCTAssertFalse(composer.didPublish)
+        XCTAssertEqual(composer.text, "Brouillon à reprendre après confirmation")
+        XCTAssertNotNil(composer.errorMessage)
+        let pending = try await outbox.pending(session: session)
+        XCTAssertTrue(pending.isEmpty)
+        await service.retryPendingPosts()
+        XCTAssertEqual(submissions, 1, "Un 403 métier ne doit pas être rejoué automatiquement")
+        let reopened = ComposerViewModel(service: service)
+        XCTAssertEqual(reopened.text, composer.text)
+        reopened.clearDraft()
+    }
+
     func testImageMetadataAndReceiptSurviveRecreationThenAckPurgesFiles() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("social-post-outbox-\(UUID().uuidString)", isDirectory: true)

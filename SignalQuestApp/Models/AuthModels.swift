@@ -3,6 +3,9 @@ import Foundation
 struct AuthUser: Codable, Identifiable, Equatable, Sendable {
     let id: String
     let email: String
+    /// `nil` = ancienne API sans ce champ ; ne jamais l'interpréter comme un
+    /// compte non confirmé pendant le déploiement progressif du backend.
+    var emailVerified: Bool? = nil
     let name: String?
     let handle: String?
     /// Horodatage ISO du dernier changement de @handle (null = jamais changé). Sert au
@@ -34,6 +37,8 @@ struct AuthUser: Codable, Identifiable, Equatable, Sendable {
     var displayName: String {
         name ?? handle.map { "@\($0)" } ?? email.components(separatedBy: "@").first ?? "Utilisateur"
     }
+
+    var isEmailVerificationPending: Bool { emailVerified == false }
 }
 
 // MARK: - Login / signup

@@ -110,6 +110,7 @@ struct AppRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.locale) private var locale
     @State private var passwordResetRoute: PasswordResetRoute?
+    @State private var pendingEmailVerificationRefresh = false
     @AppStorage("sq.hasCompletedOnboarding") private var hasCompletedOnboarding = false
     /// Miroir observable de l'unité de distance. Détenu ICI, là où se fait
     /// l'injection : les vues s'y abonnent pour se rafraîchir au changement,
@@ -198,6 +199,7 @@ struct AppRootView: View {
                 // laisse l'état à `.unknown`, donc l'app fonctionne.
                 Task { await services.versionPolicy.refresh() }
                 await services.bootstrapIfNeeded(session: session)
+                refreshEmailVerificationIfPossible()
                 await registerPushIfAuthenticated(session.state)
                 // Verrouillage biométrique à l'ouverture (si activé + authentifié).
                 if case .authenticated = session.state { appLock.lockOnActivationIfNeeded() }
@@ -223,6 +225,7 @@ struct AppRootView: View {
                     }
                 }
                 if case .authenticated = newState {
+                    refreshEmailVerificationIfPossible()
                     services.epochRotations.resume()
                     appLock.lockOnActivationIfNeeded()
                     Task {
@@ -307,12 +310,25 @@ struct AppRootView: View {
     }
 
     private func receivePasswordResetURL(_ url: URL) {
+        // Le web a consommé le jeton de confirmation. L'app ne se déclare pas
+        // vérifiée sur la foi du lien : elle relit le reçu de /api/auth/me.
+        if url.scheme == SQSharedConfiguration.urlScheme, url.host == "verify-email" {
+            pendingEmailVerificationRefresh = true
+            refreshEmailVerificationIfPossible()
+            return
+        }
         switch PasswordResetLink.parse(url, origin: AppConfig.current.appBaseURL) {
         case .unrelated: break
         case .invalid: passwordResetRoute = PasswordResetRoute(content: .invalid)
         case .request(let request):
             if passwordResetRoute?.contains(request) != true { passwordResetRoute = PasswordResetRoute(request: request) }
         }
+    }
+
+    private func refreshEmailVerificationIfPossible() {
+        guard pendingEmailVerificationRefresh, case .authenticated = session.state else { return }
+        pendingEmailVerificationRefresh = false
+        Task { await session.refreshUser() }
     }
 
     private func closePasswordReset(_ id: UUID) {

@@ -357,11 +357,26 @@ final class SocialFeedService: SocialFeedServicing {
             poll: record.request.poll,
             clientRequestId: record.clientRequestId
         )
-        let response: CreatePostResponse = try await api.requestJSON(
-            "/api/social/v2/posts",
-            body: request,
-            idempotencyKey: record.clientRequestId
-        )
+        let response: CreatePostResponse
+        do {
+            response = try await api.requestJSON(
+                "/api/social/v2/posts",
+                body: request,
+                idempotencyKey: record.clientRequestId
+            )
+        } catch let error as APIError {
+            if case .http(403, "EMAIL_NOT_VERIFIED", _, _, _) = error {
+                // Refus métier avant création : le texte reste dans le brouillon
+                // du composer. Rejouer cet outbox automatiquement après la
+                // confirmation publierait sans geste explicite, puis un second
+                // tap sur Publier ferait un doublon.
+                try await postOutbox.acknowledge(
+                    session: session,
+                    clientRequestId: record.clientRequestId
+                )
+            }
+            throw error
+        }
         try await postOutbox.acknowledge(
             session: session,
             clientRequestId: record.clientRequestId

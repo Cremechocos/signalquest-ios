@@ -48,6 +48,9 @@ struct ProfileView: View {
             VStack(spacing: SQSpace.lg + 2) {
                 profileHeader
                     .sqFadeUp()
+                if user.isEmailVerificationPending {
+                    EmailVerificationCard(userID: user.id, email: user.email)
+                }
                 if let stats {
                     statsCard(stats)
                         .sqFadeUp()
@@ -515,5 +518,115 @@ struct ProfileView: View {
             statsError = error.localizedDescription
         }
         progression = try? await profileTask
+    }
+}
+
+private struct EmailVerificationRequestReceipt: Decodable {
+    let alreadyVerified: Bool
+    let sent: Bool
+}
+
+/// Une adresse non confirmée n'empêche pas de mesurer. Les actions publiques
+/// restent gardées côté serveur ; cette carte donne une issue native à ce 403.
+private struct EmailVerificationCard: View {
+    let userID: String
+    let email: String
+    @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var session: AuthSessionViewModel
+    @State private var isSending = false
+    @State private var isRefreshing = false
+    @State private var feedback: String?
+    @State private var feedbackIsError = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            Label("Confirme ton adresse e-mail", systemImage: "envelope.fill")
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
+            Text("Ouvre le lien reçu pour publier et contacter la communauté. La carte et les tests restent disponibles.")
+                .font(SQType.body)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(email)
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.label)
+                .textSelection(.enabled)
+
+            Button {
+                Task { await resend() }
+            } label: {
+                Group {
+                    if isSending { ProgressView() } else { Text("Renvoyer le lien") }
+                }
+                .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.capsule)
+            .tint(SQColor.brandRed)
+            .disabled(isSending || isRefreshing)
+            .accessibilityIdentifier("profile.emailVerification.resend")
+
+            Button { Task { await refresh() } } label: {
+                Text("J’ai confirmé")
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+                .tint(SQColor.brandRed)
+                .disabled(isSending || isRefreshing)
+                .accessibilityIdentifier("profile.emailVerification.refresh")
+
+            if let feedback {
+                Text(feedback)
+                    .font(SQType.caption)
+                    .foregroundStyle(feedbackIsError ? SQColor.dangerInk : SQColor.label)
+                    .accessibilityIdentifier("profile.emailVerification.feedback")
+            }
+        }
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+    }
+
+    private var isCurrentAccount: Bool {
+        guard case .authenticated(let current) = session.state else { return false }
+        return current.id == userID
+    }
+
+    private func resend() async {
+        guard !isSending, isCurrentAccount else { return }
+        isSending = true
+        defer { isSending = false }
+        do {
+            let receipt: EmailVerificationRequestReceipt = try await services.api.requestJSON(
+                "/api/auth/verify-email/request", body: [String: String]()
+            )
+            guard isCurrentAccount else { return }
+            if receipt.alreadyVerified {
+                await session.refreshUser()
+                feedback = String(localized: "Adresse déjà confirmée.")
+            } else if receipt.sent {
+                feedback = String(localized: "Lien envoyé. Vérifie ta boîte e-mail.")
+            } else {
+                feedback = String(localized: "Envoi non confirmé. Réessaie.")
+            }
+            feedbackIsError = !receipt.alreadyVerified && !receipt.sent
+        } catch let error as APIError where error.isCancellation {
+            return
+        } catch {
+            guard isCurrentAccount else { return }
+            feedback = error.localizedDescription
+            feedbackIsError = true
+        }
+    }
+
+    private func refresh() async {
+        guard !isRefreshing, isCurrentAccount else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+        await session.refreshUser()
+        guard isCurrentAccount else { return }
+        feedback = String(localized: "Confirmation encore en attente. Ouvre le lien reçu puis actualise.")
+        feedbackIsError = false
     }
 }

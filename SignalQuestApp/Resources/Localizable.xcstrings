@@ -46008,6 +46008,69 @@
         "fr": { "stringUnit": { "state": "translated", "value": "Messagerie chiffrée via %@" } },
         "en": { "stringUnit": { "state": "translated", "value": "Encrypted messages with %@" } }
       }
+    },
+    "Confirme ton adresse e-mail": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Confirme ton adresse e-mail" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Confirm your email address" } }
+      }
+    },
+    "Ouvre le lien reçu pour publier et contacter la communauté. La carte et les tests restent disponibles.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Ouvre le lien reçu pour publier et contacter la communauté. La carte et les tests restent disponibles." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Open the email link to post and contact the community. The map and speed tests remain available." } }
+      }
+    },
+    "Renvoyer le lien": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Renvoyer le lien" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Resend the link" } }
+      }
+    },
+    "J’ai confirmé": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "J’ai confirmé" } },
+        "en": { "stringUnit": { "state": "translated", "value": "I've confirmed it" } }
+      }
+    },
+    "Adresse déjà confirmée.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Adresse déjà confirmée." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Email address already confirmed." } }
+      }
+    },
+    "Lien envoyé. Vérifie ta boîte e-mail.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Lien envoyé. Vérifie ta boîte e-mail." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Link sent. Check your inbox." } }
+      }
+    },
+    "Envoi non confirmé. Réessaie.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Envoi non confirmé. Réessaie." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Sending not confirmed. Try again." } }
+      }
+    },
+    "Confirmation encore en attente. Ouvre le lien reçu puis actualise.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Confirmation encore en attente. Ouvre le lien reçu puis actualise." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Confirmation still pending. Open the email link, then refresh." } }
+      }
+    },
+    "Confirme ton adresse e-mail pour publier ou contacter la communauté. Ouvre le lien reçu ou demande-en un nouveau depuis Profil.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Confirme ton adresse e-mail pour publier ou contacter la communauté. Ouvre le lien reçu ou demande-en un nouveau depuis Profil." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Confirm your email address to post or contact the community. Open the email link or request a new one from Profile." } }
+      }
     }
   },
   "version": "1.0"

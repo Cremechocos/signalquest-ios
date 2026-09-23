@@ -2,6 +2,17 @@ import XCTest
 @testable import SignalQuest
 
 final class APIClientTests: XCTestCase {
+    func testEmailVerificationFlagDistinguishesOldServerFromPendingAndConfirmed() throws {
+        func user(_ suffix: String) throws -> AuthUser {
+            let data = Data(#"{"id":"qa","email":"qa@example.invalid","name":"QA","role":"user""#.utf8)
+                + Data(suffix.utf8) + Data("}".utf8)
+            return try JSONDecoder().decode(AuthUser.self, from: data)
+        }
+        XCTAssertNil(try user("").emailVerified, "An old API must not label every account unverified")
+        XCTAssertTrue(try user(",\"emailVerified\":false").isEmailVerificationPending)
+        XCTAssertFalse(try user(",\"emailVerified\":true").isEmailVerificationPending)
+    }
+
     func testPhysicalSilentMapTransportRespectsRequestDeadline() async throws {
         let environment = ProcessInfo.processInfo.environment
         guard environment["SQ_MAP_TRANSPORT_QA"] == "paired-usb-verified",
