@@ -55,6 +55,7 @@ struct SpeedtestView: View {
     private static let continuousBurst = 0
     @State private var history: [SpeedtestRunResult] = []
     @State private var errorMessage: String?
+    @State private var isRetryingPendingSave = false
     /// Échec du MOTEUR de test (≠ échec de synchronisation) : carte dédiée
     /// dont le bouton relance le test au lieu de re-envoyer l'historique.
     @State private var runErrorMessage: String?
@@ -175,9 +176,16 @@ struct SpeedtestView: View {
 
                 if let errorMessage {
                     ErrorStateView(title: "Speedtest non synchronisé", message: errorMessage) {
-                        self.errorMessage = nil
+                        guard !isRetryingPendingSave else { return }
+                        isRetryingPendingSave = true
                         Task {
-                            await services.speedtest.retryPendingSaves()
+                            defer { isRetryingPendingSave = false }
+                            do {
+                                try await services.speedtest.retryPendingSavesReporting()
+                                self.errorMessage = nil
+                            } catch {
+                                self.errorMessage = error.localizedDescription
+                            }
                             history = await services.speedtest.history()
                         }
                     }

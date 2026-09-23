@@ -1,6 +1,7 @@
 import Foundation
 import XCTest
 import SwiftUI
+import SwiftData
 @testable import SignalQuest
 
 final class SpeedtestV6ContractTests: XCTestCase {
@@ -372,6 +373,110 @@ extension SpeedtestV6ContractTests {
         XCTAssertNil(iperf3ExtractServerMeasurement(from: ["end": ["sum_received": ["bytes": 80_000_000, "seconds": Double.infinity]]]))
     }
 
+    func testUnreadableJSONQueueIsNotOverwrittenByNextSaveOrRemoval() async throws {
+        let cache = DiskCache(folderName: "SpeedtestV6Corrupt-\(UUID().uuidString)", evicts: false)
+        let key = "pending"
+        try await cache.write("unreadable-queue", for: key)
+        let store = DiskCacheSpeedtestPendingStore(cache: cache, key: key)
+        let result = SpeedtestRunResult(label: "new", downloadMbps: 10,
+            downloadAverageMbps: 10, downloadMaxMbps: 10, durationSeconds: 10,
+            connectionType: .wifi, ownerScopeId: "guest")
+        let pending = PendingSpeedtestSave(id: result.id.uuidString, result: result,
+            streams: 1, deviceModel: "QA", createdAt: Date(), isVisibleOnMap: true,
+            shareExactLocation: true, guestDeleteToken: nil, driveSessionId: nil,
+            ownerScopeId: "guest")
+        do { try await store.upsert(pending); XCTFail("Corrupt queue was overwritten") } catch { }
+        let afterUpsert = try await cache.read(String.self, for: key)
+        XCTAssertEqual(afterUpsert, "unreadable-queue")
+        do { try await store.removeValidated(id: pending.id); XCTFail("Corrupt queue was deleted") } catch { }
+        let afterRemove = try await cache.read(String.self, for: key)
+        XCTAssertEqual(afterRemove, "unreadable-queue")
+        do { _ = try await store.loadAllValidated(); XCTFail("Corrupt queue appeared empty") } catch { }
+        await cache.remove(key)
+    }
+
+    func testUnreadableSwiftDataRowBlocksReplacementWithoutDeletingIt() async throws {
+        guard #available(iOS 17, *) else { throw XCTSkip("SwiftData requires iOS 17") }
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SpeedtestV6CorruptSwiftData-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("pending.store")
+        do {
+            let container = try ModelContainer(for: SpeedtestPendingEntity.self,
+                configurations: ModelConfiguration(url: url))
+            let context = ModelContext(container)
+            context.insert(SpeedtestPendingEntity(saveId: "broken", createdAtMs: 0,
+                payload: Data("not a pending save".utf8)))
+            try context.save()
+        }
+        let store = try XCTUnwrap(SwiftDataSpeedtestPendingStore(storeURL: url, legacyKey: "none"))
+        do { _ = try await store.loadAllValidated(); XCTFail("Corrupt row appeared empty") } catch { }
+        let result = SpeedtestRunResult(label: "new", downloadMbps: 10,
+            downloadAverageMbps: 10, downloadMaxMbps: 10, durationSeconds: 10,
+            connectionType: .wifi, ownerScopeId: "guest")
+        let pending = PendingSpeedtestSave(id: result.id.uuidString, result: result,
+            streams: 1, deviceModel: "QA", createdAt: Date(), isVisibleOnMap: true,
+            shareExactLocation: true, guestDeleteToken: nil, driveSessionId: nil,
+            ownerScopeId: "guest")
+        do { try await store.upsert(pending); XCTFail("Corrupt row accepted a new save") } catch { }
+        do { try await store.replaceAll([]); XCTFail("Corrupt row was deleted") } catch { }
+        let verification = try ModelContainer(for: SpeedtestPendingEntity.self,
+            configurations: ModelConfiguration(url: url))
+        let rows = try ModelContext(verification).fetch(FetchDescriptor<SpeedtestPendingEntity>())
+        XCTAssertEqual(rows.map(\.saveId), ["broken"])
+    }
+
+    func testRateLimitKeepsPendingSaveAndDefersReplayAcrossServiceRecreation() async throws {
+        let previousUser = LocalAccountScope.currentUserId
+        LocalAccountScope.deactivate()
+        defer {
+            MockURLProtocol.requestHandler = nil
+            if let previousUser { LocalAccountScope.activate(userId: previousUser) }
+        }
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let cache = DiskCache(folderName: "SpeedtestV6RetryAfter-\(UUID().uuidString)", evicts: false)
+        let store = DiskCacheSpeedtestPendingStore(cache: cache, key: "pending")
+        let api = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+            session: URLSession(configuration: config))
+        func service() -> SpeedtestService {
+            SpeedtestService(api: api, historyCache: cache, pendingCache: cache,
+                guestReceiptStore: GuestSpeedtestReceiptStore(store: InMemoryTokenStore()),
+                pendingStore: store, vpnIsActive: { false })
+        }
+        var requests = 0
+        MockURLProtocol.requestHandler = { request in
+            requests += 1
+            let rejected = requests == 1
+            let response = HTTPURLResponse(url: request.url!, statusCode: rejected ? 429 : 201,
+                httpVersion: nil, headerFields: rejected ? ["Retry-After": "1"] : nil)!
+            return (response, Data((rejected ? "{}" : #"{"success":true,"id":"retry-server-id"}"#).utf8))
+        }
+        let result = SpeedtestRunResult(label: "queued", downloadMbps: 10,
+            downloadAverageMbps: 10, downloadMaxMbps: 10, durationSeconds: 10,
+            connectionType: .wifi, ownerScopeId: "guest")
+        do { try await service().save(result); XCTFail("429 accepted as a save") } catch { }
+        XCTAssertEqual(requests, 1)
+        let queued = await store.loadAll()
+        XCTAssertEqual(queued.map(\.id), [result.id.uuidString])
+        let retryKey = SpeedtestService.retryAfterKey(for: "guest")
+        let notBefore = try await cache.read(Date.self, for: retryKey)
+        XCTAssertNotNil(notBefore)
+        do { try await service().retryPendingSavesReporting(); XCTFail("Retry-After ignored") } catch { }
+        XCTAssertEqual(requests, 1, "Relancer l'app ne doit pas harceler un serveur en 429")
+        try await Task.sleep(for: .milliseconds(1_100))
+        let reopened = service()
+        try await reopened.retryPendingSavesReporting()
+        XCTAssertEqual(requests, 2)
+        let remaining = await store.loadAll()
+        XCTAssertTrue(remaining.isEmpty)
+        let savedID = await reopened.serverId(forClientId: result.id)
+        XCTAssertEqual(savedID, "retry-server-id")
+        await cache.remove("pending")
+        await cache.remove(retryKey)
+    }
+
     func testMigrationFailureKeepsJSONAndRollsBackThenRetries() async throws {
         guard #available(iOS 17, *) else { throw XCTSkip("SwiftData requires iOS 17") }
         enum Injected: Error { case diskFull }
@@ -391,6 +496,10 @@ extension SpeedtestV6ContractTests {
             beforeMigrationSave: { throw Injected.diskFull }))
         let failed = await failing.loadAll()
         XCTAssertTrue(failed.isEmpty, "Rolled-back rows cannot appear durable")
+        do {
+            _ = try await failing.loadAllValidated()
+            XCTFail("Failed migration appeared as an empty queue")
+        } catch SpeedtestPendingStoreError.migrationIncomplete { }
         let source = try await cache.read([PendingSpeedtestSave].self, for: key)
         XCTAssertEqual(source, [pending], "Failed migration must preserve its recoverable source")
         let recovering = try XCTUnwrap(SwiftDataSpeedtestPendingStore(storeURL: url, legacyCache: cache, legacyKey: key))

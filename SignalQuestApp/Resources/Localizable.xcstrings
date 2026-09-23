@@ -46071,6 +46071,20 @@
         "fr": { "stringUnit": { "state": "translated", "value": "Confirme ton adresse e-mail pour publier ou contacter la communauté. Ouvre le lien reçu ou demande-en un nouveau depuis Profil." } },
         "en": { "stringUnit": { "state": "translated", "value": "Confirm your email address to post or contact the community. Open the email link or request a new one from Profile." } }
       }
+    },
+    "La file de mesures en attente ne peut pas être lue. Les données d’origine sont conservées ; réessaie plus tard.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "La file de mesures en attente ne peut pas être lue. Les données d’origine sont conservées ; réessaie plus tard." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Pending measurements cannot be read. Original data is preserved; try again later." } }
+      }
+    },
+    "Envoi reporté par le serveur. La mesure reste enregistrée et sera renvoyée plus tard.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Envoi reporté par le serveur. La mesure reste enregistrée et sera renvoyée plus tard." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Upload deferred by the server. The measurement remains saved and will be sent later." } }
+      }
     }
   },
   "version": "1.0"
