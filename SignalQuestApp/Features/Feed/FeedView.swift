@@ -634,9 +634,11 @@ struct FeedView: View {
             PostDetailView(
                 item: routed.item,
                 feedService: services.feed,
+                messagesService: services.messages,
                 commentsService: services.comments,
                 reportsService: services.reports
             )
+            .onDisappear { Task { await model.load() } }
         }
         .onChangeCompat(of: router.openUserProfileId) { _, _ in
             Task { await consumeFeedRoutesIfNeeded() }
@@ -1198,7 +1200,7 @@ struct FeedView: View {
 
 private struct StoriesPresentation: Identifiable { let id = UUID() }
 
-private struct PostShareSheet: View {
+struct PostShareSheet: View {
     let post: UnifiedSocialFeedItem
     let messagesService: MessagesServicing
     /// Renvoie l'id du message créé (succès) ou nil (échec).
@@ -1294,9 +1296,12 @@ private struct PostShareSheet: View {
     private func share(_ conversation: MessageConversation) async {
         busyConversationId = conversation.id
         defer { busyConversationId = nil }
+        errorMessage = nil
         if let messageId = await onShare(conversation) {
             onShared(messageId, conversation)
             dismiss()
+        } else {
+            errorMessage = String(localized: "Échec de l'envoi. Réessaie.")
         }
     }
 }

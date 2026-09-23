@@ -354,6 +354,7 @@ struct ConversationDetailView: View {
                 PostDetailView(
                     item: target.item,
                     feedService: services.feed,
+                    messagesService: services.messages,
                     commentsService: services.comments,
                     reportsService: services.reports
                 )
