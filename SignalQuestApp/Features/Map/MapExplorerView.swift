@@ -1476,6 +1476,7 @@ struct MapExplorerView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
+    @FocusState private var searchFieldFocused: Bool
 
     @State private var mapCenter: CLLocationCoordinate2D
     @State private var mapZoom: Double
@@ -2236,18 +2237,32 @@ struct MapExplorerView: View {
             .frame(width: 18, height: 18)
             .accessibilityHidden(!(model.isLoading || model.isSearching))
             .accessibilityLabel(model.isSearching ? "Recherche en cours" : (model.isLoading ? "Chargement de la carte" : ""))
-            TextField("Ville, adresse ou site", text: $model.searchQuery, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.body)
-                .foregroundStyle(SQColor.label)
-                .lineLimit(1...2)
-                .submitLabel(.search)
-                .autocorrectionDisabled()
-                .accessibilityLabel("Rechercher une ville, une adresse ou un site")
-                .accessibilityIdentifier("map.search.input")
-                .onSubmit { Task { await model.search() } }
-                // Suggestions à la frappe (anti-rebond + annulation côté modèle).
-                .onChangeCompat(of: model.searchQuery) { _, _ in model.scheduleSearch() }
+            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                if !model.searchQuery.isEmpty {
+                    Text("Recherche")
+                        .font(.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .accessibilityIdentifier("map.search.label")
+                }
+                TextField(
+                    "Ville, adresse ou site", text: $model.searchQuery,
+                    prompt: Text("Ville, adresse ou site").foregroundColor(SQColor.labelSecondary),
+                    axis: .vertical
+                )
+                    .textFieldStyle(.plain)
+                    .font(.body)
+                    .foregroundStyle(SQColor.label)
+                    .tint(SQColor.brandRed)
+                    .focused($searchFieldFocused)
+                    .lineLimit(1...2)
+                    .submitLabel(.search)
+                    .autocorrectionDisabled()
+                    .accessibilityLabel("Rechercher une ville, une adresse ou un site")
+                    .accessibilityIdentifier("map.search.input")
+                    .onSubmit { Task { await model.search() } }
+                    // Suggestions à la frappe (anti-rebond + annulation côté modèle).
+                    .onChangeCompat(of: model.searchQuery) { _, _ in model.scheduleSearch() }
+            }
             if !model.searchQuery.isEmpty || sightOrigin != .device {
                 Button {
                     model.searchQuery = ""
@@ -2268,6 +2283,10 @@ struct MapExplorerView: View {
         .frame(minHeight: 44)
         .frame(maxWidth: .infinity)
         .background { mapGlassBackground(Capsule(style: .continuous)) }
+        .overlay {
+            Capsule(style: .continuous)
+                .strokeBorder(searchFieldFocused ? SQColor.brandRed : .clear, lineWidth: 2)
+        }
         .sqShadowCard()
     }
 
