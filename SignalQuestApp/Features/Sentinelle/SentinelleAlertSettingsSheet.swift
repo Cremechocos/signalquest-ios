@@ -11,19 +11,20 @@ struct SentinelleAlertSettingsSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var preferences: SentinellePreferences?
+    @State private var edits: SentinellePreferenceEditQueue?
     @State private var webhookDraft = ""
     @State private var isSaving = false
     @State private var isTesting = false
     @State private var verdict: SentinelleWebhookTest?
     @State private var loadFailed = false
     @State private var saveError: String?
+    @State private var validationError: String?
 
     var body: some View {
         NavigationStack {
             Group {
-                if let preferences {
-                    form(preferences)
+                if let edits {
+                    form(edits.draft)
                 } else if loadFailed {
                     ErrorStateView(title: "Réglages indisponibles", message: "Réessayez dans un instant.") {
                         Task { await load() }
@@ -54,11 +55,16 @@ struct SentinelleAlertSettingsSheet: View {
             if isSaving {
                 Section { ProgressView("Enregistrement en cours") }
             }
-            if let saveError {
+            if let message = validationError ?? saveError {
                 Section {
-                    Text(saveError)
+                    Text(message)
                         .foregroundStyle(SQColor.dangerInk)
                         .fixedSize(horizontal: false, vertical: true)
+                    if saveError != nil, edits?.next != nil {
+                        Button("Réessayer") { Task { await flush() } }
+                            .frame(minHeight: 44)
+                            .disabled(isSaving)
+                    }
                 }
             }
             Section {
@@ -99,7 +105,7 @@ struct SentinelleAlertSettingsSheet: View {
                     .keyboardType(.URL)
                     .font(SQFont.body(14))
                     .onChangeCompat(of: webhookDraft) { _, _ in
-                        saveError = nil
+                        validationError = nil
                         verdict = nil
                     }
 
@@ -107,20 +113,21 @@ struct SentinelleAlertSettingsSheet: View {
                        ? "Retirer le webhook" : "Enregistrer") {
                     let value = webhookDraft.trimmingCharacters(in: .whitespaces)
                     guard value.isEmpty || Self.validWebhookURL(value) else {
-                        saveError = "Adresse de webhook invalide. Utilise une URL http(s) complète."
+                        validationError = "Adresse de webhook invalide. Utilise une URL http(s) complète."
                         return
                     }
                     verdict = nil
                     save(SentinellePreferencesPatch(webhookUrl: .some(value.isEmpty ? nil : value)))
                 }
-                .disabled(isSaving || webhookDraft.trimmingCharacters(in: .whitespaces) == (current.webhookUrl ?? ""))
+                .disabled(webhookDraft.trimmingCharacters(in: .whitespaces) == (current.webhookUrl ?? ""))
 
-                if current.webhookUrl != nil {
+                if edits?.confirmed.webhookUrl != nil {
+                    let canTest = edits?.canTestWebhook(webhookDraft, isSaving: isSaving) == true
                     Button(isTesting ? "Envoi…" : "Envoyer un message d’essai") {
                         Task { await test() }
                     }
-                    .disabled(isTesting || webhookDraft.trimmingCharacters(in: .whitespaces) != current.webhookUrl)
-                    if webhookDraft.trimmingCharacters(in: .whitespaces) != current.webhookUrl {
+                    .disabled(isTesting || !canTest)
+                    if !canTest {
                         Text("Enregistre l’adresse avant de tester le webhook.")
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
@@ -141,14 +148,18 @@ struct SentinelleAlertSettingsSheet: View {
                      + "Les autres destinataires reçoivent un appel signé.")
             }
         }
-        .disabled(isSaving)
     }
 
     private func load() async {
         do {
             let response = try await service.preferences()
-            preferences = response.preferences
-            webhookDraft = response.preferences.webhookUrl ?? ""
+            if var current = edits {
+                current.refresh(response.preferences)
+                edits = current
+            } else {
+                edits = SentinellePreferenceEditQueue(response.preferences)
+                webhookDraft = response.preferences.webhookUrl ?? ""
+            }
             loadFailed = false
         } catch {
             loadFailed = true
@@ -156,22 +167,33 @@ struct SentinelleAlertSettingsSheet: View {
     }
 
     private func save(_ changes: SentinellePreferencesPatch) {
+        guard var current = edits else { return }
+        current.enqueue(changes)
+        edits = current
+        saveError = nil
+        Task { await flush() }
+    }
+
+    private func flush() async {
         guard !isSaving else { return }
         isSaving = true
-        saveError = nil
-        Task {
-            defer { isSaving = false }
+        defer { isSaving = false }
+        while let changes = edits?.next {
             do {
-                // PATCH retourne les valeurs réellement acceptées. Une relecture
-                // GET séparée pouvait effacer le brouillon même après un refus.
                 let response = try await service.savePreferences(changes)
-                preferences = response.preferences
-                if changes.webhookUrl != nil {
+                guard var current = edits else { return }
+                let submittedURL = current.draft.webhookUrl ?? ""
+                current.acknowledge(response.preferences)
+                edits = current
+                if current.next == nil,
+                   webhookDraft.trimmingCharacters(in: .whitespaces) == submittedURL {
                     webhookDraft = response.preferences.webhookUrl ?? ""
                 }
+                saveError = nil
             } catch {
-                // Ni les préférences confirmées ni la saisie ne changent.
+                // La tête de file et tous les choix suivants restent visibles.
                 saveError = "Enregistrement non confirmé. Vérifie les valeurs et réessaie."
+                return
             }
         }
     }
@@ -186,11 +208,18 @@ struct SentinelleAlertSettingsSheet: View {
     }
 
     private func test() async {
+        guard let savedURL = edits?.confirmed.webhookUrl,
+              edits?.canTestWebhook(webhookDraft, isSaving: isSaving) == true else { return }
         isTesting = true
         defer { isTesting = false }
         do {
-            verdict = try await service.testWebhook()
+            let response = try await service.testWebhook()
+            guard edits?.confirmed.webhookUrl == savedURL,
+                  edits?.canTestWebhook(webhookDraft, isSaving: isSaving) == true else { return }
+            verdict = response
         } catch {
+            guard edits?.confirmed.webhookUrl == savedURL,
+                  edits?.canTestWebhook(webhookDraft, isSaving: isSaving) == true else { return }
             verdict = SentinelleWebhookTest(
                 ok: false, status: nil, destination: nil,
                 message: "L’essai n’a pas pu être lancé."
@@ -202,5 +231,50 @@ struct SentinelleAlertSettingsSheet: View {
         if seconds < 60 { return "\(seconds) s" }
         let minutes = seconds / 60
         return minutes < 60 ? "\(minutes) min" : "\(minutes / 60) h"
+    }
+}
+
+/// Un reçu PATCH fait autorité ; les choix faits pendant son trajet restent en
+/// file et s'appliquent au reçu suivant. Un GET ne détruit jamais cette file.
+struct SentinellePreferenceEditQueue {
+    private(set) var confirmed: SentinellePreferences
+    private(set) var draft: SentinellePreferences
+    private var pending: [SentinellePreferencesPatch] = []
+
+    init(_ initial: SentinellePreferences) {
+        confirmed = initial
+        draft = initial
+    }
+
+    var next: SentinellePreferencesPatch? { pending.first }
+
+    func canTestWebhook(_ entered: String, isSaving: Bool) -> Bool {
+        guard !isSaving, pending.isEmpty,
+              let saved = confirmed.webhookUrl else { return false }
+        return entered.trimmingCharacters(in: .whitespaces) == saved
+    }
+
+    mutating func enqueue(_ changes: SentinellePreferencesPatch) {
+        pending.append(changes)
+        draft = Self.applying(changes, to: draft)
+    }
+
+    mutating func acknowledge(_ saved: SentinellePreferences) {
+        if !pending.isEmpty { pending.removeFirst() }
+        refresh(saved)
+    }
+
+    mutating func refresh(_ saved: SentinellePreferences) {
+        confirmed = saved
+        draft = pending.reduce(saved) { Self.applying($1, to: $0) }
+    }
+
+    private static func applying(_ changes: SentinellePreferencesPatch, to value: SentinellePreferences) -> SentinellePreferences {
+        SentinellePreferences(
+            notifyDown: changes.notifyDown ?? value.notifyDown,
+            notifyUp: changes.notifyUp ?? value.notifyUp,
+            downThresholdSec: changes.downThresholdSec ?? value.downThresholdSec,
+            webhookUrl: changes.webhookUrl ?? value.webhookUrl
+        )
     }
 }
