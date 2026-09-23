@@ -26,7 +26,13 @@ struct ForcedUpdateView: View {
                     .font(SQType.title)
                     .foregroundStyle(SQColor.label)
                     .accessibilityAddTraits(.isHeader)
-                Text(message ?? "Cette version de SignalQuest n'est plus prise en charge. Mets l'application à jour pour continuer.")
+                Group {
+                    if let message {
+                        Text(message)
+                    } else {
+                        Text("Cette version de SignalQuest n'est plus prise en charge. Mets l'application à jour pour continuer.")
+                    }
+                }
                     .font(SQType.body)
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)
