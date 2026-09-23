@@ -822,6 +822,25 @@ final class APIClientTests: XCTestCase {
         XCTAssertTrue(identity.pendingRevocations().isEmpty)
     }
 
+    func testPushReceiptRequiresMatchingOwnerInstallationAndEnvironment() {
+        let owner = PushOwnerScope.id(for: "account-a")
+        let receipt = DevicePushRegistrationResponse(
+            success: true, ownerScope: owner, revocationSecret: "one-time-receipt",
+            deviceId: "installation-a", environment: "staging"
+        )
+        XCTAssertEqual(receipt.verifiedSecret(ownerScopeId: owner, deviceID: "installation-a", environment: "staging"),
+                       "one-time-receipt")
+        XCTAssertNil(receipt.verifiedSecret(ownerScopeId: PushOwnerScope.id(for: "account-b"),
+                                            deviceID: "installation-a", environment: "staging"))
+        XCTAssertNil(receipt.verifiedSecret(ownerScopeId: owner, deviceID: "installation-b", environment: "staging"))
+        XCTAssertNil(receipt.verifiedSecret(ownerScopeId: owner, deviceID: "installation-a", environment: "production"))
+        let legacy = DevicePushRegistrationResponse(
+            success: true, ownerScope: nil, revocationSecret: nil,
+            deviceId: "installation-a", environment: nil
+        )
+        XCTAssertNil(legacy.verifiedSecret(ownerScopeId: owner, deviceID: "installation-a", environment: "staging"))
+    }
+
     func testPushRecipientPolicyRejectsCrossAccountAndLegacyPrivatePayloads() {
         let ownerA = PushOwnerScope.id(for: "account-a")
         let ownerB = PushOwnerScope.id(for: "account-b")
