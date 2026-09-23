@@ -7,7 +7,7 @@
 
 set -eu
 
-source_plist="${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist"
+source_plist="${SQ_FIREBASE_CONFIG_PATH:-${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist}"
 resources_dir="${TARGET_BUILD_DIR:-}/${UNLOCALIZED_RESOURCES_FOLDER_PATH:-}"
 
 if [ "${SQ_ISOLATED_HOST_TEST:-NO}" = "YES" ]; then

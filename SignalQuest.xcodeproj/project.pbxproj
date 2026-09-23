@@ -1007,6 +1007,7 @@
 		969394914FD409108A452239 /* AntennaReportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaReportModels.swift; sourceTree = "<group>"; };
 		96F63BABF362FE8E93BB147A /* MobileChallenge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileChallenge.swift; sourceTree = "<group>"; };
 		9736EDBCABC5CAF864BB5244 /* E2EEV2NotificationContextBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2NotificationContextBridge.swift; sourceTree = "<group>"; };
+		9752903ED64C1C7546E4C054 /* DebugBeta.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = DebugBeta.xcconfig; sourceTree = "<group>"; };
 		97E995D86EB1D6FE8BFA16CA /* VoiceNoteRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceNoteRecorder.swift; sourceTree = "<group>"; };
 		981E7B41486B91A9E6788632 /* SpeedtestHistoryRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestHistoryRow.swift; sourceTree = "<group>"; };
 		98EFA20D5BA8CABB5D2C2BB8 /* AppPrivacyShield.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPrivacyShield.swift; sourceTree = "<group>"; };
@@ -1666,6 +1667,7 @@
 			isa = PBXGroup;
 			children = (
 				53482F595BA7C9973BE76955 /* Debug.xcconfig */,
+				9752903ED64C1C7546E4C054 /* DebugBeta.xcconfig */,
 				0412AAD8AE4FABC8AFE66ADE /* Release.xcconfig */,
 				C5B4A61B546243ACDB9EAA06 /* Staging.xcconfig */,
 			);
@@ -2669,7 +2671,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "#!/bin/sh\n\n# Téléverse les symboles de debug (dSYM) vers Crashlytics après compilation.\n#\n# Sans cette étape, les rapports de crash arrivent NON SYMBOLISÉS : on obtient\n# des adresses mémoire au lieu de noms de fonctions, ce qui les rend\n# inexploitables. C'est l'oubli classique d'une intégration Crashlytics.\n#\n# Le script est volontairement tolérant : il sort en succès (avec un warning\n# visible dans le log de build) plutôt que de casser le build quand les\n# conditions ne sont pas réunies. Un contributeur sans `GoogleService-Info.plist`\n# — le fichier est gitignoré, cf. AppDelegate — doit pouvoir compiler.\n\nset -eu\n\nconfiguration=\"${CONFIGURATION:-}\"\nplatform=\"${PLATFORM_NAME:-}\"\n\nskip() {\n  echo \"warning: upload dSYM Crashlytics ignoré — $*\"\n  exit 0\n}\n\n# Debug produit `dwarf` sans bundle dSYM (cf. DEBUG_INFORMATION_FORMAT) : rien à\n# téléverser, et on évite un appel réseau à chaque compilation locale.\n[ \"$configuration\" != \"Debug\" ] || exit 0\n\n# Un dSYM de simulateur ne peut symboliser aucun crash d'un iPhone et pollue le\n# projet Crashlytics. Les builds Release locaux doivent donc rester hors ligne.\ncase \"$platform\" in\n  *simulator*) exit 0 ;;\nesac\n\nplist=\"${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist\"\n[ -f \"$plist\" ] || skip \"GoogleService-Info.plist absent\"\n\n# Le SDK est résolu par SwiftPM ; son emplacement dérive de BUILD_DIR.\nrun=\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\n[ -x \"$run\" ] || skip \"script Crashlytics introuvable ($run)\"\n\ndsym=\"${DWARF_DSYM_FOLDER_PATH:-}/${DWARF_DSYM_FILE_NAME:-}\"\n[ -d \"$dsym\" ] || skip \"bundle dSYM introuvable ($dsym)\"\n\n\"$run\" -gsp \"$plist\"\necho \"dSYM Crashlytics téléversés ($configuration).\"\n";
+			shellScript = "#!/bin/sh\n\n# Téléverse les symboles de debug (dSYM) vers Crashlytics après compilation.\n#\n# Sans cette étape, les rapports de crash arrivent NON SYMBOLISÉS : on obtient\n# des adresses mémoire au lieu de noms de fonctions, ce qui les rend\n# inexploitables. C'est l'oubli classique d'une intégration Crashlytics.\n#\n# Le script est volontairement tolérant : il sort en succès (avec un warning\n# visible dans le log de build) plutôt que de casser le build quand les\n# conditions ne sont pas réunies. Un contributeur sans `GoogleService-Info.plist`\n# — le fichier est gitignoré, cf. AppDelegate — doit pouvoir compiler.\n\nset -eu\n\nconfiguration=\"${CONFIGURATION:-}\"\nplatform=\"${PLATFORM_NAME:-}\"\n\nskip() {\n  echo \"warning: upload dSYM Crashlytics ignoré — $*\"\n  exit 0\n}\n\n# Debug produit `dwarf` sans bundle dSYM (cf. DEBUG_INFORMATION_FORMAT) : rien à\n# téléverser, et on évite un appel réseau à chaque compilation locale.\ncase \"$configuration\" in Debug|DebugBeta) exit 0 ;; esac\n\n# Un dSYM de simulateur ne peut symboliser aucun crash d'un iPhone et pollue le\n# projet Crashlytics. Les builds Release locaux doivent donc rester hors ligne.\ncase \"$platform\" in\n  *simulator*) exit 0 ;;\nesac\n\nplist=\"${SQ_FIREBASE_CONFIG_PATH:-${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist}\"\n[ -f \"$plist\" ] || skip \"GoogleService-Info.plist absent\"\n\n# Le SDK est résolu par SwiftPM ; son emplacement dérive de BUILD_DIR.\nrun=\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\n[ -x \"$run\" ] || skip \"script Crashlytics introuvable ($run)\"\n\ndsym=\"${DWARF_DSYM_FOLDER_PATH:-}/${DWARF_DSYM_FILE_NAME:-}\"\n[ -d \"$dsym\" ] || skip \"bundle dSYM introuvable ($dsym)\"\n\n\"$run\" -gsp \"$plist\"\necho \"dSYM Crashlytics téléversés ($configuration).\"\n";
 		};
 		B222421102940D0D56C87D7C /* Validate Build Environment */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -2689,7 +2691,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "#!/bin/sh\n\n# Fail closed when a Beta points to production or when a distribution build\n# still contains placeholder staging services. Xcode invokes this as a build\n# phase; it can also be called directly with build-setting overrides.\n\nset -eu\n\nconfiguration=\"${CONFIGURATION:-}\"\nenvironment=\"${SQ_ENVIRONMENT:-}\"\nbundle_id=\"${PRODUCT_BUNDLE_IDENTIFIER:-}\"\n\nfail() {\n  echo \"error: SignalQuest environment validation failed: $*\" >&2\n  exit 1\n}\n\nurl_host() {\n  printf '%s' \"$1\" | sed -E 's#^[A-Za-z][A-Za-z0-9+.-]*://([^/:]+).*$#\\1#' | tr '[:upper:]' '[:lower:]'\n}\n\nis_production_host() {\n  case \"$1\" in\n    signalquest.fr|api.signalquest.fr) return 0 ;;\n    *) return 1 ;;\n  esac\n}\n\nvalidate_url() {\n  key=\"$1\"\n  value=\"$2\"\n  [ -n \"$value\" ] || fail \"$key is empty\"\n  host=\"$(url_host \"$value\")\"\n  [ -n \"$host\" ] || fail \"$key is not an absolute URL\"\n\n  if [ \"$environment\" = \"staging\" ]; then\n    is_production_host \"$host\" && fail \"$key points to production ($host)\"\n    case \"$host\" in\n      *.invalid) [ \"${SQ_ALLOW_PLACEHOLDER_STAGING:-NO}\" = \"YES\" ] || fail \"$key still uses placeholder host $host\" ;;\n    esac\n  fi\n}\n\ncase \"$configuration\" in\n  Staging)\n    [ \"$environment\" = \"staging\" ] || fail \"Staging configuration must set SQ_ENVIRONMENT=staging\"\n    [ \"$bundle_id\" = \"fr.signalquest.ios.beta\" ] || fail \"Staging bundle identifier must be fr.signalquest.ios.beta\"\n    ;;\n  Release)\n    [ \"$environment\" = \"production\" ] || fail \"Release configuration must set SQ_ENVIRONMENT=production\"\n    [ \"$bundle_id\" = \"fr.signalquest.ios\" ] || fail \"Release bundle identifier must be fr.signalquest.ios\"\n    ;;\n  Debug)\n    [ \"$environment\" = \"development\" ] || fail \"Debug configuration must set SQ_ENVIRONMENT=development\"\n    ;;\nesac\n\nvalidate_url SQ_APP_BASE_URL \"${SQ_APP_BASE_URL:-}\"\nvalidate_url SQ_API_BASE_URL \"${SQ_API_BASE_URL:-}\"\n\n# --- Garde-fou anti-récidive sur le code QA (SECURITY-04) -------------------\n# Un binaire de distribution ne doit contenir ni jeu de démonstration (URLs S3\n# et identifiants de photos de PRODUCTION, amis fictifs) ni lecture d'argument\n# de lancement hors des accesseurs gardés d'AppEnvironment. Deux invariants,\n# vérifiés sur les sources parce qu'ils sont structurels et donc stables :\n#   1. `ProcessInfo.processInfo.arguments` et le préfixe `--qa-` n'existent que\n#      dans AppEnvironment.swift, où ils sont derrière #if DEBUG ;\n#   2. aucune URL S3 hors d'une région #if DEBUG.\nif [ \"$configuration\" != \"Debug\" ]; then\n  sources=\"${SRCROOT:-.}/SignalQuestApp\"\n\n  # `code_hits` ignore les lignes de commentaire : documenter un drapeau dans un\n  # doc-comment est légitime, seul le code compilé compte.\n  code_hits() {\n    grep -rn \"$1\" \"$sources\" --include='*.swift' 2>/dev/null \\\n      | grep -v '^[^:]*/AppEnvironment\\.swift:' \\\n      | awk -F: '{ line=$0; sub(/^[^:]*:[0-9]+:[[:space:]]*/, \"\", line); if (line !~ /^(\\/\\/|\\*|\\/\\*)/) print $1 \":\" $2 }' \\\n      || true\n  }\n\n  strays=\"$(code_hits 'ProcessInfo\\.processInfo\\.arguments')\"\n  [ -z \"$strays\" ] || fail \"lecture d'arguments de lancement hors AppEnvironment : $(echo \"$strays\" | tr '\\n' ' ')\"\n\n  strays=\"$(code_hits '\"--qa-')\"\n  [ -z \"$strays\" ] || fail \"drapeau --qa- référencé dans du code hors AppEnvironment : $(echo \"$strays\" | tr '\\n' ' ')\"\n\n  # Suit l'imbrication des directives pour ne signaler que ce qui est réellement\n  # compilé en distribution (le corps d'un #else de #if DEBUG en fait partie).\n  leaks=\"$(find \"$sources\" -name '*.swift' -exec awk '\n    /^[[:space:]]*#if[[:space:]]+DEBUG/ { stack[++d]=\"D\"; next }\n    /^[[:space:]]*#if/                  { stack[++d]=\"O\"; next }\n    /^[[:space:]]*#else/                { if (d>0 && stack[d]==\"D\") stack[d]=\"E\"; next }\n    /^[[:space:]]*#endif/               { if (d>0) d--; next }\n    {\n      inDebug=0\n      for (i=1;i<=d;i++) if (stack[i]==\"D\") inDebug=1\n      if (!inDebug && $0 ~ /s3\\.signalquest\\.fr/) print FILENAME \":\" FNR\n    }' {} + 2>/dev/null || true)\"\n  [ -z \"$leaks\" ] || fail \"URL S3 de production hors #if DEBUG : $(echo \"$leaks\" | tr '\\n' ' ')\"\nfi\n\nif [ \"${SQ_ISOLATED_HOST_TEST:-NO}\" = \"YES\" ]; then\n  [ \"${PLATFORM_NAME:-}\" = \"iphonesimulator\" ] && [ \"${ENABLE_TESTABILITY:-NO}\" = \"YES\" ] \\\n    || fail \"isolated host tests require a testable simulator build\"\nfi\n\nif [ \"${SQ_ISOLATED_HOST_TEST:-NO}\" != \"YES\" ] && [ \"$environment\" = \"staging\" ] && [ -f \"${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist\" ]; then\n  firebase_bundle=\"$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' \"${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist\" 2>/dev/null || true)\"\n  [ \"$firebase_bundle\" = \"$bundle_id\" ] || fail \"Firebase BUNDLE_ID does not match the Beta bundle identifier\"\nfi\n\necho \"SignalQuest environment validation passed ($configuration/$environment).\"\n";
+			shellScript = "#!/bin/sh\n\n# Fail closed when a Beta points to production or when a distribution build\n# still contains placeholder staging services. Xcode invokes this as a build\n# phase; it can also be called directly with build-setting overrides.\n\nset -eu\n\nconfiguration=\"${CONFIGURATION:-}\"\nenvironment=\"${SQ_ENVIRONMENT:-}\"\nbundle_id=\"${PRODUCT_BUNDLE_IDENTIFIER:-}\"\n\nfail() {\n  echo \"error: SignalQuest environment validation failed: $*\" >&2\n  exit 1\n}\n\nurl_host() {\n  printf '%s' \"$1\" | sed -E 's#^[A-Za-z][A-Za-z0-9+.-]*://([^/:]+).*$#\\1#' | tr '[:upper:]' '[:lower:]'\n}\n\nis_production_host() {\n  case \"$1\" in\n    signalquest.fr|api.signalquest.fr) return 0 ;;\n    *) return 1 ;;\n  esac\n}\n\nvalidate_url() {\n  key=\"$1\"\n  value=\"$2\"\n  [ -n \"$value\" ] || fail \"$key is empty\"\n  host=\"$(url_host \"$value\")\"\n  [ -n \"$host\" ] || fail \"$key is not an absolute URL\"\n\n  if [ \"$environment\" = \"staging\" ]; then\n    is_production_host \"$host\" && fail \"$key points to production ($host)\"\n    case \"$host\" in\n      *.invalid) [ \"${SQ_ALLOW_PLACEHOLDER_STAGING:-NO}\" = \"YES\" ] || fail \"$key still uses placeholder host $host\" ;;\n    esac\n  fi\n}\n\ncase \"$configuration\" in\n  DebugBeta)\n    [ \"$environment\" = \"staging\" ] || fail \"DebugBeta configuration must set SQ_ENVIRONMENT=staging\"\n    [ \"$bundle_id\" = \"fr.signalquest.ios.beta\" ] || fail \"DebugBeta bundle identifier must be fr.signalquest.ios.beta\"\n    ;;\n  Staging)\n    [ \"$environment\" = \"staging\" ] || fail \"Staging configuration must set SQ_ENVIRONMENT=staging\"\n    [ \"$bundle_id\" = \"fr.signalquest.ios.beta\" ] || fail \"Staging bundle identifier must be fr.signalquest.ios.beta\"\n    ;;\n  Release)\n    [ \"$environment\" = \"production\" ] || fail \"Release configuration must set SQ_ENVIRONMENT=production\"\n    [ \"$bundle_id\" = \"fr.signalquest.ios\" ] || fail \"Release bundle identifier must be fr.signalquest.ios\"\n    ;;\n  Debug)\n    [ \"$environment\" = \"development\" ] || fail \"Debug configuration must set SQ_ENVIRONMENT=development\"\n    ;;\nesac\n\nvalidate_url SQ_APP_BASE_URL \"${SQ_APP_BASE_URL:-}\"\nvalidate_url SQ_API_BASE_URL \"${SQ_API_BASE_URL:-}\"\n\n# --- Garde-fou anti-récidive sur le code QA (SECURITY-04) -------------------\n# Un binaire de distribution ne doit contenir ni jeu de démonstration (URLs S3\n# et identifiants de photos de PRODUCTION, amis fictifs) ni lecture d'argument\n# de lancement hors des accesseurs gardés d'AppEnvironment. Deux invariants,\n# vérifiés sur les sources parce qu'ils sont structurels et donc stables :\n#   1. `ProcessInfo.processInfo.arguments` et le préfixe `--qa-` n'existent que\n#      dans AppEnvironment.swift, où ils sont derrière #if DEBUG ;\n#   2. aucune URL S3 hors d'une région #if DEBUG.\nif [ \"$configuration\" != \"Debug\" ]; then\n  sources=\"${SRCROOT:-.}/SignalQuestApp\"\n\n  # `code_hits` ignore les lignes de commentaire : documenter un drapeau dans un\n  # doc-comment est légitime, seul le code compilé compte.\n  code_hits() {\n    grep -rn \"$1\" \"$sources\" --include='*.swift' 2>/dev/null \\\n      | grep -v '^[^:]*/AppEnvironment\\.swift:' \\\n      | awk -F: '{ line=$0; sub(/^[^:]*:[0-9]+:[[:space:]]*/, \"\", line); if (line !~ /^(\\/\\/|\\*|\\/\\*)/) print $1 \":\" $2 }' \\\n      || true\n  }\n\n  strays=\"$(code_hits 'ProcessInfo\\.processInfo\\.arguments')\"\n  [ -z \"$strays\" ] || fail \"lecture d'arguments de lancement hors AppEnvironment : $(echo \"$strays\" | tr '\\n' ' ')\"\n\n  strays=\"$(code_hits '\"--qa-')\"\n  [ -z \"$strays\" ] || fail \"drapeau --qa- référencé dans du code hors AppEnvironment : $(echo \"$strays\" | tr '\\n' ' ')\"\n\n  # Suit l'imbrication des directives pour ne signaler que ce qui est réellement\n  # compilé en distribution (le corps d'un #else de #if DEBUG en fait partie).\n  leaks=\"$(find \"$sources\" -name '*.swift' -exec awk '\n    /^[[:space:]]*#if[[:space:]]+DEBUG/ { stack[++d]=\"D\"; next }\n    /^[[:space:]]*#if/                  { stack[++d]=\"O\"; next }\n    /^[[:space:]]*#else/                { if (d>0 && stack[d]==\"D\") stack[d]=\"E\"; next }\n    /^[[:space:]]*#endif/               { if (d>0) d--; next }\n    {\n      inDebug=0\n      for (i=1;i<=d;i++) if (stack[i]==\"D\") inDebug=1\n      if (!inDebug && $0 ~ /s3\\.signalquest\\.fr/) print FILENAME \":\" FNR\n    }' {} + 2>/dev/null || true)\"\n  [ -z \"$leaks\" ] || fail \"URL S3 de production hors #if DEBUG : $(echo \"$leaks\" | tr '\\n' ' ')\"\nfi\n\nif [ \"${SQ_ISOLATED_HOST_TEST:-NO}\" = \"YES\" ]; then\n  [ \"${PLATFORM_NAME:-}\" = \"iphonesimulator\" ] && [ \"${ENABLE_TESTABILITY:-NO}\" = \"YES\" ] \\\n    || fail \"isolated host tests require a testable simulator build\"\nfi\n\nfirebase_plist=\"${SQ_FIREBASE_CONFIG_PATH:-${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist}\"\nif [ -n \"${SQ_FIREBASE_CONFIG_PATH:-}\" ]; then\n  case \"$configuration\" in Staging|DebugBeta) ;; *) fail \"Firebase override is only allowed for Beta builds\" ;; esac\n  case \"$firebase_plist\" in /*) ;; *) fail \"Firebase override must be an absolute path\" ;; esac\n  [ -f \"$firebase_plist\" ] || fail \"Firebase override file is missing\"\nfi\n\nif [ \"${SQ_ISOLATED_HOST_TEST:-NO}\" != \"YES\" ] && [ \"$environment\" = \"staging\" ] && [ -f \"$firebase_plist\" ]; then\n  firebase_bundle=\"$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' \"$firebase_plist\" 2>/dev/null || true)\"\n  [ \"$firebase_bundle\" = \"$bundle_id\" ] || fail \"Firebase BUNDLE_ID does not match the Beta bundle identifier\"\nfi\n\necho \"SignalQuest environment validation passed ($configuration/$environment).\"\n";
 		};
 		D7C86E33D013622410772EE6 /* Embed Firebase Config When Available */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -2710,7 +2712,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "#!/bin/sh\n\n# Le plist Firebase est injecté après le clone par Xcode Cloud et reste absent du\n# dépôt public. Une phase Resources statique rendrait donc tout checkout propre\n# impossible à compiler. Cette phase l'embarque quand il existe et conserve le\n# mode dégradé explicite d'AppDelegate dans le cas contraire.\n\nset -eu\n\nsource_plist=\"${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist\"\nresources_dir=\"${TARGET_BUILD_DIR:-}/${UNLOCALIZED_RESOURCES_FOLDER_PATH:-}\"\n\nif [ \"${SQ_ISOLATED_HOST_TEST:-NO}\" = \"YES\" ]; then\n  if [ \"${PLATFORM_NAME:-}\" != \"iphonesimulator\" ] || [ \"${ENABLE_TESTABILITY:-NO}\" != \"YES\" ]; then\n    echo \"error: isolated host tests require a testable simulator build.\" >&2\n    exit 1\n  fi\n  [ -n \"${TARGET_BUILD_DIR:-}\" ] && [ -n \"${UNLOCALIZED_RESOURCES_FOLDER_PATH:-}\" ] || exit 1\n  rm -f \"$resources_dir/GoogleService-Info.plist\"\n  echo \"Firebase excluded from isolated simulator test host; source configuration unchanged.\"\n  exit 0\nfi\n\nif [ -f \"$source_plist\" ]; then\n  mkdir -p \"$resources_dir\"\n  cp \"$source_plist\" \"$resources_dir/GoogleService-Info.plist\"\n  echo \"Firebase config embedded.\"\nelse\n  rm -f \"$resources_dir/GoogleService-Info.plist\"\n  echo \"warning: GoogleService-Info.plist absent; Firebase push and Crashlytics stay disabled.\"\nfi\n";
+			shellScript = "#!/bin/sh\n\n# Le plist Firebase est injecté après le clone par Xcode Cloud et reste absent du\n# dépôt public. Une phase Resources statique rendrait donc tout checkout propre\n# impossible à compiler. Cette phase l'embarque quand il existe et conserve le\n# mode dégradé explicite d'AppDelegate dans le cas contraire.\n\nset -eu\n\nsource_plist=\"${SQ_FIREBASE_CONFIG_PATH:-${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist}\"\nresources_dir=\"${TARGET_BUILD_DIR:-}/${UNLOCALIZED_RESOURCES_FOLDER_PATH:-}\"\n\nif [ \"${SQ_ISOLATED_HOST_TEST:-NO}\" = \"YES\" ]; then\n  if [ \"${PLATFORM_NAME:-}\" != \"iphonesimulator\" ] || [ \"${ENABLE_TESTABILITY:-NO}\" != \"YES\" ]; then\n    echo \"error: isolated host tests require a testable simulator build.\" >&2\n    exit 1\n  fi\n  [ -n \"${TARGET_BUILD_DIR:-}\" ] && [ -n \"${UNLOCALIZED_RESOURCES_FOLDER_PATH:-}\" ] || exit 1\n  rm -f \"$resources_dir/GoogleService-Info.plist\"\n  echo \"Firebase excluded from isolated simulator test host; source configuration unchanged.\"\n  exit 0\nfi\n\nif [ -f \"$source_plist\" ]; then\n  mkdir -p \"$resources_dir\"\n  cp \"$source_plist\" \"$resources_dir/GoogleService-Info.plist\"\n  echo \"Firebase config embedded.\"\nelse\n  rm -f \"$resources_dir/GoogleService-Info.plist\"\n  echo \"warning: GoogleService-Info.plist absent; Firebase push and Crashlytics stay disabled.\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -3367,6 +3369,42 @@
 			};
 			name = Staging;
 		};
+		065A597B48B363D77C22C8CC /* DebugBeta */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9752903ED64C1C7546E4C054 /* DebugBeta.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				INFOPLIST_FILE = SignalQuestTests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios.beta.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SignalQuest.app/SignalQuest";
+			};
+			name = DebugBeta;
+		};
+		1309ABF478ADD08C9B814737 /* DebugBeta */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9752903ED64C1C7546E4C054 /* DebugBeta.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				INFOPLIST_FILE = SignalQuestUITests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios.beta.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SignalQuest;
+			};
+			name = DebugBeta;
+		};
 		3EDF074135F794207D52150C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 53482F595BA7C9973BE76955 /* Debug.xcconfig */;
@@ -3474,6 +3512,28 @@
 			};
 			name = Debug;
 		};
+		5A4D737DBD8727E65110D2F2 /* DebugBeta */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9752903ED64C1C7546E4C054 /* DebugBeta.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = SignalQuestNotificationService/SignalQuestNotificationService.entitlements;
+				CURRENT_PROJECT_VERSION = 156;
+				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "fr.signalquest.ios.beta.notification-service";
+				PRODUCT_NAME = SignalQuestNotificationService;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = DebugBeta;
+		};
 		5ADE5424B6589F3E3A9418B7 /* Staging */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = C5B4A61B546243ACDB9EAA06 /* Staging.xcconfig */;
@@ -3495,6 +3555,29 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Staging;
+		};
+		613F1D2795496910BA38A6B8 /* DebugBeta */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9752903ED64C1C7546E4C054 /* DebugBeta.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 156;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				INFOPLIST_FILE = SignalQuestApp/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = "-weak_framework SwiftData";
+				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios.beta;
+				PRODUCT_NAME = SignalQuest;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = DebugBeta;
 		};
 		67090B696006A7721A40EE3C /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -3576,6 +3659,28 @@
 				TEST_TARGET_NAME = SignalQuest;
 			};
 			name = Staging;
+		};
+		A8009CFA97EC85D93BD562E0 /* DebugBeta */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9752903ED64C1C7546E4C054 /* DebugBeta.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
+				CURRENT_PROJECT_VERSION = 156;
+				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = fr.signalquest.ios.beta.widget;
+				PRODUCT_NAME = SignalQuestWidget;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = DebugBeta;
 		};
 		ABCC4194E32DB5125661B05B /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -3763,6 +3868,73 @@
 			};
 			name = Debug;
 		};
+		E8AEE8CA11D0DAFC13B7BB77 /* DebugBeta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 835X2977R7;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = DebugBeta;
+		};
 		EF455E913D484D171377664B /* Staging */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -3848,6 +4020,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				3EDF074135F794207D52150C /* Debug */,
+				A8009CFA97EC85D93BD562E0 /* DebugBeta */,
 				85660F9EE7DEC1999D101644 /* Release */,
 				05576890912DC0B149E7B14B /* Staging */,
 			);
@@ -3858,6 +4031,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				D4B6AC90FCC07A7267E375E2 /* Debug */,
+				5A4D737DBD8727E65110D2F2 /* DebugBeta */,
 				C6FC47FDDF2C5E5EC218989E /* Release */,
 				5ADE5424B6589F3E3A9418B7 /* Staging */,
 			);
@@ -3868,6 +4042,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4C6AEAE550BFE265D3FD8EB6 /* Debug */,
+				065A597B48B363D77C22C8CC /* DebugBeta */,
 				C0D790DA8CF3B7001C034748 /* Release */,
 				C40E9D392B3695F97CF07753 /* Staging */,
 			);
@@ -3878,6 +4053,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E7C33E9907B3DCF88F969303 /* Debug */,
+				613F1D2795496910BA38A6B8 /* DebugBeta */,
 				B1E1135143F2AE4F30E041F6 /* Release */,
 				7B312AF9A99947E273F7E4BB /* Staging */,
 			);
@@ -3888,6 +4064,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				67090B696006A7721A40EE3C /* Debug */,
+				1309ABF478ADD08C9B814737 /* DebugBeta */,
 				F865F39A5D05291BDA066EB3 /* Release */,
 				9211600AF11B85DAC30B55F3 /* Staging */,
 			);
@@ -3898,6 +4075,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				40FC3791BD57BCABBBF757E5 /* Debug */,
+				E8AEE8CA11D0DAFC13B7BB77 /* DebugBeta */,
 				ABCC4194E32DB5125661B05B /* Release */,
 				EF455E913D484D171377664B /* Staging */,
 			);

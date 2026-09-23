@@ -1,0 +1,12 @@
+// App Beta distincte pour les recettes XCUITest sur appareil. Le service reste
+// isolé ; seules les portes QA de l'app sont compilées en mode debug.
+#include "Staging.xcconfig"
+SQ_DISPLAY_NAME = SignalQuest Beta QA
+SQ_APS_ENVIRONMENT = development
+SQ_DEBUG_LOGS = YES
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG STAGING
+SWIFT_OPTIMIZATION_LEVEL = -Onone
+ONLY_ACTIVE_ARCH = YES
+ENABLE_NS_ASSERTIONS = YES
+DEBUG_INFORMATION_FORMAT = dwarf
+MTL_ENABLE_DEBUG_INFO = YES

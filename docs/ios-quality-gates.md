@@ -49,6 +49,14 @@ Variables utiles :
 La configuration Staging contient volontairement des domaines `.invalid` tant
 que l'infrastructure isolée et le plist Firebase Beta ne sont pas fournis. Son
 échec dans cet état est un garde-fou attendu, pas un contournement à désactiver.
+Pour une recette Beta sur iPhone, fournir un plist Firebase du bundle
+`fr.signalquest.ios.beta` par chemin absolu dans `SQ_FIREBASE_CONFIG_PATH` ;
+le plist principal reste inchangé. La phase pré-build refuse un chemin manquant,
+un bundle différent ou cette surcharge hors des configurations Beta.
+Pour XCUITest physique, choisir `-scheme 'SignalQuest Beta' -configuration DebugBeta`
+avec ce plist et des hôtes de recette isolés. `DebugBeta` compile les portes QA
+de l'app sans surcharger globalement les dépendances SwiftPM ; l'archive
+`Staging` reste un build de distribution sans ces portes.
 
 ## Couverture
 
