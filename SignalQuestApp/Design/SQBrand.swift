@@ -35,7 +35,7 @@ enum SQBrand {
         var solid: Color { start }
     }
 
-    private static let operators: [String: OperatorColors] = [
+    static let operators: [String: OperatorColors] = [
         "sfr": .init(start: Color(hex: 0xE2001A), end: Color(hex: 0xFF5A33), name: "SFR"),
         "bouygues": .init(start: Color(hex: 0x1A3A7F), end: Color(hex: 0x3B5BDB), name: "Bouygues"),
         "orange": .init(start: Color(hex: 0xFF6B35), end: Color(hex: 0xFFA44F), name: "Orange", badgeForeground: .black),
