@@ -17,7 +17,8 @@ priorité, puis Xcode bêta seulement si stable n'est pas installé.
 ./ci_scripts/run_ios_quality_gates.sh host
 ```
 
-Le gate Debug exécute tous les tests unitaires et la classe
+Le gate Debug exécute les tests unitaires en français puis deux tests de localisation
+et de rendu Speedtest dans une passe anglaise dédiée. Il exécute aussi la classe
 `SignalQuestUITests` : login, cinq entrées, écrans principaux, carte et
 speedtest invités, Communauté/Messages et profil. Le speedtest réel conditionné
 par `SQ_AUTH_TOKEN` reste explicitement ignoré sans jeton et ne compte donc pas

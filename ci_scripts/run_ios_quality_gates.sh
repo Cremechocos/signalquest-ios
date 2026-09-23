@@ -118,7 +118,27 @@ run_debug() {
     -resultBundlePath "$result" \
     -enableCodeCoverage YES \
     -parallel-testing-enabled NO \
+    -collect-test-diagnostics never \
+    -testLanguage fr \
+    -skip-testing:SignalQuestTests/LocalizationBundleTests \
+    -skip-testing:SignalQuestTests/SpeedtestVisibilityViewModelTests/testOwnerVisibilityControlsRenderOnSmallEnglishPhone \
     ${scope_args[@]+"${scope_args[@]}"} \
+    CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES CODE_SIGN_IDENTITY=-
+
+  echo "== Debug: localisation anglaise compilée et rendu Speedtest =="
+  local english_result="$RESULT_ROOT/$RUN_ID/Debug-English.xcresult"
+  run_xcodebuild test-without-building \
+    -project "$ROOT/SignalQuest.xcodeproj" \
+    -scheme SignalQuest \
+    -configuration Debug \
+    -destination "$IPHONE_DESTINATION" \
+    -derivedDataPath "$DERIVED_DATA" \
+    -resultBundlePath "$english_result" \
+    -parallel-testing-enabled NO \
+    -collect-test-diagnostics never \
+    -testLanguage en \
+    -only-testing:SignalQuestTests/LocalizationBundleTests \
+    -only-testing:SignalQuestTests/SpeedtestVisibilityViewModelTests/testOwnerVisibilityControlsRenderOnSmallEnglishPhone \
     CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES CODE_SIGN_IDENTITY=-
 
   echo "== Debug: rotation et navigation iPad =="
@@ -131,11 +151,13 @@ run_debug() {
     -derivedDataPath "$DERIVED_DATA" \
     -resultBundlePath "$ipad_result" \
     -parallel-testing-enabled NO \
+    -collect-test-diagnostics never \
     -only-testing:SignalQuestUITests/SignalQuestUITests/testIPadLandscapeKeepsPrimaryNavigationUsable \
     CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES CODE_SIGN_IDENTITY=-
 
   "$ROOT/ci_scripts/check_coverage.sh" "$result"
   echo "Debug result bundle: $result"
+  echo "English result bundle: $english_result"
   echo "iPad result bundle: $ipad_result"
 }
 
