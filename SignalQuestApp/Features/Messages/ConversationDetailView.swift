@@ -461,11 +461,18 @@ struct ConversationDetailView: View {
             // d'appel quand SQFeatures.callsEnabled est false.
             if SQFeatures.callsEnabled {
                 Menu {
-                    Button { startCall(mode: "audio") } label: {
-                        Label("Appel audio", systemImage: "phone.fill")
-                    }
-                    Button { startCall(mode: "video") } label: {
-                        Label("Appel vidéo", systemImage: "video.fill")
+                    if e2eeCallReady {
+                        Button { startCall(mode: "audio") } label: {
+                            Label("Appel audio", systemImage: "phone.fill")
+                        }
+                        Button { startCall(mode: "video") } label: {
+                            Label("Appel vidéo", systemImage: "video.fill")
+                        }
+                    } else {
+                        Button {} label: {
+                            Label("Appels chiffrés indisponibles pour cette conversation", systemImage: "lock.shield")
+                        }
+                        .disabled(true)
                     }
                 } label: {
                     // CALL-OFFLINE-21 : grisé + désactivé hors-ligne (un appel
@@ -477,7 +484,7 @@ struct ConversationDetailView: View {
                         .contentShape(Rectangle())
                 }
                 .disabled(!networkPath.isOnline)
-                .accessibilityLabel("Appeler")
+                .accessibilityLabel(e2eeCallReady ? Text("Appeler") : Text("Appels chiffrés indisponibles pour cette conversation"))
             }
 
             Menu {
@@ -2136,6 +2143,14 @@ struct ConversationDetailView: View {
             displayName: conversationTitle,
             requiresE2EE: isE2EE
         )
+    }
+
+    private var e2eeCallReady: Bool {
+        guard isE2EE else { return true }
+        if case .prepared = E2EEV2CallBridge.prepareRuntimeRequest(conversationId: conversation.id) {
+            return true
+        }
+        return false
     }
 
     private var otherParticipantId: String? {

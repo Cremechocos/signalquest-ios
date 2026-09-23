@@ -6052,6 +6052,22 @@
         }
       }
     },
+    "Appels chiffrés indisponibles pour cette conversation": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appels chiffrés indisponibles pour cette conversation"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Encrypted calls are unavailable in this conversation"
+          }
+        }
+      }
+    },
     "Appels": {
       "localizations": {
         "en": {
