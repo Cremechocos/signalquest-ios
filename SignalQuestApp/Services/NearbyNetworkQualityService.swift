@@ -240,21 +240,27 @@ final class NearbyNetworkQualityService: NearbyNetworkQualityServicing {
         isCellular: Bool,
         simPlmn: String?
     ) async -> MarketRegistryOperator? {
-        if isCellular {
-            let viaVpn = VPNDetector.isActive()
-            if let detected = await networkOperator.resolve(viaVpn: viaVpn),
-               detected.viaVpn != true,
-               let entry = market.operatorEntry(forKey: detected.operatorKey) {
-                return entry
-            }
-        }
-        if let entry = Self.simFallbackOperator(market: market, simPlmn: simPlmn) {
-            return entry
-        }
-        return nil
+        let viaVpn = isCellular && VPNDetector.isActive()
+        let detected = isCellular && !viaVpn
+            ? await networkOperator.resolve(viaVpn: false)
+            : nil
+        return Self.selectOperator(
+            market: market, isCellular: isCellular, viaVpn: viaVpn,
+            detected: detected, simPlmn: simPlmn
+        )
     }
 
-    static func simFallbackOperator(market: MarketRegistryEntry, simPlmn: String?) -> MarketRegistryOperator? {
+    static func selectOperator(
+        market: MarketRegistryEntry,
+        isCellular: Bool,
+        viaVpn: Bool,
+        detected: DetectedOperator?,
+        simPlmn: String?
+    ) -> MarketRegistryOperator? {
+        if isCellular, !viaVpn, detected?.viaVpn != true,
+           let entry = market.operatorEntry(forKey: detected?.operatorKey) {
+            return entry
+        }
         guard let key = market.radioOperatorKey(observedPlmn: simPlmn) else { return nil }
         return market.operatorEntry(forKey: key)
     }

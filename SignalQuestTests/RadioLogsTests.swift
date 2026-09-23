@@ -1372,11 +1372,6 @@ extension RadioLogsTests {
         XCTAssertEqual(france.radioOperatorKey(mcc: 208, mnc: 8), "SFR")
         XCTAssertNil(france.radioOperatorKey(observedPlmn: "208008"),
                      "Un MNC à trois chiffres ne doit pas reprendre l'opérateur du 20808")
-        XCTAssertEqual(NearbyNetworkQualityService.simFallbackOperator(market: france, simPlmn: "20808")?.key, "SFR")
-        for plmn in ["208008", "20838", "23415"] {
-            XCTAssertNil(NearbyNetworkQualityService.simFallbackOperator(market: france, simPlmn: plmn), plmn)
-        }
-        XCTAssertNil(NearbyNetworkQualityService.simFallbackOperator(market: france, simPlmn: nil))
         XCTAssertEqual(payload.radioMvno(simPlmn: "20838", simOperatorName: nil)?.key, "LEBARA")
         XCTAssertEqual(payload.radioMvno(simPlmn: "20820", simOperatorName: "Lebara Mobile")?.key, "LEBARA")
         XCTAssertNil(payload.radioMvno(simPlmn: "20838", simOperatorName: "Lycamobile"))
@@ -1406,6 +1401,37 @@ extension RadioLogsTests {
             XCTAssertEqual(market.marketCode, marketCode, plmn)
             XCTAssertNil(market.radioOperatorKey(observedPlmn: plmn), plmn)
         }
+    }
+
+    func testNearbyQualityUsesASNThenExactSimPLMNWithoutGuessing() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let payload = try JSONDecoder.signalQuest.decode(MarketRegistryPayload.self,
+            from: Data(contentsOf: root.appendingPathComponent("SignalQuestApp/Resources/market_registry_fallback.json")))
+        let france = try XCTUnwrap(payload.market(forCode: "FR"))
+        let orange = DetectedOperator(operatorKey: "ORANGE", label: "Orange", shortLabel: "Orange",
+                                      color: nil, viaVpn: false)
+        func selected(_ simPlmn: String?, detected: DetectedOperator? = nil,
+                      isCellular: Bool = true, viaVpn: Bool = false,
+                      market: MarketRegistryEntry? = nil) -> String? {
+            NearbyNetworkQualityService.selectOperator(
+                market: market ?? france, isCellular: isCellular, viaVpn: viaVpn,
+                detected: detected, simPlmn: simPlmn
+            )?.key
+        }
+        XCTAssertEqual(selected("20808"), "SFR", "ASN absent : le PLMN exact reste utilisable")
+        XCTAssertEqual(selected("20808", detected: orange), "ORANGE", "L'ASN cellulaire valide prime")
+        XCTAssertEqual(selected("20808", detected: orange, isCellular: false), "SFR", "L'ASN Wi-Fi ne remplace pas la SIM")
+        XCTAssertEqual(selected("20808", detected: orange, viaVpn: true), "SFR", "L'ASN du VPN est ignoré")
+        XCTAssertEqual(selected("23415", detected: orange), "ORANGE", "En itinérance, l'ASN visité valide prime")
+        for plmn in ["208008", "20838", "23415", nil] as [String?] {
+            XCTAssertNil(selected(plmn), plmn ?? "absent")
+        }
+
+        var incomplete = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(france)) as? [String: Any])
+        incomplete["radioOperators"] = []
+        let incompleteMarket = try JSONDecoder.signalQuest.decode(MarketRegistryEntry.self,
+            from: JSONSerialization.data(withJSONObject: incomplete))
+        XCTAssertNil(selected("20808", market: incompleteMarket), "Un registre incomplet ne doit pas deviner le réseau")
     }
 
     func testBundledRadioChannelRegistryMatchesSharedContract() throws {
