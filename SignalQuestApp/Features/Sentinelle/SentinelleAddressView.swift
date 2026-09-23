@@ -13,9 +13,13 @@ struct SentinelleAddressView: View {
     let family: SentinelleFamily
 
     @State private var window: SentinelleWindow = .h24
-    @State private var loadedWindow: SentinelleWindow?
+    @State private var loadedContext: String?
     @State private var points: [SentinelleSeriesPoint]?
     @State private var servedFamily: SentinelleFamily?
+    @State private var seriesLoading = false
+    @State private var seriesFailed = false
+    @State private var seriesRetry = 0
+    @State private var seriesGeneration = 0
     /// Instant sous le doigt : c'est LUI qui fait la navigation dans le temps,
     /// l'en-tête de la carte lisant alors cette mesure-là plutôt que la dernière.
     @State private var selected: SentinelleLatencySample?
@@ -40,6 +44,7 @@ struct SentinelleAddressView: View {
             if let target, let address {
                 VStack(spacing: SQSpace.md + 2) {
                     verdictCard(target, address)
+                    seriesStatus
                     latencyCard(address)
                     metricsCard(address)
                     tabPicker
@@ -90,7 +95,36 @@ struct SentinelleAddressView: View {
     }
 
     private var seriesKey: String {
-        "\(window.rawValue)-\(model.lastRefresh?.timeIntervalSince1970 ?? 0)"
+        "\(seriesContext)-\(model.lastRefresh?.timeIntervalSince1970 ?? 0)-\(seriesRetry)"
+    }
+
+    private var seriesContext: String {
+        "\(targetId)-\(family.rawValue)-\(address?.address ?? "none")-\(window.rawValue)"
+    }
+
+    @ViewBuilder private var seriesStatus: some View {
+        if seriesFailed {
+            let message: LocalizedStringKey = points == nil
+                ? "Impossible de charger les mesures. Réessaie."
+                : "Actualisation impossible. Dernières mesures conservées."
+            GlassCard {
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    Text(message)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.dangerInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Réessayer") { seriesRetry += 1 }
+                        .buttonStyle(.bordered)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .accessibilityIdentifier("sentinelle.series.error")
+        } else if seriesLoading && points != nil {
+            Text("Actualisation des mesures…")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     // MARK: Verdict
@@ -170,7 +204,7 @@ struct SentinelleAddressView: View {
                             .foregroundStyle(series.allLost ? SQColor.dangerInk : SQColor.labelSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                } else {
+                } else if !seriesFailed {
                     ProgressView()
                         .tint(SQColor.brandRed)
                         .frame(maxWidth: .infinity, minHeight: 120)
@@ -556,24 +590,34 @@ struct SentinelleAddressView: View {
     // MARK: Chargements
 
     private func loadSeries() async {
-        // Repasser par « chargement » évite d'afficher un instant la courbe de
-        // l'autre fenêtre — mais seulement quand la fenêtre a changé, sinon
-        // chaque cycle de rafraîchissement ferait clignoter le graphe.
-        if loadedWindow != window {
+        let requestKey = seriesKey
+        let context = seriesContext
+        let requestedWindow = window
+        let requestedFamily = family
+        seriesGeneration += 1
+        let generation = seriesGeneration
+        // Une nouvelle fenêtre/adresse ne doit jamais montrer les anciens points.
+        // Un rafraîchissement du même contexte les conserve avec un état explicite.
+        if loadedContext != context {
             points = nil
+            servedFamily = nil
             selected = nil
         }
+        seriesLoading = true
+        seriesFailed = false
         do {
             let response = try await model.service.series(
-                targetId: targetId, window: window, family: family
+                targetId: targetId, window: requestedWindow, family: requestedFamily
             )
+            guard !Task.isCancelled, generation == seriesGeneration, requestKey == seriesKey else { return }
             // Filtre REFAIT sur le champ `family` de chaque point : un serveur qui
             // ignorerait le paramètre renverrait les deux piles mélangées, et une
             // IPv6 morte se dissoudrait dans les mesures IPv4 — exactement la panne
             // que cet écran doit rendre visible.
-            points = response.family == nil ? response.points.inFamily(family) : response.points
+            points = response.family == nil ? response.points.inFamily(requestedFamily) : response.points
             servedFamily = response.family
-            loadedWindow = window
+            loadedContext = context
+            seriesLoading = false
         } catch is CancellationError {
             // Une tâche ANNULÉE n'a rien appris. Elle laissait pourtant un
             // tableau vide, et l'écran annonçait « Aucune mesure sur cette
@@ -581,7 +625,9 @@ struct SentinelleAddressView: View {
             // fausse, sur la foi d'un simple changement de fenêtre.
             return
         } catch {
-            points = points ?? []
+            guard !Task.isCancelled, generation == seriesGeneration, requestKey == seriesKey else { return }
+            seriesLoading = false
+            seriesFailed = true
         }
     }
 

@@ -4473,6 +4473,18 @@
         }
       }
     },
+    "Actualisation des mesures…": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Refreshing measurements…" } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Actualisation des mesures…" } }
+      }
+    },
+    "Actualisation impossible. Dernières mesures conservées.": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Refresh failed. Last measurements are still shown." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "Actualisation impossible. Dernières mesures conservées." } }
+      }
+    },
     "Actualisation impossible": {
       "extractionState": "stale",
       "localizations": {
