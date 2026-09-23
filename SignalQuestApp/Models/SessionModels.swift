@@ -553,15 +553,28 @@ struct SessionsListResponse: Decodable {
     /// techno et du niveau. Le serveur charge déjà ces colonnes pour ses
     /// agrégats — les renvoyer ne lui coûte pas une requête de plus.
     let mapPoints: [CoverageSessionPoint]
+    /// Présent avec `?mapPoints=1` sur les API récentes ; nil reste compatible
+    /// avec les versions déjà servies pendant un déploiement progressif.
+    let mapPointSummary: SessionMapPointSummary?
 
-    enum CodingKeys: String, CodingKey { case sessions, pagination, mapPoints }
+    enum CodingKeys: String, CodingKey { case sessions, pagination, mapPoints, mapPointSummary }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         sessions = c.decodeLossyArray([CoverageSession].self, forKey: .sessions)
         pagination = try? c.decodeIfPresent(SessionsPagination.self, forKey: .pagination) ?? nil
         mapPoints = c.decodeLossyArray([CoverageSessionPoint].self, forKey: .mapPoints)
+        mapPointSummary = try? c.decodeIfPresent(SessionMapPointSummary.self, forKey: .mapPointSummary)
     }
+}
+
+struct SessionMapPointSummary: Decodable, Equatable {
+    let locatedCount: Int
+    let returnedCount: Int
+    let sampleStep: Int
+    let maxPoints: Int
+
+    var isSampled: Bool { sampleStep > 1 }
 }
 
 struct SessionsPagination: Decodable {

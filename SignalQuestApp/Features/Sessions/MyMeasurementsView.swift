@@ -1,37 +1,82 @@
 import SwiftUI
 
-/// F7 — « Mes mesures sur la carte » : agrège les points géolocalisés des sessions
-/// de couverture de l'utilisateur (drive tests iOS + Android) et les affiche sur une
-/// carte (nuage de points, réutilise `SessionTraceMapView`). Source = `/api/coverage/sessions`.
+/// F7 — « Mes mesures sur la carte » : consulte les positions des sessions de
+/// couverture historiques et Android, par pages bornées. Source = `/api/coverage/sessions`.
 @MainActor
 final class MyMeasurementsViewModel: ObservableObject {
     @Published private(set) var points: [CoverageSessionPoint] = []
     @Published private(set) var sessionCount = 0
+    @Published private(set) var totalSessions: Int?
+    @Published private(set) var pageOffset = 0
+    @Published private(set) var hasMore = false
+    @Published private(set) var hasLoaded = false
+    @Published private(set) var pointSummary: SessionMapPointSummary?
     @Published private(set) var isLoading = false
-    @Published var errorMessage: String?
+    @Published private(set) var errorMessage: String?
 
-    private let service: SessionsServicing
-    init(service: SessionsServicing) { self.service = service }
+    private let fetch: @MainActor (Int, Int) async throws -> SessionsListResponse
+    private let pageSize = 40
+    private var nextOffset = 0
+    private var previousOffsets: [Int] = []
+    private var requestGeneration = UUID()
+    private enum PageMove { case stay, forward, backward }
+
+    init(service: SessionsServicing) {
+        fetch = { offset, limit in
+            try await service.sessions(offset: offset, limit: limit, mapPoints: true)
+        }
+    }
+
+    init(fetch: @escaping @MainActor (Int, Int) async throws -> SessionsListResponse) {
+        self.fetch = fetch
+    }
+
+    var canGoBack: Bool { hasLoaded && !previousOffsets.isEmpty && !isLoading }
+    var canGoForward: Bool { hasLoaded && hasMore && !isLoading }
+    var pageStart: Int { sessionCount == 0 ? 0 : pageOffset + 1 }
+    var pageEnd: Int { pageOffset + sessionCount }
 
     func load() async {
+        await loadPage(at: pageOffset, move: .stay)
+    }
+
+    func nextPage() async {
+        guard canGoForward else { return }
+        await loadPage(at: nextOffset, move: .forward)
+    }
+
+    func previousPage() async {
+        guard canGoBack else { return }
+        await loadPage(at: previousOffsets[previousOffsets.count - 1], move: .backward)
+    }
+
+    private func loadPage(at offset: Int, move: PageMove) async {
+        let generation = UUID()
+        requestGeneration = generation
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer { if requestGeneration == generation { isLoading = false } }
         do {
-            // UNE requête, et un nuage déjà réduit aux champs que la carte
-            // dessine.
-            //
-            // Avant : la liste, puis le DÉTAIL des quinze sessions les plus
-            // récentes en parallèle. Mesuré sur un compte réel, un seul détail
-            // pèse 5,5 Mo pour 7 340 points — 759 octets par point, dont un
-            // `cellMeasurements` imbriqué dont on ne fait rien ici. Seize
-            // allers-retours et ~80 Mo à décoder sur le téléphone, pour poser
-            // des pastilles sur une carte.
-            let list = try await service.sessions(offset: 0, limit: 40, mapPoints: true)
+            // Une seule page et son nuage allégé. Changer de page remplace les
+            // points au lieu de les accumuler sans limite sur la carte.
+            let list = try await fetch(offset, pageSize)
+            guard requestGeneration == generation else { return }
+            switch move {
+            case .stay: break
+            case .forward: previousOffsets.append(pageOffset)
+            case .backward: previousOffsets.removeLast()
+            }
+            pageOffset = offset
             sessionCount = list.sessions.count
+            totalSessions = list.pagination?.total
+            hasMore = !list.sessions.isEmpty && (list.pagination?.hasMore ?? (list.sessions.count >= pageSize))
+            nextOffset = offset + list.sessions.count
             points = list.mapPoints.filter(\.hasValidCoordinate)
+            pointSummary = list.mapPointSummary
+            hasLoaded = true
         } catch {
-            errorMessage = error.localizedDescription
+            guard requestGeneration == generation, !error.isCancellation else { return }
+            errorMessage = String(localized: "Impossible de charger les mesures. Réessaie.")
         }
     }
 }
@@ -67,7 +112,22 @@ struct MyMeasurementsView: View {
         .refreshable { await model.load() }
         .overlay(alignment: .top) {
             VStack(spacing: SQSpace.sm) {
+                if model.hasLoaded, (model.totalSessions ?? model.sessionCount) > 0 {
+                    pageControls
+                }
                 statsBar
+                if let errorMessage = model.errorMessage, !model.points.isEmpty {
+                    HStack(spacing: SQSpace.sm) {
+                        Image(systemName: "exclamationmark.triangle")
+                        Text(errorMessage).font(SQType.caption)
+                        Button("Réessayer") { Task { await model.load() } }
+                            .disabled(model.isLoading)
+                    }
+                    .foregroundStyle(SQColor.dangerInk)
+                    .padding(SQSpace.sm)
+                    .background(SQColor.surface, in: Capsule())
+                    .accessibilityIdentifier("measurements.loadError")
+                }
                 if !model.points.isEmpty { coloringPicker }
             }
             .padding(.top, SQSpace.sm)
@@ -75,6 +135,36 @@ struct MyMeasurementsView: View {
         .overlay(alignment: .bottomLeading) {
             if coloring == .generation && !model.points.isEmpty { generationLegend }
         }
+    }
+
+    private var pageControls: some View {
+        HStack(spacing: SQSpace.sm) {
+            Button { Task { await model.previousPage() } } label: {
+                Image(systemName: "chevron.left")
+                    .frame(width: 44, height: 44)
+            }
+            .disabled(!model.canGoBack)
+            .accessibilityLabel("Précédent")
+            Text("Sessions")
+                .font(SQType.caption)
+            Text(verbatim: "\(model.pageStart)–\(model.pageEnd) / \(model.totalSessions.map(String.init) ?? "…")")
+                .font(SQType.caption)
+                .monospacedDigit()
+                .lineLimit(1)
+            Button { Task { await model.nextPage() } } label: {
+                Image(systemName: "chevron.right")
+                    .frame(width: 44, height: 44)
+            }
+            .disabled(!model.canGoForward)
+            .accessibilityLabel("Suivant")
+        }
+        .foregroundStyle(SQColor.label)
+        .padding(.horizontal, SQSpace.xs)
+        .background(SQColor.surface, in: Capsule())
+        .sqShadowSoft()
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("measurements.pageControls")
     }
 
     /// Bascule de coloration de la carte : Signal (RSRP) ↔ Génération.
@@ -142,30 +232,54 @@ struct MyMeasurementsView: View {
     @ViewBuilder
     private var statsBar: some View {
         if !model.points.isEmpty {
-            Text("\(model.points.count) points · \(model.sessionCount) session")
+            VStack(spacing: SQSpace.xxs) {
+                HStack(spacing: SQSpace.xs) {
+                    Text(verbatim: "\(model.points.count)")
+                    Text("Points affichés")
+                }
+                if let summary = model.pointSummary, summary.isSampled {
+                    HStack(spacing: SQSpace.xs) {
+                        Text("Échantillon")
+                        Text(verbatim: "\(model.points.count) / \(summary.locatedCount)")
+                            .monospacedDigit()
+                    }
+                    .font(SQType.caption)
+                } else if model.pointSummary == nil {
+                    Text("Les longs trajets peuvent être allégés.")
+                        .font(SQType.caption)
+                }
+            }
                 .font(SQFont.body(13, .semibold, relativeTo: .caption))
                 .foregroundStyle(SQColor.label)
                 .padding(.horizontal, SQSpace.lg - 2)
                 .padding(.vertical, SQSpace.sm)
-                .background(SQColor.surface, in: Capsule(style: .continuous))
+                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md))
                 .sqShadowSoft()
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(model.points.count) points de mesure sur \(model.sessionCount) sessions")
         }
     }
 
     private var emptyState: some View {
         VStack(spacing: SQSpace.lg) {
             EmptyStateView(
-                title: "Aucune mesure",
-                message: model.errorMessage ?? "Aucune mesure géolocalisée pour l'instant.",
+                title: model.errorMessage != nil ? "Chargement impossible"
+                    : model.hasLoaded && model.sessionCount > 0
+                        ? "Aucune position sur cette page" : "Aucune mesure",
+                message: model.errorMessage ?? (model.hasLoaded && model.sessionCount > 0
+                    ? "Aucune position utilisable sur cette page."
+                    : "Aucune mesure géolocalisée pour l'instant."),
                 systemImage: "mappin.slash"
             )
-            Text("Lance un Drive Test pour enregistrer tes premières mesures.")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, SQSpace.xl)
+            if model.errorMessage != nil {
+                GradientButton("Réessayer", style: .secondary) { Task { await model.load() } }
+                    .padding(.horizontal, SQSpace.xl)
+            } else if !model.hasLoaded || model.totalSessions == 0 {
+                Text("Les anciennes sessions de couverture, y compris depuis Android, apparaîtront ici.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, SQSpace.xl)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(SQColor.bg.ignoresSafeArea())

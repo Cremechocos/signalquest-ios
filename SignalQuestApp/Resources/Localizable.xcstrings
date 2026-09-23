@@ -45798,6 +45798,62 @@
           "stringUnit": { "state": "translated", "value": "No territories in this area" }
         }
       }
+    },
+    "Impossible de charger les mesures. Réessaie.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Impossible de charger les mesures. Réessaie." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Couldn't load measurements. Try again." } }
+      }
+    },
+    "Points affichés": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Points affichés" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Points shown" } }
+      }
+    },
+    "Échantillon": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Échantillon" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Sample" } }
+      }
+    },
+    "Les longs trajets peuvent être allégés.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Les longs trajets peuvent être allégés." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Long routes may be sampled." } }
+      }
+    },
+    "Aucune position sur cette page": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Aucune position sur cette page" } },
+        "en": { "stringUnit": { "state": "translated", "value": "No locations on this page" } }
+      }
+    },
+    "Aucune position utilisable sur cette page.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Aucune position utilisable sur cette page." } },
+        "en": { "stringUnit": { "state": "translated", "value": "No usable locations on this page." } }
+      }
+    },
+    "Les anciennes sessions de couverture, y compris depuis Android, apparaîtront ici.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Les anciennes sessions de couverture, y compris depuis Android, apparaîtront ici." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Previously recorded coverage sessions, including from Android, will appear here." } }
+      }
+    },
+    "Chargement impossible": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Chargement impossible" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Could not load" } }
+      }
     }
   },
   "version": "1.0"
