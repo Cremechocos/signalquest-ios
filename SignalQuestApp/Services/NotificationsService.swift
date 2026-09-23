@@ -63,36 +63,51 @@ struct AppNotification: Codable, Identifiable, Equatable {
 }
 
 protocol NotificationsServicing: Sendable {
-    func list(cursor: String?) async throws -> [AppNotification]
+    func list(cursor: String?) async throws -> AppNotificationPage
     func markRead(id: String) async throws
     func markAllRead() async throws
     func deleteAll() async throws
+}
+
+struct AppNotificationPage: Decodable {
+    let notifications: [AppNotification]
+    let nextCursor: String?
+    let unreadCount: Int?
+
+    init(notifications: [AppNotification], nextCursor: String?, unreadCount: Int?) {
+        self.notifications = notifications
+        self.nextCursor = nextCursor
+        self.unreadCount = unreadCount
+    }
+
+    enum CodingKeys: String, CodingKey { case notifications, items, nextCursor, unreadCount }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // Une notification malformée est ignorée sans perdre les autres (ROB-03).
+        if c.contains(.notifications) {
+            notifications = c.decodeLossyElementArray([AppNotification].self, forKey: .notifications)
+        } else if c.contains(.items) {
+            notifications = c.decodeLossyElementArray([AppNotification].self, forKey: .items)
+        } else {
+            notifications = []
+        }
+        nextCursor = try c.decodeIfPresent(String.self, forKey: .nextCursor)
+        unreadCount = try c.decodeIfPresent(Int.self, forKey: .unreadCount)
+    }
 }
 
 final class NotificationsService: NotificationsServicing {
     private let api: APIClient
     init(api: APIClient) { self.api = api }
 
-    func list(cursor: String? = nil) async throws -> [AppNotification] {
-        struct Response: Decodable {
-            let notifications: [AppNotification]?
-            let items: [AppNotification]?
-            enum CodingKeys: String, CodingKey { case notifications, items }
-            init(from decoder: Decoder) throws {
-                let c = try decoder.container(keyedBy: CodingKeys.self)
-                // Décodage par élément : une notification malformée est ignorée au
-                // lieu de faire échouer toute la liste (ROB-03).
-                notifications = c.contains(.notifications) ? c.decodeLossyElementArray([AppNotification].self, forKey: .notifications) : nil
-                items = c.contains(.items) ? c.decodeLossyElementArray([AppNotification].self, forKey: .items) : nil
-            }
-        }
+    func list(cursor: String? = nil) async throws -> AppNotificationPage {
         var query: [URLQueryItem] = []
         if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
-        let r: Response = try await api.request(
+        return try await api.request(
             APIEndpoint(path: "/api/notifications", query: query),
-            as: Response.self
+            as: AppNotificationPage.self
         )
-        return r.notifications ?? r.items ?? []
     }
 
     func markRead(id: String) async throws {

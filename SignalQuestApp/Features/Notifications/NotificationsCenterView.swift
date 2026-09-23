@@ -4,8 +4,12 @@ import SwiftUI
 final class NotificationsCenterViewModel: ObservableObject {
     @Published var items: [AppNotification] = []
     @Published var errorMessage: String?
+    @Published private(set) var paginationErrorMessage: String?
     @Published private(set) var actionErrorMessage: String?
     @Published var isLoading = false
+    @Published private(set) var isLoadingMore = false
+    @Published private(set) var nextCursor: String?
+    @Published private(set) var unreadCount = 0
     @Published private(set) var isMutating = false
     @Published private(set) var pendingReadIDs: Set<String> = []
 
@@ -23,15 +27,38 @@ final class NotificationsCenterViewModel: ObservableObject {
         let generation = UUID()
         loadGeneration = generation
         isLoading = true
+        isLoadingMore = false
         errorMessage = nil
+        paginationErrorMessage = nil
         defer { if loadGeneration == generation { isLoading = false } }
         do {
-            let loaded = try await service.list(cursor: nil)
+            let page = try await service.list(cursor: nil)
             guard loadGeneration == generation else { return }
-            items = loaded
+            items = page.notifications
+            nextCursor = page.nextCursor
+            unreadCount = page.unreadCount ?? page.notifications.filter { $0.read != true }.count
         } catch {
             guard loadGeneration == generation, !error.isCancellation else { return }
             errorMessage = error.localizedDescription
+        }
+    }
+
+    func loadMore() async {
+        guard let cursor = nextCursor, !isLoading, !isLoadingMore, !isMutating else { return }
+        let generation = loadGeneration
+        isLoadingMore = true
+        paginationErrorMessage = nil
+        defer { if loadGeneration == generation { isLoadingMore = false } }
+        do {
+            let page = try await service.list(cursor: cursor)
+            guard loadGeneration == generation, nextCursor == cursor else { return }
+            var seen = Set(items.map(\.id))
+            items.append(contentsOf: page.notifications.filter { seen.insert($0.id).inserted })
+            nextCursor = page.nextCursor == cursor ? nil : page.nextCursor
+            if let count = page.unreadCount { unreadCount = count }
+        } catch {
+            guard loadGeneration == generation, !error.isCancellation else { return }
+            paginationErrorMessage = String(localized: "Chargement impossible")
         }
     }
 
@@ -48,7 +75,9 @@ final class NotificationsCenterViewModel: ObservableObject {
             guard actionGeneration == generation else { return }
             loadGeneration = UUID()
             isLoading = false
+            isLoadingMore = false
             if let index = items.firstIndex(where: { $0.id == id }) {
+                if items[index].read != true { unreadCount = max(0, unreadCount - 1) }
                 items[index] = items[index].withRead(true)
             }
         } catch {
@@ -69,7 +98,9 @@ final class NotificationsCenterViewModel: ObservableObject {
             actionGeneration = UUID()
             loadGeneration = UUID()
             isLoading = false
+            isLoadingMore = false
             items = items.map { $0.withRead(true) }
+            unreadCount = 0
             errorMessage = nil
         } catch {
             guard !error.isCancellation else { return }
@@ -89,7 +120,10 @@ final class NotificationsCenterViewModel: ObservableObject {
             actionGeneration = UUID()
             loadGeneration = UUID()
             isLoading = false
+            isLoadingMore = false
             items = []
+            nextCursor = nil
+            unreadCount = 0
             errorMessage = nil
         } catch {
             guard !error.isCancellation else { return }
@@ -148,7 +182,9 @@ struct NotificationsCenterView: View {
                     .listRowBackground(SQColor.dangerSoft)
                 }
             }
-            if let error = model.errorMessage, model.items.isEmpty {
+            if model.isLoading && model.items.isEmpty {
+                Section { ProgressView().frame(maxWidth: .infinity).listRowBackground(Color.clear) }
+            } else if let error = model.errorMessage, model.items.isEmpty {
                 Section {
                     ErrorStateView(title: "Notifications indisponibles", message: error) {
                         Task { await model.load() }
@@ -182,6 +218,20 @@ struct NotificationsCenterView: View {
                         .swipeActions {
                             Button("Lu") { Task { await model.markRead(item.id) } }.tint(SQColor.success)
                         }
+                    }
+                    if model.isLoadingMore {
+                        ProgressView().frame(maxWidth: .infinity)
+                    } else if model.nextCursor != nil {
+                        Button(model.paginationErrorMessage == nil ? "Charger la suite" : "Réessayer") {
+                            Task { await model.loadMore() }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .accessibilityIdentifier("notifications.loadMore")
+                    }
+                    if let error = model.paginationErrorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.dangerInk)
                     }
                 } header: {
                     Text("Activité")

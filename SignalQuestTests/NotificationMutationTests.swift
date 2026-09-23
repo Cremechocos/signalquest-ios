@@ -9,6 +9,19 @@ final class NotificationMutationTests: XCTestCase {
             createdAt: nil, read: read, link: nil, metadata: nil)
     }
 
+    func testPageDecoderAcceptsNewCursorAndLegacyItems() throws {
+        let current = Data(#"{"notifications":[{"id":"a","read":false}],"nextCursor":"after-a","unreadCount":51}"#.utf8)
+        let page = try JSONDecoder.signalQuest.decode(AppNotificationPage.self, from: current)
+        XCTAssertEqual(page.notifications.map(\.id), ["a"])
+        XCTAssertEqual(page.nextCursor, "after-a")
+        XCTAssertEqual(page.unreadCount, 51)
+
+        let legacy = Data(#"{"items":[{"id":"b","read":true}]}"#.utf8)
+        let oldPage = try JSONDecoder.signalQuest.decode(AppNotificationPage.self, from: legacy)
+        XCTAssertEqual(oldPage.notifications.map(\.id), ["b"])
+        XCTAssertNil(oldPage.nextCursor)
+    }
+
     func testOfflineReadRemainsUnreadUntilRetrySucceeds() async {
         let service = NotificationMutationMock(items: [item("a")], failReadOnce: true)
         let model = NotificationsCenterViewModel(service: service)
@@ -120,6 +133,68 @@ final class NotificationMutationTests: XCTestCase {
         let after = await service.markAllCount()
         XCTAssertEqual(after, 1)
     }
+
+    func testFiftyFirstNotificationLoadsWithoutDuplicates() async {
+        let first = (0..<50).map { item("notice-\($0)") }
+        let last = [item("notice-49"), item("notice-50")]
+        let service = NotificationMutationMock(items: first, nextCursor: "after-50",
+            nextPage: last, unreadTotal: 51)
+        let model = NotificationsCenterViewModel(service: service)
+
+        await model.load()
+        XCTAssertEqual(model.items.count, 50)
+        XCTAssertEqual(model.unreadCount, 51)
+        XCTAssertEqual(model.nextCursor, "after-50")
+        await model.loadMore()
+        XCTAssertEqual(model.items.count, 51)
+        XCTAssertEqual(model.items.last?.id, "notice-50")
+        XCTAssertNil(model.nextCursor)
+        let cursors = await service.requestedCursors()
+        XCTAssertEqual(cursors, ["first", "after-50"])
+    }
+
+    func testFailedNextPagePreservesItemsAndRetriesTheCursor() async {
+        let service = NotificationMutationMock(items: [item("a")], nextCursor: "after-a",
+            nextPage: [item("b")], failNextPageOnce: true)
+        let model = NotificationsCenterViewModel(service: service)
+
+        await model.load()
+        await model.loadMore()
+        XCTAssertEqual(model.items.map(\.id), ["a"])
+        XCTAssertEqual(model.nextCursor, "after-a")
+        XCTAssertNotNil(model.paginationErrorMessage)
+        await model.loadMore()
+        XCTAssertEqual(model.items.map(\.id), ["a", "b"])
+        XCTAssertNil(model.paginationErrorMessage)
+        let cursors = await service.requestedCursors()
+        XCTAssertEqual(cursors, ["first", "after-a", "after-a"])
+    }
+
+    func testLatePageCannotRestoreNotificationsAfterDeleteAll() async {
+        let gate = NotificationLoadGate()
+        let service = NotificationMutationMock(items: [item("a")], nextCursor: "after-a",
+            nextPage: [item("b")], delayedNextPage: gate)
+        let model = NotificationsCenterViewModel(service: service)
+        await model.load()
+        let latePage = Task { await model.loadMore() }
+        for _ in 0..<100 {
+            if await service.listCount() == 2 { break }
+            await Task.yield()
+        }
+        guard await service.listCount() == 2 else {
+            await gate.finish()
+            latePage.cancel()
+            return XCTFail("The second page never started")
+        }
+
+        await model.deleteAll()
+        await gate.finish()
+        await latePage.value
+        XCTAssertTrue(model.items.isEmpty)
+        XCTAssertNil(model.nextCursor)
+        XCTAssertEqual(model.unreadCount, 0)
+        XCTAssertFalse(model.isLoadingMore)
+    }
 }
 
 private actor NotificationLoadGate {
@@ -140,6 +215,12 @@ private actor NotificationMutationMock: NotificationsServicing {
     private var deleteFailures: Int
     private let delayedSecondList: NotificationLoadGate?
     private let delayedRead: NotificationLoadGate?
+    private let delayedNextPage: NotificationLoadGate?
+    private let nextCursor: String?
+    private let nextPage: [AppNotification]
+    private let unreadTotal: Int?
+    private var nextPageFailures: Int
+    private var cursors: [String] = []
     private var lists = 0
     private var reads = 0
     private var markAlls = 0
@@ -147,20 +228,36 @@ private actor NotificationMutationMock: NotificationsServicing {
     init(items: [AppNotification], failReadOnce: Bool = false,
          failMarkAllOnce: Bool = false, failDeleteOnce: Bool = false,
          delayedSecondList: NotificationLoadGate? = nil,
-         delayedRead: NotificationLoadGate? = nil) {
+         delayedRead: NotificationLoadGate? = nil,
+         nextCursor: String? = nil, nextPage: [AppNotification] = [],
+         unreadTotal: Int? = nil, failNextPageOnce: Bool = false,
+         delayedNextPage: NotificationLoadGate? = nil) {
         rows = items
         readFailures = failReadOnce ? 1 : 0
         markAllFailures = failMarkAllOnce ? 1 : 0
         deleteFailures = failDeleteOnce ? 1 : 0
         self.delayedSecondList = delayedSecondList
         self.delayedRead = delayedRead
+        self.nextCursor = nextCursor
+        self.nextPage = nextPage
+        self.unreadTotal = unreadTotal
+        nextPageFailures = failNextPageOnce ? 1 : 0
+        self.delayedNextPage = delayedNextPage
     }
 
-    func list(cursor: String?) async throws -> [AppNotification] {
+    func list(cursor: String?) async throws -> AppNotificationPage {
         lists += 1
         let snapshot = rows
+        cursors.append(cursor ?? "first")
+        if cursor != nil {
+            await delayedNextPage?.wait()
+            if nextPageFailures > 0 { nextPageFailures -= 1; throw Failure.offline }
+            return AppNotificationPage(notifications: nextPage, nextCursor: nil,
+                unreadCount: unreadTotal ?? snapshot.filter { $0.read != true }.count)
+        }
         if lists == 2 { await delayedSecondList?.wait() }
-        return snapshot
+        return AppNotificationPage(notifications: snapshot, nextCursor: nextCursor,
+            unreadCount: unreadTotal ?? snapshot.filter { $0.read != true }.count)
     }
     func markRead(id: String) async throws {
         reads += 1
@@ -178,4 +275,5 @@ private actor NotificationMutationMock: NotificationsServicing {
     func listCount() -> Int { lists }
     func readCount() -> Int { reads }
     func markAllCount() -> Int { markAlls }
+    func requestedCursors() -> [String] { cursors }
 }
