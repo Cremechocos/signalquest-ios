@@ -1,7 +1,7 @@
 import XCTest
 
 /// Settings-only checks. Simulator cases require the verified loopback:9 app;
-/// physical cases require the separate Beta recipe on the paired USB backend.
+/// physical cases require the separate Beta QA app with isolated origins.
 /// No case starts a throughput measurement or an active Drive Test.
 @MainActor
 final class SpeedtestPublicationSettingsQATests: XCTestCase {
@@ -17,8 +17,10 @@ final class SpeedtestPublicationSettingsQATests: XCTestCase {
         #if targetEnvironment(simulator)
         throw XCTSkip("Requires the separate physical Beta recipe")
         #else
-        guard ProcessInfo.processInfo.environment["SQ_PHYSICAL_SETTINGS_QA"] == "beta-usb-verified" else {
-            throw XCTSkip("First verify the Beta signature, isolated USB origins and synthetic backend")
+        let qaRecipe = ProcessInfo.processInfo.environment["SQ_PHYSICAL_SETTINGS_QA"]
+            ?? ProcessInfo.processInfo.environment["TEST_RUNNER_SQ_PHYSICAL_SETTINGS_QA"]
+        guard qaRecipe == "beta-isolated-verified" else {
+            throw XCTSkip("First verify the Beta QA signature and isolated API origins")
         }
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
