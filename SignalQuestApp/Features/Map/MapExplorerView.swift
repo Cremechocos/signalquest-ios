@@ -1560,6 +1560,10 @@ struct MapExplorerView: View {
         ZStack {
             mapLayer
             controlsLayer
+                // Les contrôles flottants partagent l'espace de la carte : à la
+                // taille AX maximale, leurs libellés se chevauchent. La fiche et
+                // les panneaux restent au Dynamic Type demandé par le système.
+                .dynamicTypeSize(dynamicTypeSize.isAccessibilitySize ? .xxxLarge : dynamicTypeSize)
         }
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showsANFRMap) {
