@@ -10,6 +10,16 @@ struct DriveSpeedtestPoint: Identifiable, Equatable {
     let coordinate: CLLocationCoordinate2D
     let result: SpeedtestRunResult
 
+    init?(result: SpeedtestRunResult) {
+        guard let measuredCoordinate = result.coordinate else { return nil }
+        id = result.id
+        coordinate = CLLocationCoordinate2D(
+            latitude: measuredCoordinate.latitude,
+            longitude: measuredCoordinate.longitude
+        )
+        self.result = result
+    }
+
     static func == (lhs: DriveSpeedtestPoint, rhs: DriveSpeedtestPoint) -> Bool {
         lhs.id == rhs.id &&
         lhs.coordinate.latitude == rhs.coordinate.latitude &&
@@ -391,8 +401,9 @@ final class DriveTestViewModel: ObservableObject {
     }
 
     /// Conserve les résultats géolocalisés du trajet pour ouvrir leur détail.
-    private func appendSpeedtestPoint(_ result: SpeedtestRunResult, at coordinate: CLLocationCoordinate2D) {
-        speedtestTrail.append(DriveSpeedtestPoint(id: result.id, coordinate: coordinate, result: result))
+    private func appendSpeedtestPoint(_ result: SpeedtestRunResult) {
+        guard let point = DriveSpeedtestPoint(result: result) else { return }
+        speedtestTrail.append(point)
         if speedtestTrail.count > 500 { speedtestTrail.removeFirst(speedtestTrail.count - 500) }
     }
 
@@ -617,6 +628,12 @@ final class DriveTestViewModel: ObservableObject {
             lastTestCoordinate = services.location.lastLocation?.coordinate ?? userLocation
             do {
                 let result = try await runOneTest()
+                if let measuredCoordinate = result.coordinate {
+                    lastTestCoordinate = CLLocationCoordinate2D(
+                        latitude: measuredCoordinate.latitude,
+                        longitude: measuredCoordinate.longitude
+                    )
+                }
                 lastResult = result
                 accumulator.add(result)
                 summary = accumulator.summary(truncatedAt: nil)
@@ -809,7 +826,7 @@ final class DriveTestViewModel: ObservableObject {
         // Valeurs finales du test (restent affichées jusqu'au test suivant).
         livePhaseFinalize(measured)
         // Point speedtest géolocalisé (carte Drive Test, tappable → détails).
-        if let coordinate { appendSpeedtestPoint(measured, at: coordinate) }
+        appendSpeedtestPoint(measured)
         // Affiche le résultat de ce test dans la Live Activity.
         liveActivity.update(
             phaseLabel: "\(liveOperatorPrefix)Test \(index) terminé",
