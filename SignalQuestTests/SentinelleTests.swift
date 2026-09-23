@@ -1,6 +1,45 @@
 import XCTest
 @testable import SignalQuest
 
+final class SentinelleSeriesLoadStateTests: XCTestCase {
+    func testFailedFirstReadCanRetryWithoutClaimingAnEmptyPeriod() {
+        var state = SentinelleSeriesLoadState()
+        let first = state.begin(context: "box|ipv6|24h", key: "request-1")
+        XCTAssertTrue(first.clearPoints)
+        XCTAssertTrue(state.fail(key: "request-1", generation: first.generation))
+        XCTAssertTrue(state.failed)
+        XCTAssertNil(state.loadedContext)
+
+        let retry = state.begin(context: "box|ipv6|24h", key: "request-2")
+        XCTAssertTrue(retry.clearPoints)
+        XCTAssertTrue(state.succeed(context: "box|ipv6|24h", key: "request-2", generation: retry.generation))
+        XCTAssertEqual(state.loadedContext, "box|ipv6|24h")
+        XCTAssertFalse(state.failed)
+        XCTAssertFalse(state.isLoading)
+    }
+
+    func testFailedRefreshKeepsOldContextAndLateWindowResponseCannotReplaceNewOne() {
+        var state = SentinelleSeriesLoadState()
+        let initial = state.begin(context: "box|ipv4|24h", key: "initial")
+        XCTAssertTrue(state.succeed(context: "box|ipv4|24h", key: "initial", generation: initial.generation))
+
+        let refresh = state.begin(context: "box|ipv4|24h", key: "refresh")
+        XCTAssertFalse(refresh.clearPoints, "Les points du même contexte restent visibles pendant l'actualisation")
+        XCTAssertTrue(state.fail(key: "refresh", generation: refresh.generation))
+        XCTAssertEqual(state.loadedContext, "box|ipv4|24h")
+        XCTAssertTrue(state.failed)
+
+        let newWindow = state.begin(context: "box|ipv4|7d", key: "new-window")
+        XCTAssertTrue(newWindow.clearPoints)
+        XCTAssertFalse(state.succeed(context: "box|ipv4|24h", key: "refresh", generation: refresh.generation))
+        XCTAssertFalse(state.fail(key: "refresh", generation: refresh.generation))
+        XCTAssertTrue(state.isLoading)
+        XCTAssertTrue(state.succeed(context: "box|ipv4|7d", key: "new-window", generation: newWindow.generation))
+        XCTAssertEqual(state.loadedContext, "box|ipv4|7d")
+        XCTAssertFalse(state.failed)
+    }
+}
+
 /// Mêmes cas que `apps/web/lib/sentinelle/ipv6-prefix.test.ts` et que son
 /// portage Kotlin : la proposition d'adresse doit être IDENTIQUE sur le site,
 /// sur Android et ici, sans quoi trois écrans donneraient trois réponses pour la
