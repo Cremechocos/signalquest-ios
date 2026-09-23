@@ -130,4 +130,39 @@ final class MyMeasurementsPaginationTests: XCTestCase {
         XCTAssertNotNil(model.errorMessage)
         XCTAssertTrue(model.points.isEmpty)
     }
+
+    func testThirtyOneThousandLocatedPointsStayBoundedAcrossFortyOneSessions() async throws {
+        let sampledPoints: [[String: Any]] = (0..<15_500).map { index in
+            ["id": "point-\(index)", "lat": 48.86 + Double(index) * 0.000001, "lng": 2.35,
+             "technology": "4G", "signalStrength": 0]
+        }
+        let first = try JSONSerialization.data(withJSONObject: [
+            "sessions": (0..<40).map { ["id": "session-\($0)"] },
+            "pagination": ["total": 41, "limit": 40, "offset": 0, "hasMore": true],
+            "mapPoints": sampledPoints,
+            "mapPointSummary": ["locatedCount": 31_000, "returnedCount": 15_500,
+                "sampleStep": 2, "maxPoints": 30_000],
+        ])
+        let second = try JSONSerialization.data(withJSONObject: [
+            "sessions": [["id": "session-40"]],
+            "pagination": ["total": 41, "limit": 40, "offset": 40, "hasMore": false],
+            "mapPoints": (0..<3).map { ["id": "last-\($0)", "lat": 48.9, "lng": 2.4] },
+            "mapPointSummary": ["locatedCount": 3, "returnedCount": 3,
+                "sampleStep": 1, "maxPoints": 30_000],
+        ])
+        let model = MyMeasurementsViewModel { offset, _ in
+            try JSONDecoder().decode(SessionsListResponse.self, from: offset == 0 ? first : second)
+        }
+
+        await model.load()
+        XCTAssertEqual(model.points.count, 15_500)
+        XCTAssertEqual(model.pointSummary?.locatedCount, 31_000)
+        XCTAssertTrue(model.pointSummary?.isSampled == true)
+        XCTAssertEqual(SessionPointsOverlay(points: model.points, coloring: .generation).dots.count, 15_500)
+
+        await model.nextPage()
+        XCTAssertEqual(model.points.count, 3, "Changing page must release the previous point cloud")
+        XCTAssertEqual(model.pageStart, 41)
+        XCTAssertEqual(SessionPointsOverlay(points: model.points, coloring: .generation).dots.count, 3)
+    }
 }
