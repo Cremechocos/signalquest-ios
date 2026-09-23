@@ -114,9 +114,11 @@ final class MyMeasurementsPaginationTests: XCTestCase {
         let nextPage = UUID()
         XCTAssertTrue(coordinator.shouldRender(.init(id: nextPage, coloring: .rsrp,
             colorScheme: .light, contrast: .standard)))
-        XCTAssertTrue(coordinator.shouldRender(.init(id: nextPage, coloring: .rsrp,
-            colorScheme: .dark, contrast: .standard)))
+        let dark = SessionTraceRenderSignature(id: nextPage, coloring: .rsrp,
+            colorScheme: .dark, contrast: .standard)
+        XCTAssertTrue(coordinator.shouldRender(dark))
         XCTAssertTrue(coordinator.shouldRender(nil), "Existing map callers keep their prior behavior")
+        XCTAssertTrue(coordinator.shouldRender(dark), "Switching back to keyed rendering must refresh the overlay")
     }
 
     func testInitialFailureIsNotReportedAsARealEmptyHistory() async {

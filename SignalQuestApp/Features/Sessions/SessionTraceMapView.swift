@@ -79,7 +79,10 @@ struct SessionTraceMapView: UIViewRepresentable {
         private var lastSignature: SessionTraceRenderSignature?
 
         func shouldRender(_ signature: SessionTraceRenderSignature?) -> Bool {
-            guard let signature else { return true }
+            guard let signature else {
+                lastSignature = nil
+                return true
+            }
             guard signature != lastSignature else { return false }
             lastSignature = signature
             return true
