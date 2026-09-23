@@ -37,7 +37,7 @@ struct VoiceWaveform: View {
 struct VoiceNoteRecordingBar: View {
     @ObservedObject var recorder: VoiceNoteRecorder
     let onCancel: () -> Void
-    let onSend: () -> Void
+    let onStop: () -> Void
 
     var body: some View {
         HStack(spacing: SQSpace.md) {
@@ -58,14 +58,15 @@ struct VoiceNoteRecordingBar: View {
                 .monospacedDigit()
                 .foregroundStyle(SQColor.labelSecondary)
 
-            Button(action: onSend) {
-                Image(systemName: "arrow.up.circle.fill")
+            Button(action: onStop) {
+                Image(systemName: "stop.circle.fill")
                     .font(.system(size: 28))
                     .foregroundStyle(SQColor.brandRed)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
-            .accessibilityLabel("Envoyer la note vocale")
+            .accessibilityLabel("Terminer l’enregistrement")
+            .accessibilityIdentifier("voiceNote.stop")
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm)
@@ -75,6 +76,62 @@ struct VoiceNoteRecordingBar: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Enregistrement en cours")
         .accessibilityValue(VoiceNotePlayer.formatted(recorder.duration))
+    }
+}
+
+/// Aperçu conservé après arrêt manuel ou limite de 120 secondes.
+struct VoiceNoteDraftBar: View {
+    let url: URL
+    let duration: TimeInterval
+    let levels: [Float]
+    let onDelete: () -> Void
+    let onSend: () -> Void
+
+    @ObservedObject private var player = VoiceNotePlayer.shared
+
+    var body: some View {
+        VStack(spacing: SQSpace.sm) {
+            HStack(spacing: SQSpace.sm) {
+                Button { player.toggle(url: url) } label: {
+                    Image(systemName: player.isPlaying(url) ? "pause.fill" : "play.fill")
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel(player.isPlaying(url) ? "Toucher pour mettre en pause" : "Toucher pour écouter")
+                .accessibilityIdentifier("voiceNote.preview")
+
+                Text("Note vocale")
+                    .font(SQType.subhead)
+                    .foregroundStyle(SQColor.label)
+                    .accessibilityIdentifier("voiceNote.ready")
+                Spacer(minLength: 0)
+                Text(VoiceNotePlayer.formatted(duration))
+                    .font(SQType.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            HStack(spacing: SQSpace.md) {
+                VoiceWaveform(levels: VoiceNoteRecorder.waveform(from: levels))
+                    .frame(height: 26)
+                Button(action: onDelete) {
+                    Image(systemName: "trash").frame(width: 44, height: 44)
+                }
+                .foregroundStyle(SQColor.dangerInk)
+                .accessibilityLabel("Supprimer")
+                .accessibilityIdentifier("voiceNote.delete")
+                Button(action: onSend) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 28))
+                        .frame(width: 44, height: 44)
+                }
+                .foregroundStyle(SQColor.brandRed)
+                .accessibilityLabel("Envoyer la note vocale")
+                .accessibilityIdentifier("voiceNote.send")
+            }
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .padding(.horizontal, SQSpace.md)
     }
 }
 

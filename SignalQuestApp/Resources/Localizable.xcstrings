@@ -45340,6 +45340,22 @@
         }
       }
     },
+    "Terminer l’enregistrement": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminer l’enregistrement"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finish recording"
+          }
+        }
+      }
+    },
     "La désactivation n’a pas pu être confirmée. Actualise le compte avant de réessayer.": {
       "localizations": {
         "en": {

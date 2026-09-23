@@ -99,4 +99,35 @@ final class VoiceNoteTests: XCTestCase {
         XCTAssertGreaterThan(VoiceNoteRecorder.minimumDuration, 0)
         XCTAssertLessThanOrEqual(VoiceNoteRecorder.maximumDuration, 300)
     }
+
+    @MainActor
+    func testFinishedNoteCanBeHandedOffOnlyOnceAtDurationLimit() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("voice-draft-\(UUID().uuidString).m4a")
+        try Data("synthetic voice fixture".utf8).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let recorder = VoiceNoteRecorder()
+
+        XCTAssertTrue(recorder.restoreFinishedDraft(url: url, duration: 125))
+        guard case .finished(_, let duration) = recorder.state else {
+            return XCTFail("La note terminée doit rester visible après l'arrêt automatique")
+        }
+        XCTAssertEqual(duration, 120)
+        XCTAssertEqual(recorder.takeFinished()?.url, url)
+        XCTAssertNil(recorder.takeFinished(), "Deux touches Envoi ne doivent pas transférer deux fois le fichier")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path), "Le parent possède désormais le fichier")
+    }
+
+    @MainActor
+    func testDeletingFinishedDraftRemovesItsFile() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("voice-draft-\(UUID().uuidString).m4a")
+        try Data("synthetic voice fixture".utf8).write(to: url)
+        let recorder = VoiceNoteRecorder()
+
+        XCTAssertTrue(recorder.restoreFinishedDraft(url: url, duration: 12))
+        recorder.cancel()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        XCTAssertNil(recorder.takeFinished())
+    }
 }

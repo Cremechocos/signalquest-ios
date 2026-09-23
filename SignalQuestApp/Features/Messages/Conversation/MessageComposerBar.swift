@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import UIKit
 
 /// Barre de saisie isolée (PERF-MSG-01) : possède son propre `@State text` afin que la
 /// frappe n'invalide PAS le corps de `ConversationDetailView` (et donc la liste des
@@ -27,6 +28,7 @@ struct MessageComposerBar: View {
     @State private var text = ""
     @State private var pickerItem: PhotosPickerItem?
     @StateObject private var recorder = VoiceNoteRecorder()
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         // Pendant l'enregistrement, la barre est REMPLACÉE : garder le champ de
@@ -36,15 +38,51 @@ struct MessageComposerBar: View {
             VoiceNoteRecordingBar(
                 recorder: recorder,
                 onCancel: { recorder.cancel() },
-                onSend: {
-                    let elapsed = recorder.duration
-                    if let url = recorder.stop() { onVoiceNote(url, elapsed) }
-                }
+                onStop: { _ = recorder.stop() }
             )
             .transition(.opacity)
+        } else if case let .finished(url, duration) = recorder.state {
+            VoiceNoteDraftBar(
+                url: url,
+                duration: duration,
+                levels: recorder.levels,
+                onDelete: { recorder.cancel() },
+                onSend: {
+                    guard let draft = recorder.takeFinished() else { return }
+                    onVoiceNote(draft.url, draft.duration)
+                }
+            )
+        } else if recorder.state == .permissionDenied {
+            voiceNoteFailure(String(localized: "Autorise le micro dans les Réglages pour enregistrer."), showSettings: true)
+        } else if case let .failed(message) = recorder.state {
+            voiceNoteFailure(message, showSettings: false)
         } else {
             standardBar
         }
+    }
+
+    private func voiceNoteFailure(_ message: String, showSettings: Bool) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text(message)
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.dangerInk)
+                .accessibilityIdentifier("voiceNote.error")
+            VStack(alignment: .leading, spacing: 0) {
+                Button("Réessayer") { Task { await recorder.start() } }
+                    .frame(minHeight: 44)
+                if showSettings, let url = URL(string: UIApplication.openSettingsURLString) {
+                    Button("Ouvrir les Réglages") { openURL(url) }
+                        .frame(minHeight: 44)
+                }
+                Button("Annuler") { recorder.cancel() }
+                    .frame(minHeight: 44)
+            }
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.brandRed)
+        }
+        .padding(SQSpace.md)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .padding(.horizontal, SQSpace.md)
     }
 
     private var standardBar: some View {
