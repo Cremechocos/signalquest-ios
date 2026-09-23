@@ -550,7 +550,7 @@ struct SpeedtestView: View {
                     options: [(250, "250 m"), (500, "500 m"), (1_000, "1 km"), (2_000, "2 km")],
                     selection: $driveIntervalMeters
                 )
-                Text("Les tests s'espacent selon la DISTANCE parcourue, pas le temps : les mesures se répartissent le long du trajet au lieu de s'entasser dans les bouchons. À l'arrêt, « Tester maintenant » force une mesure.")
+                Text("Prochain test après la distance choisie ou 30 s. « Tester maintenant » le lance aussitôt.")
                     .font(.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -625,7 +625,7 @@ struct SpeedtestView: View {
                             }
                         }
                         Text(burstCount == Self.continuousBurst
-                             ? String(localized: "Mode trajet : les tests continuent selon la distance choisie, jusqu’à l’arrêt ou au plafond de données.")
+                             ? String(localized: "Trajet : un test après la distance choisie ou 30 s, jusqu’à l’arrêt ou au plafond de données.")
                              : String(localized: "Un seul test, ou plusieurs tests à la suite. Choisis Trajet pour les espacer selon la distance."))
                             .font(.caption).foregroundStyle(SQColor.labelSecondary)
                             .fixedSize(horizontal: false, vertical: true)

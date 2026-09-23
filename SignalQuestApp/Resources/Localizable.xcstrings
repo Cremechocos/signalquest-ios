@@ -22299,19 +22299,19 @@
         }
       }
     },
-    "Les tests s'espacent selon la DISTANCE parcourue, pas le temps : les mesures se répartissent le long du trajet au lieu de s'entasser dans les bouchons. À l'arrêt, « Tester maintenant » force une mesure.": {
+    "Prochain test après la distance choisie ou 30 s. « Tester maintenant » le lance aussitôt.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tests are spaced by DISTANCE travelled, not by time: measurements spread along the route instead of piling up in traffic jams. When stopped, “Test now” forces a measurement."
+            "value": "Next test after the selected distance or 30 seconds. “Test now” starts it immediately."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les tests s'espacent selon la DISTANCE parcourue, pas le temps : les mesures se répartissent le long du trajet au lieu de s'entasser dans les bouchons. À l'arrêt, « Tester maintenant » force une mesure."
+            "value": "Prochain test après la distance choisie ou 30 s. « Tester maintenant » le lance aussitôt."
           }
         }
       }
@@ -44710,18 +44710,18 @@
         }
       }
     },
-    "Mode trajet : les tests continuent selon la distance choisie, jusqu’à l’arrêt ou au plafond de données.": {
+    "Trajet : un test après la distance choisie ou 30 s, jusqu’à l’arrêt ou au plafond de données.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mode trajet : les tests continuent selon la distance choisie, jusqu’à l’arrêt ou au plafond de données."
+            "value": "Trajet : un test après la distance choisie ou 30 s, jusqu’à l’arrêt ou au plafond de données."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Route mode: tests continue at the chosen distance until you stop or reach the data limit."
+            "value": "Route: one test after the selected distance or 30 seconds, until you stop or reach the data cap."
           }
         }
       }

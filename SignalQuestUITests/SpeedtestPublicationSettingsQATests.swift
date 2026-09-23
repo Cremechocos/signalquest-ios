@@ -112,6 +112,10 @@ final class SpeedtestPublicationSettingsQATests: XCTestCase {
         XCTAssertTrue(route.isHittable)
         route.tap()
         XCTAssertTrue(cap.waitForExistence(timeout: 5))
+        let routeTiming = locale == "fr"
+            ? "Prochain test après la distance choisie ou 30 s. « Tester maintenant » le lance aussitôt."
+            : "Next test after the selected distance or 30 seconds. “Test now” starts it immediately."
+        XCTAssertTrue(app.staticTexts[routeTiming].waitForExistence(timeout: 5))
         capture(app, name: "measurement-\(locale)-route-settings")
         let single = app.buttons["1"].firstMatch
         for _ in 0..<8 where !single.isHittable { scroll.swipeDown() }

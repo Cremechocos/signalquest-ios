@@ -42,8 +42,7 @@ final class DriveTestViewModel: ObservableObject {
     @Published private(set) var statusLabel = "Prêt"
     @Published private(set) var errorMessage: String?
     /// Vrai quand la localisation est refusée/restreinte : le Drive Test ne peut
-    /// enregistrer ni trace ni couverture. La vue propose alors les Réglages plutôt
-    /// que de lancer une session muette qui n'enregistre rien (UXP-03/F-05).
+    /// placer les speedtests sur le trajet. La vue propose alors les Réglages.
     @Published private(set) var locationDenied = false
 
     // Carte / secteur.
@@ -136,8 +135,7 @@ final class DriveTestViewModel: ObservableObject {
     /// Distance par défaut entre deux speedtests. La boucle enchaînait auparavant
     /// les tests avec 800 ms de pause : les mesures s'entassaient là où l'on roule
     /// lentement, et la consommation était sans limite. Espacer par la DISTANCE
-    /// répartit les mesures dans l'espace, ce qui est aussi le bon geste
-    /// scientifique pour une carte de couverture.
+    /// répartit les mesures dans l'espace, sans remplacer la borne temporelle.
     static let defaultTestIntervalMeters: Double = 500
     /// Délai au bout duquel un test part même sans déplacement. C'est LUI qui fait
     /// avancer la session : la distance ne sert plus qu'à mesurer plus tôt quand on
@@ -244,9 +242,8 @@ final class DriveTestViewModel: ObservableObject {
     func start() {
         guard !isRunning else { return }
         errorMessage = nil
-        // Un Drive Test sans position n'enregistre ni trace ni couverture : plutôt
-        // que lancer une session muette (statut « Enregistrement… » puis « 0 point »),
-        // on explique et on renvoie vers les Réglages si la localisation est refusée.
+        // Sans position, les speedtests ne peuvent pas être placés sur le trajet.
+        // Expliquer le blocage et renvoyer vers les Réglages si l'accès est refusé.
         switch services.location.authorizationStatus {
         case .denied, .restricted:
             locationDenied = true
@@ -572,7 +569,7 @@ final class DriveTestViewModel: ObservableObject {
     }
 
     /// Détecte un changement de SIM (PLMN) en cours de session et re-résout l'opérateur
-    /// SANS interrompre la boucle speedtest / l'enregistrement de couverture (point 5).
+    /// SANS interrompre la boucle des speedtests.
     /// Le choix manuel reste prioritaire pour l'affichage.
     private func detectSimChangeIfNeeded() async {
         let plmn = services.networkPath.simPLMN()
@@ -673,7 +670,7 @@ final class DriveTestViewModel: ObservableObject {
     /// tests programmés sont périodiques) : le temps déclenche, la distance ne fait
     /// qu'anticiper quand on roule. Un espacement minimal subsiste — sans lui, un
     /// appareil posé sur un bureau accumulerait des centaines de mesures au même
-    /// point, ce qui pollue la carte de couverture et brûle le forfait.
+    /// point, ce qui brouille le trajet et brûle le forfait.
     private func waitUntilNextTestIsDue() async -> Bool {
         var secondsWaited = 0
         while !Task.isCancelled {
