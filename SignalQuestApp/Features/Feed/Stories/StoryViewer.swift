@@ -1,5 +1,37 @@
 import SwiftUI
 
+struct PendingUnencryptedStoryReply: Equatable {
+    let storyID: String
+    let text: String
+    let clearDraftOnSuccess: Bool
+}
+
+struct StoryReplyChannelConsent {
+    private var acceptedStoryIDs: Set<String> = []
+    private(set) var pending: PendingUnencryptedStoryReply?
+
+    mutating func request(storyID: String, text: String, clearDraftOnSuccess: Bool) -> Bool {
+        guard pending == nil else { return false }
+        if acceptedStoryIDs.contains(storyID) { return true }
+        pending = PendingUnencryptedStoryReply(
+            storyID: storyID, text: text, clearDraftOnSuccess: clearDraftOnSuccess
+        )
+        return false
+    }
+
+    mutating func confirm(currentStoryID: String?) -> PendingUnencryptedStoryReply? {
+        guard let pending, pending.storyID == currentStoryID else {
+            self.pending = nil
+            return nil
+        }
+        acceptedStoryIDs.insert(pending.storyID)
+        self.pending = nil
+        return pending
+    }
+
+    mutating func cancelPending() { pending = nil }
+}
+
 struct StoryViewer: View {
     let stories: [SocialStory]
     @State private var index: Int = 0
@@ -33,6 +65,8 @@ struct StoryViewer: View {
     @State private var viewers: [StoryViewerEntry] = []
     @State private var loadingViewers = false
     @State private var showDeleteConfirm = false
+    @State private var showUnencryptedConfirm = false
+    @State private var channelConsent = StoryReplyChannelConsent()
 
     /// Durée d'affichage dérivée du choix de l'auteur (5/10/15 s côté backend),
     /// bornée 5...15 (STORY-BUG-01 : la constante 6 s ignorait `durationSeconds`).
@@ -77,6 +111,12 @@ struct StoryViewer: View {
             }
             Button("Annuler", role: .cancel) {}
         }
+        .alert("Réponse privée sans chiffrement de bout en bout", isPresented: $showUnencryptedConfirm) {
+            Button("Envoyer sans chiffrement de bout en bout") { confirmUnencryptedReply() }
+            Button("Annuler", role: .cancel) { channelConsent.cancelPending() }
+        } message: {
+            Text("Cette réponse sera envoyée dans une conversation privée non chiffrée de bout en bout.")
+        }
         .onTapGesture(coordinateSpace: .local) { location in
             let half = UIScreen.main.bounds.width / 2
             if location.x < half { back() } else { forward() }
@@ -93,6 +133,8 @@ struct StoryViewer: View {
         .accessibilityAction(named: Text("Story précédente")) { back() }
         .onAppear { startStory() }
         .onChange(of: index) { _ in
+            channelConsent.cancelPending()
+            showUnencryptedConfirm = false
             replySubmission.clearFeedback()
             startStory()
         }
@@ -224,6 +266,10 @@ struct StoryViewer: View {
                     .foregroundStyle(.white)
                     .accessibilityIdentifier("story.reply.sending")
             }
+            Text("Réponse privée sans chiffrement de bout en bout")
+                .font(SQType.caption)
+                .foregroundStyle(.white.opacity(0.85))
+                .accessibilityIdentifier("story.reply.channel")
             // Réactions rapides — envoyées comme message privé à l'auteur.
             HStack(spacing: SQSpace.md) {
                 ForEach(quickReactions, id: \.self) { emoji in
@@ -318,6 +364,20 @@ struct StoryViewer: View {
     private func submitReply(_ rawText: String, clearDraftOnSuccess: Bool) {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let story = currentStory, !replySubmission.isSending else { return }
+        if !channelConsent.request(storyID: story.id, text: text, clearDraftOnSuccess: clearDraftOnSuccess) {
+            showUnencryptedConfirm = true
+            return
+        }
+        performReply(story, text: text, clearDraftOnSuccess: clearDraftOnSuccess)
+    }
+
+    private func confirmUnencryptedReply() {
+        guard let story = currentStory,
+              let pending = channelConsent.confirm(currentStoryID: story.id) else { return }
+        performReply(story, text: pending.text, clearDraftOnSuccess: pending.clearDraftOnSuccess)
+    }
+
+    private func performReply(_ story: SocialStory, text: String, clearDraftOnSuccess: Bool) {
         Task {
             let delivered = await replySubmission.submit(storyID: story.id, text: text) { requestID in
                 try await onSendReply(story, text, requestID)
@@ -347,7 +407,7 @@ struct StoryViewer: View {
     private var shouldPause: Bool {
         replyFocused || replySubmission.isSending
             || replySubmission.failedStoryID == currentStory?.id
-            || showViewers || showDeleteConfirm || voiceOverOn
+            || showViewers || showDeleteConfirm || showUnencryptedConfirm || voiceOverOn
     }
 
     /// Secondes écoulées sur la story courante à l'instant `now`.
@@ -462,6 +522,16 @@ private struct StoryViewersSheet: View {
 enum StoryReplyDeliveryError: Error {
     case unavailable
     case conversationUnavailable
+}
+
+enum StoryReplyChannelPolicy {
+    static func accepts(_ conversation: MessageConversation, authorID: String, currentUserID: String) -> Bool {
+        guard authorID != currentUserID,
+              !conversation.isGroup,
+              conversation.e2eeEnabled == false else { return false }
+        let participants = Set(conversation.participants.map(\.userId))
+        return participants == Set([authorID, currentUserID])
+    }
 }
 
 /// Garde le même identifiant lors d'un réessai si le serveur a pu accepter le

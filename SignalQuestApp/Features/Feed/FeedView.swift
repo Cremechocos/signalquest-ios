@@ -810,8 +810,8 @@ struct FeedView: View {
 
     /// Répondre / réagir à une story = message privé à l'auteur (façon Instagram).
     /// Il n'existe pas d'endpoint de réaction de story : on résout/crée la
-    /// conversation directe puis on envoie le texte (ou l'emoji). En non-E2EE pour
-    /// que la réponse parte sans déverrouillage de la messagerie.
+    /// conversation directe puis on envoie le texte (ou l'emoji). Le viewer
+    /// annonce et fait confirmer le canal non E2EE avant cet appel.
     /// Le viewer ne confirme qu'après le reçu du serveur de messagerie.
     private func sendStoryReply(_ story: SocialStory, text: String, requestID: String) async throws {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -823,9 +823,10 @@ struct FeedView: View {
             participantIds: [story.author.id], title: nil, e2ee: false
         )
         guard session.isCurrent else { throw CancellationError() }
-        let conversations = try await services.messages.conversations()
+        let conversation = try await services.messages.conversation(id: created.conversationId)
         guard session.isCurrent else { throw CancellationError() }
-        guard let conversation = conversations.first(where: { $0.id == created.conversationId }) else {
+        guard let currentUserID = LocalAccountScope.currentUserId,
+              StoryReplyChannelPolicy.accepts(conversation, authorID: story.author.id, currentUserID: currentUserID) else {
             throw StoryReplyDeliveryError.conversationUnavailable
         }
         _ = try await services.messages.sendText(trimmed, in: conversation, replyToId: nil,

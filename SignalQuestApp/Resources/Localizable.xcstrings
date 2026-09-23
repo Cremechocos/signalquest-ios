@@ -46117,6 +46117,27 @@
         "fr": { "stringUnit": { "state": "translated", "value": "Envoi reporté par le serveur. La mesure reste enregistrée et sera renvoyée plus tard." } },
         "en": { "stringUnit": { "state": "translated", "value": "Upload deferred by the server. The measurement remains saved and will be sent later." } }
       }
+    },
+    "Réponse privée sans chiffrement de bout en bout": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Réponse privée sans chiffrement de bout en bout" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Private reply without end-to-end encryption" } }
+      }
+    },
+    "Envoyer sans chiffrement de bout en bout": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Envoyer sans chiffrement de bout en bout" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Send without end-to-end encryption" } }
+      }
+    },
+    "Cette réponse sera envoyée dans une conversation privée non chiffrée de bout en bout.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Cette réponse sera envoyée dans une conversation privée non chiffrée de bout en bout." } },
+        "en": { "stringUnit": { "state": "translated", "value": "This reply will be sent in a private conversation without end-to-end encryption." } }
+      }
     }
   },
   "version": "1.0"

@@ -3,6 +3,7 @@ import Foundation
 
 protocol MessagesServicing: Sendable {
     func conversations() async throws -> [MessageConversation]
+    func conversation(id: String) async throws -> MessageConversation
     func createConversation(participantIds: [String], title: String?, e2ee: Bool) async throws -> CreateConversationResponse
     func searchUsers(query: String) async throws -> [MessageSearchUser]
     func messages(conversationId: String, cursor: String?) async throws -> MessagesPageResponse
@@ -95,6 +96,13 @@ protocol MessagesServicing: Sendable {
 }
 
 extension MessagesServicing {
+    func conversation(id: String) async throws -> MessageConversation {
+        guard let conversation = try await conversations().first(where: { $0.id == id }) else {
+            throw APIError.decoding("Conversation unavailable")
+        }
+        return conversation
+    }
+
     func activeLiveShareSessions() async throws -> [LiveShareSession] { [] }
     func retryPendingTextMessages() async {}
     func retryPendingAttachments() async {}
@@ -202,6 +210,13 @@ final class MessagesService: MessagesServicing {
 
     func conversations() async throws -> [MessageConversation] {
         try await api.request(APIEndpoint(path: "/api/messages/conversations"), as: ConversationsResponse.self).conversations
+    }
+
+    func conversation(id: String) async throws -> MessageConversation {
+        struct Response: Decodable { let conversation: MessageConversation }
+        return try await api.request(
+            APIEndpoint(path: "/api/messages/conversations/\(id)"), as: Response.self
+        ).conversation
     }
 
     func createConversation(participantIds: [String], title: String?, e2ee: Bool = true) async throws -> CreateConversationResponse {

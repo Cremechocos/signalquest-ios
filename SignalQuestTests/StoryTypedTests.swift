@@ -175,4 +175,85 @@ final class StoryReplySubmissionTests: XCTestCase {
         XCTAssertTrue(delivered)
         XCTAssertEqual(submission.sentStoryID, "story-1")
     }
+
+    func testUnencryptedReplyRequiresConsentForTheCurrentStory() {
+        var channel = StoryReplyChannelConsent()
+        XCTAssertFalse(channel.request(storyID: "story-1", text: "Bonjour", clearDraftOnSuccess: true))
+        XCTAssertEqual(channel.pending?.text, "Bonjour")
+        XCTAssertNil(channel.confirm(currentStoryID: "story-2"), "Une story suivante ne doit pas recevoir le brouillon précédent")
+        XCTAssertNil(channel.pending)
+
+        XCTAssertFalse(channel.request(storyID: "story-1", text: "❤️", clearDraftOnSuccess: false))
+        let approved = channel.confirm(currentStoryID: "story-1")
+        XCTAssertEqual(approved?.text, "❤️")
+        XCTAssertEqual(approved?.clearDraftOnSuccess, false)
+        XCTAssertTrue(channel.request(storyID: "story-1", text: "Encore", clearDraftOnSuccess: true))
+        XCTAssertFalse(channel.request(storyID: "story-2", text: "Nouvelle", clearDraftOnSuccess: true))
+        channel.cancelPending()
+        XCTAssertNil(channel.pending)
+    }
+
+    func testStoryReplyAcceptsOnlyTheExactUnencryptedDirectConversation() {
+        func conversation(ids: [String], encrypted: Bool, group: Bool) -> MessageConversation {
+            MessageConversation(
+                id: "conversation-1", title: "Fixture", isGroup: group,
+                e2eeEnabled: encrypted, groupPhotoUrl: nil, createdAt: nil,
+                updatedAt: nil, lastMessageAt: nil, lastReadAt: nil,
+                pinnedAt: nil,
+                participants: ids.map { id in
+                    ConversationParticipant(
+                        userId: id, role: "member", joinedAt: nil, lastReadAt: nil,
+                        user: MessageUser(id: id, name: id, email: "fixture@example.invalid", avatarUrl: nil),
+                        presence: nil
+                    )
+                },
+                lastMessage: nil
+            )
+        }
+        XCTAssertTrue(StoryReplyChannelPolicy.accepts(
+            conversation(ids: ["me", "author"], encrypted: false, group: false),
+            authorID: "author", currentUserID: "me"
+        ))
+        XCTAssertFalse(StoryReplyChannelPolicy.accepts(
+            conversation(ids: ["me", "author"], encrypted: true, group: false),
+            authorID: "author", currentUserID: "me"
+        ))
+        XCTAssertFalse(StoryReplyChannelPolicy.accepts(
+            conversation(ids: ["me", "other"], encrypted: false, group: false),
+            authorID: "author", currentUserID: "me"
+        ))
+        XCTAssertFalse(StoryReplyChannelPolicy.accepts(
+            conversation(ids: ["me", "author", "other"], encrypted: false, group: true),
+            authorID: "author", currentUserID: "me"
+        ))
+    }
+
+    func testStoryReplyFetchesCreatedConversationByExactID() async throws {
+        defer { MockURLProtocol.requestHandler = nil }
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-story-token")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let api = APIClient(
+            config: .test, credentials: credentials,
+            session: URLSession(configuration: configuration)
+        )
+        MockURLProtocol.requestHandler = { request in
+            guard request.url?.path == "/api/messages/conversations/old-direct" else {
+                throw URLError(.unsupportedURL)
+            }
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            let body = #"{"conversation":{"id":"old-direct","isGroup":false,"e2eeEnabled":false,"participants":[{"userId":"me","role":"member","user":{"id":"me","name":"Me"}},{"userId":"author","role":"member","user":{"id":"author","name":"Author"}}]}}"#
+            return (response, Data(body.utf8))
+        }
+
+        let conversation = try await MessagesService(api: api).conversation(id: "old-direct")
+        XCTAssertEqual(conversation.id, "old-direct")
+        XCTAssertTrue(StoryReplyChannelPolicy.accepts(
+            conversation, authorID: "author", currentUserID: "me"
+        ))
+    }
 }
