@@ -118,7 +118,7 @@ final class PhotoErrorRecoveryTests: XCTestCase {
         let service = PhotoRecoveryFixture()
         let gate = PhotoRecoveryGate<[PhotoComment]>()
         let started = expectation(description: "Comment upload pending")
-        service.sendHandler = { started.fulfill(); return (try await gate.wait()).first }
+        service.sendHandler = { _, _ in started.fulfill(); return (try await gate.wait()).first }
         let model = PhotosViewModel(service: service)
         await model.open(Photo.demoList[0])
         model.draft = "Premier commentaire"
@@ -130,6 +130,37 @@ final class PhotoErrorRecoveryTests: XCTestCase {
         XCTAssertEqual(model.draft, "Nouveau brouillon")
         XCTAssertNil(model.commentSendErrorMessage)
         XCTAssertFalse(model.isSending)
+    }
+
+    func testDelayedSendKeepsItsOriginalPhotoAndCannotEraseTheNextDraft() async {
+        let service = PhotoRecoveryFixture()
+        service.commentResult = .success([])
+        let gate = PhotoRecoveryGate<PhotoComment?>()
+        let started = expectation(description: "Photo A send pending")
+        let first = Photo.demoList[0], second = Photo.demoList[1]
+        service.sendHandler = { photoID, _ in
+            if photoID == first.id { started.fulfill(); return try await gate.wait() }
+            return nil
+        }
+        let model = PhotosViewModel(service: service)
+        await model.open(first)
+        model.draft = "Message pour A"
+        let sendA = Task { await model.sendComment() }
+        await fulfillment(of: [started], timeout: 2)
+
+        await model.open(second)
+        model.draft = "Brouillon de B"
+        await gate.finish(.success(PhotoComment.demo[0]))
+        await sendA.value
+        XCTAssertEqual(model.selectedPhoto?.id, second.id)
+        XCTAssertEqual(model.draft, "Brouillon de B")
+        XCTAssertTrue(model.comments.isEmpty)
+        XCTAssertNil(model.commentSendErrorMessage)
+
+        await model.sendComment()
+        let requests = await service.sendRecorder.all()
+        XCTAssertEqual(requests.map { $0.photoID }, [first.id, second.id])
+        XCTAssertEqual(requests.map { $0.content }, ["Message pour A", "Brouillon de B"])
     }
 
     func testRenderCommentLoadingErrorAndEmptyStatesInFrenchAndEnglish() async throws {
@@ -179,6 +210,12 @@ private actor PhotoRecoveryGate<Value: Sendable> {
     }
 }
 
+private actor PhotoSendRecorder {
+    private var requests: [(photoID: String, content: String)] = []
+    func record(_ photoID: String, _ content: String) { requests.append((photoID, content)) }
+    func all() -> [(photoID: String, content: String)] { requests }
+}
+
 // Responses are changed between awaited calls by these serial MainActor tests.
 private final class PhotoRecoveryFixture: PhotoServicing, @unchecked Sendable {
     enum Failure: Error { case unavailable }
@@ -188,7 +225,8 @@ private final class PhotoRecoveryFixture: PhotoServicing, @unchecked Sendable {
     var commentResult: Result<[PhotoComment], Error> = .failure(Failure.unavailable)
     var commentHandler: (@Sendable (String) async throws -> [PhotoComment])?
     var sendResult: Result<PhotoComment?, Error> = .failure(Failure.unavailable)
-    var sendHandler: (@Sendable () async throws -> PhotoComment?)?
+    var sendHandler: (@Sendable (String, String) async throws -> PhotoComment?)?
+    let sendRecorder = PhotoSendRecorder()
     func listPhotos(filter: String, sortBy: String, page: Int, limit: Int) async throws -> PhotoListResponse {
         requestedPages.append(page)
         if let galleryHandler { return try await galleryHandler() }
@@ -200,7 +238,8 @@ private final class PhotoRecoveryFixture: PhotoServicing, @unchecked Sendable {
         return try commentResult.get()
     }
     func addComment(photoId: String, content: String) async throws -> PhotoComment? {
-        if let sendHandler { return try await sendHandler() }
+        await sendRecorder.record(photoId, content)
+        if let sendHandler { return try await sendHandler(photoId, content) }
         return try sendResult.get()
     }
     func toggleLike(photoId: String, reaction: String) async throws -> PhotoLikeResponse { throw Failure.unavailable }
