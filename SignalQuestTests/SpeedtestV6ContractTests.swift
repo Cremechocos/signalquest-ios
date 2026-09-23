@@ -395,6 +395,59 @@ extension SpeedtestV6ContractTests {
         await cache.remove(key)
     }
 
+    func testCorruptPrimaryUsesOwnerScopedRescueForNewMeasurement() async throws {
+        let previousUser = LocalAccountScope.currentUserId
+        LocalAccountScope.deactivate()
+        defer {
+            MockURLProtocol.requestHandler = nil
+            if let previousUser { LocalAccountScope.activate(userId: previousUser) }
+        }
+        let cache = DiskCache(folderName: "SpeedtestV6Rescue-\(UUID().uuidString)", evicts: false)
+        try await cache.write("unreadable-queue", for: "pending")
+        let primary = DiskCacheSpeedtestPendingStore(cache: cache, key: "pending")
+        let rescue = DiskCacheSpeedtestPendingStore(cache: cache, key: "rescue")
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let api = APIClient(config: .test,
+            credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+            session: URLSession(configuration: config))
+        let service = SpeedtestService(api: api, historyCache: cache, pendingCache: cache,
+            guestReceiptStore: GuestSpeedtestReceiptStore(store: InMemoryTokenStore()),
+            pendingStore: primary, rescueStore: rescue, vpnIsActive: { false })
+        let result = SpeedtestRunResult(label: "rescue", downloadMbps: 10,
+            downloadAverageMbps: 10, downloadMaxMbps: 10, durationSeconds: 10,
+            connectionType: .wifi, ownerScopeId: "guest")
+        var requests = 0
+        MockURLProtocol.requestHandler = { request in
+            requests += 1
+            let first = requests == 1
+            let response = HTTPURLResponse(url: request.url!, statusCode: first ? 503 : 201,
+                httpVersion: nil, headerFields: nil)!
+            return (response, Data((first ? "{}" : #"{"success":true,"id":"rescue-server-id"}"#).utf8))
+        }
+        do { try await service.save(result); XCTFail("The first network attempt must remain queued") } catch { }
+        XCTAssertEqual(requests, 1)
+        let staged = try await rescue.loadAllValidated()
+        XCTAssertEqual(staged.map(\.id), [result.id.uuidString])
+        let original = try await cache.read(String.self, for: "pending")
+        XCTAssertEqual(original, "unreadable-queue")
+
+        LocalAccountScope.activate(userId: "unrelated-account")
+        do { try await service.retryPendingSavesReporting(); XCTFail("Corruption must remain visible") } catch { }
+        XCTAssertEqual(requests, 1, "Guest rescue must not be sent as account A")
+        LocalAccountScope.deactivate()
+        do { try await service.retryPendingSavesReporting(); XCTFail("Old corrupt file must remain reported") } catch { }
+        XCTAssertEqual(requests, 2)
+        let remaining = try await rescue.loadAllValidated()
+        XCTAssertTrue(remaining.isEmpty)
+        let serverID = await service.serverId(forClientId: result.id)
+        XCTAssertEqual(serverID, "rescue-server-id")
+        let retained = try await cache.read(String.self, for: "pending")
+        XCTAssertEqual(retained, "unreadable-queue")
+        await cache.remove("pending")
+        await cache.remove("rescue")
+    }
+
     func testUnreadableSwiftDataRowBlocksReplacementWithoutDeletingIt() async throws {
         guard #available(iOS 17, *) else { throw XCTSkip("SwiftData requires iOS 17") }
         let directory = FileManager.default.temporaryDirectory

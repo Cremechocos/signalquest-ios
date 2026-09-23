@@ -396,12 +396,14 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private let pendingCache: DiskCache
     private let legacyHistoryCache = DiskCache(folderName: "SignalQuestSpeedtestHistory")
     private let pendingStore: SpeedtestPendingStoring
+    private let rescueStore: SpeedtestPendingStoring
     private let guestReceiptStore: GuestSpeedtestReceiptStore
     private let tcpProbe: SpeedtestTCPProbing
     private let cloudflareFallbackPolicy: CloudflareAutoFallbackPolicy
     private let invalidatePublicMap: @Sendable () async -> Void
     private let vpnIsActive: @Sendable () -> Bool
     static let pendingSaveKey = "pending-speedtest-saves"
+    static let rescueSaveKey = "pending-speedtest-rescue"
     /// Dossier de la file d'attente durable (partagé entre l'init durable et la migration).
     /// `internal` (pas `private`) : référencé dans une valeur par défaut d'initialiseur.
     static let pendingFolderName = "SignalQuestSpeedtestPending"
@@ -426,6 +428,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         tcpProbe: SpeedtestTCPProbing = NetworkSpeedtestTCPProbe(),
         cloudflareFallbackPolicy: CloudflareAutoFallbackPolicy = CloudflareAutoFallbackPolicy(),
         pendingStore: SpeedtestPendingStoring? = nil,
+        rescueStore: SpeedtestPendingStoring? = nil,
         invalidatePublicMap: @escaping @Sendable () async -> Void = {},
         vpnIsActive: @escaping @Sendable () -> Bool = { VPNDetector.isActive() }
     ) {
@@ -441,6 +444,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         // iOS 17+ : vraie base SwiftData ; iOS 16 : repli sur la file durable (DiskCache).
         // La `pendingCache` durable sert de source de migration (17+) ou de backing (16).
         self.pendingStore = pendingStore ?? SpeedtestPendingStoreFactory.make(durableCache: pendingCache, key: Self.pendingSaveKey)
+        // Un fichier principal endommagé reste intact ; les nouvelles mesures
+        // utilisent cette file JSON durable séparée, y compris sur iOS 17+.
+        self.rescueStore = rescueStore ?? DiskCacheSpeedtestPendingStore(cache: pendingCache, key: Self.rescueSaveKey)
         self.guestReceiptStore = guestReceiptStore
         self.tcpProbe = tcpProbe
         self.cloudflareFallbackPolicy = cloudflareFallbackPolicy
@@ -2408,9 +2414,27 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     private func queueAndSave(_ result: SpeedtestRunResult, streams: Int, publishToMap: Bool,
                               shareExactLocation: Bool, driveSessionId: String?) async throws {
         guard result.ownerScopeId == nil || result.ownerScopeId == LocalAccountScope.currentOwnerScopeId else { throw CancellationError() }
-        if let existing = try await pendingStore.loadAllValidated().first(where: { $0.id == result.id.uuidString }) {
+        let primary: [PendingSpeedtestSave]
+        let primaryReadable: Bool
+        do {
+            primary = try await pendingStore.loadAllValidated()
+            primaryReadable = true
+        } catch {
+            primary = []
+            primaryReadable = false
+            sqDebugLog("Primary speedtest queue retained unreadable: \(error)")
+        }
+        let rescue = try await rescueStore.loadAllValidated()
+        if let existing = primary.first(where: { $0.id == result.id.uuidString }) {
             try await submitPendingSave(existing)
-            try await removePendingSave(id: existing.id)
+            try await pendingStore.removeValidated(id: existing.id)
+            try? await rescueStore.removeValidated(id: existing.id)
+            return
+        }
+        if let existing = rescue.first(where: { $0.id == result.id.uuidString }) {
+            try await submitPendingSave(existing)
+            try await rescueStore.removeValidated(id: existing.id)
+            if primaryReadable { try? await pendingStore.removeValidated(id: existing.id) }
             return
         }
         let guestDeleteToken: String?
@@ -2437,10 +2461,19 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             driveSessionId: driveSessionId,
             ownerScopeId: result.ownerScopeId ?? LocalAccountScope.currentOwnerScopeId
         )
-        try await upsertPendingSave(pending)
+        var destination: SpeedtestPendingStoring = primaryReadable ? pendingStore : rescueStore
+        do {
+            try await destination.upsert(pending)
+        } catch {
+            guard primaryReadable else { throw error }
+            destination = rescueStore
+            try await destination.upsert(pending)
+        }
         do {
             try await submitPendingSave(pending)
-            try await removePendingSave(id: pending.id)
+            try await destination.removeValidated(id: pending.id)
+            try? await pendingStore.removeValidated(id: pending.id)
+            try? await rescueStore.removeValidated(id: pending.id)
             try? await flushPendingSaves(excluding: Set([pending.id]))
         } catch {
             throw error
@@ -2537,19 +2570,26 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         SQSpotlight.donateLastSpeedtest(snapshot)
     }
 
-    private func pendingSaves() async throws -> [PendingSpeedtestSave] {
+    private struct PendingEntry {
+        let save: PendingSpeedtestSave
+        let store: SpeedtestPendingStoring
+    }
+
+    private func pendingEntries() async -> (items: [PendingEntry], readError: Error?) {
         let ownerScopeId = LocalAccountScope.currentOwnerScopeId
-        return try await pendingStore.loadAllValidated().filter { $0.ownerScopeId == ownerScopeId }
-    }
-
-    private func upsertPendingSave(_ pending: PendingSpeedtestSave) async throws {
-        // Atomique côté store (iOS 17+) : plus de read-modify-write dans ce service
-        // non isolé, donc plus de perte si deux sauvegardes s'enchaînent (ROB-11).
-        try await pendingStore.upsert(pending)
-    }
-
-    private func removePendingSave(id: String) async throws {
-        try await pendingStore.removeValidated(id: id)
+        var entries: [PendingEntry] = []
+        var seen = Set<String>()
+        var firstError: Error?
+        for store in [pendingStore, rescueStore] {
+            do {
+                for save in try await store.loadAllValidated() where save.ownerScopeId == ownerScopeId {
+                    if seen.insert(save.id).inserted { entries.append(PendingEntry(save: save, store: store)) }
+                }
+            } catch {
+                if firstError == nil { firstError = error }
+            }
+        }
+        return (entries, firstError)
     }
 
     private let submissionCoordinator = SpeedtestSubmissionCoordinator()
@@ -2718,17 +2758,18 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     }
 
     private func flushPendingSaves(excluding excludedIds: Set<String> = []) async throws {
-        let pending = try await pendingSaves()
-        guard !pending.isEmpty else { return }
-        var firstError: Error?
+        let snapshot = await pendingEntries()
+        var firstError = snapshot.readError
         // Retrait par id APRÈS chaque envoi réussi, plutôt qu'un `replaceAll` final
         // depuis ce snapshot périmé : un test sauvegardé hors-ligne pendant la
         // fenêtre réseau du flush n'est plus écrasé (ROB-11). Les entrées exclues
         // et les échecs restent simplement en place.
-        for item in pending where !excludedIds.contains(item.id) {
+        for entry in snapshot.items where !excludedIds.contains(entry.save.id) {
             do {
-                try await submitPendingSave(item)
-                try await pendingStore.removeValidated(id: item.id)
+                try await submitPendingSave(entry.save)
+                try await entry.store.removeValidated(id: entry.save.id)
+                try? await pendingStore.removeValidated(id: entry.save.id)
+                try? await rescueStore.removeValidated(id: entry.save.id)
             } catch {
                 if firstError == nil { firstError = error }
                 if let apiError = error as? APIError,
