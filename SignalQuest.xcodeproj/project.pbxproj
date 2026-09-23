@@ -48,6 +48,7 @@
 		0E91F86BD082D7967A904E1B /* GamificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DE13CA2784C45B1F0EDF3B2 /* GamificationService.swift */; };
 		0ECBE473F9CE2213A93E7583 /* SQUserBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC5255F7439DB3A81B3C67F6 /* SQUserBadge.swift */; };
 		0EEF1C07C36C03F62FB62C7C /* CommunityOutageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBF10C60A108A1CB37B923B /* CommunityOutageService.swift */; };
+		0F303A7E35909C0794F276C8 /* CommentsPaginationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FD3E622986BF2B624EAAA44 /* CommentsPaginationTests.swift */; };
 		0F93CA162732A4E9F82EC1AF /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD246E248AC961551013A82C /* Haptics.swift */; };
 		0FC1E05534800C8F2C87ABD4 /* SQFriendMarkerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E75516A87ED197A5BB4AB1 /* SQFriendMarkerView.swift */; };
 		101EE7790A3B45CF264F25A4 /* MobileChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96F63BABF362FE8E93BB147A /* MobileChallenge.swift */; };
@@ -985,6 +986,7 @@
 		8E27D904CE50C23DE8B0F1C1 /* LocationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationServiceTests.swift; sourceTree = "<group>"; };
 		8F99C9F0E518188A5BB538C4 /* LiveTelemetryDeliveryStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTelemetryDeliveryStateTests.swift; sourceTree = "<group>"; };
 		8FB83B28A83979ABC55BD6DF /* MapLoadConsistencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapLoadConsistencyTests.swift; sourceTree = "<group>"; };
+		8FD3E622986BF2B624EAAA44 /* CommentsPaginationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsPaginationTests.swift; sourceTree = "<group>"; };
 		902078213DD099E9ED6A2DC0 /* CarPlayMapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayMapTests.swift; sourceTree = "<group>"; };
 		90B0A00F01799457A250D3FE /* MapAnnotationPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAnnotationPayload.swift; sourceTree = "<group>"; };
 		91551435A0AA4D676F97FDCB /* StoryViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryViewer.swift; sourceTree = "<group>"; };
@@ -2157,6 +2159,7 @@
 				C156A7C4169EEC9DCCA60F56 /* CarPlaySpeedtestTests.swift */,
 				BB4B8BD8ED85E30D3204CA7D /* CarPlayTabsAndPOITests.swift */,
 				C40F2FA1DB9ADDD6852D0D3F /* CarPlayTemplateTests.swift */,
+				8FD3E622986BF2B624EAAA44 /* CommentsPaginationTests.swift */,
 				86C6E5D3F9D31B41B49C101D /* CommunityOutageContractTests.swift */,
 				FD162FB28B7CB0A7E2FE891E /* ComposerPollTests.swift */,
 				0DA0BEDA1A291F4FBD677EF4 /* CoordinateGridTests.swift */,
@@ -3161,6 +3164,7 @@
 				9AFF5B0611230538EA47A220 /* CarPlaySpeedtestTests.swift in Sources */,
 				74F890414C07EA1C089C3F83 /* CarPlayTabsAndPOITests.swift in Sources */,
 				F00E9F34E654165B81980678 /* CarPlayTemplateTests.swift in Sources */,
+				0F303A7E35909C0794F276C8 /* CommentsPaginationTests.swift in Sources */,
 				C52926A5158E1DE58CD00449 /* CommunityOutageContractTests.swift in Sources */,
 				0A7916FE1A3236A3599113ED /* ComposerPollTests.swift in Sources */,
 				86B8A5872A08214CDCDE5633 /* CoordinateGridTests.swift in Sources */,

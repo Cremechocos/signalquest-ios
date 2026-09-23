@@ -45854,6 +45854,27 @@
         "fr": { "stringUnit": { "state": "translated", "value": "Chargement impossible" } },
         "en": { "stringUnit": { "state": "translated", "value": "Could not load" } }
       }
+    },
+    "Réponses": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Réponses" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Replies" } }
+      }
+    },
+    "Aucune réponse": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Aucune réponse" } },
+        "en": { "stringUnit": { "state": "translated", "value": "No replies" } }
+      }
+    },
+    "Réponse à": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Réponse à" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Replying to" } }
+      }
     }
   },
   "version": "1.0"
