@@ -171,6 +171,31 @@ final class PrivacySettingsLoadingTests: XCTestCase {
         XCTAssertEqual(writes, 0)
     }
 
+    func testRelaunchAfterIndependentFailuresLoadsServerTruthWithoutFalseEmptyZone() async {
+        let fixture = Fixture()
+        await fixture.service.failPreferences(true)
+        await fixture.service.failZones(true)
+        await fixture.model.load()
+        XCTAssertTrue(fixture.model.loaded)
+        XCTAssertFalse(fixture.model.preferencesLoaded)
+        XCTAssertFalse(fixture.model.zonesLoaded)
+        await fixture.model.setUnits(.imperial)
+        let writes = await fixture.service.preferenceWriteCount()
+        XCTAssertEqual(writes, 0)
+
+        await fixture.service.failPreferences(false)
+        await fixture.service.failZones(false)
+        let reopened = PrivacySettingsViewModel(service: fixture.service,
+            sessionSnapshot: { fixture.session.current })
+        await reopened.load()
+        XCTAssertTrue(reopened.loaded)
+        XCTAssertTrue(reopened.preferencesLoaded)
+        XCTAssertTrue(reopened.zonesLoaded)
+        XCTAssertEqual(reopened.zones.map(\.id), ["android-home"])
+        XCTAssertEqual(reopened.preferences.unitsSystem, .metric)
+        XCTAssertNil(reopened.zonesError)
+    }
+
     func testOlderZoneResponseCannotReplaceNewerLoad() async {
         let fixture = Fixture()
         let started = expectation(description: "Ancienne lecture suspendue")
@@ -183,6 +208,27 @@ final class PrivacySettingsLoadingTests: XCTestCase {
         await gate.resolve([Fixture.homeZone])
         await first.value
         XCTAssertEqual(fixture.model.zones.map(\.id), ["new-zone"])
+    }
+
+    func testOlderPrivacyResponseCannotReplaceNewerServerState() async throws {
+        let fixture = Fixture()
+        let old = try await fixture.service.get()
+        let started = expectation(description: "Ancienne lecture privacy suspendue")
+        let gate = PrivacyResultGate<SocialPrivacy>(onWait: { started.fulfill() })
+        await fixture.service.holdNextPrivacy(gate)
+        let first = Task { await fixture.model.loadPrivacy() }
+        await fulfillment(of: [started], timeout: 1)
+        await fixture.service.replaceStoredPrivacy(SocialPrivacy(
+            shareLiveLocationWithFriends: true, shareRadioDataWithFriends: false,
+            shareSessionsWithFriends: false, sharePhotosOnFriendMap: false,
+            shareExactMeasurements: true, lastSeenVisibility: .none,
+            messageRequestPolicy: .friendsOnly))
+        await fixture.model.loadPrivacy()
+        await gate.resolve(old)
+        await first.value
+        XCTAssertTrue(fixture.model.shareLiveLocationWithFriends)
+        XCTAssertTrue(fixture.model.loaded)
+        XCTAssertNil(fixture.model.privacyError)
     }
 
     func testAccountChangeDiscardsPendingReadAndBlocksOldViewMutations() async {
@@ -265,6 +311,58 @@ final class PrivacySettingsLoadingTests: XCTestCase {
         XCTAssertNil(patch?.shareLiveLocationWithFriends)
         XCTAssertNil(patch?.shareExactMeasurements)
         XCTAssertNil(patch?.messageRequestPolicy)
+    }
+
+    func testRapidPreferenceChangesWaitForCanonicalReceiptWithoutRevertingUnits() async {
+        let fixture = Fixture()
+        await fixture.model.loadPreferences()
+        let started = expectation(description: "Premier PATCH de préférences suspendu")
+        let gate = PrivacyResultGate<UserPreferences>(onWait: { started.fulfill() })
+        await fixture.service.holdNextPreferenceUpdate(gate)
+        let first = Task { await fixture.model.setUnits(.imperial) }
+        await fulfillment(of: [started], timeout: 1)
+        await fixture.model.setShowHandleOnLeaderboard(false)
+        let pendingWrites = await fixture.service.preferenceWriteCount()
+        XCTAssertEqual(pendingWrites, 1, "A second setting cannot race the pending PATCH")
+
+        await gate.resolve(UserPreferences(unitsSystem: .imperial,
+            showHandleOnLeaderboard: true, showHypothesisSystem: false))
+        await first.value
+        XCTAssertEqual(fixture.model.preferences.unitsSystem, .imperial)
+        XCTAssertTrue(fixture.model.preferences.showHandleOnLeaderboard)
+
+        await fixture.model.setShowHandleOnLeaderboard(false)
+        let finalWrites = await fixture.service.preferenceWriteCount()
+        XCTAssertEqual(finalWrites, 2)
+        XCTAssertEqual(fixture.model.preferences.unitsSystem, .imperial)
+        XCTAssertFalse(fixture.model.preferences.showHandleOnLeaderboard)
+    }
+
+    func testDraftChangedDuringPrivacySaveSurvivesAndUsesAnotherTargetedPatch() async {
+        let fixture = Fixture()
+        await fixture.model.loadPrivacy()
+        fixture.model.shareLiveLocationWithFriends = true
+        let started = expectation(description: "Premier PATCH privacy suspendu")
+        let gate = PrivacyResultGate<SocialPrivacy>(onWait: { started.fulfill() })
+        await fixture.service.holdNextPrivacyUpdate(gate)
+        let first = Task { await fixture.model.save() }
+        await fulfillment(of: [started], timeout: 1)
+        fixture.model.shareRadioDataWithFriends = true
+        await gate.resolve(SocialPrivacy(shareLiveLocationWithFriends: true,
+            shareRadioDataWithFriends: false, shareSessionsWithFriends: false,
+            sharePhotosOnFriendMap: false, shareExactMeasurements: true,
+            lastSeenVisibility: .none, messageRequestPolicy: .friendsOnly))
+        let firstSaved = await first.value
+        XCTAssertFalse(firstSaved, "New draft must not be announced as already saved")
+        XCTAssertTrue(fixture.model.shareRadioDataWithFriends)
+        XCTAssertTrue(fixture.model.canSavePrivacy)
+
+        let secondSaved = await fixture.model.save()
+        XCTAssertTrue(secondSaved)
+        let patch = await fixture.service.lastPrivacyPatch()
+        XCTAssertNil(patch?.shareLiveLocationWithFriends)
+        XCTAssertEqual(patch?.shareRadioDataWithFriends, true)
+        XCTAssertTrue(fixture.model.savedConfirmation)
     }
 
     func testRefreshDoesNotOverwriteUnsavedPrivacyDraft() async {
@@ -414,7 +512,11 @@ private actor PrivacyServiceDouble: PrivacyServicing {
     private var privacyReads = 0
     private var privacyPatch: UpdatePrivacyRequest?
     private var zonesGate: PrivacyResultGate<[PrivacyZone]>?
+    private var privacyGate: PrivacyResultGate<SocialPrivacy>?
+    private var privacyUpdateGate: PrivacyResultGate<SocialPrivacy>?
+    private var preferenceUpdateGate: PrivacyResultGate<UserPreferences>?
     private var createGate: PrivacyResultGate<PrivacyZone>?
+    private var storedPreferences = UserPreferences(showHandleOnLeaderboard: true, showHypothesisSystem: false)
     private var privacy = SocialPrivacy(shareLiveLocationWithFriends: false, shareRadioDataWithFriends: false,
         shareSessionsWithFriends: false, sharePhotosOnFriendMap: false, shareExactMeasurements: true,
         lastSeenVisibility: .none, messageRequestPolicy: .friendsOnly)
@@ -426,6 +528,10 @@ private actor PrivacyServiceDouble: PrivacyServicing {
     func replaceStoredZones(_ zones: [PrivacyZone]) { storedZones = zones }
     func setUpdateReply(_ zone: PrivacyZone) { updateReply = zone }
     func holdNextZones(_ gate: PrivacyResultGate<[PrivacyZone]>) { zonesGate = gate }
+    func holdNextPrivacy(_ gate: PrivacyResultGate<SocialPrivacy>) { privacyGate = gate }
+    func holdNextPrivacyUpdate(_ gate: PrivacyResultGate<SocialPrivacy>) { privacyUpdateGate = gate }
+    func holdNextPreferenceUpdate(_ gate: PrivacyResultGate<UserPreferences>) { preferenceUpdateGate = gate }
+    func replaceStoredPrivacy(_ value: SocialPrivacy) { privacy = value }
     func holdNextCreate(_ gate: PrivacyResultGate<PrivacyZone>) { createGate = gate }
     func preferenceWriteCount() -> Int { preferenceWrites }
     func zoneWriteCount() -> Int { zoneWrites }
@@ -436,9 +542,18 @@ private actor PrivacyServiceDouble: PrivacyServicing {
             shareSessionsWithFriends: false, sharePhotosOnFriendMap: false, shareExactMeasurements: true,
             lastSeenVisibility: privacy.lastSeenVisibility, messageRequestPolicy: privacy.messageRequestPolicy)
     }
-    func get() async throws -> SocialPrivacy { privacyReads += 1; return privacy }
+    func get() async throws -> SocialPrivacy {
+        privacyReads += 1
+        if let gate = privacyGate { privacyGate = nil; return await gate.wait() }
+        return privacy
+    }
     func update(_ patch: UpdatePrivacyRequest) async throws -> SocialPrivacy {
         privacyPatch = patch
+        if let gate = privacyUpdateGate {
+            privacyUpdateGate = nil
+            privacy = await gate.wait()
+            return privacy
+        }
         privacy = SocialPrivacy(shareLiveLocationWithFriends: patch.shareLiveLocationWithFriends ?? privacy.shareLiveLocationWithFriends,
             shareRadioDataWithFriends: patch.shareRadioDataWithFriends ?? privacy.shareRadioDataWithFriends,
             shareSessionsWithFriends: patch.shareSessionsWithFriends ?? privacy.shareSessionsWithFriends,
@@ -449,12 +564,20 @@ private actor PrivacyServiceDouble: PrivacyServicing {
     }
     func preferences() async throws -> UserPreferences {
         if preferencesFail { throw APIError.transport("synthetic") }
-        return UserPreferences(showHandleOnLeaderboard: true, showHypothesisSystem: false)
+        return storedPreferences
     }
     func updatePreferences(_ patch: UserPreferencesPatch) async throws -> UserPreferences {
         preferenceWrites += 1
-        return UserPreferences(unitsSystem: patch.unitsSystem ?? .metric,
-            showHandleOnLeaderboard: patch.showHandleOnLeaderboard ?? true, showHypothesisSystem: false)
+        if let gate = preferenceUpdateGate {
+            preferenceUpdateGate = nil
+            storedPreferences = await gate.wait()
+            return storedPreferences
+        }
+        storedPreferences = UserPreferences(unitsSystem: patch.unitsSystem ?? storedPreferences.unitsSystem,
+            defaultMarket: storedPreferences.defaultMarket,
+            showHandleOnLeaderboard: patch.showHandleOnLeaderboard ?? storedPreferences.showHandleOnLeaderboard,
+            showHypothesisSystem: patch.showHypothesisSystem ?? storedPreferences.showHypothesisSystem)
+        return storedPreferences
     }
     func zones() async throws -> [PrivacyZone] {
         if let gate = zonesGate { zonesGate = nil; return await gate.wait() }
