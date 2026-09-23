@@ -265,6 +265,84 @@ extension SpeedtestV6ContractTests {
         let savedID = await service.serverId(forClientId: result.id)
         XCTAssertEqual(savedID, "server-id")
     }
+
+    func testLegacyOptOutCannotPrivatizeNewGuestReplayOrCrossAccount() async throws {
+        let previousUser = LocalAccountScope.currentUserId
+        let oldPreference = UserDefaults.standard.object(forKey: "speedtest_publish_to_map")
+        LocalAccountScope.deactivate()
+        UserDefaults.standard.set(false, forKey: "speedtest_publish_to_map")
+        defer {
+            if let oldPreference { UserDefaults.standard.set(oldPreference, forKey: "speedtest_publish_to_map") }
+            else { UserDefaults.standard.removeObject(forKey: "speedtest_publish_to_map") }
+            if let previousUser { LocalAccountScope.activate(userId: previousUser) }
+            else { LocalAccountScope.deactivate() }
+            MockURLProtocol.requestHandler = nil
+        }
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        let cache = DiskCache(folderName: "SpeedtestV6GuestPublication-\(UUID().uuidString)", evicts: false)
+        let store = DiskCacheSpeedtestPendingStore(cache: cache, key: "pending")
+        let receipts = GuestSpeedtestReceiptStore(store: InMemoryTokenStore())
+        let service = SpeedtestService(api: APIClient(config: .test, credentials: credentials,
+            session: URLSession(configuration: config)), historyCache: cache, pendingCache: cache,
+            guestReceiptStore: receipts, pendingStore: store, vpnIsActive: { false })
+        let result = SpeedtestRunResult(label: "guest", downloadMbps: 100,
+            downloadAverageMbps: 100, downloadMaxMbps: 110, durationSeconds: 10,
+            connectionType: .cellular, coordinate: Coordinates(latitude: 48.8566, longitude: 2.3522),
+            ownerScopeId: "guest")
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.url?.path, "/api/speedtests")
+            return (HTTPURLResponse(url: request.url!, statusCode: 503, httpVersion: nil,
+                headerFields: nil)!, Data("{}".utf8))
+        }
+        do { try await service.save(result); XCTFail("The first upload must remain pending") } catch { }
+        var pending = await store.loadAll()
+        XCTAssertEqual(pending.count, 1)
+        XCTAssertEqual(pending.first?.ownerScopeId, "guest")
+        XCTAssertEqual(pending.first?.isVisibleOnMap, true)
+        XCTAssertEqual(pending.first?.shareExactLocation, true)
+
+        LocalAccountScope.activate(userId: "another-account")
+        MockURLProtocol.requestHandler = { _ in XCTFail("Guest replay crossed into account A"); throw APIError.missingAuthToken }
+        await service.retryPendingSaves()
+        pending = await store.loadAll()
+        XCTAssertEqual(pending.count, 1)
+
+        LocalAccountScope.deactivate()
+        MockURLProtocol.requestHandler = { request in
+            let body: Data
+            if let directBody = request.httpBody {
+                body = directBody
+            } else {
+                let stream = try XCTUnwrap(request.httpBodyStream)
+                stream.open()
+                defer { stream.close() }
+                var data = Data()
+                var buffer = [UInt8](repeating: 0, count: 1024)
+                while true {
+                    let count = stream.read(&buffer, maxLength: buffer.count)
+                    if count < 0 { throw stream.streamError ?? URLError(.cannotDecodeRawData) }
+                    if count == 0 { break }
+                    data.append(contentsOf: buffer.prefix(count))
+                }
+                body = data
+            }
+            let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(payload["isVisibleOnMap"] as? Bool, true)
+            XCTAssertEqual(payload["shareExactLocation"] as? Bool, true)
+            let coordinate = try XCTUnwrap(payload["coordinates"] as? [String: Double])
+            XCTAssertEqual(try XCTUnwrap(coordinate["latitude"]), 48.8566, accuracy: 0.000001)
+            XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                headerFields: nil)!, Data(#"{"success":true,"id":"guest-server-id"}"#.utf8))
+        }
+        await service.retryPendingSaves()
+        let remaining = await store.loadAll()
+        XCTAssertTrue(remaining.isEmpty)
+        XCTAssertNotNil(receipts.all().first(where: { $0.id == "guest-server-id" }))
+        await cache.remove("pending")
+    }
 }
 
 

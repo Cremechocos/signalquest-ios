@@ -206,7 +206,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         try await validateTransmissionAdmission(endpoint, context: context)
         guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
         var request = try makeURLRequest(endpoint, credentials: context)
-        if let fixedAuthToken {
+        if let fixedAuthToken, !fixedAuthToken.isEmpty {
             request.setValue("auth_token=\(fixedAuthToken)", forHTTPHeaderField: "Cookie")
             request.httpShouldHandleCookies = false
         }
