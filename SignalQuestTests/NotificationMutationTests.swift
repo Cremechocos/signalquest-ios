@@ -74,6 +74,25 @@ final class NotificationMutationTests: XCTestCase {
         XCTAssertEqual(count, 2)
     }
 
+    func testRelaunchReadsServerTruthAfterOfflineFailureAndRetry() async {
+        let service = NotificationMutationMock(items: [item("a")], failReadOnce: true)
+        let firstLaunch = NotificationsCenterViewModel(service: service)
+        await firstLaunch.load()
+        await firstLaunch.markRead("a")
+        XCTAssertEqual(firstLaunch.items.first?.read, false)
+
+        let reopened = NotificationsCenterViewModel(service: service)
+        await reopened.load()
+        XCTAssertEqual(reopened.items.first?.read, false)
+        XCTAssertEqual(reopened.unreadCount, 1)
+        await reopened.markRead("a")
+
+        let afterRetry = NotificationsCenterViewModel(service: service)
+        await afterRetry.load()
+        XCTAssertEqual(afterRetry.items.first?.read, true)
+        XCTAssertEqual(afterRetry.unreadCount, 0)
+    }
+
     func testFailedGroupActionsPreserveItemsAndCanRetry() async {
         let service = NotificationMutationMock(items: [item("a"), item("b")],
             failMarkAllOnce: true, failDeleteOnce: true)
@@ -297,10 +316,21 @@ private actor NotificationMutationMock: NotificationsServicing {
         reads += 1
         await delayedRead?.wait()
         if readFailures > 0 { readFailures -= 1; throw Failure.offline }
+        rows = rows.map { row in
+            guard row.id == id else { return row }
+            return AppNotification(id: row.id, type: row.type, title: row.title,
+                message: row.message, createdAt: row.createdAt, read: true,
+                link: row.link, metadata: row.metadata)
+        }
     }
     func markAllRead() async throws {
         markAlls += 1
         if markAllFailures > 0 { markAllFailures -= 1; throw Failure.offline }
+        rows = rows.map { row in
+            AppNotification(id: row.id, type: row.type, title: row.title,
+                message: row.message, createdAt: row.createdAt, read: true,
+                link: row.link, metadata: row.metadata)
+        }
     }
     func deleteAll() async throws {
         if deleteFailures > 0 { deleteFailures -= 1; throw Failure.offline }
