@@ -481,7 +481,7 @@ struct PhotosView: View {
             if let op = photo.operator, !op.isEmpty {
                 Text(op)
                     .font(SQType.micro)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(SQBrand.operatorBadgeForeground(op))
                     .padding(.horizontal, SQSpace.sm + 2)
                     .padding(.vertical, SQSpace.xs)
                     .background(opColor, in: Capsule(style: .continuous))
@@ -747,7 +747,7 @@ struct PhotoDetailView: View {
             if let op = photo.operator, !op.isEmpty {
                 Text(op)
                     .font(SQType.micro)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(SQBrand.operatorBadgeForeground(op))
                     .padding(.horizontal, SQSpace.sm + 2)
                     .padding(.vertical, SQSpace.xs)
                     .background(opColor, in: Capsule(style: .continuous))

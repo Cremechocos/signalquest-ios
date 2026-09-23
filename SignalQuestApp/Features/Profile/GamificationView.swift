@@ -312,9 +312,13 @@ struct GamificationView: View {
     private var questsSkeleton: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
             Text("Quêtes").font(SQType.title).foregroundStyle(SQColor.label)
-            HStack(alignment: .top, spacing: SQSpace.md) {
-                questCardSkeleton
-                questCardSkeleton
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: SQSpace.md) {
+                    questCardSkeleton
+                    questCardSkeleton
+                }
+                .padding(.horizontal, 4)
+                .padding(.bottom, SQSpace.lg)
             }
             .padding(.top, SQSpace.xs)
         }
@@ -335,7 +339,7 @@ struct GamificationView: View {
             SkeletonBlock(width: 64, height: 9)
         }
         .padding(SQSpace.lg)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: 270, alignment: .leading)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .sqShadowCard()
         .sqShimmer()
