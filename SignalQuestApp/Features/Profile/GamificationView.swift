@@ -90,6 +90,7 @@ final class GamificationViewModel: ObservableObject {
 struct GamificationView: View {
     @StateObject private var model: GamificationViewModel
     @EnvironmentObject private var services: AppServices
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     init(service: GamificationServicing) {
         _model = StateObject(wrappedValue: GamificationViewModel(service: service))
     }
@@ -339,7 +340,7 @@ struct GamificationView: View {
             SkeletonBlock(width: 64, height: 9)
         }
         .padding(SQSpace.lg)
-        .frame(width: 270, alignment: .leading)
+        .frame(width: QuestCardLayout.width(for: dynamicTypeSize), alignment: .leading)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .sqShadowCard()
         .sqShimmer()
@@ -535,6 +536,12 @@ enum QuestCadenceGroup: CaseIterable, Hashable {
     }
 }
 
+private enum QuestCardLayout {
+    static func width(for size: DynamicTypeSize) -> CGFloat {
+        size.isAccessibilitySize ? 300 : 270
+    }
+}
+
 /// Carte de quête v2 — DA Crème : surface douce rayon 22 + ombre carte,
 /// pastille de cadence, jauge 8 pt (brique, olive à 100 %), bouton « Réclamer »
 /// seulement quand la récompense est encaissable.
@@ -543,6 +550,7 @@ private struct QuestCardView: View {
     let cadence: QuestCadenceGroup
     let isClaiming: Bool
     let onClaim: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
@@ -559,7 +567,7 @@ private struct QuestCardView: View {
             }
         }
         .padding(SQSpace.lg)
-        .frame(width: 270, alignment: .leading)
+        .frame(width: QuestCardLayout.width(for: dynamicTypeSize), alignment: .leading)
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .sqShadowCard()
         .opacity(quest.isClaimed ? 0.62 : 1)
@@ -577,12 +585,14 @@ private struct QuestCardView: View {
                 Text(quest.title ?? "Quête")
                     .font(SQFont.display(15.5, .semibold))
                     .foregroundStyle(SQColor.label)
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    .fixedSize(horizontal: false, vertical: true)
                     .multilineTextAlignment(.leading)
                 Text(quest.description ?? " ")
                     .font(SQFont.body(12.5))
                     .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(2, reservesSpace: true)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    .fixedSize(horizontal: false, vertical: true)
                     .multilineTextAlignment(.leading)
             }
             Spacer(minLength: 0)
