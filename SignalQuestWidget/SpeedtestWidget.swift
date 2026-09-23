@@ -60,12 +60,12 @@ func speedColor(_ mbps: Double) -> Color {
 /// Libellé qualitatif court affiché sous le cadran.
 func speedQualityLabel(_ mbps: Double) -> String {
     switch mbps {
-    case 600...: return "Excellent"
-    case 300..<600: return "Très bon"
-    case 100..<300: return "Rapide"
-    case 30..<100: return "Correct"
-    case 10..<30: return "Lent"
-    default: return "Faible"
+    case 600...: return String(localized: "Excellent")
+    case 300..<600: return String(localized: "Très bon")
+    case 100..<300: return String(localized: "Rapide")
+    case 30..<100: return String(localized: "Correct")
+    case 10..<30: return String(localized: "Lent")
+    default: return String(localized: "Faible")
     }
 }
 

@@ -45903,6 +45903,41 @@
         "fr": { "stringUnit": { "state": "translated", "value": "mesuré en" } },
         "en": { "stringUnit": { "state": "translated", "value": "measured using" } }
       }
+    },
+    "Alerte zone mal couverte": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Alerte zone mal couverte" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Poor coverage alert" } }
+      }
+    },
+    "Contact & signalement": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Contact & signalement" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Contact & report a problem" } }
+      }
+    },
+    "Mode terrain": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Mode terrain" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Field mode" } }
+      }
+    },
+    "Noir intense (OLED)": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Noir intense (OLED)" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Pure black (OLED)" } }
+      }
+    },
+    "Messagerie chiffrée via %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Messagerie chiffrée via %@" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Encrypted messages with %@" } }
+      }
     }
   },
   "version": "1.0"

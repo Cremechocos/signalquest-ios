@@ -1594,7 +1594,9 @@ struct SettingsView: View {
                                 if !newValue { E2EEBiometric.clear() }
                             }
                         )) {
-                            settingsLabel("Messagerie chiffrée via \(BiometricAuth.kind.label)", systemImage: "lock.shield")
+                            settingsLabel("Messagerie chiffrée via \(BiometricAuth.kind.label)",
+                                systemImage: "lock.shield",
+                                localizedTitle: "Messagerie chiffrée via \(BiometricAuth.kind.label)")
                         }
                     }
                 } header: {
@@ -1900,7 +1902,8 @@ struct SettingsView: View {
 
     /// Rangée de réglage (DA Crème) : pastille d'icône 36 pt `accentSoft`
     /// (icône brique) + libellé Figtree Medium 15,5. Aucune bordure.
-    private func settingsLabel(_ title: String, systemImage: String) -> some View {
+    private func settingsLabel(_ title: String, systemImage: String,
+                               localizedTitle: LocalizedStringKey? = nil) -> some View {
         HStack(spacing: SQSpace.md) {
             Image(systemName: systemImage)
                 .font(.system(size: 15, weight: .medium))
@@ -1908,7 +1911,7 @@ struct SettingsView: View {
                 .frame(width: 36, height: 36)
                 .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .accessibilityHidden(true)
-            Text(LocalizedStringKey(title))
+            Text(localizedTitle ?? LocalizedStringKey(title))
                 .font(.body.weight(.medium))
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
