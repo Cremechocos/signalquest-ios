@@ -443,7 +443,7 @@ struct PhotosView: View {
             Color.clear
                 .aspectRatio(16 / 9, contentMode: .fit)
                 .overlay {
-                    RemoteImage(url: photo.imageUrl ?? photo.thumbnailUrl, maxDimension: 800, contentMode: .fill) {
+                    RemoteImage(url: photo.imageUrl ?? photo.thumbnailUrl, maxDimension: 800, contentMode: .fill, showsFailureUI: true) {
                         Rectangle().fill(SQColor.fill).sqShimmer()
                     }
                 }
@@ -501,7 +501,7 @@ struct PhotosView: View {
             Color.clear
                 .aspectRatio(3 / 4, contentMode: .fit)
                 .overlay {
-                    RemoteImage(url: photo.thumbnailUrl ?? photo.imageUrl, maxDimension: 300, contentMode: .fill) {
+                    RemoteImage(url: photo.thumbnailUrl ?? photo.imageUrl, maxDimension: 300, contentMode: .fill, showsFailureUI: true) {
                         Rectangle().fill(SQColor.fill).sqShimmer()
                     }
                 }
@@ -738,7 +738,7 @@ struct PhotoDetailView: View {
             Color.clear
                 .aspectRatio(4 / 3, contentMode: .fit)
                 .overlay {
-                    RemoteImage(url: photo.imageUrl ?? photo.thumbnailUrl, maxDimension: 1200, contentMode: .fill) {
+                    RemoteImage(url: photo.imageUrl ?? photo.thumbnailUrl, maxDimension: 1200, contentMode: .fill, showsFailureUI: true) {
                         Rectangle().fill(SQColor.fill).sqShimmer()
                     }
                 }
@@ -1238,7 +1238,7 @@ struct PhotoShareSheet: View {
             List {
                 Section {
                     HStack(spacing: SQSpace.md) {
-                        RemoteImage(url: photo.thumbnailUrl ?? photo.imageUrl, maxDimension: 120, contentMode: .fill) {
+                        RemoteImage(url: photo.thumbnailUrl ?? photo.imageUrl, maxDimension: 120, contentMode: .fill, showsFailureUI: true) {
                             Rectangle().fill(SQColor.fill)
                         }
                         .frame(width: 60, height: 60)

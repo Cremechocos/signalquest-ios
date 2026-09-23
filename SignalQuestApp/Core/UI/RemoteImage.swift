@@ -157,10 +157,12 @@ struct RemoteImage<Placeholder: View>: View {
     var maxDimension: CGFloat
     var contentMode: ContentMode = .fill
     var cacheScope: ImageCacheScope = .publicContent
+    var showsFailureUI = false
     @ViewBuilder var placeholder: () -> Placeholder
 
     @State private var image: UIImage?
     @State private var failed = false
+    @State private var retryCount = 0
     @Environment(\.displayScale) private var displayScale
 
     var body: some View {
@@ -169,13 +171,15 @@ struct RemoteImage<Placeholder: View>: View {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
+            } else if failed && showsFailureUI {
+                failureView
             } else {
                 placeholder()
             }
         }
         .task(id: taskKey) {
             failed = false
-            guard let url else { image = nil; return }
+            guard let url else { image = nil; failed = true; return }
             let maxPixel = max(1, maxDimension * displayScale)
             // Lecture SYNCHRONE du cache mémoire avant toute remise à nil.
             // Auparavant `image = nil` s'exécutait en premier et `image(for:)`
@@ -193,19 +197,54 @@ struct RemoteImage<Placeholder: View>: View {
             }
             image = nil
             do {
-                image = try await ImagePipeline.shared.image(
+                let loaded = try await ImagePipeline.shared.image(
                     for: url,
                     maxPixel: maxPixel,
                     scope: cacheScope
                 )
+                guard !Task.isCancelled else { return }
+                image = loaded
             } catch {
+                guard !Task.isCancelled else { return }
                 failed = true
             }
         }
     }
 
+    @ViewBuilder private var failureView: some View {
+        ZStack {
+            SQColor.fill
+            VStack(spacing: 8) {
+                if url == nil {
+                    Image(systemName: "photo")
+                        .font(.title3)
+                }
+                if maxDimension >= 180 {
+                    Text("Photo indisponible")
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                }
+                if url != nil {
+                    Button {
+                        retryCount += 1
+                    } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: "arrow.clockwise")
+                            if maxDimension >= 180 { Text("Réessayer") }
+                        }
+                        .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel("Réessayer")
+                }
+            }
+            .foregroundStyle(SQColor.label)
+        }
+        .accessibilityIdentifier("remoteImage.failure")
+    }
+
     /// Recharge quand l'URL OU l'échelle change.
     private var taskKey: String {
-        "\(cacheScope.cacheIdentity)|\(url?.absoluteString ?? "nil")|\(Int(maxDimension * displayScale))"
+        "\(cacheScope.cacheIdentity)|\(url?.absoluteString ?? "nil")|\(Int(maxDimension * displayScale))|\(retryCount)"
     }
 }
