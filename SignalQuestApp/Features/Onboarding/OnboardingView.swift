@@ -111,9 +111,6 @@ struct OnboardingView: View {
                         ForEach(Array(pages.enumerated()), id: \.element.id) { index, item in
                             OnboardingSlideView(page: item, isActive: index == page)
                                 .frame(width: width, height: geo.size.height)
-                                // Une seule slide dans l'arbre d'accessibilité :
-                                // VoiceOver ne doit pas lire les pages hors écran.
-                                .accessibilityHidden(index != page)
                         }
                     }
                     .offset(x: -CGFloat(page) * width + dragX)
@@ -306,7 +303,21 @@ private struct OnboardingSlideView: View {
     @State private var revealed = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    @ViewBuilder
     var body: some View {
+        if isActive {
+            fittedContent
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(Text(verbatim: "\(page.title.localized(locale)). \(page.body.localized(locale))"))
+                .accessibilityIdentifier("onboarding.slide.\(page.scene.rawValue)")
+        } else {
+            // Le pager conserve la slide voisine pour l'animation, mais elle
+            // n'existe pas comme élément accessible tant qu'elle est hors écran.
+            fittedContent.accessibilityHidden(true)
+        }
+    }
+
+    private var fittedContent: some View {
         // À très grande taille Dynamic Type le contenu peut dépasser l'écran :
         // on bascule alors sur un défilement vertical plutôt que de tronquer.
         ViewThatFits(in: .vertical) {
@@ -317,9 +328,6 @@ private struct OnboardingSlideView: View {
         .onChangeCompat(of: isActive) { _, active in
             if active { reveal() }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(verbatim: "\(page.title.localized(locale)). \(page.body.localized(locale))"))
-        .accessibilityIdentifier("onboarding.slide.\(page.scene.rawValue)")
     }
 
     private var stack: some View {

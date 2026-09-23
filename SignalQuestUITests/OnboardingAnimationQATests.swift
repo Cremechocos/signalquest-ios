@@ -199,6 +199,11 @@ final class OnboardingAnimationQATests: XCTestCase {
         for index in scenes.indices {
             let slide = app.descendants(matching: .any)["onboarding.slide.\(scenes[index])"].firstMatch
             XCTAssertTrue(slide.waitForExistence(timeout: 5))
+            for inactive in scenes.indices where inactive != index {
+                let hidden = app.descendants(matching: .any)["onboarding.slide.\(scenes[inactive])"].firstMatch
+                XCTAssertTrue(hidden.waitForNonExistence(timeout: 3),
+                    "VoiceOver must not encounter page \(inactive + 1) while page \(index + 1) is active")
+            }
             XCTAssertTrue(slide.label.contains(expected[index]), slide.label)
             XCTAssertFalse(slide.label.contains("partout en France"))
             XCTAssertFalse(slide.label.contains("uniquement si tu le décides"))
