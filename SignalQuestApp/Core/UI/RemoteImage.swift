@@ -5,6 +5,7 @@ import UIKit
 enum ImagePipelineError: Error {
     case decodeFailed
     case privateSessionChanged
+    case httpStatus(Int)
 }
 
 /// Frontière de confidentialité du cache d'images.
@@ -55,18 +56,26 @@ final class ImagePipeline: @unchecked Sendable {
                     url: url,
                     cachePolicy: reload ? .reloadIgnoringLocalCacheData : .returnCacheDataElseLoad
                 )
-                let (data, _) = try await publicSession.data(for: request)
+                let (data, response) = try await publicSession.data(for: request)
+                try Self.requireSuccessfulHTTP(response)
                 return data
             case .privateAccount:
                 // Cette session n'a aucun URLCache ni cookie jar partagé. La
                 // requête explicite également le bypass afin qu'une évolution de
                 // configuration ne puisse pas réactiver un cache HTTP privé global.
                 let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
-                let (data, _) = try await privateSession.data(for: request)
+                let (data, response) = try await privateSession.data(for: request)
+                try Self.requireSuccessfulHTTP(response)
                 return data
             }
         }
         configureMemoryCache()
+    }
+
+    private static func requireSuccessfulHTTP(_ response: URLResponse) throws {
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw ImagePipelineError.httpStatus(http.statusCode)
+        }
     }
 
     /// Injection réservée aux tests : aucune requête réseau réelle n'est requise
@@ -167,6 +176,7 @@ struct RemoteImage<Placeholder: View>: View {
     var maxDimension: CGFloat
     var contentMode: ContentMode = .fill
     var cacheScope: ImageCacheScope = .publicContent
+    var pipeline: ImagePipeline = .shared
     var showsFailureUI = false
     @ViewBuilder var placeholder: () -> Placeholder
 
@@ -182,6 +192,7 @@ struct RemoteImage<Placeholder: View>: View {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
+                    .accessibilityIdentifier("remoteImage.loaded")
             } else if failed && showsFailureUI {
                 failureView
             } else {
@@ -198,7 +209,7 @@ struct RemoteImage<Placeholder: View>: View {
             // (scroll d'une grille de photos, pan de carte) réaffichait donc au
             // moins une frame de placeholder alors que l'image décodée était
             // déjà en mémoire. L'accesseur existait et n'était appelé nulle part.
-            if let cached = ImagePipeline.shared.cachedImage(
+            if let cached = pipeline.cachedImage(
                 for: url,
                 maxPixel: maxPixel,
                 scope: cacheScope
@@ -209,7 +220,7 @@ struct RemoteImage<Placeholder: View>: View {
             image = nil
             do {
                 let forceReload = retryIdentity == requestIdentity
-                let loaded = try await ImagePipeline.shared.image(
+                let loaded = try await pipeline.image(
                     for: url,
                     maxPixel: maxPixel,
                     scope: cacheScope,
@@ -232,11 +243,13 @@ struct RemoteImage<Placeholder: View>: View {
                 if url == nil {
                     Image(systemName: "photo")
                         .font(.title3)
+                        .accessibilityIdentifier("remoteImage.failure")
                 }
                 if maxDimension >= 180 {
                     Text("Photo indisponible")
                         .font(.caption)
                         .multilineTextAlignment(.center)
+                        .accessibilityIdentifier("remoteImage.failure")
                 }
                 if url != nil {
                     Button {
@@ -251,11 +264,11 @@ struct RemoteImage<Placeholder: View>: View {
                     }
                     .buttonStyle(.bordered)
                     .accessibilityLabel("Réessayer")
+                    .accessibilityIdentifier("remoteImage.retry")
                 }
             }
             .foregroundStyle(SQColor.label)
         }
-        .accessibilityIdentifier("remoteImage.failure")
     }
 
     /// Recharge quand l'URL OU l'échelle change.

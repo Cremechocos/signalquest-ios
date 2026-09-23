@@ -362,15 +362,11 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            // Version trop ancienne : on ne construit RIEN d'autre.
-            //
-            // Un simple `.overlay` ne suffit pas — le dock flottant restait
-            // atteignable en dessous (vérifié : les 5 onglets répondaient encore
-            // aux taps derrière l'écran de blocage). Court-circuiter la
-            // hiérarchie garantit qu'aucune requête d'une version obsolète
-            // n'atteigne un backend dont le contrat a été durci, ce qui est tout
-            // l'objet de ce kill-switch.
-            if case .updateRequired(let message, let storeURL) = versionPolicy.state {
+            if AppEnvironment.showsRemoteImageQA {
+                RemoteImageQAScreen()
+            } else if case .updateRequired(let message, let storeURL) = versionPolicy.state {
+                // Un ancien build ne construit rien d'autre : le dock restait
+                // atteignable sous un simple overlay de mise à jour forcée.
                 ForcedUpdateView(message: message, storeURL: storeURL)
             } else if isAuthenticated || isGuestApplicationAllowed {
                 MainTabView(user: authenticatedUser)

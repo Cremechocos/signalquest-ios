@@ -574,6 +574,20 @@ final class ImagePipelineAccountScopeTests: XCTestCase {
         XCTAssertEqual(reloads, [false, true])
     }
 
+    func testLargeImageIsDownsampledBeforeEnteringMemoryCache() async throws {
+        let source = UIGraphicsImageRenderer(size: CGSize(width: 2_500, height: 1_800)).image { context in
+            UIColor.blue.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 2_500, height: 1_800))
+        }
+        let bytes = try XCTUnwrap(source.pngData())
+        let pipeline = ImagePipeline { _, _, _ in bytes }
+        let image = try await pipeline.image(for: url, maxPixel: 640)
+        let pixels = try XCTUnwrap(image.cgImage)
+        XCTAssertLessThanOrEqual(max(pixels.width, pixels.height), 640)
+        XCTAssertLessThanOrEqual(pixels.bytesPerRow * pixels.height, 640 * 640 * 4)
+        XCTAssertNotNil(pipeline.cachedImage(for: url, maxPixel: 640))
+    }
+
     private func activate(_ userId: String) -> LocalAccountSession {
         LocalAccountScope.activate(userId: userId)
         return LocalAccountScope.sessionSnapshot()!
