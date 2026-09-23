@@ -487,10 +487,9 @@ final class DriveTestViewModel: ObservableObject {
         }
     }
 
-    /// Résout l'opérateur de la SIM et son marché, par ordre de fiabilité :
-    /// 1) MCC/MNC lus DIRECTEMENT sur la SIM (CoreTelephony — marche aussi en WiFi) ;
-    /// 2) `operatorKey` par IP/ASN (`resolve`) quand on est en cellulaire ;
-    /// 3) repli sur l'opérateur/marché déjà détectés et persistés par la carte (Lot 1A).
+    /// Résout l'opérateur via IP/ASN sur cellulaire hors VPN, puis le PLMN SIM
+    /// textuel exact dans le registre radio. Le MCC SIM sert au choix du marché ;
+    /// la carte ne fournit qu'un marché de repli, jamais l'identité du réseau.
     /// Mis en cache (`resolvedSim`) : un drive test = une SIM stable. Fallback "ALL"
     /// seulement si rien n'est déterminable (ex. SIM masquée iOS 16.4+ sans carte ouverte).
     private func resolveSimOperatorIfNeeded() async {
@@ -534,8 +533,8 @@ final class DriveTestViewModel: ObservableObject {
         //    Cherchait dans `selectableOperators`, dont le champ `mncs` est toujours
         //    vide (la table MNC vit dans `radioOperators`) : ce repli ne se déclenchait
         //    jamais. Même correction que dans SpeedtestService.
-        if operatorKey == nil, let mcc = plmn.mcc, let mnc = plmn.mnc, let entry,
-           let key = entry.radioOperatorKey(mcc: mcc, mnc: mnc) {
+        if operatorKey == nil, let simPlmn = plmn.plmn, let entry,
+           let key = entry.radioOperatorKey(observedPlmn: simPlmn) {
             operatorKey = key
             source = .sim
         }
