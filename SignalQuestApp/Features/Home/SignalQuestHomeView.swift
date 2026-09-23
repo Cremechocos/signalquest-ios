@@ -742,7 +742,7 @@ struct SignalQuestHomeView: View {
         // sinon on tolère jusqu'à 90 s de cache pour ne pas marteler l'API.
         let maxAge: TimeInterval = forceFresh ? 0 : 90
         let isCellular = services.networkPath.status.connection == .cellular
-        let simMnc = services.networkPath.simPLMN().mnc
+        let simPlmn = services.networkPath.simPLMN().plmn
 
         // Pouls recadré sur le même rayon que le reste (1 km), tous opérateurs.
         async let pulseTask: NetworkPulse? = try? services.feed.networkPulse(
@@ -753,7 +753,7 @@ struct SignalQuestHomeView: View {
         async let recentTask: [AndroidSpeedtestMarker] = recentNearbySpeedtests(latitude: lat, longitude: lng)
         async let tilesTask: [AndroidSpeedtestMarker] = nearbySpeedtests(latitude: lat, longitude: lng, around: location, maxAge: maxAge)
         async let qualityTask: NearbyNetworkQuality? = services.nearbyQuality.verdict(
-            latitude: lat, longitude: lng, isCellular: isCellular, simMnc: simMnc, maxAge: maxAge
+            latitude: lat, longitude: lng, isCellular: isCellular, simPlmn: simPlmn, maxAge: maxAge
         )
         async let outageTask: CommunityOutage? = nearestOutage(around: location)
 

@@ -538,7 +538,7 @@ final class CarPlayCoordinator {
                 latitude: location.coordinate.latitude,
                 longitude: location.coordinate.longitude,
                 isCellular: path.connection == .cellular,
-                simMnc: path.operatorMnc,
+                simPlmn: services.networkPath.simPLMN().plmn,
                 maxAge: nil
             )
             guard !Task.isCancelled, let verdict else { return }
@@ -826,7 +826,7 @@ final class CarPlayCoordinator {
             latitude: coordinate.latitude,
             longitude: coordinate.longitude,
             isCellular: path.connection == .cellular,
-            simMnc: path.operatorMnc,
+            simPlmn: services.networkPath.simPLMN().plmn,
             maxAge: nil
         )
 

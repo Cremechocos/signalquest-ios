@@ -30,13 +30,13 @@ protocol NearbyNetworkQualityServicing: Sendable {
     ///
     /// - Parameters:
     ///   - isCellular: connexion active cellulaire (autorise la résolution par IP/ASN).
-    ///   - simMnc: MNC de la SIM lu par CoreTelephony (repli quand l'IP est indisponible).
+    ///   - simPlmn: PLMN exact de la SIM (repli quand l'IP est indisponible).
     ///   - maxAge: fraîcheur du cache de tuiles (`0` = données fraîches forcées).
     func verdict(
         latitude: Double,
         longitude: Double,
         isCellular: Bool,
-        simMnc: Int?,
+        simPlmn: String?,
         maxAge: TimeInterval?
     ) async -> NearbyNetworkQuality?
 
@@ -82,11 +82,11 @@ final class NearbyNetworkQualityService: NearbyNetworkQualityServicing {
         latitude: Double,
         longitude: Double,
         isCellular: Bool,
-        simMnc: Int?,
+        simPlmn: String?,
         maxAge: TimeInterval?
     ) async -> NearbyNetworkQuality? {
         guard let market = await markets.marketForLocation(latitude: latitude, longitude: longitude),
-              let op = await resolveOperator(market: market, isCellular: isCellular, simMnc: simMnc)
+              let op = await resolveOperator(market: market, isCellular: isCellular, simPlmn: simPlmn)
         else { return nil }
 
         let bounds = MapBounds(
@@ -234,11 +234,11 @@ final class NearbyNetworkQualityService: NearbyNetworkQualityServicing {
 
     /// Identifie l'opérateur de la SIM : IP/ASN d'abord (fiable en cellulaire,
     /// écarté sous VPN où l'IP refléterait le tunnel ; non tenté sur WiFi où l'IP
-    /// pointerait le FAI fixe), puis repli sur le MNC de la SIM.
+    /// pointerait le FAI fixe), puis repli sur le PLMN exact de la SIM.
     private func resolveOperator(
         market: MarketRegistryEntry,
         isCellular: Bool,
-        simMnc: Int?
+        simPlmn: String?
     ) async -> MarketRegistryOperator? {
         if isCellular {
             let viaVpn = VPNDetector.isActive()
@@ -248,11 +248,15 @@ final class NearbyNetworkQualityService: NearbyNetworkQualityServicing {
                 return entry
             }
         }
-        if let simMnc,
-           let entry = market.selectableOperators.first(where: { $0.mncs.contains(simMnc) }) {
+        if let entry = Self.simFallbackOperator(market: market, simPlmn: simPlmn) {
             return entry
         }
         return nil
+    }
+
+    static func simFallbackOperator(market: MarketRegistryEntry, simPlmn: String?) -> MarketRegistryOperator? {
+        guard let key = market.radioOperatorKey(observedPlmn: simPlmn) else { return nil }
+        return market.operatorEntry(forKey: key)
     }
 
     private static func median(_ values: [Double], minCount: Int) -> Double? {

@@ -1372,6 +1372,11 @@ extension RadioLogsTests {
         XCTAssertEqual(france.radioOperatorKey(mcc: 208, mnc: 8), "SFR")
         XCTAssertNil(france.radioOperatorKey(observedPlmn: "208008"),
                      "Un MNC à trois chiffres ne doit pas reprendre l'opérateur du 20808")
+        XCTAssertEqual(NearbyNetworkQualityService.simFallbackOperator(market: france, simPlmn: "20808")?.key, "SFR")
+        for plmn in ["208008", "20838", "23415"] {
+            XCTAssertNil(NearbyNetworkQualityService.simFallbackOperator(market: france, simPlmn: plmn), plmn)
+        }
+        XCTAssertNil(NearbyNetworkQualityService.simFallbackOperator(market: france, simPlmn: nil))
         XCTAssertEqual(payload.radioMvno(simPlmn: "20838", simOperatorName: nil)?.key, "LEBARA")
         XCTAssertEqual(payload.radioMvno(simPlmn: "20820", simOperatorName: "Lebara Mobile")?.key, "LEBARA")
         XCTAssertNil(payload.radioMvno(simPlmn: "20838", simOperatorName: "Lycamobile"))
