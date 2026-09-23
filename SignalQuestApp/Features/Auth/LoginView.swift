@@ -48,12 +48,17 @@ struct LoginView: View {
                                 .font(SQType.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
-                            TextField("Code à 6 chiffres", text: $code)
-                                .textContentType(.oneTimeCode)
-                                .keyboardType(.numberPad)
-                                .font(SQFont.display(28, .bold))
-                                .multilineTextAlignment(.center)
-                                .textFieldStyle(SQTextFieldStyle())
+                            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                                SQFormFieldLabel("Code à 6 chiffres")
+                                TextField("Code à 6 chiffres", text: $code,
+                                          prompt: SQFormPrompt.text("Code à 6 chiffres"))
+                                    .textContentType(.oneTimeCode)
+                                    .keyboardType(.numberPad)
+                                    .font(SQFont.display(28, .bold))
+                                    .multilineTextAlignment(.center)
+                                    .textFieldStyle(SQTextFieldStyle())
+                                    .accessibilityLabel("Code à 6 chiffres")
+                            }
                             GradientButton("Valider le code", systemImage: "checkmark.shield", isBusy: session.isBusy) {
                                 Task { await session.verify2FA(code: code) }
                             }
@@ -62,14 +67,23 @@ struct LoginView: View {
                                 .foregroundStyle(SQColor.brandRed)
                                 .frame(maxWidth: .infinity)
                         } else {
-                            TextField("Email", text: $email)
-                                .textInputAutocapitalization(.never)
-                                .keyboardType(.emailAddress)
-                                .textContentType(.username)
-                                .textFieldStyle(SQTextFieldStyle())
-                            SecureField("Mot de passe", text: $password)
-                                .textContentType(.password)
-                                .textFieldStyle(SQTextFieldStyle())
+                            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                                SQFormFieldLabel("Email")
+                                TextField("Email", text: $email, prompt: SQFormPrompt.text("Email"))
+                                    .textInputAutocapitalization(.never)
+                                    .keyboardType(.emailAddress)
+                                    .textContentType(.username)
+                                    .textFieldStyle(SQTextFieldStyle())
+                                    .accessibilityLabel("Email")
+                            }
+                            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                                SQFormFieldLabel("Mot de passe")
+                                SecureField("Mot de passe", text: $password,
+                                            prompt: SQFormPrompt.text("Mot de passe"))
+                                    .textContentType(.password)
+                                    .textFieldStyle(SQTextFieldStyle())
+                                    .accessibilityLabel("Mot de passe")
+                            }
                             GradientButton("Se connecter", systemImage: "arrow.right.circle", isBusy: session.isBusy) {
                                 Task { await session.login(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password) }
                             }
@@ -312,6 +326,7 @@ struct SQTextFieldStyle: TextFieldStyle {
             .frame(minHeight: 44)
             .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
             .foregroundStyle(SQColor.label)
+            .tint(SQColor.brandRed)
             .autocorrectionDisabled()
     }
 }

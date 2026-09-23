@@ -347,6 +347,7 @@
 		8B49B9EE95316289B9D6DCDE /* CarPlayPOIBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33AC6BE683573C262D04CC10 /* CarPlayPOIBuilder.swift */; };
 		8B4B7237C50797C343E06242 /* RouteProgressTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC493FF44AA6DF900C9676B /* RouteProgressTracker.swift */; };
 		8B4D481EAB5B3A87D1416B21 /* SentinelleAlertSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A5D2DCFD4D9B4C849B3BD4C /* SentinelleAlertSettingsSheet.swift */; };
+		8B5AA79D90888D52BC8E5796 /* AuthFieldLabelsQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C58966E2E435E922D292908 /* AuthFieldLabelsQATests.swift */; };
 		8C7659AD0943ED428E44029F /* FriendsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D871487D03A7164E856392DE /* FriendsListView.swift */; };
 		8CB966AA0923A81D556EBC26 /* CommunityOutageDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 620E0D0FEC057F410C4DC0D4 /* CommunityOutageDetailSheet.swift */; };
 		8CC009E03CB57D8B8159BCAA /* SessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD5D954E6102D732D621D8E6 /* SessionModels.swift */; };
@@ -793,6 +794,7 @@
 		3B2B510928CA997F314547B3 /* ANFRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRService.swift; sourceTree = "<group>"; };
 		3B8BBA72A0A9FF7F8F0F8936 /* ValidationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationModels.swift; sourceTree = "<group>"; };
 		3B9DCCD7740AD051F1829F43 /* SentinelleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentinelleTests.swift; sourceTree = "<group>"; };
+		3C58966E2E435E922D292908 /* AuthFieldLabelsQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthFieldLabelsQATests.swift; sourceTree = "<group>"; };
 		3CC1369563F74D6EC8D43E72 /* PasswordResetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordResetView.swift; sourceTree = "<group>"; };
 		3CD01567054707A140E2FCA3 /* MapModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapModels.swift; sourceTree = "<group>"; };
 		3D454E35F1134B2689C8BF45 /* SignatureSpeedDial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureSpeedDial.swift; sourceTree = "<group>"; };
@@ -1820,6 +1822,7 @@
 				21471D2C10A3FFD059193B78 /* AccountSettingsQATests.swift */,
 				F1DBE566F150964A2AF9D0EE /* AntennaPhotoQATests.swift */,
 				A4F5346C853F95E32F253D7B /* AuditTourQATests.swift */,
+				3C58966E2E435E922D292908 /* AuthFieldLabelsQATests.swift */,
 				B517C6393E3FDD2A21D16E34 /* AuthFormsQATests.swift */,
 				E69486C7604BF325A3D24CED /* CommunityFirstContentQATests.swift */,
 				9E978EE2EBFDAD88C880B9C9 /* DockMinimizeQATests.swift */,
@@ -3121,6 +3124,7 @@
 				F7CFE8B7F8498A974CD80BEC /* AccountSettingsQATests.swift in Sources */,
 				AAF92F511259C586D92636FC /* AntennaPhotoQATests.swift in Sources */,
 				73A2B7B1908FB3B6415DC31B /* AuditTourQATests.swift in Sources */,
+				8B5AA79D90888D52BC8E5796 /* AuthFieldLabelsQATests.swift in Sources */,
 				1CAE82D920D95AB2CF54AF18 /* AuthFormsQATests.swift in Sources */,
 				AFCF285F3A9D181434BDB320 /* CommunityFirstContentQATests.swift in Sources */,
 				8A731C079D449D10B1E7ADD3 /* DockMinimizeQATests.swift in Sources */,

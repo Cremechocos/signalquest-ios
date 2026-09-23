@@ -29,27 +29,45 @@ struct SignupView: View {
                         .font(SQType.title)
                         .foregroundStyle(SQColor.label)
 
-                    TextField("Nom affiché", text: $name)
-                        .textContentType(.name)
-                        .textFieldStyle(SQTextFieldStyle())
-                        .accessibilityIdentifier("auth.signup.name")
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        SQFormFieldLabel("Nom affiché")
+                        TextField("Nom affiché", text: $name, prompt: SQFormPrompt.text("Nom affiché"))
+                            .textContentType(.name)
+                            .textFieldStyle(SQTextFieldStyle())
+                            .accessibilityLabel("Nom affiché")
+                            .accessibilityIdentifier("auth.signup.name")
+                    }
 
-                    TextField("Email", text: $email)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.emailAddress)
-                        .textContentType(.username)
-                        .textFieldStyle(SQTextFieldStyle())
-                        .accessibilityIdentifier("auth.signup.email")
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        SQFormFieldLabel("Email")
+                        TextField("Email", text: $email, prompt: SQFormPrompt.text("Email"))
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.emailAddress)
+                            .textContentType(.username)
+                            .textFieldStyle(SQTextFieldStyle())
+                            .accessibilityLabel("Email")
+                            .accessibilityIdentifier("auth.signup.email")
+                    }
 
-                    SecureField("Mot de passe (min. 8 caractères)", text: $password)
-                        .textContentType(.newPassword)
-                        .textFieldStyle(SQTextFieldStyle())
-                        .accessibilityIdentifier("auth.signup.password")
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        SQFormFieldLabel("Mot de passe (min. 8 caractères)")
+                        SecureField("Mot de passe (min. 8 caractères)", text: $password,
+                                    prompt: SQFormPrompt.text("Mot de passe (min. 8 caractères)"))
+                            .textContentType(.newPassword)
+                            .textFieldStyle(SQTextFieldStyle())
+                            .accessibilityLabel("Mot de passe (min. 8 caractères)")
+                            .accessibilityIdentifier("auth.signup.password")
+                    }
 
-                    SecureField("Confirmer le mot de passe", text: $passwordConfirm)
-                        .textContentType(.newPassword)
-                        .textFieldStyle(SQTextFieldStyle())
-                        .accessibilityIdentifier("auth.signup.confirmation")
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        SQFormFieldLabel("Confirmer le mot de passe")
+                        SecureField("Confirmer le mot de passe", text: $passwordConfirm,
+                                    prompt: SQFormPrompt.text("Confirmer le mot de passe"))
+                            .textContentType(.newPassword)
+                            .textFieldStyle(SQTextFieldStyle())
+                            .accessibilityLabel("Confirmer le mot de passe")
+                            .accessibilityIdentifier("auth.signup.confirmation")
+                    }
 
                     Toggle(isOn: $acceptedTerms) {
                         Text("J’accepte les conditions d’utilisation et la politique de confidentialité.")

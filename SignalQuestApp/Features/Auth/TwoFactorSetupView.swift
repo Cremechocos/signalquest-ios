@@ -161,7 +161,8 @@ struct TwoFactorSetupView: View {
             Text("Code de vérification")
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
-            TextField("Code TOTP à 6 chiffres", text: $model.code)
+            TextField("Code TOTP à 6 chiffres", text: $model.code,
+                      prompt: SQFormPrompt.text("Code TOTP à 6 chiffres"))
                 .keyboardType(.numberPad)
                 .textContentType(.oneTimeCode)
                 .autocorrectionDisabled()
@@ -170,6 +171,7 @@ struct TwoFactorSetupView: View {
                 .multilineTextAlignment(.center)
                 .textFieldStyle(SQTextFieldStyle())
                 .focused($codeFocused)
+                .accessibilityLabel("Code TOTP à 6 chiffres")
                 .disabled(model.isBusy)
                 .privacySensitive()
                 .accessibilityIdentifier("two-factor.setup.code")

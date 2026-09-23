@@ -76,14 +76,24 @@ private struct PasswordResetForm: View {
                 Text("Ce changement concerne le compte associé au lien reçu par e-mail.")
                     .font(SQType.body)
                     .foregroundStyle(SQColor.labelSecondary)
-                SecureField("Nouveau mot de passe", text: $password)
-                    .textContentType(.newPassword)
-                    .textFieldStyle(SQTextFieldStyle())
-                    .accessibilityIdentifier("auth.reset.password")
-                SecureField("Confirmer", text: $confirmation)
-                    .textContentType(.newPassword)
-                    .textFieldStyle(SQTextFieldStyle())
-                    .accessibilityIdentifier("auth.reset.confirmation")
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    SQFormFieldLabel("Nouveau mot de passe")
+                    SecureField("Nouveau mot de passe", text: $password,
+                                prompt: SQFormPrompt.text("Nouveau mot de passe"))
+                        .textContentType(.newPassword)
+                        .textFieldStyle(SQTextFieldStyle())
+                        .accessibilityLabel("Nouveau mot de passe")
+                        .accessibilityIdentifier("auth.reset.password")
+                }
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    SQFormFieldLabel("Confirmer le mot de passe")
+                    SecureField("Confirmer le mot de passe", text: $confirmation,
+                                prompt: SQFormPrompt.text("Confirmer le mot de passe"))
+                        .textContentType(.newPassword)
+                        .textFieldStyle(SQTextFieldStyle())
+                        .accessibilityLabel("Confirmer le mot de passe")
+                        .accessibilityIdentifier("auth.reset.confirmation")
+                }
                 if let issue = error ?? passwordIssue {
                     Text(issue).font(SQType.caption).foregroundStyle(SQColor.danger)
                         .fixedSize(horizontal: false, vertical: true)

@@ -41,12 +41,16 @@ struct ForgotPasswordView: View {
                             .font(SQType.body)
                             .foregroundStyle(SQColor.labelSecondary)
                             .fixedSize(horizontal: false, vertical: true)
-                        TextField("Email", text: $email)
-                            .textInputAutocapitalization(.never)
-                            .keyboardType(.emailAddress)
-                            .textContentType(.username)
-                            .textFieldStyle(SQTextFieldStyle())
-                            .accessibilityIdentifier("auth.recovery.email")
+                        VStack(alignment: .leading, spacing: SQSpace.xs) {
+                            SQFormFieldLabel("Email")
+                            TextField("Email", text: $email, prompt: SQFormPrompt.text("Email"))
+                                .textInputAutocapitalization(.never)
+                                .keyboardType(.emailAddress)
+                                .textContentType(.username)
+                                .textFieldStyle(SQTextFieldStyle())
+                                .accessibilityLabel("Email")
+                                .accessibilityIdentifier("auth.recovery.email")
+                        }
                         GradientButton("Envoyer le lien", systemImage: "paperplane.fill",
                                        isBusy: submissionID != nil || session.isBusy) { submit() }
                             .disabled(!canSubmit)
