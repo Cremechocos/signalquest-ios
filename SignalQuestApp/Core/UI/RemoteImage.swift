@@ -40,7 +40,7 @@ enum ImageCacheScope: Equatable, Sendable {
 final class ImagePipeline: @unchecked Sendable {
     static let shared = ImagePipeline()
 
-    typealias DataLoader = @Sendable (URL, ImageCacheScope) async throws -> Data
+    typealias DataLoader = @Sendable (URL, ImageCacheScope, Bool) async throws -> Data
 
     private let dataLoader: DataLoader
     private let memory = NSCache<NSString, UIImage>()
@@ -48,10 +48,14 @@ final class ImagePipeline: @unchecked Sendable {
     init() {
         let publicSession = URLSession(configuration: Self.makePublicSessionConfiguration())
         let privateSession = URLSession(configuration: Self.makePrivateSessionConfiguration())
-        dataLoader = { url, scope in
+        dataLoader = { url, scope, reload in
             switch scope {
             case .publicContent:
-                let (data, _) = try await publicSession.data(from: url)
+                let request = URLRequest(
+                    url: url,
+                    cachePolicy: reload ? .reloadIgnoringLocalCacheData : .returnCacheDataElseLoad
+                )
+                let (data, _) = try await publicSession.data(for: request)
                 return data
             case .privateAccount:
                 // Cette session n'a aucun URLCache ni cookie jar partagé. La
@@ -67,6 +71,11 @@ final class ImagePipeline: @unchecked Sendable {
 
     /// Injection réservée aux tests : aucune requête réseau réelle n'est requise
     /// pour vérifier l'isolation A → logout → B et les réponses tardives.
+    init(dataLoader: @escaping @Sendable (URL, ImageCacheScope) async throws -> Data) {
+        self.dataLoader = { url, scope, _ in try await dataLoader(url, scope) }
+        configureMemoryCache()
+    }
+
     init(dataLoader: @escaping DataLoader) {
         self.dataLoader = dataLoader
         configureMemoryCache()
@@ -109,12 +118,13 @@ final class ImagePipeline: @unchecked Sendable {
     func image(
         for url: URL,
         maxPixel: CGFloat,
-        scope: ImageCacheScope = .publicContent
+        scope: ImageCacheScope = .publicContent,
+        reload: Bool = false
     ) async throws -> UIImage {
         try scope.requireCurrentPrivateSession()
         let key = memoryKey(for: url, maxPixel: maxPixel, scope: scope)
-        if let cached = memory.object(forKey: key) { return cached }
-        let data = try await dataLoader(url, scope)
+        if !reload, let cached = memory.object(forKey: key) { return cached }
+        let data = try await dataLoader(url, scope, reload)
         // La session peut avoir changé pendant le transport ou le décodage. Ne
         // publie jamais les octets de A dans une vue qui appartient désormais à B.
         try scope.requireCurrentPrivateSession()
@@ -163,6 +173,7 @@ struct RemoteImage<Placeholder: View>: View {
     @State private var image: UIImage?
     @State private var failed = false
     @State private var retryCount = 0
+    @State private var retryIdentity: String?
     @Environment(\.displayScale) private var displayScale
 
     var body: some View {
@@ -197,13 +208,16 @@ struct RemoteImage<Placeholder: View>: View {
             }
             image = nil
             do {
+                let forceReload = retryIdentity == requestIdentity
                 let loaded = try await ImagePipeline.shared.image(
                     for: url,
                     maxPixel: maxPixel,
-                    scope: cacheScope
+                    scope: cacheScope,
+                    reload: forceReload
                 )
                 guard !Task.isCancelled else { return }
                 image = loaded
+                if forceReload { retryIdentity = nil }
             } catch {
                 guard !Task.isCancelled else { return }
                 failed = true
@@ -226,6 +240,7 @@ struct RemoteImage<Placeholder: View>: View {
                 }
                 if url != nil {
                     Button {
+                        retryIdentity = requestIdentity
                         retryCount += 1
                     } label: {
                         VStack(spacing: 2) {
@@ -244,7 +259,11 @@ struct RemoteImage<Placeholder: View>: View {
     }
 
     /// Recharge quand l'URL OU l'échelle change.
+    private var requestIdentity: String {
+        "\(cacheScope.cacheIdentity)|\(url?.absoluteString ?? "nil")|\(Int(maxDimension * displayScale))"
+    }
+
     private var taskKey: String {
-        "\(cacheScope.cacheIdentity)|\(url?.absoluteString ?? "nil")|\(Int(maxDimension * displayScale))|\(retryCount)"
+        "\(requestIdentity)|\(retryCount)"
     }
 }

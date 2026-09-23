@@ -554,6 +554,26 @@ final class ImagePipelineAccountScopeTests: XCTestCase {
         XCTAssertEqual(first.pngData(), second.pngData())
     }
 
+    func testRetryBypassesCachedFailureAndThenRestoresMemoryCache() async throws {
+        let loader = FlakyPublicImageLoader(validImage: Self.png(.green))
+        let pipeline = ImagePipeline { _, _, reload in
+            await loader.load(reload: reload)
+        }
+
+        do {
+            _ = try await pipeline.image(for: url, maxPixel: 32)
+            XCTFail("La première réponse invalide doit échouer")
+        } catch ImagePipelineError.decodeFailed {
+            // La vue peut proposer un réessai explicite.
+        }
+
+        let recovered = try await pipeline.image(for: url, maxPixel: 32, reload: true)
+        let cached = try await pipeline.image(for: url, maxPixel: 32)
+        XCTAssertEqual(recovered.pngData(), cached.pngData())
+        let reloads = await loader.reloadFlags()
+        XCTAssertEqual(reloads, [false, true])
+    }
+
     private func activate(_ userId: String) -> LocalAccountSession {
         LocalAccountScope.activate(userId: userId)
         return LocalAccountScope.sessionSnapshot()!
@@ -565,6 +585,20 @@ final class ImagePipelineAccountScopeTests: XCTestCase {
             context.cgContext.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
         }
     }
+}
+
+private actor FlakyPublicImageLoader {
+    private let validImage: Data
+    private var flags: [Bool] = []
+
+    init(validImage: Data) { self.validImage = validImage }
+
+    func load(reload: Bool) -> Data {
+        flags.append(reload)
+        return flags.count == 1 ? Data("not an image".utf8) : validImage
+    }
+
+    func reloadFlags() -> [Bool] { flags }
 }
 
 private actor ScopedImageFixtureLoader {
