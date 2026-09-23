@@ -424,6 +424,7 @@
 		AFB2A6601565F8DBE9C1ED71 /* LocationPrimingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D1A47CF6B448FBD08CC23C /* LocationPrimingSheet.swift */; };
 		AFBEA35CA2303C2A10207310 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A8D289A6D4E7B0C9C621A4 /* PushNotificationService.swift */; };
 		AFCD275D5C3626EAD024EB7B /* UserService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E03EF30DC08FEA39216CD0B /* UserService.swift */; };
+		AFCF285F3A9D181434BDB320 /* CommunityFirstContentQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E69486C7604BF325A3D24CED /* CommunityFirstContentQATests.swift */; };
 		B08E0E2192F630A0ECEECCE9 /* DirectionsRequestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DD63B04CFDED17637F04A03 /* DirectionsRequestTests.swift */; };
 		B11527ED2AE1705CF5EAA4AD /* NotificationsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEAB0F4B51977FF72375533F /* NotificationsService.swift */; };
 		B1553F600EEACD650C4103BE /* AntennaGlossaryIllustrations.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67298253C20F58314208B87 /* AntennaGlossaryIllustrations.swift */; };
@@ -1188,6 +1189,7 @@
 		E5F08F6ECE4166CBD8CCC080 /* MapFeatures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapFeatures.swift; sourceTree = "<group>"; };
 		E65943B243D74D4B50717E71 /* MessageSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageSearchView.swift; sourceTree = "<group>"; };
 		E66DFBB8FE15CA2DBA663B20 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		E69486C7604BF325A3D24CED /* CommunityFirstContentQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityFirstContentQATests.swift; sourceTree = "<group>"; };
 		E6BBB060D05107E9625F2915 /* MapViewportProjectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapViewportProjectionTests.swift; sourceTree = "<group>"; };
 		E78632B127BAC9504FB0DAE9 /* Figtree-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Figtree-SemiBold.ttf"; sourceTree = "<group>"; };
 		E8C4B217FF4AF158F90193C6 /* PhotoErrorRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoErrorRecoveryTests.swift; sourceTree = "<group>"; };
@@ -1817,6 +1819,7 @@
 				F1DBE566F150964A2AF9D0EE /* AntennaPhotoQATests.swift */,
 				A4F5346C853F95E32F253D7B /* AuditTourQATests.swift */,
 				B517C6393E3FDD2A21D16E34 /* AuthFormsQATests.swift */,
+				E69486C7604BF325A3D24CED /* CommunityFirstContentQATests.swift */,
 				9E978EE2EBFDAD88C880B9C9 /* DockMinimizeQATests.swift */,
 				E98AB3B3DAB26FF843400EAD /* DriveTestSessionLifecycleQATests.swift */,
 				A8C2E559B11AB5C6C4A0CC44 /* FeedHTTPQATests.swift */,
@@ -3116,6 +3119,7 @@
 				AAF92F511259C586D92636FC /* AntennaPhotoQATests.swift in Sources */,
 				73A2B7B1908FB3B6415DC31B /* AuditTourQATests.swift in Sources */,
 				1CAE82D920D95AB2CF54AF18 /* AuthFormsQATests.swift in Sources */,
+				AFCF285F3A9D181434BDB320 /* CommunityFirstContentQATests.swift in Sources */,
 				8A731C079D449D10B1E7ADD3 /* DockMinimizeQATests.swift in Sources */,
 				957BBD951DB3EBBDCA090720 /* DriveTestSessionLifecycleQATests.swift in Sources */,
 				ADDFB57BB4F15CED64D1B4F3 /* FeedHTTPQATests.swift in Sources */,

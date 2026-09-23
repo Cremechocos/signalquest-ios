@@ -461,6 +461,7 @@ struct FeedView: View {
     @State private var showNotifications = false
     @State private var showCalls = false
     @State private var showFeedPreferences = false
+    @State private var isPulseExpanded = false
     /// Auteur dont on pousse le profil public (cards, commentaires, stories…).
     @State private var profileAuthor: SocialFeedAuthor?
     /// Profil demandé par notification (follow) via AppRouter — par id seul.
@@ -517,8 +518,7 @@ struct FeedView: View {
                         .sqShimmer()
                 } else {
                     if let pulse = model.pulse {
-                        NetworkPulseHero(pulse: pulse)
-                            .sqFadeUp()
+                        pulseDisclosure(pulse)
                     }
                     // Rail visible dès que la page est chargée, même sans story
                     // amie (fidèle au prototype : « Ta story » reste le point
@@ -834,6 +834,40 @@ struct FeedView: View {
     }
 
     // MARK: Header custom — titre, menu secondaire, actions nommées
+
+    private func pulseDisclosure(_ pulse: NetworkPulse) -> some View {
+        VStack(spacing: SQSpace.sm) {
+            Button {
+                Haptics.selection()
+                isPulseExpanded.toggle()
+            } label: {
+                HStack(spacing: SQSpace.sm) {
+                    Image(systemName: "waveform.path.ecg")
+                        .foregroundStyle(SQColor.brandRed)
+                    Text("Pouls réseau · autour de vous")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: SQSpace.xs)
+                    Image(systemName: isPulseExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .padding(.horizontal, SQSpace.md)
+                .frame(minHeight: 48)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(SQColor.surface,
+                            in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityIdentifier("community.networkPulse.toggle")
+            .accessibilityValue(isPulseExpanded ? String(localized: "Développé") : String(localized: "Réduit"))
+
+            if isPulseExpanded {
+                NetworkPulseHero(pulse: pulse)
+                    .sqFadeUp()
+            }
+        }
+    }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {

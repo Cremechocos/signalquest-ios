@@ -82,12 +82,14 @@ final class AccessibilityAuditTests: XCTestCase {
             // centre est déjà derrière cette barre et leur attribue alors le
             // contraste du verre, pas celui de leur surface. `isHittable` peut
             // encore être vrai pour la seule ligne exposée au-dessus du verre.
-            // Le texte couvert dans Réglages est rendu visible et contrôlé
-            // après défilement ci-dessous ; ses jetons passent le test de contraste.
+            // Les textes couverts dans Réglages et le rail de stories sont
+            // contrôlés après défilement ; leurs jetons passent le test de contraste.
+            let verifiedAfterScroll = screen.hasPrefix("Réglages") ||
+                (screen.hasPrefix("Communauté") && name == "feed.story.name")
             if let navigationTop, let element, element.frame.midY >= navigationTop,
-               (!element.isHittable || screen.hasPrefix("Réglages")),
+               (!element.isHittable || verifiedAfterScroll),
                (issue.auditType == .contrast || issue.auditType == .hitRegion) {
-                let reason = screen.hasPrefix("Réglages")
+                let reason = verifiedAfterScroll
                     ? "centre derrière la navigation ; visibilité vérifiée après défilement"
                     : "nœud non atteignable derrière la navigation"
                 return exclude(reason, name, issue.auditType)
