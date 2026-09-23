@@ -68,6 +68,17 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
 
 @MainActor
 final class AuthSessionTests: XCTestCase {
+    func testBootstrapWithoutCredentialsOpensGuestEntryWithoutNetwork() async {
+        let service = MockAuthService()
+        service.meResult = .success(.mock)
+        let session = AuthSessionViewModel(service: service)
+
+        await session.bootstrap()
+
+        XCTAssertEqual(session.state, .loggedOut)
+        XCTAssertEqual(service.meCallCount, 0)
+    }
+
     func testGuestAccessClearsAnOldCachedIdentityWithoutAuthenticating() async {
         let service = MockAuthService()
         service.meResult = .failure(APIError.http(status: 401, code: nil, message: "", requestId: nil, retryAfter: nil))
@@ -84,6 +95,7 @@ final class AuthSessionTests: XCTestCase {
 
     func testGuestAccessCannotBypassCheckingBusyOrAuthenticatedState() async {
         let service = MockAuthService()
+        service.storedCredentials = true
         let session = AuthSessionViewModel(service: service)
         let duringChecking = await session.prepareGuestAccess()
         XCTAssertFalse(duringChecking)

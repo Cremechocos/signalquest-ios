@@ -580,12 +580,19 @@ final class AuthSessionViewModel: ObservableObject {
             state = .loggedOut
             return
         }
+        // Sans jeton Keychain, le transport n'enverra aucun cookie implicite :
+        // `/api/auth/me` ne peut pas authentifier cette ouverture invitée.
+        // Évite un écran de chargement jusqu'au timeout réseau après relance.
+        guard service.hasStoredCredentials() else {
+            state = .loggedOut
+            return
+        }
         // PERF-START-01 : démarrage à froid optimiste. Si on a un token ET un
         // utilisateur en cache, afficher l'app IMMÉDIATEMENT puis revalider
         // `/api/auth/me` en arrière-plan (stale-while-revalidate) au lieu de bloquer
         // l'UI jusqu'à 30 s sur le réseau. La revalidation corrige l'utilisateur
         // affiché et déconnecte proprement si la session a été révoquée.
-        if service.hasStoredCredentials(), let cached = service.cachedUser() {
+        if let cached = service.cachedUser() {
             // Active le namespace local avant que les services lisent leurs caches.
             service.cacheUser(cached)
             state = .authenticated(cached)
