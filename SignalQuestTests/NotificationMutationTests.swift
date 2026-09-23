@@ -1,4 +1,6 @@
 import Foundation
+import SwiftUI
+import UIKit
 import XCTest
 @testable import SignalQuest
 
@@ -20,6 +22,38 @@ final class NotificationMutationTests: XCTestCase {
         let oldPage = try JSONDecoder.signalQuest.decode(AppNotificationPage.self, from: legacy)
         XCTAssertEqual(oldPage.notifications.map(\.id), ["b"])
         XCTAssertNil(oldPage.nextCursor)
+    }
+
+    func testErrorAndNextPageControlsRender() async throws {
+        let service = NotificationMutationMock(items: [item("a")], failReadOnce: true,
+            nextCursor: "after-a", nextPage: [item("b")])
+        let model = NotificationsCenterViewModel(service: service)
+        await model.load()
+        await model.markRead("a")
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let size = UIDevice.current.userInterfaceIdiom == .pad
+            ? CGSize(width: 700, height: 900) : CGSize(width: 360, height: 740)
+        let view = NavigationStack {
+            NotificationsCenterView(model: model)
+        }
+        .environmentObject(AppRouter())
+        .environment(\.locale, Locale(identifier: "fr"))
+        let host = UIHostingController(rootView: view)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(origin: .zero, size: size)
+        window.rootViewController = host
+        window.windowLevel = .normal + 1
+        window.isHidden = false
+        host.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(150))
+        let image = UIGraphicsImageRenderer(size: size).image { _ in
+            XCTAssertTrue(host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true))
+        }
+        let attachment = XCTAttachment(image: image)
+        attachment.name = "notifications-error-and-next-page"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        window.isHidden = true
     }
 
     func testOfflineReadRemainsUnreadUntilRetrySucceeds() async {

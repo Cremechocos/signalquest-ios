@@ -156,6 +156,10 @@ struct NotificationsCenterView: View {
         _model = StateObject(wrappedValue: NotificationsCenterViewModel(service: service))
     }
 
+    init(model: NotificationsCenterViewModel) {
+        _model = StateObject(wrappedValue: model)
+    }
+
     var body: some View {
         List {
             if let error = model.actionErrorMessage {
