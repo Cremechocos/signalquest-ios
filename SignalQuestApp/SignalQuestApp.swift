@@ -362,7 +362,9 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if AppEnvironment.showsRemoteImageQA {
+            if AppEnvironment.showsSentinelleAlertSettingsQA {
+                SentinelleAlertSettingsQAScreen()
+            } else if AppEnvironment.showsRemoteImageQA {
                 RemoteImageQAScreen()
             } else if case .updateRequired(let message, let storeURL) = versionPolicy.state {
                 // Un ancien build ne construit rien d'autre : le dock restait

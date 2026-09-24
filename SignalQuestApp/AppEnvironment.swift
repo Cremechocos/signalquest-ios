@@ -127,6 +127,13 @@ enum AppEnvironment {
         false
         #endif
     }
+    static var showsSentinelleAlertSettingsQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-sentinelle-alerts")
+        #else
+        false
+        #endif
+    }
     static var usesDemoFriends: Bool { hasArgument("--qa-demo-friends") }
     static var walksDemoFriends: Bool { hasArgument("--qa-friends-walk") }
     static var opensMapLayers: Bool { hasArgument("--qa-map-layers") }

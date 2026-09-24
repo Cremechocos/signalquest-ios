@@ -57,7 +57,13 @@ struct SentinelleCurrentIp: Decodable, Sendable {
 /// Distingué du reste : l'écran doit proposer l'abonnement, pas afficher une erreur.
 struct SentinelleAccessDenied: Error {}
 
-protocol SentinelleServicing: Sendable {
+protocol SentinellePreferencesServicing: Sendable {
+    func preferences() async throws -> SentinellePreferencesResponse
+    func savePreferences(_ changes: SentinellePreferencesPatch) async throws -> SentinellePreferencesResponse
+    func testWebhook() async throws -> SentinelleWebhookTest
+}
+
+protocol SentinelleServicing: SentinellePreferencesServicing {
     func targets() async throws -> SentinelleTargetsResponse
     func detail(targetId: String) async throws -> SentinelleDetailResponse
     func series(targetId: String, window: SentinelleWindow, family: SentinelleFamily?) async throws -> SentinelleSeriesResponse
@@ -69,9 +75,6 @@ protocol SentinelleServicing: Sendable {
     func setAddress(targetId: String, family: SentinelleFamily, address: String) async throws
     func delete(targetId: String) async throws
     func currentIp() async throws -> SentinelleCurrentIp
-    func preferences() async throws -> SentinellePreferencesResponse
-    func savePreferences(_ changes: SentinellePreferencesPatch) async throws -> SentinellePreferencesResponse
-    func testWebhook() async throws -> SentinelleWebhookTest
     func followers(targetId: String) async throws -> SentinelleFollowersResponse
     func following() async throws -> SentinelleFollowingResponse
     func followedSeries(followId: String, window: SentinelleWindow) async throws -> SentinelleSeriesResponse

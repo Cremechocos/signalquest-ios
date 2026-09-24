@@ -7,7 +7,7 @@ import SwiftUI
 /// répond 400, mais ce refus se perdait dans les journaux du serveur. On affiche
 /// donc le code HTTP réel du destinataire, pas un « c'est fait ».
 struct SentinelleAlertSettingsSheet: View {
-    let service: SentinelleServicing
+    let service: SentinellePreferencesServicing
 
     @Environment(\.dismiss) private var dismiss
 
@@ -37,6 +37,14 @@ struct SentinelleAlertSettingsSheet: View {
             .navigationTitle("Alertes")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                #if DEBUG && targetEnvironment(simulator)
+                if AppEnvironment.showsSentinelleAlertSettingsQA {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Actualiser QA") { Task { await load() } }
+                            .accessibilityIdentifier("sentinelle.qa.refresh")
+                    }
+                }
+                #endif
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Terminé") { dismiss() }.tint(SQColor.brandRed)
                 }
@@ -60,10 +68,12 @@ struct SentinelleAlertSettingsSheet: View {
                     Text(message)
                         .foregroundStyle(SQColor.dangerInk)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("sentinelle.save.error")
                     if saveError != nil, edits?.next != nil {
                         Button("Réessayer") { Task { await flush() } }
                             .frame(minHeight: 44)
                             .disabled(isSaving)
+                            .accessibilityIdentifier("sentinelle.save.retry")
                     }
                 }
             }
@@ -72,6 +82,7 @@ struct SentinelleAlertSettingsSheet: View {
                     get: { current.notifyDown },
                     set: { value in save(SentinellePreferencesPatch(notifyDown: value)) }
                 ))
+                .accessibilityIdentifier("sentinelle.notifyDown")
                 // Le seuil n'était qu'AFFICHÉ en pied de section, alors que le
                 // patch le supporte, que l'API l'accepte depuis 5 s et que le web
                 // le règle. Il compte plus qu'il n'y paraît : un redémarrage de
@@ -91,6 +102,7 @@ struct SentinelleAlertSettingsSheet: View {
                     get: { current.notifyUp },
                     set: { value in save(SentinellePreferencesPatch(notifyUp: value)) }
                 ))
+                .accessibilityIdentifier("sentinelle.notifyUp")
             } header: {
                 Text("Notifications")
             } footer: {
@@ -104,6 +116,7 @@ struct SentinelleAlertSettingsSheet: View {
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
                     .font(SQFont.body(14))
+                    .accessibilityIdentifier("sentinelle.webhook.input")
                     .onChangeCompat(of: webhookDraft) { _, _ in
                         validationError = nil
                         verdict = nil
@@ -113,13 +126,14 @@ struct SentinelleAlertSettingsSheet: View {
                        ? "Retirer le webhook" : "Enregistrer") {
                     let value = webhookDraft.trimmingCharacters(in: .whitespaces)
                     guard value.isEmpty || Self.validWebhookURL(value) else {
-                        validationError = "Adresse de webhook invalide. Utilise une URL http(s) complète."
+                        validationError = String(localized: "Adresse de webhook invalide. Utilise une URL http(s) complète.")
                         return
                     }
                     verdict = nil
                     save(SentinellePreferencesPatch(webhookUrl: .some(value.isEmpty ? nil : value)))
                 }
                 .disabled(webhookDraft.trimmingCharacters(in: .whitespaces) == (current.webhookUrl ?? ""))
+                .accessibilityIdentifier("sentinelle.webhook.save")
 
                 if edits?.confirmed.webhookUrl != nil {
                     let canTest = edits?.canTestWebhook(webhookDraft, isSaving: isSaving) == true
@@ -127,6 +141,7 @@ struct SentinelleAlertSettingsSheet: View {
                         Task { await test() }
                     }
                     .disabled(isTesting || !canTest)
+                    .accessibilityIdentifier("sentinelle.webhook.test")
                     if !canTest {
                         Text("Enregistre l’adresse avant de tester le webhook.")
                             .font(SQType.caption)
@@ -140,6 +155,7 @@ struct SentinelleAlertSettingsSheet: View {
                     Text(verdict.message)
                         .font(SQFont.body(12))
                         .foregroundStyle(verdict.ok ? SQColor.labelSecondary : SQColor.danger)
+                        .accessibilityIdentifier("sentinelle.webhook.verdict")
                 }
             } header: {
                 Text("Webhook")
@@ -148,6 +164,7 @@ struct SentinelleAlertSettingsSheet: View {
                      + "Les autres destinataires reçoivent un appel signé.")
             }
         }
+        .refreshable { await load() }
     }
 
     private func load() async {
@@ -192,7 +209,7 @@ struct SentinelleAlertSettingsSheet: View {
                 saveError = nil
             } catch {
                 // La tête de file et tous les choix suivants restent visibles.
-                saveError = "Enregistrement non confirmé. Vérifie les valeurs et réessaie."
+                saveError = String(localized: "Enregistrement non confirmé. Vérifie les valeurs et réessaie.")
                 return
             }
         }
@@ -222,7 +239,7 @@ struct SentinelleAlertSettingsSheet: View {
                   edits?.canTestWebhook(webhookDraft, isSaving: isSaving) == true else { return }
             verdict = SentinelleWebhookTest(
                 ok: false, status: nil, destination: nil,
-                message: "L’essai n’a pas pu être lancé."
+                message: String(localized: "L’essai n’a pas pu être lancé.")
             )
         }
     }
@@ -276,5 +293,76 @@ struct SentinellePreferenceEditQueue {
             downThresholdSec: changes.downThresholdSec ?? value.downThresholdSec,
             webhookUrl: changes.webhookUrl ?? value.webhookUrl
         )
+    }
+}
+
+#if DEBUG && targetEnvironment(simulator)
+/// Banc isolé : mêmes vues et modèle de file, sans compte ni destinataire réel.
+actor SentinelleAlertPreferencesQAFixture: SentinellePreferencesServicing {
+    private var saved = SentinellePreferences(
+        notifyDown: true, notifyUp: false, downThresholdSec: 30,
+        webhookUrl: nil
+    )
+    private let rejectionStatus: Int
+    private var remainingRejections: Int
+
+    init(rejectNextPatch status: Int) {
+        rejectionStatus = status
+        remainingRejections = status == 503 ? 2 : 1
+    }
+
+    func preferences() async throws -> SentinellePreferencesResponse {
+        SentinellePreferencesResponse(preferences: saved)
+    }
+
+    func savePreferences(_ changes: SentinellePreferencesPatch) async throws -> SentinellePreferencesResponse {
+        try await Task.sleep(nanoseconds: 600_000_000)
+        if remainingRejections > 0 {
+            remainingRejections -= 1
+            throw APIError.http(status: rejectionStatus, code: nil, message: "QA refusal", requestId: nil, retryAfter: nil)
+        }
+        saved = SentinellePreferences(
+            notifyDown: changes.notifyDown ?? saved.notifyDown,
+            notifyUp: changes.notifyUp ?? saved.notifyUp,
+            downThresholdSec: changes.downThresholdSec ?? saved.downThresholdSec,
+            webhookUrl: changes.webhookUrl ?? saved.webhookUrl
+        )
+        return SentinellePreferencesResponse(preferences: saved)
+    }
+
+    func testWebhook() async throws -> SentinelleWebhookTest {
+        SentinelleWebhookTest(
+            ok: false, status: 400, destination: "synthetic",
+            message: "Webhook synthétique refusé · HTTP 400"
+        )
+    }
+}
+#endif
+
+struct SentinelleAlertSettingsQAScreen: View {
+    #if DEBUG && targetEnvironment(simulator)
+    @State private var fixture: SentinelleAlertPreferencesQAFixture
+    @State private var showsSettings = true
+
+    init() {
+        let status = Int(ProcessInfo.processInfo.environment["SQ_QA_SENTINELLE_PATCH_STATUS"] ?? "400") ?? 400
+        _fixture = State(initialValue: SentinelleAlertPreferencesQAFixture(rejectNextPatch: status))
+    }
+    #endif
+
+    var body: some View {
+        #if DEBUG && targetEnvironment(simulator)
+        NavigationStack {
+            Button("Ouvrir les réglages d’alerte") { showsSettings = true }
+                .accessibilityIdentifier("sentinelle.qa.open")
+                .frame(minHeight: 44)
+                .navigationTitle("Sentinelle QA")
+        }
+        .sheet(isPresented: $showsSettings) {
+            SentinelleAlertSettingsSheet(service: fixture)
+        }
+        #else
+        EmptyView()
+        #endif
     }
 }

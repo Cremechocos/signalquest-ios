@@ -4503,6 +4503,13 @@
         "fr": { "stringUnit": { "state": "translated", "value": "Enregistrement non confirmé. Vérifie les valeurs et réessaie." } }
       }
     },
+    "L’essai n’a pas pu être lancé.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The test could not be started." } },
+        "fr": { "stringUnit": { "state": "translated", "value": "L’essai n’a pas pu être lancé." } }
+      }
+    },
     "Offre indisponible": {
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Offer unavailable" } },

@@ -491,6 +491,85 @@ final class SignalQuestUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Sent"].exists)
     }
 
+    func testSentinelleWebhookDraftSurvivesRejectedPatchAndRefresh() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(
+            app, arguments: ["--qa-sentinelle-alerts"],
+            environment: ["SQ_QA_SENTINELLE_PATCH_STATUS": "400"], locale: "fr"
+        )
+        defer { app.terminate() }
+        let input = app.textFields["sentinelle.webhook.input"]
+        if !input.waitForExistence(timeout: 5) { app.buttons["sentinelle.qa.open"].tap() }
+        XCTAssertTrue(input.waitForExistence(timeout: 5))
+        input.tap()
+        input.typeText("https://example.invalid/new-hook")
+        app.buttons["sentinelle.webhook.save"].tap()
+        XCTAssertTrue(app.staticTexts["sentinelle.save.error"].waitForExistence(timeout: 8))
+        app.buttons["sentinelle.qa.refresh"].tap()
+        XCTAssertEqual(input.value as? String, "https://example.invalid/new-hook")
+
+        app.buttons["sentinelle.save.retry"].tap()
+        let testWebhook = app.buttons["sentinelle.webhook.test"]
+        XCTAssertTrue(testWebhook.waitForExistence(timeout: 8))
+        XCTAssertTrue(testWebhook.isEnabled)
+        testWebhook.tap()
+        let verdict = app.staticTexts["sentinelle.webhook.verdict"]
+        XCTAssertTrue(verdict.waitForExistence(timeout: 5))
+        XCTAssertTrue(verdict.label.contains("HTTP 400"))
+
+        app.buttons["Terminé"].tap()
+        app.buttons["sentinelle.qa.open"].tap()
+        XCTAssertEqual(app.textFields["sentinelle.webhook.input"].value as? String, "https://example.invalid/new-hook")
+    }
+
+    func testSentinelleRapidSwitchesSurvive503AndRetry() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(
+            app, arguments: ["--qa-sentinelle-alerts"],
+            environment: ["SQ_QA_SENTINELLE_PATCH_STATUS": "503"], locale: "fr"
+        )
+        defer { app.terminate() }
+        let down = app.switches["sentinelle.notifyDown"]
+        if !down.waitForExistence(timeout: 5) { app.buttons["sentinelle.qa.open"].tap() }
+        XCTAssertTrue(down.waitForExistence(timeout: 5))
+        down.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        let up = app.switches["sentinelle.notifyUp"]
+        XCTAssertTrue(up.waitForExistence(timeout: 5))
+        up.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        XCTAssertTrue(app.staticTexts["sentinelle.save.error"].waitForExistence(timeout: 8))
+        XCTAssertEqual(down.value as? String, "0")
+        XCTAssertEqual(up.value as? String, "1")
+        app.buttons["sentinelle.save.retry"].tap()
+        XCTAssertTrue(app.buttons["sentinelle.save.retry"].waitForNonExistence(timeout: 8))
+        app.buttons["Terminé"].tap()
+        app.buttons["sentinelle.qa.open"].tap()
+        XCTAssertEqual(app.switches["sentinelle.notifyDown"].value as? String, "0")
+        XCTAssertEqual(app.switches["sentinelle.notifyUp"].value as? String, "1")
+    }
+
+    func testSentinelleSaveErrorAndRetryRenderInEnglish() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(
+            app, arguments: ["--qa-sentinelle-alerts"],
+            environment: ["SQ_QA_SENTINELLE_PATCH_STATUS": "400"], locale: "en"
+        )
+        defer { app.terminate() }
+        let input = app.textFields["sentinelle.webhook.input"]
+        if !input.waitForExistence(timeout: 5) { app.buttons["sentinelle.qa.open"].tap() }
+        XCTAssertTrue(input.waitForExistence(timeout: 5))
+        input.tap()
+        input.typeText("https://example.invalid/new-hook")
+        app.buttons["sentinelle.webhook.save"].tap()
+        let error = app.staticTexts["sentinelle.save.error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 8))
+        XCTAssertEqual(error.label, "Could not confirm the save. Check the values and try again.")
+        app.buttons["sentinelle.save.retry"].tap()
+        XCTAssertTrue(app.buttons["sentinelle.webhook.test"].waitForExistence(timeout: 8))
+        app.buttons["Done"].tap()
+        app.buttons["sentinelle.qa.open"].tap()
+        XCTAssertEqual(app.textFields["sentinelle.webhook.input"].value as? String, "https://example.invalid/new-hook")
+    }
+
     func testProfilePhotosAndLeaderboardsRender() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])
