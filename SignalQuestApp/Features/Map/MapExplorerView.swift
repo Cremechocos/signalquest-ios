@@ -1,6 +1,12 @@
 import SwiftUI
 import MapKit
 import ImageIO
+import OSLog
+
+/// Compteurs seulement : aucune coordonnée, identité de compte ou réponse brute.
+private enum MapDiagnosticsLog {
+    static let logger = Logger(subsystem: "fr.signalquest.ios", category: "map-diagnostics")
+}
 
 /// Un lieu géocodé (ville / adresse / POI) via `MKLocalSearch`, unifié avec les
 /// antennes dans les résultats de recherche de la carte.
@@ -1169,6 +1175,13 @@ final class MapExplorerViewModel: ObservableObject {
         }
         var seenMessages = Set<String>()
         displayLimitMessages = displayLimitMessages.filter { seenMessages.insert($0).inserted }
+        let failedTiles = tileLoadIssues.values.reduce(0) { $0 + $1.failedTiles.count }
+        let retainedTiles = tileLoadIssues.values.reduce(0) { $0 + $1.retainedCount }
+        let speedtestCount = speedtestTiles.reduce(0) { $0 + $1.markers.count }
+        let coverageCount = coverageTiles.reduce(0) { $0 + $1.points.count }
+        MapDiagnosticsLog.logger.info(
+            "load \(id.uuidString, privacy: .public) version=\(self.dataVersion) antennas=\(self.antennas.count) speedtests=\(speedtestCount) coverage=\(coverageCount) photos=\(self.publicPhotos.count) failedTiles=\(failedTiles) retainedTiles=\(retainedTiles) error=\(self.errorMessage != nil) complete=\(self.hasCurrentResponse)"
+        )
     }
 
     /// Applique un instantané du flux temps réel des amis. Fait autorité sur
@@ -2742,6 +2755,9 @@ struct MapExplorerView: View {
         renderedCoverageFeatures = coverageHeatFeatures
         renderedSpeedtestFeatures = speedtestFeatures
         renderVersion &+= 1
+        MapDiagnosticsLog.logger.debug(
+            "render version=\(self.model.dataVersion) annotations=\(self.renderedAnnotations.count) coverage=\(self.renderedCoverageFeatures.count) speedtests=\(self.renderedSpeedtestFeatures.count) zoomBucket=\(Self.zoomRenderBucket(for: self.mapZoom))"
+        )
     }
 
     /// PERF-MAP-05 : ne reconstruit QUE la couche amis (marqueurs de présence).
