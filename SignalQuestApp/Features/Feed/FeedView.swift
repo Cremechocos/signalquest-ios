@@ -814,6 +814,7 @@ struct FeedView: View {
     /// annonce et fait confirmer le canal non E2EE avant cet appel.
     /// Le viewer ne confirme qu'après le reçu du serveur de messagerie.
     private func sendStoryReply(_ story: SocialStory, text: String, requestID: String) async throws {
+        guard !AppEnvironment.usesDemoData else { throw StoryReplyDeliveryError.unavailable }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw StoryReplyDeliveryError.unavailable }
         guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else {
@@ -1394,8 +1395,8 @@ extension SocialFeedPage {
           ],
           "nextCursor": null,
           "stories": [
-            {"id": "story-1", "author": {"id": "u1", "name": "Camille", "handle": "camille", "avatarUrl": null}, "text": "5G Paris", "mediaUrl": null, "thumbnailUrl": null, "mediaKind": "text", "background": null, "metadata": null, "visibility": "friends", "status": "active", "durationSeconds": 5, "createdAt": "2026-05-11T10:00:00.000Z", "expiresAt": null, "viewedByMe": false, "isMine": false},
-            {"id": "story-2", "author": {"id": "u2", "name": "Nora", "handle": "nora", "avatarUrl": null}, "text": "Photo site", "mediaUrl": null, "thumbnailUrl": null, "mediaKind": "text", "background": null, "metadata": null, "visibility": "public", "status": "active", "durationSeconds": 5, "createdAt": "2026-05-11T10:00:00.000Z", "expiresAt": null, "viewedByMe": true, "isMine": false}
+            {"id": "story-1", "author": {"id": "u1", "name": "Camille", "handle": "camille", "avatarUrl": null}, "text": "5G Paris", "mediaUrl": null, "thumbnailUrl": null, "mediaKind": "text", "background": null, "metadata": null, "visibility": "friends", "status": "active", "durationSeconds": 15, "createdAt": "2026-05-11T10:00:00.000Z", "expiresAt": null, "viewedByMe": false, "isMine": false},
+            {"id": "story-2", "author": {"id": "u2", "name": "Nora", "handle": "nora", "avatarUrl": null}, "text": "Photo site", "mediaUrl": null, "thumbnailUrl": null, "mediaKind": "text", "background": null, "metadata": null, "visibility": "public", "status": "active", "durationSeconds": 15, "createdAt": "2026-05-11T10:00:00.000Z", "expiresAt": null, "viewedByMe": true, "isMine": false}
           ],
           "trendingHashtags": [{"tag": "ios", "postCount": 32}, {"tag": "5g", "postCount": 21}, {"tag": "photos", "postCount": 15}],
           "suggestedUsers": [],

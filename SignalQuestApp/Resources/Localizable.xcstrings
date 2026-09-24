@@ -6068,6 +6068,22 @@
         }
       }
     },
+    "Cet appel n’est pas encore disponible pour une conversation chiffrée. Aucun appel moins protégé ne sera lancé.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet appel n’est pas encore disponible pour une conversation chiffrée. Aucun appel moins protégé ne sera lancé."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calls are not yet available in an encrypted conversation. No less-protected call will be started."
+          }
+        }
+      }
+    },
     "Appels": {
       "localizations": {
         "en": {

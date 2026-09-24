@@ -363,6 +363,134 @@ final class SignalQuestUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Tu peux partager un post, une photo ou un speedtest vers cette conversation."].waitForExistence(timeout: 5))
     }
 
+    func testEncryptedConversationExplainsUnavailableCall() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "fr")
+        defer { app.terminate() }
+        SignalQuestUITestSupport.openMessages(in: app)
+        let inboxUnlockCancel = app.buttons["Annuler"].firstMatch
+        if inboxUnlockCancel.waitForExistence(timeout: 3) { inboxUnlockCancel.tap() }
+        let conversation = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Conversation chiffrée")
+        ).firstMatch
+        XCTAssertTrue(conversation.waitForExistence(timeout: 5))
+        conversation.tap()
+
+        let callMenu = app.buttons["Appels chiffrés indisponibles pour cette conversation"]
+        XCTAssertTrue(callMenu.waitForExistence(timeout: 5))
+        callMenu.tap()
+        let explanation = app.alerts["Appels chiffrés indisponibles pour cette conversation"]
+        XCTAssertTrue(explanation.waitForExistence(timeout: 5))
+        XCTAssertTrue(explanation.staticTexts["Cet appel n’est pas encore disponible pour une conversation chiffrée. Aucun appel moins protégé ne sera lancé."].exists)
+        XCTAssertFalse(app.buttons["Appel audio"].exists)
+        XCTAssertFalse(app.buttons["Appel vidéo"].exists)
+        explanation.buttons["OK"].tap()
+    }
+
+    func testEnglishEncryptedCallExplainsGate() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "en")
+        defer { app.terminate() }
+        SignalQuestUITestSupport.tab(named: "Community", in: app).tap()
+        let messages = app.buttons["Messages"]
+        XCTAssertTrue(messages.waitForExistence(timeout: 10))
+        messages.tap()
+        let inboxUnlockCancel = app.buttons["Cancel"].firstMatch
+        if inboxUnlockCancel.waitForExistence(timeout: 3) { inboxUnlockCancel.tap() }
+
+        let encrypted = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Conversation chiffrée")
+        ).firstMatch
+        XCTAssertTrue(encrypted.waitForExistence(timeout: 5))
+        encrypted.tap()
+        let gatedCall = app.buttons["Encrypted calls are unavailable in this conversation"]
+        XCTAssertTrue(gatedCall.waitForExistence(timeout: 5))
+        gatedCall.tap()
+        let explanation = app.alerts["Encrypted calls are unavailable in this conversation"]
+        XCTAssertTrue(explanation.waitForExistence(timeout: 5))
+        XCTAssertTrue(explanation.staticTexts["Calls are not yet available in an encrypted conversation. No less-protected call will be started."].exists)
+        explanation.buttons["OK"].tap()
+    }
+
+    func testPlainConversationCallMenuKeepsAudioAndVideo() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "en")
+        defer { app.terminate() }
+        SignalQuestUITestSupport.tab(named: "Community", in: app).tap()
+        let messages = app.buttons["Messages"]
+        XCTAssertTrue(messages.waitForExistence(timeout: 10))
+        messages.tap()
+        let inboxUnlockCancel = app.buttons["Cancel"].firstMatch
+        if inboxUnlockCancel.waitForExistence(timeout: 3) { inboxUnlockCancel.tap() }
+        let plain = app.staticTexts["SignalQuest iOS"].firstMatch
+        XCTAssertTrue(plain.waitForExistence(timeout: 5))
+        plain.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let callMenu = app.buttons["Call"]
+        XCTAssertTrue(callMenu.waitForExistence(timeout: 5))
+        callMenu.tap()
+        XCTAssertTrue(app.buttons["Audio call"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Video call"].exists)
+    }
+
+    func testStoryReplyRequiresChannelConsentWithoutSendingOnCancel() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "fr")
+        defer { app.terminate() }
+        SignalQuestUITestSupport.tab(named: "Communauté", in: app).tap()
+        let story = app.buttons["Story de Camille"]
+        XCTAssertTrue(story.waitForExistence(timeout: 10))
+        story.tap()
+
+        let channel = app.staticTexts["story.reply.channel"]
+        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        let input = app.textFields["story.reply.input"]
+        XCTAssertTrue(input.waitForExistence(timeout: 5))
+        input.tap()
+        input.typeText("Bonjour")
+        app.buttons["story.reply.send"].tap()
+
+        let consent = app.alerts["Réponse privée sans chiffrement de bout en bout"]
+        XCTAssertTrue(consent.waitForExistence(timeout: 5))
+        XCTAssertTrue(consent.buttons["Envoyer sans chiffrement de bout en bout"].exists)
+        consent.buttons["Annuler"].tap()
+        XCTAssertEqual(input.value as? String, "Bonjour")
+        XCTAssertFalse(app.staticTexts["Envoyé"].exists)
+
+        app.buttons["story.reply.send"].tap()
+        let retryConsent = app.alerts["Réponse privée sans chiffrement de bout en bout"]
+        XCTAssertTrue(retryConsent.waitForExistence(timeout: 5))
+        retryConsent.buttons["Envoyer sans chiffrement de bout en bout"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["story.reply.error"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(input.value as? String, "Bonjour")
+        XCTAssertFalse(app.staticTexts["Envoyé"].exists)
+    }
+
+    func testEnglishStoryReplyKeepsDraftWhenChannelConsentIsCancelled() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "en")
+        defer { app.terminate() }
+        SignalQuestUITestSupport.tab(named: "Community", in: app).tap()
+        let story = app.buttons["Camille's story"]
+        XCTAssertTrue(story.waitForExistence(timeout: 10))
+        story.tap()
+
+        let channel = app.staticTexts["story.reply.channel"]
+        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        XCTAssertEqual(channel.label, "Private reply without end-to-end encryption")
+        let input = app.textFields["story.reply.input"]
+        XCTAssertTrue(input.waitForExistence(timeout: 5))
+        input.tap()
+        input.typeText("Hello")
+        app.buttons["story.reply.send"].tap()
+
+        let consent = app.alerts["Private reply without end-to-end encryption"]
+        XCTAssertTrue(consent.waitForExistence(timeout: 5))
+        XCTAssertTrue(consent.buttons["Send without end-to-end encryption"].exists)
+        consent.buttons["Cancel"].tap()
+        XCTAssertEqual(input.value as? String, "Hello")
+        XCTAssertFalse(app.staticTexts["Sent"].exists)
+    }
+
     func testProfilePhotosAndLeaderboardsRender() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])

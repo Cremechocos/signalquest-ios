@@ -288,6 +288,7 @@ struct StoryViewer: View {
             HStack(spacing: SQSpace.sm) {
                 TextField("", text: $replySubmission.draft, prompt: Text("Répondre…").foregroundColor(.white.opacity(0.7)))
                     .focused($replyFocused)
+                    .accessibilityIdentifier("story.reply.input")
                     .disabled(replySubmission.isSending)
                     .foregroundStyle(.white)
                     .tint(.white)
