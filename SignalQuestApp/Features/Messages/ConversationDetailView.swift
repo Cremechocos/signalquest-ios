@@ -347,7 +347,8 @@ struct ConversationDetailView: View {
         // Commentaires d'une publication partagée — même sheet que le feed ;
         // au retour, l'embed est rafraîchi (compteur de commentaires).
         .sheet(item: $sharedPostComments, onDismiss: { refreshSharedPostAfterSheet() }) { target in
-            CommentsSheet(service: services.comments, postId: target.backendPostId)
+            CommentsSheet(service: services.comments, postId: target.backendPostId,
+                          profileService: services.feed)
         }
         // Publication complète (réutilise PostDetailView du feed par composition).
         .sheet(item: $sharedPostDetail, onDismiss: { refreshSharedPostAfterSheet() }) { target in

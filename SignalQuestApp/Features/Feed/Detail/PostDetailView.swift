@@ -105,10 +105,7 @@ struct PostDetailView: View {
             CommentsSheet(
                 service: commentsService,
                 postId: localItem.backendPostId,
-                onAuthorTap: { author in
-                    showCommentsSheet = false
-                    pushProfileAfterDismiss(author)
-                }
+                profileService: feedService
             )
         }
         .sheet(isPresented: $showShareSheet) {

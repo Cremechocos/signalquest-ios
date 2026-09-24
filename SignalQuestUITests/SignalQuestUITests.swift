@@ -570,6 +570,60 @@ final class SignalQuestUITests: XCTestCase {
         XCTAssertEqual(app.textFields["sentinelle.webhook.input"].value as? String, "https://example.invalid/new-hook")
     }
 
+    func testCommentsFiftyFirstParentAndAuthorReturnKeepReadingPosition() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth", "--qa-comments"], locale: "fr")
+        defer { app.terminate() }
+        let first = app.staticTexts["parent-0"]
+        if !first.waitForExistence(timeout: 5) { app.buttons["comments.qa.open"].tap() }
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+
+        let loadMore = app.buttons["comments.loadMore"]
+        for _ in 0..<24 {
+            if loadMore.exists && loadMore.isHittable { break }
+            app.scrollViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(loadMore.isHittable, "La page 51 doit rester accessible dans la feuille")
+        loadMore.tap()
+        XCTAssertTrue(app.staticTexts["Impossible de charger les commentaires."].waitForExistence(timeout: 5))
+        loadMore.tap()
+        let last = app.staticTexts["parent-50"]
+        XCTAssertTrue(last.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "parent-49")).count, 1)
+
+        let author = app.buttons["comment.author.parent-50"].firstMatch
+        XCTAssertTrue(author.waitForExistence(timeout: 5))
+        author.tap()
+        XCTAssertTrue(app.navigationBars["Camille"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(last.waitForExistence(timeout: 5))
+        let visibleAgain = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "hittable == true"), object: last
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [visibleAgain], timeout: 5), .completed,
+                       "Le retour du profil doit conserver la lecture près du commentaire 51")
+    }
+
+    func testCommentsTwentyFirstReplyCanBeLoadedWithoutDuplicates() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth", "--qa-comments-replies"], locale: "fr")
+        defer { app.terminate() }
+        let first = app.staticTexts["parent-0"]
+        if !first.waitForExistence(timeout: 5) { app.buttons["comments.qa.open"].tap() }
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        app.buttons["comments.replies.parent-0"].tap()
+        XCTAssertTrue(app.staticTexts["reply-0"].waitForExistence(timeout: 5))
+        let loadMore = app.buttons["comments.replies.loadMore.parent-0"]
+        for _ in 0..<8 {
+            if loadMore.exists && loadMore.isHittable { break }
+            app.scrollViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(loadMore.isHittable)
+        loadMore.tap()
+        XCTAssertTrue(app.staticTexts["reply-20"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "reply-19")).count, 1)
+    }
+
     func testProfilePhotosAndLeaderboardsRender() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])

@@ -695,10 +695,7 @@ struct FeedView: View {
                 CommentsSheet(
                     service: services.comments,
                     postId: item.backendPostId,
-                    onAuthorTap: { author in
-                        presentedSheet = nil
-                        pushProfileAfterDismiss(author)
-                    }
+                    profileService: services.feed
                 )
             case .report(let item):
                 ReportSheet(target: .post(item.backendPostId), service: services.reports)

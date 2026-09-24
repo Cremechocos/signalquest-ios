@@ -228,17 +228,25 @@ final class CommentsViewModel: ObservableObject {
 struct CommentsSheet: View {
     @StateObject private var model: CommentsViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var profileAuthor: SocialFeedAuthor?
+    @State private var authorReturnAnchorID: String?
 
-    /// Navigation vers le profil de l'auteur d'un commentaire (gérée par le parent).
+    /// Repli pour les anciens appels sans service de profil injecté.
     private let onAuthorTap: ((SocialFeedAuthor) -> Void)?
+    private let profileService: SocialFeedServicing?
 
-    init(service: CommentsServicing, postId: String, onAuthorTap: ((SocialFeedAuthor) -> Void)? = nil) {
+    init(service: CommentsServicing, postId: String,
+         profileService: SocialFeedServicing? = nil,
+         onAuthorTap: ((SocialFeedAuthor) -> Void)? = nil) {
         _model = StateObject(wrappedValue: CommentsViewModel(service: service, postId: postId))
+        self.profileService = profileService
         self.onAuthorTap = onAuthorTap
     }
 
-    init(model: CommentsViewModel, onAuthorTap: ((SocialFeedAuthor) -> Void)? = nil) {
+    init(model: CommentsViewModel, profileService: SocialFeedServicing? = nil,
+         onAuthorTap: ((SocialFeedAuthor) -> Void)? = nil) {
         _model = StateObject(wrappedValue: model)
+        self.profileService = profileService
         self.onAuthorTap = onAuthorTap
     }
 
@@ -262,10 +270,15 @@ struct CommentsSheet: View {
                         .tint(SQColor.brandRed)
                 }
             }
+            .navigationDestinationItemCompat($profileAuthor) { author in
+                if let profileService {
+                    UserProfileView(userId: author.id, prefill: author, service: profileService)
+                }
+            }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
-        .task { await model.load() }
+        .task { if !model.hasLoaded { await model.load() } }
     }
 
     /// En-tête « Crème » : poignée seule, sans filet ni kicker (le titre est
@@ -293,27 +306,41 @@ struct CommentsSheet: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: SQSpace.md) {
-                    ForEach(model.comments) { comment in
-                        commentThread(comment)
-                            .sqFadeUp()
-                    }
-                    if model.isLoadingMore {
-                        ProgressView().tint(SQColor.brandRed)
-                            .frame(maxWidth: .infinity)
-                    } else if model.nextCursor != nil {
-                        GradientButton(model.paginationErrorMessage == nil ? "Charger la suite" : "Réessayer", style: .secondary) {
-                            Task { await model.loadMore() }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: SQSpace.md) {
+                        ForEach(model.comments) { comment in
+                            commentThread(comment)
+                                .id(comment.id)
+                                .sqFadeUp()
                         }
-                        .accessibilityIdentifier("comments.loadMore")
+                        if model.isLoadingMore {
+                            ProgressView().tint(SQColor.brandRed)
+                                .frame(maxWidth: .infinity)
+                        } else if model.nextCursor != nil {
+                            GradientButton(model.paginationErrorMessage == nil ? "Charger la suite" : "Réessayer", style: .secondary) {
+                                Task { await model.loadMore() }
+                            }
+                            .accessibilityIdentifier("comments.loadMore")
+                        }
+                        if let error = model.paginationErrorMessage {
+                            errorBanner(error)
+                        }
                     }
-                    if let error = model.paginationErrorMessage {
-                        errorBanner(error)
+                    .padding(SQSpace.lg)
+                    .sqReadableWidth(600)
+                }
+                .onChangeCompat(of: profileAuthor) { oldAuthor, newAuthor in
+                    guard oldAuthor != nil, newAuthor == nil,
+                          let anchor = authorReturnAnchorID else { return }
+                    Task { @MainActor in
+                        // Attend que la liste reprenne sa taille après le pop du profil.
+                        try? await Task.sleep(nanoseconds: 250_000_000)
+                        guard profileAuthor == nil, authorReturnAnchorID == anchor else { return }
+                        proxy.scrollTo(anchor, anchor: .center)
+                        authorReturnAnchorID = nil
                     }
                 }
-                .padding(SQSpace.lg)
-                .sqReadableWidth(600)
             }
         }
     }
@@ -357,10 +384,10 @@ struct CommentsSheet: View {
             ProgressView().tint(SQColor.brandRed).padding(.leading, SQSpace.xl)
         }
         ForEach(page.comments) { reply in
-            commentRow(reply).padding(.leading, SQSpace.xl)
+            commentRow(reply).padding(.leading, SQSpace.xl).id(reply.id)
         }
         ForEach(page.sentComments) { reply in
-            commentRow(reply).padding(.leading, SQSpace.xl)
+            commentRow(reply).padding(.leading, SQSpace.xl).id(reply.id)
         }
         if page.hasLoaded && page.comments.isEmpty && page.sentComments.isEmpty && page.errorMessage == nil {
             Text("Aucune réponse")
@@ -448,16 +475,22 @@ struct CommentsSheet: View {
     /// Avatar / nom tappable quand le parent fournit `onAuthorTap`.
     @ViewBuilder
     private func authorButton(_ comment: SocialComment, @ViewBuilder content: () -> some View) -> some View {
-        if let onAuthorTap, comment.author.id != "?" {
+        if comment.author.id != "?", profileService != nil || onAuthorTap != nil {
             Button {
                 Haptics.light()
-                dismiss()
-                onAuthorTap(comment.author)
+                if profileService != nil {
+                    authorReturnAnchorID = comment.id
+                    profileAuthor = comment.author
+                } else {
+                    dismiss()
+                    onAuthorTap?(comment.author)
+                }
             } label: {
                 content()
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Voir le profil de \(comment.author.displayName)")
+            .accessibilityIdentifier("comment.author.\(comment.id)")
         } else {
             content()
         }
@@ -520,5 +553,100 @@ struct CommentsSheet: View {
         }
         .padding(SQSpace.md)
         .background(SQColor.surface)
+    }
+}
+
+#if DEBUG && targetEnvironment(simulator)
+actor CommentsQAFixture: CommentsServicing {
+    private let singleParent: Bool
+    private var failedMoreOnce = false
+
+    init(singleParent: Bool = false) { self.singleParent = singleParent }
+
+    func list(postId: String, cursor: String?) async throws -> SocialCommentsResponse {
+        try await Task.sleep(nanoseconds: 180_000_000)
+        if cursor == "after-50", !failedMoreOnce {
+            failedMoreOnce = true
+            throw URLError(.notConnectedToInternet)
+        }
+        if singleParent {
+            return try Self.page(ids: ["parent-0"])
+        }
+        return try Self.page(
+            ids: cursor == nil ? (0..<50).map { "parent-\($0)" } : ["parent-49", "parent-50"],
+            next: cursor == nil ? "after-50" : nil
+        )
+    }
+
+    func replies(postId: String, commentId: String, cursor: String?) async throws -> SocialCommentsResponse {
+        try await Task.sleep(nanoseconds: 180_000_000)
+        return try Self.page(
+            ids: cursor == nil ? (0..<20).map { "reply-\($0)" } : ["reply-19", "reply-20"],
+            parentID: commentId, next: cursor == nil ? "after-20" : nil
+        )
+    }
+
+    func add(postId: String, text: String, parentId: String?) async throws -> SocialComment {
+        let body: [String: Any] = [
+            "id": "sent-\(UUID().uuidString)", "postId": postId,
+            "parentId": parentId as Any? ?? NSNull(),
+            "author": ["id": "me", "name": "Moi"], "text": text,
+        ]
+        return try JSONDecoder.signalQuest.decode(
+            SocialComment.self, from: JSONSerialization.data(withJSONObject: body)
+        )
+    }
+
+    func like(postId: String, commentId: String) async throws -> CommentReactionResponse {
+        try JSONDecoder().decode(CommentReactionResponse.self, from: Data(#"{"liked":true,"count":2}"#.utf8))
+    }
+
+    func unlike(postId: String, commentId: String) async throws -> CommentReactionResponse {
+        try JSONDecoder().decode(CommentReactionResponse.self, from: Data(#"{"liked":false,"count":1}"#.utf8))
+    }
+
+    private static func page(ids: [String], parentID: String? = nil, next: String? = nil) throws -> SocialCommentsResponse {
+        let rows: [[String: Any]] = ids.map { id in
+            ["id": id, "postId": "post-1", "parentId": parentID as Any? ?? NSNull(),
+             "author": ["id": "author", "name": "Camille"], "text": id,
+             "repliesCount": parentID == nil ? 21 : 0, "likesCount": 1]
+        }
+        let body: [String: Any] = [
+            parentID == nil ? "comments" : "replies": rows,
+            "nextCursor": next as Any? ?? NSNull(), "totalCount": ids.count,
+        ]
+        return try JSONDecoder.signalQuest.decode(
+            SocialCommentsResponse.self, from: JSONSerialization.data(withJSONObject: body)
+        )
+    }
+}
+#endif
+
+struct CommentsQAScreen: View {
+    #if DEBUG && targetEnvironment(simulator)
+    @EnvironmentObject private var services: AppServices
+    @State private var fixture: CommentsQAFixture
+    @State private var showsComments = true
+
+    init() {
+        let repliesOnly = ProcessInfo.processInfo.arguments.contains("--qa-comments-replies")
+        _fixture = State(initialValue: CommentsQAFixture(singleParent: repliesOnly))
+    }
+    #endif
+
+    var body: some View {
+        #if DEBUG && targetEnvironment(simulator)
+        NavigationStack {
+            Button("Ouvrir les commentaires") { showsComments = true }
+                .accessibilityIdentifier("comments.qa.open")
+                .frame(minHeight: 44)
+                .navigationTitle("Commentaires QA")
+        }
+        .sheet(isPresented: $showsComments) {
+            CommentsSheet(service: fixture, postId: "post-1", profileService: services.feed)
+        }
+        #else
+        EmptyView()
+        #endif
     }
 }

@@ -362,7 +362,9 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if AppEnvironment.showsSentinelleAlertSettingsQA {
+            if AppEnvironment.showsCommentsQA {
+                CommentsQAScreen()
+            } else if AppEnvironment.showsSentinelleAlertSettingsQA {
                 SentinelleAlertSettingsQAScreen()
             } else if AppEnvironment.showsRemoteImageQA {
                 RemoteImageQAScreen()
