@@ -262,6 +262,41 @@ final class CoverageSessionQueueTests: XCTestCase {
         }
     }
 
+    func testRetiredCoverageLeavesSwiftDataDraftsUntouchedWithoutUploading() async throws {
+        guard #available(iOS 17, *) else { throw XCTSkip("SwiftData coverage store requires iOS 17") }
+        let legacyURL = try makeTemporaryQueueURL()
+        let storeURL = legacyURL.deletingLastPathComponent().appendingPathComponent("CoverageSessions.store")
+        let recording = makeSession(id: UUID(), startTime: 1_000, endTime: 2_000,
+                                    showOnMap: false, points: [makePoint(timestamp: 1_000), makePoint(timestamp: 2_000)])
+        let queued = makeSession(id: UUID(), startTime: 3_000, endTime: 4_000,
+                                 showOnMap: true, points: [makePoint(timestamp: 3_000), makePoint(timestamp: 4_000)])
+        let before: [PendingCoverageSession] = try {
+            let oldStore = try XCTUnwrap(SwiftDataCoverageSessionStore(storeURL: storeURL, legacyFileURL: legacyURL))
+            try oldStore.upsert(recording, state: .recording)
+            try oldStore.upsert(queued, state: .queued)
+            return try oldStore.allPending()
+        }()
+        XCTAssertEqual(before.count, 2)
+        MockURLProtocol.requestHandler = { _ in
+            XCTFail("Retired SwiftData coverage must never reach the network")
+            throw URLError(.notConnectedToInternet)
+        }
+
+        let service = SessionsService(api: makeAPIClient(), queueFileURL: legacyURL)
+        await service.retryPendingCoverageSessions()
+        await SessionsService(api: makeAPIClient(), queueFileURL: legacyURL).retryPendingCoverageSessions()
+        do {
+            _ = try await service.createCoverageSession(queued)
+            XCTFail("Retired coverage accepted a new upload")
+        } catch CoverageRecordingError.retired {
+            // Expected: the old store stays available for a future explicit migration.
+        }
+
+        let reopened = try XCTUnwrap(SwiftDataCoverageSessionStore(storeURL: storeURL, legacyFileURL: legacyURL))
+        XCTAssertEqual(try reopened.allPending(), before)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.path))
+    }
+
     func testRetiredCoverageRejectsNewDraftsWithoutCreatingAQueue() throws {
         let fileURL = try makeTemporaryQueueURL()
         let upload = makeSession(id: UUID(), startTime: 1_000, endTime: 2_000,
