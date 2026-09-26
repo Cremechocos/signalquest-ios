@@ -16,7 +16,15 @@ struct LoginView: View {
     @State private var code = ""
     @State private var showSignup = false
     @State private var showForgotPassword = false
+    @State private var pendingAppleConsent: PendingAppleConsent?
+    @State private var acceptedAppleTerms = false
     @State private var appeared = false
+
+    private struct PendingAppleConsent: Identifiable {
+        let id = UUID()
+        let identityToken: String
+        let fullName: String?
+    }
 
     init(onContinueAsGuest: (() -> Void)? = nil) {
         self.onContinueAsGuest = onContinueAsGuest
@@ -134,6 +142,9 @@ struct LoginView: View {
             .sheet(isPresented: $showForgotPassword) {
                 NavigationStack { ForgotPasswordView() }
             }
+            .sheet(item: $pendingAppleConsent, onDismiss: { acceptedAppleTerms = false }) { credential in
+                appleTermsSheet(for: credential)
+            }
         }
     }
 
@@ -231,16 +242,92 @@ struct LoginView: View {
                 .compactMap { $0 }
                 .joined(separator: " ")
             Task {
-                await session.signInWithApple(
+                let outcome = await session.signInWithApple(
                     identityToken: identityToken,
-                    fullName: fullName.isEmpty ? nil : fullName
+                    fullName: fullName.isEmpty ? nil : fullName,
+                    acceptedTerms: false
                 )
+                if case .requiresTerms = outcome {
+                    acceptedAppleTerms = false
+                    pendingAppleConsent = PendingAppleConsent(identityToken: identityToken,
+                                                              fullName: fullName.isEmpty ? nil : fullName)
+                }
             }
         case .failure(let error):
             // Annulation utilisateur → silencieux ; autre erreur → message générique.
             if (error as? ASAuthorizationError)?.code == .canceled { return }
             session.errorMessage = "Connexion Apple impossible. Réessaie."
         }
+    }
+
+    private func appleTermsSheet(for credential: PendingAppleConsent) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: SQSpace.lg) {
+                    Text("Créer un compte")
+                        .font(SQType.title)
+                        .foregroundStyle(SQColor.label)
+                    Toggle(isOn: $acceptedAppleTerms) {
+                        Text("J’accepte les conditions d’utilisation et la politique de confidentialité.")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    .tint(SQColor.brandRed)
+                    .accessibilityIdentifier("login.apple.terms")
+                    Group {
+                        if dynamicTypeSize.isAccessibilitySize {
+                            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                                appleTermsLink
+                                applePrivacyLink
+                            }
+                        } else {
+                            HStack(spacing: SQSpace.md) {
+                                appleTermsLink
+                                Text("·").foregroundStyle(SQColor.labelSecondary)
+                                applePrivacyLink
+                            }
+                        }
+                    }
+                    .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
+                    .tint(SQColor.brandRed)
+                    if let error = session.errorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .font(.footnote)
+                            .foregroundStyle(SQColor.danger)
+                    }
+                    GradientButton("Continuer avec Apple", systemImage: "apple.logo", isBusy: session.isBusy) {
+                        Task {
+                            let outcome = await session.signInWithApple(
+                                identityToken: credential.identityToken,
+                                fullName: credential.fullName,
+                                acceptedTerms: acceptedAppleTerms
+                            )
+                            if case .continued = outcome { pendingAppleConsent = nil }
+                        }
+                    }
+                    .disabled(!acceptedAppleTerms || session.isBusy)
+                    .accessibilityIdentifier("login.apple.accept")
+                    Button("Annuler") { pendingAppleConsent = nil }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .disabled(session.isBusy)
+                }
+                .padding(SQSpace.xl)
+                .frame(maxWidth: 600)
+                .frame(maxWidth: .infinity)
+            }
+            .signalQuestHeroBackground()
+        }
+        .interactiveDismissDisabled(session.isBusy)
+    }
+
+    private var appleTermsLink: some View {
+        Link("Conditions d’utilisation", destination: AppConfig.current.termsURL)
+            .frame(minHeight: 44)
+    }
+
+    private var applePrivacyLink: some View {
+        Link("Politique de confidentialité", destination: AppConfig.current.privacyURL)
+            .frame(minHeight: 44)
     }
 
     private var header: some View {

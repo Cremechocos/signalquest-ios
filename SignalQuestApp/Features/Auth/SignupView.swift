@@ -203,7 +203,8 @@ struct SignupView: View {
             Task {
                 await session.signInWithApple(
                     identityToken: identityToken,
-                    fullName: fullName.isEmpty ? nil : fullName
+                    fullName: fullName.isEmpty ? nil : fullName,
+                    acceptedTerms: acceptedTerms
                 )
             }
         case .failure(let error):

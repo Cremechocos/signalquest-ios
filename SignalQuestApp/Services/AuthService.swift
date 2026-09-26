@@ -168,7 +168,7 @@ protocol AuthServicing: Sendable {
     func verify2FA(tempToken: String, code: String) async throws -> LoginResponse
     /// Sign in with Apple : envoie le jeton d'identité Apple (JWT) + le nom
     /// (1re autorisation) ; le backend vérifie le jeton et crée/connecte l'utilisateur.
-    func signInWithApple(identityToken: String, fullName: String?) async throws -> LoginResponse
+    func signInWithApple(identityToken: String, fullName: String?, acceptedTerms: Bool) async throws -> LoginResponse
     /// Associe un Apple ID au compte authentifié courant (depuis les Réglages).
     func linkApple(identityToken: String) async throws
     /// Dissocie l'Apple ID du compte authentifié courant.
@@ -250,14 +250,15 @@ final class AuthService: AuthServicing {
         )
     }
 
-    func signInWithApple(identityToken: String, fullName: String?) async throws -> LoginResponse {
+    func signInWithApple(identityToken: String, fullName: String?, acceptedTerms: Bool) async throws -> LoginResponse {
         struct AppleSignInRequest: Encodable {
             let identityToken: String
             let fullName: String?
+            let acceptedTerms: Bool
         }
         return try await api.requestJSON(
             "/api/auth/apple",
-            body: AppleSignInRequest(identityToken: identityToken, fullName: fullName),
+            body: AppleSignInRequest(identityToken: identityToken, fullName: fullName, acceptedTerms: acceptedTerms),
             authenticated: false
         )
     }
@@ -770,21 +771,36 @@ final class AuthSessionViewModel: ObservableObject {
         }
     }
 
-    func signInWithApple(identityToken: String, fullName: String?) async {
+    enum AppleSignInOutcome: Equatable {
+        case continued
+        case requiresTerms
+        case failed
+    }
+
+    @discardableResult
+    func signInWithApple(identityToken: String, fullName: String?, acceptedTerms: Bool = false) async -> AppleSignInOutcome {
+        guard case .loggedOut = state, !isBusy else { return .failed }
         isBusy = true
         errorMessage = nil
         defer { isBusy = false }
         do {
-            let response = try await service.signInWithApple(identityToken: identityToken, fullName: fullName)
+            let response = try await service.signInWithApple(identityToken: identityToken, fullName: fullName,
+                                                              acceptedTerms: acceptedTerms)
             if response.requires2FA == true, let tempToken = response.tempToken {
                 state = .requires2FA(tempToken: tempToken)
+                return .continued
             } else if let user = response.user {
                 await setAuthenticated(user)
+                return .continued
             } else {
                 errorMessage = "Réponse Apple invalide"
+                return .failed
             }
+        } catch APIError.http(_, let code, _, _, _) where code == "APPLE_TERMS_REQUIRED" && !acceptedTerms {
+            return .requiresTerms
         } catch {
             errorMessage = error.localizedDescription
+            return .failed
         }
     }
 

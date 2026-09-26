@@ -24,6 +24,8 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
     var signupResponse: LoginResponse?
     var signupCredentialID: UUID?
     var signupReplacementBeforeReturn: UUID?
+    var appleResponses: [Result<LoginResponse, Error>] = []
+    private(set) var appleTermsSent: [Bool] = []
     var wipeIdentity: (@Sendable () async -> Void)?
     private(set) var identityWipeCalls = 0
     private(set) var cached: AuthUser?
@@ -53,7 +55,11 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
         return CredentialResponse(value: signupResponse, credentialSessionID: signupCredentialID)
     }
     func verify2FA(tempToken: String, code: String) async throws -> LoginResponse { throw Unused.notImplemented }
-    func signInWithApple(identityToken: String, fullName: String?) async throws -> LoginResponse { throw Unused.notImplemented }
+    func signInWithApple(identityToken: String, fullName: String?, acceptedTerms: Bool) async throws -> LoginResponse {
+        appleTermsSent.append(acceptedTerms)
+        guard !appleResponses.isEmpty else { throw Unused.notImplemented }
+        return try appleResponses.removeFirst().get()
+    }
     func linkApple(identityToken: String) async throws { throw Unused.notImplemented }
     func unlinkApple() async throws { throw Unused.notImplemented }
     func setup2FA() async throws -> TwoFactorSetupResponse { throw Unused.notImplemented }
@@ -68,6 +74,41 @@ final class MockAuthService: AuthServicing, @unchecked Sendable {
 
 @MainActor
 final class AuthSessionTests: XCTestCase {
+    func testAppleAccountCreationWaitsForTermsAndOnlyThenAuthenticates() async {
+        let service = MockAuthService()
+        service.appleResponses = [
+            .failure(APIError.http(status: 428, code: "APPLE_TERMS_REQUIRED", message: "",
+                                    requestId: nil, retryAfter: nil)),
+            .success(LoginResponse(user: .mock, requires2FA: false, tempToken: nil)),
+        ]
+        let session = AuthSessionViewModel(service: service)
+        await session.bootstrap()
+
+        let first = await session.signInWithApple(identityToken: "synthetic", fullName: "Test",
+                                                  acceptedTerms: false)
+        XCTAssertEqual(first, .requiresTerms)
+        XCTAssertEqual(session.state, .loggedOut)
+        XCTAssertNil(session.errorMessage)
+        let accepted = await session.signInWithApple(identityToken: "synthetic", fullName: "Test",
+                                                     acceptedTerms: true)
+        XCTAssertEqual(accepted, .continued)
+        XCTAssertEqual(session.state, .authenticated(.mock))
+        XCTAssertEqual(service.appleTermsSent, [false, true])
+    }
+
+    func testExistingAppleAccountSignsInWithoutInventingAcceptance() async {
+        let service = MockAuthService()
+        service.appleResponses = [.success(LoginResponse(user: .mock, requires2FA: false, tempToken: nil))]
+        let session = AuthSessionViewModel(service: service)
+        await session.bootstrap()
+
+        let outcome = await session.signInWithApple(identityToken: "synthetic", fullName: nil,
+                                                    acceptedTerms: false)
+        XCTAssertEqual(outcome, .continued)
+        XCTAssertEqual(session.state, .authenticated(.mock))
+        XCTAssertEqual(service.appleTermsSent, [false])
+    }
+
     func testBootstrapWithoutCredentialsOpensGuestEntryWithoutNetwork() async {
         let service = MockAuthService()
         service.meResult = .success(.mock)
