@@ -10,6 +10,7 @@ struct LoginView: View {
     @EnvironmentObject private var onboardingEntry: OnboardingEntryState
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var email = ""
     @State private var password = ""
     @State private var code = ""
@@ -89,17 +90,7 @@ struct LoginView: View {
                             }
                             .accessibilityIdentifier("login.submit")
 
-                            HStack {
-                                Button("Mot de passe oublié ?") { showForgotPassword = true }
-                                    .accessibilityIdentifier("login.recovery")
-                                    .font(SQType.caption)
-                                    .foregroundStyle(SQColor.brandRed)
-                                Spacer()
-                                Button("Créer un compte") { showSignup = true }
-                                    .accessibilityIdentifier("login.signup")
-                                    .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
-                                    .foregroundStyle(SQColor.brandRed)
-                            }
+                            accountActions
                         }
 
                         if let error = session.errorMessage {
@@ -110,8 +101,6 @@ struct LoginView: View {
                         }
                     }
                     .padding(SQSpace.xl)
-                .frame(maxWidth: 600)
-                .frame(maxWidth: .infinity)
                     .sqSoftCard()
                     .sqAuthAppear(appeared, delay: 0.08)
 
@@ -150,16 +139,75 @@ struct LoginView: View {
 
     /// Liens légaux discrets (FOCUS « lien légal sur login » — LOGIN-LEGAL-01),
     /// réutilisant les URLs centralisées d'AppConfig comme SignupView.
+    @ViewBuilder
+    private var accountActions: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                recoveryButton
+                signupButton
+            }
+        } else {
+            HStack {
+                recoveryButton
+                Spacer()
+                signupButton
+            }
+        }
+    }
+
+    private var recoveryButton: some View {
+        Button { showForgotPassword = true } label: {
+            Text("Mot de passe oublié ?")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.brandRed)
+                .frame(minHeight: 48)
+                .contentShape(Rectangle())
+        }
+            .accessibilityIdentifier("login.recovery")
+    }
+
+    private var signupButton: some View {
+        Button { showSignup = true } label: {
+            Text("Créer un compte")
+                .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(minHeight: 48)
+                .contentShape(Rectangle())
+        }
+            .accessibilityIdentifier("login.signup")
+    }
+
     private var legalFooter: some View {
-        HStack(spacing: SQSpace.xs) {
-            Link("Conditions d’utilisation", destination: AppConfig.current.termsURL)
-            Text("·").foregroundStyle(SQColor.labelSecondary)
-            Link("Confidentialité", destination: AppConfig.current.privacyURL)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: SQSpace.xs) {
+                    termsLink
+                    privacyLink
+                }
+            } else {
+                HStack(spacing: SQSpace.xs) {
+                    termsLink
+                    Text("·").foregroundStyle(SQColor.labelSecondary)
+                    privacyLink
+                }
+            }
         }
         .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
         .tint(SQColor.brandRed)
         .frame(maxWidth: .infinity)
         .padding(.top, SQSpace.sm)
+    }
+
+    private var termsLink: some View {
+        Link("Conditions d’utilisation", destination: AppConfig.current.termsURL)
+            .frame(minHeight: 48)
+            .accessibilityIdentifier("login.terms")
+    }
+
+    private var privacyLink: some View {
+        Link("Confidentialité", destination: AppConfig.current.privacyURL)
+            .frame(minHeight: 48)
+            .accessibilityIdentifier("login.privacy")
     }
 
     private var isTwoFactor: Bool {
