@@ -67,6 +67,11 @@ struct SignupView: View {
                             .textFieldStyle(SQTextFieldStyle())
                             .accessibilityLabel("Confirmer le mot de passe")
                             .accessibilityIdentifier("auth.signup.confirmation")
+                        if challengeError == nil && session.errorMessage == nil, let info = passwordIssue {
+                            Label(info, systemImage: "info.circle")
+                                .font(.footnote)
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
                     }
 
                     Toggle(isOn: $acceptedTerms) {
@@ -90,10 +95,6 @@ struct SignupView: View {
                             .accessibilityIdentifier("auth.signup.error")
                             .font(.footnote)
                             .foregroundStyle(SQColor.danger)
-                    } else if let info = passwordIssue {
-                        Label(info, systemImage: "info.circle")
-                            .font(.footnote)
-                            .foregroundStyle(SQColor.labelSecondary)
                     }
 
                     GradientButton("Créer mon compte", systemImage: "person.crop.circle.badge.plus", isBusy: session.isBusy || submissionID != nil) {
@@ -220,7 +221,7 @@ struct SignupView: View {
     private var passwordIssue: String? {
         if password.isEmpty { return nil }
         if password.count < 8 { return String(localized: "Le mot de passe doit faire au moins 8 caractères.") }
-        if password != passwordConfirm { return "Les deux mots de passe ne correspondent pas." }
+        if password != passwordConfirm { return String(localized: "Les deux mots de passe ne correspondent pas.") }
         return nil
     }
 
