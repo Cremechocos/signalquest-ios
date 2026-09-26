@@ -25,6 +25,78 @@ final class AccountSettingsQATests: XCTestCase {
         let expectedB: String
     }
 
+    private struct RecipeMarker: Decodable {
+        let kind: String
+        let database: String
+        let ports: [String: Int]
+    }
+
+    func testPrivateZones503KeepsErrorUntilExplicitRetry() throws {
+        #if !targetEnvironment(simulator)
+        throw XCTSkip("Recette locale uniquement sur simulateur")
+        #endif
+        continueAfterFailure = false
+        let environment = ProcessInfo.processInfo.environment
+        guard let fixturePath = environment["SQ_RECIPE_FIXTURE"] ?? environment["TEST_RUNNER_SQ_RECIPE_FIXTURE"],
+              let appPath = environment["SQ_RECIPE_APP_BUNDLE_PATH"] ?? environment["TEST_RUNNER_SQ_RECIPE_APP_BUNDLE_PATH"],
+              let statePath = environment["SQ_RECIPE_STATE"] ?? environment["TEST_RUNNER_SQ_RECIPE_STATE"] else {
+            throw XCTSkip("Requiert le banc PRE-02 et le binaire isolé explicites")
+        }
+        let state = URL(fileURLWithPath: statePath, isDirectory: true).standardizedFileURL
+        let fixtureURL = URL(fileURLWithPath: fixturePath).standardizedFileURL
+        let marker = try JSONDecoder().decode(RecipeMarker.self,
+            from: Data(contentsOf: state.appendingPathComponent("recipe.json")))
+        let fixture = try JSONDecoder().decode(RecipeFixture.self, from: Data(contentsOf: fixtureURL))
+        let expectedURL = URL(string: "http://127.0.0.1:49141")!
+        let bundle = try XCTUnwrap(Bundle(path: appPath))
+        guard state.path.hasPrefix("/Users/alexandregermain/Site/qa/"),
+              fixtureURL.deletingLastPathComponent() == state,
+              marker.kind == "signalquest-ios-synthetic-v1", marker.database == "sq_ios_recipe_test",
+              marker.ports["proxy"] == 49141, fixture.baseURL == expectedURL,
+              fixture.expectedUserID == "ios_recipe_user_a",
+              bundle.bundleIdentifier == "fr.signalquest.ios.beta",
+              bundle.object(forInfoDictionaryKey: "SQ_API_BASE_URL") as? String == expectedURL.absoluteString,
+              bundle.object(forInfoDictionaryKey: "SQ_APP_BASE_URL") as? String == expectedURL.absoluteString else {
+            XCTFail("La panne synthétique refuse un état ou binaire hors du banc isolé")
+            return
+        }
+        let fault = state.appendingPathComponent("fault.json")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fault.path), "Une autre panne est déjà active")
+
+        let app = XCUIApplication()
+        app.launchArguments = ["--reset-auth", "--reset-onboarding"]
+        app.sqLaunch(locale: "fr")
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
+        app.terminate()
+        app.launchArguments = []
+        app.launchEnvironment["SQ_AUTH_TOKEN"] = fixture.token
+        app.sqLaunch(locale: "fr")
+        defer { app.terminate() }
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
+        let profile = SignalQuestUITestSupport.tab(named: "Profil", in: app)
+        XCTAssertTrue(profile.waitForExistence(timeout: 25))
+        profile.tap()
+        XCTAssertTrue(app.staticTexts["profile.displayName"].waitForExistence(timeout: 20))
+        let privacy = app.staticTexts["Confidentialité"].firstMatch
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(privacy, in: app))
+
+        try Data(#"{"path":"/api/user/zones","mode":"503"}"#.utf8).write(to: fault, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: fault) }
+        privacy.tap()
+        XCTAssertTrue(app.navigationBars["Confidentialité"].waitForExistence(timeout: 10))
+        let retry = app.buttons["privacy.zone.retry"]
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(retry, in: app))
+        XCTAssertFalse(app.staticTexts["Aucune zone privée enregistrée. Ajoute un lieu à protéger."].exists,
+                       "Un 503 ne doit pas ressembler à une vraie liste vide")
+
+        try FileManager.default.removeItem(at: fault)
+        retry.tap()
+        let existing = app.buttons["privacy.zone.row.ios_recipe_zone_0"]
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(existing, in: app),
+                      "La zone connue doit revenir après le réessai réel")
+        XCTAssertTrue(retry.waitForNonExistence(timeout: 5))
+    }
+
     func testPrivateZoneFromAccountAIsAbsentAfterSwitchToAccountB() throws {
         #if !targetEnvironment(simulator)
         throw XCTSkip("Recette locale uniquement sur simulateur")

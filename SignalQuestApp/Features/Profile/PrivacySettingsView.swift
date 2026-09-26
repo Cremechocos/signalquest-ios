@@ -123,7 +123,9 @@ struct PrivacySettingsView: View {
             Section {
                 if model.isLoadingZones { ProgressView("Chargement des zones…") }
                 if let error = model.zonesError {
-                    loadError(error, hasPrevious: model.zonesLoaded) { await model.loadZones() }
+                    loadError(error, hasPrevious: model.zonesLoaded, retryID: "privacy.zone.retry") {
+                        await model.loadZones()
+                    }
                 }
                 if let error = model.zoneMutationError {
                     Text(error).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
@@ -317,13 +319,19 @@ struct PrivacySettingsView: View {
         .accessibilityElement(children: .contain)
     }
 
-    private func loadError(_ error: String, hasPrevious: Bool, retry: @escaping @MainActor () async -> Void) -> some View {
+    private func loadError(_ error: String, hasPrevious: Bool, retryID: String? = nil,
+                           retry: @escaping @MainActor () async -> Void) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text(error).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
             if hasPrevious {
                 Text("Dernier état connu conservé.").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
             }
-            Button("Réessayer") { Task { await retry() } }
+            if let retryID {
+                Button("Réessayer") { Task { await retry() } }
+                    .accessibilityIdentifier(retryID)
+            } else {
+                Button("Réessayer") { Task { await retry() } }
+            }
         }
     }
 }
