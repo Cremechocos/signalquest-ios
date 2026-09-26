@@ -831,16 +831,19 @@ struct AntennaDetailSheet: View {
                     }
                 }
             )
+            .accessibilityLabel("Carte du site")
             .frame(height: 150)
             .allowsHitTesting(false)
             .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
             .sqShadowCard()
             .overlay(alignment: .bottomTrailing) {
-                if let userLocation = services.location.lastLocation {
-                    let distance = userLocation.distance(from: CLLocation(
+                if let originCoordinate = sightOrigin.coordinate(deviceLocation: services.location.cachedLocation()) {
+                    let originLocation = CLLocation(latitude: originCoordinate.latitude, longitude: originCoordinate.longitude)
+                    let siteLocation = CLLocation(
                         latitude: coordinate.latitude,
                         longitude: coordinate.longitude
-                    ))
+                    )
+                    let distance = originLocation.distance(from: siteLocation)
                     Text(SQUnits.distance(meters: distance))
                         .font(SQFont.archivo(11, .bold))
                         .foregroundStyle(SQColor.label)
@@ -848,9 +851,9 @@ struct AntennaDetailSheet: View {
                         .padding(.vertical, SQSpace.xs)
                         .background(SQColor.surface, in: Capsule(style: .continuous))
                         .padding(SQSpace.sm)
+                        .accessibilityLabel(sightOrigin.label + ". " + SQUnits.distance(meters: distance))
                 }
             }
-            .accessibilityLabel("Carte du site")
         }
     }
 
