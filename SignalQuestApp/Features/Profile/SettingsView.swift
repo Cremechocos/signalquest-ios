@@ -1345,27 +1345,65 @@ final class SettingsViewModel: ObservableObject {
 
     private let userService: UserServicing
     private let authService: AuthServicing
-    init(userService: UserServicing, authService: AuthServicing) {
+    private let exportDirectory: URL
+    private var exportSession: LocalAccountSession?
+    private var exportURL: URL?
+
+    init(userService: UserServicing, authService: AuthServicing,
+         exportDirectory: URL = FileManager.default.temporaryDirectory) {
         self.userService = userService
         self.authService = authService
+        self.exportDirectory = exportDirectory
     }
 
     func exportData() async {
+        guard !isExporting, let expectedSession = LocalAccountScope.sessionSnapshot() else { return }
+        clearExport()
         isExporting = true
         errorMessage = nil
         defer { isExporting = false }
+        var pendingURL: URL?
         do {
             let data = try await userService.exportPersonalData()
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("signalquest-mes-donnees.json")
-            try data.write(to: url, options: .atomic)
+            guard !Task.isCancelled, expectedSession.isCurrent else { return }
+            let url = exportDirectory
+                .appendingPathComponent("signalquest-mes-donnees-\(UUID().uuidString).json")
+            pendingURL = url
+            // Un export volumineux ne doit pas figer le thread de l'interface.
+            try await Task.detached(priority: .utility) {
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                        withIntermediateDirectories: true)
+                try data.write(to: url, options: [.atomic, .completeFileProtection])
+            }.value
+            guard !Task.isCancelled, expectedSession.isCurrent else {
+                try? FileManager.default.removeItem(at: url)
+                return
+            }
+            exportSession = expectedSession
+            exportURL = url
             exportedFile = ExportedDataFile(url: url)
+            pendingURL = nil
             Haptics.success()
         } catch {
-            if error.isCancellation { return }
+            if let pendingURL { try? FileManager.default.removeItem(at: pendingURL) }
+            if error.isCancellation || !expectedSession.isCurrent { return }
             errorMessage = error.localizedDescription
             Haptics.error()
         }
+    }
+
+    func clearExport() {
+        exportedFile = nil
+        exportSession = nil
+        if let exportURL { try? FileManager.default.removeItem(at: exportURL) }
+        exportURL = nil
+    }
+
+    func clearExportIfAccountChanged(_ state: AuthSessionViewModel.State) {
+        guard let exportSession else { return }
+        if case .authenticated(let user) = state,
+           exportSession.ownerScopeId == "user:\(user.id)", exportSession.isCurrent { return }
+        clearExport()
     }
 
     func load() async {
@@ -1877,8 +1915,11 @@ struct SettingsView: View {
         } message: {
             Text("Tu ne pourras plus te connecter via Apple. Si ton compte a été créé avec Apple, définis d'abord un mot de passe via « Mot de passe oublié » pour ne pas perdre l'accès.")
         }
-        .sheet(item: $model.exportedFile) { file in
+        .sheet(item: $model.exportedFile, onDismiss: { model.clearExport() }) { file in
             ShareSheet(items: [file.url])
+        }
+        .onChangeCompat(of: session.state) { _, state in
+            model.clearExportIfAccountChanged(state)
         }
         .sheet(isPresented: $showDeleteConfirm) {
             DeleteAccountSheet(model: model) {
