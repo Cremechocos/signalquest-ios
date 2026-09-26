@@ -447,6 +447,7 @@
 		B658108BD0F52263964FCAEB /* SQDock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AA0F72C82A77725FACCD301 /* SQDock.swift */; };
 		B6F59F55BF8CFE41FFBD30E1 /* RadioLogIdentifyChainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9251F38206885980205B046C /* RadioLogIdentifyChainView.swift */; };
 		B6FB2B5B1F6516981E6A8ACF /* RadioLogsSiteCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE0378DBCDC3C95B69153DE /* RadioLogsSiteCard.swift */; };
+		B774ED85843BA1ECD8508743 /* CommentsHTTPQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E6BA6C2490AD1325025210C /* CommentsHTTPQATests.swift */; };
 		B8A85AD81CA49026682265E0 /* MapStores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 326E848B4ED2FD2F140691BE /* MapStores.swift */; };
 		B94DDE8435F0822E91854DD6 /* MapHTTPFixtureAdmissionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D78631EFAA5BDFD941C21AB9 /* MapHTTPFixtureAdmissionTests.swift */; };
 		B977D4399EE21E562B686269 /* PrivacyZonesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45C74FCE985C39D989DD7AC5 /* PrivacyZonesTests.swift */; };
@@ -1006,6 +1007,7 @@
 		8DA025CCAC0DF6A4A8AD5A6E /* AntennaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaModels.swift; sourceTree = "<group>"; };
 		8DE0378DBCDC3C95B69153DE /* RadioLogsSiteCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioLogsSiteCard.swift; sourceTree = "<group>"; };
 		8E27D904CE50C23DE8B0F1C1 /* LocationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationServiceTests.swift; sourceTree = "<group>"; };
+		8E6BA6C2490AD1325025210C /* CommentsHTTPQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsHTTPQATests.swift; sourceTree = "<group>"; };
 		8F99C9F0E518188A5BB538C4 /* LiveTelemetryDeliveryStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTelemetryDeliveryStateTests.swift; sourceTree = "<group>"; };
 		8FB83B28A83979ABC55BD6DF /* MapLoadConsistencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapLoadConsistencyTests.swift; sourceTree = "<group>"; };
 		8FD3E622986BF2B624EAAA44 /* CommentsPaginationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsPaginationTests.swift; sourceTree = "<group>"; };
@@ -1837,6 +1839,7 @@
 				A4F5346C853F95E32F253D7B /* AuditTourQATests.swift */,
 				3C58966E2E435E922D292908 /* AuthFieldLabelsQATests.swift */,
 				B517C6393E3FDD2A21D16E34 /* AuthFormsQATests.swift */,
+				8E6BA6C2490AD1325025210C /* CommentsHTTPQATests.swift */,
 				E69486C7604BF325A3D24CED /* CommunityFirstContentQATests.swift */,
 				9E978EE2EBFDAD88C880B9C9 /* DockMinimizeQATests.swift */,
 				E98AB3B3DAB26FF843400EAD /* DriveTestSessionLifecycleQATests.swift */,
@@ -3145,6 +3148,7 @@
 				73A2B7B1908FB3B6415DC31B /* AuditTourQATests.swift in Sources */,
 				8B5AA79D90888D52BC8E5796 /* AuthFieldLabelsQATests.swift in Sources */,
 				1CAE82D920D95AB2CF54AF18 /* AuthFormsQATests.swift in Sources */,
+				B774ED85843BA1ECD8508743 /* CommentsHTTPQATests.swift in Sources */,
 				AFCF285F3A9D181434BDB320 /* CommunityFirstContentQATests.swift in Sources */,
 				8A731C079D449D10B1E7ADD3 /* DockMinimizeQATests.swift in Sources */,
 				957BBD951DB3EBBDCA090720 /* DriveTestSessionLifecycleQATests.swift in Sources */,
