@@ -16,6 +16,14 @@ final class AccountSettingsQATests: XCTestCase {
     }
 
     func testPrivateZoneEditorCreatePauseAndDeleteAgainstIsolatedBackend() throws {
+        try checkPrivateZoneCRUD(locale: "fr")
+    }
+
+    func testEnglishPrivateZoneEditorCRUDOnIPadAgainstIsolatedBackend() throws {
+        try checkPrivateZoneCRUD(locale: "en")
+    }
+
+    private func checkPrivateZoneCRUD(locale: String) throws {
         #if !targetEnvironment(simulator)
         throw XCTSkip("Recette locale uniquement sur simulateur")
         #endif
@@ -39,24 +47,25 @@ final class AccountSettingsQATests: XCTestCase {
 
         let app = XCUIApplication()
         app.launchArguments = ["--reset-auth", "--reset-onboarding"]
-        app.sqLaunch(locale: "fr")
+        app.sqLaunch(locale: locale)
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
         app.terminate()
         app.launchArguments = []
         app.launchEnvironment["SQ_AUTH_TOKEN"] = fixture.token
-        app.sqLaunch(locale: "fr")
+        app.sqLaunch(locale: locale)
         defer { app.terminate() }
         SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
 
-        let profile = SignalQuestUITestSupport.tab(named: "Profil", in: app)
+        let profile = SignalQuestUITestSupport.tab(named: locale == "fr" ? "Profil" : "Profile", in: app)
         XCTAssertTrue(profile.waitForExistence(timeout: 25))
         profile.tap()
         XCTAssertTrue(app.staticTexts["profile.displayName"].waitForExistence(timeout: 20),
                       "Le jeton de recette doit ouvrir le vrai profil avant les réglages")
-        let privacy = app.staticTexts["Confidentialité"].firstMatch
+        let privacyTitle = locale == "fr" ? "Confidentialité" : "Privacy"
+        let privacy = app.staticTexts[privacyTitle].firstMatch
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(privacy, in: app))
         privacy.tap()
-        XCTAssertTrue(app.navigationBars["Confidentialité"].waitForExistence(timeout: 10),
+        XCTAssertTrue(app.navigationBars[privacyTitle].waitForExistence(timeout: 10),
                       "Le tap doit ouvrir les réglages de confidentialité, pas un lien légal")
         let create = app.buttons["privacy.zone.create"]
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(create, in: app))
@@ -64,7 +73,8 @@ final class AccountSettingsQATests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [canCreate], timeout: 8), .completed)
         create.tap()
 
-        XCTAssertTrue(app.navigationBars["Nouvelle zone privée"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars[locale == "fr" ? "Nouvelle zone privée" : "New private zone"]
+            .waitForExistence(timeout: 10))
         let name = "Zone QA R120 \(UUID().uuidString.prefix(6))"
         let latitude = "\(Int.random(in: 10...59)).\(Int.random(in: 10_000...99_999))"
         let longitude = "\(Int.random(in: 20...119)).\(Int.random(in: 10_000...99_999))"
@@ -92,7 +102,8 @@ final class AccountSettingsQATests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 15), "La réponse serveur doit apparaître dans la liste")
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(row, in: app))
         row.tap()
-        XCTAssertTrue(app.navigationBars["Modifier la zone"].waitForExistence(timeout: 10))
+        let editTitle = locale == "fr" ? "Modifier la zone" : "Edit zone"
+        XCTAssertTrue(app.navigationBars[editTitle].waitForExistence(timeout: 10))
         let active = app.switches["privacy-zone.active"]
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(active, in: app))
         active.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.5)).tap()
@@ -102,7 +113,7 @@ final class AccountSettingsQATests: XCTestCase {
         let updateEnabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: save)
         let updateResult = XCTWaiter.wait(for: [updateEnabled], timeout: 6)
         if updateResult != .completed {
-            print("Zone pause UI: switch=\(active.value ?? "nil") saveEnabled=\(save.isEnabled) editor=\(app.navigationBars["Modifier la zone"].exists)")
+            print("Zone pause UI: switch=\(active.value ?? "nil") saveEnabled=\(save.isEnabled) editor=\(app.navigationBars[editTitle].exists)")
             let shot = XCTAttachment(screenshot: app.screenshot())
             shot.name = "privacy-zone-pause-save-disabled"
             shot.lifetime = .keepAlways
@@ -112,8 +123,9 @@ final class AccountSettingsQATests: XCTestCase {
         save.tap()
         XCTAssertTrue(row.waitForExistence(timeout: 15))
         row.tap()
+        XCTAssertTrue(app.navigationBars[editTitle].waitForExistence(timeout: 10))
         let paused = app.switches["privacy-zone.active"]
-        XCTAssertTrue(paused.waitForExistence(timeout: 5))
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(paused, in: app))
         XCTAssertEqual(paused.value as? String, "0")
         let remove = app.buttons["privacy-zone.delete"]
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(remove, in: app))
