@@ -59,6 +59,12 @@ final class FeedViewModel: ObservableObject {
     }
     private var queryRevision = UUID()
     private var loadRevision = UUID()
+    private struct DetailReceipt {
+        let revision: UInt64
+        let item: UnifiedSocialFeedItem
+    }
+    private var detailReceiptRevision: UInt64 = 0
+    private var detailReceipts: [String: DetailReceipt] = [:]
     private var streamRevision = UUID()
     private var metadataOwner = LocalAccountScope.currentOwnerScopeId
     private var streamTask: Task<Void, Never>?
@@ -73,6 +79,7 @@ final class FeedViewModel: ObservableObject {
 
     private func invalidateQuery() {
         queryRevision = UUID(); loadRevision = UUID()
+        detailReceipts.removeAll()
         page = nil; errorMessage = nil; isLoading = true; isLoadingMore = false
         pendingCount = 0; knownIds.removeAll(); needsLiveCheck = false; liveCheckID = nil
         if metadataOwner != LocalAccountScope.currentOwnerScopeId { trendingHashtags = [] }
@@ -160,6 +167,7 @@ final class FeedViewModel: ObservableObject {
 
     func load() async {
         let context = query, request = UUID()
+        let receiptRevisionAtStart = detailReceiptRevision
         loadRevision = request; isLoading = true; isLoadingMore = false; errorMessage = nil
         if metadataOwner != context.owner { trendingHashtags = [] }
         defer { if context == query && loadRevision == request { isLoading = false } }
@@ -173,7 +181,21 @@ final class FeedViewModel: ObservableObject {
         do {
             let loaded = try await service.loadFeed(cursor: nil, hashtag: context.hashtag, tab: context.tab)
             guard context == query, request == loadRevision, !Task.isCancelled else { return }
-            page = loaded; trendingHashtags = loaded.trendingHashtags; metadataOwner = context.owner
+            page = SocialFeedPage(
+                items: loaded.items.map { item in
+                    guard let receipt = detailReceipts[item.id],
+                          receipt.revision > receiptRevisionAtStart else { return item }
+                    return item.adoptingInteractions(from: receipt.item)
+                },
+                nextCursor: loaded.nextCursor,
+                stories: loaded.stories,
+                trendingHashtags: loaded.trendingHashtags,
+                suggestedUsers: loaded.suggestedUsers,
+                requestId: loaded.requestId
+            )
+            // Un GET démarré après le reçu peut désormais faire autorité.
+            detailReceipts = detailReceipts.filter { $0.value.revision > receiptRevisionAtStart }
+            trendingHashtags = loaded.trendingHashtags; metadataOwner = context.owner
             pendingCount = 0; knownIds.removeAll()
             if needsLiveCheck, streamFactory != nil {
                 needsLiveCheck = false
@@ -382,6 +404,8 @@ final class FeedViewModel: ObservableObject {
     /// Garde le fil cohérent avec le détail ouvert par notification/lien,
     /// même si son rechargement réseau au retour échoue.
     func acceptDetailItem(_ item: UnifiedSocialFeedItem) {
+        detailReceiptRevision &+= 1
+        detailReceipts[item.id] = DetailReceipt(revision: detailReceiptRevision, item: item)
         guard let current = page,
               current.items.contains(where: { $0.id == item.id }) else { return }
         page = SocialFeedPage(
@@ -661,13 +685,12 @@ struct FeedView: View {
         .alert("Publication", isPresented: Binding(
             get: { failedRoutedPostID != nil },
             set: { if !$0 { failedRoutedPostID = nil } }
-        )) {
+        ), presenting: failedRoutedPostID) { retryID in
             Button("Réessayer") {
-                guard let id = failedRoutedPostID else { return }
-                Task { await openRoutedPost(id) }
+                Task { await openRoutedPost(retryID) }
             }
             Button("Fermer", role: .cancel) { failedRoutedPostID = nil }
-        } message: {
+        } message: { _ in
             Text("Une erreur est survenue. Réessaie.")
         }
         .onChangeCompat(of: router.openUserProfileId) { _, _ in

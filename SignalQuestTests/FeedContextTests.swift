@@ -4,6 +4,36 @@ import Combine
 
 @MainActor
 final class FeedContextTests: XCTestCase {
+    func testDetailReceiptSurvivesOlderInFlightReload() async throws {
+        let gate = FeedFixtureGate<SocialFeedPage>(), calls = FeedCallCount()
+        let started = expectation(description: "old GET started")
+        let original = Self.item("post-1")
+        var stale = original
+        stale.commentsCount = 9
+        let model = FeedViewModel(service: FeedContextFixture { _, _, _ in
+            if await calls.next() == 1 { return Self.page("initial", items: [original]) }
+            started.fulfill()
+            return try await gate.wait()
+        })
+        await model.load()
+
+        let reload = Task { await model.load() }
+        await fulfillment(of: [started], timeout: 2)
+        let data = Data(#"{"reactions":[{"emoji":"❤️","count":4,"reactedByMe":true}],"reposted":true,"repostsCount":2}"#.utf8)
+        let receipt = try JSONDecoder().decode(ReactionResponse.self, from: data)
+        model.acceptDetailItem(original.applying(receipt))
+        XCTAssertEqual(model.page?.items.first?.reactions.first?.count, 4)
+
+        await gate.finish(.success(Self.page("old-get", items: [stale])))
+        await reload.value
+        XCTAssertEqual(model.page?.requestId, "old-get")
+        XCTAssertEqual(model.page?.items.first?.commentsCount, 9)
+        XCTAssertEqual(model.page?.items.first?.reactions.first?.count, 4)
+        XCTAssertTrue(model.page?.items.first?.likedByMe == true)
+        XCTAssertEqual(model.page?.items.first?.repostsCount, 2)
+        XCTAssertFalse(model.isLoading)
+    }
+
     func testLatePageCannotReplaceTheSelectedTab() async {
         let gate = FeedFixtureGate<SocialFeedPage>()
         let entered = expectation(description: "Old tab is pending")
