@@ -175,9 +175,9 @@ struct AppRootView: View {
             .background(PasswordResetPresentation(route: passwordResetRoute,
                 canPresent: canPresentPasswordReset, mustDismiss: mustDismissPasswordReset,
                 session: session, locale: locale, onClose: closePasswordReset, onSuccess: completePasswordReset))
-            .onOpenURL(perform: receivePasswordResetURL)
+            .onOpenURL(perform: receiveAccountOrPostURL)
             .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
-                if let url = activity.webpageURL { receivePasswordResetURL(url) }
+                if let url = activity.webpageURL { receiveAccountOrPostURL(url) }
             }
             .task {
                 // `networkPath.start()` et `session.bootstrap()` ont migré dans
@@ -309,7 +309,17 @@ struct AppRootView: View {
         return true
     }
 
-    private func receivePasswordResetURL(_ url: URL) {
+    private func receiveAccountOrPostURL(_ url: URL) {
+        // Le routeur survit à l'onboarding et à la connexion : un lien ouvert à
+        // froid reste disponible quand le fil Communauté est enfin monté.
+        if let postID = PostDeepLink.postID(
+            from: url,
+            appOrigin: AppConfig.current.appBaseURL,
+            appScheme: SQSharedConfiguration.urlScheme
+        ) {
+            services.router.route(toPost: postID)
+            return
+        }
         // Le web a consommé le jeton de confirmation. L'app ne se déclare pas
         // vérifiée sur la foi du lien : elle relit le reçu de /api/auth/me.
         if url.scheme == SQSharedConfiguration.urlScheme, url.host == "verify-email" {
@@ -501,7 +511,7 @@ struct RootView: View {
                 router.routeFromOnboarding(to: lease.request.destination)
             } else {
                 if let pending = onboardingEntry.pending { onboardingEntry.consume(pending) }
-                router.selectedTab = .home
+                if !router.hasPendingContentRoute { router.selectedTab = .home }
             }
             router.isDockHidden = false
             router.isDockMinimized = false

@@ -358,7 +358,8 @@ struct ConversationDetailView: View {
                     feedService: services.feed,
                     messagesService: services.messages,
                     commentsService: services.comments,
-                    reportsService: services.reports
+                    reportsService: services.reports,
+                    onItemChanged: { sharedPosts.acceptDetailItem($0, for: target.id) }
                 )
             }
         }

@@ -44,6 +44,7 @@ final class SharedPostStore: ObservableObject {
     @Published private(set) var states: [String: SharedPostState] = [:]
     private var service: SocialFeedServicing?
     private var inFlight: Set<String> = []
+    private var refreshRevisions: [String: UUID] = [:]
 
     func state(for postId: String) -> SharedPostState {
         states[postId] ?? .loading
@@ -80,11 +81,23 @@ final class SharedPostStore: ObservableObject {
     /// ou détail), sans repasser par l'état squelette.
     func refresh(_ postId: String) {
         guard let service, case .loaded = states[postId] else { return }
+        let revision = UUID()
+        refreshRevisions[postId] = revision
         Task { [weak self] in
-            if let item = try? await service.post(id: postId) {
+            if let item = try? await service.post(id: postId),
+               self?.refreshRevisions[postId] == revision {
                 self?.states[postId] = .loaded(item)
             }
         }
+    }
+
+    /// Reçu d'une mutation effectuée dans le détail : la bulle reflète aussitôt
+    /// le résultat, même si le GET de rafraîchissement au retour échoue.
+    func acceptDetailItem(_ item: UnifiedSocialFeedItem, for postId: String) {
+        guard case .loaded(let current) = states[postId],
+              current.backendPostId == item.backendPostId else { return }
+        refreshRevisions[postId] = UUID()
+        states[postId] = .loaded(current.adoptingInteractions(from: item))
     }
 
     /// Toggle ❤️ optimiste, réconcilié par la réponse serveur (rollback si échec).
