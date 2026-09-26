@@ -556,6 +556,7 @@ struct SpeedtestView: View {
                 chipRow(
                     title: "Un test tous les",
                     options: [(250, "250 m"), (500, "500 m"), (1_000, "1 km"), (2_000, "2 km")],
+                    accessibilityContext: String(localized: "Un test tous les"),
                     selection: $driveIntervalMeters
                 )
                 Text("Prochain test après la distance choisie ou 30 s. « Tester maintenant » le lance aussitôt.")
@@ -567,7 +568,8 @@ struct SpeedtestView: View {
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 chipRow(
                     title: "Plafond de données",
-                    options: [(500, String(localized: "500 Mo")), (2_000, String(localized: "2 Go")), (5_120, String(localized: "5,12 Go")), (0, "∞")],
+                    options: [(500, String(localized: "500 Mo")), (2_000, String(localized: "2 Go")), (5_120, String(localized: "5,12 Go")), (0, String(localized: "Sans limite"))],
+                    accessibilityContext: String(localized: "Plafond de données"),
                     selection: $driveDataCapMB
                 )
                 Text("Un speedtest consomme son débit × sa durée : environ 375 Mo à 300 Mb/s sur 10 s. La session s'arrête proprement au plafond et te le dit.")
@@ -582,18 +584,25 @@ struct SpeedtestView: View {
     private func chipRow(
         title: LocalizedStringKey,
         options: [(value: Int, label: String)],
+        accessibilityContext: String,
         selection: Binding<Int>
     ) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text(title).foregroundStyle(SQColor.label)
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: SQSpace.sm) { chipButtons(options: options, selection: selection) }
+                HStack(spacing: SQSpace.sm) {
+                    chipButtons(options: options, accessibilityContext: accessibilityContext, selection: selection)
+                }
             }
         }
     }
 
     @ViewBuilder
-    private func chipButtons(options: [(value: Int, label: String)], selection: Binding<Int>) -> some View {
+    private func chipButtons(
+        options: [(value: Int, label: String)],
+        accessibilityContext: String,
+        selection: Binding<Int>
+    ) -> some View {
         ForEach(options, id: \.value) { option in
                 Button {
                     selection.wrappedValue = option.value
@@ -611,6 +620,7 @@ struct SpeedtestView: View {
                         .foregroundStyle(selection.wrappedValue == option.value ? SQColor.onAccent : SQColor.label)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("\(accessibilityContext), \(option.label)")
                 .accessibilityAddTraits(selection.wrappedValue == option.value ? [.isSelected] : [])
         }
     }
@@ -627,8 +637,12 @@ struct SpeedtestView: View {
                             Text("Nombre de tests").foregroundStyle(SQColor.label)
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: SQSpace.sm) {
-                                    chipButtons(options: [(1, "1"), (3, "3"), (5, "5"), (10, "10"),
-                                        (Self.continuousBurst, String(localized: "Trajet"))], selection: $burstCount)
+                                    chipButtons(
+                                        options: [(1, "1"), (3, "3"), (5, "5"), (10, "10"),
+                                            (Self.continuousBurst, String(localized: "Trajet"))],
+                                        accessibilityContext: String(localized: "Nombre de tests"),
+                                        selection: $burstCount
+                                    )
                                 }
                             }
                         }
