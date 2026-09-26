@@ -87,10 +87,11 @@ struct MyMeasurementsView: View {
     /// Coloration courante, basculable Signal (RSRP) ↔ Génération. Défaut génération
     /// (iOS ne fournit pas de RSRP → la couleur signal est peu informative en iOS pur).
     @State private var coloring: SessionPointColoring
-    private let mapTitle: String
+    private let mapTitle: LocalizedStringKey
     @StateObject private var model: MyMeasurementsViewModel
 
-    init(service: SessionsServicing, initialColoring: SessionPointColoring = .generation, title: String = "Mes mesures") {
+    init(service: SessionsServicing, initialColoring: SessionPointColoring = .generation,
+         title: LocalizedStringKey = "Mes mesures") {
         _coloring = State(initialValue: initialColoring)
         self.mapTitle = title
         _model = StateObject(wrappedValue: MyMeasurementsViewModel(service: service))
@@ -136,7 +137,10 @@ struct MyMeasurementsView: View {
             .padding(.top, SQSpace.sm)
         }
         .overlay(alignment: .bottomLeading) {
-            if coloring == .generation && !model.points.isEmpty { generationLegend }
+            if coloring == .generation && !model.points.isEmpty {
+                generationLegend
+                    .padding(.bottom, SQDock.floatingContentInset(subtracting: SQSpace.md))
+            }
         }
     }
 
@@ -147,7 +151,9 @@ struct MyMeasurementsView: View {
                     .frame(width: 44, height: 44)
             }
             .disabled(!model.canGoBack)
+            .opacity(model.canGoBack ? 1 : 0.4)
             .accessibilityLabel("Précédent")
+            .accessibilityIdentifier("measurements.previousPage")
             Text("Sessions")
                 .font(SQType.caption)
             Text(verbatim: "\(model.pageStart)–\(model.pageEnd) / \(model.totalSessions.map(String.init) ?? "…")")
@@ -159,7 +165,9 @@ struct MyMeasurementsView: View {
                     .frame(width: 44, height: 44)
             }
             .disabled(!model.canGoForward)
+            .opacity(model.canGoForward ? 1 : 0.4)
             .accessibilityLabel("Suivant")
+            .accessibilityIdentifier("measurements.nextPage")
         }
         .foregroundStyle(SQColor.label)
         .padding(.horizontal, SQSpace.xs)
