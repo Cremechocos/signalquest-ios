@@ -9,6 +9,122 @@ import XCTest
 final class AccountSettingsQATests: XCTestCase {
     override func setUp() { continueAfterFailure = true }
 
+    private struct RecipeFixture: Decodable {
+        let baseURL: URL
+        let token: String
+        let expectedUserID: String
+    }
+
+    func testPrivateZoneEditorCreatePauseAndDeleteAgainstIsolatedBackend() throws {
+        #if !targetEnvironment(simulator)
+        throw XCTSkip("Recette locale uniquement sur simulateur")
+        #endif
+        continueAfterFailure = false
+        let environment = ProcessInfo.processInfo.environment
+        guard let fixturePath = environment["SQ_RECIPE_FIXTURE"] ?? environment["TEST_RUNNER_SQ_RECIPE_FIXTURE"],
+              let appPath = environment["SQ_RECIPE_APP_BUNDLE_PATH"] ?? environment["TEST_RUNNER_SQ_RECIPE_APP_BUNDLE_PATH"] else {
+            throw XCTSkip("Requiert la recette isolée explicite et son binaire compilé")
+        }
+        let fixture = try JSONDecoder().decode(RecipeFixture.self,
+            from: Data(contentsOf: URL(fileURLWithPath: fixturePath)))
+        let expectedURL = URL(string: "http://127.0.0.1:49141")!
+        let bundle = try XCTUnwrap(Bundle(path: appPath))
+        guard fixture.baseURL == expectedURL, fixture.expectedUserID == "ios_recipe_user_a",
+              bundle.bundleIdentifier == "fr.signalquest.ios.beta",
+              bundle.object(forInfoDictionaryKey: "SQ_API_BASE_URL") as? String == expectedURL.absoluteString,
+              bundle.object(forInfoDictionaryKey: "SQ_APP_BASE_URL") as? String == expectedURL.absoluteString else {
+            XCTFail("La recette refuse un compte ou un binaire hors du loopback isolé")
+            return
+        }
+
+        let app = XCUIApplication()
+        app.launchArguments = ["--reset-auth", "--reset-onboarding"]
+        app.sqLaunch(locale: "fr")
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
+        app.terminate()
+        app.launchArguments = []
+        app.launchEnvironment["SQ_AUTH_TOKEN"] = fixture.token
+        app.sqLaunch(locale: "fr")
+        defer { app.terminate() }
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
+
+        let profile = SignalQuestUITestSupport.tab(named: "Profil", in: app)
+        XCTAssertTrue(profile.waitForExistence(timeout: 25))
+        profile.tap()
+        XCTAssertTrue(app.staticTexts["profile.displayName"].waitForExistence(timeout: 20),
+                      "Le jeton de recette doit ouvrir le vrai profil avant les réglages")
+        let privacy = app.staticTexts["Confidentialité"].firstMatch
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(privacy, in: app))
+        privacy.tap()
+        XCTAssertTrue(app.navigationBars["Confidentialité"].waitForExistence(timeout: 10),
+                      "Le tap doit ouvrir les réglages de confidentialité, pas un lien légal")
+        let create = app.buttons["privacy.zone.create"]
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(create, in: app))
+        let canCreate = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: create)
+        XCTAssertEqual(XCTWaiter.wait(for: [canCreate], timeout: 8), .completed)
+        create.tap()
+
+        XCTAssertTrue(app.navigationBars["Nouvelle zone privée"].waitForExistence(timeout: 10))
+        let name = "Zone QA R120 \(UUID().uuidString.prefix(6))"
+        let latitude = "\(Int.random(in: 10...59)).\(Int.random(in: 10_000...99_999))"
+        let longitude = "\(Int.random(in: 20...119)).\(Int.random(in: 10_000...99_999))"
+        let nameField = app.textFields["privacy-zone.name"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        nameField.tap()
+        nameField.typeText(name + "\n")
+        let form = app.tables.firstMatch.exists ? app.tables.firstMatch : app.scrollViews.firstMatch
+        for (id, value) in [("privacy-zone.latitude", latitude),
+                            ("privacy-zone.longitude", longitude)] {
+            let field = app.textFields[id]
+            XCTAssertTrue(field.waitForExistence(timeout: 5))
+            for _ in 0..<6 where !field.isHittable { form.swipeUp() }
+            XCTAssertTrue(field.isHittable)
+            field.tap()
+            field.typeText(value + "\n")
+        }
+        let save = app.buttons["privacy-zone.save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: save)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 6), .completed)
+        save.tap()
+
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", name)).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "La réponse serveur doit apparaître dans la liste")
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(row, in: app))
+        row.tap()
+        XCTAssertTrue(app.navigationBars["Modifier la zone"].waitForExistence(timeout: 10))
+        let active = app.switches["privacy-zone.active"]
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(active, in: app))
+        active.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.5)).tap()
+        let switchedOff = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '0'"), object: active)
+        XCTAssertEqual(XCTWaiter.wait(for: [switchedOff], timeout: 5), .completed,
+                       "Le switch doit réellement passer sur désactivé avant l'enregistrement")
+        let updateEnabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: save)
+        let updateResult = XCTWaiter.wait(for: [updateEnabled], timeout: 6)
+        if updateResult != .completed {
+            print("Zone pause UI: switch=\(active.value ?? "nil") saveEnabled=\(save.isEnabled) editor=\(app.navigationBars["Modifier la zone"].exists)")
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "privacy-zone-pause-save-disabled"
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+        XCTAssertEqual(updateResult, .completed)
+        save.tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        row.tap()
+        let paused = app.switches["privacy-zone.active"]
+        XCTAssertTrue(paused.waitForExistence(timeout: 5))
+        XCTAssertEqual(paused.value as? String, "0")
+        let remove = app.buttons["privacy-zone.delete"]
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(remove, in: app))
+        remove.tap()
+        let confirm = app.buttons.matching(identifier: "privacy-zone.confirmDelete")
+            .allElementsBoundByIndex.first(where: \.isHittable)
+        XCTAssertNotNil(confirm)
+        confirm?.tap()
+        XCTAssertTrue(row.waitForNonExistence(timeout: 15))
+    }
+
     func testAccountSettingsAreReachable() throws {
         let token = ProcessInfo.processInfo.environment["SQ_AUTH_TOKEN"] ?? ""
         try XCTSkipIf(token.isEmpty, "Requiert SQ_AUTH_TOKEN : réglages liés au compte")

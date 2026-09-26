@@ -160,6 +160,7 @@ struct PrivacySettingsView: View {
                 } label: {
                     Label("Créer une zone privée", systemImage: "plus.circle.fill")
                 }
+                .accessibilityIdentifier("privacy.zone.create")
                 .disabled(!model.zonesLoaded || model.isLoadingZones || model.zoneBusyId != nil || !model.isSessionCurrent)
             } header: {
                 Text("Zones privées")
@@ -300,6 +301,7 @@ struct PrivacySettingsView: View {
             }
             .buttonStyle(.plain)
             .accessibilityHint("Modifier cette zone")
+            .accessibilityIdentifier("privacy.zone.row.\(zone.id)")
             if model.zoneBusyId == zone.id {
                 ProgressView()
             } else {

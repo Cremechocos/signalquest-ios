@@ -46,13 +46,6 @@ struct PrivacyZoneEditorView: View {
                 .listRowBackground(SQColor.surface)
 
                 Section {
-                    PrivacyZoneMapPicker(draft: draft) { coordinate in
-                        invalidateLocationRequest()
-                        draft.select(latitude: coordinate.latitude, longitude: coordinate.longitude)
-                    }
-                    .frame(height: 260)
-                    .listRowInsets(EdgeInsets())
-                    .accessibilityLabel("Carte de la zone privée")
                     Button {
                         useCurrentLocation()
                     } label: {
@@ -63,15 +56,21 @@ struct PrivacyZoneEditorView: View {
                     }
                     .disabled(locating)
                     if let locationError { Text(locationError).font(SQType.caption).foregroundStyle(SQColor.dangerInk) }
-                    DisclosureGroup("Saisir les coordonnées") {
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        SQFormFieldLabel("Latitude")
                         TextField("Latitude", text: draftBinding(for: \.latitudeText))
                             .keyboardType(.numbersAndPunctuation)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                            .accessibilityIdentifier("privacy-zone.latitude")
+                    }
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        SQFormFieldLabel("Longitude")
                         TextField("Longitude", text: draftBinding(for: \.longitudeText))
                             .keyboardType(.numbersAndPunctuation)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                            .accessibilityIdentifier("privacy-zone.longitude")
                     }
                     HStack {
                         Text("Rayon")
@@ -92,13 +91,13 @@ struct PrivacyZoneEditorView: View {
                             .font(SQType.caption).foregroundStyle(SQColor.dangerInk)
                     }
                 } header: { Text("Position et rayon") }
-                footer: { Text("Touche la carte pour choisir le centre. Le cercle montre la zone à protéger ; vérifie sa position avant d’enregistrer.") }
                 .listRowBackground(SQColor.surface)
 
                 Section {
                     Toggle("Protéger les nouveaux speedtests", isOn: draftBinding(for: \.hideSpeedtestsOnMap))
                     if original != nil {
                         Toggle("Zone active", isOn: draftBinding(for: \.isActive))
+                            .accessibilityIdentifier("privacy-zone.active")
                     }
                     if !draft.isActive {
                         Label("La protection est en pause tant que la zone est inactive.", systemImage: "pause.circle")
@@ -115,13 +114,27 @@ struct PrivacyZoneEditorView: View {
                 if original != nil {
                     Section {
                         Button("Supprimer cette zone", role: .destructive) { showDeleteConfirmation = true }
+                            .accessibilityIdentifier("privacy-zone.delete")
                     }
                     .listRowBackground(SQColor.surface)
                 }
+                Section {
+                    PrivacyZoneMapPicker(draft: draft) { coordinate in
+                        invalidateLocationRequest()
+                        draft.select(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                    }
+                    .frame(height: 260)
+                    .listRowInsets(EdgeInsets())
+                    .accessibilityLabel("Carte de la zone privée")
+                } footer: {
+                    Text("Touche la carte pour choisir le centre. Le cercle montre la zone à protéger ; vérifie sa position avant d’enregistrer.")
+                }
+                .listRowBackground(SQColor.surface)
             }
             .disabled(isBusy || !model.isSessionCurrent)
             .tint(SQColor.brandRed)
             .scrollContentBackground(.hidden)
+            .scrollDismissesKeyboard(.interactively)
             .signalQuestBackground()
             .navigationTitle(original == nil ? Text("Nouvelle zone privée") : Text("Modifier la zone"))
             .navigationBarTitleDisplayMode(.inline)
@@ -138,6 +151,7 @@ struct PrivacyZoneEditorView: View {
                     } label: {
                         if isBusy { ProgressView() } else { Text("Enregistrer") }
                     }
+                    .accessibilityIdentifier("privacy-zone.save")
                     .disabled(!canSave)
                 }
             }
@@ -151,6 +165,7 @@ struct PrivacyZoneEditorView: View {
                         apply: { deleted in if deleted { closeRequests(); dismiss() } }
                     )
                 }
+                .accessibilityIdentifier("privacy-zone.confirmDelete")
             } message: {
                 Text("Elle sera supprimée de ton compte sur iOS, Android et le web. Les nouveaux speedtests ne seront plus protégés par cette zone.")
             }
