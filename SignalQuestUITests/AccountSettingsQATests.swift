@@ -15,6 +15,82 @@ final class AccountSettingsQATests: XCTestCase {
         let expectedUserID: String
     }
 
+    private struct AccountScopeFixture: Decodable {
+        let baseURL: URL
+        let tokenA: String
+        let tokenB: String
+        let zoneID: String
+        let zoneName: String
+        let expectedA: String
+        let expectedB: String
+    }
+
+    func testPrivateZoneFromAccountAIsAbsentAfterSwitchToAccountB() throws {
+        #if !targetEnvironment(simulator)
+        throw XCTSkip("Recette locale uniquement sur simulateur")
+        #endif
+        continueAfterFailure = false
+        let environment = ProcessInfo.processInfo.environment
+        guard let fixturePath = environment["SQ_ZONE_AB_FIXTURE"] ?? environment["TEST_RUNNER_SQ_ZONE_AB_FIXTURE"],
+              let appPath = environment["SQ_RECIPE_APP_BUNDLE_PATH"] ?? environment["TEST_RUNNER_SQ_RECIPE_APP_BUNDLE_PATH"] else {
+            throw XCTSkip("Requiert les comptes A/B synthétiques et le binaire isolé")
+        }
+        let fixture = try JSONDecoder().decode(AccountScopeFixture.self,
+            from: Data(contentsOf: URL(fileURLWithPath: fixturePath)))
+        let expectedURL = URL(string: "http://127.0.0.1:49141")!
+        let bundle = try XCTUnwrap(Bundle(path: appPath))
+        guard fixture.baseURL == expectedURL,
+              fixture.expectedA == "ios_recipe_user_a", fixture.expectedB == "ios_recipe_user_b",
+              fixture.zoneName.hasPrefix("Zone QA AB "), !fixture.zoneID.isEmpty,
+              bundle.bundleIdentifier == "fr.signalquest.ios.beta",
+              bundle.object(forInfoDictionaryKey: "SQ_API_BASE_URL") as? String == expectedURL.absoluteString,
+              bundle.object(forInfoDictionaryKey: "SQ_APP_BASE_URL") as? String == expectedURL.absoluteString else {
+            XCTFail("La recette A/B refuse un compte ou un binaire hors loopback")
+            return
+        }
+
+        let app = XCUIApplication()
+        app.launchArguments = ["--reset-auth", "--reset-onboarding"]
+        app.sqLaunch(locale: "fr")
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
+        app.terminate()
+        defer { app.terminate() }
+
+        func openPrivacy(locale: String) {
+            let tab = SignalQuestUITestSupport.tab(named: locale == "fr" ? "Profil" : "Profile", in: app)
+            XCTAssertTrue(tab.waitForExistence(timeout: 25))
+            tab.tap()
+            XCTAssertTrue(app.staticTexts["profile.displayName"].waitForExistence(timeout: 20))
+            let title = locale == "fr" ? "Confidentialité" : "Privacy"
+            let entry = app.staticTexts[title].firstMatch
+            XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(entry, in: app))
+            entry.tap()
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10))
+            let create = app.buttons["privacy.zone.create"]
+            XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(create, in: app))
+            let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: create)
+            XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 8), .completed)
+        }
+
+        app.launchArguments = []
+        app.launchEnvironment["SQ_AUTH_TOKEN"] = fixture.tokenA
+        app.sqLaunch(locale: "fr")
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
+        openPrivacy(locale: "fr")
+        let owned = app.buttons["privacy.zone.row.\(fixture.zoneID)"]
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(owned, in: app))
+        XCTAssertTrue(owned.label.contains(fixture.zoneName))
+        app.terminate()
+
+        app.launchEnvironment["SQ_AUTH_TOKEN"] = fixture.tokenB
+        app.sqLaunch(locale: "en")
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
+        openPrivacy(locale: "en")
+        XCTAssertTrue(app.staticTexts["No private zones saved. Add a place to protect."].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["privacy.zone.row.\(fixture.zoneID)"].exists,
+                       "B must not inherit A's private zone or stale list")
+    }
+
     func testPrivateZoneEditorCreatePauseAndDeleteAgainstIsolatedBackend() throws {
         try checkPrivateZoneCRUD(locale: "fr")
     }
