@@ -139,7 +139,9 @@ struct MyMeasurementsView: View {
         .overlay(alignment: .bottomLeading) {
             if coloring == .generation && !model.points.isEmpty {
                 generationLegend
-                    .padding(.bottom, SQDock.floatingContentInset(subtracting: SQSpace.md))
+                    // Laisser aussi visible l'attribution légale de MapKit sous
+                    // la légende, y compris sur iPad sans dock inférieur.
+                    .padding(.bottom, SQDock.floatingContentInset(subtracting: SQSpace.md) + SQSpace.huge)
             }
         }
     }
