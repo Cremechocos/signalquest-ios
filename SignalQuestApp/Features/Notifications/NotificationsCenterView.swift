@@ -4,42 +4,148 @@ import SwiftUI
 final class NotificationsCenterViewModel: ObservableObject {
     @Published var items: [AppNotification] = []
     @Published var errorMessage: String?
+    @Published private(set) var paginationErrorMessage: String?
+    @Published private(set) var actionErrorMessage: String?
     @Published var isLoading = false
+    @Published private(set) var isLoadingMore = false
+    @Published private(set) var nextCursor: String?
+    @Published private(set) var unreadCount = 0
+    @Published private(set) var isMutating = false
+    @Published private(set) var pendingReadIDs: Set<String> = []
+
+    enum FailedAction: Equatable {
+        case markRead(String), markAll, deleteAll
+    }
+    @Published private(set) var failedAction: FailedAction?
 
     private let service: NotificationsServicing
+    private var loadGeneration = UUID()
+    private var actionGeneration = UUID()
     init(service: NotificationsServicing) { self.service = service }
 
     func load() async {
+        let generation = UUID()
+        loadGeneration = generation
         isLoading = true
+        isLoadingMore = false
         errorMessage = nil
-        defer { isLoading = false }
+        paginationErrorMessage = nil
+        defer { if loadGeneration == generation { isLoading = false } }
         do {
-            items = try await service.list(cursor: nil)
+            let page = try await service.list(cursor: nil)
+            guard loadGeneration == generation else { return }
+            items = page.notifications
+            nextCursor = page.nextCursor
+            unreadCount = page.unreadCount ?? page.notifications.filter { $0.read != true }.count
         } catch {
-            if error.isCancellation { return }
+            guard loadGeneration == generation, !error.isCancellation else { return }
             errorMessage = error.localizedDescription
         }
     }
 
+    func loadMore() async {
+        guard let cursor = nextCursor, !isLoading, !isLoadingMore, !isMutating else { return }
+        let generation = loadGeneration
+        isLoadingMore = true
+        paginationErrorMessage = nil
+        defer { if loadGeneration == generation { isLoadingMore = false } }
+        do {
+            let page = try await service.list(cursor: cursor)
+            guard loadGeneration == generation, nextCursor == cursor else { return }
+            var seen = Set(items.map(\.id))
+            items.append(contentsOf: page.notifications.filter { seen.insert($0.id).inserted })
+            nextCursor = page.nextCursor == cursor ? nil : page.nextCursor
+            if let count = page.unreadCount { unreadCount = count }
+        } catch {
+            guard loadGeneration == generation, !error.isCancellation else { return }
+            paginationErrorMessage = String(localized: "Chargement impossible")
+        }
+    }
+
     func markRead(_ id: String) async {
-        try? await service.markRead(id: id)
-        if let idx = items.firstIndex(where: { $0.id == id }) {
-            let clone = items[idx]
-            items[idx] = AppNotification(
-                id: clone.id, type: clone.type, title: clone.title, message: clone.message,
-                createdAt: clone.createdAt, read: true, link: clone.link, metadata: clone.metadata
-            )
+        guard !isMutating, !pendingReadIDs.contains(id),
+              items.contains(where: { $0.id == id && $0.read != true }) else { return }
+        let generation = actionGeneration
+        pendingReadIDs.insert(id)
+        actionErrorMessage = nil
+        failedAction = nil
+        defer { pendingReadIDs.remove(id) }
+        do {
+            try await service.markRead(id: id)
+            guard actionGeneration == generation else { return }
+            loadGeneration = UUID()
+            isLoading = false
+            isLoadingMore = false
+            if let index = items.firstIndex(where: { $0.id == id }) {
+                if items[index].read != true { unreadCount = max(0, unreadCount - 1) }
+                items[index] = items[index].withRead(true)
+            }
+        } catch {
+            guard actionGeneration == generation, !error.isCancellation else { return }
+            actionErrorMessage = String(localized: "Action impossible")
+            failedAction = .markRead(id)
         }
     }
 
     func markAll() async {
-        try? await service.markAllRead()
-        await load()
+        guard !isMutating, pendingReadIDs.isEmpty else { return }
+        isMutating = true
+        actionErrorMessage = nil
+        failedAction = nil
+        defer { isMutating = false }
+        do {
+            try await service.markAllRead()
+            actionGeneration = UUID()
+            loadGeneration = UUID()
+            isLoading = false
+            isLoadingMore = false
+            items = items.map { $0.withRead(true) }
+            unreadCount = 0
+            errorMessage = nil
+        } catch {
+            guard !error.isCancellation else { return }
+            actionErrorMessage = String(localized: "Action impossible")
+            failedAction = .markAll
+        }
     }
 
     func deleteAll() async {
-        try? await service.deleteAll()
-        await load()
+        guard !isMutating, pendingReadIDs.isEmpty else { return }
+        isMutating = true
+        actionErrorMessage = nil
+        failedAction = nil
+        defer { isMutating = false }
+        do {
+            try await service.deleteAll()
+            actionGeneration = UUID()
+            loadGeneration = UUID()
+            isLoading = false
+            isLoadingMore = false
+            items = []
+            nextCursor = nil
+            unreadCount = 0
+            errorMessage = nil
+        } catch {
+            guard !error.isCancellation else { return }
+            actionErrorMessage = String(localized: "Action impossible")
+            failedAction = .deleteAll
+        }
+    }
+
+    func retryFailedAction() async {
+        switch failedAction {
+        case .markRead(let id): await markRead(id)
+        case .markAll: await markAll()
+        case .deleteAll: await deleteAll()
+        case nil: break
+        }
+    }
+}
+
+private extension AppNotification {
+    func withRead(_ value: Bool) -> AppNotification {
+        AppNotification(id: id, type: type, title: title, message: message,
+            createdAt: createdAt, read: value, link: link, metadata: metadata)
     }
 }
 
@@ -50,9 +156,39 @@ struct NotificationsCenterView: View {
         _model = StateObject(wrappedValue: NotificationsCenterViewModel(service: service))
     }
 
+    init(model: NotificationsCenterViewModel) {
+        _model = StateObject(wrappedValue: model)
+    }
+
     var body: some View {
         List {
-            if let error = model.errorMessage, model.items.isEmpty {
+            if let error = model.actionErrorMessage {
+                Section {
+                    HStack(spacing: SQSpace.md) {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(SQColor.dangerInk)
+                        Spacer(minLength: 0)
+                        Button("Réessayer") { Task { await model.retryFailedAction() } }
+                            .disabled(model.isMutating || !model.pendingReadIDs.isEmpty)
+                    }
+                    .font(SQType.caption)
+                    .listRowBackground(SQColor.dangerSoft)
+                }
+            }
+            if let error = model.errorMessage, !model.items.isEmpty {
+                Section {
+                    HStack(spacing: SQSpace.md) {
+                        Text(error).foregroundStyle(SQColor.dangerInk)
+                        Spacer(minLength: 0)
+                        Button("Réessayer") { Task { await model.load() } }
+                    }
+                    .font(SQType.caption)
+                    .listRowBackground(SQColor.dangerSoft)
+                }
+            }
+            if model.isLoading && model.items.isEmpty {
+                Section { ProgressView().frame(maxWidth: .infinity).listRowBackground(Color.clear) }
+            } else if let error = model.errorMessage, model.items.isEmpty {
                 Section {
                     ErrorStateView(title: "Notifications indisponibles", message: error) {
                         Task { await model.load() }
@@ -87,6 +223,20 @@ struct NotificationsCenterView: View {
                             Button("Lu") { Task { await model.markRead(item.id) } }.tint(SQColor.success)
                         }
                     }
+                    if model.isLoadingMore {
+                        ProgressView().frame(maxWidth: .infinity)
+                    } else if model.nextCursor != nil {
+                        Button(model.paginationErrorMessage == nil ? "Charger la suite" : "Réessayer") {
+                            Task { await model.loadMore() }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .accessibilityIdentifier("notifications.loadMore")
+                    }
+                    if let error = model.paginationErrorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.dangerInk)
+                    }
                 } header: {
                     Text("Activité")
                         .font(SQType.subhead)
@@ -108,6 +258,7 @@ struct NotificationsCenterView: View {
                     Button("Tout supprimer", role: .destructive) { Task { await model.deleteAll() } }
                 } label: { Image(systemName: "ellipsis.circle").foregroundStyle(SQColor.label) }
                 .accessibilityLabel("Options")
+                .disabled(model.isMutating || !model.pendingReadIDs.isEmpty)
             }
         }
         .task { await model.load() }

@@ -15,6 +15,8 @@ struct SignalDetailSheet: View {
     var onReport: () -> Void = {}
     /// Tap sur l'auteur — le parent ferme le sheet et pousse le profil.
     var onAuthorTap: (() -> Void)? = nil
+    var actionError: String? = nil
+    var actionBusy = false
 
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
@@ -31,6 +33,18 @@ struct SignalDetailSheet: View {
                     header
                         .padding(SQSpace.lg)
                         .sqEditorialCard()
+                    if let actionError {
+                        Label(actionError, systemImage: "exclamationmark.triangle")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.dangerInk)
+                            .padding(.horizontal, SQSpace.lg)
+                            .accessibilityIdentifier("signal.detail.actionError")
+                    }
+                    if actionBusy {
+                        ProgressView("En cours")
+                            .tint(SQColor.brandRed)
+                            .padding(.horizontal, SQSpace.lg)
+                    }
                     if let signal {
                         metricsGrid(for: signal)
                         extraMetrics(for: signal)

@@ -82,7 +82,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SignalQuest utilise ta position, si tu l'autorises, pour placer tes speedtests et contributions sur la carte, suivre un Drive Test (y compris écran verrouillé) et, si tu l'actives, partager ta position en direct avec tes amis.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>SignalQuest utilise le micro uniquement pendant les appels audio ou vidéo que tu démarres ou acceptes.</string>
+	<string>SignalQuest utilise le micro pour les appels audio ou vidéo que tu démarres ou acceptes, et pour enregistrer des notes vocales à ta demande.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>SignalQuest peut importer une photo choisie pour contribuer aux sites antennes.</string>
 	<key>NSSupportsLiveActivities</key>

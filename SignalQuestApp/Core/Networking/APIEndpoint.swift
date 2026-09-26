@@ -25,6 +25,10 @@ struct APIEndpoint: Sendable {
     /// par la valeur de l'endpoint, elle reste identique sur tous les rejeux d'une
     /// même requête logique.
     var idempotencyKey: String?
+    /// Admission locale réévaluée avant chaque émission, y compris les rejeux.
+    var validateBeforeSend: (@Sendable () async throws -> Void)?
+    /// Overall deadline for one response, distinct from the inactivity timeout.
+    var responseDeadline: Duration?
 
     init(
         path: String,
@@ -35,7 +39,9 @@ struct APIEndpoint: Sendable {
         authenticated: Bool = true,
         baseURL: URL? = nil,
         skipsAutoRefresh: Bool = false,
-        idempotencyKey: String? = nil
+        idempotencyKey: String? = nil,
+        validateBeforeSend: (@Sendable () async throws -> Void)? = nil,
+        responseDeadline: Duration? = nil
     ) {
         self.path = path
         self.method = method
@@ -46,5 +52,7 @@ struct APIEndpoint: Sendable {
         self.baseURL = baseURL
         self.skipsAutoRefresh = skipsAutoRefresh
         self.idempotencyKey = idempotencyKey ?? (method == .post ? UUID().uuidString : nil)
+        self.validateBeforeSend = validateBeforeSend
+        self.responseDeadline = responseDeadline
     }
 }

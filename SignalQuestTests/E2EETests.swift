@@ -4661,7 +4661,9 @@ extension E2EETests {
             }
             if let legacy = previous[Self.legacyKey] { UserDefaults.standard.set(legacy, forKey: Self.legacyKey) }
             else { UserDefaults.standard.removeObject(forKey: Self.legacyKey) }
-            try? FileManager.default.removeItem(at: outboxURL)
+            if FileManager.default.fileExists(atPath: outboxURL.path) {
+                try? FileManager.default.removeItem(at: outboxURL)
+            }
         }
 
         static func token(_ user: String) -> String {
@@ -4710,6 +4712,121 @@ extension E2EETests {
             (HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil,
                 headerFields: ["Content-Type": "application/json"].merging(extra) { _, value in value })!, data)
         }
+    }
+
+    func testV2RecoveryEpochRuntimeRestoresSignedKeyAcrossPages() async throws {
+        let fixture = try RotationFixture(); defer { fixture.close() }
+        var recovery = try E2EEV2RecoveryV2Crypto.generateMaterial(ownerBinding: fixture.context.ownerScopeId)
+        defer { recovery.zeroize() }
+        let bundleHash = E2EEV2RecoveryV2Crypto.bundleHash(recovery.bundle)
+        let epoch = try recoveryEpochFixture()
+        let epochKey = try XCTUnwrap(Data(base64Encoded: epoch.epochKeyB64))
+
+        let context = E2EEV2RecoveryEpochContext(
+            conversationId: epoch.conversationId,
+            epochNumber: epoch.epochNumber,
+            senderDeviceId: fixture.descriptor.deviceId,
+            recipientUserId: fixture.user,
+            recoveryBundleHash: bundleHash
+        )
+        let envelope = try fixture.identity.createSignedRecoveryEpochEnvelope(
+            context: context,
+            keyCommitmentB64: epoch.keyCommitmentB64,
+            epochKey: epochKey,
+            recipientPublicIdentityKeyB64: recovery.bundle.recoveryPublicIdentityKeyB64,
+            ownerNamespace: fixture.context.ownerNamespace,
+            nonce: Data(repeating: 0, count: 12)
+        )
+        var delivery = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: recoveryEpochDeliveryData(epoch, envelope: envelope)) as? [String: Any]
+        )
+        delivery["senderDevice"] = [
+            "deviceId": fixture.descriptor.deviceId,
+            "publicSigningKeyB64": fixture.descriptor.publicSigningKeyB64,
+        ]
+        let firstPage = try JSONSerialization.data(withJSONObject: [
+            "protocolVersion": 2,
+            "recoveryBundleHash": bundleHash,
+            "missingEpochCount": 3,
+            "nextCursor": "cursor_recovery_page_02",
+            "items": [],
+        ])
+        let lastPage = try JSONSerialization.data(withJSONObject: [
+            "protocolVersion": 2,
+            "recoveryBundleHash": bundleHash,
+            "missingEpochCount": 3,
+            "nextCursor": NSNull(),
+            "items": [delivery],
+        ])
+        let requestedQueries = LockedBox<[String?]>([])
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.url?.path, "/api/e2ee/v2/recovery-epochs")
+            XCTAssertEqual(request.value(forHTTPHeaderField: E2EEV2SignedRequest.headerDeviceId),
+                fixture.descriptor.deviceId)
+            let timestamp = try XCTUnwrap(Int64(XCTUnwrap(request.value(
+                forHTTPHeaderField: E2EEV2SignedRequest.headerTimestampMs))))
+            let nonce = try XCTUnwrap(request.value(forHTTPHeaderField: E2EEV2SignedRequest.headerNonce))
+            let signature = try P256.Signing.ECDSASignature(derRepresentation: XCTUnwrap(
+                Data(base64Encoded: XCTUnwrap(request.value(forHTTPHeaderField:
+                    E2EEV2SignedRequest.headerSignature)))))
+            let publicKey = try P256.Signing.PublicKey(x963Representation: XCTUnwrap(
+                Data(base64Encoded: fixture.descriptor.publicSigningKeyB64)))
+            let wirePath = try XCTUnwrap(request.url?.path) +
+                (request.url?.query.map { "?\($0)" } ?? "")
+            XCTAssertTrue(publicKey.isValidSignature(signature, for: try E2EEV2SignedRequest.canonicalRequest(
+                method: "GET", path: wirePath, timestampMs: timestamp, nonce: nonce, body: Data())))
+            requestedQueries.value.append(request.url?.query)
+            let data = request.url?.query == nil ? firstPage : lastPage
+            return RotationFixture.response(request, data)
+        }
+
+        let coordinator = E2EEV2RecoveryEpochCoordinator(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys)
+        switch await coordinator.restoreAll(bundle: recovery.bundle, recoveryKey: recovery.recoveryKey) {
+        case .success(let summary):
+            XCTAssertEqual(summary.restoredEpochCount, 1)
+            XCTAssertEqual(summary.missingEpochCount, 3)
+        case .failure(let failure):
+            XCTFail("Signed recovery failed: \(failure.kind)")
+        }
+        XCTAssertEqual(requestedQueries.value, [nil, "cursor=cursor_recovery_page_02"])
+        XCTAssertEqual(try fixture.keys.loadEpoch(
+            conversationId: epoch.conversationId,
+            epochNumber: epoch.epochNumber,
+            ownerNamespace: fixture.context.ownerNamespace
+        )?.epochKey, epochKey)
+    }
+
+    func testV2RecoveryEpochBackfillPaginatesWithARealQuery() async throws {
+        let fixture = try RotationFixture(); defer { fixture.close() }
+        let firstPage = try JSONSerialization.data(withJSONObject: [
+            "protocolVersion": 2,
+            "items": [],
+            "nextCursor": "cursor_backfill_page_02",
+        ])
+        let lastPage = try JSONSerialization.data(withJSONObject: [
+            "protocolVersion": 2,
+            "items": [],
+            "nextCursor": NSNull(),
+        ])
+        let requestedQueries = LockedBox<[String?]>([])
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.url?.path, "/api/e2ee/v2/recovery-epochs/backfill")
+            requestedQueries.value.append(request.url?.query)
+            let data = request.url?.query == nil ? firstPage : lastPage
+            return RotationFixture.response(request, data)
+        }
+
+        let coordinator = E2EEV2RecoveryEpochCoordinator(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys)
+        switch await coordinator.backfillAll() {
+        case .success(let summary):
+            XCTAssertEqual(summary.backedUpEpochCount, 0)
+            XCTAssertEqual(summary.missingParticipantUserIds, [])
+        case .failure(let failure):
+            XCTFail("Empty backfill pagination failed: \(failure.kind)")
+        }
+        XCTAssertEqual(requestedQueries.value, [nil, "cursor=cursor_backfill_page_02"])
     }
 
     func testV2RotationLostAckReconcilesCurrentAndKeepsHistoricalKey() async throws {
@@ -5818,6 +5935,52 @@ final class MessageAttachmentOutboxTests: XCTestCase {
 }
 
 final class SocialPostOutboxTests: XCTestCase {
+    @MainActor
+    func testEmailVerification403KeepsComposerDraftWithoutAutomaticReplay() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("social-email-gate-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            MockURLProtocol.requestHandler = nil
+            LocalAccountScope.deactivate()
+            try? FileManager.default.removeItem(at: root)
+        }
+        LocalAccountScope.activate(userId: "email-gate-\(UUID().uuidString)")
+        let session = try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-email-gate-token")
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: config))
+        let outbox = SocialPostOutboxStore(
+            baseDirectory: root,
+            currentSession: { _ in true },
+            publisher: { _, write in try write() }
+        )
+        let service = SocialFeedService(api: api, postOutbox: outbox)
+        var submissions = 0
+        MockURLProtocol.requestHandler = { request in
+            submissions += 1
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 403,
+                                           httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"code":"EMAIL_NOT_VERIFIED","error":"Confirme ton adresse."}"#.utf8))
+        }
+
+        let composer = ComposerViewModel(service: service)
+        composer.text = "Brouillon à reprendre après confirmation"
+        await composer.publish()
+        XCTAssertEqual(submissions, 1, "Le refus doit venir du vrai transport HTTP simulé")
+        XCTAssertFalse(composer.didPublish)
+        XCTAssertEqual(composer.text, "Brouillon à reprendre après confirmation")
+        XCTAssertNotNil(composer.errorMessage)
+        let pending = try await outbox.pending(session: session)
+        XCTAssertTrue(pending.isEmpty)
+        await service.retryPendingPosts()
+        XCTAssertEqual(submissions, 1, "Un 403 métier ne doit pas être rejoué automatiquement")
+        let reopened = ComposerViewModel(service: service)
+        XCTAssertEqual(reopened.text, composer.text)
+        reopened.clearDraft()
+    }
+
     func testImageMetadataAndReceiptSurviveRecreationThenAckPurgesFiles() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("social-post-outbox-\(UUID().uuidString)", isDirectory: true)

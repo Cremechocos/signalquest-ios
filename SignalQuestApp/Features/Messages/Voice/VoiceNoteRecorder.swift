@@ -31,6 +31,7 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
         case idle
         case recording
         case finished(URL, duration: TimeInterval)
+        case permissionDenied
         case failed(String)
     }
 
@@ -60,8 +61,9 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
 
     func start() async {
         guard state != .recording else { return }
+        if case .finished = state { return }
         guard await Self.requestPermission() else {
-            state = .failed(String(localized: "Autorise le micro dans les Réglages pour enregistrer."))
+            state = .permissionDenied
             return
         }
 
@@ -97,7 +99,7 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
             state = .recording
             startMetering()
         } catch {
-            state = .failed(error.localizedDescription)
+            state = .failed(String(localized: "Impossible de démarrer l'enregistrement."))
         }
     }
 
@@ -109,7 +111,7 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
         meterTask = nil
         guard let recorder else { return nil }
         let url = recorder.url
-        let elapsed = startedAt.map { Date().timeIntervalSince($0) } ?? 0
+        let elapsed = min(Self.maximumDuration, startedAt.map { Date().timeIntervalSince($0) } ?? 0)
         recorder.stop()
         self.recorder = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
@@ -119,21 +121,51 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
             state = .idle
             return nil
         }
-        duration = elapsed
-        state = .finished(url, duration: elapsed)
+        guard restoreFinishedDraft(url: url, duration: elapsed) else {
+            state = .failed(String(localized: "Impossible de démarrer l'enregistrement."))
+            return nil
+        }
         return url
+    }
+
+    /// Vérifie le fichier avant de présenter une note prête.
+    @discardableResult
+    func restoreFinishedDraft(url: URL, duration: TimeInterval) -> Bool {
+        guard duration >= Self.minimumDuration,
+              FileManager.default.fileExists(atPath: url.path) else { return false }
+        let boundedDuration = min(Self.maximumDuration, duration)
+        self.duration = boundedDuration
+        state = .finished(url, duration: boundedDuration)
+        return true
+    }
+
+    /// Transfère la note terminée à la file d'envoi, une seule fois. Le parent
+    /// devient responsable du fichier ; un second toucher ne peut pas le renvoyer.
+    func takeFinished() -> (url: URL, duration: TimeInterval)? {
+        guard case let .finished(url, duration) = state else { return nil }
+        if VoiceNotePlayer.shared.isPlaying(url) { VoiceNotePlayer.shared.stop() }
+        state = .idle
+        self.duration = 0
+        levels = []
+        startedAt = nil
+        return (url, duration)
     }
 
     /// Abandon explicite : le fichier est supprimé.
     func cancel() {
         meterTask?.cancel()
         meterTask = nil
+        if case let .finished(url, _) = state {
+            if VoiceNotePlayer.shared.isPlaying(url) { VoiceNotePlayer.shared.stop() }
+            try? FileManager.default.removeItem(at: url)
+        }
         if let recorder {
             let url = recorder.url
             recorder.stop()
             try? FileManager.default.removeItem(at: url)
         }
         recorder = nil
+        startedAt = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         state = .idle
         duration = 0

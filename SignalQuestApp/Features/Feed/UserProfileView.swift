@@ -345,7 +345,8 @@ struct UserProfileView: View {
                     onReport: { presentedSheet = .report(item) }
                 )
             case .comments(let item):
-                CommentsSheet(service: services.comments, postId: item.backendPostId)
+                CommentsSheet(service: services.comments, postId: item.backendPostId,
+                              profileService: services.feed)
             case .report(let item):
                 ReportSheet(target: .post(item.backendPostId), service: services.reports)
             case .reportUser:

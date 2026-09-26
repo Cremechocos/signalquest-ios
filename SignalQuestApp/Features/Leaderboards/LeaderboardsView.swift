@@ -495,10 +495,18 @@ private struct LeaderboardHeroCard: View {
                             .foregroundStyle(SQColor.labelSecondary)
                             .lineLimit(2)
                     }
-                    HStack(spacing: SQSpace.sm) {
-                        heroChip(icon: "flame.fill", text: streak > 1 ? "\(streak) jours" : "\(streak) jour")
-                        if !unlockedBadges.isEmpty {
-                            heroChip(icon: "rosette", text: "\(unlockedBadges.count) badge\(unlockedBadges.count > 1 ? "s" : "")")
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: SQSpace.sm) {
+                            heroChip(icon: "flame.fill", text: streak > 1 ? "\(streak) jours" : "\(streak) jour")
+                            if !unlockedBadges.isEmpty {
+                                heroChip(icon: "rosette", text: "\(unlockedBadges.count) badge\(unlockedBadges.count > 1 ? "s" : "")")
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: SQSpace.xs) {
+                            heroChip(icon: "flame.fill", text: streak > 1 ? "\(streak) jours" : "\(streak) jour")
+                            if !unlockedBadges.isEmpty {
+                                heroChip(icon: "rosette", text: "\(unlockedBadges.count) badge\(unlockedBadges.count > 1 ? "s" : "")")
+                            }
                         }
                     }
                 }
@@ -586,6 +594,8 @@ private struct LeaderboardHeroCard: View {
             Text(text)
                 .font(SQType.micro)
                 .monospacedDigit()
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(SQColor.label)
         }
         .padding(.horizontal, SQSpace.sm + 2)
@@ -1146,6 +1156,7 @@ private struct LeaderboardRowView<Meta: View>: View {
         }
         .modifier(SQSoftShadowIf(active: !isMe))
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("leaderboard.row.\(rank)")
     }
 }
 

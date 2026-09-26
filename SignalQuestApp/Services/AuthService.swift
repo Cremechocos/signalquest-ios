@@ -164,7 +164,7 @@ enum LocalOfflineOwnership {
 
 protocol AuthServicing: Sendable {
     func login(email: String, password: String) async throws -> LoginResponse
-    func signup(email: String, password: String, name: String, acceptedTerms: Bool) async throws -> LoginResponse
+    func signup(email: String, password: String, name: String, acceptedTerms: Bool, turnstileToken: String?) async throws -> CredentialResponse<LoginResponse>
     func verify2FA(tempToken: String, code: String) async throws -> LoginResponse
     /// Sign in with Apple : envoie le jeton d'identité Apple (JWT) + le nom
     /// (1re autorisation) ; le backend vérifie le jeton et crée/connecte l'utilisateur.
@@ -176,13 +176,15 @@ protocol AuthServicing: Sendable {
     func setup2FA() async throws -> TwoFactorSetupResponse
     func confirm2FA(secret: String, code: String) async throws
     func disable2FA(code: String) async throws
-    func forgotPassword(email: String) async throws
+    func forgotPassword(email: String, turnstileToken: String?) async throws
     func resetPassword(token: String, newPassword: String) async throws
     func changePassword(currentPassword: String, newPassword: String) async throws
     func refresh() async throws
     func logout() async throws
     func me() async throws -> AuthUser
     func hasStoredCredentials() -> Bool
+    /// Identité de la connexion HTTP, indépendante des rotations de son token.
+    func credentialSessionID() -> UUID?
     func installAuthTokenForDebugQA(_ token: String)
     /// QA `--reset-auth` : efface la session LOCALE (credentials + clés E2EE)
     /// sans révoquer le token côté serveur — contrairement à `logout()`.
@@ -205,6 +207,7 @@ protocol AuthServicing: Sendable {
 }
 
 extension AuthServicing {
+    func credentialSessionID() -> UUID? { nil }
     func installAuthTokenForDebugQA(_ token: String) {}
     func clearLocalSessionForDebugQA() async {}
     func clearLocalSession() async {}
@@ -239,10 +242,10 @@ final class AuthService: AuthServicing {
         )
     }
 
-    func signup(email: String, password: String, name: String, acceptedTerms: Bool) async throws -> LoginResponse {
-        try await api.requestJSON(
+    func signup(email: String, password: String, name: String, acceptedTerms: Bool, turnstileToken: String? = nil) async throws -> CredentialResponse<LoginResponse> {
+        try await api.requestJSONSingleAttemptWithCredentials(
             "/api/auth/signup",
-            body: SignupRequest(email: email, password: password, name: name, acceptedTerms: acceptedTerms),
+            body: SignupRequest(email: email, password: password, name: name, acceptedTerms: acceptedTerms, turnstileToken: turnstileToken),
             authenticated: false
         )
     }
@@ -292,35 +295,39 @@ final class AuthService: AuthServicing {
     }
 
     func confirm2FA(secret: String, code: String) async throws {
-        let _: SuccessResponse = try await api.requestJSON(
+        let response: SuccessResponse = try await api.requestJSON(
             "/api/auth/2fa/verify-setup",
             body: TwoFactorVerifySetupRequest(secret: secret, code: code)
         )
+        guard response.isAcknowledged else { throw TwoFactorEnrollmentError.unconfirmedResponse }
     }
 
     func disable2FA(code: String) async throws {
-        let _: SuccessResponse = try await api.requestJSON(
+        let response: SuccessResponse = try await api.requestJSON(
             "/api/auth/2fa/disable",
             body: TwoFactorDisableRequest(code: code)
         )
+        guard response.isAcknowledged else { throw APIError.decoding("two-factor-disable-acknowledgement-missing") }
     }
 
     // MARK: Password
 
-    func forgotPassword(email: String) async throws {
-        let _: SuccessResponse = try await api.requestJSON(
+    func forgotPassword(email: String, turnstileToken: String? = nil) async throws {
+        let response: SuccessResponse = try await api.requestJSONSingleAttempt(
             "/api/auth/forgot-password",
-            body: ForgotPasswordRequest(email: email),
+            body: ForgotPasswordRequest(email: email, turnstileToken: turnstileToken),
             authenticated: false
         )
+        guard response.isAcknowledged else { throw APIError.decoding("password-reset-request-acknowledgement-missing") }
     }
 
     func resetPassword(token: String, newPassword: String) async throws {
-        let _: SuccessResponse = try await api.requestJSON(
+        let response: SuccessResponse = try await api.requestJSONSingleAttempt(
             "/api/auth/reset-password",
             body: ResetPasswordRequest(token: token, password: newPassword),
             authenticated: false
         )
+        guard response.isAcknowledged else { throw APIError.decoding("password-reset-acknowledgement-missing") }
     }
 
     func changePassword(currentPassword: String, newPassword: String) async throws {
@@ -412,17 +419,25 @@ final class AuthService: AuthServicing {
             let json = try? sessionStore.string(for: Self.cachedUserKey),
             let data = json.data(using: .utf8)
         else { return nil }
-        return try? JSONDecoder.signalQuest.decode(AuthUser.self, from: data)
+        guard let user = try? JSONDecoder.signalQuest.decode(AuthUser.self, from: data) else { return nil }
+        if let token = api.credentials.accessToken(),
+           E2EEV2NotificationSessionClaims.expirationMs(token: token, expectedUserId: user.id, now: Date()) == nil {
+            return nil
+        }
+        return user
     }
 
     func wipeE2EEIfIdentityChanged(to userId: String) async {
         // API conservée : le changement de propriétaire verrouille désormais le coffre,
         // sans effacer son identité approuvée ni ses époques historiques.
+        let account = LocalAccountScope.sessionSnapshot()
+        let credentials = api.credentials.snapshot()
         let store = KeychainStore()
         let last = try? store.string(for: "lastUserId")
         if let last, last != userId {
             await e2ee?.lockLocalKeys(expectedSession: LocalAccountScope.sessionSnapshot())
         }
+        guard LocalAccountScope.sessionSnapshot() == account, api.credentials.isCurrent(credentials) else { return }
         try? store.set(userId, for: "lastUserId")
     }
 
@@ -439,6 +454,8 @@ final class AuthService: AuthServicing {
         return user
     }
 
+    func credentialSessionID() -> UUID? { api.credentials.snapshot().sessionID }
+
     func hasStoredCredentials() -> Bool {
         api.credentials.accessToken() != nil
     }
@@ -452,6 +469,10 @@ final class AuthService: AuthServicing {
 
 @MainActor
 final class AuthSessionViewModel: ObservableObject {
+    struct PublicFormContext: Equatable, Sendable {
+        fileprivate let stateID: UUID
+        fileprivate let credentialID: UUID?
+    }
     enum State: Equatable {
         case checking
         case loggedOut
@@ -461,12 +482,16 @@ final class AuthSessionViewModel: ObservableObject {
         case authenticated(AuthUser)
     }
 
-    @Published private(set) var state: State = .checking
+    @Published private(set) var state: State = .checking {
+        didSet { if oldValue != state { stateID = UUID(); profileRevision = UUID() } }
+    }
     @Published var errorMessage: String?
     @Published var infoMessage: String?
     @Published var isBusy = false
 
     private let service: AuthServicing
+    private var stateID = UUID()
+    private var profileRevision = UUID()
     // Écrit une seule fois (init, MainActor), lu une seule fois (deinit, quand plus
     // aucune autre référence n'existe) → `nonisolated(unsafe)` sûr pour permettre le
     // retrait de l'observateur depuis le deinit nonisolé.
@@ -522,8 +547,17 @@ final class AuthSessionViewModel: ObservableObject {
     /// les clés E2EE de l'ancien compte si l'identité a changé sur cet appareil
     /// (changement de compte sans logout, ex. expiration de session). No-op pour le
     /// même utilisateur → aucune ressaisie du mot de passe E2EE.
-    private func setAuthenticated(_ user: AuthUser) async {
+    private func setAuthenticated(_ user: AuthUser, expectedStateID: UUID? = nil,
+                                  expectedCredentialSessionID: UUID? = nil) async {
+        guard !Task.isCancelled, expectedStateID == nil || expectedStateID == stateID,
+              expectedCredentialSessionID == nil || expectedCredentialSessionID == service.credentialSessionID() else { return }
+        let revision = UUID()
+        profileRevision = revision
+        let credentials = service.credentialSessionID()
         await service.wipeE2EEIfIdentityChanged(to: user.id)
+        guard !Task.isCancelled, profileRevision == revision, service.credentialSessionID() == credentials,
+              expectedStateID == nil || expectedStateID == stateID,
+              expectedCredentialSessionID == nil || expectedCredentialSessionID == service.credentialSessionID() else { return }
         // Active d'abord le namespace local. Les observers de `state` peuvent lancer
         // immédiatement l'enregistrement push et des reprises de files ; ils doivent
         // tous voir le nouveau propriétaire, jamais le précédent.
@@ -546,12 +580,19 @@ final class AuthSessionViewModel: ObservableObject {
             state = .loggedOut
             return
         }
+        // Sans jeton Keychain, le transport n'enverra aucun cookie implicite :
+        // `/api/auth/me` ne peut pas authentifier cette ouverture invitée.
+        // Évite un écran de chargement jusqu'au timeout réseau après relance.
+        guard service.hasStoredCredentials() else {
+            state = .loggedOut
+            return
+        }
         // PERF-START-01 : démarrage à froid optimiste. Si on a un token ET un
         // utilisateur en cache, afficher l'app IMMÉDIATEMENT puis revalider
         // `/api/auth/me` en arrière-plan (stale-while-revalidate) au lieu de bloquer
         // l'UI jusqu'à 30 s sur le réseau. La revalidation corrige l'utilisateur
         // affiché et déconnecte proprement si la session a été révoquée.
-        if service.hasStoredCredentials(), let cached = service.cachedUser() {
+        if let cached = service.cachedUser() {
             // Active le namespace local avant que les services lisent leurs caches.
             service.cacheUser(cached)
             state = .authenticated(cached)
@@ -588,10 +629,13 @@ final class AuthSessionViewModel: ObservableObject {
     /// Succès → rafraîchit l'utilisateur affiché ; 401/403 → déconnexion propre ;
     /// réseau/serveur → on conserve l'affichage optimiste (déjà `.authenticated`).
     private func revalidateSession() async {
+        let revision = profileRevision
         do {
             let user = try await service.me()
+            guard profileRevision == revision else { return }
             await setAuthenticated(user)
         } catch let error as APIError {
+            guard profileRevision == revision else { return }
             if case .http(let status, _, _, _, _) = error, status == 401 || status == 403 {
                 state = .loggedOut
                 await AppDelegate.sharedPush?.unregister()
@@ -612,11 +656,41 @@ final class AuthSessionViewModel: ObservableObject {
     /// Utilisé après un changement de @handle pour rafraîchir l'état (et fermer la modale de
     /// choix de handle). Conserve la session en cas d'échec réseau.
     func refreshUser() async {
-        guard case .authenticated = state else { return }
-        if let user = try? await service.me() {
-            state = .authenticated(user)
-            service.cacheUser(user)
+        guard case .authenticated(let current) = state else { return }
+        let account = LocalAccountScope.sessionSnapshot()
+        let generation = service.credentialSessionID()
+        let service = service
+        try? await refreshUser(expectedUserID: current.id, isCurrent: {
+            LocalAccountScope.sessionSnapshot() == account && service.credentialSessionID() == generation
+        }, fetchUser: { try await service.me() })
+    }
+
+    /// Le chargeur est lié à la session capturée par l'action qui a demandé le
+    /// refresh. Ne jamais installer le profil d'une autre connexion après await.
+    func refreshUser(expectedUserID: String, isCurrent: @MainActor () -> Bool,
+                     fetchUser: @Sendable () async throws -> AuthUser) async throws {
+        guard isCurrent(), case .authenticated(let current) = state, current.id == expectedUserID else {
+            throw APIError.cancelled
         }
+        let revision = profileRevision
+        let user = try await fetchUser()
+        guard !Task.isCancelled, isCurrent(), profileRevision == revision, user.id == expectedUserID,
+              case .authenticated(let latest) = state, latest.id == expectedUserID else { throw APIError.cancelled }
+        profileRevision = UUID()
+        service.cacheUser(user)
+        state = .authenticated(user)
+    }
+
+    /// Le reçu d'activation est une preuve serveur : l'afficher immédiatement,
+    /// même si la relecture du profil échoue ensuite. Aucune requête supplémentaire.
+    func acknowledgeTwoFactorState(enabled: Bool = true, expectedUserID: String, isCurrent: @MainActor () -> Bool) throws {
+        guard isCurrent(), case .authenticated(let current) = state, current.id == expectedUserID else {
+            throw APIError.cancelled
+        }
+        let updated = current.withConfirmedTwoFactor(enabled: enabled)
+        profileRevision = UUID()
+        service.cacheUser(updated)
+        state = .authenticated(updated)
     }
 
     func login(email: String, password: String) async {
@@ -637,22 +711,61 @@ final class AuthSessionViewModel: ObservableObject {
         }
     }
 
-    func signup(email: String, password: String, name: String, acceptedTerms: Bool) async {
+    func beginPublicForm() throws -> PublicFormContext {
+        guard case .loggedOut = state, !isBusy else { throw APIError.cancelled }
+        return PublicFormContext(stateID: stateID, credentialID: service.credentialSessionID())
+    }
+
+    var canBrowseAsGuest: Bool {
+        guard case .loggedOut = state else { return false }
+        return !service.hasStoredCredentials() && service.cachedUser() == nil
+            && LocalAccountScope.currentUserId == nil
+    }
+
+    /// Guest browsing never installs a synthetic authenticated identity and
+    /// must not expose an old account's local namespace after expiration.
+    func prepareGuestAccess() async -> Bool {
+        guard case .loggedOut = state, !isBusy else { return false }
+        let expected = stateID
+        isBusy = true
+        defer { if stateID == expected { isBusy = false } }
+        errorMessage = nil
+        await service.clearLocalSession()
+        guard stateID == expected, !Task.isCancelled else { return false }
+        return canBrowseAsGuest
+    }
+
+    private func acceptsPublicForm(_ context: PublicFormContext, checkCredentials: Bool = true) -> Bool {
+        guard case .loggedOut = state, context.stateID == stateID, !Task.isCancelled else { return false }
+        return !checkCredentials || context.credentialID == service.credentialSessionID()
+    }
+
+    func signup(email: String, password: String, name: String, acceptedTerms: Bool,
+                proof: MobileChallengeProof, context: PublicFormContext) async {
+        guard !isBusy, acceptsPublicForm(context) else { return }
         isBusy = true
         errorMessage = nil
         defer { isBusy = false }
         do {
-            let response = try await service.signup(
-                email: email, password: password, name: name, acceptedTerms: acceptedTerms
+            let token = try proof.consume(for: .signup)
+            let received = try await service.signup(
+                email: email, password: password, name: name, acceptedTerms: acceptedTerms, turnstileToken: token
             )
-            if let user = response.user {
-                await setAuthenticated(user)
-            } else if response.requires2FA == true, let tempToken = response.tempToken {
+            // Le cookie peut ouvrir une nouvelle génération légitime ; vérifier
+            // le reçu de cette réponse, jamais un snapshot relu après son await.
+            guard acceptsPublicForm(context, checkCredentials: false),
+                  received.credentialSessionID == service.credentialSessionID() else { return }
+            let response = received.value
+            if response.requires2FA == true, let tempToken = response.tempToken {
                 state = .requires2FA(tempToken: tempToken)
+            } else if let user = response.user {
+                await setAuthenticated(user, expectedStateID: context.stateID,
+                                       expectedCredentialSessionID: received.credentialSessionID)
             } else {
                 errorMessage = "Compte créé mais session non initialisée"
             }
         } catch {
+            guard acceptsPublicForm(context, checkCredentials: false) else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -692,28 +805,39 @@ final class AuthSessionViewModel: ObservableObject {
         }
     }
 
-    func forgotPassword(email: String) async {
+    func forgotPassword(email: String, proof: MobileChallengeProof, context: PublicFormContext) async -> Bool {
+        guard !isBusy, acceptsPublicForm(context) else { return false }
         isBusy = true
         errorMessage = nil
         infoMessage = nil
         defer { isBusy = false }
         do {
-            try await service.forgotPassword(email: email)
+            let token = try proof.consume(for: .passwordReset)
+            try await service.forgotPassword(email: email, turnstileToken: token)
+            guard acceptsPublicForm(context) else { return false }
             infoMessage = "Si l’adresse existe, un lien de réinitialisation t’a été envoyé."
+            return true
         } catch {
+            guard acceptsPublicForm(context) else { return false }
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
     func resetPassword(token: String, newPassword: String) async -> Bool {
+        guard !isBusy, !Task.isCancelled else { return false }
+        let startingState = stateID
+        let credentials = service.credentialSessionID()
         isBusy = true
         errorMessage = nil
         defer { isBusy = false }
         do {
             try await service.resetPassword(token: token, newPassword: newPassword)
+            guard !Task.isCancelled, stateID == startingState, credentials == service.credentialSessionID() else { return false }
             infoMessage = "Mot de passe mis à jour. Connecte-toi avec le nouveau mot de passe."
             return true
         } catch {
+            guard !Task.isCancelled, stateID == startingState, credentials == service.credentialSessionID() else { return false }
             errorMessage = error.localizedDescription
             return false
         }

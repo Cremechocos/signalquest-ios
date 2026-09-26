@@ -21,28 +21,36 @@ final class LivePresenceService: ObservableObject {
     private let api: APIClient
     private let location: LocationService
     private let networkPath: NetworkPathMonitor
-    private let privacy: PrivacyServicing
+    private let preferences: LivePresencePreferences
+    private let loadSettings: @Sendable (UUID) async -> LivePresenceSettingsResponse
     private let logger = Logger(subsystem: "fr.signalquest.ios", category: "LivePresence")
 
     /// Mode de partage courant (persisté localement).
-    @Published private(set) var mode: LiveShareMode = LiveShareModeStore.load()
+    @Published private(set) var mode: LiveShareMode
     /// Vrai quand la boucle de publication tourne. Alimente l'indicateur « en direct ».
     @Published private(set) var isBroadcasting = false
-    @Published private(set) var status = SocialPresencePreferenceStore.loadStatus()
-    @Published private(set) var customStatus = SocialPresencePreferenceStore.loadCustomStatus()
+    @Published private(set) var status: SocialPresenceStatus
+    @Published private(set) var customStatus: String?
+    /// Le statut du propriétaire doit être connu avant toute édition/publication.
+    @Published private(set) var presenceLoaded = false
 
     /// Miroirs locaux des réglages serveur, rechargés via `refreshSharingSettings()`.
     private var shareLocation = false
     private var shareRadio = false
     private var settingsLoaded = false
+    private var settingsOwner: UUID?
+    private var settingsRevision = UUID()
+    private var presenceRevision = UUID()
+    private var refreshGeneration = UUID()
+    private var loopGeneration = UUID()
     /// Carte des amis actuellement à l'écran (pilote `mapOpenOnly`).
     private var mapVisible = false
 
     private var loopTask: Task<Void, Never>?
     private var presenceUpdateTask: Task<Void, Never>?
-    private var lastSentLocation: CLLocation?
-    private var lastSentAt: Date?
+    private var telemetryDelivery = LiveTelemetryDeliveryState()
     private var hasBroadcasted = false
+    private var lastBroadcastSessionID: UUID?
 
     /// Cadence de publication (s), pilotée par le serveur : rapide quand un ami me
     /// regarde (« boost à la demande » façon Localiser), lente sinon — pour ne pas
@@ -62,12 +70,25 @@ final class LivePresenceService: ObservableObject {
         api: APIClient,
         location: LocationService,
         networkPath: NetworkPathMonitor,
-        privacy: PrivacyServicing
+        privacy: PrivacyServicing,
+        preferences: LivePresencePreferences = LivePresencePreferences(),
+        settingsLoader: (@Sendable (UUID) async -> LivePresenceSettingsResponse)? = nil
     ) {
         self.api = api
         self.location = location
         self.networkPath = networkPath
-        self.privacy = privacy
+        self.preferences = preferences
+        mode = preferences.loadMode()
+        status = preferences.loadStatus()
+        customStatus = preferences.loadCustomStatus()
+        self.loadSettings = settingsLoader ?? { owner in
+            async let settings = try? privacy.get()
+            async let presence: OwnPresenceEnvelope? = try? api.request(
+                APIEndpoint(path: "/api/user/presence"), as: OwnPresenceEnvelope.self,
+                expectedSessionID: owner
+            )
+            return await LivePresenceSettingsResponse(settings: settings, presence: presence?.presence)
+        }
     }
 
     // MARK: - Pilotage
@@ -76,7 +97,7 @@ final class LivePresenceService: ObservableObject {
     func setMode(_ newMode: LiveShareMode) {
         guard newMode != mode else { return }
         mode = newMode
-        LiveShareModeStore.save(newMode)
+        preferences.saveMode(newMode)
         reevaluate()
     }
 
@@ -84,56 +105,97 @@ final class LivePresenceService: ObservableObject {
     /// au lancement (pour amorcer le mode continu) et après une modification des
     /// réglages de confidentialité.
     func refreshSharingSettings() async {
-        async let fetchedSettings = try? privacy.get()
-        async let fetchedPresence: OwnPresenceEnvelope? = try? api.request(
-            APIEndpoint(path: "/api/user/presence"),
-            as: OwnPresenceEnvelope.self
-        )
-        let (settings, presenceEnvelope) = await (fetchedSettings, fetchedPresence)
-        if let settings {
-            shareLocation = settings.shareLiveLocationWithFriends
-            shareRadio = settings.shareRadioDataWithFriends
-            settingsLoaded = true
+        let owner = api.credentials.snapshot()
+        guard owner.accessToken != nil else { stopForSignOut(); return }
+        adoptOwner(owner.sessionID)
+        let refresh = UUID()
+        refreshGeneration = refresh
+        let privacyVersion = settingsRevision
+        let presenceVersion = presenceRevision
+        let result = await loadSettings(owner.sessionID)
+        guard !Task.isCancelled, api.credentials.isCurrent(owner),
+              settingsOwner == owner.sessionID, refreshGeneration == refresh else { return }
+        if settingsRevision == privacyVersion, let settings = result.settings {
+            updateSharingFlags(shareLocation: settings.shareLiveLocationWithFriends,
+                               shareRadio: settings.shareRadioDataWithFriends)
         }
-        if let presence = presenceEnvelope?.presence {
-            if let serverStatus = presence.status, serverStatus != .offline {
-                status = serverStatus
-            }
+        if presenceRevision == presenceVersion, let presence = result.presence,
+           let serverStatus = presence.status {
+            presenceRevision = UUID()
+            status = serverStatus == .offline ? .online : serverStatus
             customStatus = presence.customStatus.map {
                 String($0.trimmingCharacters(in: .whitespacesAndNewlines).prefix(100))
             }?.nilIfBlank
-            SocialPresencePreferenceStore.save(status: status, customStatus: customStatus)
+            presenceLoaded = true
+            preferences.saveStatus(status, customStatus)
         }
         reevaluate()
     }
 
-    /// Applique localement des réglages déjà connus (évite un aller-retour réseau
-    /// quand l'écran Confidentialité vient de les sauvegarder).
-    func applySharingSettings(shareLocation: Bool, shareRadio: Bool) {
+    /// Applique un enregistrement confirmé pour la session qui l'a demandé.
+    /// Un refresh plus ancien du même compte ne peut pas rétablir ses valeurs.
+    func applySharingSettings(shareLocation: Bool, shareRadio: Bool, expectedSessionID: UUID) {
+        let owner = api.credentials.snapshot()
+        guard owner.accessToken != nil, owner.sessionID == expectedSessionID else { return }
+        adoptOwner(owner.sessionID)
+        settingsRevision = UUID()
+        updateSharingFlags(shareLocation: shareLocation, shareRadio: shareRadio)
+        reevaluate()
+    }
+
+    private func updateSharingFlags(shareLocation: Bool, shareRadio: Bool) {
+        if self.shareLocation != shareLocation { telemetryDelivery.reset(.location) }
+        if self.shareRadio != shareRadio { telemetryDelivery.reset(.radio) }
+        settingsRevision = UUID()
         self.shareLocation = shareLocation
         self.shareRadio = shareRadio
         settingsLoaded = true
-        reevaluate()
+    }
+
+    private func adoptOwner(_ owner: UUID) {
+        guard settingsOwner != owner else { return }
+        stopForSignOut()
+        settingsOwner = owner
+        mode = preferences.loadMode()
+        status = preferences.loadStatus()
+        customStatus = preferences.loadCustomStatus()
     }
 
     /// Met à jour le statut propre de l'utilisateur. L'envoi est débouncé pour ne
     /// pas publier chaque frappe du statut personnalisé.
     func setPresence(status newStatus: SocialPresenceStatus, customStatus newCustomStatus: String?) {
+        let owner = api.credentials.snapshot()
+        guard owner.accessToken != nil else { return }
+        adoptOwner(owner.sessionID)
+        // Une édition de texte ne confirme pas le statut serveur : après un GET
+        // partiel, la valeur locale pourrait remplacer un statut invisible.
+        guard presenceLoaded else { return }
+        presenceRevision = UUID()
         status = newStatus == .offline ? .online : newStatus
         customStatus = String(
             (newCustomStatus ?? "").trimmingCharacters(in: .whitespacesAndNewlines).prefix(100)
         ).nilIfBlank
-        SocialPresencePreferenceStore.save(status: status, customStatus: customStatus)
+        preferences.saveStatus(status, customStatus)
         presenceUpdateTask?.cancel()
+        reevaluate()
         presenceUpdateTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(500))
-            guard !Task.isCancelled, let self, self.shouldBroadcast else { return }
-            await self.publishPresence(status: self.status, location: nil)
+            guard !Task.isCancelled, let self, self.shouldBroadcast,
+                  self.api.credentials.isCurrent(owner) else { return }
+            await self.publishPresence(status: self.status, location: nil, expectedSessionID: owner.sessionID,
+                                       expectedLoopGeneration: self.loopGeneration)
         }
     }
 
     func stopForSignOut() {
+        refreshGeneration = UUID()
+        settingsRevision = UUID()
+        presenceRevision = UUID()
+        settingsOwner = nil
+        presenceLoaded = false
         settingsLoaded = false
+        status = .online
+        customStatus = nil
         shareLocation = false
         shareRadio = false
         presenceUpdateTask?.cancel()
@@ -180,7 +242,9 @@ final class LivePresenceService: ObservableObject {
 
     /// Le heartbeat décrit l'activité du compte, pas le consentement aux coordonnées.
     private var shouldBroadcast: Bool {
-        settingsLoaded && appIsActive
+        settingsLoaded && presenceLoaded && appIsActive
+            && settingsOwner == api.credentials.snapshot().sessionID
+            && api.credentials.accessToken() != nil
     }
 
     private var shouldPublishLocation: Bool {
@@ -198,71 +262,103 @@ final class LivePresenceService: ObservableObject {
     private func startLoop() {
         guard loopTask == nil else { return }
         isBroadcasting = true
+        let generation = UUID()
+        loopGeneration = generation
         loopTask = Task { [weak self] in
             while !Task.isCancelled {
                 // `guard let self` et non `self?` : si le service est désalloué
                 // sans passer par `stopLoop()`, la boucle tournait à vide
                 // indéfiniment, réveillant le processeur toutes les 15 s pour
                 // ne rien faire.
-                guard let self else { return }
-                await self.publishTick()
+                guard let self, self.loopGeneration == generation else { return }
+                await self.publishTick(generation: generation)
                 try? await Task.sleep(for: .seconds(self.publishInterval))
             }
         }
     }
 
     private func stopLoop() {
+        loopGeneration = UUID()
         guard loopTask != nil else { return }
         loopTask?.cancel()
         loopTask = nil
         isBroadcasting = false
-        lastSentLocation = nil
-        lastSentAt = nil
+        telemetryDelivery = LiveTelemetryDeliveryState()
         // Signale la sortie best-effort : l'ami passe « hors ligne » côté amis.
         // (La position expire de toute façon au TTL serveur ; désactiver le partage
         // la purge immédiatement via le PATCH privacy.)
+        isObserved = false
+        publishInterval = idleInterval
+        minDistanceMeters = 15
         if hasBroadcasted {
             hasBroadcasted = false
-            Task { [weak self] in await self?.publishPresence(status: .offline, location: nil) }
+            let owner = lastBroadcastSessionID
+            lastBroadcastSessionID = nil
+            if let owner {
+                let stoppedGeneration = loopGeneration
+                Task { [weak self] in
+                    await self?.publishPresence(status: .offline, location: nil, expectedSessionID: owner,
+                                                expectedLoopGeneration: stoppedGeneration)
+                }
+            }
         }
     }
 
-    private func publishTick() async {
-        guard shouldBroadcast else { return }
+    private func publishTick(generation: UUID) async {
+        guard shouldBroadcast, loopGeneration == generation else { return }
         let needsFix = shouldPublishLocation || shareRadio
+        let owner = api.credentials.snapshot()
         let fix = needsFix ? await location.currentLocation(timeoutSeconds: 4) : nil
-        var shouldSendTelemetry = false
-        if let fix {
-            if let last = lastSentLocation, let at = lastSentAt {
-                shouldSendTelemetry = fix.distance(from: last) >= minDistanceMeters
-                    || Date().timeIntervalSince(at) >= maxSilence
-            } else {
-                shouldSendTelemetry = true
-            }
-        }
-
-        await publishPresence(
-            status: status,
-            location: shouldPublishLocation && shouldSendTelemetry ? fix : nil
+        guard !Task.isCancelled, shouldBroadcast, loopGeneration == generation, api.credentials.isCurrent(owner) else { return }
+        let privacyVersion = settingsRevision
+        let presenceVersion = presenceRevision
+        let locationDue = fix.map { telemetryDelivery.shouldSend($0, channel: .location, now: Date(),
+            minDistance: minDistanceMeters, maxSilence: maxSilence) } ?? false
+        let radioDue = fix.map { telemetryDelivery.shouldSend($0, channel: .radio, now: Date(),
+            minDistance: minDistanceMeters, maxSilence: maxSilence) } ?? false
+        let positionSubmitted = shouldPublishLocation && locationDue
+        let acknowledged = await publishPresence(
+            status: status, location: positionSubmitted ? fix : nil,
+            expectedSessionID: owner.sessionID, expectedLoopGeneration: generation
         )
-        hasBroadcasted = true
-        if let fix, shouldSendTelemetry {
-            lastSentLocation = fix
-            lastSentAt = Date()
-            if shareRadio { await publishRadio(at: fix) }
+        guard !Task.isCancelled, shouldBroadcast, loopGeneration == generation, api.credentials.isCurrent(owner),
+              settingsRevision == privacyVersion, presenceRevision == presenceVersion else { return }
+        if let fix {
+            if positionSubmitted {
+                telemetryDelivery.acknowledge(fix, channel: .location,
+                    accepted: acknowledged?.ok == true && acknowledged?.locationAccepted != false, now: Date())
+            }
+            if shareRadio, radioDue {
+                let radioAccepted = await publishRadio(at: fix)
+                guard !Task.isCancelled, shouldBroadcast, loopGeneration == generation,
+                      settingsRevision == privacyVersion, presenceRevision == presenceVersion,
+                      api.credentials.isCurrent(owner) else { return }
+                telemetryDelivery.acknowledge(fix, channel: .radio, accepted: radioAccepted, now: Date())
+            }
         }
     }
 
     // MARK: - Requêtes
 
-    private func publishPresence(status: SocialPresenceStatus, location fix: CLLocation?) async {
-        let payloadLocation: PresenceLocationPayload? = fix.map { fix in
+    @discardableResult
+    private func publishPresence(status: SocialPresenceStatus, location fix: CLLocation?, expectedSessionID: UUID? = nil,
+                                 expectedLoopGeneration: UUID? = nil) async -> PresenceAck? {
+        let owner = expectedSessionID ?? api.credentials.snapshot().sessionID
+        let runtime = expectedLoopGeneration ?? loopGeneration
+        let privacyVersion = settingsRevision
+        let presenceVersion = presenceRevision
+        guard api.credentials.snapshot().sessionID == owner,
+              runtime == loopGeneration,
+              status == .offline || shouldBroadcast else { return nil }
+        let validFix = fix.flatMap { location.isUsable($0) ? $0 : nil }
+        let payloadLocation: PresenceLocationPayload? = validFix.map { fix in
             PresenceLocationPayload(
                 lat: fix.coordinate.latitude,
                 lng: fix.coordinate.longitude,
                 accuracy: fix.horizontalAccuracy >= 0 ? fix.horizontalAccuracy : nil,
                 heading: fix.course >= 0 ? fix.course : nil,
-                speed: fix.speed >= 0 ? fix.speed : nil
+                speed: fix.speed >= 0 ? fix.speed : nil,
+                observedAt: fix.timestamp
             )
         }
         let body = PresencePublishRequest(
@@ -271,10 +367,29 @@ final class LivePresenceService: ObservableObject {
             location: payloadLocation
         )
         do {
-            let ack: PresenceAck = try await api.requestJSON("/api/social/presence", body: body)
+            let ack = try await api.request(
+                APIEndpoint(path: "/api/social/presence", method: .post,
+                            headers: ["Content-Type": "application/json"], body: try JSONEncoder.signalQuest.encode(body),
+                            validateBeforeSend: { [weak self] in
+                                guard let self else { throw APIError.cancelled }
+                                try await self.validateTransmission(owner: owner, runtime: runtime,
+                                    privacyVersion: privacyVersion, presenceVersion: presenceVersion,
+                                    offline: status == .offline, fix: validFix, radio: false)
+                            }),
+                as: PresenceAck.self, expectedSessionID: owner
+            )
+            guard !Task.isCancelled, api.credentials.snapshot().sessionID == owner,
+                  loopGeneration == runtime, settingsRevision == privacyVersion,
+                  presenceRevision == presenceVersion, ack.ok == true else { return nil }
+            if status != .offline {
+                hasBroadcasted = true
+                lastBroadcastSessionID = owner
+            }
             applyAck(ack)
+            return ack
         } catch {
             logger.debug("presence non publiée: \(error.localizedDescription, privacy: .public)")
+            return nil
         }
     }
 
@@ -292,26 +407,69 @@ final class LivePresenceService: ObservableObject {
         minDistanceMeters = isObserved ? 5 : 15
     }
 
-    private func publishRadio(at fix: CLLocation) async {
+    private func publishRadio(at fix: CLLocation) async -> Bool {
+        guard !Task.isCancelled, shouldBroadcast, shareRadio, location.isUsable(fix) else { return false }
+        let owner = api.credentials.snapshot().sessionID
+        let runtime = loopGeneration
+        let privacyVersion = settingsRevision
+        let presenceVersion = presenceRevision
+        networkPath.refreshNow()
+        let capturedAt = Date()
         let status = networkPath.status
         // Rien d'utile à transmettre hors cellulaire (techno + opérateur vides).
-        guard status.cellularTechnology != nil || status.operatorName != nil else { return }
+        guard status.cellularTechnology != nil || status.operatorName != nil else { return false }
         let body = RadioSnapshotPublishRequest(
             technology: status.cellularTechnology?.displayName,
             operator: status.operatorName,
             lat: fix.coordinate.latitude,
-            lng: fix.coordinate.longitude
+            lng: fix.coordinate.longitude,
+            observedAt: capturedAt,
+            locationObservedAt: fix.timestamp
         )
         // 403 attendu si le partage radio est coupé côté serveur : silencieux.
-        try? await api.requestJSON("/api/social/radio-snapshot", body: body)
+        do {
+            let data = try await api.requestData(
+                APIEndpoint(path: "/api/social/radio-snapshot", method: .post,
+                            headers: ["Content-Type": "application/json"], body: try JSONEncoder.signalQuest.encode(body),
+                            validateBeforeSend: { [weak self] in
+                                guard let self else { throw APIError.cancelled }
+                                try await self.validateTransmission(owner: owner, runtime: runtime,
+                                    privacyVersion: privacyVersion, presenceVersion: presenceVersion,
+                                    offline: false, fix: fix, radio: true)
+                            }),
+                expectedSessionID: owner
+            )
+            guard !Task.isCancelled, api.credentials.snapshot().sessionID == owner else { return false }
+            // Les anciens backends peuvent confirmer par 204. Le nouveau contrat
+            // distingue un 200 reçu d'un échantillon effectivement accepté.
+            if data.isEmpty { return true }
+            let ack = try JSONDecoder.signalQuest.decode(RadioSnapshotAck.self, from: data)
+            return ack.ok == true && ack.accepted != false
+        } catch { return false }
     }
+    private func validateTransmission(owner: UUID, runtime: UUID, privacyVersion: UUID,
+                                      presenceVersion: UUID, offline: Bool, fix: CLLocation?, radio: Bool) throws {
+        try Task.checkCancellation()
+        guard api.credentials.snapshot().sessionID == owner, loopGeneration == runtime,
+              settingsRevision == privacyVersion, presenceRevision == presenceVersion,
+              offline || shouldBroadcast else { throw APIError.cancelled }
+        if let fix {
+            guard location.isUsable(fix), radio ? shareRadio : shouldPublishLocation else { throw APIError.cancelled }
+        }
+    }
+
 }
 
-private struct OwnPresenceEnvelope: Decodable {
+struct LivePresenceSettingsResponse: Sendable {
+    let settings: SocialPrivacy?
     let presence: OwnPresence?
 }
 
-private struct OwnPresence: Decodable {
+private struct OwnPresenceEnvelope: Decodable, Sendable {
+    let presence: OwnPresence?
+}
+
+struct OwnPresence: Decodable, Sendable {
     let status: SocialPresenceStatus?
     let customStatus: String?
 
@@ -323,4 +481,17 @@ private struct OwnPresence: Decodable {
 
 private extension String {
     var nilIfBlank: String? { isEmpty ? nil : self }
+}
+
+/// Accès aux préférences locales séparé du moteur de diffusion : le banc de
+/// concurrence n'écrit jamais dans les préférences du runner ou d'un compte.
+@MainActor
+struct LivePresencePreferences {
+    var loadMode: () -> LiveShareMode = { LiveShareModeStore.load() }
+    var loadStatus: () -> SocialPresenceStatus = { SocialPresencePreferenceStore.loadStatus() }
+    var loadCustomStatus: () -> String? = { SocialPresencePreferenceStore.loadCustomStatus() }
+    var saveMode: (LiveShareMode) -> Void = { LiveShareModeStore.save($0) }
+    var saveStatus: (SocialPresenceStatus, String?) -> Void = {
+        SocialPresencePreferenceStore.save(status: $0, customStatus: $1)
+    }
 }

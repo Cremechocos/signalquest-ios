@@ -120,6 +120,27 @@ enum AppEnvironment {
     }
 
     static var usesDemoPhotos: Bool { hasArgument("--qa-demo-photos") }
+    static var showsRemoteImageQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-remote-image")
+        #else
+        false
+        #endif
+    }
+    static var showsSentinelleAlertSettingsQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-sentinelle-alerts")
+        #else
+        false
+        #endif
+    }
+    static var showsCommentsQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-comments") || hasArgument("--qa-comments-replies")
+        #else
+        false
+        #endif
+    }
     static var usesDemoFriends: Bool { hasArgument("--qa-demo-friends") }
     static var walksDemoFriends: Bool { hasArgument("--qa-friends-walk") }
     static var opensMapLayers: Bool { hasArgument("--qa-map-layers") }

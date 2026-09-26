@@ -9,6 +9,7 @@ struct SignalQuestApp: App {
     @StateObject private var services: AppServices
     @StateObject private var session: AuthSessionViewModel
     @StateObject private var appLock = AppLockController()
+    @StateObject private var onboardingEntry: OnboardingEntryState
     /// Observé À LA RACINE, et nulle part ailleurs : les jetons de surface lisent
     /// ce réglage au moment du rendu, mais rien ne les ferait ré-évaluer si
     /// personne ne l'observait. Sans cette ligne, activer le mode OLED ne
@@ -17,6 +18,9 @@ struct SignalQuestApp: App {
 
     init() {
         MapBackdrop.migrateLegacyPreference()
+        if AppEnvironment.resetsAuthOnLaunch {
+            UserDefaults.standard.set(false, forKey: RootView.guestPreferenceKey)
+        }
         // Le test UI d'onboarding doit pouvoir repartir d'une première
         // ouverture, même après les autres parcours de la même suite. Ce flag
         // est éliminé des binaires Release par AppEnvironment.
@@ -28,6 +32,7 @@ struct SignalQuestApp: App {
         // arrière-plan au branchement du véhicule) et doit partager exactement
         // le même `AppServices` — deux graphes signifieraient deux `APIClient`,
         // donc deux jeux de cookies et deux refresh concurrents sur 401.
+        _onboardingEntry = StateObject(wrappedValue: OnboardingEntryState())
         _services = StateObject(wrappedValue: AppServicesHolder.services)
         _session = StateObject(wrappedValue: AppServicesHolder.session)
         Self.configureNavigationTypography()
@@ -55,6 +60,7 @@ struct SignalQuestApp: App {
         let services = self.services
         let session = self.session
         let appLock = self.appLock
+        let onboardingEntry = self.onboardingEntry
         // `@Sendable` n'est PAS décoratif et ne doit pas être retiré : sans lui,
         // cette fermeture hérite de l'isolation `@MainActor` d'`App.body` et le
         // mode langage Swift 6 lui greffe une vérification d'exécuteur qui piège
@@ -62,7 +68,7 @@ struct SignalQuestApp: App {
         // Une fermeture `@Sendable` n'hérite d'aucune isolation, donc plus de
         // vérification. Voir la note d'en-tête d'`AppRootView`.
         return WindowGroup { @Sendable in
-            AppRootView(services: services, session: session, appLock: appLock)
+            AppRootView(services: services, session: session, appLock: appLock, onboardingEntry: onboardingEntry)
         }
     }
 }
@@ -99,7 +105,12 @@ struct AppRootView: View {
     @ObservedObject var services: AppServices
     @ObservedObject var session: AuthSessionViewModel
     @ObservedObject var appLock: AppLockController
+    @ObservedObject var onboardingEntry: OnboardingEntryState
+    @StateObject private var onboardingScene = OnboardingSceneContext()
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.locale) private var locale
+    @State private var passwordResetRoute: PasswordResetRoute?
+    @State private var pendingEmailVerificationRefresh = false
     @AppStorage("sq.hasCompletedOnboarding") private var hasCompletedOnboarding = false
     /// Miroir observable de l'unité de distance. Détenu ICI, là où se fait
     /// l'injection : les vues s'y abonnent pour se rafraîchir au changement,
@@ -141,7 +152,11 @@ struct AppRootView: View {
         // présentation. C'est ce qui remplace le garde `set: { _ in }` de
         // l'ancien cover (UXP-06), et ce qui permet à la transition de sortie
         // d'être animée au lieu d'être coupée par la fermeture du cover.
-        OnboardingHost { RootView() }
+        OnboardingHost(sceneID: onboardingScene.id) {
+            RootView(onboardingSceneID: onboardingScene.id, hasPriorityAuthRoute: passwordResetRoute != nil)
+        }
+            .onAppear { onboardingScene.attach(to: onboardingEntry) }
+            .environmentObject(onboardingEntry)
             .environmentObject(services)
             .environmentObject(session)
             .environmentObject(services.router)
@@ -157,6 +172,13 @@ struct AppRootView: View {
             .environmentObject(inAppNotifications)
             .environment(\.legibilityWeight, fieldMode ? .bold : nil)
             .controlSize(fieldMode ? .large : .regular)
+            .background(PasswordResetPresentation(route: passwordResetRoute,
+                canPresent: canPresentPasswordReset, mustDismiss: mustDismissPasswordReset,
+                session: session, locale: locale, onClose: closePasswordReset, onSuccess: completePasswordReset))
+            .onOpenURL(perform: receivePasswordResetURL)
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                if let url = activity.webpageURL { receivePasswordResetURL(url) }
+            }
             .task {
                 // `networkPath.start()` et `session.bootstrap()` ont migré dans
                 // `bootstrapIfNeeded` : la scène CarPlay a besoin des deux, et
@@ -177,6 +199,7 @@ struct AppRootView: View {
                 // laisse l'état à `.unknown`, donc l'app fonctionne.
                 Task { await services.versionPolicy.refresh() }
                 await services.bootstrapIfNeeded(session: session)
+                refreshEmailVerificationIfPossible()
                 await registerPushIfAuthenticated(session.state)
                 // Verrouillage biométrique à l'ouverture (si activé + authentifié).
                 if case .authenticated = session.state { appLock.lockOnActivationIfNeeded() }
@@ -202,13 +225,13 @@ struct AppRootView: View {
                     }
                 }
                 if case .authenticated = newState {
+                    refreshEmailVerificationIfPossible()
                     services.epochRotations.resume()
                     appLock.lockOnActivationIfNeeded()
                     Task {
                         await services.livePresence.refreshSharingSettings()
                         if case .authenticated(let user) = newState {
                             await services.liveShare.bootstrap(currentUserId: user.id)
-                            await services.sessions.retryPendingCoverageSessions()
                             await services.speedtest.retryPendingSaves()
                         }
                     }
@@ -234,6 +257,7 @@ struct AppRootView: View {
                 services.epochRotations.resume()
             }
             .onChangeCompat(of: scenePhase) { _, phase in
+                if phase != .active { onboardingEntry.releaseGuestScene(onboardingScene.id) }
                 switch phase {
                 case .active:
                     UNUserNotificationCenter.current().setBadgeCountCompat(0)
@@ -273,9 +297,62 @@ struct AppRootView: View {
                 }
             }
     }
+    private var mustDismissPasswordReset: Bool {
+        if services.versionPolicy.state.blocksApp || !hasCompletedOnboarding { return true }
+        if case .requires2FA = session.state { return true }
+        return false
+    }
+
+    private var canPresentPasswordReset: Bool {
+        guard !mustDismissPasswordReset, !appLock.isLocked, scenePhase == .active else { return false }
+        if case .checking = session.state { return false }
+        return true
+    }
+
+    private func receivePasswordResetURL(_ url: URL) {
+        // Le web a consommé le jeton de confirmation. L'app ne se déclare pas
+        // vérifiée sur la foi du lien : elle relit le reçu de /api/auth/me.
+        if url.scheme == SQSharedConfiguration.urlScheme, url.host == "verify-email" {
+            pendingEmailVerificationRefresh = true
+            refreshEmailVerificationIfPossible()
+            return
+        }
+        switch PasswordResetLink.parse(url, origin: AppConfig.current.appBaseURL) {
+        case .unrelated: break
+        case .invalid: passwordResetRoute = PasswordResetRoute(content: .invalid)
+        case .request(let request):
+            if passwordResetRoute?.contains(request) != true { passwordResetRoute = PasswordResetRoute(request: request) }
+        }
+    }
+
+    private func refreshEmailVerificationIfPossible() {
+        guard pendingEmailVerificationRefresh, case .authenticated = session.state else { return }
+        pendingEmailVerificationRefresh = false
+        Task { await session.refreshUser() }
+    }
+
+    private func closePasswordReset(_ id: UUID) {
+        if passwordResetRoute?.id == id { passwordResetRoute = nil }
+    }
+
+    private func completePasswordReset(_ id: UUID) {
+        guard passwordResetRoute?.id == id else { return }
+        // Remplacer la route retire son jeton du modèle pendant la confirmation.
+        passwordResetRoute = PasswordResetRoute(id: id, content: .completed)
+    }
 }
 
 struct RootView: View {
+    static let guestPreferenceKey = "sq.browseAsGuest"
+    let onboardingSceneID: UUID
+    let hasPriorityAuthRoute: Bool
+    @AppStorage(RootView.guestPreferenceKey) private var guestBrowsing = false
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var guestLease: OnboardingGuestLease?
+    @State private var guestEntryInFlight = false
+    @State private var mainApplicationAppeared = false
+    @EnvironmentObject private var onboardingEntry: OnboardingEntryState
+    @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var callManager: CallManager
     @EnvironmentObject private var networkPath: NetworkPathMonitor
@@ -285,22 +362,29 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            // Version trop ancienne : on ne construit RIEN d'autre.
-            //
-            // Un simple `.overlay` ne suffit pas — le dock flottant restait
-            // atteignable en dessous (vérifié : les 5 onglets répondaient encore
-            // aux taps derrière l'écran de blocage). Court-circuiter la
-            // hiérarchie garantit qu'aucune requête d'une version obsolète
-            // n'atteigne un backend dont le contrat a été durci, ce qui est tout
-            // l'objet de ce kill-switch.
-            if case .updateRequired(let message, let storeURL) = versionPolicy.state {
+            if AppEnvironment.showsCommentsQA {
+                CommentsQAScreen()
+            } else if AppEnvironment.showsSentinelleAlertSettingsQA {
+                SentinelleAlertSettingsQAScreen()
+            } else if AppEnvironment.showsRemoteImageQA {
+                RemoteImageQAScreen()
+            } else if case .updateRequired(let message, let storeURL) = versionPolicy.state {
+                // Un ancien build ne construit rien d'autre : le dock restait
+                // atteignable sous un simple overlay de mise à jour forcée.
                 ForcedUpdateView(message: message, storeURL: storeURL)
+            } else if isAuthenticated || isGuestApplicationAllowed {
+                MainTabView(user: authenticatedUser)
+                    .onAppear {
+                        mainApplicationAppeared = true
+                        acknowledgeGuestPresentation()
+                    }
+                    .onDisappear { mainApplicationAppeared = false }
             } else {
                 switch session.state {
                 case .checking:
                     LaunchLoadingView()
                 case .loggedOut, .requires2FA:
-                    LoginView()
+                    LoginView(onContinueAsGuest: { enterGuestApplication() })
                 case .offline:
                     OfflineRetryView()
                 case .authenticated(let user):
@@ -319,21 +403,28 @@ struct RootView: View {
             SQInAppNotificationHost()
                 .padding(.top, networkPath.isOnline ? SQSpace.sm : 52)
         }
-        // Verrouillage biométrique : masque tout le contenu authentifié tant que
-        // l'utilisateur ne s'est pas déverrouillé par Face ID / Touch ID.
-        .overlay {
-            if isAuthenticated, appLock.isLocked {
-                AppLockScreen(lock: appLock).transition(.opacity)
-            }
-        }
+        // La fenêtre de protection couvre aussi les feuilles présentées, tout
+        // en conservant leurs tâches et les mesures déjà en cours.
+        .background(AppPrivacyShield(lock: appLock, authenticated: isAuthenticated))
         .sqAnimation(SQMotion.smooth, value: versionPolicy.state)
-        .sqAnimation(SQMotion.smooth, value: appLock.isLocked)
+        .onAppear { consumeOnboardingDestination() }
+        .onChangeCompat(of: onboardingResolution) { _, _ in consumeOnboardingDestination() }
+        .onChangeCompat(of: onboardingEntry.guestPresentationRevision) { _, _ in consumeOnboardingDestination() }
+        .onChangeCompat(of: session.isBusy) { _, busy in if !busy { consumeOnboardingDestination() } }
+        .onChangeCompat(of: scenePhase) { _, phase in
+            if phase == .active { consumeOnboardingDestination(); acknowledgeGuestPresentation() }
+            else if let lease = guestLease, !lease.didPresent { lease.release(); guestLease = nil }
+        }
+        .onChangeCompat(of: isAuthenticated) { _, authenticated in
+            if authenticated { guestBrowsing = false; guestLease?.release(); guestLease = nil }
+        }
         // CALL-VOIP-07 : au retour du réseau (sortie de tunnel/mode avion), si le
         // dernier enregistrement du token VoIP avait échoué, on le rejoue — sinon
         // l'utilisateur resterait injoignable jusqu'au prochain passage foreground.
         .onChangeCompat(of: networkPath.isOnline) { _, online in
             guard online, case .authenticated = session.state else { return }
             services.epochRotations.resume()
+            services.refreshFavoritesForCurrentAccount()
             Task {
                 await callManager.retryVoIPTokenRegistrationIfNeeded()
                 await callManager.retryPendingCallTerminations()
@@ -345,6 +436,98 @@ struct RootView: View {
     private var isAuthenticated: Bool {
         if case .authenticated = session.state { return true }
         return false
+    }
+
+    private var authenticatedUser: AuthUser? {
+        if case .authenticated(let user) = session.state { return user }
+        return nil
+    }
+
+    private var isGuestApplicationAllowed: Bool {
+        guard guestBrowsing, case .loggedOut = session.state else { return false }
+        return session.canBrowseAsGuest || (mainApplicationAppeared && session.isBusy)
+    }
+
+    private var onboardingResolution: OnboardingEntryState.Resolution {
+        let access: OnboardingEntryState.Access
+        switch session.state {
+        case .checking: access = .checking
+        case .loggedOut: access = .loggedOut
+        case .requires2FA: access = .twoFactor
+        case .offline: access = .offline
+        case .authenticated: access = .authenticated
+        }
+        let updateRequired: Bool
+        if case .updateRequired = versionPolicy.state { updateRequired = true }
+        else { updateRequired = false }
+        return onboardingEntry.resolve(access: access, updateRequired: updateRequired,
+            locked: appLock.isLocked, hasExternalRoute: router.hasPendingContentRoute || hasPriorityAuthRoute)
+    }
+
+    private var onboardingGuestRequest: OnboardingEntryRequest? {
+        if case .guest(let request) = onboardingResolution { return request }
+        return nil
+    }
+
+    private func consumeOnboardingDestination() {
+        switch onboardingResolution {
+        case .authenticated(let request):
+            router.routeFromOnboarding(to: request.destination)
+            onboardingEntry.consume(request)
+        case .superseded(let request):
+            onboardingEntry.consume(request)
+        case .guest(let request):
+            guard scenePhase == .active, !session.isBusy, !guestEntryInFlight,
+                  guestLease?.isValid != true,
+                  let lease = reserveOnboardingGuest(request) else { return }
+            enterGuestApplication(lease: lease)
+        case .wait: break
+        }
+    }
+
+    private func enterGuestApplication(lease: OnboardingGuestLease? = nil) {
+        guard !session.isBusy, !guestEntryInFlight else { return }
+        guestEntryInFlight = true
+        guestLease = lease
+        Task {
+            defer { guestEntryInFlight = false }
+            let allowed: Bool
+            if session.canBrowseAsGuest { allowed = true }
+            else { allowed = await session.prepareGuestAccess() }
+            guard allowed, scenePhase == .active else { lease?.release(); return }
+            if case .updateRequired = versionPolicy.state { lease?.release(); return }
+            if let lease {
+                guard lease.isValid else { return }
+                router.routeFromOnboarding(to: lease.request.destination)
+            } else {
+                if let pending = onboardingEntry.pending { onboardingEntry.consume(pending) }
+                router.selectedTab = .home
+            }
+            router.isDockHidden = false
+            router.isDockMinimized = false
+            guestBrowsing = true
+            acknowledgeGuestPresentation()
+        }
+    }
+
+    private func acknowledgeGuestPresentation() {
+        guard mainApplicationAppeared, scenePhase == .active,
+              let lease = guestLease, !lease.didPresent else { return }
+        if !acknowledgeOnboardingGuest(lease) { lease.release() }
+        guestLease = nil
+    }
+
+    private func reserveOnboardingGuest(_ request: OnboardingEntryRequest) -> OnboardingGuestLease? {
+        guard case .guest(let current) = onboardingResolution, current.id == request.id else { return nil }
+        return onboardingEntry.reserveGuestPresentation(request, sceneID: onboardingSceneID)
+    }
+
+    private func acknowledgeOnboardingGuest(_ lease: OnboardingGuestLease) -> Bool {
+        guard case .guest(let current) = onboardingResolution, current.id == lease.request.id else {
+            lease.release()
+            return false
+        }
+        return router.acknowledgeOnboardingGuest(lease)
     }
 }
 
@@ -416,34 +599,39 @@ struct MainTabView: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var session: AuthSessionViewModel
     @Environment(\.scenePhase) private var scenePhase
-    let user: AuthUser
+    let user: AuthUser?
     @State private var showHandleGate = false
+    @State private var showGuestReceipts = false
 
-    init(user: AuthUser) {
+    init(user: AuthUser?) {
         self.user = user
     }
 
     var body: some View {
         tabContainer
-        .task {
-            await services.refreshInboxBadge()
+        .task(id: user?.id) {
             consumeIntentRoutes()
+            guard let user else { return }
+            await services.refreshInboxBadge()
             // À l'arrivée (Feed = onglet par défaut) sans @handle : inviter à en choisir un.
             if (user.handle ?? "").isEmpty { showHandleGate = true }
         }
         .sheet(isPresented: $showHandleGate) {
             ChooseHandleSheet(onSuccess: { _ in Task { await session.refreshUser() } })
         }
+        .sheet(isPresented: $showGuestReceipts) {
+            NavigationStack { GuestSpeedtestReceiptsView() }
+        }
         .onChangeCompat(of: scenePhase) { _, phase in
             if phase == .active {
-                Task { await services.refreshInboxBadge() }
+                if user != nil { Task { await services.refreshInboxBadge() } }
                 consumeIntentRoutes()
             }
         }
         .onChangeCompat(of: router.selectedTab) { _, _ in
             // Changement d'onglet (tap, deep-link, intent) : dock redéployé.
             withAnimation(SQMotion.snappy) { router.isDockMinimized = false }
-            Task { await services.refreshInboxBadge() }
+            if user != nil { Task { await services.refreshInboxBadge() } }
         }
         .onChangeCompat(of: router.isDockHidden) { _, hidden in
             // Retour de conversation : le dock réapparaît toujours déployé
@@ -484,6 +672,37 @@ struct MainTabView: View {
 #endif
     }
 
+    private var speedtestTab: some View {
+        NavigationStack {
+            SpeedtestView(guestMode: user == nil)
+                .toolbar {
+                    if user == nil {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Mes reçus") { showGuestReceipts = true }
+                        }
+                    }
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var communityTab: some View {
+        if user != nil {
+            NavigationStack { FeedView(service: services.feed, location: services.location) }
+        } else {
+            LoginView()
+        }
+    }
+
+    @ViewBuilder
+    private var profileTab: some View {
+        if let user {
+            NavigationStack { ProfileView(user: user) }
+        } else {
+            LoginView()
+        }
+    }
+
     // MARK: Tab bar Liquid Glass native (iOS 26+)
 
     @available(iOS 26.0, *)
@@ -507,19 +726,19 @@ struct MainTabView: View {
                 .tabItem { Label("Carte", systemImage: "map") }
                 .tag(AppRouter.AppTab.map)
 
-            NavigationStack { SpeedtestView() }
+            speedtestTab
                 .tabItem { Label("Tester", systemImage: "speedometer") }
                 .tag(AppRouter.AppTab.speed)
 
-            NavigationStack { FeedView(service: services.feed, location: services.location) }
+            communityTab
                 // La conversation pose isDockHidden : on masque aussi la barre
                 // système pour laisser le composer prendre le bas de l'écran.
                 .toolbar(router.isDockHidden ? .hidden : .automatic, for: .tabBar)
                 .tabItem { Label("Communauté", systemImage: "person.2") }
                 .tag(AppRouter.AppTab.community)
-                .badge(services.unreadConversations)
+                .badge(user == nil ? 0 : services.unreadConversations)
 
-            NavigationStack { ProfileView(user: user) }
+            profileTab
             .tabItem { Label("Profil", systemImage: "person.crop.circle") }
             .tag(AppRouter.AppTab.profile)
         }
@@ -554,15 +773,15 @@ struct MainTabView: View {
             }
                 .tag(AppRouter.AppTab.map)
 
-            NavigationStack { SpeedtestView().toolbar(.hidden, for: .tabBar) }
+            speedtestTab.toolbar(.hidden, for: .tabBar)
                 .sqDockSafeArea()
                 .tag(AppRouter.AppTab.speed)
 
-            NavigationStack { FeedView(service: services.feed, location: services.location).toolbar(.hidden, for: .tabBar) }
+            communityTab.toolbar(.hidden, for: .tabBar)
                 .sqDockSafeArea(!router.isDockHidden)
                 .tag(AppRouter.AppTab.community)
 
-            NavigationStack { ProfileView(user: user).toolbar(.hidden, for: .tabBar) }
+            profileTab.toolbar(.hidden, for: .tabBar)
             .sqDockSafeArea()
             .tag(AppRouter.AppTab.profile)
         }
@@ -574,7 +793,7 @@ struct MainTabView: View {
             if !router.isDockHidden {
                 SQDock(
                     selection: $router.selectedTab,
-                    communityBadge: services.unreadConversations,
+                    communityBadge: user == nil ? 0 : services.unreadConversations,
                     minimized: router.isDockMinimized,
                     onExpand: {
                         withAnimation(SQMotion.snappy) { router.isDockMinimized = false }

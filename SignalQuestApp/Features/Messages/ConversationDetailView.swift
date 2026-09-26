@@ -39,6 +39,7 @@ struct ConversationDetailView: View {
     @State private var errorMessage: String?
     @State private var isSending = false
     @State private var showUnlockSheet = false
+    @State private var showE2EECallUnavailable = false
     @State private var syncTask: Task<Void, Never>?
     @State private var isE2EEUnlocked = false
     @State private var decryptedMessages: [String: String] = [:]
@@ -346,7 +347,8 @@ struct ConversationDetailView: View {
         // Commentaires d'une publication partagée — même sheet que le feed ;
         // au retour, l'embed est rafraîchi (compteur de commentaires).
         .sheet(item: $sharedPostComments, onDismiss: { refreshSharedPostAfterSheet() }) { target in
-            CommentsSheet(service: services.comments, postId: target.backendPostId)
+            CommentsSheet(service: services.comments, postId: target.backendPostId,
+                          profileService: services.feed)
         }
         // Publication complète (réutilise PostDetailView du feed par composition).
         .sheet(item: $sharedPostDetail, onDismiss: { refreshSharedPostAfterSheet() }) { target in
@@ -354,6 +356,7 @@ struct ConversationDetailView: View {
                 PostDetailView(
                     item: target.item,
                     feedService: services.feed,
+                    messagesService: services.messages,
                     commentsService: services.comments,
                     reportsService: services.reports
                 )
@@ -459,24 +462,40 @@ struct ConversationDetailView: View {
             // CALL-SCOPE-17 : kill-switch de repli — masque toute initiation
             // d'appel quand SQFeatures.callsEnabled est false.
             if SQFeatures.callsEnabled {
-                Menu {
-                    Button { startCall(mode: "audio") } label: {
-                        Label("Appel audio", systemImage: "phone.fill")
+                if e2eeCallReady {
+                    Menu {
+                        Button { startCall(mode: "audio") } label: {
+                            Label("Appel audio", systemImage: "phone.fill")
+                        }
+                        Button { startCall(mode: "video") } label: {
+                            Label("Appel vidéo", systemImage: "video.fill")
+                        }
+                    } label: {
+                        Image(systemName: "phone")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(networkPath.isOnline ? SQColor.label : SQColor.labelTertiary)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
-                    Button { startCall(mode: "video") } label: {
-                        Label("Appel vidéo", systemImage: "video.fill")
-                    }
-                } label: {
                     // CALL-OFFLINE-21 : grisé + désactivé hors-ligne (un appel
                     // lancé sans réseau échouerait et ferait flasher l'écran).
-                    Image(systemName: "phone")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(networkPath.isOnline ? SQColor.label : SQColor.labelTertiary)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                    .disabled(!networkPath.isOnline)
+                    .accessibilityLabel("Appeler")
+                } else {
+                    Button { showE2EECallUnavailable = true } label: {
+                        Image(systemName: "phone")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(SQColor.labelTertiary)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Appels chiffrés indisponibles pour cette conversation")
+                    .alert("Appels chiffrés indisponibles pour cette conversation", isPresented: $showE2EECallUnavailable) {
+                        Button("OK", role: .cancel) {}
+                    } message: {
+                        Text("Cet appel n’est pas encore disponible pour une conversation chiffrée. Aucun appel moins protégé ne sera lancé.")
+                    }
                 }
-                .disabled(!networkPath.isOnline)
-                .accessibilityLabel("Appeler")
             }
 
             Menu {
@@ -2135,6 +2154,14 @@ struct ConversationDetailView: View {
             displayName: conversationTitle,
             requiresE2EE: isE2EE
         )
+    }
+
+    private var e2eeCallReady: Bool {
+        guard isE2EE else { return true }
+        if case .prepared = E2EEV2CallBridge.prepareRuntimeRequest(conversationId: conversation.id) {
+            return true
+        }
+        return false
     }
 
     private var otherParticipantId: String? {

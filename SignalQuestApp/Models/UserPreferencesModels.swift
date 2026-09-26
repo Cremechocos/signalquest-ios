@@ -32,11 +32,13 @@ struct UserPreferences: Codable, Equatable, Sendable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        unitsSystem = c.decodeFlexibleString(forKey: .unitsSystem)
-            .flatMap(SQUnitsSystem.init(rawValue:)) ?? .metric
-        defaultMarket = c.decodeFlexibleString(forKey: .defaultMarket)
-        showHandleOnLeaderboard = (try? c.decodeIfPresent(Bool.self, forKey: .showHandleOnLeaderboard)) ?? false
-        showHypothesisSystem = (try? c.decodeIfPresent(Bool.self, forKey: .showHypothesisSystem)) ?? true
+        // Les champs du contrat courant sont requis : une réponse malformée
+        // ne doit pas autoriser des écritures à partir de valeurs inventées.
+        unitsSystem = try c.decode(SQUnitsSystem.self, forKey: .unitsSystem)
+        defaultMarket = try c.decodeIfPresent(String.self, forKey: .defaultMarket)
+        showHandleOnLeaderboard = try c.decode(Bool.self, forKey: .showHandleOnLeaderboard)
+        // Facultatif dans les anciennes réponses, mais strict si présent.
+        showHypothesisSystem = try c.decodeIfPresent(Bool.self, forKey: .showHypothesisSystem) ?? true
     }
 }
 
@@ -60,6 +62,21 @@ struct PrivacyZone: Codable, Identifiable, Equatable, Sendable {
     var visitCount: Int?
     var isAutoDetected: Bool
 
+    init(id: String, name: String, type: String? = "custom", latitude: Double? = nil,
+         longitude: Double? = nil, radius: Double? = nil, isActive: Bool = true,
+         hideSpeedtestsOnMap: Bool = true, visitCount: Int? = nil, isAutoDetected: Bool = false) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.latitude = latitude
+        self.longitude = longitude
+        self.radius = radius
+        self.isActive = isActive
+        self.hideSpeedtestsOnMap = hideSpeedtestsOnMap
+        self.visitCount = visitCount
+        self.isAutoDetected = isAutoDetected
+    }
+
     enum CodingKeys: String, CodingKey {
         case id, name, type, latitude, longitude, radius, isActive
         case hideSpeedtestsOnMap, visitCount, isAutoDetected
@@ -67,14 +84,17 @@ struct PrivacyZone: Codable, Identifiable, Equatable, Sendable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = c.decodeFlexibleString(forKey: .id) ?? UUID().uuidString
-        name = c.decodeFlexibleString(forKey: .name) ?? String(localized: "Zone")
+        id = try c.decode(String.self, forKey: .id)
+        guard !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw DecodingError.dataCorruptedError(forKey: .id, in: c, debugDescription: "Missing private zone identifier")
+        }
+        name = try c.decode(String.self, forKey: .name)
         type = c.decodeFlexibleString(forKey: .type)
-        latitude = try? c.decodeIfPresent(Double.self, forKey: .latitude)
-        longitude = try? c.decodeIfPresent(Double.self, forKey: .longitude)
-        radius = try? c.decodeIfPresent(Double.self, forKey: .radius)
-        isActive = (try? c.decodeIfPresent(Bool.self, forKey: .isActive)) ?? true
-        hideSpeedtestsOnMap = (try? c.decodeIfPresent(Bool.self, forKey: .hideSpeedtestsOnMap)) ?? false
+        latitude = try c.decodeIfPresent(Double.self, forKey: .latitude)
+        longitude = try c.decodeIfPresent(Double.self, forKey: .longitude)
+        radius = try c.decodeIfPresent(Double.self, forKey: .radius)
+        isActive = try c.decode(Bool.self, forKey: .isActive)
+        hideSpeedtestsOnMap = try c.decode(Bool.self, forKey: .hideSpeedtestsOnMap)
         visitCount = try? c.decodeIfPresent(Int.self, forKey: .visitCount)
         isAutoDetected = (try? c.decodeIfPresent(Bool.self, forKey: .isAutoDetected)) ?? false
     }
@@ -84,7 +104,7 @@ struct PrivacyZone: Codable, Identifiable, Equatable, Sendable {
         var parts: [String] = []
         if let radius { parts.append(SQUnits.radius(meters: radius)) }
         if let visitCount, visitCount > 0 {
-            parts.append(visitCount <= 1 ? "\(visitCount) visite" : "\(visitCount) visites")
+            parts.append(visitCount <= 1 ? String(localized: "\(visitCount) visite") : String(localized: "\(visitCount) visites"))
         }
         if isAutoDetected { parts.append(String(localized: "détectée")) }
         return parts.joined(separator: " · ")
@@ -94,6 +114,8 @@ struct PrivacyZone: Codable, Identifiable, Equatable, Sendable {
         switch (type ?? "").lowercased() {
         case "home": return String(localized: "Domicile")
         case "work": return String(localized: "Travail")
+        case "school": return String(localized: "École")
+        case "frequent": return String(localized: "Lieu fréquent")
         default: return String(localized: "Personnalisée")
         }
     }
@@ -102,6 +124,8 @@ struct PrivacyZone: Codable, Identifiable, Equatable, Sendable {
         switch (type ?? "").lowercased() {
         case "home": return "house.fill"
         case "work": return "briefcase.fill"
+        case "school": return "building.2.fill"
+        case "frequent": return "mappin.and.ellipse"
         default: return "mappin.circle.fill"
         }
     }
@@ -114,6 +138,35 @@ struct PrivacyZonesResponse: Decodable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        zones = c.decodeLossyArray([PrivacyZone].self, forKey: .zones)
+        // Une réponse illisible n'est pas une liste vide : conserver le dernier
+        // état valide de l'écran au lieu d'annoncer une absence de protection.
+        zones = try c.decode([PrivacyZone].self, forKey: .zones)
+        guard Set(zones.map(\.id)).count == zones.count else {
+            throw DecodingError.dataCorruptedError(forKey: .zones, in: c, debugDescription: "Duplicate private zone identifiers")
+        }
     }
+}
+
+struct PrivacyZoneResponse: Decodable, Sendable {
+    let zone: PrivacyZone
+}
+
+struct CreatePrivacyZoneRequest: Encodable, Sendable {
+    let name: String
+    let type: String
+    let latitude: Double
+    let longitude: Double
+    let radius: Double
+    let hideSpeedtestsOnMap: Bool
+}
+
+struct UpdatePrivacyZoneRequest: Encodable, Sendable {
+    let id: String
+    var name: String? = nil
+    var type: String? = nil
+    var latitude: Double? = nil
+    var longitude: Double? = nil
+    var radius: Double? = nil
+    var isActive: Bool? = nil
+    var hideSpeedtestsOnMap: Bool? = nil
 }

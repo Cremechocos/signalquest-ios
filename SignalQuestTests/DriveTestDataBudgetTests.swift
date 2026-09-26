@@ -81,4 +81,37 @@ final class DriveTestDataBudgetTests: XCTestCase {
         XCTAssertNotEqual(small, large)
         XCTAssertFalse(DriveTestViewModel.formattedBytes(-1).isEmpty, "Un volume négatif ne doit pas produire du vide")
     }
+
+    func testMovingDeviceDoesNotRelocateTheMeasuredSpeedtest() throws {
+        let measuredFix = Coordinates(latitude: 48.8566, longitude: 2.3522,
+            accuracy: 8, observedAt: Date(timeIntervalSince1970: 1_790_000_000))
+        let laterFix = Coordinates(latitude: 48.8666, longitude: 2.3622)
+        let result = SpeedtestRunResult(label: "Drive Test", downloadMbps: 80,
+            downloadAverageMbps: 80, downloadMaxMbps: 90, durationSeconds: 10,
+            connectionType: .cellular, coordinate: measuredFix)
+            .withDriveTestContext(runID: UUID())
+
+        let point = try XCTUnwrap(DriveSpeedtestPoint(result: result))
+        let payload = SpeedtestSubmission.iosPayload(from: result, streams: 4, deviceModel: "iPhone")
+        XCTAssertEqual(point.id, result.id)
+        XCTAssertEqual(point.coordinate.latitude, measuredFix.latitude)
+        XCTAssertEqual(point.coordinate.longitude, measuredFix.longitude)
+        XCTAssertEqual(payload.coordinates, measuredFix)
+        XCTAssertNotEqual(point.coordinate.latitude, laterFix.latitude)
+        XCTAssertEqual(point.result.coordinate, result.coordinate)
+        XCTAssertEqual(point.result.runOrigin, "drive_test")
+
+        let restored = try JSONDecoder().decode(SpeedtestRunResult.self, from: JSONEncoder().encode(result))
+        XCTAssertEqual(restored.coordinate?.latitude, point.coordinate.latitude)
+        XCTAssertEqual(restored.coordinate?.longitude, point.coordinate.longitude)
+        XCTAssertEqual(SpeedtestSubmission.iosPayload(from: restored, streams: 4,
+            deviceModel: "iPhone").coordinates, restored.coordinate)
+    }
+
+    func testUnlocatedSpeedtestCreatesNoMapPoint() {
+        let result = SpeedtestRunResult(label: "Drive Test", downloadMbps: 80,
+            downloadAverageMbps: 80, downloadMaxMbps: 90, durationSeconds: 10,
+            connectionType: .cellular)
+        XCTAssertNil(DriveSpeedtestPoint(result: result))
+    }
 }

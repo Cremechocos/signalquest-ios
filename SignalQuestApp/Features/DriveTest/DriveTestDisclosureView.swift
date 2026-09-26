@@ -1,20 +1,10 @@
 import SwiftUI
 
-/// Information affichée UNE FOIS avant le tout premier Drive Test.
-///
-/// Un Drive Test publie systématiquement : c'est sa raison d'être, et lui greffer
-/// un interrupteur reviendrait à proposer un mode « contribuer sans contribuer ».
-/// Mais publier une trace de déplacement sans aucun contrôle impose au minimum
-/// d'en informer clairement — c'est ce que regardent la revue App Store
-/// (guideline 5.1.1) et le RGPD (art. 13).
-///
-/// Ce n'est donc PAS un consentement : il n'y a rien à accepter ni à refuser, un
-/// seul bouton. Le texte doit dire la vérité sans l'euphémiser, y compris la
-/// précision réelle publiée — un écran rassurant mais faux serait pire que pas
-/// d'écran du tout.
+/// Présente le Drive Test recentré sur les mesures de débit, leur publication
+/// et la conservation sans envoi des anciens brouillons de couverture.
 struct DriveTestDisclosureView: View {
     /// Vu au moins une fois : l'écran ne réapparaît plus.
-    static let seenKey = "drivetest_disclosure_seen"
+    static let seenKey = "drivetest_speedtests_disclosure_seen_v2"
 
     let onAcknowledge: () -> Void
 
@@ -32,7 +22,7 @@ struct DriveTestDisclosureView: View {
                         Text("Ce qu'un Drive Test partage")
                             .font(SQType.title)
                             .foregroundStyle(SQColor.label)
-                        Text("Un Drive Test sert à cartographier le réseau. Ce que tu enregistres est publié sur la carte communautaire — c'est le principe, il n'y a pas de réglage pour l'en empêcher.")
+                        Text("Le Drive Test enchaîne des tests de débit pendant ton trajet, selon la distance et le plafond de données choisis.")
                             .font(SQFont.body(14))
                             .foregroundStyle(SQColor.labelSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -41,13 +31,13 @@ struct DriveTestDisclosureView: View {
                     VStack(alignment: .leading, spacing: SQSpace.md) {
                         row(
                             icon: "antenna.radiowaves.left.and.right",
-                            title: "La génération, pas le signal",
-                            detail: "iOS ne donne accès à aucune mesure radio. On enregistre la technologie disponible le long du trajet (5G, 4G, ou aucun réseau), jamais une puissance de signal."
+                            title: "Des résultats, sans collecte de couverture",
+                            detail: "Chaque speedtest garde ses débits, sa latence et sa position. Le suivi du trajet sert à espacer les tests ; aucun enregistrement de couverture n’est créé."
                         )
                         row(
                             icon: "mappin.and.ellipse",
-                            title: "Une position arrondie à environ 50 mètres",
-                            detail: "Ta position exacte n'est jamais publiée : chaque point est ramené sur une grille d'environ 50 m. Cela reste un déplacement identifiable à l'échelle du pâté de maisons — garde-le en tête avant de partir de chez toi."
+                            title: "La position exacte de chaque speedtest",
+                            detail: "Les nouveaux speedtests éligibles sont publiés à leur position exacte. Tes zones privées restent protégées ; tu peux masquer un résultat depuis ton historique."
                         )
                         row(
                             icon: "speedometer",
@@ -57,9 +47,12 @@ struct DriveTestDisclosureView: View {
                         row(
                             icon: "lock.shield",
                             title: "Jamais sous VPN",
-                            detail: "Sous tunnel, l'opérateur détecté est celui de la sortie du VPN : la mesure serait attribuée au mauvais réseau. Rien n'est alors ni enregistré ni publié."
+                            detail: "Un VPN empêche une attribution fiable de l’opérateur. Les mesures sous VPN ne sont pas publiées."
                         )
                     }
+
+                    Text("Les anciens brouillons de couverture restent sur cet appareil et ne sont plus envoyés automatiquement.")
+                        .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
 
                     GradientButton("J'ai compris", systemImage: "checkmark") {
                         UserDefaults.standard.set(true, forKey: Self.seenKey)

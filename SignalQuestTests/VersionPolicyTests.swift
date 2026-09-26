@@ -49,6 +49,16 @@ final class VersionPolicyTests: XCTestCase {
         XCTAssertEqual(state, .upToDate)
     }
 
+    func testTestFlight156Blocks155ButAdmits156WithAnUpdateLink() {
+        let invite = URL(string: "https://testflight.apple.com/join/UpU2vwtH")!
+        let rollout = policy(min: 156, recommended: 156, block: nil, store: invite)
+        XCTAssertEqual(
+            VersionPolicyService.evaluate(policy: rollout, currentBuild: 155),
+            .updateRequired(message: nil, storeURL: invite)
+        )
+        XCTAssertEqual(VersionPolicyService.evaluate(policy: rollout, currentBuild: 156), .upToDate)
+    }
+
     // MARK: - Garde-fous : aucune politique douteuse ne doit bloquer
 
     func testIncoherentPolicyIsIgnored() {

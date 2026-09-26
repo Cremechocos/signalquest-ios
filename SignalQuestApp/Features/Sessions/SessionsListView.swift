@@ -20,8 +20,9 @@ final class SessionsListViewModel: ObservableObject {
         }
     }
 
-    let service: SessionsServicing
+    private let loadPage: @MainActor (Int, Int) async throws -> SessionsListResponse
     private var offset = 0
+    private var requestGeneration = UUID()
     /// Quinze, pas trente.
     ///
     /// Le serveur charge TOUS les points de TOUTES les sessions de la page pour
@@ -32,7 +33,15 @@ final class SessionsListViewModel: ObservableObject {
     /// charge la suite pendant qu'on lit.
     private let pageSize = 15
 
-    init(service: SessionsServicing) { self.service = service }
+    init(service: SessionsServicing) {
+        loadPage = { offset, limit in
+            try await service.sessions(offset: offset, limit: limit, mapPoints: false)
+        }
+    }
+
+    init(loadPage: @escaping @MainActor (Int, Int) async throws -> SessionsListResponse) {
+        self.loadPage = loadPage
+    }
 
     var filtered: [CoverageSession] {
         switch filter {
@@ -42,31 +51,46 @@ final class SessionsListViewModel: ObservableObject {
         }
     }
 
+    var isExhaustedEmpty: Bool {
+        filtered.isEmpty && !isLoading && !hasMore && errorMessage == nil
+    }
+
     func reload() async {
+        let generation = UUID()
+        requestGeneration = generation
         offset = 0
+        hasMore = false
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer { if requestGeneration == generation { isLoading = false } }
         do {
-            let page = try await service.sessions(offset: 0, limit: pageSize)
+            let page = try await loadPage(0, pageSize)
+            guard requestGeneration == generation else { return }
             sessions = page.sessions
-            hasMore = page.pagination?.hasMore ?? (page.sessions.count >= pageSize)
+            hasMore = !page.sessions.isEmpty && (page.pagination?.hasMore ?? (page.sessions.count >= pageSize))
             offset = page.sessions.count
         } catch {
+            guard requestGeneration == generation else { return }
             if !error.isCancellation { errorMessage = error.localizedDescription }
         }
     }
 
     func loadMore() async {
         guard hasMore, !isLoading else { return }
+        let generation = requestGeneration
+        let requestedOffset = offset
         isLoading = true
-        defer { isLoading = false }
+        errorMessage = nil
+        defer { if requestGeneration == generation { isLoading = false } }
         do {
-            let page = try await service.sessions(offset: offset, limit: pageSize)
-            sessions.append(contentsOf: page.sessions)
-            hasMore = page.pagination?.hasMore ?? (page.sessions.count >= pageSize)
+            let page = try await loadPage(requestedOffset, pageSize)
+            guard requestGeneration == generation else { return }
+            var seen = Set(sessions.map(\.id))
+            sessions.append(contentsOf: page.sessions.filter { seen.insert($0.id).inserted })
+            hasMore = !page.sessions.isEmpty && (page.pagination?.hasMore ?? (page.sessions.count >= pageSize))
             offset += page.sessions.count
         } catch {
+            guard requestGeneration == generation else { return }
             if !error.isCancellation { errorMessage = error.localizedDescription }
         }
     }
@@ -91,10 +115,12 @@ struct SessionsListView: View {
                 .padding(.horizontal, -SQSpace.lg)
                 .padding(.bottom, SQSpace.xs)
 
-                if model.filtered.isEmpty && !model.isLoading {
+                if model.isExhaustedEmpty {
                     EmptyStateView(
                         title: "Aucune session",
-                        message: "Tes sessions enregistrées (drive-test, couverture) — y compris depuis Android — apparaîtront ici.",
+                        message: model.sessions.isEmpty
+                            ? "Tes sessions enregistrées (drive-test, couverture) — y compris depuis Android — apparaîtront ici."
+                            : "Aucune session ne correspond à ce filtre dans l’historique complet.",
                         systemImage: "point.topleft.down.curvedto.point.bottomright.up"
                     )
                 } else {
@@ -107,9 +133,19 @@ struct SessionsListView: View {
                         .buttonStyle(SQPressButtonStyle())
                     }
                     if model.hasMore {
-                        HStack { Spacer(); ProgressView().tint(SQColor.brandRed); Spacer() }
-                            .padding(.vertical, SQSpace.md)
-                            .task { await model.loadMore() }
+                        if model.isLoading {
+                            HStack { Spacer(); ProgressView().tint(SQColor.brandRed); Spacer() }
+                                .padding(.vertical, SQSpace.md)
+                        } else if model.filtered.isEmpty || model.errorMessage != nil {
+                            GradientButton("Charger la suite", style: .secondary) {
+                                Task { await model.loadMore() }
+                            }
+                                .accessibilityIdentifier("sessions.loadMore")
+                        } else {
+                            HStack { Spacer(); ProgressView().tint(SQColor.brandRed); Spacer() }
+                                .padding(.vertical, SQSpace.md)
+                                .task { await model.loadMore() }
+                        }
                     }
                 }
 
@@ -118,6 +154,11 @@ struct SessionsListView: View {
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.warning)
                         .padding(.horizontal, SQSpace.xs)
+                    if !model.hasMore {
+                        GradientButton("Réessayer", style: .secondary) {
+                            Task { await model.reload() }
+                        }
+                    }
                 }
             }
             .padding(.horizontal, SQSpace.lg)

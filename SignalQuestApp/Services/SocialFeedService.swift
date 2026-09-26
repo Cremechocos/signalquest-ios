@@ -178,7 +178,7 @@ final class SocialFeedService: SocialFeedServicing {
         ]
         if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
         if let hashtag, !hashtag.isEmpty { query.append(URLQueryItem(name: "hashtag", value: hashtag)) }
-        return try await api.request(APIEndpoint(path: "/api/social/feed", query: query), as: SocialFeedPage.self)
+        return try await api.request(APIEndpoint(path: "/api/social/feed", query: query, responseDeadline: .seconds(30)), as: SocialFeedPage.self)
     }
 
     func post(id: String) async throws -> UnifiedSocialFeedItem? {
@@ -357,11 +357,26 @@ final class SocialFeedService: SocialFeedServicing {
             poll: record.request.poll,
             clientRequestId: record.clientRequestId
         )
-        let response: CreatePostResponse = try await api.requestJSON(
-            "/api/social/v2/posts",
-            body: request,
-            idempotencyKey: record.clientRequestId
-        )
+        let response: CreatePostResponse
+        do {
+            response = try await api.requestJSON(
+                "/api/social/v2/posts",
+                body: request,
+                idempotencyKey: record.clientRequestId
+            )
+        } catch let error as APIError {
+            if case .http(403, "EMAIL_NOT_VERIFIED", _, _, _) = error {
+                // Refus métier avant création : le texte reste dans le brouillon
+                // du composer. Rejouer cet outbox automatiquement après la
+                // confirmation publierait sans geste explicite, puis un second
+                // tap sur Publier ferait un doublon.
+                try await postOutbox.acknowledge(
+                    session: session,
+                    clientRequestId: record.clientRequestId
+                )
+            }
+            throw error
+        }
         try await postOutbox.acknowledge(
             session: session,
             clientRequestId: record.clientRequestId

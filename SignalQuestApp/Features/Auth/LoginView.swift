@@ -2,18 +2,25 @@ import SwiftUI
 import AuthenticationServices
 
 struct LoginView: View {
+    let onContinueAsGuest: (() -> Void)?
+
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var onboardingEntry: OnboardingEntryState
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var email = ""
     @State private var password = ""
     @State private var code = ""
     @State private var showSignup = false
     @State private var showForgotPassword = false
-    @State private var showGuestMap = false
-    @State private var showGuestSpeedtest = false
     @State private var appeared = false
+
+    init(onContinueAsGuest: (() -> Void)? = nil) {
+        self.onContinueAsGuest = onContinueAsGuest
+    }
 
     var body: some View {
         NavigationStack {
@@ -21,6 +28,16 @@ struct LoginView: View {
                 VStack(alignment: .leading, spacing: SQSpace.xxl) {
                     header
                         .sqAuthAppear(appeared)
+
+                    if !isTwoFactor, let onContinueAsGuest {
+                        Button("Continuer sans compte", action: onContinueAsGuest)
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .disabled(session.isBusy)
+                            .accessibilityIdentifier("login.continueGuest")
+                            .sqAuthAppear(appeared, delay: 0.11)
+                    }
 
                     VStack(alignment: .leading, spacing: SQSpace.lg) {
                         Text(isTwoFactor ? "Validation 2FA" : "Connexion")
@@ -32,12 +49,17 @@ struct LoginView: View {
                                 .font(SQType.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
-                            TextField("Code à 6 chiffres", text: $code)
-                                .textContentType(.oneTimeCode)
-                                .keyboardType(.numberPad)
-                                .font(SQFont.display(28, .bold))
-                                .multilineTextAlignment(.center)
-                                .textFieldStyle(SQTextFieldStyle())
+                            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                                SQFormFieldLabel("Code à 6 chiffres")
+                                TextField("Code à 6 chiffres", text: $code,
+                                          prompt: SQFormPrompt.text("Code à 6 chiffres"))
+                                    .textContentType(.oneTimeCode)
+                                    .keyboardType(.numberPad)
+                                    .font(SQFont.display(28, .bold))
+                                    .multilineTextAlignment(.center)
+                                    .textFieldStyle(SQTextFieldStyle())
+                                    .accessibilityLabel("Code à 6 chiffres")
+                            }
                             GradientButton("Valider le code", systemImage: "checkmark.shield", isBusy: session.isBusy) {
                                 Task { await session.verify2FA(code: code) }
                             }
@@ -46,27 +68,29 @@ struct LoginView: View {
                                 .foregroundStyle(SQColor.brandRed)
                                 .frame(maxWidth: .infinity)
                         } else {
-                            TextField("Email", text: $email)
-                                .textInputAutocapitalization(.never)
-                                .keyboardType(.emailAddress)
-                                .textContentType(.username)
-                                .textFieldStyle(SQTextFieldStyle())
-                            SecureField("Mot de passe", text: $password)
-                                .textContentType(.password)
-                                .textFieldStyle(SQTextFieldStyle())
+                            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                                SQFormFieldLabel("Email")
+                                TextField("Email", text: $email, prompt: SQFormPrompt.text("Email"))
+                                    .textInputAutocapitalization(.never)
+                                    .keyboardType(.emailAddress)
+                                    .textContentType(.username)
+                                    .textFieldStyle(SQTextFieldStyle())
+                                    .accessibilityLabel("Email")
+                            }
+                            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                                SQFormFieldLabel("Mot de passe")
+                                SecureField("Mot de passe", text: $password,
+                                            prompt: SQFormPrompt.text("Mot de passe"))
+                                    .textContentType(.password)
+                                    .textFieldStyle(SQTextFieldStyle())
+                                    .accessibilityLabel("Mot de passe")
+                            }
                             GradientButton("Se connecter", systemImage: "arrow.right.circle", isBusy: session.isBusy) {
                                 Task { await session.login(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password) }
                             }
+                            .accessibilityIdentifier("login.submit")
 
-                            HStack {
-                                Button("Mot de passe oublié ?") { showForgotPassword = true }
-                                    .font(SQType.caption)
-                                    .foregroundStyle(SQColor.brandRed)
-                                Spacer()
-                                Button("Créer un compte") { showSignup = true }
-                                    .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
-                                    .foregroundStyle(SQColor.brandRed)
-                            }
+                            accountActions
                         }
 
                         if let error = session.errorMessage {
@@ -93,56 +117,97 @@ struct LoginView: View {
                         .sqAuthAppear(appeared, delay: 0.10)
                     }
 
-                    GradientButton(String(localized: "Explorer sans compte"), systemImage: "map", style: .secondary) {
-                        showGuestMap = true
-                    }
-                    .accessibilityLabel("Explorer la carte sans compte")
-                    .accessibilityIdentifier("login.guestMap")
-                    .sqAuthAppear(appeared, delay: 0.11)
-
-                    GradientButton(String(localized: "Tester sans compte"), systemImage: "speedometer", style: .secondary) {
-                        showGuestSpeedtest = true
-                    }
-                    .accessibilityLabel("Lancer un speedtest sans compte")
-                    .sqAuthAppear(appeared, delay: 0.12)
-
                     legalFooter
                         .sqAuthAppear(appeared, delay: 0.14)
                 }
                 .padding(SQSpace.xl)
+                .frame(maxWidth: 600)
+                .frame(maxWidth: .infinity)
             }
             .signalQuestHeroBackground()
-            .onAppear { appeared = true }
+            .onAppear {
+                appeared = true
+            }
             .sheet(isPresented: $showSignup) {
                 NavigationStack { SignupView() }
             }
             .sheet(isPresented: $showForgotPassword) {
                 NavigationStack { ForgotPasswordView() }
             }
-            .fullScreenCover(isPresented: $showGuestMap) {
-                GuestMapPreview()
-                    .environmentObject(services)
-                    .environmentObject(router)
-            }
-            .fullScreenCover(isPresented: $showGuestSpeedtest) {
-                GuestSpeedtestPreview()
-                    .environmentObject(services)
-            }
         }
     }
 
     /// Liens légaux discrets (FOCUS « lien légal sur login » — LOGIN-LEGAL-01),
     /// réutilisant les URLs centralisées d'AppConfig comme SignupView.
+    @ViewBuilder
+    private var accountActions: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                recoveryButton
+                signupButton
+            }
+        } else {
+            HStack {
+                recoveryButton
+                Spacer()
+                signupButton
+            }
+        }
+    }
+
+    private var recoveryButton: some View {
+        Button { showForgotPassword = true } label: {
+            Text("Mot de passe oublié ?")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.brandRed)
+                .frame(minHeight: 48)
+                .contentShape(Rectangle())
+        }
+            .accessibilityIdentifier("login.recovery")
+    }
+
+    private var signupButton: some View {
+        Button { showSignup = true } label: {
+            Text("Créer un compte")
+                .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
+                .foregroundStyle(SQColor.brandRed)
+                .frame(minHeight: 48)
+                .contentShape(Rectangle())
+        }
+            .accessibilityIdentifier("login.signup")
+    }
+
     private var legalFooter: some View {
-        HStack(spacing: SQSpace.xs) {
-            Link("Conditions d’utilisation", destination: AppConfig.current.termsURL)
-            Text("·").foregroundStyle(SQColor.labelSecondary)
-            Link("Confidentialité", destination: AppConfig.current.privacyURL)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: SQSpace.xs) {
+                    termsLink
+                    privacyLink
+                }
+            } else {
+                HStack(spacing: SQSpace.xs) {
+                    termsLink
+                    Text("·").foregroundStyle(SQColor.labelSecondary)
+                    privacyLink
+                }
+            }
         }
         .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
         .tint(SQColor.brandRed)
         .frame(maxWidth: .infinity)
         .padding(.top, SQSpace.sm)
+    }
+
+    private var termsLink: some View {
+        Link("Conditions d’utilisation", destination: AppConfig.current.termsURL)
+            .frame(minHeight: 48)
+            .accessibilityIdentifier("login.terms")
+    }
+
+    private var privacyLink: some View {
+        Link("Confidentialité", destination: AppConfig.current.privacyURL)
+            .frame(minHeight: 48)
+            .accessibilityIdentifier("login.privacy")
     }
 
     private var isTwoFactor: Bool {
@@ -199,123 +264,7 @@ struct LoginView: View {
     }
 }
 
-/// Mode découverte (ONB-USER-01) : la carte communautaire accessible SANS compte.
-/// Les actions contributives nécessitent une connexion (échec géré côté services).
-/// Hérite de `services`/`router` de l'environnement (injectés sur RootView).
-private struct GuestMapPreview: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    /// Le commentaire ci-dessus disait déjà que les services viennent de
-    /// l'environnement — mais `MapExplorerView()` s'appuyait sur ses valeurs par
-    /// défaut et construisait donc un SECOND graphe complet : autre `APIClient`,
-    /// autre `DiskCache` sur le même dossier, autre coalescing de refresh.
-    @EnvironmentObject private var services: AppServices
-    var body: some View {
-        NavigationStack {
-            MapExplorerView(
-                service: services.map,
-                antennas: services.antennas,
-                markets: services.markets,
-                communityOutages: services.communityOutages
-            )
-                // MapExplorerView masque volontairement sa navigation bar. Une
-                // safe-area dédiée garde donc les sorties invité visibles et
-                // accessibles, indépendamment de cette préférence interne.
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    guestNavigationControls
-                    .foregroundStyle(SQColor.brandRed)
-                    .padding(.horizontal, SQSpace.md)
-                    .frame(minHeight: 50)
-                    .background {
-                        Rectangle()
-                            .fill(SQColor.surfaceGlass)
-                            .background(.ultraThinMaterial)
-                            .ignoresSafeArea(edges: .top)
-                    }
-                    .overlay(alignment: .bottom) {
-                        Rectangle()
-                            .fill(SQColor.separator)
-                            .frame(height: 1 / UIScreen.main.scale)
-                    }
-                }
-        }
-    }
-
-    @ViewBuilder
-    private var guestNavigationControls: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            VStack(spacing: SQSpace.xs) {
-                guestTitle
-                HStack(spacing: SQSpace.md) {
-                    closeButton
-                    Spacer(minLength: SQSpace.sm)
-                    signInButton
-                }
-            }
-            .padding(.vertical, SQSpace.xs)
-        } else {
-            HStack(spacing: SQSpace.md) {
-                closeButton
-                Spacer(minLength: SQSpace.sm)
-                guestTitle
-                Spacer(minLength: SQSpace.sm)
-                signInButton
-            }
-        }
-    }
-
-    private var guestTitle: some View {
-        Text("Explorer")
-            .font(SQFont.archivo(16, .bold))
-            .foregroundStyle(SQColor.label)
-            .fixedSize(horizontal: true, vertical: false)
-            .accessibilityAddTraits(.isHeader)
-    }
-
-    private var closeButton: some View {
-        Button("Fermer") { dismiss() }
-            .font(SQFont.archivo(15, .semibold))
-            .fixedSize(horizontal: true, vertical: false)
-            .frame(minHeight: 44)
-    }
-
-    private var signInButton: some View {
-        Button("Se connecter") { dismiss() }
-            .font(SQFont.archivo(14, .bold))
-            .fixedSize(horizontal: true, vertical: false)
-            .frame(minHeight: 44)
-    }
-}
-
-/// Speedtest utilisable sans compte. Les choix de publication et de précision
-/// vivent uniquement pendant cette présentation et repartent à false ensuite.
-private struct GuestSpeedtestPreview: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var showReceipts = false
-
-    var body: some View {
-        NavigationStack {
-            SpeedtestView(guestMode: true)
-                .navigationTitle("Test invité")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Fermer") { dismiss() }.tint(SQColor.brandRed)
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Mes reçus") { showReceipts = true }
-                            .font(SQFont.archivo(14, .bold))
-                            .tint(SQColor.brandRed)
-                    }
-                }
-        }
-        .sheet(isPresented: $showReceipts) {
-            NavigationStack { GuestSpeedtestReceiptsView() }
-        }
-    }
-}
-
-private struct GuestSpeedtestReceiptsView: View {
+struct GuestSpeedtestReceiptsView: View {
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
     @State private var receipts: [GuestSpeedtestDeletionReceipt] = []
@@ -425,6 +374,7 @@ struct SQTextFieldStyle: TextFieldStyle {
             .frame(minHeight: 44)
             .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
             .foregroundStyle(SQColor.label)
+            .tint(SQColor.brandRed)
             .autocorrectionDisabled()
     }
 }

@@ -1,5 +1,33 @@
 import XCTest
+import StoreKit
 @testable import SignalQuest
+
+final class SubscriptionPriceCopyTests: XCTestCase {
+    func testEquivalentUsesActualRenewalPeriodAndStorefrontCurrency() throws {
+        let price = try XCTUnwrap(Decimal(string: "79.99"))
+        let monthly = try XCTUnwrap(SubscriptionPriceCopy.monthlyAmount(price: price, unit: .year, value: 1))
+        let euros = monthly.formatted(Decimal.FormatStyle.Currency(code: "EUR", locale: Locale(identifier: "fr_FR")))
+        let dollars = monthly.formatted(Decimal.FormatStyle.Currency(code: "USD", locale: Locale(identifier: "en_US")))
+        XCTAssertTrue(euros.contains("6,67") && euros.contains("€"), euros)
+        XCTAssertTrue(dollars.contains("6.67") && dollars.contains("$"), dollars)
+
+        let yen = try XCTUnwrap(SubscriptionPriceCopy.monthlyAmount(price: 12000, unit: .year, value: 1))
+            .formatted(Decimal.FormatStyle.Currency(code: "JPY", locale: Locale(identifier: "ja_JP")))
+        XCTAssertTrue(yen.contains("1,000") && !yen.contains(".00"), yen)
+    }
+
+    func testNoInventedMonthlyEquivalentOrWrongBillingPeriod() {
+        XCTAssertNil(SubscriptionPriceCopy.monthlyAmount(price: 3, unit: .month, value: 1))
+        XCTAssertNil(SubscriptionPriceCopy.monthlyAmount(price: 10, unit: .week, value: 1))
+        XCTAssertNil(SubscriptionPriceCopy.monthlyAmount(price: 10, unit: .year, value: 0))
+        XCTAssertEqual(SubscriptionPriceCopy.monthlyAmount(price: 30, unit: .month, value: 3), 10)
+        XCTAssertEqual(SubscriptionPriceCopy.monthlyAmount(price: 240, unit: .year, value: 2), 10)
+        XCTAssertTrue(SubscriptionPriceCopy.matchesSelection(.month, value: 1, selection: .monthly))
+        XCTAssertTrue(SubscriptionPriceCopy.matchesSelection(.year, value: 1, selection: .annual))
+        XCTAssertFalse(SubscriptionPriceCopy.matchesSelection(.year, value: 1, selection: .monthly))
+        XCTAssertFalse(SubscriptionPriceCopy.matchesSelection(.month, value: 3, selection: .annual))
+    }
+}
 
 final class EntitlementsTests: XCTestCase {
     func testProductCatalogContainsTheFourPlannedOffers() {
@@ -20,10 +48,6 @@ final class EntitlementsTests: XCTestCase {
             SignalQuestSubscriptionProduct.product(tier: .premium, period: .annual),
             .premiumAnnual
         )
-        XCTAssertEqual(SignalQuestSubscriptionProduct.basicMonthly.plannedDisplayPrice, "2,99 € / mois")
-        XCTAssertEqual(SignalQuestSubscriptionProduct.basicAnnual.plannedDisplayPrice, "29,99 € / an")
-        XCTAssertEqual(SignalQuestSubscriptionProduct.premiumMonthly.plannedDisplayPrice, "7,99 € / mois")
-        XCTAssertEqual(SignalQuestSubscriptionProduct.premiumAnnual.plannedDisplayPrice, "79,99 € / an")
     }
 
     func testBackendSnapshotKeepsStripeAsCanonicalSource() throws {

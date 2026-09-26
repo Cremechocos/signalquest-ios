@@ -15,7 +15,18 @@ enum OutageFeedScope: String, CaseIterable, Identifiable {
 
 @MainActor
 final class CommunityOutagesListViewModel: ObservableObject {
-    @Published var scope: OutageFeedScope = .all { didSet { Task { await reload() } } }
+    @Published var scope: OutageFeedScope = .all {
+        didSet {
+            guard scope != oldValue else { return }
+            contextRevision = UUID()
+            clearContext()
+            let requestedContext = context
+            Task {
+                guard requestedContext == context else { return }
+                await reload()
+            }
+        }
+    }
     @Published private(set) var outages: [CommunityOutage] = []
     @Published private(set) var isLoading = false
     @Published private(set) var isLoadingMore = false
@@ -31,6 +42,34 @@ final class CommunityOutagesListViewModel: ObservableObject {
     /// Chaque ligne a son propre `marketCode` : la page mélange les marchés, on ne peut donc pas
     /// se contenter du marché courant de la carte.
     private var registry: MarketRegistryPayload = .empty
+    private struct Context: Equatable {
+        let scope: OutageFeedScope
+        let owner: String
+        let session: LocalAccountSession?
+        let revision: UUID
+    }
+    private var contextRevision = UUID()
+    private var loadRevision = UUID()
+    private var closeRevision: UUID?
+    private var displayedContext: Context?
+    private var nextOffset = 0
+    private var context: Context {
+        Context(scope: scope, owner: LocalAccountScope.currentOwnerScopeId,
+                session: LocalAccountScope.sessionSnapshot(), revision: contextRevision)
+    }
+
+    private func clearContext() {
+        loadRevision = UUID(); closeRevision = nil
+        outages = []; nextOffset = 0; hasMore = false
+        isLoading = false; isLoadingMore = false; closingId = nil; errorMessage = nil
+    }
+
+    /// Leaving invalidates reads and mutation feedback without discarding a
+    /// compatible list. Returning refreshes that list through a new request.
+    func stop() {
+        loadRevision = UUID(); contextRevision = UUID(); closeRevision = nil
+        isLoading = false; isLoadingMore = false; closingId = nil
+    }
 
     init(service: CommunityOutageServicing, markets: MarketRegistryServicing) {
         self.service = service
@@ -46,14 +85,24 @@ final class CommunityOutagesListViewModel: ObservableObject {
     }
 
     func reload() async {
+        let requestedContext = context
+        if let displayedContext, displayedContext.owner != requestedContext.owner
+            || displayedContext.session != requestedContext.session { clearContext() }
+        let request = UUID()
+        loadRevision = request
         isLoading = true
+        isLoadingMore = false
         errorMessage = nil
-        defer { isLoading = false }
+        defer { if context == requestedContext && loadRevision == request { isLoading = false } }
         // Le registre AVANT la page : sinon la première liste s'affiche avec les clés brutes,
         // puis se réécrit sous les yeux. `registry()` ne lève jamais et sert son cache mémoire
         // dès le deuxième appel.
-        if registry.markets.isEmpty { registry = await markets.registry() }
-        await fetch(offset: 0, replacing: true)
+        if registry.markets.isEmpty {
+            let loaded = await markets.registry()
+            guard context == requestedContext, loadRevision == request, !Task.isCancelled else { return }
+            registry = loaded
+        }
+        await fetch(offset: 0, replacing: true, context: requestedContext, request: request)
     }
 
     func loadMoreIfNeeded(after outage: CommunityOutage) async {
@@ -61,9 +110,11 @@ final class CommunityOutagesListViewModel: ObservableObject {
         // On déclenche sur l'avant-dernière ligne : attendre la dernière ferait apparaître le
         // chargement APRÈS que le doigt a atteint le bas, ce qui se lit comme une saccade.
         guard outages.suffix(2).contains(where: { $0.id == outage.id }) else { return }
+        let requestedContext = context, request = loadRevision
+        guard displayedContext == requestedContext else { return }
         isLoadingMore = true
-        defer { isLoadingMore = false }
-        await fetch(offset: outages.count, replacing: false)
+        defer { if context == requestedContext && loadRevision == request { isLoadingMore = false } }
+        await fetch(offset: nextOffset, replacing: false, context: requestedContext, request: request)
     }
 
     /// Confirme ou dément depuis la liste.
@@ -71,6 +122,7 @@ final class CommunityOutagesListViewModel: ObservableObject {
     /// Recharge plutôt que de retoucher la ligne : un vote peut faire basculer l'état de la panne
     /// — et donc les boutons de la ligne d'à côté —, et seul le serveur sait quand.
     func vote(outageId: String, kind: String) async {
+        let requestedContext = context
         do {
             _ = try await service.vote(
                 outageId: outageId,
@@ -79,9 +131,10 @@ final class CommunityOutagesListViewModel: ObservableObject {
                 longitude: nil,
                 accuracyMeters: nil
             )
+            guard requestedContext == context, !Task.isCancelled else { return }
             await reload()
         } catch {
-            if error.isCancellation { return }
+            guard requestedContext == context, !Task.isCancelled, !error.isCancellation else { return }
             errorMessage = OutageWriteError.message(for: error)
         }
     }
@@ -94,27 +147,35 @@ final class CommunityOutagesListViewModel: ObservableObject {
     /// `OUTAGE_CLOSED` ne se disent pas pareil, et la phrase du serveur n'existe qu'en français.
     func close(outageId: String) async {
         guard closingId == nil else { return }
+        let requestedContext = context, request = UUID()
+        closeRevision = request
         closingId = outageId
         errorMessage = nil
-        defer { closingId = nil }
+        defer { if closeRevision == request { closingId = nil; closeRevision = nil } }
         do {
             _ = try await service.close(outageId: outageId)
+            guard requestedContext == context, !Task.isCancelled else { return }
             await reload()
         } catch {
-            if error.isCancellation { return }
+            guard requestedContext == context, !Task.isCancelled, !error.isCancellation else { return }
             errorMessage = OutageWriteError.message(for: error)
         }
     }
 
-    private func fetch(offset: Int, replacing: Bool) async {
+    private func fetch(offset: Int, replacing: Bool, context requestedContext: Context, request: UUID) async {
+        guard context == requestedContext, loadRevision == request, !Task.isCancelled else { return }
         do {
-            let page = try await service.feed(scope: scope, offset: offset, limit: pageSize)
-            outages = replacing ? page.outages : outages + page.outages
-            hasMore = page.hasMore
+            let page = try await service.feed(scope: requestedContext.scope, offset: offset, limit: pageSize)
+            guard context == requestedContext, loadRevision == request, !Task.isCancelled else { return }
+            var seen = Set(replacing ? [] : outages.map(\.id))
+            let unique = page.outages.filter { seen.insert($0.id).inserted }
+            outages = replacing ? unique : outages + unique
+            nextOffset = offset + page.outages.count
+            hasMore = page.hasMore && !page.outages.isEmpty
+            displayedContext = requestedContext
         } catch {
-            if error.isCancellation { return }
+            guard context == requestedContext, loadRevision == request, !Task.isCancelled, !error.isCancellation else { return }
             errorMessage = error.localizedDescription
-            if replacing { outages = [] }
         }
     }
 }
@@ -208,7 +269,8 @@ struct CommunityOutagesListView: View {
         .signalQuestBackground()
         .navigationTitle("Pannes signalées")
         .navigationBarTitleDisplayMode(.inline)
-        .task { if model.outages.isEmpty { await model.reload() } }
+        .task { await model.reload() }
+        .onDisappear { model.stop() }
         .refreshable { await model.reload() }
         .overlay {
             if model.isLoading && model.outages.isEmpty { ProgressView() }

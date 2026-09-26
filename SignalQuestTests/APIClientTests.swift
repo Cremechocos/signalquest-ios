@@ -2,6 +2,53 @@ import XCTest
 @testable import SignalQuest
 
 final class APIClientTests: XCTestCase {
+    func testEmailVerificationFlagDistinguishesOldServerFromPendingAndConfirmed() throws {
+        func user(_ suffix: String) throws -> AuthUser {
+            let data = Data(#"{"id":"qa","email":"qa@example.invalid","name":"QA","role":"user""#.utf8)
+                + Data(suffix.utf8) + Data("}".utf8)
+            return try JSONDecoder().decode(AuthUser.self, from: data)
+        }
+        XCTAssertNil(try user("").emailVerified, "An old API must not label every account unverified")
+        XCTAssertTrue(try user(",\"emailVerified\":false").isEmailVerificationPending)
+        XCTAssertFalse(try user(",\"emailVerified\":true").isEmailVerificationPending)
+    }
+
+    func testPhysicalSilentMapTransportRespectsRequestDeadline() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["SQ_MAP_TRANSPORT_QA"] == "paired-usb-verified",
+              let raw = environment["SQ_MAP_FIXTURE_ORIGIN"], let origin = URL(string: raw) else {
+            throw XCTSkip("Requires the isolated physical map timeout fixture")
+        }
+        guard Bundle.main.bundleIdentifier == "fr.signalquest.ios.beta",
+              origin == AppConfig.current.apiBaseURL,
+              origin.scheme == "http", origin.port == 49144 else {
+            XCTFail("Refusing a transport probe outside the separate Beta recipe")
+            return
+        }
+        let client = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()))
+        let start = ContinuousClock.now
+        let request = Task {
+            try await client.requestData(APIEndpoint(path: "/api/android/map/tiles/speedtests/14/8452/5881",
+                query: [URLQueryItem(name: "operator", value: "SFR")], authenticated: false, baseURL: origin,
+                responseDeadline: .seconds(30)))
+        }
+        let limit = Task {
+            try await Task.sleep(for: .seconds(45))
+            request.cancel()
+        }
+        defer { limit.cancel() }
+        do {
+            _ = try await request.value
+            XCTFail("A silent fixture must not produce a successful response")
+        } catch {
+            guard case APIError.transport = error else {
+                XCTFail("The network deadline did not finish the request before the 45-second test limit: \(error)")
+                return
+            }
+            XCTAssertLessThan(start.duration(to: .now), .seconds(40))
+        }
+    }
+
     override func tearDown() {
         MockURLProtocol.requestHandler = nil
         super.tearDown()
@@ -22,6 +69,55 @@ final class APIClientTests: XCTestCase {
             _ = try await client.requestData(APIEndpoint(path: "/api/owner"), expectedSessionID: expected)
             XCTFail("A raw request crossed the prepared session")
         } catch { XCTAssertEqual(error as? APIError, .cancelled) }
+    }
+
+    func testSingleAttemptRejectsChangedOrReconnectedCredentialSessionBeforeTransport() async throws {
+        for nextToken in ["account-b", "account-a"] {
+            let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+            try credentials.setAccessToken("account-a")
+            let expected = credentials.snapshot().sessionID
+            credentials.clearAll()
+            try credentials.setAccessToken(nextToken)
+            XCTAssertNotEqual(credentials.snapshot().sessionID, expected)
+            let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+            MockURLProtocol.requestHandler = { _ in
+                XCTFail("Une intention de l’ancienne session ne doit pas atteindre le transport")
+                throw URLError(.unsupportedURL)
+            }
+            do {
+                _ = try await client.performSingleAttempt(
+                    APIEndpoint(path: "/api/android/favorite-antennas", method: .patch),
+                    expectedCredentialSessionID: expected
+                )
+                XCTFail("Une intention a franchi un changement ou une reconnexion de session")
+            } catch { XCTAssertEqual(error as? APIError, .cancelled) }
+        }
+    }
+
+    func testSingleAttemptAllowsCookieRotationWithinExpectedCredentialSession() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("account-a")
+        let expected = credentials.snapshot()
+        let rotation = HTTPURLResponse(
+            url: URL(string: "https://api.signalquest.test/api/auth/refresh")!,
+            statusCode: 200, httpVersion: nil,
+            headerFields: ["Set-Cookie": "auth_token=account-a-rotated; Path=/; HttpOnly"]
+        )!
+        let rotated = try credentials.captureFromResponse(rotation, for: expected)
+        XCTAssertEqual(rotated.sessionID, expected.sessionID)
+        XCTAssertNotEqual(rotated.revision, expected.revision)
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "auth_token=account-a-rotated")
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+        let (data, response) = try await client.performSingleAttempt(
+            APIEndpoint(path: "/api/android/favorite-antennas", method: .patch),
+            expectedCredentialSessionID: expected.sessionID
+        )
+        XCTAssertEqual(response.statusCode, 200)
+        XCTAssertEqual(try JSONDecoder().decode(SuccessResponse.self, from: data).success, true)
     }
 
     func testNetworkFreshnessHeadersBypassTheURLCacheLayer() async throws {
@@ -735,6 +831,25 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(identity.pendingRevocations(), [record])
         identity.completePendingRevocation(record)
         XCTAssertTrue(identity.pendingRevocations().isEmpty)
+    }
+
+    func testPushReceiptRequiresMatchingOwnerInstallationAndEnvironment() {
+        let owner = PushOwnerScope.id(for: "account-a")
+        let receipt = DevicePushRegistrationResponse(
+            success: true, ownerScope: owner, revocationSecret: "one-time-receipt",
+            deviceId: "installation-a", environment: "staging"
+        )
+        XCTAssertEqual(receipt.verifiedSecret(ownerScopeId: owner, deviceID: "installation-a", environment: "staging"),
+                       "one-time-receipt")
+        XCTAssertNil(receipt.verifiedSecret(ownerScopeId: PushOwnerScope.id(for: "account-b"),
+                                            deviceID: "installation-a", environment: "staging"))
+        XCTAssertNil(receipt.verifiedSecret(ownerScopeId: owner, deviceID: "installation-b", environment: "staging"))
+        XCTAssertNil(receipt.verifiedSecret(ownerScopeId: owner, deviceID: "installation-a", environment: "production"))
+        let legacy = DevicePushRegistrationResponse(
+            success: true, ownerScope: nil, revocationSecret: nil,
+            deviceId: "installation-a", environment: nil
+        )
+        XCTAssertNil(legacy.verifiedSecret(ownerScopeId: owner, deviceID: "installation-a", environment: "staging"))
     }
 
     func testPushRecipientPolicyRejectsCrossAccountAndLegacyPrivatePayloads() {

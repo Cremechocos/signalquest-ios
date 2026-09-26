@@ -202,11 +202,21 @@ private struct DevicePushRegistration: Encodable {
     let timeZone: String
 }
 
-private struct DevicePushRegistrationResponse: Decodable {
+struct DevicePushRegistrationResponse: Decodable {
     let success: Bool?
     let ownerScope: String?
     let revocationSecret: String?
     let deviceId: String?
+    let environment: String?
+
+    func verifiedSecret(ownerScopeId: String, deviceID: String, environment expectedEnvironment: String) -> String? {
+        guard success == true,
+              ownerScope == ownerScopeId,
+              deviceId == deviceID,
+              environment == expectedEnvironment,
+              let revocationSecret, !revocationSecret.isEmpty else { return nil }
+        return revocationSecret
+    }
 }
 
 private struct DevicePushRevocation: Encodable {
@@ -626,26 +636,19 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
                         timeZone: TimeZone.current.identifier
                     )
                 )
-                guard response.ownerScope == expectedOwnerScopeId else {
-                    logger.error("Push registration rejected: owner scope was not verified")
-                    if let secret = response.revocationSecret {
-                        let untrusted = PushRegistrationRecord(
-                            ownerScopeId: expectedOwnerScopeId,
-                            token: token,
-                            deviceID: response.deviceId ?? deviceID,
-                            revocationSecret: secret,
-                            registeredAt: Date()
-                        )
-                        identity.enqueuePendingRevocation(untrusted)
-                        await retryPendingRevocations()
-                    }
+                guard let secret = response.verifiedSecret(
+                    ownerScopeId: expectedOwnerScopeId,
+                    deviceID: deviceID,
+                    environment: api.config.environment.rawValue
+                ) else {
+                    logger.error("Push registration rejected: owner, device, environment or revocation receipt missing")
                     return
                 }
                 let record = PushRegistrationRecord(
                     ownerScopeId: expectedOwnerScopeId,
                     token: token,
-                    deviceID: response.deviceId ?? deviceID,
-                    revocationSecret: response.revocationSecret,
+                    deviceID: deviceID,
+                    revocationSecret: secret,
                     registeredAt: Date()
                 )
                 guard identity.saveRegistration(record) else {

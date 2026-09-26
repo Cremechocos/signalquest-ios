@@ -24,6 +24,9 @@ struct AntennaProfileView: View {
     let tint: Color
     /// Fréquence servant au calcul de Fresnel — la plus basse du site.
     var frequencyMhz: Double = 2100
+    var originLabel: String = String(localized: "Depuis ta position")
+    var isSearchedAddress = false
+    var originTimestamp: Date?
     @State private var glossaryEntry: AntennaGlossaryEntry?
     @Environment(\.dismiss) private var dismiss
 
@@ -41,6 +44,15 @@ struct AntennaProfileView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
+                    Text(originLabel)
+                        .accessibilityIdentifier("antenna.profile.origin")
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.labelSecondary)
+                    if let originTimestamp {
+                        Text("Position relevée à \(originTimestamp.formatted(date: .omitted, time: .standard))")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
                     chart
                         .frame(height: 330)
                         .frame(maxWidth: .infinity)
@@ -64,6 +76,7 @@ struct AntennaProfileView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fermer") { dismiss() }
+                        .accessibilityIdentifier("antenna.profile.close")
                         .tint(SQColor.brandRed)
                 }
             }
@@ -202,6 +215,7 @@ struct AntennaProfileView: View {
             )
         }
         .accessibilityLabel(accessibilitySummary)
+        .accessibilityIdentifier("antenna.profile.chart")
     }
 
     /// Axe des altitudes : sans lui, « 274 m » n'a pas d'échelle à laquelle se
@@ -295,7 +309,7 @@ struct AntennaProfileView: View {
         context.stroke(body, with: .color(SQColor.label), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
 
         context.draw(
-            Text("toi").font(SQFont.archivo(9.5, .bold)).foregroundColor(SQColor.label),
+            Text(isSearchedAddress ? String(localized: "adresse") : String(localized: "toi")).font(SQFont.archivo(9.5, .bold)).foregroundColor(SQColor.label),
             at: CGPoint(x: x + 2, y: bottom + 11)
         )
         context.draw(
@@ -386,7 +400,7 @@ struct AntennaProfileView: View {
                 entry: AntennaGlossary.elevationGap(user: userGround, site: antennaGround), selection: $glossaryEntry
             )
             AntennaMetricTile(
-                label: "Ton altitude", value: userGround.map { "\(Int($0.rounded())) m" } ?? "—",
+                label: String(localized: "Altitude de départ"), value: userGround.map { "\(Int($0.rounded())) m" } ?? "—",
                 entry: AntennaGlossary.altitude(userGround, isSite: false), selection: $glossaryEntry
             )
             AntennaMetricTile(
@@ -406,7 +420,7 @@ struct AntennaProfileView: View {
                 selection: $glossaryEntry
             )
             AntennaMetricTile(
-                label: "Tilt pour te viser", value: downtiltLabel,
+                label: String(localized: "Tilt vers le départ"), value: downtiltLabel,
                 entry: AntennaGlossary.downtilt(downtiltDegrees), selection: $glossaryEntry
             )
             AntennaMetricTile(
@@ -506,7 +520,7 @@ struct AntennaProfileView: View {
         guard ground.count == 2 else {
             return String(localized: "Profil du relief vers le site \(siteLabel)")
         }
-        return String(localized: "Profil du relief : toi à \(Int(ground[0].rounded())) mètres d'altitude, site \(siteLabel) à \(Int(ground[1].rounded())) mètres, distants de \(SQUnits.distance(meters: distanceMeters))")
+        return originLabel + ". " + String(localized: "Profil du relief : départ à \(Int(ground[0].rounded())) mètres d'altitude, site \(siteLabel) à \(Int(ground[1].rounded())) mètres, distants de \(SQUnits.distance(meters: distanceMeters))")
     }
 
     /// Dire ce que le calcul ignore vaut mieux qu'un verdict qui a l'air certain :
@@ -522,4 +536,12 @@ struct AntennaProfileView: View {
         let scale = String(localized: " Les hauteurs sont à l'échelle du graphe, dont l'axe vertical est dilaté pour rester lisible.")
         return base + " " + unknowns + height + scale
     }
+}
+
+/// La vue contient des valeurs copiées à l'ouverture, aucun modèle observable.
+struct AntennaProfilePresentation: Identifiable {
+    let id = UUID()
+    let requestKey: String
+    let expiresAt: Date?
+    let view: AntennaProfileView
 }

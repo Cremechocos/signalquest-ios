@@ -20,8 +20,6 @@ struct DriveTestPreflightSnapshot: Equatable {
     let isOnline: Bool
     let connection: NetworkConnectionKind
     let isConstrained: Bool
-    let recordsCoverage: Bool
-    let runsSpeedtest: Bool
 }
 
 struct DriveTestPreflightIssue: Identifiable, Equatable {
@@ -133,16 +131,16 @@ enum DriveTestPreflightPolicy {
             )
         }
 
-        if !snapshot.isOnline, snapshot.runsSpeedtest {
+        if !snapshot.isOnline {
             issues.append(
                 DriveTestPreflightIssue(
                     id: .connectivity,
-                    severity: snapshot.recordsCoverage ? .warning : .blocking,
+                    severity: .blocking,
                     action: .none,
                     value: nil
                 )
             )
-        } else if snapshot.connection == .wifi, snapshot.runsSpeedtest {
+        } else if snapshot.connection == .wifi {
             issues.append(
                 DriveTestPreflightIssue(
                     id: .wifi,
@@ -153,7 +151,7 @@ enum DriveTestPreflightPolicy {
             )
         }
 
-        if snapshot.isConstrained, snapshot.runsSpeedtest {
+        if snapshot.isConstrained {
             issues.append(
                 DriveTestPreflightIssue(
                     id: .constrainedNetwork,
@@ -182,7 +180,7 @@ struct DriveTestPreflightSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.lg) {
             VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text(report.isBlocked ? "Enregistrement impossible" : "Avant de démarrer")
+                Text(report.isBlocked ? "Impossible de démarrer le Drive Test" : "Avant de démarrer")
                     .font(SQFont.display(24, .bold))
                     .foregroundStyle(SQColor.label)
                     .accessibilityAddTraits(.isHeader)

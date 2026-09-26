@@ -59,6 +59,22 @@ enum SignalQuestUITestSupport {
         }
     }
 
+    static func enterGuestApplication(_ app: XCUIApplication, tab: String, locale: String = "fr") {
+        let entry = app.buttons["login.continueGuest"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 20))
+        XCTAssertTrue(scrollToHittable(entry, in: app))
+        entry.tap()
+        let title: String
+        switch tab {
+        case "map": title = locale == "fr" ? "Carte" : "Map"
+        case "speed": title = locale == "fr" ? "Tester" : "Test"
+        default: title = locale == "fr" ? "Accueil" : "Home"
+        }
+        let destination = Self.tab(named: title, in: app)
+        XCTAssertTrue(destination.waitForExistence(timeout: 20))
+        destination.tap()
+    }
+
     /// Sur iPad, le style SwiftUI `sidebarAdaptable` peut exposer une barre
     /// latérale plutôt qu'un `XCUIElementTypeTabBar`. Le fallback conserve le
     /// même test fonctionnel dans les deux présentations.
@@ -129,8 +145,9 @@ final class SignalQuestUITests: XCTestCase {
         SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth"])
         XCTAssertTrue(app.staticTexts["SignalQuest"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["Se connecter"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Explorer la carte sans compte"].exists)
-        XCTAssertTrue(app.buttons["Lancer un speedtest sans compte"].exists)
+        XCTAssertTrue(app.buttons["login.continueGuest"].exists)
+        XCTAssertFalse(app.buttons["Explorer la carte sans compte"].exists)
+        XCTAssertFalse(app.buttons["Lancer un speedtest sans compte"].exists)
     }
 
     func testFiveTabsAndPrimaryStatesWithMockAuth() {
@@ -156,7 +173,7 @@ final class SignalQuestUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Calques et filtres"].waitForExistence(timeout: 10))
 
         SignalQuestUITestSupport.tab(named: "Tester", in: app).tap()
-        XCTAssertTrue(app.buttons["Lancer le test"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["speedtest.start"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["speedtest.history"].firstMatch.exists)
 
         SignalQuestUITestSupport.tab(named: "Communauté", in: app).tap()
@@ -215,7 +232,7 @@ final class SignalQuestUITests: XCTestCase {
         attachScreenshot(app, name: "updated-home")
 
         SignalQuestUITestSupport.tab(named: "Tester", in: app).tap()
-        XCTAssertTrue(app.buttons["Lancer le test"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["speedtest.start"].waitForExistence(timeout: 10))
         attachScreenshot(app, name: "updated-speedtest-idle")
 
         SignalQuestUITestSupport.tab(named: "Communauté", in: app).tap()
@@ -244,36 +261,24 @@ final class SignalQuestUITests: XCTestCase {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])
         SignalQuestUITestSupport.tab(named: "Tester", in: app).tap()
-        XCTAssertTrue(app.buttons["Lancer le test"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["speedtest.start"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["speedtest.history"].firstMatch.exists)
     }
 
     func testGuestCanExploreMapWithoutAccount() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth"])
-
-        let guestMap = app.buttons["Explorer la carte sans compte"]
-        XCTAssertTrue(guestMap.waitForExistence(timeout: 10))
-        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(guestMap, in: app))
-        guestMap.tap()
-
-        XCTAssertTrue(app.staticTexts["Explorer"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Fermer"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Se connecter"].exists)
+        SignalQuestUITestSupport.enterGuestApplication(app, tab: "map")
         XCTAssertTrue(app.buttons["Calques et filtres"].waitForExistence(timeout: 10))
+        SignalQuestUITestSupport.tab(named: "Profil", in: app).tap()
+        XCTAssertTrue(app.buttons["Se connecter"].waitForExistence(timeout: 10))
     }
 
     func testGuestCanOpenSpeedtestAndReceiptsWithoutAccount() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth"])
-
-        let guestSpeedtest = app.buttons["Lancer un speedtest sans compte"]
-        XCTAssertTrue(guestSpeedtest.waitForExistence(timeout: 10))
-        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(guestSpeedtest, in: app))
-        guestSpeedtest.tap()
-
-        XCTAssertTrue(app.buttons["Lancer le test"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Fermer"].exists)
+        SignalQuestUITestSupport.enterGuestApplication(app, tab: "speed")
+        XCTAssertTrue(app.buttons["speedtest.start"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["Mes reçus"].exists)
         app.buttons["Mes reçus"].tap()
         XCTAssertTrue(app.navigationBars["Reçus invités"].waitForExistence(timeout: 10))
@@ -315,7 +320,7 @@ final class SignalQuestUITests: XCTestCase {
         XCTAssertTrue(tester.waitForExistence(timeout: 20))
         tester.tap()
 
-        let startButton = app.buttons["Lancer le test"]
+        let startButton = app.buttons["speedtest.start"]
         XCTAssertTrue(startButton.waitForExistence(timeout: 10))
         startButton.tap()
 
@@ -358,6 +363,267 @@ final class SignalQuestUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Tu peux partager un post, une photo ou un speedtest vers cette conversation."].waitForExistence(timeout: 5))
     }
 
+    func testEncryptedConversationExplainsUnavailableCall() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "fr")
+        defer { app.terminate() }
+        SignalQuestUITestSupport.openMessages(in: app)
+        let inboxUnlockCancel = app.buttons["Annuler"].firstMatch
+        if inboxUnlockCancel.waitForExistence(timeout: 3) { inboxUnlockCancel.tap() }
+        let conversation = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Conversation chiffrée")
+        ).firstMatch
+        XCTAssertTrue(conversation.waitForExistence(timeout: 5))
+        conversation.tap()
+
+        let callMenu = app.buttons["Appels chiffrés indisponibles pour cette conversation"]
+        XCTAssertTrue(callMenu.waitForExistence(timeout: 5))
+        callMenu.tap()
+        let explanation = app.alerts["Appels chiffrés indisponibles pour cette conversation"]
+        XCTAssertTrue(explanation.waitForExistence(timeout: 5))
+        XCTAssertTrue(explanation.staticTexts["Cet appel n’est pas encore disponible pour une conversation chiffrée. Aucun appel moins protégé ne sera lancé."].exists)
+        XCTAssertFalse(app.buttons["Appel audio"].exists)
+        XCTAssertFalse(app.buttons["Appel vidéo"].exists)
+        explanation.buttons["OK"].tap()
+    }
+
+    func testEnglishEncryptedCallExplainsGate() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "en")
+        defer { app.terminate() }
+        SignalQuestUITestSupport.tab(named: "Community", in: app).tap()
+        let messages = app.buttons["Messages"]
+        XCTAssertTrue(messages.waitForExistence(timeout: 10))
+        messages.tap()
+        let inboxUnlockCancel = app.buttons["Cancel"].firstMatch
+        if inboxUnlockCancel.waitForExistence(timeout: 3) { inboxUnlockCancel.tap() }
+
+        let encrypted = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Conversation chiffrée")
+        ).firstMatch
+        XCTAssertTrue(encrypted.waitForExistence(timeout: 5))
+        encrypted.tap()
+        let gatedCall = app.buttons["Encrypted calls are unavailable in this conversation"]
+        XCTAssertTrue(gatedCall.waitForExistence(timeout: 5))
+        gatedCall.tap()
+        let explanation = app.alerts["Encrypted calls are unavailable in this conversation"]
+        XCTAssertTrue(explanation.waitForExistence(timeout: 5))
+        XCTAssertTrue(explanation.staticTexts["Calls are not yet available in an encrypted conversation. No less-protected call will be started."].exists)
+        explanation.buttons["OK"].tap()
+    }
+
+    func testPlainConversationCallMenuKeepsAudioAndVideo() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "en")
+        defer { app.terminate() }
+        SignalQuestUITestSupport.tab(named: "Community", in: app).tap()
+        let messages = app.buttons["Messages"]
+        XCTAssertTrue(messages.waitForExistence(timeout: 10))
+        messages.tap()
+        let inboxUnlockCancel = app.buttons["Cancel"].firstMatch
+        if inboxUnlockCancel.waitForExistence(timeout: 3) { inboxUnlockCancel.tap() }
+        let plain = app.staticTexts["SignalQuest iOS"].firstMatch
+        XCTAssertTrue(plain.waitForExistence(timeout: 5))
+        plain.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let callMenu = app.buttons["Call"]
+        XCTAssertTrue(callMenu.waitForExistence(timeout: 5))
+        callMenu.tap()
+        XCTAssertTrue(app.buttons["Audio call"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Video call"].exists)
+    }
+
+    func testStoryReplyRequiresChannelConsentWithoutSendingOnCancel() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "fr")
+        defer { app.terminate() }
+        SignalQuestUITestSupport.tab(named: "Communauté", in: app).tap()
+        let story = app.buttons["Story de Camille"]
+        XCTAssertTrue(story.waitForExistence(timeout: 10))
+        story.tap()
+
+        let channel = app.staticTexts["story.reply.channel"]
+        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        let input = app.textFields["story.reply.input"]
+        XCTAssertTrue(input.waitForExistence(timeout: 5))
+        input.tap()
+        input.typeText("Bonjour")
+        app.buttons["story.reply.send"].tap()
+
+        let consent = app.alerts["Réponse privée sans chiffrement de bout en bout"]
+        XCTAssertTrue(consent.waitForExistence(timeout: 5))
+        XCTAssertTrue(consent.buttons["Envoyer sans chiffrement de bout en bout"].exists)
+        consent.buttons["Annuler"].tap()
+        XCTAssertEqual(input.value as? String, "Bonjour")
+        XCTAssertFalse(app.staticTexts["Envoyé"].exists)
+
+        app.buttons["story.reply.send"].tap()
+        let retryConsent = app.alerts["Réponse privée sans chiffrement de bout en bout"]
+        XCTAssertTrue(retryConsent.waitForExistence(timeout: 5))
+        retryConsent.buttons["Envoyer sans chiffrement de bout en bout"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["story.reply.error"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(input.value as? String, "Bonjour")
+        XCTAssertFalse(app.staticTexts["Envoyé"].exists)
+    }
+
+    func testEnglishStoryReplyKeepsDraftWhenChannelConsentIsCancelled() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "en")
+        defer { app.terminate() }
+        SignalQuestUITestSupport.tab(named: "Community", in: app).tap()
+        let story = app.buttons["Camille's story"]
+        XCTAssertTrue(story.waitForExistence(timeout: 10))
+        story.tap()
+
+        let channel = app.staticTexts["story.reply.channel"]
+        XCTAssertTrue(channel.waitForExistence(timeout: 5))
+        XCTAssertEqual(channel.label, "Private reply without end-to-end encryption")
+        let input = app.textFields["story.reply.input"]
+        XCTAssertTrue(input.waitForExistence(timeout: 5))
+        input.tap()
+        input.typeText("Hello")
+        app.buttons["story.reply.send"].tap()
+
+        let consent = app.alerts["Private reply without end-to-end encryption"]
+        XCTAssertTrue(consent.waitForExistence(timeout: 5))
+        XCTAssertTrue(consent.buttons["Send without end-to-end encryption"].exists)
+        consent.buttons["Cancel"].tap()
+        XCTAssertEqual(input.value as? String, "Hello")
+        XCTAssertFalse(app.staticTexts["Sent"].exists)
+    }
+
+    func testSentinelleWebhookDraftSurvivesRejectedPatchAndRefresh() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(
+            app, arguments: ["--qa-sentinelle-alerts"],
+            environment: ["SQ_QA_SENTINELLE_PATCH_STATUS": "400"], locale: "fr"
+        )
+        defer { app.terminate() }
+        let input = app.textFields["sentinelle.webhook.input"]
+        if !input.waitForExistence(timeout: 5) { app.buttons["sentinelle.qa.open"].tap() }
+        XCTAssertTrue(input.waitForExistence(timeout: 5))
+        input.tap()
+        input.typeText("https://example.invalid/new-hook")
+        app.buttons["sentinelle.webhook.save"].tap()
+        XCTAssertTrue(app.staticTexts["sentinelle.save.error"].waitForExistence(timeout: 8))
+        app.buttons["sentinelle.qa.refresh"].tap()
+        XCTAssertEqual(input.value as? String, "https://example.invalid/new-hook")
+
+        app.buttons["sentinelle.save.retry"].tap()
+        let testWebhook = app.buttons["sentinelle.webhook.test"]
+        XCTAssertTrue(testWebhook.waitForExistence(timeout: 8))
+        XCTAssertTrue(testWebhook.isEnabled)
+        testWebhook.tap()
+        let verdict = app.staticTexts["sentinelle.webhook.verdict"]
+        XCTAssertTrue(verdict.waitForExistence(timeout: 5))
+        XCTAssertTrue(verdict.label.contains("HTTP 400"))
+
+        app.buttons["Terminé"].tap()
+        app.buttons["sentinelle.qa.open"].tap()
+        XCTAssertEqual(app.textFields["sentinelle.webhook.input"].value as? String, "https://example.invalid/new-hook")
+    }
+
+    func testSentinelleRapidSwitchesSurvive503AndRetry() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(
+            app, arguments: ["--qa-sentinelle-alerts"],
+            environment: ["SQ_QA_SENTINELLE_PATCH_STATUS": "503"], locale: "fr"
+        )
+        defer { app.terminate() }
+        let down = app.switches["sentinelle.notifyDown"]
+        if !down.waitForExistence(timeout: 5) { app.buttons["sentinelle.qa.open"].tap() }
+        XCTAssertTrue(down.waitForExistence(timeout: 5))
+        down.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        let up = app.switches["sentinelle.notifyUp"]
+        XCTAssertTrue(up.waitForExistence(timeout: 5))
+        up.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        XCTAssertTrue(app.staticTexts["sentinelle.save.error"].waitForExistence(timeout: 8))
+        XCTAssertEqual(down.value as? String, "0")
+        XCTAssertEqual(up.value as? String, "1")
+        app.buttons["sentinelle.save.retry"].tap()
+        XCTAssertTrue(app.buttons["sentinelle.save.retry"].waitForNonExistence(timeout: 8))
+        app.buttons["Terminé"].tap()
+        app.buttons["sentinelle.qa.open"].tap()
+        XCTAssertEqual(app.switches["sentinelle.notifyDown"].value as? String, "0")
+        XCTAssertEqual(app.switches["sentinelle.notifyUp"].value as? String, "1")
+    }
+
+    func testSentinelleSaveErrorAndRetryRenderInEnglish() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(
+            app, arguments: ["--qa-sentinelle-alerts"],
+            environment: ["SQ_QA_SENTINELLE_PATCH_STATUS": "400"], locale: "en"
+        )
+        defer { app.terminate() }
+        let input = app.textFields["sentinelle.webhook.input"]
+        if !input.waitForExistence(timeout: 5) { app.buttons["sentinelle.qa.open"].tap() }
+        XCTAssertTrue(input.waitForExistence(timeout: 5))
+        input.tap()
+        input.typeText("https://example.invalid/new-hook")
+        app.buttons["sentinelle.webhook.save"].tap()
+        let error = app.staticTexts["sentinelle.save.error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 8))
+        XCTAssertEqual(error.label, "Could not confirm the save. Check the values and try again.")
+        app.buttons["sentinelle.save.retry"].tap()
+        XCTAssertTrue(app.buttons["sentinelle.webhook.test"].waitForExistence(timeout: 8))
+        app.buttons["Done"].tap()
+        app.buttons["sentinelle.qa.open"].tap()
+        XCTAssertEqual(app.textFields["sentinelle.webhook.input"].value as? String, "https://example.invalid/new-hook")
+    }
+
+    func testCommentsFiftyFirstParentAndAuthorReturnKeepReadingPosition() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth", "--qa-comments"], locale: "fr")
+        defer { app.terminate() }
+        let first = app.staticTexts["parent-0"]
+        if !first.waitForExistence(timeout: 5) { app.buttons["comments.qa.open"].tap() }
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+
+        let loadMore = app.buttons["comments.loadMore"]
+        for _ in 0..<24 {
+            if loadMore.exists && loadMore.isHittable { break }
+            app.scrollViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(loadMore.isHittable, "La page 51 doit rester accessible dans la feuille")
+        loadMore.tap()
+        XCTAssertTrue(app.staticTexts["Impossible de charger les commentaires."].waitForExistence(timeout: 5))
+        loadMore.tap()
+        let last = app.staticTexts["parent-50"]
+        XCTAssertTrue(last.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "parent-49")).count, 1)
+
+        let author = app.buttons["comment.author.parent-50"].firstMatch
+        XCTAssertTrue(author.waitForExistence(timeout: 5))
+        author.tap()
+        XCTAssertTrue(app.navigationBars["Camille"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(last.waitForExistence(timeout: 5))
+        let visibleAgain = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "hittable == true"), object: last
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [visibleAgain], timeout: 5), .completed,
+                       "Le retour du profil doit conserver la lecture près du commentaire 51")
+    }
+
+    func testCommentsTwentyFirstReplyCanBeLoadedWithoutDuplicates() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth", "--qa-comments-replies"], locale: "fr")
+        defer { app.terminate() }
+        let first = app.staticTexts["parent-0"]
+        if !first.waitForExistence(timeout: 5) { app.buttons["comments.qa.open"].tap() }
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        app.buttons["comments.replies.parent-0"].tap()
+        XCTAssertTrue(app.staticTexts["reply-0"].waitForExistence(timeout: 5))
+        let loadMore = app.buttons["comments.replies.loadMore.parent-0"]
+        for _ in 0..<8 {
+            if loadMore.exists && loadMore.isHittable { break }
+            app.scrollViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(loadMore.isHittable)
+        loadMore.tap()
+        XCTAssertTrue(app.staticTexts["reply-20"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "reply-19")).count, 1)
+    }
+
     func testProfilePhotosAndLeaderboardsRender() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])
@@ -384,10 +650,12 @@ final class SignalQuestUITests: XCTestCase {
         speedShot.lifetime = .keepAlways
         add(speedShot)
 
-        // Onglet Points : pastilles de niveau dans les rangées du classement.
+        // Onglet Points : le niveau fait partie de la ligne accessible combinée.
+        // Les rangées sous le podium sont matérialisées après défilement.
         app.buttons["Points"].tap()
-        let levelBadge = app.descendants(matching: .any)["leaderboard.levelPill"].firstMatch
-        XCTAssertTrue(levelBadge.waitForExistence(timeout: 5))
+        let fourthRow = app.descendants(matching: .any)["leaderboard.row.4"].firstMatch
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(fourthRow, in: app))
+        XCTAssertTrue(fourthRow.label.contains("Niv."))
         let pointsShot = XCTAttachment(screenshot: app.screenshot())
         pointsShot.name = "Leaderboards — onglet Points"
         pointsShot.lifetime = .keepAlways

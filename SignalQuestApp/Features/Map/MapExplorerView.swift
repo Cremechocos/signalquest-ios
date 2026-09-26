@@ -1,6 +1,12 @@
 import SwiftUI
 import MapKit
 import ImageIO
+import OSLog
+
+/// Compteurs seulement : aucune coordonnée, identité de compte ou réponse brute.
+private enum MapDiagnosticsLog {
+    static let logger = Logger(subsystem: "fr.signalquest.ios", category: "map-diagnostics")
+}
 
 /// Un lieu géocodé (ville / adresse / POI) via `MKLocalSearch`, unifié avec les
 /// antennes dans les résultats de recherche de la carte.
@@ -1169,6 +1175,13 @@ final class MapExplorerViewModel: ObservableObject {
         }
         var seenMessages = Set<String>()
         displayLimitMessages = displayLimitMessages.filter { seenMessages.insert($0).inserted }
+        let failedTiles = tileLoadIssues.values.reduce(0) { $0 + $1.failedTiles.count }
+        let retainedTiles = tileLoadIssues.values.reduce(0) { $0 + $1.retainedCount }
+        let speedtestCount = speedtestTiles.reduce(0) { $0 + $1.markers.count }
+        let coverageCount = coverageTiles.reduce(0) { $0 + $1.points.count }
+        MapDiagnosticsLog.logger.info(
+            "load \(id.uuidString, privacy: .public) version=\(self.dataVersion) antennas=\(self.antennas.count) speedtests=\(speedtestCount) coverage=\(coverageCount) photos=\(self.publicPhotos.count) failedTiles=\(failedTiles) retainedTiles=\(retainedTiles) error=\(self.errorMessage != nil) complete=\(self.hasCurrentResponse)"
+        )
     }
 
     /// Applique un instantané du flux temps réel des amis. Fait autorité sur
@@ -1327,6 +1340,13 @@ final class MapExplorerViewModel: ObservableObject {
     /// Géocodage ville / adresse / POI via MapKit (moteur carte unique). Biaisé vers
     /// la région courante de la carte. Ne jette jamais (échec → liste vide).
     private func geocodePlaces(_ q: String) async -> [PlaceResult] {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["SQ_MAP_PROFILE_QA"] == "1" {
+            // Fixture dédiée : aucune requête Apple, même en cas d'erreur ou
+            // de configuration incorrecte. Les URL proviennent du binaire.
+            return await MapProfileQASearch.places(query: q, config: .current)
+        }
+        #endif
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = q
         if let center = lastCenter {
@@ -1469,6 +1489,7 @@ struct MapExplorerView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
+    @FocusState private var searchFieldFocused: Bool
 
     @State private var mapCenter: CLLocationCoordinate2D
     @State private var mapZoom: Double
@@ -1552,6 +1573,10 @@ struct MapExplorerView: View {
         ZStack {
             mapLayer
             controlsLayer
+                // Les contrôles flottants partagent l'espace de la carte : à la
+                // taille AX maximale, leurs libellés se chevauchent. La fiche et
+                // les panneaux restent au Dynamic Type demandé par le système.
+                .dynamicTypeSize(dynamicTypeSize.isAccessibilitySize ? .xxxLarge : dynamicTypeSize)
         }
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showsANFRMap) {
@@ -1608,6 +1633,7 @@ struct MapExplorerView: View {
                 market: model.marketFilter,
                 operatorName: model.operatorFilter,
                 service: services.antennas,
+                sightOrigin: sightOrigin,
                 onIsolateCoverage: { focus in isolateCoverage(focus) }
             )
         }
@@ -1798,6 +1824,17 @@ struct MapExplorerView: View {
             guard bucket != lastZoomRenderBucket else { return }
             lastZoomRenderBucket = bucket
             refreshMapRender()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sqSpeedtestMapVisibilityChanged).receive(on: DispatchQueue.main)) { notification in
+            guard let change = notification.object as? SpeedtestMapVisibilityChange,
+                  change.session == services.speedtest.visibilitySession else { return }
+            fetchTask?.cancel()
+            model.applySpeedtestVisibility(serverID: change.serverID, isSharedOnMap: change.isSharedOnMap)
+            if selectedItem?.kind == .speedtest, selectedItem?.backendId == change.serverID {
+                selectedItem = nil
+            }
+            refreshMapRender()
+            fetchTask = Task { await reloadCurrentRegion() }
         }
         .onChangeCompat(of: scenePhase) { _, phase in
             guard phase == .active, router.selectedTab == .map else { return }
@@ -2217,18 +2254,33 @@ struct MapExplorerView: View {
             .frame(width: 18, height: 18)
             .accessibilityHidden(!(model.isLoading || model.isSearching))
             .accessibilityLabel(model.isSearching ? "Recherche en cours" : (model.isLoading ? "Chargement de la carte" : ""))
-            TextField("Ville, adresse ou site", text: $model.searchQuery, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.body)
-                .foregroundStyle(SQColor.label)
-                .lineLimit(1...2)
-                .submitLabel(.search)
-                .autocorrectionDisabled()
-                .accessibilityLabel("Rechercher une ville, une adresse ou un site")
-                .onSubmit { Task { await model.search() } }
-                // Suggestions à la frappe (anti-rebond + annulation côté modèle).
-                .onChangeCompat(of: model.searchQuery) { _, _ in model.scheduleSearch() }
-            if !model.searchQuery.isEmpty {
+            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                if !model.searchQuery.isEmpty {
+                    Text("Recherche")
+                        .font(.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .accessibilityIdentifier("map.search.label")
+                }
+                TextField(
+                    "Ville, adresse ou site", text: $model.searchQuery,
+                    prompt: Text("Ville, adresse ou site").foregroundColor(SQColor.labelSecondary),
+                    axis: .vertical
+                )
+                    .textFieldStyle(.plain)
+                    .font(.body)
+                    .foregroundStyle(SQColor.label)
+                    .tint(SQColor.brandRed)
+                    .focused($searchFieldFocused)
+                    .lineLimit(1...2)
+                    .submitLabel(.search)
+                    .autocorrectionDisabled()
+                    .accessibilityLabel("Rechercher une ville, une adresse ou un site")
+                    .accessibilityIdentifier("map.search.input")
+                    .onSubmit { Task { await model.search() } }
+                    // Suggestions à la frappe (anti-rebond + annulation côté modèle).
+                    .onChangeCompat(of: model.searchQuery) { _, _ in model.scheduleSearch() }
+            }
+            if !model.searchQuery.isEmpty || sightOrigin != .device {
                 Button {
                     model.searchQuery = ""
                     model.searchResults = []
@@ -2241,12 +2293,17 @@ struct MapExplorerView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Effacer la recherche")
+                .accessibilityIdentifier("map.search.clear")
             }
         }
         .padding(.horizontal, SQSpace.md + 2)
         .frame(minHeight: 44)
         .frame(maxWidth: .infinity)
         .background { mapGlassBackground(Capsule(style: .continuous)) }
+        .overlay {
+            Capsule(style: .continuous)
+                .strokeBorder(searchFieldFocused ? SQColor.brandRed : .clear, lineWidth: 2)
+        }
         .sqShadowCard()
     }
 
@@ -2402,6 +2459,8 @@ struct MapExplorerView: View {
                 mapToast(error, icon: "exclamationmark.triangle.fill", tint: SQColor.warning)
                 Button("Réessayer") { fetchTask = Task { await reloadCurrentRegion() } }
                     .buttonStyle(.borderedProminent)
+                    .tint(SQColor.brandRed)
+                    .foregroundStyle(SQColor.onAccent)
                     .frame(minHeight: 44)
                     .accessibilityIdentifier("map.status.retry")
             }
@@ -2513,6 +2572,7 @@ struct MapExplorerView: View {
                         Button { selectSearchResult(result) } label: {
                             searchResultRow(result)
                         }
+                        .accessibilityIdentifier(searchResultIdentifier(result))
                         .buttonStyle(SQPressButtonStyle())
                         .foregroundStyle(SQColor.label)
                     }
@@ -2549,6 +2609,13 @@ struct MapExplorerView: View {
     }
 
     @ViewBuilder
+    private func searchResultIdentifier(_ result: MapSearchResult) -> String {
+        switch result {
+        case .place(let place): return "map.search.result.place.\(place.id)"
+        case .antenna(let site): return "map.search.result.antenna.\(site.id)"
+        }
+    }
+
     private func searchResultRow(_ result: MapSearchResult) -> some View {
         HStack(spacing: SQSpace.sm) {
             switch result {
@@ -2596,7 +2663,6 @@ struct MapExplorerView: View {
             mapCenter = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
             mapZoom = 14
         case .antenna(let site):
-            clearSearchPin()
             if site.hasValidCoordinate, let lat = site.latitude, let lng = site.longitude {
                 mapCenter = CLLocationCoordinate2D(latitude: lat, longitude: lng)
                 mapZoom = 15
@@ -2612,6 +2678,15 @@ struct MapExplorerView: View {
         model.isSearching = false
         model.searchFailed = false
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
+    private var sightOrigin: AntennaSightOrigin {
+        AntennaSightOrigin.resolve(
+            query: model.searchQuery,
+            latitudeText: searchPinLatitude,
+            longitudeText: searchPinLongitude,
+            title: searchPinTitle
+        )
     }
 
     private var searchPinPayload: MapAnnotationPayload? {
@@ -2680,6 +2755,9 @@ struct MapExplorerView: View {
         renderedCoverageFeatures = coverageHeatFeatures
         renderedSpeedtestFeatures = speedtestFeatures
         renderVersion &+= 1
+        MapDiagnosticsLog.logger.debug(
+            "render version=\(self.model.dataVersion) annotations=\(self.renderedAnnotations.count) coverage=\(self.renderedCoverageFeatures.count) speedtests=\(self.renderedSpeedtestFeatures.count) zoomBucket=\(Self.zoomRenderBucket(for: self.mapZoom))"
+        )
     }
 
     /// PERF-MAP-05 : ne reconstruit QUE la couche amis (marqueurs de présence).
@@ -3819,7 +3897,6 @@ struct MapExplorerView: View {
         if annotation.isSearchPin { return }
         if let antennaId = annotation.antennaId,
            let site = model.antennas.first(where: { $0.id == antennaId }) {
-            clearSearchPin()
             selectedAntenna = site
             return
         }
@@ -3872,7 +3949,6 @@ struct MapExplorerView: View {
         // Site ajouté à la main : même fiche terrain que les antennes officielles.
         if annotation.kind == .customSite, let siteId = annotation.backendId,
            let site = model.customSiteTiles.flatMap(\.markers).first(where: { $0.id == siteId }) {
-            clearSearchPin()
             selectedCustomSite = site
             return
         }
@@ -3908,6 +3984,7 @@ struct MapExplorerView: View {
             operatorName: operatorName,
             service: services.antennas,
             customSite: site,
+            sightOrigin: sightOrigin,
             onIsolateCoverage: { focus in isolateCoverage(focus) }
         )
     }
@@ -4075,3 +4152,60 @@ struct MapExplorerView: View {
 // MARK: - Carte MapKit (moteur unique)
 
 // MARK: - Style des marqueurs MapKit (couleur / taille / glyphe par type)
+
+#if DEBUG
+/// Recherche synthétique réservée au banc local du profil, absente de Release.
+private enum MapProfileQASearch {
+    private struct Response: Decodable {
+        struct Place: Decodable {
+            let id: String
+            let name: String
+            let subtitle: String?
+            let latitude: Double
+            let longitude: Double
+        }
+        let places: [Place]
+    }
+
+    static func places(query: String, config: AppConfig) async -> [PlaceResult] {
+        let fixtureBase = "http://127.0.0.1:8770"
+        guard config.apiBaseURL.absoluteString == fixtureBase,
+              config.appBaseURL.absoluteString == fixtureBase,
+              var components = URLComponents(string: fixtureBase + "/__qa/profile/places") else { return [] }
+        components.queryItems = [URLQueryItem(name: "q", value: query)]
+        guard let url = components.url else { return [] }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpCookieStorage = nil
+        configuration.urlCredentialStorage = nil
+        configuration.urlCache = nil
+        configuration.httpShouldSetCookies = false
+        let session = URLSession(configuration: configuration, delegate: NoRedirects(), delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        var request = URLRequest(url: url)
+        request.httpShouldHandleCookies = false
+        request.timeoutInterval = 10
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard !Task.isCancelled, let response = response as? HTTPURLResponse,
+                  response.statusCode == 200, response.url == url else { return [] }
+            return try JSONDecoder().decode(Response.self, from: data).places.prefix(6).compactMap { place in
+                let coordinate = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
+                guard CLLocationCoordinate2DIsValid(coordinate), !place.id.isEmpty else { return nil }
+                return PlaceResult(id: place.id, name: place.name, subtitle: place.subtitle,
+                                   latitude: place.latitude, longitude: place.longitude)
+            }
+        } catch { return [] }
+    }
+
+    /// Une redirection ne doit jamais exporter la requête hors du banc.
+    private final class NoRedirects: NSObject, URLSessionTaskDelegate {
+        func urlSession(_ session: URLSession, task: URLSessionTask,
+                        willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest,
+                        completionHandler: @escaping (URLRequest?) -> Void) {
+            completionHandler(nil)
+        }
+    }
+}
+#endif

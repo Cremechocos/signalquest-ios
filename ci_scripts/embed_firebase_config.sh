@@ -7,8 +7,19 @@
 
 set -eu
 
-source_plist="${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist"
+source_plist="${SQ_FIREBASE_CONFIG_PATH:-${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist}"
 resources_dir="${TARGET_BUILD_DIR:-}/${UNLOCALIZED_RESOURCES_FOLDER_PATH:-}"
+
+if [ "${SQ_ISOLATED_HOST_TEST:-NO}" = "YES" ]; then
+  if [ "${PLATFORM_NAME:-}" != "iphonesimulator" ] || [ "${ENABLE_TESTABILITY:-NO}" != "YES" ]; then
+    echo "error: isolated host tests require a testable simulator build." >&2
+    exit 1
+  fi
+  [ -n "${TARGET_BUILD_DIR:-}" ] && [ -n "${UNLOCALIZED_RESOURCES_FOLDER_PATH:-}" ] || exit 1
+  rm -f "$resources_dir/GoogleService-Info.plist"
+  echo "Firebase excluded from isolated simulator test host; source configuration unchanged."
+  exit 0
+fi
 
 if [ -f "$source_plist" ]; then
   mkdir -p "$resources_dir"
