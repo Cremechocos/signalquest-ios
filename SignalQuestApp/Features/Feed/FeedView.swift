@@ -379,6 +379,21 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
+    /// Garde le fil cohérent avec le détail ouvert par notification/lien,
+    /// même si son rechargement réseau au retour échoue.
+    func acceptDetailItem(_ item: UnifiedSocialFeedItem) {
+        guard let current = page,
+              current.items.contains(where: { $0.id == item.id }) else { return }
+        page = SocialFeedPage(
+            items: current.items.map { $0.id == item.id ? $0.adoptingInteractions(from: item) : $0 },
+            nextCursor: current.nextCursor,
+            stories: current.stories,
+            trendingHashtags: current.trendingHashtags,
+            suggestedUsers: current.suggestedUsers,
+            requestId: current.requestId
+        )
+    }
+
     private func applyLocalToggle(itemId: String, _ transform: (UnifiedSocialFeedItem) -> UnifiedSocialFeedItem) async {
         guard var current = page else { return }
         let updated = current.items.map { $0.id == itemId ? transform($0) : $0 }
@@ -468,6 +483,8 @@ struct FeedView: View {
     @State private var routedProfileId: String?
     /// Post ouvert via deep-link / notification (résolu en item complet).
     @State private var routedPostItem: RoutedPost?
+    @State private var failedRoutedPostID: String?
+    @State private var routedPostRevision = UUID()
     private enum FeedSheet: Identifiable {
         case detail(UnifiedSocialFeedItem)
         case comments(UnifiedSocialFeedItem)
@@ -636,9 +653,22 @@ struct FeedView: View {
                 feedService: services.feed,
                 messagesService: services.messages,
                 commentsService: services.comments,
-                reportsService: services.reports
+                reportsService: services.reports,
+                onItemChanged: { model.acceptDetailItem($0) }
             )
             .onDisappear { Task { await model.load() } }
+        }
+        .alert("Publication", isPresented: Binding(
+            get: { failedRoutedPostID != nil },
+            set: { if !$0 { failedRoutedPostID = nil } }
+        )) {
+            Button("Réessayer") {
+                guard let id = failedRoutedPostID else { return }
+                Task { await openRoutedPost(id) }
+            }
+            Button("Fermer", role: .cancel) { failedRoutedPostID = nil }
+        } message: {
+            Text("Une erreur est survenue. Réessaie.")
         }
         .onChangeCompat(of: router.openUserProfileId) { _, _ in
             Task { await consumeFeedRoutesIfNeeded() }
@@ -782,10 +812,36 @@ struct FeedView: View {
         }
         if let id = router.openPostId {
             router.openPostId = nil
+            await openRoutedPost(id)
+        }
+    }
+
+    /// Résout le post demandé depuis le serveur pour afficher des compteurs à
+    /// jour. En panne réseau, une carte déjà chargée permet encore d'ouvrir le
+    /// détail ; sans carte, l'intention reste réessayable au lieu de disparaître.
+    private func openRoutedPost(_ id: String) async {
+        let revision = UUID()
+        routedPostRevision = revision
+        failedRoutedPostID = nil
+        if AppEnvironment.usesDemoData,
+           let existing = model.page?.items.first(where: { $0.id == id || $0.backendPostId == id }) {
+            routedPostItem = RoutedPost(item: existing)
+            return
+        }
+        do {
+            let fetched = try await services.feed.post(id: id)
+            guard routedPostRevision == revision, !Task.isCancelled else { return }
+            if let fetched {
+                routedPostItem = RoutedPost(item: fetched)
+            } else {
+                failedRoutedPostID = id
+            }
+        } catch {
+            guard routedPostRevision == revision, !error.isCancellation else { return }
             if let existing = model.page?.items.first(where: { $0.id == id || $0.backendPostId == id }) {
                 routedPostItem = RoutedPost(item: existing)
-            } else if let fetched = try? await services.feed.post(id: id) {
-                routedPostItem = RoutedPost(item: fetched)
+            } else {
+                failedRoutedPostID = id
             }
         }
     }
@@ -1293,12 +1349,19 @@ struct PostShareSheet: View {
                             }
                         }
                         .disabled(busyConversationId != nil || isE2EE)
+                        .accessibilityIdentifier("post.share.conversation.\(conversation.id)")
                     }
                 }
 
                 if let errorMessage {
                     Section {
-                        Text(errorMessage).foregroundStyle(SQColor.danger)
+                        Text(errorMessage)
+                            .foregroundStyle(SQColor.danger)
+                            .accessibilityIdentifier("post.share.error")
+                        if conversations.isEmpty {
+                            Button("Réessayer") { Task { await load() } }
+                                .accessibilityIdentifier("post.share.retry")
+                        }
                     }
                 }
             }
@@ -1318,6 +1381,7 @@ struct PostShareSheet: View {
 
     private func load() async {
         isLoading = true
+        errorMessage = nil
         defer { isLoading = false }
         do {
             conversations = AppEnvironment.usesDemoData ? .demo : try await messagesService.conversations()
@@ -1327,6 +1391,7 @@ struct PostShareSheet: View {
     }
 
     private func share(_ conversation: MessageConversation) async {
+        guard busyConversationId == nil, conversation.e2eeEnabled != true else { return }
         busyConversationId = conversation.id
         defer { busyConversationId = nil }
         errorMessage = nil

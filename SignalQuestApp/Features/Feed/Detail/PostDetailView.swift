@@ -11,9 +11,7 @@ struct PostDetailView: View {
     @State private var showCommentsSheet = false
     @State private var showReportSheet = false
     @State private var showShareSheet = false
-    @State private var localItem: UnifiedSocialFeedItem
-    @State private var isMutating = false
-    @State private var errorMessage: String?
+    @StateObject private var actions: PostDetailActions
     /// Auteur dont on pousse le profil public.
     @State private var profileAuthor: SocialFeedAuthor?
 
@@ -22,42 +20,45 @@ struct PostDetailView: View {
         feedService: SocialFeedServicing,
         messagesService: MessagesServicing,
         commentsService: CommentsServicing,
-        reportsService: ReportsServicing
+        reportsService: ReportsServicing,
+        onItemChanged: @escaping @MainActor (UnifiedSocialFeedItem) -> Void = { _ in }
     ) {
         self.item = item
         self.feedService = feedService
         self.messagesService = messagesService
         self.commentsService = commentsService
         self.reportsService = reportsService
-        _localItem = State(initialValue: item)
+        _actions = StateObject(wrappedValue: PostDetailActions(
+            item: item, service: feedService, onItemChanged: onItemChanged
+        ))
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: SQSpace.lg + 2) {
-                if let errorMessage {
+                if let errorMessage = actions.errorMessage {
                     Label(errorMessage, systemImage: "exclamationmark.triangle")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.dangerInk)
                         .accessibilityIdentifier("post.detail.error")
                 }
-                if isMutating {
+                if actions.isMutating {
                     ProgressView("En cours")
                         .tint(SQColor.brandRed)
                         .accessibilityIdentifier("post.detail.saving")
                 }
                 FeedItemCard(
-                    item: localItem,
+                    item: actions.item,
                     onTap: { showSignalSheet = true },
-                    onLike: { Task { await mutate(.react) } },
-                    onRepost: { Task { await mutate(.repost) } },
+                    onLike: { Task { await actions.mutate(.react) } },
+                    onRepost: { Task { await actions.mutate(.repost) } },
                     onComment: { showCommentsSheet = true },
-                    onFavorite: { Task { await mutate(.favorite) } },
+                    onFavorite: { Task { await actions.mutate(.favorite) } },
                     onShare: { showShareSheet = true },
-                    onAuthorTap: { profileAuthor = localItem.author }
+                    onAuthorTap: { profileAuthor = actions.item.author }
                 )
                 GradientButton(
-                    "Voir tous les commentaires (\(localItem.commentsCount))",
+                    "Voir tous les commentaires (\(actions.item.commentsCount))",
                     systemImage: "bubble.left.and.bubble.right",
                     style: .secondary
                 ) {
@@ -80,10 +81,10 @@ struct PostDetailView: View {
             }
         }
         .sheet(isPresented: $showSignalSheet) {
-            SignalDetailSheet(item: localItem,
-                              onLike: { Task { await mutate(.react) } },
-                              onRepost: { Task { await mutate(.repost) } },
-                              onFavorite: { Task { await mutate(.favorite) } },
+            SignalDetailSheet(item: actions.item,
+                              onLike: { Task { await actions.mutate(.react) } },
+                              onRepost: { Task { await actions.mutate(.repost) } },
+                              onFavorite: { Task { await actions.mutate(.favorite) } },
                               onComment: { showCommentsSheet = true },
                               onShare: {
                                   showSignalSheet = false
@@ -92,36 +93,29 @@ struct PostDetailView: View {
                                       showShareSheet = true
                                   }
                               },
-                              onMute: { Task { try? await feedService.muteNotifications(postId: localItem.id) } },
+                              onMute: { Task { try? await feedService.muteNotifications(postId: actions.item.id) } },
                               onReport: { showReportSheet = true },
                               onAuthorTap: {
                                   showSignalSheet = false
-                                  pushProfileAfterDismiss(localItem.author)
+                                  pushProfileAfterDismiss(actions.item.author)
                               },
-                              actionError: errorMessage,
-                              actionBusy: isMutating)
+                              actionError: actions.errorMessage,
+                              actionBusy: actions.isMutating)
         }
         .sheet(isPresented: $showCommentsSheet) {
             CommentsSheet(
                 service: commentsService,
-                postId: localItem.backendPostId,
+                postId: actions.item.backendPostId,
                 profileService: feedService
             )
         }
         .sheet(isPresented: $showShareSheet) {
-            PostShareSheet(post: localItem, messagesService: messagesService) { conversation in
-                do {
-                    let messageID = try await feedService.share(
-                        postId: localItem.id, conversationId: conversation.id)
-                    if messageID != nil { Haptics.success() }
-                    return messageID
-                } catch {
-                    return nil
-                }
+            PostShareSheet(post: actions.item, messagesService: messagesService) { conversation in
+                await actions.share(to: conversation.id)
             }
         }
         .sheet(isPresented: $showReportSheet) {
-            ReportSheet(target: .post(localItem.backendPostId), service: reportsService)
+            ReportSheet(target: .post(actions.item.backendPostId), service: reportsService)
         }
         .navigationDestinationItemCompat($profileAuthor) { author in
             UserProfileView(userId: author.id, prefill: author, service: feedService)
@@ -137,9 +131,56 @@ struct PostDetailView: View {
         }
     }
 
-    private enum Mutation { case react, repost, favorite }
+}
 
-    private func mutate(_ action: Mutation) async {
+/// Même état pour le détail ouvert depuis le fil, une notification ou un message.
+/// Un seul appel de mutation à la fois ; les compteurs changent sur reçu serveur.
+@MainActor
+final class PostDetailActions: ObservableObject {
+    enum Mutation { case react, repost, favorite }
+
+    @Published private(set) var item: UnifiedSocialFeedItem
+    @Published private(set) var isMutating = false
+    @Published private(set) var errorMessage: String?
+
+    private let react: @MainActor (String) async throws -> ReactionResponse
+    private let repost: @MainActor (String) async throws -> ReactionResponse
+    private let favorite: @MainActor (String) async throws -> ReactionResponse
+    private let sendShare: @MainActor (String, String) async throws -> String?
+    private let onItemChanged: @MainActor (UnifiedSocialFeedItem) -> Void
+
+    convenience init(
+        item: UnifiedSocialFeedItem,
+        service: SocialFeedServicing,
+        onItemChanged: @escaping @MainActor (UnifiedSocialFeedItem) -> Void = { _ in }
+    ) {
+        self.init(
+            item: item,
+            react: { try await service.react(postId: $0, emoji: "❤️") },
+            repost: { try await service.repost(postId: $0) },
+            favorite: { try await service.favorite(postId: $0) },
+            share: { try await service.share(postId: $0, conversationId: $1) },
+            onItemChanged: onItemChanged
+        )
+    }
+
+    init(
+        item: UnifiedSocialFeedItem,
+        react: @escaping @MainActor (String) async throws -> ReactionResponse,
+        repost: @escaping @MainActor (String) async throws -> ReactionResponse,
+        favorite: @escaping @MainActor (String) async throws -> ReactionResponse,
+        share: @escaping @MainActor (String, String) async throws -> String?,
+        onItemChanged: @escaping @MainActor (UnifiedSocialFeedItem) -> Void = { _ in }
+    ) {
+        self.item = item
+        self.react = react
+        self.repost = repost
+        self.favorite = favorite
+        self.sendShare = share
+        self.onItemChanged = onItemChanged
+    }
+
+    func mutate(_ action: Mutation) async {
         guard !isMutating else { return }
         isMutating = true
         errorMessage = nil
@@ -147,11 +188,12 @@ struct PostDetailView: View {
         do {
             let response: ReactionResponse
             switch action {
-            case .react: response = try await feedService.react(postId: localItem.id, emoji: "❤️")
-            case .repost: response = try await feedService.repost(postId: localItem.id)
-            case .favorite: response = try await feedService.favorite(postId: localItem.id)
+            case .react: response = try await react(item.id)
+            case .repost: response = try await repost(item.id)
+            case .favorite: response = try await favorite(item.id)
             }
-            localItem = localItem.applying(response)
+            item = item.applying(response)
+            onItemChanged(item)
             Haptics.success()
         } catch {
             guard !error.isCancellation else { return }
@@ -159,9 +201,35 @@ struct PostDetailView: View {
             Haptics.error()
         }
     }
+
+    func share(to conversationID: String) async -> String? {
+        do {
+            guard let messageID = try await sendShare(item.id, conversationID), !messageID.isEmpty else {
+                return nil
+            }
+            Haptics.success()
+            return messageID
+        } catch {
+            if !error.isCancellation { Haptics.error() }
+            return nil
+        }
+    }
 }
 
 extension UnifiedSocialFeedItem {
+    /// Projette uniquement les interactions validées, sans écraser un commentaire
+    /// ou un autre champ plus récent déjà présent dans le fil ou le message.
+    func adoptingInteractions(from detail: Self) -> Self {
+        var updated = self
+        updated.reactions = detail.reactions
+        updated.likedByMe = detail.likedByMe
+        updated.favoritedByMe = detail.favoritedByMe
+        updated.favoritesCount = detail.favoritesCount
+        updated.repostedByMe = detail.repostedByMe
+        updated.repostsCount = detail.repostsCount
+        return updated
+    }
+
     func applying(_ response: ReactionResponse) -> Self {
         var updated = self
         if let reactions = response.reactions {
