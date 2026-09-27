@@ -175,6 +175,11 @@ struct AppRootView: View {
             .background(PasswordResetPresentation(route: passwordResetRoute,
                 canPresent: canPresentPasswordReset, mustDismiss: mustDismissPasswordReset,
                 session: session, locale: locale, onClose: closePasswordReset, onSuccess: completePasswordReset))
+            .onAppear {
+                if AppEnvironment.showsPasswordResetQA, passwordResetRoute == nil {
+                    passwordResetRoute = PasswordResetRoute(request: PasswordResetRequest(token: "qa-layout-only"))
+                }
+            }
             .onOpenURL(perform: receiveAccountOrPostURL)
             .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
                 if let url = activity.webpageURL { receiveAccountOrPostURL(url) }

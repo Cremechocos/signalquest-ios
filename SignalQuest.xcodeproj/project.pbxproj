@@ -187,6 +187,7 @@
 		4AAA9D4C5E2B4E22D55AFF6A /* LiveTelemetryDeliveryStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F99C9F0E518188A5BB538C4 /* LiveTelemetryDeliveryStateTests.swift */; };
 		4AD407D0ECC09A2E4AEB9EEE /* OutageDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FD1C03F7963002D147C2B6A /* OutageDetailSheet.swift */; };
 		4AE7A6DFDC700D3BAAF84BE6 /* ShareCardBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01462ACA13AD33221D20FAF /* ShareCardBubble.swift */; };
+		4AEECDAB1464FF822DA10E8B /* PasswordResetFieldFeedbackQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E9B10F3C150DF7BA948B47 /* PasswordResetFieldFeedbackQATests.swift */; };
 		4AF68EACB68B6313048DB195 /* TileCacheConsistencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7FBDDB44021FF40EE20D16 /* TileCacheConsistencyTests.swift */; };
 		4AFB0DC62CF13CCEA58DEC77 /* RadioLogModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C263B41C968A1E89912CAEA9 /* RadioLogModels.swift */; };
 		4B210BA00F5D6D35E73E36AA /* RadioLogSiteModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1F197A1DD02322E21D022C /* RadioLogSiteModels.swift */; };
@@ -863,6 +864,7 @@
 		55FD59340CD7E3743D7EF4B9 /* AntennaProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaProfileView.swift; sourceTree = "<group>"; };
 		5668B2D20BD77FACF98E80BB /* RedesignTourQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedesignTourQATests.swift; sourceTree = "<group>"; };
 		56C63E44A7E96FCFBDBE3BD8 /* AntennaSightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaSightView.swift; sourceTree = "<group>"; };
+		56E9B10F3C150DF7BA948B47 /* PasswordResetFieldFeedbackQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordResetFieldFeedbackQATests.swift; sourceTree = "<group>"; };
 		5723505E7140ACE78C7A67FA /* CarPlaySceneManifestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneManifestTests.swift; sourceTree = "<group>"; };
 		57D22679EFB8F1BAF06D20F4 /* OnboardingRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingRoutingTests.swift; sourceTree = "<group>"; };
 		57FDE918733D1625D560F628 /* MarketRegistryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketRegistryModels.swift; sourceTree = "<group>"; };
@@ -1865,6 +1867,7 @@
 				F06E026EA0B3667BF1129FCF /* NotificationsHTTPQATests.swift */,
 				FBEB88B2CA9EC99EE88C5146 /* OledTourQATests.swift */,
 				23E85A770CF60ED550C4CCFE /* OnboardingAnimationQATests.swift */,
+				56E9B10F3C150DF7BA948B47 /* PasswordResetFieldFeedbackQATests.swift */,
 				4886511AB14489C9F2B2CD6B /* ProfileCardQATests.swift */,
 				CA9370C0177B2346BC4EBEC5 /* ProfileReorgQATests.swift */,
 				67A7BAA01EBC785D3B4AAD54 /* QuestLayoutQATests.swift */,
@@ -3176,6 +3179,7 @@
 				465550028B0506CE315A9506 /* NotificationsHTTPQATests.swift in Sources */,
 				6EC78D1C71A760B6A239524F /* OledTourQATests.swift in Sources */,
 				7DC00F26E17E3572AD6AC560 /* OnboardingAnimationQATests.swift in Sources */,
+				4AEECDAB1464FF822DA10E8B /* PasswordResetFieldFeedbackQATests.swift in Sources */,
 				34BA73B5085E3FEA3207B12F /* ProfileCardQATests.swift in Sources */,
 				7827FB3BCE2C62729FA1C132 /* ProfileReorgQATests.swift in Sources */,
 				AE81F6A9F6B4B5AFAF56AEC6 /* QuestLayoutQATests.swift in Sources */,

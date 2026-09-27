@@ -84,6 +84,11 @@ private struct PasswordResetForm: View {
                         .textFieldStyle(SQTextFieldStyle())
                         .accessibilityLabel("Nouveau mot de passe")
                         .accessibilityIdentifier("auth.reset.password")
+                    if let issue = passwordLengthIssue {
+                        Text(issue).font(SQType.caption).foregroundStyle(SQColor.danger)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("auth.reset.password-error")
+                    }
                 }
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
                     SQFormFieldLabel("Confirmer le mot de passe")
@@ -93,9 +98,14 @@ private struct PasswordResetForm: View {
                         .textFieldStyle(SQTextFieldStyle())
                         .accessibilityLabel("Confirmer le mot de passe")
                         .accessibilityIdentifier("auth.reset.confirmation")
+                    if let issue = confirmationIssue {
+                        Text(issue).font(SQType.caption).foregroundStyle(SQColor.danger)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("auth.reset.confirmation-error")
+                    }
                 }
-                if let issue = error ?? passwordIssue {
-                    Text(issue).font(SQType.caption).foregroundStyle(SQColor.danger)
+                if let error {
+                    Text(error).font(SQType.caption).foregroundStyle(SQColor.danger)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("auth.reset.error")
                 }
@@ -116,11 +126,14 @@ private struct PasswordResetForm: View {
         }
     }
 
-    private var passwordIssue: String? {
-        guard !password.isEmpty else { return nil }
-        if password.count < 8 { return String(localized: "Le mot de passe doit faire au moins 8 caractères.") }
-        if !confirmation.isEmpty, password != confirmation { return String(localized: "Les deux mots de passe ne correspondent pas.") }
-        return nil
+    private var passwordLengthIssue: String? {
+        guard !password.isEmpty, password.count < 8 else { return nil }
+        return String(localized: "Le mot de passe doit faire au moins 8 caractères.")
+    }
+
+    private var confirmationIssue: String? {
+        guard password.count >= 8, !confirmation.isEmpty, password != confirmation else { return nil }
+        return String(localized: "Les deux mots de passe ne correspondent pas.")
     }
 
     private var canSubmit: Bool {

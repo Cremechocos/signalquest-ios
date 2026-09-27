@@ -92,10 +92,19 @@ enum AppEnvironment {
     static var showsSpeedtestSharePreviewQA: Bool {
         ProcessInfo.processInfo.arguments.contains("--qa-speedtest-share-preview")
     }
+    /// Formulaire local de recette : aucun lien ni jeton réseau n'est émis.
+    static var showsPasswordResetQA: Bool {
+        #if targetEnvironment(simulator)
+        ProcessInfo.processInfo.arguments.contains("--qa-password-reset-form")
+        #else
+        false
+        #endif
+    }
     #else
     static var runsSpeedtestQA: Bool { false }
     static var exitsAfterSpeedtestQA: Bool { false }
     static var showsSpeedtestSharePreviewQA: Bool { false }
+    static var showsPasswordResetQA: Bool { false }
     #endif
 
     #if DEBUG
