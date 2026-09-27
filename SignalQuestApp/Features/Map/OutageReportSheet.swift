@@ -108,8 +108,9 @@ struct OutageReportSheet: View {
         }
         .task {
             restoreDraft()
-            await measureDistance()
+            measureDistance()
         }
+        .onReceive(services.location.$lastLocation) { _ in measureDistance() }
         .onChangeCompat(of: draft) { _, _ in scheduleDraftSave() }
         .onDisappear {
             draftSaveTask?.cancel()
@@ -423,10 +424,12 @@ struct OutageReportSheet: View {
     // MARK: - Actions
 
     /// Annonce la distance que le serveur vérifiera, sans jamais bloquer dessus.
-    private func measureDistance() async {
+    private func measureDistance() {
+        distanceMeters = nil
+        accuracyMeters = nil
         guard
             let siteLatitude, let siteLongitude,
-            let here = services.location.lastLocation
+            let here = services.location.cachedLocation()
         else { return }
         let site = CLLocation(latitude: siteLatitude, longitude: siteLongitude)
         distanceMeters = Int(here.distance(from: site))
@@ -435,7 +438,9 @@ struct OutageReportSheet: View {
 
     private func submit() async {
         guard !submitting else { return }
-        let here = services.location.lastLocation
+        // Relire permission et âge au moment de l'envoi : `lastLocation` peut
+        // encore contenir un fix expiré ou révoqué avant son callback d'invalidation.
+        let here = services.location.cachedLocation()
         // Le brouillon refuse lui-même de produire un corps tant que la gravité n'est pas choisie :
         // le bouton désactivé ne couvre pas les chemins clavier et VoiceOver.
         guard let body = draft.request(

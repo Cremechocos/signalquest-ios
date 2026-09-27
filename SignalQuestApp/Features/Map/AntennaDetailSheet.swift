@@ -605,7 +605,7 @@ struct AntennaDetailSheet: View {
     /// Le refus est mis en mots par le CLIENT, sur le code applicatif : la phrase du serveur
     /// n'existe qu'en français.
     private func voteOnOutage(_ outageId: String, kind: String) async {
-        let here = services.location.lastLocation
+        let here = services.location.cachedLocation()
         outageError = nil
         do {
             _ = try await services.communityOutages.vote(

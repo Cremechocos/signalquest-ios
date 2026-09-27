@@ -75,6 +75,24 @@ final class LocationServiceTests: XCTestCase {
         XCTAssertFalse(tracking.allowsBackgroundLocationUpdates)
     }
 
+    func testSubmissionLocationRejectsExpiredOrRevokedFixBeforePublishedStateUpdates() {
+        let (service, tracking, _, clock) = makeService()
+        service.receiveLocations([fix()])
+        XCTAssertNotNil(service.cachedLocation())
+
+        // Un retour d'arrière-plan peut précéder le timer d'expiration.
+        clock.advance(3_600)
+        XCTAssertNotNil(service.lastLocation)
+        XCTAssertNil(service.cachedLocation(), "Un signalement ne doit pas poster l'ancien point")
+
+        service.receiveLocations([fix(at: clock.value)])
+        XCTAssertNotNil(service.cachedLocation())
+        // Révocation système : le callback d'autorisation peut être encore en file.
+        tracking.authorizationStatus = .denied
+        XCTAssertNotNil(service.lastLocation)
+        XCTAssertNil(service.cachedLocation(), "Un vote ne doit pas poster le point après révocation")
+    }
+
     func testAQueuedLocationAfterRevocationCannotRepopulateCacheOrObservers() {
         let (service, tracking, _, _) = makeService()
         var observed = 0
