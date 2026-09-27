@@ -30,6 +30,13 @@ final class AppPrivacyCoverPolicyTests: XCTestCase {
         XCTAssertEqual(AppPrivacyCoverMode.resolve(authenticated: false, enabled: true, locked: true,
             sceneActive: false, appBackgrounded: true), .hidden)
     }
+
+    func testSensitiveRecoverySceneIsCoveredWithoutLocalAppLock() {
+        XCTAssertEqual(AppPrivacyCoverMode.resolve(authenticated: true, enabled: false, locked: false,
+            sceneActive: false, appBackgrounded: false, sensitivePresented: true), .obscured)
+        XCTAssertEqual(AppPrivacyCoverMode.resolve(authenticated: true, enabled: false, locked: false,
+            sceneActive: true, appBackgrounded: false, sensitivePresented: true), .hidden)
+    }
 }
 
 @MainActor

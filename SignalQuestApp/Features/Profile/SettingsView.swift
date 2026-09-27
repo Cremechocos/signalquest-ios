@@ -1074,6 +1074,9 @@ private struct E2EEV2RecoveryResetView: View {
         .navigationBarBackButtonHidden(!model.mayLeaveSecret)
         .task { await model.load() }
         .onDisappear { model.wipeTransientSecrets() }
+        // La clé de récupération peut être affichée en clair. Masquer aussi
+        // cette vue dans l'aperçu système, même si le verrou local est désactivé.
+        .background(AppSensitiveContentMarker())
     }
 
     private var statusSection: some View {
@@ -1172,6 +1175,7 @@ private struct E2EEV2RecoveryResetView: View {
             .autocorrectionDisabled()
             .font(.body.monospaced())
             .accessibilityLabel("Clé de récupération")
+            .privacySensitive()
             Button {
                 revealRecoveryInput.toggle()
             } label: {
@@ -1228,6 +1232,7 @@ private struct E2EEV2RecoveryResetView: View {
                 TextField("Code à 6 chiffres", text: $model.resetCode)
                     .keyboardType(.numberPad)
                     .textContentType(.oneTimeCode)
+                    .privacySensitive()
                     .onChangeCompat(of: model.resetCode) { _, value in
                         model.resetCode = String(value.filter(\.isNumber).prefix(6))
                     }
@@ -1271,6 +1276,7 @@ private struct E2EEV2RecoveryResetView: View {
                 Text(key.base64EncodedString())
                     .font(.caption.monospaced())
                     .textSelection(.enabled)
+                    .privacySensitive()
                     .accessibilityLabel("Clé de récupération de 256 bits affichée. Utilisez le bouton Copier pour la sauvegarder.")
                 Button {
                     UIPasteboard.general.setItems(
