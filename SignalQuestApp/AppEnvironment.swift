@@ -92,10 +92,31 @@ enum AppEnvironment {
     static var showsSpeedtestSharePreviewQA: Bool {
         ProcessInfo.processInfo.arguments.contains("--qa-speedtest-share-preview")
     }
+    /// Formulaire local de recette : aucun lien ni jeton réseau n'est émis.
+    static var showsPasswordResetQA: Bool {
+        #if targetEnvironment(simulator)
+        ProcessInfo.processInfo.arguments.contains("--qa-password-reset-form")
+        #else
+        false
+        #endif
+    }
+    /// Affiche le vrai formulaire de vérification 2FA sans passer par la feuille
+    /// système de sauvegarde du mot de passe. Strictement Debug + simulateur,
+    /// et uniquement vers le serveur HTTPS synthétique local.
+    static var showsTwoFactorLoginQA: Bool {
+        #if targetEnvironment(simulator)
+        ProcessInfo.processInfo.arguments.contains("--qa-two-factor-login") &&
+            AppConfig.current.apiBaseURL.absoluteString == "https://127.0.0.1:4325"
+        #else
+        false
+        #endif
+    }
     #else
     static var runsSpeedtestQA: Bool { false }
     static var exitsAfterSpeedtestQA: Bool { false }
     static var showsSpeedtestSharePreviewQA: Bool { false }
+    static var showsPasswordResetQA: Bool { false }
+    static var showsTwoFactorLoginQA: Bool { false }
     #endif
 
     #if DEBUG
@@ -120,6 +141,27 @@ enum AppEnvironment {
     }
 
     static var usesDemoPhotos: Bool { hasArgument("--qa-demo-photos") }
+    static var showsRemoteImageQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-remote-image")
+        #else
+        false
+        #endif
+    }
+    static var showsSentinelleAlertSettingsQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-sentinelle-alerts")
+        #else
+        false
+        #endif
+    }
+    static var showsCommentsQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-comments") || hasArgument("--qa-comments-replies")
+        #else
+        false
+        #endif
+    }
     static var usesDemoFriends: Bool { hasArgument("--qa-demo-friends") }
     static var walksDemoFriends: Bool { hasArgument("--qa-friends-walk") }
     static var opensMapLayers: Bool { hasArgument("--qa-map-layers") }

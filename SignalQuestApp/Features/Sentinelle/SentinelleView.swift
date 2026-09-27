@@ -45,6 +45,8 @@ final class SentinelleViewModel: ObservableObject {
     /// remplacerait un écran de données valides par un message d'échec.
     @Published var actionError: String?
 
+    private var loadGeneration = UUID()
+
     let service: SentinelleServicing
 
     init(service: SentinelleServicing) {
@@ -60,12 +62,18 @@ final class SentinelleViewModel: ObservableObject {
     ///   d'échec : perdre le réseau une seconde effacerait ce que l'utilisateur
     ///   est en train de lire. On garde l'affichage précédent et on retentera.
     func load(silently: Bool = false) async {
+        let generation = UUID()
+        loadGeneration = generation
+        if !silently { isLoading = true }
+        defer { if loadGeneration == generation { isLoading = false } }
         // Chargé à part et AVANT le reste : la liste de mes box exige Premium,
         // mes abonnements non. Les enchaîner ferait disparaître les connexions
         // suivies d'un utilisateur Free derrière un 403 qui ne les concerne pas.
         if let response = try? await service.following() {
+            guard loadGeneration == generation, !Task.isCancelled else { return }
             following = response.following
         }
+        guard loadGeneration == generation, !Task.isCancelled else { return }
 
         // Le lien reçu ne se consulte qu'UNE fois. Il n'était jamais oublié :
         // la requête repartait toutes les vingt secondes, à vie, pour un lien
@@ -77,17 +85,23 @@ final class SentinelleViewModel: ObservableObject {
             inviteSlug = slug
             do {
                 let box = try await service.sharedBox(slug: slug)
+                guard inviteSlug == slug, pendingShareSlug == nil, !Task.isCancelled else { return }
+                shareLinkError = nil
                 // Déjà suivie ou déjà à soi : rien à proposer. Un bouton « suivre »
                 // qui répondrait par une erreur n'a pas sa place.
                 sharedInvite = (box.isFollowing || box.isOwner) ? nil : box
             } catch {
+                guard inviteSlug == slug, pendingShareSlug == nil, !Task.isCancelled, !error.isCancellation else { return }
                 shareLinkError = "Ce lien de partage n’est plus valide. "
                     + "Demandez-en un nouveau à la personne qui vous l’a envoyé."
             }
         }
 
+        guard loadGeneration == generation, !Task.isCancelled else { return }
         do {
             let response = try await loadTargets()
+            guard loadGeneration == generation, !Task.isCancelled else { return }
+            accessDenied = false
             targets = response.targets
             quota = response.quota
 
@@ -122,6 +136,7 @@ final class SentinelleViewModel: ObservableObject {
                 }
             }
 
+            guard loadGeneration == generation, !Task.isCancelled else { return }
             incidents = collectedIncidents
             points = collectedPoints
             errorMessage = nil
@@ -138,11 +153,17 @@ final class SentinelleViewModel: ObservableObject {
             // par cycle au lieu d'une.
             lastRefresh = Date()
         } catch is SentinelleAccessDenied {
+            guard loadGeneration == generation, !Task.isCancelled else { return }
             accessDenied = true
+            targets = []
+            quota = nil
+            incidents = [:]
+            points = [:]
+            errorMessage = nil
         } catch {
+            guard loadGeneration == generation, !Task.isCancelled, !error.isCancellation else { return }
             if !silently { errorMessage = error.localizedDescription }
         }
-        isLoading = false
     }
 
     /// Charge la liste, avec UNE seconde tentative.
@@ -158,7 +179,8 @@ final class SentinelleViewModel: ObservableObject {
         } catch is SentinelleAccessDenied {
             throw SentinelleAccessDenied()
         } catch {
-            try? await Task.sleep(for: .milliseconds(400))
+            if error.isCancellation { throw error }
+            try await Task.sleep(for: .milliseconds(400))
             return try await service.targets()
         }
     }
@@ -264,7 +286,11 @@ struct SentinelleView: View {
             if model.isLoading && model.targets.isEmpty {
                 loadingState
             } else if model.accessDenied && model.following.isEmpty {
-                premiumUpsell
+                if services.entitlements.confirmedServerTier == .premium {
+                    premiumActivationPending
+                } else {
+                    premiumUpsell
+                }
             } else if let errorMessage = model.errorMessage, model.targets.isEmpty {
                 ErrorStateView(title: "Chargement impossible", message: errorMessage) {
                     Task { await model.load() }
@@ -544,6 +570,17 @@ struct SentinelleView: View {
                 showPremiumPaywall = true
             }
         }
+        .padding(SQSpace.lg)
+    }
+
+    /// Un droit Apple déjà détecté peut précéder de quelques secondes l'accès
+    /// effectif à l'API. Ne pas revendre Premium pendant cette propagation.
+    private var premiumActivationPending: some View {
+        ErrorStateView(
+            title: "Accès Sentinelle en cours d’activation",
+            message: "Ton droit Premium est détecté. Sentinelle ne l’a pas encore pris en compte.",
+            retry: { Task { await model.load() } }
+        )
         .padding(SQSpace.lg)
     }
 }

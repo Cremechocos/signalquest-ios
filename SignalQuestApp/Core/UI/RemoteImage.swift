@@ -5,6 +5,7 @@ import UIKit
 enum ImagePipelineError: Error {
     case decodeFailed
     case privateSessionChanged
+    case httpStatus(Int)
 }
 
 /// Frontière de confidentialité du cache d'images.
@@ -40,7 +41,7 @@ enum ImageCacheScope: Equatable, Sendable {
 final class ImagePipeline: @unchecked Sendable {
     static let shared = ImagePipeline()
 
-    typealias DataLoader = @Sendable (URL, ImageCacheScope) async throws -> Data
+    typealias DataLoader = @Sendable (URL, ImageCacheScope, Bool) async throws -> Data
 
     private let dataLoader: DataLoader
     private let memory = NSCache<NSString, UIImage>()
@@ -48,25 +49,42 @@ final class ImagePipeline: @unchecked Sendable {
     init() {
         let publicSession = URLSession(configuration: Self.makePublicSessionConfiguration())
         let privateSession = URLSession(configuration: Self.makePrivateSessionConfiguration())
-        dataLoader = { url, scope in
+        dataLoader = { url, scope, reload in
             switch scope {
             case .publicContent:
-                let (data, _) = try await publicSession.data(from: url)
+                let request = URLRequest(
+                    url: url,
+                    cachePolicy: reload ? .reloadIgnoringLocalCacheData : .returnCacheDataElseLoad
+                )
+                let (data, response) = try await publicSession.data(for: request)
+                try Self.requireSuccessfulHTTP(response)
                 return data
             case .privateAccount:
                 // Cette session n'a aucun URLCache ni cookie jar partagé. La
                 // requête explicite également le bypass afin qu'une évolution de
                 // configuration ne puisse pas réactiver un cache HTTP privé global.
                 let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
-                let (data, _) = try await privateSession.data(for: request)
+                let (data, response) = try await privateSession.data(for: request)
+                try Self.requireSuccessfulHTTP(response)
                 return data
             }
         }
         configureMemoryCache()
     }
 
+    private static func requireSuccessfulHTTP(_ response: URLResponse) throws {
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw ImagePipelineError.httpStatus(http.statusCode)
+        }
+    }
+
     /// Injection réservée aux tests : aucune requête réseau réelle n'est requise
     /// pour vérifier l'isolation A → logout → B et les réponses tardives.
+    init(dataLoader: @escaping @Sendable (URL, ImageCacheScope) async throws -> Data) {
+        self.dataLoader = { url, scope, _ in try await dataLoader(url, scope) }
+        configureMemoryCache()
+    }
+
     init(dataLoader: @escaping DataLoader) {
         self.dataLoader = dataLoader
         configureMemoryCache()
@@ -109,12 +127,13 @@ final class ImagePipeline: @unchecked Sendable {
     func image(
         for url: URL,
         maxPixel: CGFloat,
-        scope: ImageCacheScope = .publicContent
+        scope: ImageCacheScope = .publicContent,
+        reload: Bool = false
     ) async throws -> UIImage {
         try scope.requireCurrentPrivateSession()
         let key = memoryKey(for: url, maxPixel: maxPixel, scope: scope)
-        if let cached = memory.object(forKey: key) { return cached }
-        let data = try await dataLoader(url, scope)
+        if !reload, let cached = memory.object(forKey: key) { return cached }
+        let data = try await dataLoader(url, scope, reload)
         // La session peut avoir changé pendant le transport ou le décodage. Ne
         // publie jamais les octets de A dans une vue qui appartient désormais à B.
         try scope.requireCurrentPrivateSession()
@@ -157,10 +176,14 @@ struct RemoteImage<Placeholder: View>: View {
     var maxDimension: CGFloat
     var contentMode: ContentMode = .fill
     var cacheScope: ImageCacheScope = .publicContent
+    var pipeline: ImagePipeline = .shared
+    var showsFailureUI = false
     @ViewBuilder var placeholder: () -> Placeholder
 
     @State private var image: UIImage?
     @State private var failed = false
+    @State private var retryCount = 0
+    @State private var retryIdentity: String?
     @Environment(\.displayScale) private var displayScale
 
     var body: some View {
@@ -169,13 +192,16 @@ struct RemoteImage<Placeholder: View>: View {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
+                    .accessibilityIdentifier("remoteImage.loaded")
+            } else if failed && showsFailureUI {
+                failureView
             } else {
                 placeholder()
             }
         }
         .task(id: taskKey) {
             failed = false
-            guard let url else { image = nil; return }
+            guard let url else { image = nil; failed = true; return }
             let maxPixel = max(1, maxDimension * displayScale)
             // Lecture SYNCHRONE du cache mémoire avant toute remise à nil.
             // Auparavant `image = nil` s'exécutait en premier et `image(for:)`
@@ -183,7 +209,7 @@ struct RemoteImage<Placeholder: View>: View {
             // (scroll d'une grille de photos, pan de carte) réaffichait donc au
             // moins une frame de placeholder alors que l'image décodée était
             // déjà en mémoire. L'accesseur existait et n'était appelé nulle part.
-            if let cached = ImagePipeline.shared.cachedImage(
+            if let cached = pipeline.cachedImage(
                 for: url,
                 maxPixel: maxPixel,
                 scope: cacheScope
@@ -193,19 +219,64 @@ struct RemoteImage<Placeholder: View>: View {
             }
             image = nil
             do {
-                image = try await ImagePipeline.shared.image(
+                let forceReload = retryIdentity == requestIdentity
+                let loaded = try await pipeline.image(
                     for: url,
                     maxPixel: maxPixel,
-                    scope: cacheScope
+                    scope: cacheScope,
+                    reload: forceReload
                 )
+                guard !Task.isCancelled else { return }
+                image = loaded
+                if forceReload { retryIdentity = nil }
             } catch {
+                guard !Task.isCancelled else { return }
                 failed = true
             }
         }
     }
 
+    @ViewBuilder private var failureView: some View {
+        ZStack {
+            SQColor.fill
+            VStack(spacing: 8) {
+                if url == nil {
+                    Image(systemName: "photo")
+                        .font(.title3)
+                        .accessibilityIdentifier("remoteImage.failure")
+                }
+                if maxDimension >= 180 {
+                    Text("Photo indisponible")
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                        .accessibilityIdentifier("remoteImage.failure")
+                }
+                if url != nil {
+                    Button {
+                        retryIdentity = requestIdentity
+                        retryCount += 1
+                    } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: "arrow.clockwise")
+                            if maxDimension >= 180 { Text("Réessayer") }
+                        }
+                        .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel("Réessayer")
+                    .accessibilityIdentifier("remoteImage.retry")
+                }
+            }
+            .foregroundStyle(SQColor.label)
+        }
+    }
+
     /// Recharge quand l'URL OU l'échelle change.
-    private var taskKey: String {
+    private var requestIdentity: String {
         "\(cacheScope.cacheIdentity)|\(url?.absoluteString ?? "nil")|\(Int(maxDimension * displayScale))"
+    }
+
+    private var taskKey: String {
+        "\(requestIdentity)|\(retryCount)"
     }
 }

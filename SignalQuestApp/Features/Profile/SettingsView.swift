@@ -1074,6 +1074,9 @@ private struct E2EEV2RecoveryResetView: View {
         .navigationBarBackButtonHidden(!model.mayLeaveSecret)
         .task { await model.load() }
         .onDisappear { model.wipeTransientSecrets() }
+        // La clé de récupération peut être affichée en clair. Masquer aussi
+        // cette vue dans l'aperçu système, même si le verrou local est désactivé.
+        .background(AppSensitiveContentMarker())
     }
 
     private var statusSection: some View {
@@ -1172,6 +1175,7 @@ private struct E2EEV2RecoveryResetView: View {
             .autocorrectionDisabled()
             .font(.body.monospaced())
             .accessibilityLabel("Clé de récupération")
+            .privacySensitive()
             Button {
                 revealRecoveryInput.toggle()
             } label: {
@@ -1228,6 +1232,7 @@ private struct E2EEV2RecoveryResetView: View {
                 TextField("Code à 6 chiffres", text: $model.resetCode)
                     .keyboardType(.numberPad)
                     .textContentType(.oneTimeCode)
+                    .privacySensitive()
                     .onChangeCompat(of: model.resetCode) { _, value in
                         model.resetCode = String(value.filter(\.isNumber).prefix(6))
                     }
@@ -1271,6 +1276,7 @@ private struct E2EEV2RecoveryResetView: View {
                 Text(key.base64EncodedString())
                     .font(.caption.monospaced())
                     .textSelection(.enabled)
+                    .privacySensitive()
                     .accessibilityLabel("Clé de récupération de 256 bits affichée. Utilisez le bouton Copier pour la sauvegarder.")
                 Button {
                     UIPasteboard.general.setItems(
@@ -1345,27 +1351,65 @@ final class SettingsViewModel: ObservableObject {
 
     private let userService: UserServicing
     private let authService: AuthServicing
-    init(userService: UserServicing, authService: AuthServicing) {
+    private let exportDirectory: URL
+    private var exportSession: LocalAccountSession?
+    private var exportURL: URL?
+
+    init(userService: UserServicing, authService: AuthServicing,
+         exportDirectory: URL = FileManager.default.temporaryDirectory) {
         self.userService = userService
         self.authService = authService
+        self.exportDirectory = exportDirectory
     }
 
     func exportData() async {
+        guard !isExporting, let expectedSession = LocalAccountScope.sessionSnapshot() else { return }
+        clearExport()
         isExporting = true
         errorMessage = nil
         defer { isExporting = false }
+        var pendingURL: URL?
         do {
             let data = try await userService.exportPersonalData()
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("signalquest-mes-donnees.json")
-            try data.write(to: url, options: .atomic)
+            guard !Task.isCancelled, expectedSession.isCurrent else { return }
+            let url = exportDirectory
+                .appendingPathComponent("signalquest-mes-donnees-\(UUID().uuidString).json")
+            pendingURL = url
+            // Un export volumineux ne doit pas figer le thread de l'interface.
+            try await Task.detached(priority: .utility) {
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                        withIntermediateDirectories: true)
+                try data.write(to: url, options: [.atomic, .completeFileProtection])
+            }.value
+            guard !Task.isCancelled, expectedSession.isCurrent else {
+                try? FileManager.default.removeItem(at: url)
+                return
+            }
+            exportSession = expectedSession
+            exportURL = url
             exportedFile = ExportedDataFile(url: url)
+            pendingURL = nil
             Haptics.success()
         } catch {
-            if error.isCancellation { return }
+            if let pendingURL { try? FileManager.default.removeItem(at: pendingURL) }
+            if error.isCancellation || !expectedSession.isCurrent { return }
             errorMessage = error.localizedDescription
             Haptics.error()
         }
+    }
+
+    func clearExport() {
+        exportedFile = nil
+        exportSession = nil
+        if let exportURL { try? FileManager.default.removeItem(at: exportURL) }
+        exportURL = nil
+    }
+
+    func clearExportIfAccountChanged(_ state: AuthSessionViewModel.State) {
+        guard let exportSession else { return }
+        if case .authenticated(let user) = state,
+           exportSession.ownerScopeId == "user:\(user.id)", exportSession.isCurrent { return }
+        clearExport()
     }
 
     func load() async {
@@ -1376,10 +1420,6 @@ final class SettingsViewModel: ObservableObject {
         isBusy = true
         defer { isBusy = false }
         do { prefs = try await userService.updateNotificationPreferences(prefs) } catch { errorMessage = error.localizedDescription }
-    }
-
-    func disable2FA(code: String) async {
-        do { try await authService.disable2FA(code: code) } catch { errorMessage = error.localizedDescription }
     }
 
     func loadAccountDeletionPreview() async {
@@ -1424,12 +1464,16 @@ struct SettingsView: View {
     @StateObject private var model: SettingsViewModel
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var services: AppServices
-    @State private var show2FASetup = false
+    @State private var twoFactorEnrollment: TwoFactorEnrollmentService?
+    @State private var twoFactorDisable: TwoFactorEnrollmentService?
+    @State private var isDisabling2FA = false
     @State private var show2FADisable = false
     @State private var disable2FACode = ""
     @State private var showDeleteConfirm = false
     @AppStorage(MapBackdrop.storageKey) private var mapBackdropRaw = MapBackdrop.applePlan.rawValue
     @AppStorage(AppLockSettings.enabledKey) private var appLockEnabled = false
+    @State private var canAuthenticateDeviceOwner = BiometricAuth.canAuthenticateDeviceOwner
+    @StateObject private var appLockSetup = AppLockSetupController()
     @AppStorage(AppLockSettings.lockGraceKey) private var lockGraceSeconds = 0.0
     @AppStorage(SQOledPalette.storageKey) private var pureBlack = false
     @AppStorage(SQFieldMode.storageKey) private var fieldMode = false
@@ -1467,13 +1511,25 @@ struct SettingsView: View {
             Section {
                 if twoFactorEnabled {
                     Button(role: .destructive) {
+                        guard case .authenticated(let user) = session.state,
+                              let operation = TwoFactorEnrollmentService(api: services.api, userID: user.id) else {
+                            model.errorMessage = TwoFactorEnrollmentError.sessionChanged.localizedDescription
+                            return
+                        }
+                        twoFactorDisable = operation
                         show2FADisable = true
                     } label: {
                         settingsLabel("Désactiver la 2FA", systemImage: "lock.open")
                     }
+                    .disabled(isDisabling2FA)
                 } else {
                     Button {
-                        show2FASetup = true
+                        guard case .authenticated(let user) = session.state,
+                              let enrollment = TwoFactorEnrollmentService(api: services.api, userID: user.id) else {
+                            model.errorMessage = TwoFactorEnrollmentError.sessionChanged.localizedDescription
+                            return
+                        }
+                        twoFactorEnrollment = enrollment
                     } label: {
                         settingsLabel("Activer la 2FA", systemImage: "lock.shield")
                     }
@@ -1538,23 +1594,25 @@ struct SettingsView: View {
                 Text("CarPlay")
             }
             .listRowBackground(SQColor.surface)
-            if BiometricAuth.isAvailable {
+            Group {
                 Section {
                     Toggle(isOn: Binding(
                         get: { appLockEnabled },
                         set: { newValue in
-                            guard newValue else { appLockEnabled = false; return }
-                            // Confirme par biométrie avant d'activer (évite de se
-                            // verrouiller dehors si Face ID ne marche pas).
-                            Task {
-                                let ok = await BiometricAuth.authenticate(
-                                    reason: "Confirme \(BiometricAuth.kind.label) pour activer le verrouillage"
-                                )
-                                appLockEnabled = ok
-                            }
+                            appLockSetup.setEnabled(newValue, credentials: services.api.credentials)
                         }
                     )) {
-                        settingsLabel("Verrouiller avec \(BiometricAuth.kind.label)", systemImage: BiometricAuth.kind.systemImage)
+                        settingsLabel("Verrouiller SignalQuest", systemImage: "lock.shield")
+                    }
+                    .accessibilityIdentifier("settings.app-lock")
+                    .disabled(appLockSetup.isConfirming || (!canAuthenticateDeviceOwner && !appLockEnabled))
+                    if !canAuthenticateDeviceOwner && !appLockEnabled {
+                        Text("Configure un code pour l’appareil dans les Réglages iOS afin d’activer le verrouillage.")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    if let appLockError = appLockSetup.errorMessage {
+                        Text(appLockError).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
                     }
                     if appLockEnabled {
                         Picker(selection: $lockGraceSeconds) {
@@ -1580,13 +1638,15 @@ struct SettingsView: View {
                                 if !newValue { E2EEBiometric.clear() }
                             }
                         )) {
-                            settingsLabel("Messagerie chiffrée via \(BiometricAuth.kind.label)", systemImage: "lock.shield")
+                            settingsLabel("Messagerie chiffrée via \(BiometricAuth.kind.label)",
+                                systemImage: "lock.shield",
+                                localizedTitle: "Messagerie chiffrée via \(BiometricAuth.kind.label)")
                         }
                     }
                 } header: {
                     Text("Verrouillage")
                 } footer: {
-                    Text("Exige \(BiometricAuth.kind.label) à l’ouverture après le délai d’inactivité choisi. La déconnexion automatique efface la session après une inactivité prolongée.")
+                    Text("Protège l’ouverture avec la biométrie ou le code de l’appareil après le délai choisi. Le contenu est masqué dans le sélecteur d’apps, même pendant ce délai. La déconnexion automatique efface la session après une inactivité prolongée.")
                         .font(SQType.caption)
                 }
                 .tint(SQColor.brandRed)
@@ -1789,6 +1849,16 @@ struct SettingsView: View {
         .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Réglages")
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            canAuthenticateDeviceOwner = BiometricAuth.canAuthenticateDeviceOwner
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            appLockSetup.cancel()
+        }
+        .onChangeCompat(of: session.state) { _, _ in
+            appLockSetup.cancelIfSessionChanged()
+        }
+        .onDisappear { appLockSetup.cancel() }
         .navigationBarTitleDisplayMode(.inline)
         .task(id: PushOwnerScope.current) {
             await model.load()
@@ -1798,19 +1868,48 @@ struct SettingsView: View {
             let settings = await UNUserNotificationCenter.current().notificationSettings()
             systemNotificationsDenied = settings.authorizationStatus == .denied
         }
-        .sheet(isPresented: $show2FASetup) {
-            NavigationStack { TwoFactorSetupView(service: services.auth) }
+        .sheet(item: $twoFactorEnrollment) { enrollment in
+            NavigationStack {
+                TwoFactorSetupView(service: enrollment, acknowledge: {
+                    try session.acknowledgeTwoFactorState(expectedUserID: enrollment.scope.userID,
+                        isCurrent: enrollment.isCurrent)
+                }, refreshProfile: {
+                    try await session.refreshUser(expectedUserID: enrollment.scope.userID,
+                        isCurrent: enrollment.isCurrent, fetchUser: {
+                            let user = try await enrollment.profile()
+                            guard user.twoFactorEnabled == true else { throw TwoFactorEnrollmentError.profileNotReady }
+                            return user
+                        })
+                })
+            }
+        }
+        .onChangeCompat(of: session.state) { _, _ in
+            if let enrollment = twoFactorEnrollment, !enrollment.isCurrent() { twoFactorEnrollment = nil }
+            if let operation = twoFactorDisable, !operation.isCurrent() {
+                show2FADisable = false
+                disable2FACode = ""
+                twoFactorDisable = nil
+            }
         }
         .alert("Désactiver la 2FA ?", isPresented: $show2FADisable) {
             TextField("Code à 6 chiffres", text: $disable2FACode)
                 .keyboardType(.numberPad)
-            Button("Annuler", role: .cancel) { disable2FACode = "" }
+            Button("Annuler", role: .cancel) { disable2FACode = ""; twoFactorDisable = nil }
             Button("Désactiver", role: .destructive) {
                 let code = disable2FACode
                 disable2FACode = ""
-                Task {
-                    await model.disable2FA(code: code)
-                    await session.refreshUser()
+                guard let operation = twoFactorDisable, !isDisabling2FA else { return }
+                isDisabling2FA = true
+                model.errorMessage = nil
+                Task { @MainActor in
+                    defer { isDisabling2FA = false; twoFactorDisable = nil }
+                    do {
+                        try await operation.disable(code: code)
+                        try session.acknowledgeTwoFactorState(enabled: false,
+                            expectedUserID: operation.scope.userID, isCurrent: operation.isCurrent)
+                    } catch {
+                        if operation.isCurrent() { model.errorMessage = error.localizedDescription }
+                    }
                 }
             }
         } message: {
@@ -1822,22 +1921,36 @@ struct SettingsView: View {
         } message: {
             Text("Tu ne pourras plus te connecter via Apple. Si ton compte a été créé avec Apple, définis d'abord un mot de passe via « Mot de passe oublié » pour ne pas perdre l'accès.")
         }
-        .sheet(item: $model.exportedFile) { file in
+        .sheet(item: $model.exportedFile, onDismiss: { model.clearExport() }) { file in
             ShareSheet(items: [file.url])
+        }
+        .onChangeCompat(of: session.state) { _, state in
+            model.clearExportIfAccountChanged(state)
         }
         .sheet(isPresented: $showDeleteConfirm) {
             DeleteAccountSheet(model: model) {
-                guard model.deletedOwnerScopeId == LocalAccountScope.currentOwnerScopeId else { return }
+                guard let deletedOwner = model.deletedOwnerScopeId else { return }
+                var cleanupWarning: String?
+                // Le reçu serveur concerne ce propriétaire, même si un autre
+                // compte a été ouvert entre-temps. Ne jamais effacer son voisin.
+                do { try await services.favoriteAntennas.eraseLocalDataForDeletedAccount(ownerScopeID: deletedOwner) }
+                catch {
+                    cleanupWarning = String(localized: "Le compte est supprimé, mais le nettoyage des favoris locaux a échoué sur cet appareil.")
+                    model.deletionError = cleanupWarning
+                }
+                guard deletedOwner == LocalAccountScope.currentOwnerScopeId else { return }
                 await services.push.unregister()
-                guard model.deletedOwnerScopeId == LocalAccountScope.currentOwnerScopeId else { return }
+                guard deletedOwner == LocalAccountScope.currentOwnerScopeId else { return }
                 await session.logout()
+                if case .loggedOut = session.state, let cleanupWarning { session.errorMessage = cleanupWarning }
             }
         }
     }
 
     /// Rangée de réglage (DA Crème) : pastille d'icône 36 pt `accentSoft`
     /// (icône brique) + libellé Figtree Medium 15,5. Aucune bordure.
-    private func settingsLabel(_ title: String, systemImage: String) -> some View {
+    private func settingsLabel(_ title: String, systemImage: String,
+                               localizedTitle: LocalizedStringKey? = nil) -> some View {
         HStack(spacing: SQSpace.md) {
             Image(systemName: systemImage)
                 .font(.system(size: 15, weight: .medium))
@@ -1845,7 +1958,7 @@ struct SettingsView: View {
                 .frame(width: 36, height: 36)
                 .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .accessibilityHidden(true)
-            Text(LocalizedStringKey(title))
+            Text(localizedTitle ?? LocalizedStringKey(title))
                 .font(.body.weight(.medium))
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)

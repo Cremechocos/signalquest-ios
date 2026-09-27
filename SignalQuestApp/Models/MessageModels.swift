@@ -285,6 +285,25 @@ struct LiveSharePayload: Codable, Equatable, Sendable {
     let at: String?
 }
 
+/// Une session active ne prouve pas que sa dernière position est encore actuelle.
+/// `at` décrit la capture GPS, tandis que `lastUpdateAt` peut décrire une mise à
+/// jour radio ou serveur : il ne peut donc pas rafraîchir une ancienne position.
+enum LiveShareLocationFreshness {
+    static let maximumAge: TimeInterval = 30
+
+    static func observedAt(_ payload: LiveSharePayload?) -> Date? {
+        payload?.at.flatMap(SQDateParsing.parse)
+    }
+
+    static func isCurrent(_ payload: LiveSharePayload?, at now: Date) -> Bool {
+        guard let location = payload?.location,
+              location.latitude.isFinite, (-90...90).contains(location.latitude),
+              location.longitude.isFinite, (-180...180).contains(location.longitude),
+              let observedAt = observedAt(payload) else { return false }
+        return (0...maximumAge).contains(now.timeIntervalSince(observedAt))
+    }
+}
+
 struct LiveShareSession: Decodable, Identifiable, Equatable, Sendable {
     let id: String
     let conversationId: String

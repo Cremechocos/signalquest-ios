@@ -34,7 +34,17 @@ final class InboxBadgePresentationState {
     @discardableResult
     func publish(unreadCount: Int, for ticket: RefreshTicket, now: Date = Date()) -> Bool {
         guard ticket.generation == generation, sessionSnapshot() == ticket.session else { return false }
-        self.unreadCount = unreadCount
+        self.unreadCount = max(0, unreadCount)
+        lastRefresh = now
+        return true
+    }
+
+    /// Une mutation confirmée prime sur tout GET lancé avant elle.
+    @discardableResult
+    func replaceAfterMutation(unreadCount: Int, for session: LocalAccountSession, now: Date = Date()) -> Bool {
+        guard sessionSnapshot() == session else { return false }
+        generation &+= 1
+        self.unreadCount = max(0, unreadCount)
         lastRefresh = now
         return true
     }
@@ -106,7 +116,7 @@ final class AppServices: ObservableObject {
     let router: AppRouter
     let callManager: CallManager
     let sse: SSEClient
-    let location = LocationService()
+    let location: LocationService
     let networkPath = NetworkPathMonitor()
     /// Émetteur de la position/présence live pour la carte des amis.
     let livePresence: LivePresenceService
@@ -117,8 +127,11 @@ final class AppServices: ObservableObject {
     /// Nombre de conversations non lues — alimente le badge de l'onglet Messages.
     @Published var unreadConversations = 0
     private let inboxBadgeState = InboxBadgePresentationState()
+    @Published private(set) var unreadNotifications = 0
+    private let notificationBadgeState = InboxBadgePresentationState()
 
-    init(config: AppConfig = .current) {
+    init(config: AppConfig = .current, location: LocationService = LocationService()) {
+        self.location = location
         let credentials = CredentialStore()
         let api = APIClient(config: config, credentials: credentials)
         self.api = api
@@ -138,12 +151,12 @@ final class AppServices: ObservableObject {
         comments = CommentsService(api: api)
         stories = StoriesService(api: api)
         reports = ReportsService(api: api)
-        let privacyService = PrivacyService(api: api)
+        let mapService = MapSnapshotService(api: api)
+        map = mapService
+        let privacyService = PrivacyService(api: api, invalidatePublicMap: { await mapService.invalidateTiles() })
         privacy = privacyService
         livePresence = LivePresenceService(api: api, location: location, networkPath: networkPath, privacy: privacyService)
         versionPolicy = VersionPolicyService(api: api)
-        let mapService = MapSnapshotService(api: api)
-        map = mapService
         let marketsService = MarketRegistryService(api: api)
         markets = marketsService
         antennas = AntennasService(api: api)
@@ -159,7 +172,10 @@ final class AppServices: ObservableObject {
         let networkOperatorService = NetworkOperatorService(api: api)
         networkOperator = networkOperatorService
         nearbyQuality = NearbyNetworkQualityService(map: mapService, markets: marketsService, networkOperator: networkOperatorService)
-        speedtest = SpeedtestService(api: api, markets: marketsService, networkOperator: networkOperatorService)
+        speedtest = SpeedtestService(
+            api: api, markets: marketsService, networkOperator: networkOperatorService,
+            invalidatePublicMap: { await mapService.invalidateTiles() }
+        )
         photos = PhotoService(api: api)
         let messagesService = MessagesService(api: api, sse: sseClient)
         messages = messagesService
@@ -219,17 +235,57 @@ final class AppServices: ObservableObject {
         unreadConversations = inboxBadgeState.unreadCount
     }
 
+    func refreshNotificationBadge(force: Bool = false) async {
+        guard let ticket = notificationBadgeState.beginRefresh(force: force) else { return }
+        guard let page = try? await notifications.list(cursor: nil) else { return }
+        let count = page.unreadCount ?? page.notifications.filter { $0.read != true }.count
+        publishNotificationBadge(unreadCount: count, for: ticket)
+    }
+
+    func notificationBadgeRefreshTicket() -> InboxBadgePresentationState.RefreshTicket? {
+        notificationBadgeState.beginRefresh(force: true)
+    }
+
+    func publishNotificationBadge(unreadCount: Int, for ticket: InboxBadgePresentationState.RefreshTicket) {
+        guard notificationBadgeState.publish(unreadCount: unreadCount, for: ticket) else { return }
+        unreadNotifications = notificationBadgeState.unreadCount
+    }
+
+    func applyNotificationBadgeMutation(unreadCount: Int, for session: LocalAccountSession) {
+        guard notificationBadgeState.replaceAfterMutation(unreadCount: unreadCount, for: session) else { return }
+        unreadNotifications = notificationBadgeState.unreadCount
+    }
+
     /// Efface immédiatement tout état visuel privé de l'ancien compte. Le reset
     /// invalide aussi les requêtes déjà parties et rouvre le throttle pour que le
     /// nouveau compte puisse charger son propre badge sans attendre 20 secondes.
     func resetAccountPresentationState() {
         inboxBadgeState.reset()
         unreadConversations = 0
+        notificationBadgeState.reset()
+        unreadNotifications = 0
+        favoriteRefreshTask?.cancel()
+        favoriteRefreshTask = nil
+        favoriteAntennas.resetForAccountChange()
+        refreshFavoritesForCurrentAccount()
     }
 
     // MARK: - Amorçage partagé
 
     private var bootstrapTask: Task<Void, Never>?
+    private var favoriteRefreshTask: Task<Void, Never>?
+
+    func refreshFavoritesForCurrentAccount() {
+        favoriteRefreshTask?.cancel()
+        guard let owner = LocalAccountScope.sessionSnapshot() else {
+            favoriteRefreshTask = nil
+            return
+        }
+        favoriteRefreshTask = Task { [favoriteAntennas] in
+            guard owner.isCurrent, !Task.isCancelled else { return }
+            await favoriteAntennas.load()
+        }
+    }
 
     /// Amorçage de session, appelable depuis TOUS les points d'entrée — la
     /// fenêtre SwiftUI comme la scène CarPlay. Idempotent et coalescé : les
@@ -251,9 +307,9 @@ final class AppServices: ObservableObject {
             await session.bootstrap()
             if case .authenticated(let user) = session.state {
                 epochRotations.resume()
+                refreshFavoritesForCurrentAccount()
                 // Le namespace du compte est actif : les files ne peuvent plus être
                 // rejouées avec l'identité d'un autre utilisateur.
-                await sessions.retryPendingCoverageSessions()
                 await speedtest.retryPendingSaves()
                 await liveShare.bootstrap(currentUserId: user.id)
             }
@@ -351,6 +407,7 @@ final class AppServices: ObservableObject {
         if networkPath.isOnline { epochRotations.resume() }
         livePresence.setAppActive(true)
         liveShare.setAppActive(true)
+        refreshFavoritesForCurrentAccount()
     }
 }
 
@@ -729,36 +786,52 @@ final class ConversationLiveShareCoordinator: ObservableObject {
         let status = networkPath.status
         let sim = networkPath.simPLMN()
         let activeSimPlmn = status.connection == .cellular ? (status.simPlmn ?? sim.plmn) : nil
-        let payload = LiveSharePayload(
-            radio: LiveShareRadio(
-                connectionType: status.speedtestConnectionType,
-                technology: status.cellularTechnology?.displayName,
-                // CoreTelephony décrit la SIM, pas nécessairement le réseau
-                // visité. Aucun PLMN servant n'est donc fabriqué en roaming.
-                operatorName: nil,
-                mcc: nil,
-                mnc: nil,
-                observedPlmn: nil,
-                simPlmn: activeSimPlmn,
-                simOperatorName: status.operatorName,
-                networkIdentitySource: activeSimPlmn == nil ? nil : "SIM"
-            ),
-            location: currentLocation.map {
-                LiveShareLocation(
-                    latitude: $0.coordinate.latitude,
-                    longitude: $0.coordinate.longitude,
-                    accuracy: $0.horizontalAccuracy >= 0 ? $0.horizontalAccuracy : nil,
-                    altitude: $0.verticalAccuracy >= 0 ? $0.altitude : nil,
-                    speed: $0.speed >= 0 ? $0.speed : nil,
-                    heading: $0.course >= 0 ? $0.course : nil
-                )
-            },
-            at: ISO8601DateFormatter().string(from: Date())
+        let radio = LiveShareRadio(
+            connectionType: status.speedtestConnectionType,
+            technology: status.cellularTechnology?.displayName,
+            // CoreTelephony décrit la SIM, pas nécessairement le réseau
+            // visité. Aucun PLMN servant n'est donc fabriqué en roaming.
+            operatorName: nil,
+            mcc: nil,
+            mnc: nil,
+            observedPlmn: nil,
+            simPlmn: activeSimPlmn,
+            simOperatorName: status.operatorName,
+            networkIdentitySource: activeSimPlmn == nil ? nil : "SIM"
         )
 
         var sawSuccess = false
+        var lastSentLocation: CLLocation?
         for session in publishableSessions {
             guard appIsActive, !Task.isCancelled else { break }
+            // Un callback GPS ancien peut survivre dans `lastObservedLocation`.
+            // Revalider juste avant CHAQUE envoi, y compris après un await pour
+            // une autre session : révocation/expiration => localisation absente.
+            let admissibleLocation = currentLocation.flatMap {
+                location.isUsable($0, maxAge: 30) ? $0 : nil
+            }
+            // Le contrat E2EE v2 exige une position chiffrée : sans fix admis,
+            // attendre le prochain relevé plutôt que recycler une ancienne position.
+            if session.e2eeV2Required == true, admissibleLocation == nil {
+                errorMessage = String(localized: "Position indisponible")
+                continue
+            }
+            let payload = LiveSharePayload(
+                radio: radio,
+                location: admissibleLocation.map {
+                    LiveShareLocation(
+                        latitude: $0.coordinate.latitude,
+                        longitude: $0.coordinate.longitude,
+                        accuracy: $0.horizontalAccuracy >= 0 ? $0.horizontalAccuracy : nil,
+                        altitude: $0.verticalAccuracy >= 0 ? $0.altitude : nil,
+                        speed: $0.speed >= 0 ? $0.speed : nil,
+                        heading: $0.course >= 0 ? $0.course : nil
+                    )
+                },
+                // `at` est l'heure d'observation du lieu, pas celle du heartbeat.
+                // Sinon un fix encore admissible mais âgé paraît pris à l'instant.
+                at: ISO8601DateFormatter().string(from: admissibleLocation?.timestamp ?? Date())
+            )
             do {
                 if session.e2eeV2Required == true {
                     try await service.updateE2eeLiveShare(session: session, payload: payload)
@@ -771,6 +844,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
                 }
                 payloadsBySessionID[session.id] = payload
                 sawSuccess = true
+                lastSentLocation = admissibleLocation
             } catch {
                 errorMessage = "Partage en direct interrompu : \(error.localizedDescription)"
                 if case APIError.http(let status, _, _, _, _) = error,
@@ -781,7 +855,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
         }
         if sawSuccess {
             lastPublishedAt = Date()
-            lastPublishedLocation = currentLocation
+            lastPublishedLocation = lastSentLocation
             errorMessage = nil
         }
         if publishableSessions.isEmpty { stopPublisher() }

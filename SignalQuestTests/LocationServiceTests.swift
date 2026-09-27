@@ -1,5 +1,6 @@
 import XCTest
 import CoreLocation
+import CarPlay
 @testable import SignalQuest
 
 @MainActor
@@ -73,6 +74,158 @@ final class LocationServiceTests: XCTestCase {
         XCTAssertEqual(service.authorizationStatus, .denied)
         XCTAssertGreaterThan(tracking.stops, 0)
         XCTAssertFalse(tracking.allowsBackgroundLocationUpdates)
+    }
+
+    func testSubmissionLocationRejectsExpiredOrRevokedFixBeforePublishedStateUpdates() {
+        let (service, tracking, _, clock) = makeService()
+        service.receiveLocations([fix()])
+        XCTAssertNotNil(service.cachedLocation())
+
+        // Un retour d'arrière-plan peut précéder le timer d'expiration.
+        clock.advance(3_600)
+        XCTAssertNotNil(service.lastLocation)
+        XCTAssertNil(service.cachedLocation(), "Un signalement ne doit pas poster l'ancien point")
+
+        service.receiveLocations([fix(at: clock.value)])
+        XCTAssertNotNil(service.cachedLocation())
+        // Révocation système : le callback d'autorisation peut être encore en file.
+        tracking.authorizationStatus = .denied
+        XCTAssertNotNil(service.lastLocation)
+        XCTAssertNil(service.cachedLocation(), "Un vote ne doit pas poster le point après révocation")
+    }
+
+    func testDriveTestOpeningDoesNotAddAnExpiredFixToItsTrace() {
+        let (service, _, _, clock) = makeService(immediateTimeout: true)
+        service.receiveLocations([fix()])
+        clock.advance(3_600)
+        XCTAssertNotNil(service.lastLocation, "Le timer d'expiration peut attendre la reprise de l'app")
+
+        let model = DriveTestViewModel(services: AppServices(config: .test, location: service))
+        model.onAppear()
+        XCTAssertNil(model.userLocation)
+        XCTAssertTrue(model.trace.isEmpty)
+        model.onDisappear(isLeavingScreen: true)
+    }
+
+    func testDriveTestOpeningDoesNotAddAFixAfterPermissionRevocation() {
+        let (service, driver, _, _) = makeService(immediateTimeout: true)
+        service.receiveLocations([fix()])
+        driver.authorizationStatus = .denied
+        XCTAssertNotNil(service.lastLocation, "Le callback d'autorisation peut encore être en attente")
+
+        let model = DriveTestViewModel(services: AppServices(config: .test, location: service))
+        model.onAppear()
+        XCTAssertNil(model.userLocation)
+        XCTAssertTrue(model.trace.isEmpty)
+        model.onDisappear(isLeavingScreen: true)
+    }
+
+    func testDriveTestOpeningKeepsAnAuthorizedApproximateFixWithItsRealAccuracy() {
+        let (service, _, _, _) = makeService(immediateTimeout: true)
+        service.receiveLocations([fix(accuracy: 1_000)])
+
+        let model = DriveTestViewModel(services: AppServices(config: .test, location: service))
+        model.onAppear()
+        XCTAssertEqual(model.userLocation?.latitude, 48.85)
+        XCTAssertTrue(model.trace.isEmpty, "La trace ne commence qu'avec une session Drive Test")
+        XCTAssertEqual(service.cachedLocation()?.horizontalAccuracy, 1_000)
+        model.onDisappear(isLeavingScreen: true)
+    }
+
+    func testCarPlayNavigationRejectsExpiredOriginOnResume() {
+        let (service, _, _, clock) = makeService()
+        service.receiveLocations([fix()])
+        clock.advance(3_600)
+        XCTAssertNotNil(service.lastLocation, "Le timer d'expiration peut être suspendu en arrière-plan")
+
+        let interface = FakeCarPlayInterface()
+        let coordinator = CarPlayCoordinator(
+            interface: interface,
+            services: AppServices(config: .test, location: service),
+            session: AuthSessionViewModel(service: MockAuthService()),
+            carWindow: nil
+        )
+        coordinator.startNavigation(
+            to: CLLocationCoordinate2D(latitude: 48.86, longitude: 2.36),
+            title: "Destination"
+        )
+
+        XCTAssertTrue(interface.presented is CPAlertTemplate,
+                      "Ne pas calculer d'itinéraire depuis un fix expiré")
+    }
+
+    func testCarPlayNavigationRejectsOriginAfterPermissionRevocation() {
+        let (service, driver, _, _) = makeService()
+        service.receiveLocations([fix()])
+        driver.authorizationStatus = .denied
+        XCTAssertNotNil(service.lastLocation, "Le callback de révocation peut être encore en file")
+
+        let interface = FakeCarPlayInterface()
+        let coordinator = CarPlayCoordinator(
+            interface: interface,
+            services: AppServices(config: .test, location: service),
+            session: AuthSessionViewModel(service: MockAuthService()),
+            carWindow: nil
+        )
+        coordinator.startNavigation(
+            to: CLLocationCoordinate2D(latitude: 48.86, longitude: 2.36),
+            title: "Destination"
+        )
+
+        XCTAssertTrue(interface.presented is CPAlertTemplate,
+                      "Ne pas calculer d'itinéraire après révocation système")
+    }
+
+    func testCarPlayNetworkResponseDoesNotRenderAfterFixExpires() async throws {
+        let (service, _, _, clock) = makeService()
+        service.receiveLocations([fix()])
+        let captured = await service.currentLocation()
+        let location = try XCTUnwrap(captured)
+
+        var renderCount = 0
+        XCTAssertTrue(CarPlayLocationRenderGate.commit(location, service: service) { renderCount += 1 })
+        clock.advance(LocationService.defaultMaxLocationAge)
+        XCTAssertNotNil(service.lastLocation, "La réponse réseau peut précéder le timer d'expiration")
+        XCTAssertFalse(CarPlayLocationRenderGate.commit(location, service: service) { renderCount += 1 })
+        XCTAssertEqual(renderCount, 1, "Ne pas repeindre Ici, POI ou comparaison depuis une réponse périmée")
+    }
+
+    func testCarPlayNetworkResponseDoesNotRenderAfterPermissionRevocation() async throws {
+        let (service, driver, _, _) = makeService()
+        service.receiveLocations([fix()])
+        let captured = await service.currentLocation()
+        let location = try XCTUnwrap(captured)
+
+        driver.authorizationStatus = .denied
+        XCTAssertNotNil(service.lastLocation, "Le callback de révocation peut encore attendre")
+        var renderCount = 0
+        XCTAssertFalse(CarPlayLocationRenderGate.commit(location, service: service) { renderCount += 1 })
+        XCTAssertEqual(renderCount, 0, "Ne pas afficher un ancien résultat après révocation")
+    }
+
+    func testDriveTestTraceStopsWithSessionAndClearsOnRestart() {
+        let (service, _, _, clock) = makeService(immediateTimeout: true)
+        service.receiveLocations([fix()])
+        let model = DriveTestViewModel(services: AppServices(config: .test, location: service))
+        model.onAppear()
+        model.start()
+        clock.advance(1)
+        service.receiveLocations([fix(latitude: 48.851, at: clock.value)])
+        XCTAssertEqual(model.trace.last?.latitude, 48.851)
+
+        model.stop()
+        let completedTrace = model.trace
+        let completedDistance = model.distanceMeters
+        clock.advance(1)
+        service.receiveLocations([fix(latitude: 48.852, at: clock.value)])
+        XCTAssertEqual(model.trace.map(\.latitude), completedTrace.map(\.latitude))
+        XCTAssertEqual(model.distanceMeters, completedDistance)
+
+        model.start()
+        XCTAssertTrue(model.trace.isEmpty)
+        XCTAssertEqual(model.distanceMeters, 0)
+        model.stop()
+        model.onDisappear(isLeavingScreen: true)
     }
 
     func testAQueuedLocationAfterRevocationCannotRepopulateCacheOrObservers() {

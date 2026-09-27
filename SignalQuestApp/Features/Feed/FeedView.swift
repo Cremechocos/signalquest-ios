@@ -4,7 +4,7 @@ import CoreLocation
 @MainActor
 final class FeedViewModel: ObservableObject {
     @Published var page: SocialFeedPage?
-    @Published var selectedHashtag: String?
+    @Published var selectedHashtag: String? { didSet { if oldValue != selectedHashtag { invalidateQuery() } } }
     @Published var isLoading = false
     @Published var isLoadingMore = false
     @Published var errorMessage: String?
@@ -42,115 +42,189 @@ final class FeedViewModel: ObservableObject {
 
     /// Onglet actif. Changer d'onglet change le couple filtre/classement envoyé
     /// au serveur — c'est le seul état qui pilote `loadFeed`.
-    @Published var tab: FeedTab = .forYou
+    @Published var tab: FeedTab = .forYou { didSet { if oldValue != tab { invalidateQuery() } } }
     /// Publications reçues en direct et NON encore insérées.
     ///
     /// Le plan est explicite : jamais d'insertion directe. Faire remonter la
     /// liste pendant que l'utilisateur lit déplace ce qu'il regarde — on
     /// annonce, il décide. C'est aussi ce que font toutes les apps de fil.
     @Published private(set) var pendingCount = 0
+    @Published private(set) var trendingHashtags: [TrendingHashtag] = []
+    private struct Query: Equatable {
+        let tab: FeedTab
+        let hashtag: String?
+        let owner: String
+        let session: LocalAccountSession?
+        let revision: UUID
+    }
+    private var queryRevision = UUID()
+    private var loadRevision = UUID()
+    private struct DetailReceipt {
+        let revision: UInt64
+        let item: UnifiedSocialFeedItem
+    }
+    private var detailReceiptRevision: UInt64 = 0
+    private var detailReceipts: [String: DetailReceipt] = [:]
+    private var streamRevision = UUID()
+    private var metadataOwner = LocalAccountScope.currentOwnerScopeId
     private var streamTask: Task<Void, Never>?
+    private var streamFactory: (() -> AsyncStream<(event: String, data: String)>)?
+    private var needsLiveCheck = false
+    private var liveCheckID: UUID?
     private var knownIds: Set<String> = []
+    private var query: Query {
+        Query(tab: tab, hashtag: selectedHashtag, owner: LocalAccountScope.currentOwnerScopeId,
+              session: LocalAccountScope.sessionSnapshot(), revision: queryRevision)
+    }
 
-    /// Bascule d'onglet : recharge depuis zéro. Pas de fusion avec la page
-    /// précédente — deux classements différents produisent deux ordres, les
-    /// mélanger donnerait une liste incohérente.
+    private func invalidateQuery() {
+        queryRevision = UUID(); loadRevision = UUID()
+        detailReceipts.removeAll()
+        page = nil; errorMessage = nil; isLoading = true; isLoadingMore = false
+        pendingCount = 0; knownIds.removeAll(); needsLiveCheck = false; liveCheckID = nil
+        if metadataOwner != LocalAccountScope.currentOwnerScopeId { trendingHashtags = [] }
+        restartStream()
+    }
+
     func select(_ newTab: FeedTab) async {
         guard newTab != tab else { return }
         tab = newTab
-        page = nil
         await load()
     }
 
-    /// S'abonne au flux temps réel. Idempotent : rappeler ne crée pas un second
-    /// abonnement.
     func startStream(_ sse: SSEClient) {
+        startStream { sse.dataStream(path: "/api/social/feed/stream", keep: ["snapshot"], bufferingPolicy: .bufferingNewest(1)) }
+    }
+
+    func startStream(_ factory: @escaping () -> AsyncStream<(event: String, data: String)>) {
         guard streamTask == nil else { return }
+        streamFactory = factory
+        restartStream()
+    }
+
+    private func restartStream() {
+        streamRevision = UUID()
+        streamTask?.cancel(); streamTask = nil
+        guard let streamFactory else { return }
+        let streamID = streamRevision, context = query
+        let messages = streamFactory()
         streamTask = Task { [weak self] in
-            for await message in sse.dataStream(
-                path: "/api/social/feed/stream", keep: ["snapshot"]
-            ) {
-                guard !Task.isCancelled else { return }
-                await self?.handleSnapshot(message.data)
+            for await message in messages {
+                guard !Task.isCancelled else { break }
+                await self?.handleSnapshot(message.data, context: context, streamID: streamID)
             }
+            if self?.streamRevision == streamID { self?.streamTask = nil }
         }
     }
 
     func stopStream() {
-        streamTask?.cancel()
-        streamTask = nil
+        streamFactory = nil; streamRevision = UUID(); loadRevision = UUID()
+        streamTask?.cancel(); streamTask = nil
+        isLoading = false; isLoadingMore = false; needsLiveCheck = false; liveCheckID = nil
     }
 
-    /// Compte les publications réellement NOUVELLES.
-    ///
-    /// Le serveur renvoie les 5 dernières à chaque événement : sans
-    /// déduplication contre ce qui est déjà affiché ET contre ce qui a déjà été
-    /// annoncé, la pastille grimperait à chaque battement pour les mêmes posts.
-    private func handleSnapshot(_ raw: String) {
+    deinit { streamTask?.cancel() }
+
+    private func handleSnapshot(_ raw: String, context: Query, streamID: UUID) async {
         struct Snapshot: Decodable { let items: [UnifiedSocialFeedItem] }
-        guard let data = raw.data(using: .utf8),
-              let snapshot = try? JSONDecoder.signalQuest.decode(Snapshot.self, from: data)
-        else { return }
-        let displayed = Set(page?.items.map(\.id) ?? [])
-        let fresh = snapshot.items.filter { !displayed.contains($0.id) && !knownIds.contains($0.id) }
-        guard !fresh.isEmpty else { return }
-        fresh.forEach { knownIds.insert($0.id) }
-        pendingCount += fresh.count
+        guard context == query, streamID == streamRevision, !Task.isCancelled,
+              let data = raw.data(using: .utf8),
+              (try? JSONDecoder.signalQuest.decode(Snapshot.self, from: data)) != nil else { return }
+        // The shared SSE endpoint sends global latest posts, not this tab or
+        // hashtag. Treat it as an invalidation and re-read the exact filter.
+        guard !isLoading, page != nil else { needsLiveCheck = true; return }
+        await refreshPending(context: context, streamID: streamID)
     }
 
-    /// L'utilisateur accepte les nouveautés : rechargement complet depuis le
-    /// haut. Insérer les seuls éléments reçus laisserait des trous si d'autres
-    /// ont été publiés entre-temps.
-    func applyPending() async {
-        pendingCount = 0
-        knownIds.removeAll()
-        await load()
+    private func refreshPending(context: Query, streamID: UUID) async {
+        guard context == query, streamID == streamRevision, !Task.isCancelled else { return }
+        guard !isLoading, page != nil, liveCheckID == nil else { needsLiveCheck = true; return }
+        let check = UUID()
+        liveCheckID = check
+        defer {
+            if liveCheckID == check {
+                liveCheckID = nil
+                if needsLiveCheck, !isLoading, context == query, streamID == streamRevision {
+                    needsLiveCheck = false
+                    Task { [weak self] in await self?.refreshPending(context: context, streamID: streamID) }
+                }
+            }
+        }
+        let loading = loadRevision
+        do {
+            let freshPage = try await service.loadFeed(cursor: nil, hashtag: context.hashtag, tab: context.tab)
+            guard context == query, streamID == streamRevision, loading == loadRevision,
+                  !Task.isCancelled, let page else { return }
+            let fresh = Set(freshPage.items.map(\.id)).subtracting(page.items.map(\.id)).subtracting(knownIds)
+            knownIds.formUnion(fresh)
+            pendingCount += fresh.count
+        } catch {
+            // A live refresh failure never replaces the current reading.
+        }
     }
+
+    func applyPending() async { await load() }
 
     func load() async {
+        let context = query, request = UUID()
+        let receiptRevisionAtStart = detailReceiptRevision
+        loadRevision = request; isLoading = true; isLoadingMore = false; errorMessage = nil
+        if metadataOwner != context.owner { trendingHashtags = [] }
+        defer { if context == query && loadRevision == request { isLoading = false } }
         if AppEnvironment.usesDemoData {
-            page = .demo
-            errorMessage = nil
+            page = .demo; trendingHashtags = page?.trendingHashtags ?? []
+            pendingCount = 0; knownIds.removeAll()
             return
         }
         Task { await service.retryPendingPosts() }
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-        if AppEnvironment.delaysLoadForQA {
-            try? await Task.sleep(for: .seconds(4))
-        }
+        if AppEnvironment.delaysLoadForQA { try? await Task.sleep(for: .seconds(4)) }
         do {
-            page = try await service.loadFeed(cursor: nil, hashtag: selectedHashtag, tab: tab)
+            let loaded = try await service.loadFeed(cursor: nil, hashtag: context.hashtag, tab: context.tab)
+            guard context == query, request == loadRevision, !Task.isCancelled else { return }
+            page = SocialFeedPage(
+                items: loaded.items.map { item in
+                    guard let receipt = detailReceipts[item.id],
+                          receipt.revision > receiptRevisionAtStart else { return item }
+                    return item.adoptingInteractions(from: receipt.item)
+                },
+                nextCursor: loaded.nextCursor,
+                stories: loaded.stories,
+                trendingHashtags: loaded.trendingHashtags,
+                suggestedUsers: loaded.suggestedUsers,
+                requestId: loaded.requestId
+            )
+            // Un GET démarré après le reçu peut désormais faire autorité.
+            detailReceipts = detailReceipts.filter { $0.value.revision > receiptRevisionAtStart }
+            trendingHashtags = loaded.trendingHashtags; metadataOwner = context.owner
+            pendingCount = 0; knownIds.removeAll()
+            if needsLiveCheck, streamFactory != nil {
+                needsLiveCheck = false
+                let streamID = streamRevision
+                Task { [weak self] in await self?.refreshPending(context: context, streamID: streamID) }
+            }
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            guard context == query, request == loadRevision, !error.isCancellation else { return }
+            errorMessage = error.localizedDescription
         }
     }
 
-    /// Pagination ascendante du fil (FEED-FUNC-01) : charge la page suivante via
-    /// `nextCursor` et append en dédoublonnant par id. Déclenchée à l'apparition de
-    /// la dernière carte. Le `refreshable` reste un reset complet (`load`).
     func loadMore() async {
-        guard !isLoading, !isLoadingMore,
-              let current = page,
-              let cursor = current.nextCursor, !cursor.isEmpty else { return }
-        if AppEnvironment.usesDemoData { return }
+        guard !isLoading, !isLoadingMore, let current = page,
+              let cursor = current.nextCursor, !cursor.isEmpty, !AppEnvironment.usesDemoData else { return }
+        let context = query, loading = loadRevision
         isLoadingMore = true
-        defer { isLoadingMore = false }
+        defer { if context == query && loading == loadRevision { isLoadingMore = false } }
         do {
-            let next = try await service.loadFeed(cursor: cursor, hashtag: selectedHashtag, tab: tab)
-            var seen = Set(current.items.map { $0.id })
+            let next = try await service.loadFeed(cursor: cursor, hashtag: context.hashtag, tab: context.tab)
+            guard context == query, loading == loadRevision, !Task.isCancelled, let current = page else { return }
+            var seen = Set(current.items.map(\.id))
             let appended = next.items.filter { seen.insert($0.id).inserted }
-            page = SocialFeedPage(
-                items: current.items + appended,
-                nextCursor: next.nextCursor,
-                stories: current.stories,
-                trendingHashtags: current.trendingHashtags,
-                suggestedUsers: current.suggestedUsers,
-                requestId: next.requestId ?? current.requestId
-            )
+            page = SocialFeedPage(items: current.items + appended, nextCursor: next.nextCursor,
+                stories: current.stories, trendingHashtags: current.trendingHashtags,
+                suggestedUsers: current.suggestedUsers, requestId: next.requestId ?? current.requestId)
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            guard context == query, loading == loadRevision, !error.isCancellation else { return }
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -327,6 +401,23 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
+    /// Garde le fil cohérent avec le détail ouvert par notification/lien,
+    /// même si son rechargement réseau au retour échoue.
+    func acceptDetailItem(_ item: UnifiedSocialFeedItem) {
+        detailReceiptRevision &+= 1
+        detailReceipts[item.id] = DetailReceipt(revision: detailReceiptRevision, item: item)
+        guard let current = page,
+              current.items.contains(where: { $0.id == item.id }) else { return }
+        page = SocialFeedPage(
+            items: current.items.map { $0.id == item.id ? $0.adoptingInteractions(from: item) : $0 },
+            nextCursor: current.nextCursor,
+            stories: current.stories,
+            trendingHashtags: current.trendingHashtags,
+            suggestedUsers: current.suggestedUsers,
+            requestId: current.requestId
+        )
+    }
+
     private func applyLocalToggle(itemId: String, _ transform: (UnifiedSocialFeedItem) -> UnifiedSocialFeedItem) async {
         guard var current = page else { return }
         let updated = current.items.map { $0.id == itemId ? transform($0) : $0 }
@@ -383,6 +474,8 @@ final class FeedViewModel: ObservableObject {
 }
 
 struct FeedView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var isFeedVisible = false
     @StateObject private var model: FeedViewModel
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
@@ -407,12 +500,15 @@ struct FeedView: View {
     @State private var showNotifications = false
     @State private var showCalls = false
     @State private var showFeedPreferences = false
+    @State private var isPulseExpanded = false
     /// Auteur dont on pousse le profil public (cards, commentaires, stories…).
     @State private var profileAuthor: SocialFeedAuthor?
     /// Profil demandé par notification (follow) via AppRouter — par id seul.
     @State private var routedProfileId: String?
     /// Post ouvert via deep-link / notification (résolu en item complet).
     @State private var routedPostItem: RoutedPost?
+    @State private var failedRoutedPostID: String?
+    @State private var routedPostRevision = UUID()
     private enum FeedSheet: Identifiable {
         case detail(UnifiedSocialFeedItem)
         case comments(UnifiedSocialFeedItem)
@@ -455,15 +551,15 @@ struct FeedView: View {
             LazyVStack(alignment: .leading, spacing: SQSpace.lg) {
                 header
                 feedTabs
+                hashtags
                 if model.pendingCount > 0 { newPostsPill }
 
-                if model.isLoading && model.page == nil {
+                if model.page == nil && model.errorMessage == nil {
                     LoadingSkeleton()
                         .sqShimmer()
                 } else {
                     if let pulse = model.pulse {
-                        NetworkPulseHero(pulse: pulse)
-                            .sqFadeUp()
+                        pulseDisclosure(pulse)
                     }
                     // Rail visible dès que la page est chargée, même sans story
                     // amie (fidèle au prototype : « Ta story » reste le point
@@ -483,12 +579,12 @@ struct FeedView: View {
                         // scroll fuie sous les bords (1re bulle alignée à 20 pt).
                         .padding(.horizontal, -SQSpace.lg)
                     }
-                    hashtags
                     if let error = model.errorMessage {
                         ErrorStateView(title: "Feed indisponible", message: error) {
                             Task { await model.load() }
                         }
-                    } else if (model.page?.items.isEmpty ?? true), !model.isLoading {
+                    }
+                    if (model.page?.items.isEmpty ?? true), !model.isLoading, model.errorMessage == nil {
                         // État vide explicite : sans lui, un nouveau compte (onglet par
                         // défaut) voit un écran quasi nu, l'app paraît cassée (INT-01).
                         EmptyStateView(
@@ -528,7 +624,7 @@ struct FeedView: View {
             FriendsListView(service: services.friends)
         }
         .navigationDestination(isPresented: $showNotifications) {
-            NotificationsCenterView(service: services.notifications)
+            NotificationsCenterView(service: services.notifications, badge: services)
         }
         .navigationDestination(isPresented: $showCalls) {
             CallHistoryView(service: services.calls)
@@ -538,10 +634,21 @@ struct FeedView: View {
         }
         .signalQuestBackground()
         .task {
+            isFeedVisible = true
+            model.startStream(services.sse)
             if model.page == nil { await model.load() }
+            guard !Task.isCancelled, isFeedVisible else { return }
             await model.loadPulse()
             await consumeFeedRoutesIfNeeded()
             presentMessagesIfNeeded()
+        }
+        .onDisappear { isFeedVisible = false; model.stopStream() }
+        .onChangeCompat(of: scenePhase) { _, phase in
+            guard isFeedVisible else { return }
+            if phase == .active {
+                model.startStream(services.sse)
+                if model.page == nil { Task { await model.load() } }
+            } else { model.stopStream() }
         }
         .refreshable {
             await model.load()
@@ -568,9 +675,23 @@ struct FeedView: View {
             PostDetailView(
                 item: routed.item,
                 feedService: services.feed,
+                messagesService: services.messages,
                 commentsService: services.comments,
-                reportsService: services.reports
+                reportsService: services.reports,
+                onItemChanged: { model.acceptDetailItem($0) }
             )
+            .onDisappear { Task { await model.load() } }
+        }
+        .alert("Publication", isPresented: Binding(
+            get: { failedRoutedPostID != nil },
+            set: { if !$0 { failedRoutedPostID = nil } }
+        ), presenting: failedRoutedPostID) { retryID in
+            Button("Réessayer") {
+                Task { await openRoutedPost(retryID) }
+            }
+            Button("Fermer", role: .cancel) { failedRoutedPostID = nil }
+        } message: { _ in
+            Text("Une erreur est survenue. Réessaie.")
         }
         .onChangeCompat(of: router.openUserProfileId) { _, _ in
             Task { await consumeFeedRoutesIfNeeded() }
@@ -627,10 +748,7 @@ struct FeedView: View {
                 CommentsSheet(
                     service: services.comments,
                     postId: item.backendPostId,
-                    onAuthorTap: { author in
-                        presentedSheet = nil
-                        pushProfileAfterDismiss(author)
-                    }
+                    profileService: services.feed
                 )
             case .report(let item):
                 ReportSheet(target: .post(item.backendPostId), service: services.reports)
@@ -662,8 +780,8 @@ struct FeedView: View {
                                 presentedStoryStart = nil
                                 pushProfileAfterDismiss(story.author)
                             },
-                            onSendReply: { story, text in
-                                sendStoryReply(story, text: text)
+                            onSendReply: { story, text, requestID in
+                                try await sendStoryReply(story, text: text, requestID: requestID)
                             },
                             onDelete: { story in
                                 Task {
@@ -717,10 +835,36 @@ struct FeedView: View {
         }
         if let id = router.openPostId {
             router.openPostId = nil
+            await openRoutedPost(id)
+        }
+    }
+
+    /// Résout le post demandé depuis le serveur pour afficher des compteurs à
+    /// jour. En panne réseau, une carte déjà chargée permet encore d'ouvrir le
+    /// détail ; sans carte, l'intention reste réessayable au lieu de disparaître.
+    private func openRoutedPost(_ id: String) async {
+        let revision = UUID()
+        routedPostRevision = revision
+        failedRoutedPostID = nil
+        if AppEnvironment.usesDemoData,
+           let existing = model.page?.items.first(where: { $0.id == id || $0.backendPostId == id }) {
+            routedPostItem = RoutedPost(item: existing)
+            return
+        }
+        do {
+            let fetched = try await services.feed.post(id: id)
+            guard routedPostRevision == revision, !Task.isCancelled else { return }
+            if let fetched {
+                routedPostItem = RoutedPost(item: fetched)
+            } else {
+                failedRoutedPostID = id
+            }
+        } catch {
+            guard routedPostRevision == revision, !error.isCancellation else { return }
             if let existing = model.page?.items.first(where: { $0.id == id || $0.backendPostId == id }) {
                 routedPostItem = RoutedPost(item: existing)
-            } else if let fetched = try? await services.feed.post(id: id) {
-                routedPostItem = RoutedPost(item: fetched)
+            } else {
+                failedRoutedPostID = id
             }
         }
     }
@@ -742,26 +886,66 @@ struct FeedView: View {
 
     /// Répondre / réagir à une story = message privé à l'auteur (façon Instagram).
     /// Il n'existe pas d'endpoint de réaction de story : on résout/crée la
-    /// conversation directe puis on envoie le texte (ou l'emoji). En non-E2EE pour
-    /// que la réponse parte sans déverrouillage de la messagerie.
-    private func sendStoryReply(_ story: SocialStory, text: String) {
+    /// conversation directe puis on envoie le texte (ou l'emoji). Le viewer
+    /// annonce et fait confirmer le canal non E2EE avant cet appel.
+    /// Le viewer ne confirme qu'après le reçu du serveur de messagerie.
+    private func sendStoryReply(_ story: SocialStory, text: String, requestID: String) async throws {
+        guard !AppEnvironment.usesDemoData else { throw StoryReplyDeliveryError.unavailable }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        Task {
-            do {
-                let created = try await services.messages.createConversation(
-                    participantIds: [story.author.id], title: nil, e2ee: false
-                )
-                let conversations = try await services.messages.conversations()
-                guard let conversation = conversations.first(where: { $0.id == created.conversationId }) else { return }
-                _ = try await services.messages.sendText(trimmed, in: conversation, replyToId: nil, e2ee: services.e2ee, idempotencyKey: nil, ttlSeconds: 0)
-            } catch {
-                // Best-effort : la confirmation « Envoyé » du viewer est optimiste.
-            }
+        guard !trimmed.isEmpty else { throw StoryReplyDeliveryError.unavailable }
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else {
+            throw CancellationError()
         }
+        let created = try await services.messages.createConversation(
+            participantIds: [story.author.id], title: nil, e2ee: false
+        )
+        guard session.isCurrent else { throw CancellationError() }
+        let conversation = try await services.messages.conversation(id: created.conversationId)
+        guard session.isCurrent else { throw CancellationError() }
+        guard let currentUserID = LocalAccountScope.currentUserId,
+              StoryReplyChannelPolicy.accepts(conversation, authorID: story.author.id, currentUserID: currentUserID) else {
+            throw StoryReplyDeliveryError.conversationUnavailable
+        }
+        _ = try await services.messages.sendText(trimmed, in: conversation, replyToId: nil,
+            e2ee: services.e2ee, idempotencyKey: requestID, ttlSeconds: 0)
+        guard session.isCurrent else { throw CancellationError() }
     }
 
     // MARK: Header custom — titre, menu secondaire, actions nommées
+
+    private func pulseDisclosure(_ pulse: NetworkPulse) -> some View {
+        VStack(spacing: SQSpace.sm) {
+            Button {
+                Haptics.selection()
+                isPulseExpanded.toggle()
+            } label: {
+                HStack(spacing: SQSpace.sm) {
+                    Image(systemName: "waveform.path.ecg")
+                        .foregroundStyle(SQColor.brandRed)
+                    Text("Pouls réseau · autour de vous")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: SQSpace.xs)
+                    Image(systemName: isPulseExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .padding(.horizontal, SQSpace.md)
+                .frame(minHeight: 48)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(SQColor.surface,
+                            in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityIdentifier("community.networkPulse.toggle")
+            .accessibilityValue(isPulseExpanded ? String(localized: "Développé") : String(localized: "Réduit"))
+
+            if isPulseExpanded {
+                NetworkPulseHero(pulse: pulse)
+                    .sqFadeUp()
+            }
+        }
+    }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
@@ -1005,6 +1189,7 @@ struct FeedView: View {
             }
         }
         .sqFadeUp()
+        .accessibilityIdentifier("feed.item.\(item.id)")
         .onAppear {
             // Une vue par post et par session : le collecteur
             // déduplique, l'appeler à chaque réapparition de
@@ -1041,6 +1226,7 @@ struct FeedView: View {
         .buttonStyle(SQPressButtonStyle())
         .frame(maxWidth: .infinity)
         .accessibilityHint("Affiche les publications reçues")
+        .accessibilityIdentifier("feed.pending")
     }
 
     /// Barre d'onglets du fil.
@@ -1077,6 +1263,7 @@ struct FeedView: View {
                     // `.isSelected` plutôt qu'un libellé « sélectionné » ajouté au
                     // texte : VoiceOver l'annonce déjà, et le rotor s'en sert.
                     .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+                    .accessibilityIdentifier("feed.tab.\(tab.rawValue)")
                 }
             }
             .padding(.horizontal, SQSpace.xl)
@@ -1090,7 +1277,7 @@ struct FeedView: View {
     private var hashtags: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
-                ForEach(model.page?.trendingHashtags ?? []) { tag in
+                ForEach(model.trendingHashtags) { tag in
                     let isOn = tag.tag == model.selectedHashtag
                     Button {
                         Haptics.selection()
@@ -1101,6 +1288,7 @@ struct FeedView: View {
                             .font(.body.weight(.semibold))
                             .padding(.horizontal, SQSpace.md + 1)
                             .padding(.vertical, SQSpace.sm)
+                            .frame(minHeight: 44)
                             .background(
                                 isOn ? AnyShapeStyle(SQColor.accentTextSurface) : AnyShapeStyle(SQColor.surface),
                                 in: Capsule(style: .continuous)
@@ -1111,7 +1299,7 @@ struct FeedView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(isOn ? .isSelected : [])
-                    .accessibilityIdentifier("feed.hashtag")
+                    .accessibilityIdentifier("feed.hashtag.\(tag.tag)")
                 }
             }
             .padding(.horizontal, SQSpace.xl)
@@ -1124,7 +1312,7 @@ struct FeedView: View {
 
 private struct StoriesPresentation: Identifiable { let id = UUID() }
 
-private struct PostShareSheet: View {
+struct PostShareSheet: View {
     let post: UnifiedSocialFeedItem
     let messagesService: MessagesServicing
     /// Renvoie l'id du message créé (succès) ou nil (échec).
@@ -1184,12 +1372,19 @@ private struct PostShareSheet: View {
                             }
                         }
                         .disabled(busyConversationId != nil || isE2EE)
+                        .accessibilityIdentifier("post.share.conversation.\(conversation.id)")
                     }
                 }
 
                 if let errorMessage {
                     Section {
-                        Text(errorMessage).foregroundStyle(SQColor.danger)
+                        Text(errorMessage)
+                            .foregroundStyle(SQColor.danger)
+                            .accessibilityIdentifier("post.share.error")
+                        if conversations.isEmpty {
+                            Button("Réessayer") { Task { await load() } }
+                                .accessibilityIdentifier("post.share.retry")
+                        }
                     }
                 }
             }
@@ -1209,6 +1404,7 @@ private struct PostShareSheet: View {
 
     private func load() async {
         isLoading = true
+        errorMessage = nil
         defer { isLoading = false }
         do {
             conversations = AppEnvironment.usesDemoData ? .demo : try await messagesService.conversations()
@@ -1218,11 +1414,15 @@ private struct PostShareSheet: View {
     }
 
     private func share(_ conversation: MessageConversation) async {
+        guard busyConversationId == nil, conversation.e2eeEnabled != true else { return }
         busyConversationId = conversation.id
         defer { busyConversationId = nil }
+        errorMessage = nil
         if let messageId = await onShare(conversation) {
             onShared(messageId, conversation)
             dismiss()
+        } else {
+            errorMessage = String(localized: "Échec de l'envoi. Réessaie.")
         }
     }
 }
@@ -1280,8 +1480,8 @@ extension SocialFeedPage {
           ],
           "nextCursor": null,
           "stories": [
-            {"id": "story-1", "author": {"id": "u1", "name": "Camille", "handle": "camille", "avatarUrl": null}, "text": "5G Paris", "mediaUrl": null, "thumbnailUrl": null, "mediaKind": "text", "background": null, "metadata": null, "visibility": "friends", "status": "active", "durationSeconds": 5, "createdAt": "2026-05-11T10:00:00.000Z", "expiresAt": null, "viewedByMe": false, "isMine": false},
-            {"id": "story-2", "author": {"id": "u2", "name": "Nora", "handle": "nora", "avatarUrl": null}, "text": "Photo site", "mediaUrl": null, "thumbnailUrl": null, "mediaKind": "text", "background": null, "metadata": null, "visibility": "public", "status": "active", "durationSeconds": 5, "createdAt": "2026-05-11T10:00:00.000Z", "expiresAt": null, "viewedByMe": true, "isMine": false}
+            {"id": "story-1", "author": {"id": "u1", "name": "Camille", "handle": "camille", "avatarUrl": null}, "text": "5G Paris", "mediaUrl": null, "thumbnailUrl": null, "mediaKind": "text", "background": null, "metadata": null, "visibility": "friends", "status": "active", "durationSeconds": 15, "createdAt": "2026-05-11T10:00:00.000Z", "expiresAt": null, "viewedByMe": false, "isMine": false},
+            {"id": "story-2", "author": {"id": "u2", "name": "Nora", "handle": "nora", "avatarUrl": null}, "text": "Photo site", "mediaUrl": null, "thumbnailUrl": null, "mediaKind": "text", "background": null, "metadata": null, "visibility": "public", "status": "active", "durationSeconds": 15, "createdAt": "2026-05-11T10:00:00.000Z", "expiresAt": null, "viewedByMe": true, "isMine": false}
           ],
           "trendingHashtags": [{"tag": "ios", "postCount": 32}, {"tag": "5g", "postCount": 21}, {"tag": "photos", "postCount": 15}],
           "suggestedUsers": [],

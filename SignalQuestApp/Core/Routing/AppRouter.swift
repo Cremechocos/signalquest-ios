@@ -1,4 +1,33 @@
 import Foundation
+import Combine
+
+/// Liens vers une publication : chemin web public ou schéma propre à l'app.
+/// Le chemin web ne s'ouvre dans l'app que si l'AASA du site le revendique.
+enum PostDeepLink {
+    static func postID(from url: URL, appOrigin: URL, appScheme: String) -> String? {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.user == nil, components.password == nil else { return nil }
+        let parts = url.path.split(separator: "/").map(String.init)
+        let id: String
+        if components.scheme?.lowercased() == "https",
+           components.host?.lowercased() == appOrigin.host?.lowercased(),
+           components.port == appOrigin.port,
+           parts.count == 2, parts[0] == "posts" {
+            id = parts[1]
+        } else if components.scheme?.lowercased() == appScheme.lowercased(),
+                  components.host?.lowercased() == "post",
+                  parts.count == 1 {
+            id = parts[0]
+        } else {
+            return nil
+        }
+        guard !id.isEmpty, id.count <= 128,
+              id.utf8.allSatisfy({ ($0 >= 48 && $0 <= 57) ||
+                  ($0 >= 65 && $0 <= 90) || ($0 >= 97 && $0 <= 122) ||
+                  $0 == 45 || $0 == 95 }) else { return nil }
+        return id
+    }
+}
 
 /// App-wide navigation coordinator. Push notifications (and, later, universal
 /// links) write an intent here; the SwiftUI tree observes it to switch tab and
@@ -54,6 +83,32 @@ final class AppRouter: ObservableObject {
     /// Dock rétracté en pastille après un scroll vers le bas ; redéployé en
     /// remontant, en changeant d'onglet ou en tapant la pastille.
     @Published var isDockMinimized = false
+
+    /// Une destination reçue de l'extérieur garde la priorité sur le choix
+    /// générique de fin d'introduction, notamment après une connexion.
+    var hasPendingContentRoute: Bool {
+        openConversationId != nil || openMessagesInbox || openPostId != nil
+            || openUserProfileId != nil || openSiteId != nil || openCommunityOutage != nil
+            || openCommunityOutageId != nil || openAntennaReportId != nil
+            || openE2EEDeviceApprovalId != nil || openSentinelleTargetId != nil
+            || openSentinelle || openSentinelleShareSlug != nil
+            || pendingMapFocus != nil || pendingDriveTest
+    }
+
+    @discardableResult
+    func routeFromOnboarding(to destination: OnboardingEntryDestination) -> Bool {
+        guard !hasPendingContentRoute else { return false }
+        selectedTab = destination == .map ? .map : .speed
+        return true
+    }
+
+    /// Le preview invité consomme l'intention de présentation, tout en gardant
+    /// l'onglet choisi pour l'arrivée dans MainTabView après connexion.
+    func acknowledgeOnboardingGuest(_ lease: OnboardingGuestLease) -> Bool {
+        guard !hasPendingContentRoute, lease.acknowledge() else { return false }
+        selectedTab = lease.request.destination == .map ? .map : .speed
+        return true
+    }
 
     init() {
         // Tous les drapeaux passent par AppEnvironment : en Release ce sont des

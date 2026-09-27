@@ -27,8 +27,8 @@ enum AntennaGlossary {
     static func distance(_ meters: Double) -> AntennaGlossaryEntry {
         AntennaGlossaryEntry(
             title: String(localized: "Distance"),
-            definition: String(localized: "La distance à vol d'oiseau entre toi et le pied du support, mesurée sur l'ellipsoïde terrestre. Ce n'est pas la longueur du trajet radio, qui monte jusqu'aux antennes."),
-            reading: String(localized: "Tu es à \(SQUnits.distance(meters: meters)) du site."),
+            definition: String(localized: "La distance à vol d'oiseau entre le point de départ et le pied du support, mesurée sur l'ellipsoïde terrestre. Ce n'est pas la longueur du trajet radio, qui monte jusqu'aux antennes."),
+            reading: String(localized: "Le point de départ est à \(SQUnits.distance(meters: meters)) du site."),
             scale: [
                 (String(localized: "< 300 m"), String(localized: "très proche, le signal dépend surtout de l'orientation du secteur")),
                 (String(localized: "300 m – 2 km"), String(localized: "portée urbaine typique en 3500 MHz")),
@@ -42,14 +42,14 @@ enum AntennaGlossary {
         if let user, let site {
             let delta = site - user
             reading = delta >= 0
-                ? String(localized: "Le site domine ta position de \(Int(delta.rounded())) m.")
-                : String(localized: "Tu domines le site de \(Int(abs(delta).rounded())) m.")
+                ? String(localized: "Le site domine le point de départ de \(Int(delta.rounded())) m.")
+                : String(localized: "Le point de départ domine le site de \(Int(abs(delta).rounded())) m.")
         } else {
             reading = nil
         }
         return AntennaGlossaryEntry(
             title: String(localized: "Dénivelé"),
-            definition: String(localized: "L'écart d'altitude entre le sol sous tes pieds et le sol au pied du support. Un site perché voit par-dessus les obstacles ; un site en contrebas se fait masquer par le moindre relief."),
+            definition: String(localized: "L'écart d'altitude entre le sol au point de départ et le sol au pied du support. Un site perché voit par-dessus les obstacles ; un site en contrebas se fait masquer par le moindre relief."),
             reading: reading,
             scale: [],
             illustration: (user != nil && site != nil)
@@ -60,7 +60,7 @@ enum AntennaGlossary {
 
     static func altitude(_ meters: Double?, isSite: Bool) -> AntennaGlossaryEntry {
         AntennaGlossaryEntry(
-            title: isSite ? String(localized: "Altitude du site") : String(localized: "Ton altitude"),
+            title: isSite ? String(localized: "Altitude du site") : String(localized: "Altitude de départ"),
             definition: String(localized: "Altitude du sol au-dessus du niveau de la mer, lue dans le modèle numérique de terrain de l'IGN — pas dans le GPS, dont la précision verticale est bien plus faible."),
             reading: meters.map { String(localized: "\(Int($0.rounded())) m au-dessus du niveau de la mer.") },
             scale: []
@@ -102,12 +102,12 @@ enum AntennaGlossary {
     static func downtilt(_ degrees: Double?) -> AntennaGlossaryEntry {
         AntennaGlossaryEntry(
             title: String(localized: "Tilt"),
-            definition: String(localized: "L'inclinaison d'une antenne vers le bas. Les opérateurs l'utilisent pour concentrer l'énergie sur la zone à couvrir plutôt que de l'envoyer à l'horizon, où elle brouillerait les cellules voisines. Le chiffre donné ici est purement géométrique : c'est l'angle qui pointerait exactement sur toi."),
+            definition: String(localized: "L'inclinaison d'une antenne vers le bas. Les opérateurs l'utilisent pour concentrer l'énergie sur la zone à couvrir plutôt que de l'envoyer à l'horizon, où elle brouillerait les cellules voisines. Le chiffre donné ici est purement géométrique : c'est l'angle qui pointerait exactement vers le point de départ."),
             reading: degrees.map { value in
-                let rounded = String(format: "%.1f", abs(value)).replacingOccurrences(of: ".", with: ",")
+                let rounded = abs(value).formatted(.number.precision(.fractionLength(1)))
                 return value >= 0
-                    ? String(localized: "Une antenne inclinée de \(rounded)° vers le bas te viserait exactement.")
-                    : String(localized: "Tu es au-dessus de l'antenne : il faudrait la relever de \(rounded)° pour te viser.")
+                    ? String(localized: "Une antenne inclinée de \(rounded)° vers le bas viserait exactement le point de départ.")
+                    : String(localized: "Le point de départ est au-dessus de l'antenne : il faudrait la relever de \(rounded)° pour le viser.")
             },
             scale: [
                 (String(localized: "0 – 3°"), String(localized: "couverture lointaine, typique d'un site rural")),
@@ -125,7 +125,7 @@ enum AntennaGlossary {
         let reading: String?
         switch verdict?.level {
         case .clear:
-            reading = String(localized: "Rien ne coupe la droite entre tes yeux et les antennes.")
+            reading = String(localized: "Rien ne coupe la droite entre un observateur au point de départ et les antennes.")
         case .grazing:
             reading = String(localized: "La droite passe, mais un obstacle entame la zone de Fresnel : le signal s'atténue sans être coupé.")
         case .blocked:
@@ -137,7 +137,7 @@ enum AntennaGlossary {
         }
         return AntennaGlossaryEntry(
             title: String(localized: "Ligne de visée"),
-            definition: String(localized: "La droite entre tes yeux et les antennes. Quand elle est dégagée, la liaison est dite « en visibilité directe » : c'est le cas le plus favorable. Sinon le signal doit contourner ou traverser, et perd beaucoup."),
+            definition: String(localized: "La droite entre un observateur au point de départ et les antennes. Quand elle est dégagée, la liaison est dite « en visibilité directe » : c'est le cas le plus favorable. Sinon le signal doit contourner ou traverser, et perd beaucoup."),
             reading: reading,
             scale: [],
             illustration: profile.count > 2

@@ -120,7 +120,7 @@ struct AntennaGlossaryIllustrationView: View {
             at: CGPoint(x: min(max(px, 46), size.width - 46), y: bottom + 13)
         )
         context.draw(
-            Text("toi").font(SQFont.archivo(9, .semibold)).foregroundColor(SQColor.labelSecondary),
+            Text("départ").font(SQFont.archivo(9, .semibold)).foregroundColor(SQColor.labelSecondary),
             at: CGPoint(x: inset + 8, y: bottom + 13)
         )
         context.draw(
@@ -267,13 +267,13 @@ struct AntennaGlossaryIllustrationView: View {
         wedge.closeSubpath()
         context.fill(wedge, with: .color(tint.opacity(0.18)))
 
-        let label = String(format: "%.1f", abs(degrees)).replacingOccurrences(of: ".", with: ",")
+        let label = abs(degrees).formatted(.number.precision(.fractionLength(1)))
         context.draw(
             Text("\(label)°").font(SQFont.archivo(11, .bold)).foregroundColor(tint),
             at: CGPoint(x: mastX - 54, y: topY + 16)
         )
         context.draw(
-            Text("l'antenne pique vers toi").font(SQFont.archivo(9, .semibold)).foregroundColor(SQColor.labelSecondary),
+            Text("l'antenne vise le départ").font(SQFont.archivo(9, .semibold)).foregroundColor(SQColor.labelSecondary),
             at: CGPoint(x: size.width / 2, y: size.height - 8)
         )
     }
@@ -446,7 +446,7 @@ extension AntennaGlossaryIllustration {
         case .downtilt:
             return String(localized: "Schéma d'une antenne inclinée vers son point de couverture")
         case .elevationGap:
-            return String(localized: "Schéma du dénivelé entre ta position et le site")
+            return String(localized: "Schéma du dénivelé entre le point de départ et le site")
         case .heights:
             return String(localized: "Schéma du support et de la hauteur de ses antennes")
         }

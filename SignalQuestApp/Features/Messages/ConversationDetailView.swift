@@ -39,6 +39,7 @@ struct ConversationDetailView: View {
     @State private var errorMessage: String?
     @State private var isSending = false
     @State private var showUnlockSheet = false
+    @State private var showE2EECallUnavailable = false
     @State private var syncTask: Task<Void, Never>?
     @State private var isE2EEUnlocked = false
     @State private var decryptedMessages: [String: String] = [:]
@@ -346,7 +347,8 @@ struct ConversationDetailView: View {
         // Commentaires d'une publication partagée — même sheet que le feed ;
         // au retour, l'embed est rafraîchi (compteur de commentaires).
         .sheet(item: $sharedPostComments, onDismiss: { refreshSharedPostAfterSheet() }) { target in
-            CommentsSheet(service: services.comments, postId: target.backendPostId)
+            CommentsSheet(service: services.comments, postId: target.backendPostId,
+                          profileService: services.feed)
         }
         // Publication complète (réutilise PostDetailView du feed par composition).
         .sheet(item: $sharedPostDetail, onDismiss: { refreshSharedPostAfterSheet() }) { target in
@@ -354,8 +356,10 @@ struct ConversationDetailView: View {
                 PostDetailView(
                     item: target.item,
                     feedService: services.feed,
+                    messagesService: services.messages,
                     commentsService: services.comments,
-                    reportsService: services.reports
+                    reportsService: services.reports,
+                    onItemChanged: { sharedPosts.acceptDetailItem($0, for: target.id) }
                 )
             }
         }
@@ -459,24 +463,40 @@ struct ConversationDetailView: View {
             // CALL-SCOPE-17 : kill-switch de repli — masque toute initiation
             // d'appel quand SQFeatures.callsEnabled est false.
             if SQFeatures.callsEnabled {
-                Menu {
-                    Button { startCall(mode: "audio") } label: {
-                        Label("Appel audio", systemImage: "phone.fill")
+                if e2eeCallReady {
+                    Menu {
+                        Button { startCall(mode: "audio") } label: {
+                            Label("Appel audio", systemImage: "phone.fill")
+                        }
+                        Button { startCall(mode: "video") } label: {
+                            Label("Appel vidéo", systemImage: "video.fill")
+                        }
+                    } label: {
+                        Image(systemName: "phone")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(networkPath.isOnline ? SQColor.label : SQColor.labelTertiary)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
-                    Button { startCall(mode: "video") } label: {
-                        Label("Appel vidéo", systemImage: "video.fill")
-                    }
-                } label: {
                     // CALL-OFFLINE-21 : grisé + désactivé hors-ligne (un appel
                     // lancé sans réseau échouerait et ferait flasher l'écran).
-                    Image(systemName: "phone")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(networkPath.isOnline ? SQColor.label : SQColor.labelTertiary)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                    .disabled(!networkPath.isOnline)
+                    .accessibilityLabel("Appeler")
+                } else {
+                    Button { showE2EECallUnavailable = true } label: {
+                        Image(systemName: "phone")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(SQColor.labelTertiary)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Appels chiffrés indisponibles pour cette conversation")
+                    .alert("Appels chiffrés indisponibles pour cette conversation", isPresented: $showE2EECallUnavailable) {
+                        Button("OK", role: .cancel) {}
+                    } message: {
+                        Text("Cet appel n’est pas encore disponible pour une conversation chiffrée. Aucun appel moins protégé ne sera lancé.")
+                    }
                 }
-                .disabled(!networkPath.isOnline)
-                .accessibilityLabel("Appeler")
             }
 
             Menu {
@@ -2044,22 +2064,44 @@ struct ConversationDetailView: View {
         guard !isSharingLocation else { return }
         isSharingLocation = true
         defer { isSharingLocation = false }
-        guard let location = await services.location.currentLocation() else {
+        guard let owner = LocalAccountScope.sessionSnapshot() else {
+            errorMessage = String(localized: "Position indisponible")
+            Haptics.error()
+            return
+        }
+        let expectedSessionID = services.api.credentials.snapshot().sessionID
+        guard let location = await services.location.currentLocation(maxAge: 30) else {
             errorMessage = "Position indisponible — autorise la localisation dans les réglages."
             Haptics.error()
             return
         }
         let place = await reverseGeocodedName(location)
+        guard !Task.isCancelled, owner.isCurrent,
+              services.api.credentials.snapshot().sessionID == expectedSessionID else { return }
+        guard services.location.isUsable(location, maxAge: 30) else {
+            errorMessage = String(localized: "Position indisponible")
+            Haptics.error()
+            return
+        }
         do {
             let sent = try await service.sendLocation(
                 latitude: location.coordinate.latitude,
                 longitude: location.coordinate.longitude,
                 place: place,
-                in: conversation
+                accuracyMeters: location.horizontalAccuracy,
+                observedAt: location.timestamp,
+                in: conversation,
+                expectedSessionID: expectedSessionID,
+                validateBeforeSend: { [locationService = services.location] in
+                    try Task.checkCancellation()
+                    let usable = await locationService.isUsable(location, maxAge: 30)
+                    guard owner.isCurrent, usable else { throw APIError.cancelled }
+                }
             )
             messages = Self.normalized(messages + [sent])
             Haptics.success()
         } catch {
+            guard owner.isCurrent, !error.isCancellation else { return }
             errorMessage = error.localizedDescription
             Haptics.error()
         }
@@ -2135,6 +2177,14 @@ struct ConversationDetailView: View {
             displayName: conversationTitle,
             requiresE2EE: isE2EE
         )
+    }
+
+    private var e2eeCallReady: Bool {
+        guard isE2EE else { return true }
+        if case .prepared = E2EEV2CallBridge.prepareRuntimeRequest(conversationId: conversation.id) {
+            return true
+        }
+        return false
     }
 
     private var otherParticipantId: String? {
@@ -2292,25 +2342,30 @@ private struct LiveShareConversationBar: View {
                 }
 
                 ForEach(sessions.prefix(3)) { session in
-                    HStack(spacing: SQSpace.sm) {
-                        Circle()
-                            .fill(session.status == "active" ? SQColor.success : SQColor.brandRed)
-                            .frame(width: 7, height: 7)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(summary(for: session))
-                                .font(SQType.caption)
-                                .foregroundStyle(SQColor.label)
-                                .lineLimit(1)
-                            if let detail = detail(for: session) {
-                                Text(detail)
-                                    .font(SQType.micro)
-                                    .foregroundStyle(SQColor.labelSecondary)
+                    TimelineView(.periodic(from: .now, by: 5)) { timeline in
+                        HStack(spacing: SQSpace.sm) {
+                            Circle()
+                                .fill(session.status != "active" ? SQColor.brandRed :
+                                      LiveShareLocationFreshness.isCurrent(
+                                          coordinator.payload(for: session.id), at: timeline.date
+                                      ) ? SQColor.success : SQColor.warning)
+                                .frame(width: 7, height: 7)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(summary(for: session))
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.label)
                                     .lineLimit(1)
+                                if let detail = detail(for: session, at: timeline.date) {
+                                    Text(detail)
+                                        .font(SQType.micro)
+                                        .foregroundStyle(SQColor.labelSecondary)
+                                        .lineLimit(1)
+                                }
                             }
+                            Spacer(minLength: SQSpace.xs)
+                            action(for: session)
                         }
-                        Spacer(minLength: SQSpace.xs)
-                        action(for: session)
                     }
                 }
                 if sessions.count > 3 {
@@ -2369,9 +2424,16 @@ private struct LiveShareConversationBar: View {
             : "\(name(for: session.sharerId)) partage avec vous"
     }
 
-    private func detail(for session: LiveShareSession) -> String? {
-        guard session.status == "active" else { return "En attente de réponse" }
+    private func detail(for session: LiveShareSession, at now: Date) -> String? {
+        guard session.status == "active" else { return String(localized: "En attente de réponse") }
         let payload = coordinator.payload(for: session.id)
+        if payload?.location != nil,
+           !LiveShareLocationFreshness.isCurrent(payload, at: now) {
+            return String(localized: "Position indisponible")
+        }
+        if payload?.location == nil, payload?.radio != nil {
+            return String(localized: "GPS indisponible, données réseau reçues.")
+        }
         let radio = payload?.radio
         let parts = [
             radio?.displayOperatorName,
@@ -2380,7 +2442,9 @@ private struct LiveShareConversationBar: View {
             radio?.rsrp.map { "RSRP \($0) dBm" }
         ].compactMap { $0 }.filter { !$0.isEmpty }
         if !parts.isEmpty { return parts.joined(separator: " · ") }
-        return payload?.location == nil ? "En attente de la première position" : "Position actualisée"
+        return payload?.location == nil
+            ? String(localized: "En attente de la première position…")
+            : String(localized: "Position partagée")
     }
 
     private func name(for userId: String) -> String {
@@ -2595,15 +2659,23 @@ private struct LiveShareSessionCard: View {
     }
 
     var body: some View {
+        TimelineView(.periodic(from: .now, by: 5)) { timeline in
+            content(at: timeline.date)
+        }
+    }
+
+    private func content(at now: Date) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(SQType.body.weight(.semibold))
                         .foregroundStyle(SQColor.label)
-                    Text(session.status == "active" ? "En direct" : "En attente")
+                    Text(statusText(at: now))
                         .font(SQType.micro.weight(.semibold))
-                        .foregroundStyle(session.status == "active" ? SQColor.success : SQColor.brandRed)
+                        .foregroundStyle(session.status == "active"
+                                         && LiveShareLocationFreshness.isCurrent(payload, at: now)
+                                         ? SQColor.success : SQColor.labelSecondary)
                 }
                 Spacer()
                 if coordinator.isBusy { ProgressView().controlSize(.small) }
@@ -2615,8 +2687,14 @@ private struct LiveShareSessionCard: View {
                     .foregroundStyle(SQColor.labelSecondary)
             }
 
-            if session.status == "active", let location = payload?.location {
+            if session.status == "active",
+               LiveShareLocationFreshness.isCurrent(payload, at: now),
+               let location = payload?.location {
                 LiveShareMapPreview(location: location)
+            } else if session.status == "active", payload?.location != nil {
+                Text("Position indisponible")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
             } else if session.status == "active" {
                 Text(payload?.radio == nil
                      ? "En attente de la première position…"
@@ -2630,10 +2708,11 @@ private struct LiveShareSessionCard: View {
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
             }
-            if let updated = session.lastUpdateAt {
+            if let updated = LiveShareLocationFreshness.observedAt(payload) ?? session.lastUpdateAt,
+               updated <= now {
                 Text("Actualisé à \(updated.formatted(date: .omitted, time: .standard))")
                     .font(SQType.micro)
-                    .foregroundStyle(SQColor.labelTertiary)
+                    .foregroundStyle(SQColor.labelSecondary)
             }
 
             if isIncomingRequest {
@@ -2666,6 +2745,14 @@ private struct LiveShareSessionCard: View {
             RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
                 .stroke(SQColor.separator, lineWidth: 1)
         }
+    }
+
+    private func statusText(at now: Date) -> String {
+        guard session.status == "active" else { return String(localized: "En attente") }
+        guard payload != nil else { return String(localized: "En attente") }
+        return LiveShareLocationFreshness.isCurrent(payload, at: now)
+            ? String(localized: "En direct")
+            : String(localized: "Position indisponible")
     }
 
     private var title: String {

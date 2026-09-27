@@ -165,18 +165,11 @@ final class DriveTestPreflightPolicyTests: XCTestCase {
         XCTAssertFalse(report.isBlocked)
     }
 
-    func testOfflineSpeedtestOnlyBlocksButCoverageCanStillBeRecorded() {
-        let speedtestOnly = DriveTestPreflightPolicy.evaluate(
-            snapshot(isOnline: false, recordsCoverage: false, runsSpeedtest: true)
-        )
-        let coverageAndSpeedtest = DriveTestPreflightPolicy.evaluate(
-            snapshot(isOnline: false, recordsCoverage: true, runsSpeedtest: true)
-        )
+    func testOfflineDriveTestBlocksWithoutCoverageFallback() {
+        let report = DriveTestPreflightPolicy.evaluate(snapshot(isOnline: false))
 
-        XCTAssertEqual(speedtestOnly.issues.first?.id, .connectivity)
-        XCTAssertTrue(speedtestOnly.isBlocked)
-        XCTAssertEqual(coverageAndSpeedtest.issues.first?.id, .connectivity)
-        XCTAssertFalse(coverageAndSpeedtest.isBlocked)
+        XCTAssertEqual(report.issues.first?.id, .connectivity)
+        XCTAssertTrue(report.isBlocked)
     }
 
     func testMissingOrStaleGpsFixWarnsWithoutInventingASimProblem() {
@@ -197,9 +190,7 @@ final class DriveTestPreflightPolicyTests: XCTestCase {
         isCharging: Bool = false,
         isOnline: Bool = true,
         connection: NetworkConnectionKind = .cellular,
-        isConstrained: Bool = false,
-        recordsCoverage: Bool = true,
-        runsSpeedtest: Bool = true
+        isConstrained: Bool = false
     ) -> DriveTestPreflightSnapshot {
         DriveTestPreflightSnapshot(
             locationAuthorization: locationAuthorization,
@@ -210,9 +201,7 @@ final class DriveTestPreflightPolicyTests: XCTestCase {
             isCharging: isCharging,
             isOnline: isOnline,
             connection: connection,
-            isConstrained: isConstrained,
-            recordsCoverage: recordsCoverage,
-            runsSpeedtest: runsSpeedtest
+            isConstrained: isConstrained
         )
     }
 }
@@ -253,53 +242,172 @@ final class CoverageSessionQueueTests: XCTestCase {
         XCTAssertFalse(recovered.upload.showOnMap, "Le choix privé doit survivre au relaunch")
     }
 
-    func testFailedUploadKeepsQueueAndRetryReusesStableIdentity() async throws {
+    func testIncompleteLegacyJSONDraftSurvivesRecovery() throws {
         let fileURL = try makeTemporaryQueueURL()
-        let upload = makeSession(
-            id: UUID(),
-            startTime: 1_000,
-            endTime: 2_000,
-            showOnMap: false,
-            points: [makePoint(timestamp: 1_000), makePoint(timestamp: 2_000)]
-        )
-        let service = SessionsService(api: makeAPIClient(), queueFileURL: fileURL)
-        try service.finalizeCoverageDraft(upload)
+        let upload = makeSession(id: UUID(), startTime: 1_000, endTime: 1_000,
+                                 showOnMap: false, points: [makePoint(timestamp: 1_000)])
+        let queue = CoverageSessionQueue(fileURL: fileURL)
+        try queue.upsert(upload, state: .recording)
+        let original = try Data(contentsOf: fileURL)
 
-        var firstKey: String?
-        var firstBody: Data?
-        MockURLProtocol.requestHandler = { request in
-            firstKey = request.value(forHTTPHeaderField: "Idempotency-Key")
-            firstBody = Self.requestBody(request)
+        try queue.recoverInterruptedRecordings()
+
+        XCTAssertEqual(try Data(contentsOf: fileURL), original)
+        XCTAssertEqual(try queue.allPending().first?.upload.sessionId, upload.sessionId)
+        XCTAssertEqual(try queue.allPending().first?.state, .recording)
+    }
+
+    func testIncompleteLegacySwiftDataDraftSurvivesRecovery() throws {
+        guard #available(iOS 17, *) else { throw XCTSkip("SwiftData coverage store requires iOS 17") }
+        let legacyURL = try makeTemporaryQueueURL()
+        let storeURL = legacyURL.deletingLastPathComponent().appendingPathComponent("CoverageSessions.store")
+        let store = try XCTUnwrap(SwiftDataCoverageSessionStore(storeURL: storeURL, legacyFileURL: legacyURL))
+        let upload = makeSession(id: UUID(), startTime: 1_000, endTime: 1_000,
+                                 showOnMap: false, points: [makePoint(timestamp: 1_000)])
+        try store.upsert(upload, state: .recording)
+        let original = try store.allPending()
+
+        try store.recoverInterruptedRecordings()
+
+        XCTAssertEqual(try store.allPending(), original)
+    }
+
+    func testRetiredCoveragePreservesOldDraftsWithoutUploadingOrRecoveringThem() async throws {
+        for state: CoverageSessionQueueState in [.recording, .queued] {
+            let fileURL = try makeTemporaryQueueURL()
+            let upload = makeSession(id: UUID(), startTime: 1_000, endTime: 2_000,
+                showOnMap: false, points: [makePoint(timestamp: 1_000), makePoint(timestamp: 2_000)])
+            try CoverageSessionQueue(fileURL: fileURL).upsert(upload, state: state)
+            LocalOfflineOwnership.claim(kind: "coverage", id: upload.sessionId.uuidString)
+            defer { LocalOfflineOwnership.release(kind: "coverage", id: upload.sessionId.uuidString) }
+            let original = try Data(contentsOf: fileURL)
+            MockURLProtocol.requestHandler = { _ in
+                XCTFail("Retired coverage must never reach the network")
+                throw URLError(.notConnectedToInternet)
+            }
+            let service = SessionsService(api: makeAPIClient(), queueFileURL: fileURL)
+            await service.retryPendingCoverageSessions()
+            await SessionsService(api: makeAPIClient(), queueFileURL: fileURL).retryPendingCoverageSessions()
+            XCTAssertEqual(try Data(contentsOf: fileURL), original, "Legacy data must remain byte-for-byte unchanged")
+        }
+    }
+
+    func testRetiredCoverageLeavesSwiftDataDraftsUntouchedWithoutUploading() async throws {
+        guard #available(iOS 17, *) else { throw XCTSkip("SwiftData coverage store requires iOS 17") }
+        let legacyURL = try makeTemporaryQueueURL()
+        let storeURL = legacyURL.deletingLastPathComponent().appendingPathComponent("CoverageSessions.store")
+        let recording = makeSession(id: UUID(), startTime: 1_000, endTime: 2_000,
+                                    showOnMap: false, points: [makePoint(timestamp: 1_000), makePoint(timestamp: 2_000)])
+        let queued = makeSession(id: UUID(), startTime: 3_000, endTime: 4_000,
+                                 showOnMap: true, points: [makePoint(timestamp: 3_000), makePoint(timestamp: 4_000)])
+        let before: [PendingCoverageSession] = try {
+            let oldStore = try XCTUnwrap(SwiftDataCoverageSessionStore(storeURL: storeURL, legacyFileURL: legacyURL))
+            try oldStore.upsert(recording, state: .recording)
+            try oldStore.upsert(queued, state: .queued)
+            return try oldStore.allPending()
+        }()
+        XCTAssertEqual(before.count, 2)
+        MockURLProtocol.requestHandler = { _ in
+            XCTFail("Retired SwiftData coverage must never reach the network")
             throw URLError(.notConnectedToInternet)
         }
+
+        let service = SessionsService(api: makeAPIClient(), queueFileURL: legacyURL)
         await service.retryPendingCoverageSessions()
-
-        XCTAssertEqual(firstKey, upload.idempotencyKey)
-        XCTAssertEqual(try CoverageSessionQueue(fileURL: fileURL).allPending().count, 1)
-
-        var retryKey: String?
-        var retryBody: Data?
-        MockURLProtocol.requestHandler = { request in
-            retryKey = request.value(forHTTPHeaderField: "Idempotency-Key")
-            retryBody = Self.requestBody(request)
-            return (
-                HTTPURLResponse(
-                    url: request.url!,
-                    statusCode: 200,
-                    httpVersion: nil,
-                    headerFields: ["Content-Type": "application/json"]
-                )!,
-                Data(#"{"ok":true}"#.utf8)
-            )
+        await SessionsService(api: makeAPIClient(), queueFileURL: legacyURL).retryPendingCoverageSessions()
+        do {
+            _ = try await service.createCoverageSession(queued)
+            XCTFail("Retired coverage accepted a new upload")
+        } catch CoverageRecordingError.retired {
+            // Expected: the old store stays available for a future explicit migration.
         }
-        await service.retryPendingCoverageSessions()
 
-        XCTAssertEqual(retryKey, firstKey)
-        XCTAssertEqual(try bodySessionId(firstBody), upload.sessionId.uuidString)
-        XCTAssertEqual(try bodySessionId(retryBody), upload.sessionId.uuidString)
-        XCTAssertEqual(try bodyShowOnMap(retryBody), false)
-        XCTAssertTrue(try CoverageSessionQueue(fileURL: fileURL).allPending().isEmpty)
-        XCTAssertEqual(service.bufferedImportResponseCount, 0)
+        let reopened = try XCTUnwrap(SwiftDataCoverageSessionStore(storeURL: storeURL, legacyFileURL: legacyURL))
+        XCTAssertEqual(try reopened.allPending(), before)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.path))
+    }
+
+    func testRetiredCoverageRejectsNewDraftsWithoutCreatingAQueue() throws {
+        let fileURL = try makeTemporaryQueueURL()
+        let upload = makeSession(id: UUID(), startTime: 1_000, endTime: 2_000,
+            showOnMap: false, points: [makePoint(timestamp: 1_000), makePoint(timestamp: 2_000)])
+        let service = SessionsService(api: makeAPIClient(), queueFileURL: fileURL)
+        XCTAssertThrowsError(try service.persistCoverageDraft(upload))
+        XCTAssertThrowsError(try service.finalizeCoverageDraft(upload))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
+    }
+
+    func testSwiftDataMigrationKeepsEarlierJSONBackup() throws {
+        guard #available(iOS 17, *) else { throw XCTSkip("SwiftData coverage store requires iOS 17") }
+        let legacyURL = try makeTemporaryQueueURL()
+        let backupURL = legacyURL.appendingPathExtension("migrated")
+        let storeURL = legacyURL.deletingLastPathComponent().appendingPathComponent("CoverageSessions.store")
+        let older = makeSession(id: UUID(), startTime: 1_000, endTime: 2_000,
+                                showOnMap: false, points: [makePoint(timestamp: 1_000), makePoint(timestamp: 2_000)])
+        let newer = makeSession(id: UUID(), startTime: 3_000, endTime: 4_000,
+                                showOnMap: false, points: [makePoint(timestamp: 3_000), makePoint(timestamp: 4_000)])
+        try CoverageSessionQueue(fileURL: backupURL).upsert(older, state: .queued)
+        try CoverageSessionQueue(fileURL: legacyURL).upsert(newer, state: .queued)
+        let olderBytes = try Data(contentsOf: backupURL)
+        let newerBytes = try Data(contentsOf: legacyURL)
+
+        let store = try XCTUnwrap(SwiftDataCoverageSessionStore(storeURL: storeURL, legacyFileURL: legacyURL))
+
+        XCTAssertEqual(try Data(contentsOf: backupURL), olderBytes)
+        XCTAssertEqual(try Data(contentsOf: backupURL.appendingPathExtension("1")), newerBytes)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.path))
+        XCTAssertEqual(try store.allPending().map(\.upload.sessionId), [newer.sessionId])
+    }
+
+    func testLocalArchiveReadsJSONAndBackupsWithoutChangingFiles() throws {
+        let directory = try makeTemporaryQueueURL().deletingLastPathComponent()
+        let currentURL = directory.appendingPathComponent("PendingCoverageSessions.json")
+        let backupURL = currentURL.appendingPathExtension("migrated")
+        let unreadableURL = currentURL.appendingPathExtension("migrated.1")
+        let id = UUID()
+        let older = makeSession(id: id, startTime: 1_000, endTime: 1_000,
+                                showOnMap: false, points: [makePoint(timestamp: 1_000)])
+        let newer = makeSession(id: id, startTime: 1_000, endTime: 3_000,
+                                showOnMap: false, points: [makePoint(timestamp: 1_000), makePoint(timestamp: 3_000)])
+        let other = makeSession(id: UUID(), startTime: 4_000, endTime: 4_000,
+                                showOnMap: false, points: [makePoint(timestamp: 4_000)])
+        try CoverageSessionQueue(fileURL: currentURL).upsert(older, state: .recording)
+        try CoverageSessionQueue(fileURL: backupURL).upsert(newer, state: .queued)
+        try CoverageSessionQueue(fileURL: backupURL).upsert(other, state: .recording)
+        try Data("invalid archive".utf8).write(to: unreadableURL)
+        let originalFiles = try [currentURL, backupURL, unreadableURL].map { try Data(contentsOf: $0) }
+
+        let snapshot = LocalCoverageArchiveReader.load(directory: directory)
+
+        XCTAssertEqual(snapshot.entries.count, 2)
+        XCTAssertEqual(snapshot.entries.first?.id, other.sessionId)
+        XCTAssertEqual(snapshot.entries.last?.id, id)
+        XCTAssertEqual(snapshot.entries.last?.pointCount, 2)
+        XCTAssertEqual(snapshot.entries.last?.state, .queued)
+        XCTAssertEqual(snapshot.unreadableSources, 1)
+        XCTAssertEqual(try [currentURL, backupURL, unreadableURL].map { try Data(contentsOf: $0) }, originalFiles)
+    }
+
+    func testLocalArchiveReadsSwiftDataAndLegacyJSONWithoutMigrating() throws {
+        guard #available(iOS 17, *) else { throw XCTSkip("SwiftData coverage store requires iOS 17") }
+        let directory = try makeTemporaryQueueURL().deletingLastPathComponent()
+        let legacyURL = directory.appendingPathComponent("PendingCoverageSessions.json")
+        let storeURL = directory.appendingPathComponent("CoverageSessions.store")
+        let databaseSession = makeSession(id: UUID(), startTime: 1_000, endTime: 2_000,
+                                          showOnMap: false, points: [makePoint(timestamp: 1_000), makePoint(timestamp: 2_000)])
+        let jsonSession = makeSession(id: UUID(), startTime: 3_000, endTime: 4_000,
+                                      showOnMap: false, points: [makePoint(timestamp: 3_000), makePoint(timestamp: 4_000)])
+        let store = try XCTUnwrap(SwiftDataCoverageSessionStore(storeURL: storeURL, migrateLegacy: false))
+        try store.upsert(databaseSession, state: .queued)
+        try CoverageSessionQueue(fileURL: legacyURL).upsert(jsonSession, state: .recording)
+        let originalJSON = try Data(contentsOf: legacyURL)
+
+        let snapshot = LocalCoverageArchiveReader.load(directory: directory, storeURL: storeURL)
+
+        XCTAssertEqual(Set(snapshot.entries.map(\.id)), Set([databaseSession.sessionId, jsonSession.sessionId]))
+        XCTAssertEqual(snapshot.unreadableSources, 0)
+        XCTAssertEqual(try Data(contentsOf: legacyURL), originalJSON)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.appendingPathExtension("migrated").path))
     }
 
     func testFinalizedSnapshotCannotBeDowngradedByOlderDraft() throws {

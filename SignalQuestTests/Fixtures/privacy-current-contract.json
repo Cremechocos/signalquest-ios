@@ -1,0 +1,18 @@
+{
+  "settings": {
+    "shareLiveLocationWithFriends": false,
+    "shareRadioDataWithFriends": false,
+    "shareSessionsWithFriends": false,
+    "sharePhotosOnFriendMap": false,
+    "lastSeenVisibility": "none",
+    "messageRequestPolicy": "friends_only",
+    "shareExactMeasurements": true
+  },
+  "measurementPolicy": {
+    "publicCoordinates": "exact_when_available",
+    "publicationDefault": "automatic",
+    "privateZones": "exclude_from_publication",
+    "allowHiding": true,
+    "existingPrivateMeasurements": "unchanged"
+  }
+}

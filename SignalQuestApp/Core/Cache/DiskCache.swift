@@ -26,7 +26,18 @@ actor DiskCache {
         fileManager: FileManager = .default
     ) {
         let base = fileManager.urls(for: baseDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        root = base.appendingPathComponent(folderName, isDirectory: true)
+        var cacheFolder = folderName
+        #if DEBUG
+        // Cold map recipes get their own cache; never erase the user's cache
+        // or durable drafts to arrange a network fault on a physical device.
+        if baseDirectory == .cachesDirectory,
+           ["SignalQuestMapCache", "SignalQuestTileCache"].contains(folderName),
+           let raw = ProcessInfo.processInfo.environment["SQ_MAP_CACHE_QA"],
+           let run = UUID(uuidString: raw) {
+            cacheFolder += "-qa-\(run.uuidString)"
+        }
+        #endif
+        root = base.appendingPathComponent(cacheFolder, isDirectory: true)
         self.evicts = evicts
         self.fileProtection = fileProtection
         self.maxBytes = maxBytes

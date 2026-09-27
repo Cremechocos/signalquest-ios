@@ -110,13 +110,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SignalQuest uses the microphone only during audio or video calls that you start or accept."
+            "value" : "SignalQuest uses the microphone for audio or video calls you start or accept, and to record voice messages when you choose to."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SignalQuest utilise le micro uniquement pendant les appels audio ou vidéo que tu démarres ou acceptes."
+            "value" : "SignalQuest utilise le micro pour les appels audio ou vidéo que tu démarres ou acceptes, et pour enregistrer des notes vocales à ta demande."
           }
         }
       }

@@ -14,7 +14,7 @@ struct SocialComment: Decodable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, postId, parentId, author, text, content, body, createdAt
-        case likes, likedByMe, repliesCount
+        case likes, likesCount, likedByMe, repliesCount
     }
 
     init(from decoder: Decoder) throws {
@@ -29,7 +29,8 @@ struct SocialComment: Decodable, Identifiable, Equatable {
             ?? (try? c.decode(String.self, forKey: .body))
             ?? ""
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
-        likes = try c.decodeIfPresent(Int.self, forKey: .likes)
+        likes = try c.decodeIfPresent(Int.self, forKey: .likesCount)
+            ?? c.decodeIfPresent(Int.self, forKey: .likes)
         likedByMe = try c.decodeIfPresent(Bool.self, forKey: .likedByMe)
         repliesCount = try c.decodeIfPresent(Int.self, forKey: .repliesCount)
     }

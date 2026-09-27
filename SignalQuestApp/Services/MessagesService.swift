@@ -3,6 +3,7 @@ import Foundation
 
 protocol MessagesServicing: Sendable {
     func conversations() async throws -> [MessageConversation]
+    func conversation(id: String) async throws -> MessageConversation
     func createConversation(participantIds: [String], title: String?, e2ee: Bool) async throws -> CreateConversationResponse
     func searchUsers(query: String) async throws -> [MessageSearchUser]
     func messages(conversationId: String, cursor: String?) async throws -> MessagesPageResponse
@@ -11,7 +12,9 @@ protocol MessagesServicing: Sendable {
     func retryPendingTextMessages() async
     /// Partage une position (kind LOCATION). Refusé par le backend en conversation
     /// E2EE (allowedKinds) → l'appelant ne le propose qu'en conversation non chiffrée.
-    func sendLocation(latitude: Double, longitude: Double, place: String?, in conversation: MessageConversation) async throws -> MessageItem
+    func sendLocation(latitude: Double, longitude: Double, place: String?, accuracyMeters: Double,
+                      observedAt: Date, in conversation: MessageConversation, expectedSessionID: UUID,
+                      validateBeforeSend: @escaping @Sendable () async throws -> Void) async throws -> MessageItem
     // Partage GPS/radio en direct
     func liveShareSessions(conversationId: String) async throws -> [LiveShareSession]
     func activeLiveShareSessions() async throws -> [LiveShareSession]
@@ -95,6 +98,13 @@ protocol MessagesServicing: Sendable {
 }
 
 extension MessagesServicing {
+    func conversation(id: String) async throws -> MessageConversation {
+        guard let conversation = try await conversations().first(where: { $0.id == id }) else {
+            throw APIError.decoding("Conversation unavailable")
+        }
+        return conversation
+    }
+
     func activeLiveShareSessions() async throws -> [LiveShareSession] { [] }
     func retryPendingTextMessages() async {}
     func retryPendingAttachments() async {}
@@ -202,6 +212,13 @@ final class MessagesService: MessagesServicing {
 
     func conversations() async throws -> [MessageConversation] {
         try await api.request(APIEndpoint(path: "/api/messages/conversations"), as: ConversationsResponse.self).conversations
+    }
+
+    func conversation(id: String) async throws -> MessageConversation {
+        struct Response: Decodable { let conversation: MessageConversation }
+        return try await api.request(
+            APIEndpoint(path: "/api/messages/conversations/\(id)"), as: Response.self
+        ).conversation
     }
 
     func createConversation(participantIds: [String], title: String?, e2ee: Bool = true) async throws -> CreateConversationResponse {
@@ -361,7 +378,10 @@ final class MessagesService: MessagesServicing {
         return response.message
     }
 
-    func sendLocation(latitude: Double, longitude: Double, place: String?, in conversation: MessageConversation) async throws -> MessageItem {
+    func sendLocation(latitude: Double, longitude: Double, place: String?, accuracyMeters: Double,
+                      observedAt: Date, in conversation: MessageConversation, expectedSessionID: UUID,
+                      validateBeforeSend: @escaping @Sendable () async throws -> Void) async throws -> MessageItem {
+        try await validateBeforeSend()
         try LegacyE2EEWritePolicy.requireAllowed(
             e2eeEnabled: conversation.e2eeEnabled == true,
             feature: .location
@@ -372,17 +392,27 @@ final class MessagesService: MessagesServicing {
             let metadata: Meta
             struct Meta: Encodable {
                 let location: Loc
-                struct Loc: Encodable { let lat: Double; let lng: Double; let place: String? }
+                struct Loc: Encodable {
+                    let lat: Double
+                    let lng: Double
+                    let place: String?
+                    let accuracyMeters: Double
+                    let observedAt: String
+                }
             }
         }
         let cleanPlace = place?.trimmingCharacters(in: .whitespacesAndNewlines)
         let body = LocationRequest(
             content: cleanPlace ?? "",
-            metadata: .init(location: .init(lat: latitude, lng: longitude, place: (cleanPlace?.isEmpty == false) ? cleanPlace : nil))
+            metadata: .init(location: .init(lat: latitude, lng: longitude,
+                place: (cleanPlace?.isEmpty == false) ? cleanPlace : nil,
+                accuracyMeters: accuracyMeters, observedAt: ObservationTimestamp.string(observedAt)))
         )
-        let response: CreatedMessageResponse = try await api.requestJSON(
-            "/api/messages/conversations/\(conversation.id)/messages",
-            body: body
+        let response: CreatedMessageResponse = try await api.request(
+            APIEndpoint(path: "/api/messages/conversations/\(conversation.id)/messages", method: .post,
+                headers: ["Content-Type": "application/json"], body: try JSONEncoder.signalQuest.encode(body),
+                validateBeforeSend: validateBeforeSend),
+            as: CreatedMessageResponse.self, expectedSessionID: expectedSessionID
         )
         return response.message
     }

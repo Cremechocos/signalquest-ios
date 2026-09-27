@@ -2,6 +2,27 @@ import SwiftUI
 import MapKit
 import UIKit
 
+/// Libellé visuel persistant ; le champ conserve son propre nom VoiceOver.
+struct SQFormFieldLabel: View {
+    let title: LocalizedStringKey
+
+    init(_ title: LocalizedStringKey) { self.title = title }
+
+    var body: some View {
+        Text(title)
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityHidden(true)
+    }
+}
+
+enum SQFormPrompt {
+    static func text(_ title: LocalizedStringKey) -> Text {
+        Text(title).foregroundColor(SQColor.labelSecondary)
+    }
+}
+
 struct TechBadge: View {
     let text: String
     var color: Color = SQColor.brandRed
@@ -530,6 +551,7 @@ struct ErrorStateView: View {
                     Button("Réessayer", action: retry)
                         .buttonStyle(.borderedProminent)
                         .tint(SQColor.brandRed)
+                        .foregroundStyle(SQColor.onAccent)
                 }
             }
             .frame(maxWidth: .infinity)

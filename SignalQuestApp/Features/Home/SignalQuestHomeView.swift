@@ -10,7 +10,7 @@ struct SignalQuestHomeView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    let user: AuthUser
+    let user: AuthUser?
 
     @State private var latestMeasurement: SpeedtestRunResult?
     @State private var networkStatus: NetworkPathStatus = .unknown
@@ -18,7 +18,7 @@ struct SignalQuestHomeView: View {
     @State private var pulse: NetworkPulse?
     @State private var nearbyMeasures: [AndroidSpeedtestMarker] = []
     @State private var userLocation: CLLocation?
-    /// Verdict de qualité réseau (opérateur SIM, données communautaires) qui pilote
+    /// Verdict de qualité réseau (opérateur identifié, données communautaires) qui pilote
     /// la pastille d'état. `nil` = pas encore chargé ou zone sans mesures.
     @State private var networkQuality: NearbyNetworkQuality?
     /// Sheet expliquant la source et le calcul du verdict réseau.
@@ -90,19 +90,19 @@ struct SignalQuestHomeView: View {
     }
 
     private var firstName: String {
-        user.name?.split(separator: " ").first.map(String.init) ?? "à toi"
+        user?.name?.split(separator: " ").first.map(String.init) ?? (user == nil ? "SignalQuest" : "à toi")
     }
 
     // MARK: Header — avatar + salutation + cloche
 
     private var header: some View {
         HStack(spacing: SQSpace.md + 2) {
-            SQAvatar(url: user.avatarUrl, name: user.name ?? "S", size: 54)
+            SQAvatar(url: user?.avatarUrl, name: user?.name ?? "SignalQuest", size: 54)
                 // Le nom est annoncé juste à droite ; relire aussi l'image
                 // produit un élément sans description utile dans VoiceOver.
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
-                Text("Bonjour,")
+                Text(user == nil ? String(localized: "Bienvenue") : String(localized: "Bonjour,"))
                     .font(SQFont.body(14))
                     .foregroundStyle(SQColor.labelSecondary)
                 Text(firstName)
@@ -110,8 +110,8 @@ struct SignalQuestHomeView: View {
                     .foregroundStyle(SQColor.label)
             }
             Spacer()
-            NavigationLink {
-                NotificationsCenterView(service: services.notifications)
+            if user != nil { NavigationLink {
+                NotificationsCenterView(service: services.notifications, badge: services)
             } label: {
                 Image(systemName: "bell")
                     .font(.system(size: 18, weight: .medium))
@@ -119,9 +119,24 @@ struct SignalQuestHomeView: View {
                     .frame(width: 44, height: 44)
                     .background(SQColor.surface, in: Circle())
                     .sqShadowSoft()
+                    .overlay(alignment: .topTrailing) {
+                        if services.unreadNotifications > 0 {
+                            Text(services.unreadNotifications > 99 ? "99+" : "\(services.unreadNotifications)")
+                                .font(SQFont.body(11, relativeTo: .caption))
+                                .fontWeight(.bold)
+                                .foregroundStyle(SQColor.onAccent)
+                                .padding(.horizontal, 4)
+                                .frame(minWidth: 18, minHeight: 18)
+                                .background(SQColor.brandRed, in: Capsule())
+                                .offset(x: 4, y: -4)
+                                .accessibilityHidden(true)
+                        }
+                    }
             }
             .buttonStyle(SQPressButtonStyle())
             .accessibilityLabel("Notifications")
+            .accessibilityValue(services.unreadNotifications > 0 ? Text(services.unreadNotifications, format: .number) : Text(""))
+            }
         }
         .accessibilityElement(children: .contain)
     }
@@ -261,7 +276,7 @@ struct SignalQuestHomeView: View {
     private var isOnline: Bool { services.networkPath.isOnline }
 
     // Priorité du verdict affiché : hors-ligne → mode données réduites (contrainte
-    // système réelle) → qualité communautaire de l'opérateur SIM → état neutre en
+    // système réelle) → qualité communautaire de l'opérateur identifié → état neutre en
     // attendant les données. On n'annonce plus « au top » par défaut : le libellé
     // vert ne s'affiche que si les mesures de la zone le confirment.
 
@@ -274,14 +289,15 @@ struct SignalQuestHomeView: View {
 
     private var networkSubtitle: String {
         guard isOnline else { return String(localized: "Vérifie ta connexion") }
-        // Verdict dispo (hors mode données réduites) : opérateur SIM + le débit
+        // Verdict dispo (hors mode données réduites) : opérateur + provenance + débit
         // médian communautaire. Le détail RSRP vit dans la sheet explicative
         // (peu lisible en un coup d'œil sur la pastille).
         if !networkStatus.isConstrained, let quality = networkQuality {
+            let operatorAndSource = "\(quality.operatorLabel) · \(quality.operatorSource.shortLabel)"
             if let mbps = quality.medianDownloadMbps {
-                return "\(quality.operatorLabel) · \(mbps) Mbps"
+                return "\(operatorAndSource) · \(mbps) Mbps"
             }
-            return "\(quality.operatorLabel) · \(quality.sampleCount) mesures"
+            return "\(operatorAndSource) · \(quality.sampleCount) mesures"
         }
         switch networkStatus.connection {
         case .cellular:
@@ -347,12 +363,13 @@ struct SignalQuestHomeView: View {
                 title: "Messages",
                 subtitle: messagesSubtitle,
                 systemImage: "bubble.left.and.bubble.right",
-                badgeCount: services.unreadConversations
+                badgeCount: user == nil ? 0 : services.unreadConversations
             ) { router.route(toConversation: nil) }
         }
     }
 
     private var messagesSubtitle: String {
+        guard user != nil else { return String(localized: "Connexion requise") }
         let unread = services.unreadConversations
         if unread <= 0 { return String(localized: "Conversations") }
         return unread == 1 ? "1 non lu" : "\(unread) non lus"
@@ -714,7 +731,7 @@ struct SignalQuestHomeView: View {
     }
 
     /// Charge le pouls réseau, les dernières mesures communautaires et le verdict
-    /// de qualité (opérateur SIM) autour de la position. Best-effort : sans
+    /// de qualité (opérateur identifié) autour de la position. Best-effort : sans
     /// position ou sans données, la section reste masquée et la pastille retombe
     /// sur un état neutre (jamais d'erreur affichée sur l'Accueil).
     /// `forceFresh` (pull-to-refresh) contourne le cache de tuiles.
@@ -740,7 +757,7 @@ struct SignalQuestHomeView: View {
         // sinon on tolère jusqu'à 90 s de cache pour ne pas marteler l'API.
         let maxAge: TimeInterval = forceFresh ? 0 : 90
         let isCellular = services.networkPath.status.connection == .cellular
-        let simMnc = services.networkPath.simPLMN().mnc
+        let simPlmn = services.networkPath.simPLMN().plmn
 
         // Pouls recadré sur le même rayon que le reste (1 km), tous opérateurs.
         async let pulseTask: NetworkPulse? = try? services.feed.networkPulse(
@@ -751,7 +768,7 @@ struct SignalQuestHomeView: View {
         async let recentTask: [AndroidSpeedtestMarker] = recentNearbySpeedtests(latitude: lat, longitude: lng)
         async let tilesTask: [AndroidSpeedtestMarker] = nearbySpeedtests(latitude: lat, longitude: lng, around: location, maxAge: maxAge)
         async let qualityTask: NearbyNetworkQuality? = services.nearbyQuality.verdict(
-            latitude: lat, longitude: lng, isCellular: isCellular, simMnc: simMnc, maxAge: maxAge
+            latitude: lat, longitude: lng, isCellular: isCellular, simPlmn: simPlmn, maxAge: maxAge
         )
         async let outageTask: CommunityOutage? = nearestOutage(around: location)
 

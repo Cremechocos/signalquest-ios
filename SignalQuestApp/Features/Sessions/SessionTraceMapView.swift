@@ -13,6 +13,9 @@ struct SessionTraceMapView: UIViewRepresentable {
     var drawPath: Bool = false
     /// Mode de coloration des points : par signal (RSRP) ou par génération (carte couverture).
     var coloring: SessionPointColoring = .rsrp
+    /// Fourni par « Mes mesures » : évite de reconstruire 30 000 points quand
+    /// seul un état d'interface change. Les autres appelants gardent leur rendu.
+    var renderID: UUID? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -26,6 +29,12 @@ struct SessionTraceMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ map: MKMapView, context: Context) {
+        let signature = renderID.map {
+            SessionTraceRenderSignature(id: $0, coloring: coloring,
+                colorScheme: context.environment.colorScheme,
+                contrast: context.environment.colorSchemeContrast)
+        }
+        guard context.coordinator.shouldRender(signature) else { return }
         map.removeOverlays(map.overlays)
         map.removeAnnotations(map.annotations)
 
@@ -67,6 +76,18 @@ struct SessionTraceMapView: UIViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, MKMapViewDelegate {
+        private var lastSignature: SessionTraceRenderSignature?
+
+        func shouldRender(_ signature: SessionTraceRenderSignature?) -> Bool {
+            guard let signature else {
+                lastSignature = nil
+                return true
+            }
+            guard signature != lastSignature else { return false }
+            lastSignature = signature
+            return true
+        }
+
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let points = overlay as? SessionPointsOverlay {
                 return SessionPointsRenderer(overlay: points)
@@ -108,6 +129,13 @@ struct SessionTraceMapView: UIViewRepresentable {
             return nil
         }
     }
+}
+
+struct SessionTraceRenderSignature: Equatable {
+    let id: UUID
+    let coloring: SessionPointColoring
+    let colorScheme: ColorScheme
+    let contrast: ColorSchemeContrast
 }
 
 /// Overlay « nuage de points » dessiné en une passe Core Graphics : chaque point
@@ -162,7 +190,7 @@ enum SessionRSRPColor {
 
 /// Mode de coloration du nuage de points : RSRP (signal) ou GÉNÉRATION.
 /// IMPORTANT : carte RSRP et carte génération sont deux cartes DISTINCTES.
-enum SessionPointColoring { case rsrp, generation }
+enum SessionPointColoring: Equatable { case rsrp, generation }
 
 /// Couleurs par GÉNÉRATION (carte de couverture génération, distincte du RSRP).
 /// Délègue à l'échelle canonique unique (SQNetworkColors).

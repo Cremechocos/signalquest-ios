@@ -28,9 +28,15 @@ enum LeaderboardTab: String, CaseIterable, Identifiable {
 @MainActor
 final class LeaderboardsViewModel: ObservableObject {
     @Published var tab: LeaderboardTab = .speed
-    @Published var period = "week"
-    @Published var scope = "global"
-    @Published var category = "download"
+    @Published var period = "week" {
+        didSet { if period != oldValue { invalidateSpeed(); invalidatePoints() } }
+    }
+    @Published var scope = "global" {
+        didSet { if scope != oldValue { invalidateSpeed(); invalidatePoints() } }
+    }
+    @Published var category = "download" {
+        didSet { if category != oldValue { invalidateSpeed() } }
+    }
 
     @Published var speedResult: LeaderboardResult = .empty
     @Published var pointsResult: PointsLeaderboardResult = .empty
@@ -43,6 +49,23 @@ final class LeaderboardsViewModel: ObservableObject {
     /// pour rejouer son animation d'entrée quand le classement change.
     @Published private(set) var speedStamp = 0
     @Published private(set) var pointsStamp = 0
+
+    private var speedGeneration = UUID()
+    private var pointsGeneration = UUID()
+
+    private func invalidateSpeed() {
+        speedGeneration = UUID()
+        speedResult = .empty
+        speedError = nil
+        isLoadingSpeed = false
+    }
+
+    private func invalidatePoints() {
+        pointsGeneration = UUID()
+        pointsResult = .empty
+        pointsError = nil
+        isLoadingPoints = false
+    }
 
     private let service: LeaderboardServicing
     private let gamification: GamificationServicing?
@@ -72,6 +95,11 @@ final class LeaderboardsViewModel: ObservableObject {
     }
 
     func loadSpeed() async {
+        let generation = UUID()
+        speedGeneration = generation
+        let requestedPeriod = period
+        let requestedScope = scope
+        let requestedCategory = category
         if AppEnvironment.usesDemoData {
             speedResult = .demo
             speedError = nil
@@ -79,17 +107,25 @@ final class LeaderboardsViewModel: ObservableObject {
             return
         }
         isLoadingSpeed = true
-        defer { isLoadingSpeed = false }
+        speedError = nil
+        defer { if speedGeneration == generation { isLoadingSpeed = false } }
         do {
-            speedResult = try await service.leaderboard(period: period, scope: scope, category: category)
+            let response = try await service.leaderboard(period: requestedPeriod, scope: requestedScope, category: requestedCategory)
+            guard speedGeneration == generation, !Task.isCancelled else { return }
+            speedResult = response
             speedError = nil
             speedStamp += 1
         } catch {
+            guard speedGeneration == generation, !Task.isCancelled, !error.isCancellation else { return }
             speedError = error.localizedDescription
         }
     }
 
     func loadPoints() async {
+        let generation = UUID()
+        pointsGeneration = generation
+        let requestedPeriod = period
+        let requestedScope = scope
         if AppEnvironment.usesDemoData {
             pointsResult = .demo
             pointsError = nil
@@ -97,12 +133,16 @@ final class LeaderboardsViewModel: ObservableObject {
             return
         }
         isLoadingPoints = true
-        defer { isLoadingPoints = false }
+        pointsError = nil
+        defer { if pointsGeneration == generation { isLoadingPoints = false } }
         do {
-            pointsResult = try await service.pointsLeaderboard(period: period, scope: scope)
+            let response = try await service.pointsLeaderboard(period: requestedPeriod, scope: requestedScope)
+            guard pointsGeneration == generation, !Task.isCancelled else { return }
+            pointsResult = response
             pointsError = nil
             pointsStamp += 1
         } catch {
+            guard pointsGeneration == generation, !Task.isCancelled, !error.isCancellation else { return }
             pointsError = error.localizedDescription
         }
     }
@@ -495,10 +535,18 @@ private struct LeaderboardHeroCard: View {
                             .foregroundStyle(SQColor.labelSecondary)
                             .lineLimit(2)
                     }
-                    HStack(spacing: SQSpace.sm) {
-                        heroChip(icon: "flame.fill", text: streak > 1 ? "\(streak) jours" : "\(streak) jour")
-                        if !unlockedBadges.isEmpty {
-                            heroChip(icon: "rosette", text: "\(unlockedBadges.count) badge\(unlockedBadges.count > 1 ? "s" : "")")
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: SQSpace.sm) {
+                            heroChip(icon: "flame.fill", text: streak > 1 ? "\(streak) jours" : "\(streak) jour")
+                            if !unlockedBadges.isEmpty {
+                                heroChip(icon: "rosette", text: "\(unlockedBadges.count) badge\(unlockedBadges.count > 1 ? "s" : "")")
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: SQSpace.xs) {
+                            heroChip(icon: "flame.fill", text: streak > 1 ? "\(streak) jours" : "\(streak) jour")
+                            if !unlockedBadges.isEmpty {
+                                heroChip(icon: "rosette", text: "\(unlockedBadges.count) badge\(unlockedBadges.count > 1 ? "s" : "")")
+                            }
                         }
                     }
                 }
@@ -586,6 +634,8 @@ private struct LeaderboardHeroCard: View {
             Text(text)
                 .font(SQType.micro)
                 .monospacedDigit()
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(SQColor.label)
         }
         .padding(.horizontal, SQSpace.sm + 2)
@@ -1146,6 +1196,7 @@ private struct LeaderboardRowView<Meta: View>: View {
         }
         .modifier(SQSoftShadowIf(active: !isMe))
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("leaderboard.row.\(rank)")
     }
 }
 

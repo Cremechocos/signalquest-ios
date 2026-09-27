@@ -42,7 +42,7 @@ struct OpenMessagesIntent: AppIntent {
 }
 
 /// Raccourci « Lancer un Drive Test » (F4). Ouvre l'app sur l'onglet Speed et
-/// présente le mode Drive Test (mesure continue + couverture le long du trajet).
+/// présente le mode Drive Test (speedtests successifs le long du trajet).
 struct RunDriveTestIntent: AppIntent {
     static let title: LocalizedStringResource = "Lancer un Drive Test"
     static let description = IntentDescription("Ouvre SignalQuest et démarre le mode Drive Test (mesure en continu).")

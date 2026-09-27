@@ -1,7 +1,17 @@
 import Foundation
 import CoreLocation
 
-/// Verdict de qualité réseau COMMUNAUTAIRE pour l'opérateur de la SIM, autour
+/// Provenance de l'opérateur utilisé pour filtrer les mesures communautaires.
+/// L'IP/ASN identifie l'accès Internet mobile, pas nécessairement la cellule
+/// servante (notamment en itinérance) ; le PLMN SIM décrit l'abonnement.
+enum NearbyOperatorSource: Equatable, Sendable {
+    case ipAsn
+    case simPlmn
+
+    var shortLabel: String { self == .ipAsn ? "IP/ASN" : "SIM" }
+}
+
+/// Verdict de qualité réseau COMMUNAUTAIRE pour un opérateur identifié autour
 /// d'une position donnée.
 ///
 /// Le niveau retenu (`level`) est LE PIRE des deux bandes mesurées — couverture
@@ -17,6 +27,7 @@ struct NearbyNetworkQuality: Equatable, Sendable {
     let medianDownloadMbps: Int?
     let operatorLabel: String
     let operatorKey: String
+    let operatorSource: NearbyOperatorSource
     /// Nombre de mesures communautaires (RSRP + débit) ayant servi au verdict.
     let sampleCount: Int
     /// Rayon d'analyse (m) autour de la position — pour l'explication à l'écran.
@@ -24,19 +35,19 @@ struct NearbyNetworkQuality: Equatable, Sendable {
 }
 
 protocol NearbyNetworkQualityServicing: Sendable {
-    /// Calcule le verdict pour l'opérateur de la SIM autour de la position.
+    /// Calcule le verdict pour l'opérateur identifié autour de la position.
     /// Renvoie `nil` si l'opérateur n'a pas pu être identifié ou si la zone n'a
     /// pas assez de mesures communautaires pour trancher.
     ///
     /// - Parameters:
     ///   - isCellular: connexion active cellulaire (autorise la résolution par IP/ASN).
-    ///   - simMnc: MNC de la SIM lu par CoreTelephony (repli quand l'IP est indisponible).
+    ///   - simPlmn: PLMN exact de la SIM (repli quand l'IP est indisponible).
     ///   - maxAge: fraîcheur du cache de tuiles (`0` = données fraîches forcées).
     func verdict(
         latitude: Double,
         longitude: Double,
         isCellular: Bool,
-        simMnc: Int?,
+        simPlmn: String?,
         maxAge: TimeInterval?
     ) async -> NearbyNetworkQuality?
 
@@ -82,12 +93,13 @@ final class NearbyNetworkQualityService: NearbyNetworkQualityServicing {
         latitude: Double,
         longitude: Double,
         isCellular: Bool,
-        simMnc: Int?,
+        simPlmn: String?,
         maxAge: TimeInterval?
     ) async -> NearbyNetworkQuality? {
         guard let market = await markets.marketForLocation(latitude: latitude, longitude: longitude),
-              let op = await resolveOperator(market: market, isCellular: isCellular, simMnc: simMnc)
+              let selection = await resolveOperator(market: market, isCellular: isCellular, simPlmn: simPlmn)
         else { return nil }
+        let op = selection.entry
 
         let bounds = MapBounds(
             north: latitude + Self.halfSpanLat,
@@ -142,6 +154,7 @@ final class NearbyNetworkQualityService: NearbyNetworkQualityServicing {
             medianDownloadMbps: medianDownload.map { Int($0.rounded()) },
             operatorLabel: op.shortLabel.isEmpty ? op.label : op.shortLabel,
             operatorKey: op.key,
+            operatorSource: selection.source,
             sampleCount: rsrps.count + downloads.count,
             radiusMeters: Int(Self.radiusMeters)
         )
@@ -232,27 +245,51 @@ final class NearbyNetworkQualityService: NearbyNetworkQualityServicing {
         }
     }
 
-    /// Identifie l'opérateur de la SIM : IP/ASN d'abord (fiable en cellulaire,
+    /// Identifie l'opérateur du verdict : IP/ASN d'abord (disponible en cellulaire,
     /// écarté sous VPN où l'IP refléterait le tunnel ; non tenté sur WiFi où l'IP
-    /// pointerait le FAI fixe), puis repli sur le MNC de la SIM.
+    /// pointerait le FAI fixe), puis repli sur le PLMN exact de la SIM.
     private func resolveOperator(
         market: MarketRegistryEntry,
         isCellular: Bool,
-        simMnc: Int?
-    ) async -> MarketRegistryOperator? {
-        if isCellular {
-            let viaVpn = VPNDetector.isActive()
-            if let detected = await networkOperator.resolve(viaVpn: viaVpn),
-               detected.viaVpn != true,
-               let entry = market.operatorEntry(forKey: detected.operatorKey) {
-                return entry
-            }
+        simPlmn: String?
+    ) async -> (entry: MarketRegistryOperator, source: NearbyOperatorSource)? {
+        let viaVpn = isCellular && VPNDetector.isActive()
+        let detected = isCellular && !viaVpn
+            ? await networkOperator.resolve(viaVpn: false)
+            : nil
+        return Self.selectOperatorWithSource(
+            market: market, isCellular: isCellular, viaVpn: viaVpn,
+            detected: detected, simPlmn: simPlmn
+        )
+    }
+
+    static func selectOperator(
+        market: MarketRegistryEntry,
+        isCellular: Bool,
+        viaVpn: Bool,
+        detected: DetectedOperator?,
+        simPlmn: String?
+    ) -> MarketRegistryOperator? {
+        selectOperatorWithSource(
+            market: market, isCellular: isCellular, viaVpn: viaVpn,
+            detected: detected, simPlmn: simPlmn
+        )?.entry
+    }
+
+    static func selectOperatorWithSource(
+        market: MarketRegistryEntry,
+        isCellular: Bool,
+        viaVpn: Bool,
+        detected: DetectedOperator?,
+        simPlmn: String?
+    ) -> (entry: MarketRegistryOperator, source: NearbyOperatorSource)? {
+        if isCellular, !viaVpn, detected?.viaVpn != true,
+           let entry = market.operatorEntry(forKey: detected?.operatorKey) {
+            return (entry, .ipAsn)
         }
-        if let simMnc,
-           let entry = market.selectableOperators.first(where: { $0.mncs.contains(simMnc) }) {
-            return entry
-        }
-        return nil
+        guard let key = market.radioOperatorKey(observedPlmn: simPlmn) else { return nil }
+        guard let entry = market.operatorEntry(forKey: key) else { return nil }
+        return (entry, .simPlmn)
     }
 
     private static func median(_ values: [Double], minCount: Int) -> Double? {

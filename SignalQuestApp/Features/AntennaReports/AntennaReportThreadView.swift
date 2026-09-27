@@ -471,7 +471,7 @@ struct AntennaReportImageViewer: View {
     private var imageContent: some View {
         switch image {
         case .remote(let url):
-            RemoteImage(url: url, maxDimension: 1600, contentMode: .fit) {
+            RemoteImage(url: url, maxDimension: 1600, contentMode: .fit, showsFailureUI: true) {
                 ProgressView().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         case .inline(let uiImage):

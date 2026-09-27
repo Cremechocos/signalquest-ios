@@ -188,10 +188,14 @@ struct MapKitMapView: UIViewRepresentable {
                     continue
                 }
                 guard newPayload != payloadsById[id] else { continue }
-                // Un ami qui a bougé/changé est mis à jour EN PLACE : déplacement
-                // animé + avatar conservé (pas de recréation, donc pas de
-                // clignotement). Les autres types sont retirés puis rajoutés.
-                if newPayload.kind == .friend, ann.payload.kind == .friend {
+                // A cluster keeps its cell ID while its centroid and count change
+                // during a pan. Replacing the annotation flashes or briefly drops
+                // it; update its existing marker and accessibility instead.
+                if newPayload.clusterCount != nil, ann.payload.clusterCount != nil,
+                   newPayload.kind == ann.payload.kind {
+                    updateClusterInPlace(ann, to: newPayload, on: map)
+                    payloadsById[id] = newPayload
+                } else if newPayload.kind == .friend, ann.payload.kind == .friend {
                     updateFriendInPlace(ann, to: newPayload, on: map)
                     payloadsById[id] = newPayload
                 } else {
@@ -210,6 +214,18 @@ struct MapKitMapView: UIViewRepresentable {
                 toAdd.append(ann)
             }
             if !toAdd.isEmpty { map.addAnnotations(toAdd) }
+        }
+
+        /// Cluster positions follow the current admitted points immediately.
+        /// No movement animation: a pan already moves the map, and Reduce Motion
+        /// must not see an extra marker transition.
+        func updateClusterInPlace(_ ann: SQMapKitAnnotation, to payload: MapAnnotationPayload, on map: MKMapView) {
+            ann.payload = payload
+            if ann.coordinate.latitude != payload.coordinate.latitude
+                || ann.coordinate.longitude != payload.coordinate.longitude {
+                UIView.performWithoutAnimation { ann.coordinate = payload.coordinate }
+            }
+            (map.view(for: ann) as? SQMapKitMarkerView)?.apply(payload)
         }
 
         /// Met à jour un ami existant sans recréer l'annotation : ré-applique ses

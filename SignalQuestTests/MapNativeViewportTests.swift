@@ -6,6 +6,79 @@ import MapKit
 /// Exercises the actual representable and MKMapView inside a UIWindow.
 @MainActor
 final class MapNativeViewportTests: XCTestCase {
+    func testAdjacentClusterCellsAcrossEquatorKeepDistinctStableAnnotationIDs() {
+        func marker(_ id: String, _ latitude: Double) -> MapAnnotationPayload {
+            MapAnnotationPayload(
+                id: id, kind: .customSite, title: id, subtitle: "",
+                coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: 0.02),
+                metric: nil, backendId: nil, details: nil, antennaId: nil,
+                clusterCount: nil, azimuths: [], showsAzimuths: false
+            )
+        }
+        let points = [marker("south-1", -0.06), marker("south-2", -0.05),
+                      marker("north-1", 0.02), marker("north-2", 0.03)]
+        func clusters(_ values: [MapAnnotationPayload]) -> [MapAnnotationPayload] {
+            MapExplorerView.clusteredPayloads(
+                from: values, kind: .customSite, idPrefix: "custom-site",
+                minCount: 1, zoom: 10, label: { "\($0) sites" }
+            )
+        }
+
+        let initial = clusters(points)
+        let ids = Set(initial.map(\.id))
+        XCTAssertEqual(initial.count, 2)
+        XCTAssertEqual(ids, ["custom-site-cluster--1-0", "custom-site-cluster-0-0"])
+        XCTAssertEqual(initial.map(\.clusterCount).compactMap { $0 }.sorted(), [2, 2])
+
+        // A small pan can change a cell's centroid without changing its identity.
+        let moved = clusters(points + [marker("south-3", -0.07)])
+        XCTAssertEqual(Set(moved.map(\.id)), ids)
+        XCTAssertEqual(moved.map(\.clusterCount).compactMap { $0 }.sorted(), [2, 3])
+    }
+
+    func testNativeClusterUpdatesCountAndPositionWithoutReplacingAnnotation() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let map = try await fixture.loadedMap()
+        let coordinator = try XCTUnwrap(map.delegate as? MapKitMapView.Coordinator)
+        let center = map.centerCoordinate
+        func site(_ id: String, latitude: Double) -> MapAnnotationPayload {
+            MapAnnotationPayload(
+                id: id, kind: .customSite, title: id, subtitle: "",
+                coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: center.longitude),
+                metric: nil, backendId: nil, details: nil, antennaId: nil,
+                clusterCount: nil, azimuths: [], showsAzimuths: false
+            )
+        }
+        func cluster(_ points: [MapAnnotationPayload]) throws -> MapAnnotationPayload {
+            try XCTUnwrap(MapExplorerView.clusteredPayloads(
+                from: points, kind: .customSite, idPrefix: "custom-site",
+                minCount: 1, zoom: 10, label: { "\($0) sites ajoutés" }
+            ).first)
+        }
+        let points = [site("one", latitude: center.latitude),
+                      site("two", latitude: center.latitude + 0.002)]
+        let initial = try cluster(points)
+        coordinator.apply(annotations: [initial], on: map)
+        let annotation = try XCTUnwrap(coordinator.annotationsById[initial.id])
+        try await fixture.settle { map.view(for: annotation) is SQMapKitMarkerView }
+        let view = try XCTUnwrap(map.view(for: annotation) as? SQMapKitMarkerView)
+        XCTAssertEqual(view.countLabel.text, "2")
+
+        let updated = try cluster(points + [site("three", latitude: center.latitude + 0.003)])
+        XCTAssertEqual(updated.id, initial.id, "A small pan keeps the same cluster cell")
+        coordinator.apply(annotations: [updated], on: map)
+
+        XCTAssertTrue(coordinator.annotationsById[updated.id] === annotation)
+        XCTAssertTrue(map.view(for: annotation) === view)
+        XCTAssertEqual(map.annotations.compactMap { $0 as? SQMapKitAnnotation }.filter { $0.payload.id == updated.id }.count, 1)
+        XCTAssertEqual(annotation.coordinate.latitude, updated.coordinate.latitude, accuracy: 0.000001)
+        XCTAssertEqual(view.countLabel.text, "3")
+        XCTAssertEqual(view.accessibilityLabel, MapAccessibility.describe(updated).label)
+        coordinator.mapView(map, didSelect: view)
+        XCTAssertEqual(fixture.probe.selectedPayloads.last?.clusterCount, 3)
+    }
+
     func testRenderUpdatesDoNotAccumulateSafeAreaIntoOrnamentMargins() async throws {
         let fixture = try Fixture()
         defer { fixture.close() }
@@ -154,6 +227,7 @@ final class MapNativeViewportTests: XCTestCase {
         var publications = 0
         var latest: MapViewportSnapshot?
         var selectedIDs: [String] = []
+        var selectedPayloads: [MapAnnotationPayload] = []
         init(center: CLLocationCoordinate2D, zoom: Double) { self.center = center; self.zoom = zoom }
     }
 
@@ -165,7 +239,10 @@ final class MapNativeViewportTests: XCTestCase {
                           colorScheme: .light, ornamentBottomInset: probe.bottom,
                           center: $probe.center, zoom: $probe.zoom,
                           onMoveEnd: { snapshot, _ in probe.latest = snapshot; probe.publications += 1 },
-                          onSelect: { probe.selectedIDs.append($0.backendId ?? $0.id) })
+                          onSelect: { payload in
+                              probe.selectedIDs.append(payload.backendId ?? payload.id)
+                              probe.selectedPayloads.append(payload)
+                          })
                 .ignoresSafeArea()
         }
     }

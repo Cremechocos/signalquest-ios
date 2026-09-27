@@ -1,6 +1,287 @@
 import XCTest
 @testable import SignalQuest
 
+@MainActor
+final class SentinelleAccessRecoveryTests: XCTestCase {
+    private func waitForRequests(_ queue: SentinelleTargetRequests, _ count: Int) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while await queue.count < count {
+            guard ContinuousClock.now < deadline else { throw SentinelleAccessTestError.timeout }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+    }
+
+    func testFreeFollowingSurvivesDeniedThenPremiumGrantOpensTargets() async throws {
+        let service = SentinelleAccessService()
+        let model = SentinelleViewModel(service: service)
+        let denied = Task { await model.load() }
+        try await waitForRequests(service.loads, 1)
+        await service.loads.fail(0, SentinelleAccessDenied())
+        await denied.value
+        XCTAssertTrue(model.accessDenied)
+        XCTAssertEqual(model.following.map(\.followId), ["follow"])
+
+        let granted = Task { await model.load() }
+        try await waitForRequests(service.loads, 2)
+        await service.loads.succeed(1, .init(targets: [], quota: .init(used: 0, max: 3)))
+        await granted.value
+        XCTAssertFalse(model.accessDenied)
+        XCTAssertEqual(model.quota?.max, 3)
+        XCTAssertEqual(model.following.map(\.followId), ["follow"])
+        XCTAssertFalse(model.isLoading)
+    }
+
+    func testOldDenialCannotReplaceNewPremiumGrant() async throws {
+        let service = SentinelleAccessService()
+        let model = SentinelleViewModel(service: service)
+        let old = Task { await model.load() }
+        try await waitForRequests(service.loads, 1)
+        let granted = Task { await model.load() }
+        try await waitForRequests(service.loads, 2)
+        await service.loads.succeed(1, .init(targets: [], quota: .init(used: 0, max: 3)))
+        await granted.value
+        let refresh = model.lastRefresh
+        await service.loads.fail(0, SentinelleAccessDenied())
+        await old.value
+        XCTAssertFalse(model.accessDenied)
+        XCTAssertEqual(model.quota?.max, 3)
+        XCTAssertEqual(model.lastRefresh, refresh)
+        XCTAssertNil(model.errorMessage)
+    }
+}
+
+private enum SentinelleAccessTestError: Error { case unexpectedCall, timeout }
+
+private actor SentinelleTargetRequests {
+    private var pending: [Int: CheckedContinuation<SentinelleTargetsResponse, Error>] = [:]
+    private(set) var count = 0
+
+    func request() async throws -> SentinelleTargetsResponse {
+        try await withCheckedThrowingContinuation { continuation in
+            pending[count] = continuation
+            count += 1
+        }
+    }
+
+    func succeed(_ index: Int, _ value: SentinelleTargetsResponse) {
+        pending.removeValue(forKey: index)?.resume(returning: value)
+    }
+
+    func fail(_ index: Int, _ error: Error) {
+        pending.removeValue(forKey: index)?.resume(throwing: error)
+    }
+}
+
+private struct SentinelleAccessService: SentinelleServicing {
+    let loads = SentinelleTargetRequests()
+    func targets() async throws -> SentinelleTargetsResponse { try await loads.request() }
+    func following() async throws -> SentinelleFollowingResponse {
+        try JSONDecoder.signalQuest.decode(
+            SentinelleFollowingResponse.self,
+            from: Data(#"{"following":[{"followId":"follow","displayName":"Box partagée","status":"up","families":["IPv4"],"incidents":[]}]}"#.utf8)
+        )
+    }
+    func detail(targetId: String) async throws -> SentinelleDetailResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func series(targetId: String, window: SentinelleWindow, family: SentinelleFamily?) async throws -> SentinelleSeriesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func diagnostic(targetId: String, family: SentinelleFamily?) async throws -> SentinelleDiagnostic { throw SentinelleAccessTestError.unexpectedCall }
+    func trends(targetId: String, family: SentinelleFamily?) async throws -> SentinelleTrends { throw SentinelleAccessTestError.unexpectedCall }
+    func proof(targetId: String, family: SentinelleFamily?) async throws -> SentinelleProof { throw SentinelleAccessTestError.unexpectedCall }
+    func create(label: String, address: String, ownerLabel: String?, ownerEmoji: String?) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func setOwner(targetId: String, ownerLabel: String?, ownerEmoji: String?) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func setAddress(targetId: String, family: SentinelleFamily, address: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func delete(targetId: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func currentIp() async throws -> SentinelleCurrentIp { throw SentinelleAccessTestError.unexpectedCall }
+    func preferences() async throws -> SentinellePreferencesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func savePreferences(_ changes: SentinellePreferencesPatch) async throws -> SentinellePreferencesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func testWebhook() async throws -> SentinelleWebhookTest { throw SentinelleAccessTestError.unexpectedCall }
+    func followers(targetId: String) async throws -> SentinelleFollowersResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func followedSeries(followId: String, window: SentinelleWindow) async throws -> SentinelleSeriesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func sharedBox(slug: String) async throws -> SentinelleSharedBox { throw SentinelleAccessTestError.unexpectedCall }
+    func follow(shareInput: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func unfollow(followId: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func revokeFollower(targetId: String, followerId: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func setSharing(targetId: String, changes: SentinelleSharingPatch) async throws -> SentinelleTarget { throw SentinelleAccessTestError.unexpectedCall }
+}
+
+@MainActor
+final class SentinelleAlertSettingsTests: XCTestCase {
+    func testWebhookAddressRequiresAnHttpUrlWithinServerLimit() {
+        XCTAssertTrue(SentinelleAlertSettingsSheet.validWebhookURL("https://example.org/hook"))
+        XCTAssertTrue(SentinelleAlertSettingsSheet.validWebhookURL("http://example.org/hook"))
+        XCTAssertFalse(SentinelleAlertSettingsSheet.validWebhookURL("example.org/hook"))
+        XCTAssertFalse(SentinelleAlertSettingsSheet.validWebhookURL("ftp://example.org/hook"))
+        XCTAssertFalse(SentinelleAlertSettingsSheet.validWebhookURL("https://example.org/bad path"))
+        XCTAssertFalse(SentinelleAlertSettingsSheet.validWebhookURL("https://example.org/" + String(repeating: "x", count: 500)))
+    }
+
+    func testSaveUsesTheAcknowledgedPatchResponseWithoutASecondRead() async throws {
+        let api = SentinellePreferencesAPIStub()
+        let service = SentinelleService(api: api)
+        let result = try await service.savePreferences(
+            SentinellePreferencesPatch(webhookUrl: .some("https://example.org/hook"))
+        )
+        XCTAssertEqual(result.preferences.webhookUrl, "https://example.org/hook")
+        XCTAssertTrue(result.preferences.notifyDown)
+        let requestCount = api.requestCount()
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    func testRejectedPatchThenSuccessfulGetKeepsWebhookDraftForRetry() async throws {
+        for status in [400, 503] {
+            let service = SentinelleService(api: SentinelleRejectedPatchAPIStub(status: status))
+            var queue = SentinellePreferenceEditQueue(try await service.preferences().preferences)
+            queue.enqueue(SentinellePreferencesPatch(webhookUrl: .some("https://example.org/new-hook")))
+
+            do {
+                _ = try await service.savePreferences(try XCTUnwrap(queue.next))
+                XCTFail("PATCH \(status) doit refuser l’enregistrement")
+            } catch {
+                queue.refresh(try await service.preferences().preferences)
+            }
+            XCTAssertEqual(queue.confirmed.webhookUrl, "https://example.org/old-hook")
+            XCTAssertEqual(queue.draft.webhookUrl, "https://example.org/new-hook")
+            XCTAssertNotNil(queue.next, "Le brouillon refusé doit rester réessayable")
+        }
+    }
+
+    func testRapidChangesStayQueuedAcrossEachServerReceipt() {
+        let initial = SentinellePreferences(
+            notifyDown: true, notifyUp: false, downThresholdSec: 30, webhookUrl: nil
+        )
+        var queue = SentinellePreferenceEditQueue(initial)
+        queue.enqueue(SentinellePreferencesPatch(notifyDown: false))
+        queue.enqueue(SentinellePreferencesPatch(notifyUp: true))
+        queue.enqueue(SentinellePreferencesPatch(downThresholdSec: 120))
+
+        queue.acknowledge(SentinellePreferences(
+            notifyDown: false, notifyUp: false, downThresholdSec: 30, webhookUrl: nil
+        ))
+        XCTAssertFalse(queue.draft.notifyDown)
+        XCTAssertTrue(queue.draft.notifyUp)
+        XCTAssertEqual(queue.draft.downThresholdSec, 120)
+
+        queue.acknowledge(SentinellePreferences(
+            notifyDown: false, notifyUp: true, downThresholdSec: 30, webhookUrl: nil
+        ))
+        XCTAssertEqual(queue.draft.downThresholdSec, 120)
+        queue.acknowledge(SentinellePreferences(
+            notifyDown: false, notifyUp: true, downThresholdSec: 120, webhookUrl: nil
+        ))
+        XCTAssertNil(queue.next)
+        XCTAssertEqual(queue.draft.downThresholdSec, queue.confirmed.downThresholdSec)
+    }
+
+    func testWebhookTrialRequiresConfirmedAddressAndRemovalIsExplicit() {
+        let initial = SentinellePreferences(
+            notifyDown: true, notifyUp: false, downThresholdSec: 30,
+            webhookUrl: "https://example.org/old-hook"
+        )
+        var queue = SentinellePreferenceEditQueue(initial)
+        XCTAssertTrue(queue.canTestWebhook("https://example.org/old-hook", isSaving: false))
+
+        queue.enqueue(SentinellePreferencesPatch(webhookUrl: .some("https://example.org/new-hook")))
+        XCTAssertFalse(queue.canTestWebhook("https://example.org/new-hook", isSaving: false))
+        queue.acknowledge(SentinellePreferences(
+            notifyDown: true, notifyUp: false, downThresholdSec: 30,
+            webhookUrl: "https://example.org/new-hook"
+        ))
+        XCTAssertTrue(queue.canTestWebhook("https://example.org/new-hook", isSaving: false))
+        XCTAssertFalse(queue.canTestWebhook("https://example.org/other-hook", isSaving: false))
+        XCTAssertFalse(queue.canTestWebhook("https://example.org/new-hook", isSaving: true))
+
+        queue.enqueue(SentinellePreferencesPatch(webhookUrl: .some(nil)))
+        XCTAssertNil(queue.draft.webhookUrl)
+        XCTAssertNotNil(queue.next)
+        XCTAssertFalse(queue.canTestWebhook("", isSaving: false))
+    }
+}
+
+private final class SentinelleRejectedPatchAPIStub: APIClientProtocol, @unchecked Sendable {
+    let status: Int
+    init(status: Int) { self.status = status }
+
+    func request<T: Decodable>(_ endpoint: APIEndpoint, as type: T.Type) async throws -> T {
+        guard endpoint.path == "/api/sentinelle/preferences" else {
+            throw APIError.invalidURL(endpoint.path)
+        }
+        if endpoint.method.rawValue == "PATCH" {
+            throw APIError.http(status: status, code: nil, message: "rejected", requestId: nil, retryAfter: nil)
+        }
+        let body = #"{"preferences":{"notifyDown":true,"notifyUp":false,"downThresholdSec":30,"webhookUrl":"https://example.org/old-hook"}}"#
+        return try JSONDecoder().decode(type, from: Data(body.utf8))
+    }
+
+    func request(_ endpoint: APIEndpoint) async throws { throw APIError.invalidURL(endpoint.path) }
+
+    func uploadMultipart<T: Decodable>(
+        path: String, fields: [String: String], fileField: String,
+        fileName: String, mimeType: String, data: Data, as type: T.Type
+    ) async throws -> T { throw APIError.invalidURL(path) }
+}
+
+private final class SentinellePreferencesAPIStub: APIClientProtocol, @unchecked Sendable {
+    enum StubError: Error { case unexpectedRequest }
+    private let lock = NSLock()
+    private var calls = 0
+
+    func request<T: Decodable>(_ endpoint: APIEndpoint, as type: T.Type) async throws -> T {
+        guard endpoint.path == "/api/sentinelle/preferences", endpoint.method.rawValue == "PATCH" else {
+            throw StubError.unexpectedRequest
+        }
+        lock.withLock { calls += 1 }
+        let body = #"{"preferences":{"notifyDown":true,"notifyUp":false,"downThresholdSec":30,"webhookUrl":"https://example.org/hook"}}"#
+        return try JSONDecoder().decode(type, from: Data(body.utf8))
+    }
+
+    func request(_ endpoint: APIEndpoint) async throws { throw StubError.unexpectedRequest }
+
+    func uploadMultipart<T: Decodable>(
+        path: String, fields: [String: String], fileField: String,
+        fileName: String, mimeType: String, data: Data, as type: T.Type
+    ) async throws -> T { throw StubError.unexpectedRequest }
+
+    func requestCount() -> Int { lock.withLock { calls } }
+}
+
+final class SentinelleSeriesLoadStateTests: XCTestCase {
+    func testFailedFirstReadCanRetryWithoutClaimingAnEmptyPeriod() {
+        var state = SentinelleSeriesLoadState()
+        let first = state.begin(context: "box|ipv6|24h", key: "request-1")
+        XCTAssertTrue(first.clearPoints)
+        XCTAssertTrue(state.fail(key: "request-1", generation: first.generation))
+        XCTAssertTrue(state.failed)
+        XCTAssertNil(state.loadedContext)
+
+        let retry = state.begin(context: "box|ipv6|24h", key: "request-2")
+        XCTAssertTrue(retry.clearPoints)
+        XCTAssertTrue(state.succeed(context: "box|ipv6|24h", key: "request-2", generation: retry.generation))
+        XCTAssertEqual(state.loadedContext, "box|ipv6|24h")
+        XCTAssertFalse(state.failed)
+        XCTAssertFalse(state.isLoading)
+    }
+
+    func testFailedRefreshKeepsOldContextAndLateWindowResponseCannotReplaceNewOne() {
+        var state = SentinelleSeriesLoadState()
+        let initial = state.begin(context: "box|ipv4|24h", key: "initial")
+        XCTAssertTrue(state.succeed(context: "box|ipv4|24h", key: "initial", generation: initial.generation))
+
+        let refresh = state.begin(context: "box|ipv4|24h", key: "refresh")
+        XCTAssertFalse(refresh.clearPoints, "Les points du même contexte restent visibles pendant l'actualisation")
+        XCTAssertTrue(state.fail(key: "refresh", generation: refresh.generation))
+        XCTAssertEqual(state.loadedContext, "box|ipv4|24h")
+        XCTAssertTrue(state.failed)
+
+        let newWindow = state.begin(context: "box|ipv4|7d", key: "new-window")
+        XCTAssertTrue(newWindow.clearPoints)
+        XCTAssertFalse(state.succeed(context: "box|ipv4|24h", key: "refresh", generation: refresh.generation))
+        XCTAssertFalse(state.fail(key: "refresh", generation: refresh.generation))
+        XCTAssertTrue(state.isLoading)
+        XCTAssertTrue(state.succeed(context: "box|ipv4|7d", key: "new-window", generation: newWindow.generation))
+        XCTAssertEqual(state.loadedContext, "box|ipv4|7d")
+        XCTAssertFalse(state.failed)
+    }
+}
+
 /// Mêmes cas que `apps/web/lib/sentinelle/ipv6-prefix.test.ts` et que son
 /// portage Kotlin : la proposition d'adresse doit être IDENTIQUE sur le site,
 /// sur Android et ici, sans quoi trois écrans donneraient trois réponses pour la

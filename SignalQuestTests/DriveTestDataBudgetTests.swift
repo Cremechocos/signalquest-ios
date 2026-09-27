@@ -1,4 +1,5 @@
 import XCTest
+import MapKit
 @testable import SignalQuest
 
 /// Compteur de données d'un Drive Test.
@@ -80,5 +81,154 @@ final class DriveTestDataBudgetTests: XCTestCase {
         XCTAssertTrue(large.contains("5"), "Volume illisible : « \(large) »")
         XCTAssertNotEqual(small, large)
         XCTAssertFalse(DriveTestViewModel.formattedBytes(-1).isEmpty, "Un volume négatif ne doit pas produire du vide")
+    }
+
+    func testMovingDeviceDoesNotRelocateTheMeasuredSpeedtest() throws {
+        let measuredFix = Coordinates(latitude: 48.8566, longitude: 2.3522,
+            accuracy: 8, observedAt: Date(timeIntervalSince1970: 1_790_000_000))
+        let laterFix = Coordinates(latitude: 48.8666, longitude: 2.3622)
+        let result = SpeedtestRunResult(label: "Drive Test", downloadMbps: 80,
+            downloadAverageMbps: 80, downloadMaxMbps: 90, durationSeconds: 10,
+            connectionType: .cellular, coordinate: measuredFix)
+            .withDriveTestContext(runID: UUID())
+
+        let point = try XCTUnwrap(DriveSpeedtestPoint(result: result))
+        let payload = SpeedtestSubmission.iosPayload(from: result, streams: 4, deviceModel: "iPhone")
+        XCTAssertEqual(point.id, result.id)
+        XCTAssertEqual(point.coordinate.latitude, measuredFix.latitude)
+        XCTAssertEqual(point.coordinate.longitude, measuredFix.longitude)
+        XCTAssertEqual(payload.coordinates, measuredFix)
+        XCTAssertNotEqual(point.coordinate.latitude, laterFix.latitude)
+        XCTAssertEqual(point.result.coordinate, result.coordinate)
+        XCTAssertEqual(point.result.runOrigin, "drive_test")
+
+        let restored = try JSONDecoder().decode(SpeedtestRunResult.self, from: JSONEncoder().encode(result))
+        XCTAssertEqual(restored.coordinate?.latitude, point.coordinate.latitude)
+        XCTAssertEqual(restored.coordinate?.longitude, point.coordinate.longitude)
+        XCTAssertEqual(SpeedtestSubmission.iosPayload(from: restored, streams: 4,
+            deviceModel: "iPhone").coordinates, restored.coordinate)
+    }
+
+    func testUnlocatedSpeedtestCreatesNoMapPoint() {
+        let result = SpeedtestRunResult(label: "Drive Test", downloadMbps: 80,
+            downloadAverageMbps: 80, downloadMaxMbps: 90, durationSeconds: 10,
+            connectionType: .cellular)
+        XCTAssertNil(DriveSpeedtestPoint(result: result))
+    }
+
+    func testLostGpsDoesNotStartUnlimitedSpeedtests() {
+        XCTAssertTrue(DriveTestViewModel.isAutomaticTestDue(testCount: 0, secondsWaited: 0, metersMoved: nil,
+                          intervalMeters: 500, maxSeconds: 30))
+        XCTAssertFalse(DriveTestViewModel.isAutomaticTestDue(testCount: 1, secondsWaited: 0, metersMoved: nil,
+                           intervalMeters: 500, maxSeconds: 30))
+        XCTAssertFalse(DriveTestViewModel.isAutomaticTestDue(testCount: 1, secondsWaited: 29, metersMoved: nil,
+                           intervalMeters: 500, maxSeconds: 30))
+        XCTAssertTrue(DriveTestViewModel.isAutomaticTestDue(testCount: 1, secondsWaited: 30, metersMoved: nil,
+                          intervalMeters: 500, maxSeconds: 30))
+        XCTAssertTrue(DriveTestViewModel.isAutomaticTestDue(testCount: 1, secondsWaited: 0, metersMoved: 500,
+                          intervalMeters: 500, maxSeconds: 30))
+    }
+
+    @MainActor
+    func testMapFilterNeverBecomesDetectedOperatorAfterNetworkOrVPNChange() {
+        let defaults = UserDefaults.standard
+        let previousMarket = defaults.object(forKey: MapMarketStore.marketKey)
+        let previousOperator = defaults.object(forKey: MapMarketStore.operatorKey)
+        defer {
+            if let previousMarket { defaults.set(previousMarket, forKey: MapMarketStore.marketKey) }
+            else { defaults.removeObject(forKey: MapMarketStore.marketKey) }
+            if let previousOperator { defaults.set(previousOperator, forKey: MapMarketStore.operatorKey) }
+            else { defaults.removeObject(forKey: MapMarketStore.operatorKey) }
+        }
+        MapMarketStore.save(market: "FR", operator: "ORANGE") // filtre de consultation A
+
+        let model = DriveTestViewModel(services: AppServices(config: .test))
+        XCTAssertTrue(model.observeOperatorContext(connection: .cellular, viaVPN: false))
+        model.recordResolvedOperator(market: "FR", operatorKey: "SFR",
+            source: .internetAccess, label: "SFR") // ancien accès
+        let measured = SpeedtestRunResult(label: "Drive Test", downloadMbps: 80,
+            downloadAverageMbps: 80, downloadMaxMbps: 90, durationSeconds: 10,
+            connectionType: .cellular, networkOperatorName: "Bouygues",
+            simPlmn: "20801", marketCode: "FR", operatorKey: "BOUYGUES")
+        XCTAssertTrue(model.reconcileOperatorFromSpeedtest(measured,
+            currentConnection: .cellular, viaVPN: false),
+            "ASN B doit remplacer l'ancien ASN sans changement de connexion ni de SIM")
+        XCTAssertEqual(model.displayedOperatorKey, "BOUYGUES")
+        XCTAssertEqual(SpeedtestSubmission.iosPayload(from: measured, streams: 4,
+            deviceModel: "iPhone").operatorKey, "BOUYGUES")
+        XCTAssertFalse(model.observeOperatorContext(connection: .cellular, viaVPN: false))
+        XCTAssertEqual(model.displayedOperatorKey, "BOUYGUES")
+
+        let unconfirmed = SpeedtestRunResult(label: "Drive Test", downloadMbps: 70,
+            downloadAverageMbps: 70, downloadMaxMbps: 75, durationSeconds: 10,
+            connectionType: .cellular, simPlmn: "20801")
+        XCTAssertTrue(model.reconcileOperatorFromSpeedtest(unconfirmed,
+            currentConnection: .cellular, viaVPN: false))
+        XCTAssertNil(model.displayedOperatorKey,
+            "Un ASN indisponible ne doit pas conserver l'ancien ni reprendre le filtre ORANGE")
+        model.recordResolvedOperator(market: "FR", operatorKey: "BOUYGUES",
+            source: .sim, label: "Bouygues") // seul PLMN SIM disponible
+
+        XCTAssertTrue(model.observeOperatorContext(connection: .cellular, viaVPN: true))
+        XCTAssertNil(model.displayedOperatorKey, "Le filtre ORANGE ne doit pas remplacer l'accès devenu inconnu")
+        XCTAssertNil(model.operatorSource)
+        model.recordResolvedOperator(market: "FR", operatorKey: "BOUYGUES",
+            source: .sim, label: "Bouygues") // seul PLMN SIM disponible
+        XCTAssertEqual(model.displayedOperatorKey, "BOUYGUES")
+
+        XCTAssertTrue(model.observeOperatorContext(connection: .wifi, viaVPN: true))
+        XCTAssertNil(model.displayedOperatorKey)
+        XCTAssertNil(model.operatorSource)
+        XCTAssertTrue(model.observeOperatorContext(connection: .cellular, viaVPN: false))
+        XCTAssertNil(model.displayedOperatorKey, "Une reprise cellulaire exige une nouvelle attribution")
+    }
+}
+
+final class DriveTestTraceTests: XCTestCase {
+    func testLongSessionKeepsBothEndsAndMajorTurnWithinMapLimit() {
+        var trace: [CLLocationCoordinate2D] = []
+        let corner = CLLocationCoordinate2D(latitude: 48.95, longitude: 2.38)
+        let coordinates = (0..<1_201).map { index -> CLLocationCoordinate2D in
+            if index == 300 { return corner }
+            return CLLocationCoordinate2D(latitude: 48.85, longitude: 2.35 + Double(index) * 0.0001)
+        }
+
+        for coordinate in coordinates {
+            DriveTraceSampler.append(coordinate, to: &trace, maxPoints: 600)
+            XCTAssertLessThanOrEqual(trace.count, 600)
+        }
+
+        XCTAssertEqual(trace.first?.longitude, coordinates.first?.longitude)
+        XCTAssertEqual(trace.last?.longitude, coordinates.last?.longitude)
+        XCTAssertTrue(trace.contains { $0.latitude == corner.latitude && $0.longitude == corner.longitude })
+        XCTAssertTrue(trace.contains { $0.longitude < 2.40 && $0.longitude > 2.35 },
+            "Le parcours ancien ne doit pas disparaître lorsque la limite est atteinte")
+    }
+
+    @MainActor
+    func testMapRedrawsLatestPositionWhenTraceCountStaysAtLimit() throws {
+        let map = MKMapView(frame: .zero)
+        let coordinator = DriveTestMapView.Coordinator(onSelectSite: { _ in }, onSelectSpeedtest: { _ in })
+        var trace = (0..<600).map {
+            CLLocationCoordinate2D(latitude: 48.85, longitude: 2.35 + Double($0) * 0.0001)
+        }
+        func sync() {
+            coordinator.sync(antennas: [], trace: trace, speedtestTrail: [],
+                highlightedSiteId: nil, userLocation: nil, operatorPalette: [:], displayedKey: nil, on: map)
+        }
+
+        sync()
+        let firstLine = try XCTUnwrap(map.overlays.compactMap { $0 as? MKPolyline }.first)
+        let next = CLLocationCoordinate2D(latitude: 48.86, longitude: 2.42)
+        DriveTraceSampler.append(next, to: &trace, maxPoints: 600)
+        XCTAssertEqual(trace.count, 600)
+        sync()
+
+        let currentLine = try XCTUnwrap(map.overlays.compactMap { $0 as? MKPolyline }.first)
+        XCTAssertFalse(firstLine === currentLine)
+        var last = CLLocationCoordinate2D()
+        currentLine.getCoordinates(&last, range: NSRange(location: currentLine.pointCount - 1, length: 1))
+        XCTAssertEqual(last.latitude, next.latitude, accuracy: 0.0000001)
+        XCTAssertEqual(last.longitude, next.longitude, accuracy: 0.0000001)
     }
 }

@@ -5,7 +5,7 @@ projet Xcode ni les sources, mais XCUITest installe et lance l'app, modifie les
 permissions du simulateur et l'oriente pendant le test iPad. Utiliser des
 simulateurs CI dédiés ou réinitialisables. Le script sélectionne Xcode stable en
 priorité, puis Xcode bêta seulement si stable n'est pas installé.
-`DEVELOPER_DIR` reste prioritaire.
+`DEVELOPER_DIR` reste prioritaire. Après une modification des scripts de phases, lancer `xcodegen generate` : le runner refuse un projet généré périmé avant compilation.
 
 ## Commandes
 
@@ -14,15 +14,17 @@ priorité, puis Xcode bêta seulement si stable n'est pas installé.
 ./ci_scripts/run_ios_quality_gates.sh staging
 ./ci_scripts/run_ios_quality_gates.sh release
 ./ci_scripts/run_ios_quality_gates.sh all
+./ci_scripts/run_ios_quality_gates.sh host
 ```
 
-Le gate Debug exécute tous les tests unitaires et la classe
+Le gate Debug exécute les tests unitaires en français puis deux tests de localisation
+et de rendu Speedtest dans une passe anglaise dédiée. Il exécute aussi la classe
 `SignalQuestUITests` : login, cinq entrées, écrans principaux, carte et
 speedtest invités, Communauté/Messages et profil. Le speedtest réel conditionné
 par `SQ_AUTH_TOKEN` reste explicitement ignoré sans jeton et ne compte donc pas
 comme couvert. Le script rejoue ensuite le test de navigation/rotation sur iPad
 et contrôle la couverture. Les gates
-Staging et Release vérifient des builds optimisés sans signature. Une archive de
+Staging et Release vérifient des builds optimisés sans signature. Les hôtes des tests Debug sont signés ad hoc pour autoriser le trousseau du simulateur. Le mode `host` exécute le vrai aller-retour Keychain en Debug, Staging et Release sur un simulateur dédié, avec des origines loopback fermées et `ENABLE_TESTABILITY=YES` uniquement pour cette invocation. Ce mode exclut Firebase du seul binaire de test (`SQ_ISOLATED_HOST_TEST=YES`, admis uniquement sur simulateur avec testabilité activée), sans modifier le plist source. Il ne qualifie donc ni Firebase ni les services Beta et ne remplace pas les gates fonctionnels et de couverture. Les garde-fous de distribution et des URL Staging restent actifs. Une archive de
 distribution signée reste un gate Xcode Cloud/App Store Connect distinct :
 
 ```bash
@@ -39,17 +41,28 @@ Variables utiles :
 - `SQ_IPHONE_DESTINATION`, défaut `platform=iOS Simulator,name=SQ-Test` ;
 - `SQ_IPAD_DESTINATION`, défaut `platform=iOS Simulator,name=iPad (A16)` ;
 - `SQ_RESULT_ROOT`, `SQ_RUN_ID` et `SQ_DERIVED_DATA` pour les artefacts ;
+- `SQ_SPM_CACHE` pour réutiliser les dépendances résolues sans mise à jour ;
+- `SQ_HOST_CONFIGURATIONS` pour reprendre une partie de la matrice `host` (par défaut `Debug Staging Release`) ;
+- `SQ_BUILD_JOBS` (4 par défaut) pour borner le parallélisme ;
 - `DEVELOPER_DIR` pour pinner la version Xcode retenue par Apple.
 
 La configuration Staging contient volontairement des domaines `.invalid` tant
 que l'infrastructure isolée et le plist Firebase Beta ne sont pas fournis. Son
 échec dans cet état est un garde-fou attendu, pas un contournement à désactiver.
+Pour une recette Beta sur iPhone, fournir un plist Firebase du bundle
+`fr.signalquest.ios.beta` par chemin absolu dans `SQ_FIREBASE_CONFIG_PATH` ;
+le plist principal reste inchangé. La phase pré-build refuse un chemin manquant,
+un bundle différent ou cette surcharge hors des configurations Beta.
+Pour XCUITest physique, choisir `-scheme 'SignalQuest Beta' -configuration DebugBeta`
+avec ce plist et des hôtes de recette isolés. `DebugBeta` compile les portes QA
+de l'app sans surcharger globalement les dépendances SwiftPM ; l'archive
+`Staging` reste un build de distribution sans ces portes.
 
 ## Couverture
 
 Le gate lit le `.xcresult` avec `xccov` et applique par défaut :
 
-- lignes applicatives : 70 % ;
+- lignes applicatives : 35 % (valeur actuelle du script) ;
 - branches : 60 % lorsqu'un rapport xccov expose cette métrique ;
 - logique critique listée dans `ci_scripts/critical_coverage_paths.txt` : 90 %.
 

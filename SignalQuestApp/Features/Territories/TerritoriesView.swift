@@ -39,6 +39,26 @@ struct TerritoriesView: View {
                 } else if model.grid?.truncated == true {
                     notice("Zone trop large : certains territoires ne sont pas affichés", icon: "exclamationmark.triangle")
                 }
+                if let errorMessage = model.errorMessage {
+                    VStack(alignment: .leading, spacing: SQSpace.sm) {
+                        Label(errorMessage, systemImage: "exclamationmark.triangle")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.dangerInk)
+                        if model.grid != nil {
+                            Text("Dernier état connu conservé.")
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
+                        GradientButton("Réessayer", isBusy: model.isLoading, style: .secondary) {
+                            Task { await model.retry() }
+                        }
+                    }
+                    .padding(SQSpace.md)
+                    .background(SQColor.surfaceGlass, in: RoundedRectangle(cornerRadius: SQRadius.md))
+                    .accessibilityIdentifier("territories.loadError")
+                } else if !model.isZoomedOut, model.grid?.cells.isEmpty == true, !model.isLoading {
+                    notice("Aucun territoire dans cette zone", icon: "square.grid.3x3")
+                }
                 legend
             }
             .padding(SQSpace.lg)
@@ -118,6 +138,7 @@ struct TerritoriesView: View {
 final class TerritoriesViewModel: ObservableObject {
     @Published private(set) var grid: TerritoryGrid?
     @Published private(set) var isLoading = false
+    @Published private(set) var errorMessage: String?
     /// Au-delà de ce span, la grille n'a plus de sens à l'écran : les cellules
     /// font moins d'un pixel. On ne charge RIEN plutôt que de faire travailler
     /// le serveur pour un rendu illisible.
@@ -125,15 +146,25 @@ final class TerritoriesViewModel: ObservableObject {
 
     static let maxSpanDegrees: Double = 1.2
 
-    private let service: GamificationServicing
-    private let marketCode: String?
-    private let operatorKey: String?
+    private let fetch: @MainActor (MKCoordinateRegion, MKCoordinateSpan) async throws -> TerritoryGrid
     private var reloadTask: Task<Void, Never>?
+    private var requestedRegion: (region: MKCoordinateRegion, span: MKCoordinateSpan)?
+    private var requestGeneration = UUID()
 
     init(service: GamificationServicing, marketCode: String?, operatorKey: String?) {
-        self.service = service
-        self.marketCode = marketCode
-        self.operatorKey = operatorKey
+        fetch = { region, span in
+            try await service.territories(
+                south: region.center.latitude - span.latitudeDelta / 2,
+                west: region.center.longitude - span.longitudeDelta / 2,
+                north: region.center.latitude + span.latitudeDelta / 2,
+                east: region.center.longitude + span.longitudeDelta / 2,
+                marketCode: marketCode, operatorKey: operatorKey
+            )
+        }
+    }
+
+    init(fetch: @escaping @MainActor (MKCoordinateRegion, MKCoordinateSpan) async throws -> TerritoryGrid) {
+        self.fetch = fetch
     }
 
     deinit { reloadTask?.cancel() }
@@ -141,13 +172,18 @@ final class TerritoriesViewModel: ObservableObject {
     func regionChanged(_ region: MKCoordinateRegion, span: MKCoordinateSpan) {
         let tooWide = max(span.latitudeDelta, span.longitudeDelta) > Self.maxSpanDegrees
         isZoomedOut = tooWide
+        requestGeneration = UUID()
+        reloadTask?.cancel()
+        isLoading = false
         guard !tooWide else {
-            reloadTask?.cancel()
+            requestedRegion = nil
+            grid = nil
+            errorMessage = nil
             return
         }
+        requestedRegion = (region, span)
         // Débounce 400 ms : un déplacement de carte émet des dizaines
         // d'événements de région, et chacun déclencherait une agrégation SQL.
-        reloadTask?.cancel()
         reloadTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 400_000_000)
             guard !Task.isCancelled else { return }
@@ -155,22 +191,28 @@ final class TerritoriesViewModel: ObservableObject {
         }
     }
 
-    private func load(region: MKCoordinateRegion, span: MKCoordinateSpan) async {
+    func retry() async {
+        guard let requestedRegion else { return }
+        reloadTask?.cancel()
+        await load(region: requestedRegion.region, span: requestedRegion.span)
+    }
+
+    func load(region: MKCoordinateRegion, span: MKCoordinateSpan) async {
+        requestedRegion = (region, span)
+        let generation = UUID()
+        requestGeneration = generation
         isLoading = true
-        defer { isLoading = false }
-        let south = region.center.latitude - span.latitudeDelta / 2
-        let north = region.center.latitude + span.latitudeDelta / 2
-        let west = region.center.longitude - span.longitudeDelta / 2
-        let east = region.center.longitude + span.longitudeDelta / 2
+        defer { if requestGeneration == generation { isLoading = false } }
         do {
-            grid = try await service.territories(
-                south: south, west: west, north: north, east: east,
-                marketCode: marketCode, operatorKey: operatorKey
-            )
+            let response = try await fetch(region, span)
+            guard requestGeneration == generation, !Task.isCancelled else { return }
+            grid = response
+            errorMessage = nil
         } catch {
-            // Silencieux : la carte reste utilisable avec la grille précédente,
-            // et un bandeau d'erreur par déplacement serait insupportable.
-            if !error.isCancellation { grid = grid }
+            guard requestGeneration == generation, !Task.isCancelled, !error.isCancellation else { return }
+            // Conserver la dernière grille, mais signaler explicitement qu'elle
+            // n'est pas le résultat du viewport demandé.
+            errorMessage = String(localized: "Impossible de charger les territoires. Réessaie.")
         }
     }
 }
@@ -199,32 +241,40 @@ struct TerritoryMapView: UIViewRepresentable {
 
     func updateUIView(_ map: MKMapView, context: Context) {
         // Un overlay UNIQUE : on le remplace en bloc plutôt que d'ajouter des
-        // milliers de polygones. Comparer les clés évite de le recréer quand
-        // seule la région a bougé sans changer la grille.
-        let keys = cells.map(\.cellKey).joined(separator: ",").hashValue
-        guard keys != context.coordinator.lastCellsHash else { return }
-        context.coordinator.lastCellsHash = keys
-        map.removeOverlays(map.overlays)
-        guard !cells.isEmpty else { return }
-        let overlay = TerritoryOverlay(cells: cells.map {
-            TerritoryOverlay.Cell(
-                rect: $0.mapRect,
-                fill: $0.fillColor.cgColor,
-                stroke: $0.strokeColor.cgColor,
-                mine: $0.mine
-            )
-        })
-        map.addOverlay(overlay, level: .aboveRoads)
+        // milliers de polygones. La clé seule ne suffit pas : une même cellule
+        // peut changer de statut, de propriétaire ou de couleur avec le thème.
+        let identity = TerritoryRenderIdentity(
+            cells: cells,
+            colorScheme: context.environment.colorScheme,
+            contrast: context.environment.colorSchemeContrast
+        )
+        context.coordinator.render(cells: cells, identity: identity, on: map)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(onRegionChange: onRegionChange) }
 
     final class Coordinator: NSObject, MKMapViewDelegate {
         let onRegionChange: (MKCoordinateRegion, MKCoordinateSpan) -> Void
-        var lastCellsHash: Int?
+        var lastIdentity: TerritoryRenderIdentity?
 
         init(onRegionChange: @escaping (MKCoordinateRegion, MKCoordinateSpan) -> Void) {
             self.onRegionChange = onRegionChange
+        }
+
+        func render(cells: [TerritoryCell], identity: TerritoryRenderIdentity, on map: MKMapView) {
+            guard identity != lastIdentity else { return }
+            lastIdentity = identity
+            map.removeOverlays(map.overlays)
+            guard !cells.isEmpty else { return }
+            let overlay = TerritoryOverlay(cells: cells.map {
+                TerritoryOverlay.Cell(
+                    rect: $0.mapRect,
+                    fill: $0.fillColor.cgColor,
+                    stroke: $0.strokeColor.cgColor,
+                    mine: $0.mine
+                )
+            })
+            map.addOverlay(overlay, level: .aboveRoads)
         }
 
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
@@ -237,5 +287,24 @@ struct TerritoryMapView: UIViewRepresentable {
             }
             return TerritoryOverlayRenderer(overlay: territory)
         }
+    }
+}
+
+struct TerritoryRenderIdentity: Equatable {
+    struct Cell: Equatable {
+        let key: String
+        let status: TerritoryCell.Status
+        let bounds: TerritoryCell.Bounds
+        let mine: Bool
+    }
+
+    let cells: [Cell]
+    let colorScheme: ColorScheme
+    let contrast: ColorSchemeContrast
+
+    init(cells: [TerritoryCell], colorScheme: ColorScheme, contrast: ColorSchemeContrast) {
+        self.cells = cells.map { Cell(key: $0.cellKey, status: $0.status, bounds: $0.bounds, mine: $0.mine) }
+        self.colorScheme = colorScheme
+        self.contrast = contrast
     }
 }

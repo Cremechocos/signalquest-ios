@@ -42,6 +42,10 @@ validate_url() {
 }
 
 case "$configuration" in
+  DebugBeta)
+    [ "$environment" = "staging" ] || fail "DebugBeta configuration must set SQ_ENVIRONMENT=staging"
+    [ "$bundle_id" = "fr.signalquest.ios.beta" ] || fail "DebugBeta bundle identifier must be fr.signalquest.ios.beta"
+    ;;
   Staging)
     [ "$environment" = "staging" ] || fail "Staging configuration must set SQ_ENVIRONMENT=staging"
     [ "$bundle_id" = "fr.signalquest.ios.beta" ] || fail "Staging bundle identifier must be fr.signalquest.ios.beta"
@@ -99,8 +103,20 @@ if [ "$configuration" != "Debug" ]; then
   [ -z "$leaks" ] || fail "URL S3 de production hors #if DEBUG : $(echo "$leaks" | tr '\n' ' ')"
 fi
 
-if [ "$environment" = "staging" ] && [ -f "${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist" ]; then
-  firebase_bundle="$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' "${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist" 2>/dev/null || true)"
+if [ "${SQ_ISOLATED_HOST_TEST:-NO}" = "YES" ]; then
+  [ "${PLATFORM_NAME:-}" = "iphonesimulator" ] && [ "${ENABLE_TESTABILITY:-NO}" = "YES" ] \
+    || fail "isolated host tests require a testable simulator build"
+fi
+
+firebase_plist="${SQ_FIREBASE_CONFIG_PATH:-${SRCROOT:-.}/SignalQuestApp/GoogleService-Info.plist}"
+if [ -n "${SQ_FIREBASE_CONFIG_PATH:-}" ]; then
+  case "$configuration" in Staging|DebugBeta) ;; *) fail "Firebase override is only allowed for Beta builds" ;; esac
+  case "$firebase_plist" in /*) ;; *) fail "Firebase override must be an absolute path" ;; esac
+  [ -f "$firebase_plist" ] || fail "Firebase override file is missing"
+fi
+
+if [ "${SQ_ISOLATED_HOST_TEST:-NO}" != "YES" ] && [ "$environment" = "staging" ] && [ -f "$firebase_plist" ]; then
+  firebase_bundle="$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' "$firebase_plist" 2>/dev/null || true)"
   [ "$firebase_bundle" = "$bundle_id" ] || fail "Firebase BUNDLE_ID does not match the Beta bundle identifier"
 fi
 

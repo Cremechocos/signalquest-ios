@@ -98,7 +98,8 @@ final class MapSnapshotService: MapSnapshotServicing {
                         URLQueryItem(name: "zoom", value: "\(zoom)"),
                         URLQueryItem(name: "lightweight", value: lightweight ? "1" : "0"),
                     ],
-                    headers: ["Cache-Control": "no-cache"]
+                    headers: ["Cache-Control": "no-cache"],
+                    responseDeadline: .seconds(30)
                 ),
                 expectedSessionID: owner.sessionID
             )
@@ -402,7 +403,8 @@ final class MapSnapshotService: MapSnapshotServicing {
                         path: "/api/android/map/tiles/speedtests/\(tile.z)/\(tile.x)/\(tile.y)",
                         query: query,
                         headers: ["Cache-Control": "no-cache"],
-                        authenticated: false
+                        authenticated: false,
+                        responseDeadline: .seconds(30)
                     ), expectedSessionID: owner.sessionID
                 )
             }
@@ -542,6 +544,7 @@ final class MapSnapshotService: MapSnapshotServicing {
             }) {
                 var request = endpoint(tile)
                 request.headers["Cache-Control"] = "no-cache"
+                request.responseDeadline = .seconds(30)
                 return try await api.requestData(request, expectedSessionID: owner.sessionID)
             }
             return try JSONDecoder.signalQuest.decode(T.self, from: data)

@@ -1,8 +1,11 @@
 import Foundation
 
-struct AuthUser: Codable, Identifiable, Equatable {
+struct AuthUser: Codable, Identifiable, Equatable, Sendable {
     let id: String
     let email: String
+    /// `nil` = ancienne API sans ce champ ; ne jamais l'interpréter comme un
+    /// compte non confirmé pendant le déploiement progressif du backend.
+    var emailVerified: Bool? = nil
     let name: String?
     let handle: String?
     /// Horodatage ISO du dernier changement de @handle (null = jamais changé). Sert au
@@ -14,7 +17,7 @@ struct AuthUser: Codable, Identifiable, Equatable {
     /// `/api/user/profile` pour préremplir l'édition sans l'écraser (EDITPROFILE-BUG-01).
     let bio: String?
     let role: String
-    let twoFactorEnabled: Bool?
+    private(set) var twoFactorEnabled: Bool?
     let notifyMessagesPush: Bool?
     /// Interactions du fil PUBLIC : commentaires, réponses, mentions, réactions, abonnements.
     /// Séparé de `notifyMessagesPush`, qui les portait toutes sous un libellé ne parlant que des
@@ -25,9 +28,17 @@ struct AuthUser: Codable, Identifiable, Equatable {
     /// Vrai si un Apple ID est associé à ce compte (Sign in with Apple).
     let appleLinked: Bool?
 
+    func withConfirmedTwoFactor(enabled: Bool) -> AuthUser {
+        var copy = self
+        copy.twoFactorEnabled = enabled
+        return copy
+    }
+
     var displayName: String {
         name ?? handle.map { "@\($0)" } ?? email.components(separatedBy: "@").first ?? "Utilisateur"
     }
+
+    var isEmailVerificationPending: Bool { emailVerified == false }
 }
 
 // MARK: - Login / signup
@@ -49,13 +60,14 @@ struct SignupRequest: Codable {
     /// et bloquait le bouton. Exigence RGPD, et attendu par la revue App Store
     /// sur la guideline EULA.
     let acceptedTerms: Bool
+    var turnstileToken: String? = nil
 }
 
 struct AppleLinkResponse: Decodable {
     let appleLinked: Bool?
 }
 
-struct LoginResponse: Codable {
+struct LoginResponse: Codable, Sendable {
     let user: AuthUser?
     let requires2FA: Bool?
     let tempToken: String?
@@ -68,12 +80,20 @@ struct TwoFactorVerifyRequest: Codable {
     let code: String
 }
 
-struct TwoFactorSetupResponse: Codable {
+struct TwoFactorSetupResponse: Codable, Sendable {
     /// Base32 TOTP secret returned by the server, ready for an authenticator app.
     let secret: String
     /// `otpauth://totp/...` URI que l'on rend en QR code. Le backend renvoie la
     /// clé JSON `uri` (et NON `otpauthUrl`) — un mauvais nom laissait le QR vide.
     let uri: String?
+    /// Le challenge serveur est limité dans le temps. Absent sur un ancien backend.
+    let expiresAt: Date?
+
+    init(secret: String, uri: String? = nil, expiresAt: Date? = nil) {
+        self.secret = secret
+        self.uri = uri
+        self.expiresAt = expiresAt
+    }
 }
 
 struct TwoFactorVerifySetupRequest: Codable {
@@ -89,6 +109,7 @@ struct TwoFactorDisableRequest: Codable {
 
 struct ForgotPasswordRequest: Codable {
     let email: String
+    var turnstileToken: String? = nil
 }
 
 struct ResetPasswordRequest: Codable {
@@ -103,14 +124,19 @@ struct ChangePasswordRequest: Codable {
 
 // MARK: - Common
 
-struct AuthMeResponse: Codable {
+struct AuthMeResponse: Codable, Sendable {
     /// Optionnel : le backend renvoie `{ user: null }` (HTTP 200) quand la session
     /// est invalide — décoder en non-optionnel faisait planter le bootstrap.
     let user: AuthUser?
 }
 
-struct SuccessResponse: Codable {
+struct SuccessResponse: Codable, Sendable {
     let success: Bool?
     let ok: Bool?
     let requestId: String?
+
+    /// Un corps vide ou contradictoire n'est pas un accusé de mutation.
+    var isAcknowledged: Bool {
+        (success == true || ok == true) && success != false && ok != false
+    }
 }

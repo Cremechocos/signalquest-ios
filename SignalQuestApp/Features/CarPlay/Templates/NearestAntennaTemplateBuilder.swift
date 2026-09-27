@@ -42,6 +42,16 @@ enum NearestAntennaTemplateBuilder {
         )
     }
 
+    static func itemsWithoutLocation(path: NetworkPathStatus) -> [CPInformationItem] {
+        [
+            CPInformationItem(
+                title: String(localized: "Position inconnue"),
+                detail: String(localized: "Autorise la localisation pour voir les sites autour.")
+            ),
+            connectionItem(for: path),
+        ]
+    }
+
     static func items(for input: Input) -> [CPInformationItem] {
         var items: [CPInformationItem] = []
 
@@ -75,13 +85,7 @@ enum NearestAntennaTemplateBuilder {
 
         // 2. Ce à quoi on est réellement connecté, qui peut différer du verdict
         // communautaire (autre opérateur, Wi-Fi du véhicule…).
-        items.append(CPInformationItem(
-            title: String(localized: "Connexion"),
-            detail: [input.path.operatorName, input.path.displayName]
-                .compactMap { $0 }
-                .filter { !$0.isEmpty }
-                .joined(separator: " · ")
-        ))
+        items.append(connectionItem(for: input.path))
 
         // 3. L'antenne qui dessert, avec de quoi la situer.
         if let site = input.nearestSite {
@@ -119,6 +123,16 @@ enum NearestAntennaTemplateBuilder {
         }
 
         return items
+    }
+
+    private static func connectionItem(for path: NetworkPathStatus) -> CPInformationItem {
+        CPInformationItem(
+            title: String(localized: "Connexion"),
+            detail: [path.operatorName, path.displayName]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+                .joined(separator: " · ")
+        )
     }
 
     private static func buttons(_ actions: Actions) -> [CPTextButton] {

@@ -1460,11 +1460,13 @@ final class E2EEV2APITransport: @unchecked Sendable {
 
     func getJSON(
         path: String,
+        query: [URLQueryItem] = [],
         expectedOwnerScopeId: String,
         capabilitySet: E2EEV2RequestCapabilitySet
     ) async -> E2EEV2TransportResult<Data> {
         await execute(
             path: path,
+            query: query,
             method: .get,
             body: nil,
             contentType: nil,
@@ -1671,6 +1673,7 @@ final class E2EEV2APITransport: @unchecked Sendable {
 
     private func execute(
         path: String,
+        query: [URLQueryItem] = [],
         method: HTTPMethod,
         body: Data?,
         contentType: String?,
@@ -1678,9 +1681,14 @@ final class E2EEV2APITransport: @unchecked Sendable {
         capabilitySet: E2EEV2RequestCapabilitySet,
         useResetCandidate: Bool = false
     ) async -> E2EEV2TransportResult<Data> {
-        guard validPath(path), validOwner(expectedOwnerScopeId) else {
+        var signedComponents = URLComponents()
+        signedComponents.path = path
+        signedComponents.queryItems = query.isEmpty ? nil : query
+        guard validPath(path), validOwner(expectedOwnerScopeId),
+              signedComponents.percentEncodedPath == path else {
             return localFailure("invalid-e2ee-request-scope")
         }
+        let signedPath = path + (signedComponents.percentEncodedQuery.map { "?\($0)" } ?? "")
         guard currentOwnerIs(expectedOwnerScopeId) else {
             return authenticationFailure("account-scope-changed")
         }
@@ -1691,7 +1699,7 @@ final class E2EEV2APITransport: @unchecked Sendable {
             if useResetCandidate {
                 proof = try E2EEV2SignedRequest.signResetCandidateBodyHash(
                     method: method.rawValue,
-                    path: path,
+                    path: signedPath,
                     bodySHA256Base64URL: bodyHash,
                     ownerNamespace: ownerNamespace,
                     identityStore: identityStore
@@ -1699,7 +1707,7 @@ final class E2EEV2APITransport: @unchecked Sendable {
             } else {
                 proof = try E2EEV2SignedRequest.signBodyHash(
                     method: method.rawValue,
-                    path: path,
+                    path: signedPath,
                     bodySHA256Base64URL: bodyHash,
                     ownerNamespace: ownerNamespace,
                     identityStore: identityStore
@@ -1711,6 +1719,7 @@ final class E2EEV2APITransport: @unchecked Sendable {
             let endpoint = APIEndpoint(
                 path: path,
                 method: method,
+                query: query,
                 headers: requestHeaders(
                     contentType: contentType,
                     capabilitySet: capabilitySet,
@@ -1797,7 +1806,7 @@ final class E2EEV2APITransport: @unchecked Sendable {
 
     private func validPath(_ path: String) -> Bool {
         !path.isEmpty && path.utf8.count <= 512 && path.hasPrefix("/")
-            && path.filter({ $0 == "?" }).count <= 1 && !path.contains("#")
+            && !path.contains("?") && !path.contains("#")
             && !path.contains("\n") && !path.contains("\r")
     }
 
@@ -5184,9 +5193,9 @@ final class E2EEV2RecoveryEpochCoordinator: @unchecked Sendable {
         var missing = 0
         for _ in 0..<Self.maxPages {
             guard accountIsCurrent(account) else { return authenticationFailure() }
-            let path = "/api/e2ee/v2/recovery-epochs" + (cursor.map { "?cursor=\($0)" } ?? "")
             let response = await transport.getJSON(
-                path: path,
+                path: "/api/e2ee/v2/recovery-epochs",
+                query: cursor.map { [URLQueryItem(name: "cursor", value: $0)] } ?? [],
                 expectedOwnerScopeId: account.ownerScopeId,
                 capabilitySet: .history
             )
@@ -5270,9 +5279,9 @@ final class E2EEV2RecoveryEpochCoordinator: @unchecked Sendable {
         var missingUsers = Set<String>()
         for _ in 0..<Self.maxPages {
             guard accountIsCurrent(account) else { return authenticationFailure() }
-            let path = "/api/e2ee/v2/recovery-epochs/backfill" + (cursor.map { "?cursor=\($0)" } ?? "")
             let response = await transport.getJSON(
-                path: path,
+                path: "/api/e2ee/v2/recovery-epochs/backfill",
+                query: cursor.map { [URLQueryItem(name: "cursor", value: $0)] } ?? [],
                 expectedOwnerScopeId: account.ownerScopeId,
                 capabilitySet: .history
             )

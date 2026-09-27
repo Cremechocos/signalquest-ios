@@ -1,7 +1,7 @@
 import SwiftUI
 import Foundation
 
-/// Héro « Pouls réseau » en tête du feed : agrégat réseau autour de la position
+/// Détail dépliable « Pouls réseau » du feed : agrégat réseau autour de la position
 /// (RSRP moyen, débit descendant médian, meilleur opérateur de la zone). Parité
 /// avec le `NetworkPulseHero` Android. Alimenté par `GET /api/social/network-pulse`.
 ///
