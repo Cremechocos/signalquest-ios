@@ -273,15 +273,16 @@ final class EntitlementsTests: XCTestCase {
     }
 }
 
-private actor AccountScopedSubscriptionAPIStub: APIClientProtocol {
+private final class AccountScopedSubscriptionAPIStub: APIClientProtocol, @unchecked Sendable {
+    private let lock = NSLock()
     private var reads = 0
 
     func request<T: Decodable>(_ endpoint: APIEndpoint, as type: T.Type) async throws -> T {
         guard endpoint.path == EntitlementsStore.subscriptionEndpoint else {
             throw URLError(.badURL)
         }
-        reads += 1
-        let json = reads == 1
+        let read = lock.withLock { reads += 1; return reads }
+        let json = read == 1
             ? #"{"tier":"premium","purchases":[]}"#
             : #"{"tier":"free","purchases":[]}"#
         return try JSONDecoder.signalQuest.decode(type, from: Data(json.utf8))
