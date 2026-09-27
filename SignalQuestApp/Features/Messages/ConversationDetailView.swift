@@ -2320,25 +2320,30 @@ private struct LiveShareConversationBar: View {
                 }
 
                 ForEach(sessions.prefix(3)) { session in
-                    HStack(spacing: SQSpace.sm) {
-                        Circle()
-                            .fill(session.status == "active" ? SQColor.success : SQColor.brandRed)
-                            .frame(width: 7, height: 7)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(summary(for: session))
-                                .font(SQType.caption)
-                                .foregroundStyle(SQColor.label)
-                                .lineLimit(1)
-                            if let detail = detail(for: session) {
-                                Text(detail)
-                                    .font(SQType.micro)
-                                    .foregroundStyle(SQColor.labelSecondary)
+                    TimelineView(.periodic(from: .now, by: 5)) { timeline in
+                        HStack(spacing: SQSpace.sm) {
+                            Circle()
+                                .fill(session.status != "active" ? SQColor.brandRed :
+                                      LiveShareLocationFreshness.isCurrent(
+                                          coordinator.payload(for: session.id), at: timeline.date
+                                      ) ? SQColor.success : SQColor.warning)
+                                .frame(width: 7, height: 7)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(summary(for: session))
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.label)
                                     .lineLimit(1)
+                                if let detail = detail(for: session, at: timeline.date) {
+                                    Text(detail)
+                                        .font(SQType.micro)
+                                        .foregroundStyle(SQColor.labelSecondary)
+                                        .lineLimit(1)
+                                }
                             }
+                            Spacer(minLength: SQSpace.xs)
+                            action(for: session)
                         }
-                        Spacer(minLength: SQSpace.xs)
-                        action(for: session)
                     }
                 }
                 if sessions.count > 3 {
@@ -2397,9 +2402,16 @@ private struct LiveShareConversationBar: View {
             : "\(name(for: session.sharerId)) partage avec vous"
     }
 
-    private func detail(for session: LiveShareSession) -> String? {
-        guard session.status == "active" else { return "En attente de réponse" }
+    private func detail(for session: LiveShareSession, at now: Date) -> String? {
+        guard session.status == "active" else { return String(localized: "En attente de réponse") }
         let payload = coordinator.payload(for: session.id)
+        if payload?.location != nil,
+           !LiveShareLocationFreshness.isCurrent(payload, at: now) {
+            return String(localized: "Position indisponible")
+        }
+        if payload?.location == nil, payload?.radio != nil {
+            return String(localized: "GPS indisponible, données réseau reçues.")
+        }
         let radio = payload?.radio
         let parts = [
             radio?.displayOperatorName,
@@ -2408,7 +2420,9 @@ private struct LiveShareConversationBar: View {
             radio?.rsrp.map { "RSRP \($0) dBm" }
         ].compactMap { $0 }.filter { !$0.isEmpty }
         if !parts.isEmpty { return parts.joined(separator: " · ") }
-        return payload?.location == nil ? "En attente de la première position" : "Position actualisée"
+        return payload?.location == nil
+            ? String(localized: "En attente de la première position…")
+            : String(localized: "Position partagée")
     }
 
     private func name(for userId: String) -> String {
@@ -2623,15 +2637,23 @@ private struct LiveShareSessionCard: View {
     }
 
     var body: some View {
+        TimelineView(.periodic(from: .now, by: 5)) { timeline in
+            content(at: timeline.date)
+        }
+    }
+
+    private func content(at now: Date) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(SQType.body.weight(.semibold))
                         .foregroundStyle(SQColor.label)
-                    Text(session.status == "active" ? "En direct" : "En attente")
+                    Text(statusText(at: now))
                         .font(SQType.micro.weight(.semibold))
-                        .foregroundStyle(session.status == "active" ? SQColor.success : SQColor.brandRed)
+                        .foregroundStyle(session.status == "active"
+                                         && LiveShareLocationFreshness.isCurrent(payload, at: now)
+                                         ? SQColor.success : SQColor.labelSecondary)
                 }
                 Spacer()
                 if coordinator.isBusy { ProgressView().controlSize(.small) }
@@ -2643,8 +2665,14 @@ private struct LiveShareSessionCard: View {
                     .foregroundStyle(SQColor.labelSecondary)
             }
 
-            if session.status == "active", let location = payload?.location {
+            if session.status == "active",
+               LiveShareLocationFreshness.isCurrent(payload, at: now),
+               let location = payload?.location {
                 LiveShareMapPreview(location: location)
+            } else if session.status == "active", payload?.location != nil {
+                Text("Position indisponible")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
             } else if session.status == "active" {
                 Text(payload?.radio == nil
                      ? "En attente de la première position…"
@@ -2658,10 +2686,11 @@ private struct LiveShareSessionCard: View {
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
             }
-            if let updated = session.lastUpdateAt {
+            if let updated = LiveShareLocationFreshness.observedAt(payload) ?? session.lastUpdateAt,
+               updated <= now {
                 Text("Actualisé à \(updated.formatted(date: .omitted, time: .standard))")
                     .font(SQType.micro)
-                    .foregroundStyle(SQColor.labelTertiary)
+                    .foregroundStyle(SQColor.labelSecondary)
             }
 
             if isIncomingRequest {
@@ -2694,6 +2723,14 @@ private struct LiveShareSessionCard: View {
             RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
                 .stroke(SQColor.separator, lineWidth: 1)
         }
+    }
+
+    private func statusText(at now: Date) -> String {
+        guard session.status == "active" else { return String(localized: "En attente") }
+        guard payload != nil else { return String(localized: "En attente") }
+        return LiveShareLocationFreshness.isCurrent(payload, at: now)
+            ? String(localized: "En direct")
+            : String(localized: "Position indisponible")
     }
 
     private var title: String {

@@ -291,6 +291,7 @@
 		74F890414C07EA1C089C3F83 /* CarPlayTabsAndPOITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB4B8BD8ED85E30D3204CA7D /* CarPlayTabsAndPOITests.swift */; };
 		7504C042BDC291BA547ACAE8 /* CarPlaySearchController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0BCB1234BAB095230CE47BD /* CarPlaySearchController.swift */; };
 		750DF6CED7C8F7426AB950AB /* CallManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3E12C14EC03895F48D39245 /* CallManager.swift */; };
+		75228C3698799B371D41A038 /* LiveShareLocationFreshnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DAD6827B7954D8DA96CF665 /* LiveShareLocationFreshnessTests.swift */; };
 		75BFED4817463517F5991DE3 /* AntennaReportsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C73A379F93D002ADB36740 /* AntennaReportsListView.swift */; };
 		75C095DBB43F66C37DF4A51F /* SQSpotlight.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD56FDC7488816633CC5202E /* SQSpotlight.swift */; };
 		7646C39F8B3F70170191AA50 /* SQTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86CF3B083A9BF65407412BBF /* SQTheme.swift */; };
@@ -875,6 +876,7 @@
 		5D288CBB554D53F9CEA529CD /* MyMeasurementsPaginationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyMeasurementsPaginationTests.swift; sourceTree = "<group>"; };
 		5D3298EDB2E0523439799250 /* TypingDotsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingDotsView.swift; sourceTree = "<group>"; };
 		5D7C53B1F380E7089AC55E11 /* AntennaMarketAdaptationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaMarketAdaptationTests.swift; sourceTree = "<group>"; };
+		5DAD6827B7954D8DA96CF665 /* LiveShareLocationFreshnessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveShareLocationFreshnessTests.swift; sourceTree = "<group>"; };
 		5E03418AAFBEEEBDF356739B /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
 		5E552A9B78EBBE744667DDC4 /* market_location_areas.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = market_location_areas.json; sourceTree = "<group>"; };
 		5E5547A4163714BB45440475 /* WidgetSharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSharedStore.swift; sourceTree = "<group>"; };
@@ -2230,6 +2232,7 @@
 				74CF7E1DDA21B03198307ED6 /* Info.plist */,
 				16C9E5FDD182F8B718FA3F0A /* JSONDateParsingTests.swift */,
 				E375079277F78FD8BC4EDC5A /* LivePresenceServiceTests.swift */,
+				5DAD6827B7954D8DA96CF665 /* LiveShareLocationFreshnessTests.swift */,
 				91F51AC70BDC8F2F1EF5BC5A /* LiveSharePreflightTransportTests.swift */,
 				8F99C9F0E518188A5BB538C4 /* LiveTelemetryDeliveryStateTests.swift */,
 				EC51B558FC8D2BD425C08864 /* LocalizationBundleTests.swift */,
@@ -3249,6 +3252,7 @@
 				E7CE9DC50F6EB2A39D1FB723 /* ICMPPingerTests.swift in Sources */,
 				4E5AFE32AFF929E8AE4E94D7 /* JSONDateParsingTests.swift in Sources */,
 				4C08B3D8538380EDD221B5B1 /* LivePresenceServiceTests.swift in Sources */,
+				75228C3698799B371D41A038 /* LiveShareLocationFreshnessTests.swift in Sources */,
 				EE09E8F383D3C47DF4E3ADB1 /* LiveSharePreflightTransportTests.swift in Sources */,
 				4AAA9D4C5E2B4E22D55AFF6A /* LiveTelemetryDeliveryStateTests.swift in Sources */,
 				BF6C11953C6A4F448569095B /* LocalizationBundleTests.swift in Sources */,
