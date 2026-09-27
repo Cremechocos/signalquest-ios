@@ -164,9 +164,11 @@ enum SQColor {
     static let accentInk = dynamicTint(
         light: (0xA6, 0x44, 0x37, 1.0), dark: (0xE0, 0x8A, 0x78, 1.0)
     )
-    /// Danger lisible sur `dangerSoft` (4,90:1 en clair, 5,08:1 en sombre).
+    /// Danger lisible sur `dangerSoft` (5,86:1 en clair, 5,08:1 en sombre).
+    /// En clair, cette marge couvre aussi les erreurs de formulaire sur fond crème
+    /// après rendu : l'ancienne encre tombait à 4,29:1 sur la feuille de reset.
     static let dangerInk = dynamicTint(
-        light: (0xB3, 0x36, 0x28, 1.0), dark: (0xE8, 0x8D, 0x7C, 1.0)
+        light: (0xA2, 0x2B, 0x1F, 1.0), dark: (0xE8, 0x8D, 0x7C, 1.0)
     )
 
     // MARK: Surfaces spéciales

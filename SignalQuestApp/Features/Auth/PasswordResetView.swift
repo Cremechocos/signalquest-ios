@@ -85,7 +85,7 @@ private struct PasswordResetForm: View {
                         .accessibilityLabel("Nouveau mot de passe")
                         .accessibilityIdentifier("auth.reset.password")
                     if let issue = passwordLengthIssue {
-                        Text(issue).font(SQType.caption).foregroundStyle(SQColor.danger)
+                        Text(issue).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("auth.reset.password-error")
                     }
@@ -99,13 +99,13 @@ private struct PasswordResetForm: View {
                         .accessibilityLabel("Confirmer le mot de passe")
                         .accessibilityIdentifier("auth.reset.confirmation")
                     if let issue = confirmationIssue {
-                        Text(issue).font(SQType.caption).foregroundStyle(SQColor.danger)
+                        Text(issue).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("auth.reset.confirmation-error")
                     }
                 }
                 if let error {
-                    Text(error).font(SQType.caption).foregroundStyle(SQColor.danger)
+                    Text(error).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("auth.reset.error")
                 }
