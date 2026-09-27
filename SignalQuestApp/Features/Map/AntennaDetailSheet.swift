@@ -1481,7 +1481,7 @@ private struct AntennaPhotoViewer: View {
 
             TabView(selection: $selection) {
                 ForEach(photos) { photo in
-                    RemoteImage(url: photo.imageUrl ?? photo.thumbnailUrl, maxDimension: 1400, contentMode: .fit) {
+                    RemoteImage(url: photo.imageUrl ?? photo.thumbnailUrl, maxDimension: 1400, contentMode: .fit, showsFailureUI: true) {
                         ProgressView()
                             .tint(.white)
                     }

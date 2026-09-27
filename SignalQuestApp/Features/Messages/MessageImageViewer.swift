@@ -47,7 +47,8 @@ struct MessageImageViewer: View {
                     url: target.url,
                     maxDimension: 1600,
                     contentMode: .fit,
-                    cacheScope: .privateAccount(target.accountSession)
+                    cacheScope: .privateAccount(target.accountSession),
+                    showsFailureUI: true
                 ) {
                     ProgressView()
                         .tint(.white)
