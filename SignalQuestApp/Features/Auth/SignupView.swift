@@ -227,6 +227,7 @@ struct SignupView: View {
     private var passwordIssue: String? {
         if password.isEmpty { return nil }
         if password.count < 8 { return String(localized: "Le mot de passe doit faire au moins 8 caractères.") }
+        if passwordConfirm.isEmpty { return nil }
         if password != passwordConfirm { return String(localized: "Les deux mots de passe ne correspondent pas.") }
         return nil
     }

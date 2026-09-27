@@ -21,6 +21,39 @@ final class PasswordResetFieldFeedbackQATests: XCTestCase {
                              "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
     }
 
+    func testEnglishConfirmationMismatchOnIPadAtAccessibilityXXXL() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        SignalQuestUITestSupport.launch(app,
+            arguments: ["--reset-auth", "--reset-onboarding", "--qa-password-reset-form",
+                        "-app_pure_black", "NO",
+                        "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"],
+            locale: "en")
+        XCTAssertGreaterThan(app.frame.width, 600, "Run this recipe on iPad")
+
+        let password = app.secureTextFields["auth.reset.password"]
+        let confirmation = app.secureTextFields["auth.reset.confirmation"]
+        XCTAssertTrue(password.waitForExistence(timeout: 20))
+        password.tap()
+        password.typeText("SyntheticPass-2026!")
+        XCTAssertFalse(app.staticTexts["auth.reset.confirmation-error"].exists)
+
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(confirmation, in: app))
+        confirmation.tap()
+        confirmation.typeText("OtherPass-2026!")
+        let mismatch = app.staticTexts["auth.reset.confirmation-error"]
+        XCTAssertTrue(mismatch.waitForExistence(timeout: 10))
+        XCTAssertEqual(mismatch.label, "The two passwords don't match.")
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(mismatch, in: app))
+        XCTAssertLessThanOrEqual(mismatch.frame.minY - confirmation.frame.maxY, 40)
+        XCTAssertFalse(app.buttons["auth.reset.submit"].isEnabled)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "reset-confirmation-mismatch-en-ipad-dark-axxxl"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     private func run(locale: String, passwordLabel: String, lengthError: String,
                      extraArguments: [String] = []) {
         #if !targetEnvironment(simulator)
