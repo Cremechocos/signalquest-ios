@@ -1,5 +1,6 @@
 import XCTest
 import CoreLocation
+import CarPlay
 @testable import SignalQuest
 
 @MainActor
@@ -129,6 +130,50 @@ final class LocationServiceTests: XCTestCase {
         XCTAssertTrue(model.trace.isEmpty, "La trace ne commence qu'avec une session Drive Test")
         XCTAssertEqual(service.cachedLocation()?.horizontalAccuracy, 1_000)
         model.onDisappear(isLeavingScreen: true)
+    }
+
+    func testCarPlayNavigationRejectsExpiredOriginOnResume() {
+        let (service, _, _, clock) = makeService()
+        service.receiveLocations([fix()])
+        clock.advance(3_600)
+        XCTAssertNotNil(service.lastLocation, "Le timer d'expiration peut être suspendu en arrière-plan")
+
+        let interface = FakeCarPlayInterface()
+        let coordinator = CarPlayCoordinator(
+            interface: interface,
+            services: AppServices(config: .test, location: service),
+            session: AuthSessionViewModel(service: MockAuthService()),
+            carWindow: nil
+        )
+        coordinator.startNavigation(
+            to: CLLocationCoordinate2D(latitude: 48.86, longitude: 2.36),
+            title: "Destination"
+        )
+
+        XCTAssertTrue(interface.presented is CPAlertTemplate,
+                      "Ne pas calculer d'itinéraire depuis un fix expiré")
+    }
+
+    func testCarPlayNavigationRejectsOriginAfterPermissionRevocation() {
+        let (service, driver, _, _) = makeService()
+        service.receiveLocations([fix()])
+        driver.authorizationStatus = .denied
+        XCTAssertNotNil(service.lastLocation, "Le callback de révocation peut être encore en file")
+
+        let interface = FakeCarPlayInterface()
+        let coordinator = CarPlayCoordinator(
+            interface: interface,
+            services: AppServices(config: .test, location: service),
+            session: AuthSessionViewModel(service: MockAuthService()),
+            carWindow: nil
+        )
+        coordinator.startNavigation(
+            to: CLLocationCoordinate2D(latitude: 48.86, longitude: 2.36),
+            title: "Destination"
+        )
+
+        XCTAssertTrue(interface.presented is CPAlertTemplate,
+                      "Ne pas calculer d'itinéraire après révocation système")
     }
 
     func testDriveTestTraceStopsWithSessionAndClearsOnRestart() {

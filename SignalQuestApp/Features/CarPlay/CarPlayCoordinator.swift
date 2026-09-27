@@ -440,7 +440,7 @@ final class CarPlayCoordinator {
 
         // Premier cadrage : la dernière position connue si elle est fraîche,
         // sinon on laisse le suivi GPS recentrer dès le premier fix.
-        if let location = services.location.lastLocation {
+        if let location = services.location.cachedLocation() {
             controller.setZoom(Self.drivingZoom, animated: false)
             reloadLayersIfNeeded(bounds: SQMapProjection.bounds(of: controller.mapView.region),
                                  zoom: Self.drivingZoom,
@@ -868,12 +868,12 @@ final class CarPlayCoordinator {
         case .outage:
             guard let site = outagesById[payload.id] else { return }
             interface.push(CarPlayDetailTemplateBuilder.outage(
-                site, userLocation: services.location.lastLocation, actions: detailActions(for: payload)
+                site, userLocation: services.location.cachedLocation(), actions: detailActions(for: payload)
             ), animated: true)
         case .planned:
             guard let site = plannedById[payload.id] else { return }
             interface.push(CarPlayDetailTemplateBuilder.planned(
-                site, userLocation: services.location.lastLocation, actions: detailActions(for: payload)
+                site, userLocation: services.location.cachedLocation(), actions: detailActions(for: payload)
             ), animated: true)
         default:
             showAntennaDetail(for: payload)
@@ -884,7 +884,7 @@ final class CarPlayCoordinator {
         let actions = detailActions(for: payload)
         let template = CarPlayDetailTemplateBuilder.antenna(
             payload: payload, details: nil,
-            userLocation: services.location.lastLocation, actions: actions
+            userLocation: services.location.cachedLocation(), actions: actions
         )
         interface.push(template, animated: true)
 
@@ -905,7 +905,7 @@ final class CarPlayCoordinator {
             // fiches identiques, et le bouton retour ramènerait sur la première.
             let enriched = CarPlayDetailTemplateBuilder.antenna(
                 payload: payload, details: details,
-                userLocation: services.location.lastLocation, actions: actions
+                userLocation: services.location.cachedLocation(), actions: actions
             )
             template.items = enriched.items
             template.actions = enriched.actions
@@ -937,7 +937,7 @@ final class CarPlayCoordinator {
     /// bouton n'a rien fait.
     func startNavigation(to coordinate: CLLocationCoordinate2D, title: String) {
         interface.pop(animated: true)
-        guard let origin = services.location.lastLocation?.coordinate else {
+        guard let origin = services.location.cachedLocation()?.coordinate else {
             presentNavigationAlert(String(localized: "Position indisponible — autorise la localisation dans les réglages."))
             return
         }
@@ -954,6 +954,10 @@ final class CarPlayCoordinator {
                 return
             }
             guard !Task.isCancelled else { return }
+            guard services.location.cachedLocation() != nil else {
+                presentNavigationAlert(String(localized: "Position indisponible — autorise la localisation dans les réglages."))
+                return
+            }
             beginGuidance(with: plan, title: title)
         }
     }
@@ -1157,7 +1161,7 @@ final class CarPlayCoordinator {
     /// on l'a, sinon le début du tracé — jamais (0, 0), qui placerait l'origine
     /// dans le golfe de Guinée.
     private func origin(of plan: RoutePlan) -> CLLocationCoordinate2D {
-        services.location.lastLocation?.coordinate ?? plan.polyline.first ?? plan.steps.first?.maneuverCoordinate
+        services.location.cachedLocation()?.coordinate ?? plan.polyline.first ?? plan.steps.first?.maneuverCoordinate
             ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
     }
 
@@ -1182,7 +1186,7 @@ final class CarPlayCoordinator {
     /// antennes en mode liste.
     private func showNearby() {
         let known = NearbyListTemplateBuilder.entries(from: loadedLayers.annotations,
-                                                     userLocation: services.location.lastLocation)
+                                                     userLocation: services.location.cachedLocation())
         let template = NearbyListTemplateBuilder.make(entries: known) { [weak self] payload in
             self?.showDetail(for: payload)
         }
@@ -1264,7 +1268,7 @@ final class CarPlayCoordinator {
     private func showSearch() {
         let controller = CarPlaySearchController(
             antennas: services.antennas,
-            around: { [weak self] in self?.services.location.lastLocation?.coordinate },
+            around: { [weak self] in self?.services.location.cachedLocation()?.coordinate },
             market: { MapMarketStore.initialMarketCode() },
             onSelect: { [weak self] coordinate, title in
                 self?.startNavigation(to: coordinate, title: title)
