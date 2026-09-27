@@ -35,6 +35,40 @@
         }
       }
     },
+    "Accès Sentinelle en cours d’activation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accès Sentinelle en cours d’activation"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinel access is being activated"
+          }
+        }
+      }
+    },
+    "Ton droit Premium est détecté. Sentinelle ne l’a pas encore pris en compte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton droit Premium est détecté. Sentinelle ne l’a pas encore pris en compte."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Premium access is detected. Sentinel has not activated it yet."
+          }
+        }
+      }
+    },
     "Chargement des commentaires…" : {
       "extractionState" : "manual",
       "localizations" : {

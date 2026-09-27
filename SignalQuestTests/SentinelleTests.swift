@@ -2,6 +2,108 @@ import XCTest
 @testable import SignalQuest
 
 @MainActor
+final class SentinelleAccessRecoveryTests: XCTestCase {
+    private func waitForRequests(_ queue: SentinelleTargetRequests, _ count: Int) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while await queue.count < count {
+            guard ContinuousClock.now < deadline else { throw SentinelleAccessTestError.timeout }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+    }
+
+    func testFreeFollowingSurvivesDeniedThenPremiumGrantOpensTargets() async throws {
+        let service = SentinelleAccessService()
+        let model = SentinelleViewModel(service: service)
+        let denied = Task { await model.load() }
+        try await waitForRequests(service.loads, 1)
+        await service.loads.fail(0, SentinelleAccessDenied())
+        await denied.value
+        XCTAssertTrue(model.accessDenied)
+        XCTAssertEqual(model.following.map(\.followId), ["follow"])
+
+        let granted = Task { await model.load() }
+        try await waitForRequests(service.loads, 2)
+        await service.loads.succeed(1, .init(targets: [], quota: .init(used: 0, max: 3)))
+        await granted.value
+        XCTAssertFalse(model.accessDenied)
+        XCTAssertEqual(model.quota?.max, 3)
+        XCTAssertEqual(model.following.map(\.followId), ["follow"])
+        XCTAssertFalse(model.isLoading)
+    }
+
+    func testOldDenialCannotReplaceNewPremiumGrant() async throws {
+        let service = SentinelleAccessService()
+        let model = SentinelleViewModel(service: service)
+        let old = Task { await model.load() }
+        try await waitForRequests(service.loads, 1)
+        let granted = Task { await model.load() }
+        try await waitForRequests(service.loads, 2)
+        await service.loads.succeed(1, .init(targets: [], quota: .init(used: 0, max: 3)))
+        await granted.value
+        let refresh = model.lastRefresh
+        await service.loads.fail(0, SentinelleAccessDenied())
+        await old.value
+        XCTAssertFalse(model.accessDenied)
+        XCTAssertEqual(model.quota?.max, 3)
+        XCTAssertEqual(model.lastRefresh, refresh)
+        XCTAssertNil(model.errorMessage)
+    }
+}
+
+private enum SentinelleAccessTestError: Error { case unexpectedCall, timeout }
+
+private actor SentinelleTargetRequests {
+    private var pending: [Int: CheckedContinuation<SentinelleTargetsResponse, Error>] = [:]
+    private(set) var count = 0
+
+    func request() async throws -> SentinelleTargetsResponse {
+        try await withCheckedThrowingContinuation { continuation in
+            pending[count] = continuation
+            count += 1
+        }
+    }
+
+    func succeed(_ index: Int, _ value: SentinelleTargetsResponse) {
+        pending.removeValue(forKey: index)?.resume(returning: value)
+    }
+
+    func fail(_ index: Int, _ error: Error) {
+        pending.removeValue(forKey: index)?.resume(throwing: error)
+    }
+}
+
+private struct SentinelleAccessService: SentinelleServicing {
+    let loads = SentinelleTargetRequests()
+    func targets() async throws -> SentinelleTargetsResponse { try await loads.request() }
+    func following() async throws -> SentinelleFollowingResponse {
+        try JSONDecoder.signalQuest.decode(
+            SentinelleFollowingResponse.self,
+            from: Data(#"{"following":[{"followId":"follow","displayName":"Box partagée","status":"up","families":["IPv4"],"incidents":[]}]}"#.utf8)
+        )
+    }
+    func detail(targetId: String) async throws -> SentinelleDetailResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func series(targetId: String, window: SentinelleWindow, family: SentinelleFamily?) async throws -> SentinelleSeriesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func diagnostic(targetId: String, family: SentinelleFamily?) async throws -> SentinelleDiagnostic { throw SentinelleAccessTestError.unexpectedCall }
+    func trends(targetId: String, family: SentinelleFamily?) async throws -> SentinelleTrends { throw SentinelleAccessTestError.unexpectedCall }
+    func proof(targetId: String, family: SentinelleFamily?) async throws -> SentinelleProof { throw SentinelleAccessTestError.unexpectedCall }
+    func create(label: String, address: String, ownerLabel: String?, ownerEmoji: String?) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func setOwner(targetId: String, ownerLabel: String?, ownerEmoji: String?) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func setAddress(targetId: String, family: SentinelleFamily, address: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func delete(targetId: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func currentIp() async throws -> SentinelleCurrentIp { throw SentinelleAccessTestError.unexpectedCall }
+    func preferences() async throws -> SentinellePreferencesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func savePreferences(_ changes: SentinellePreferencesPatch) async throws -> SentinellePreferencesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func testWebhook() async throws -> SentinelleWebhookTest { throw SentinelleAccessTestError.unexpectedCall }
+    func followers(targetId: String) async throws -> SentinelleFollowersResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func followedSeries(followId: String, window: SentinelleWindow) async throws -> SentinelleSeriesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func sharedBox(slug: String) async throws -> SentinelleSharedBox { throw SentinelleAccessTestError.unexpectedCall }
+    func follow(shareInput: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func unfollow(followId: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func revokeFollower(targetId: String, followerId: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func setSharing(targetId: String, changes: SentinelleSharingPatch) async throws -> SentinelleTarget { throw SentinelleAccessTestError.unexpectedCall }
+}
+
+@MainActor
 final class SentinelleAlertSettingsTests: XCTestCase {
     func testWebhookAddressRequiresAnHttpUrlWithinServerLimit() {
         XCTAssertTrue(SentinelleAlertSettingsSheet.validWebhookURL("https://example.org/hook"))
