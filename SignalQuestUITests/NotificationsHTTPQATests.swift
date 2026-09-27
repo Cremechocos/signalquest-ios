@@ -9,6 +9,9 @@ final class NotificationsHTTPQATests: XCTestCase {
         let token: String
         let expectedUserID: String
     }
+    private struct RecipeCredentials: Decodable {
+        let password: String
+    }
     private struct RecipeMarker: Decodable {
         let kind: String
         let database: String
@@ -189,6 +192,104 @@ final class NotificationsHTTPQATests: XCTestCase {
             assertBellCount(after, in: app)
             capture(app, "home-bell-relaunch-en")
         }
+        app.terminate()
+    }
+
+    /// Le badge doit changer sans relance et ne jamais suivre le compte A vers B.
+    func testBellUpdatesOnReturnAndDoesNotLeakToAccountB() async throws {
+        #if !targetEnvironment(simulator)
+        throw XCTSkip("Recette loopback uniquement sur simulateur")
+        #endif
+        continueAfterFailure = false
+        let environment = ProcessInfo.processInfo.environment
+        func input(_ name: String) -> String? { environment[name] ?? environment["TEST_RUNNER_\(name)"] }
+        guard let statePath = input("SQ_RECIPE_STATE"),
+              let fixturePath = input("SQ_RECIPE_FIXTURE"),
+              let appPath = input("SQ_RECIPE_APP_BUNDLE_PATH") else {
+            throw XCTSkip("Banc PRE-02 et binaire Beta isolé requis")
+        }
+        let state = URL(fileURLWithPath: statePath, isDirectory: true).standardizedFileURL
+        let fixtureURL = URL(fileURLWithPath: fixturePath).standardizedFileURL
+        let marker = try JSONDecoder().decode(RecipeMarker.self,
+            from: Data(contentsOf: state.appendingPathComponent("recipe.json")))
+        let fixture = try JSONDecoder().decode(RecipeFixture.self, from: Data(contentsOf: fixtureURL))
+        let expectedURL = URL(string: "http://127.0.0.1:49141")!
+        let bundle = try XCTUnwrap(Bundle(path: appPath))
+        guard state.path.hasPrefix("/Users/alexandregermain/Site/qa/"),
+              fixtureURL.deletingLastPathComponent() == state,
+              marker.kind == "signalquest-ios-synthetic-v1",
+              marker.database == "sq_ios_recipe_test",
+              marker.ports["proxy"] == 49141,
+              fixture.baseURL == expectedURL,
+              fixture.expectedUserID == "ios_recipe_user_a",
+              bundle.bundleIdentifier == "fr.signalquest.ios.beta",
+              bundle.object(forInfoDictionaryKey: "SQ_API_BASE_URL") as? String == expectedURL.absoluteString,
+              bundle.object(forInfoDictionaryKey: "SQ_APP_BASE_URL") as? String == expectedURL.absoluteString else {
+            XCTFail("Recette refusée hors backend et binaire synthétiques")
+            return
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: state.appendingPathComponent("fault.json").path))
+        let initial = try await page(cursor: nil, fixture: fixture)
+        let unread = try XCTUnwrap(initial.notifications.first(where: { !$0.read }))
+        XCTAssertEqual(unread.id, "ios_recipe_notification_badge_r133")
+        let unreadTitle = try XCTUnwrap(unread.title)
+        XCTAssertGreaterThan(initial.unreadCount, 0)
+
+        let reset = XCUIApplication()
+        reset.launchArguments = ["--reset-auth", "--reset-onboarding"]
+        reset.sqLaunch(locale: "fr")
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: reset)
+        reset.terminate()
+
+        var app = launchAuthenticated(fixture: fixture, locale: "fr")
+        assertBellCount(initial.unreadCount, in: app)
+        openActivity(in: app)
+        let row = app.staticTexts[unreadTitle]
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        row.tap()
+        let unreadAfter = try await waitForUnread(initial.unreadCount - 1, fixture: fixture)
+        XCTAssertEqual(unreadAfter, initial.unreadCount - 1)
+        let back = app.navigationBars["Notifications"].buttons.firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 10))
+        back.tap()
+        assertBellCount(unreadAfter, in: app)
+        capture(app, "home-bell-immediate-after-read-fr")
+        app.terminate()
+
+        // Purge QA locale : ne révoque pas le jeton A dans le banc.
+        let signOut = XCUIApplication()
+        signOut.launchArguments = ["--reset-auth"]
+        signOut.sqLaunch(locale: "en")
+        XCTAssertTrue(signOut.buttons["login.submit"].waitForExistence(timeout: 20))
+        signOut.terminate()
+
+        let credentials = try JSONDecoder().decode(RecipeCredentials.self,
+            from: Data(contentsOf: state.appendingPathComponent("credentials.json")))
+        var login = URLRequest(url: expectedURL.appendingPathComponent("api/auth/login"))
+        login.httpMethod = "POST"
+        login.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        login.httpBody = try JSONSerialization.data(withJSONObject: [
+            "email": "b@recipe.invalid", "password": credentials.password
+        ])
+        let (_, response) = try await URLSession.shared.data(for: login)
+        let http = try XCTUnwrap(response as? HTTPURLResponse)
+        XCTAssertEqual(http.statusCode, 200)
+        let cookie = try XCTUnwrap(http.value(forHTTPHeaderField: "Set-Cookie"))
+        let token = try XCTUnwrap(cookie.split(separator: ";").first?
+            .replacingOccurrences(of: "auth_token=", with: ""))
+        let accountB = RecipeFixture(baseURL: expectedURL, token: token,
+                                     expectedUserID: "ios_recipe_user_b")
+        let accountBUnread = try await page(cursor: nil, fixture: accountB).unreadCount
+        XCTAssertEqual(accountBUnread, 0)
+
+        app = launchAuthenticated(fixture: accountB, locale: "en")
+        let bell = app.buttons["Notifications"]
+        XCTAssertTrue(bell.waitForExistence(timeout: 25))
+        XCTAssertEqual(bell.value as? String ?? "", "")
+        capture(app, "home-bell-account-b-en")
+        openActivity(in: app)
+        XCTAssertTrue(app.staticTexts["No notifications"].waitForExistence(timeout: 20))
+        capture(app, "activity-account-b-en")
         app.terminate()
     }
 
