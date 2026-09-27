@@ -100,11 +100,23 @@ enum AppEnvironment {
         false
         #endif
     }
+    /// Affiche le vrai formulaire de vérification 2FA sans passer par la feuille
+    /// système de sauvegarde du mot de passe. Strictement Debug + simulateur,
+    /// et uniquement vers le serveur HTTPS synthétique local.
+    static var showsTwoFactorLoginQA: Bool {
+        #if targetEnvironment(simulator)
+        ProcessInfo.processInfo.arguments.contains("--qa-two-factor-login") &&
+            AppConfig.current.apiBaseURL.absoluteString == "https://127.0.0.1:4325"
+        #else
+        false
+        #endif
+    }
     #else
     static var runsSpeedtestQA: Bool { false }
     static var exitsAfterSpeedtestQA: Bool { false }
     static var showsSpeedtestSharePreviewQA: Bool { false }
     static var showsPasswordResetQA: Bool { false }
+    static var showsTwoFactorLoginQA: Bool { false }
     #endif
 
     #if DEBUG

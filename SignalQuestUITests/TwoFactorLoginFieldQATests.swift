@@ -16,6 +16,35 @@ final class TwoFactorLoginFieldQATests: XCTestCase {
     func testFrenchFailureStaysBesideCode() async throws { try await run(locale: "fr", label: "Code à 6 chiffres") }
     func testEnglishFailureStaysBesideCode() async throws { try await run(locale: "en", label: "6-digit code") }
 
+    func testFrenchFailureWithoutPasswordSheet() async throws {
+        let healthURL = URL(string: "https://127.0.0.1:4325/health")!
+        let (health, response) = try await URLSession.shared.data(from: healthURL)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        XCTAssertEqual(String(data: health, encoding: .utf8), "{\"fixture\":\"two-factor-login-error-only\"}")
+
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        SignalQuestUITestSupport.launch(app,
+            arguments: ["--reset-auth", "--reset-onboarding", "--qa-two-factor-login"], locale: "fr")
+        let code = app.textFields["login.twoFactor.code"]
+        XCTAssertTrue(code.waitForExistence(timeout: 15))
+        XCTAssertEqual(code.label, "Code à 6 chiffres")
+        code.tap(); code.typeText("123456")
+        XCTAssertEqual(code.label, "Code à 6 chiffres", "Accessible name must survive input")
+        app.buttons["login.twoFactor.submit"].tap()
+
+        let error = app.descendants(matching: .any)["login.twoFactor.error"].firstMatch
+        XCTAssertTrue(error.waitForExistence(timeout: 15))
+        XCTAssertTrue(error.label.contains("Code de vérification invalide"), "Expected server error, not a local mock")
+        XCTAssertGreaterThanOrEqual(error.frame.minY, code.frame.maxY)
+        XCTAssertLessThanOrEqual(error.frame.minY - code.frame.maxY, 40)
+        XCTAssertTrue(app.buttons["login.twoFactor.cancel"].exists)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "two-factor-login-error-fr-direct-qa"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     private func run(locale: String, label: String) async throws {
         let healthURL = URL(string: "https://127.0.0.1:4325/health")!
         let (health, response) = try await URLSession.shared.data(from: healthURL)

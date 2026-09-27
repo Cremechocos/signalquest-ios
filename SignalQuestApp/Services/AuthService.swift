@@ -569,6 +569,11 @@ final class AuthSessionViewModel: ObservableObject {
     func bootstrap() async {
         if case .authenticated = state { return }
         guard !AppEnvironment.usesDemoData else { return }
+        if AppEnvironment.showsTwoFactorLoginQA {
+            await service.clearLocalSessionForDebugQA()
+            state = .requires2FA(tempToken: "synthetic-temporary-token")
+            return
+        }
         if let injectedAuthToken = AppEnvironment.injectedAuthToken {
             service.installAuthTokenForDebugQA(injectedAuthToken)
         }
