@@ -57,6 +57,12 @@ struct SignupView: View {
                             .textFieldStyle(SQTextFieldStyle())
                             .accessibilityLabel("Mot de passe (min. 8 caractères)")
                             .accessibilityIdentifier("auth.signup.password")
+                        if challengeError == nil && session.errorMessage == nil,
+                           password.count < 8, let info = passwordIssue {
+                            Label(info, systemImage: "info.circle")
+                                .font(.footnote)
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: SQSpace.xs) {
@@ -67,7 +73,8 @@ struct SignupView: View {
                             .textFieldStyle(SQTextFieldStyle())
                             .accessibilityLabel("Confirmer le mot de passe")
                             .accessibilityIdentifier("auth.signup.confirmation")
-                        if challengeError == nil && session.errorMessage == nil, let info = passwordIssue {
+                        if challengeError == nil && session.errorMessage == nil,
+                           password.count >= 8, let info = passwordIssue {
                             Label(info, systemImage: "info.circle")
                                 .font(.footnote)
                                 .foregroundStyle(SQColor.labelSecondary)
