@@ -40,7 +40,10 @@ final class AuthFormsQATests: XCTestCase {
         try tap(app.buttons["login.recovery"], in: app)
         try fill(app.textFields["auth.recovery.email"], "recovery-en@example.invalid", in: app)
         try tap(app.buttons["auth.recovery.submit"], in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["auth.recovery.error"].firstMatch.waitForExistence(timeout: 20))
+        let error = app.descendants(matching: .any)["auth.recovery.error"].firstMatch
+        XCTAssertTrue(error.waitForExistence(timeout: 20))
+        XCTAssertLessThan(error.frame.minY - app.textFields["auth.recovery.email"].frame.maxY, 40,
+                          "Recovery error must stay beside the email field")
         XCTAssertFalse(app.staticTexts["auth.recovery.sent"].exists)
         XCTAssertEqual(app.textFields["auth.recovery.email"].value as? String, "recovery-en@example.invalid")
         let before = try await metrics()
@@ -89,7 +92,10 @@ final class AuthFormsQATests: XCTestCase {
         XCTAssertFalse(submit.isEnabled, "Consent must still be required")
         try tap(app.switches["auth.signup.terms"], in: app)
         try tap(submit, in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["auth.signup.error"].firstMatch.waitForExistence(timeout: 20))
+        let signupError = app.descendants(matching: .any)["auth.signup.error"].firstMatch
+        XCTAssertTrue(signupError.waitForExistence(timeout: 20))
+        XCTAssertLessThan(signupError.frame.minY - app.textFields["auth.signup.email"].frame.maxY, 40,
+                          "Signup error must stay beside the email field")
         let first = try await metrics()
         XCTAssertEqual(first.signup, 1)
         XCTAssertTrue(first.acceptedTerms && first.hasEmail && first.hasPassword)

@@ -50,18 +50,18 @@ struct ForgotPasswordView: View {
                                 .textFieldStyle(SQTextFieldStyle())
                                 .accessibilityLabel("Email")
                                 .accessibilityIdentifier("auth.recovery.email")
+                            if let error = challengeError ?? session.errorMessage {
+                                Label(error, systemImage: "exclamationmark.triangle")
+                                    .font(.footnote)
+                                    .foregroundStyle(SQColor.danger)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .accessibilityIdentifier("auth.recovery.error")
+                            }
                         }
                         GradientButton("Envoyer le lien", systemImage: "paperplane.fill",
                                        isBusy: submissionID != nil || session.isBusy) { submit() }
                             .disabled(!canSubmit)
                             .accessibilityIdentifier("auth.recovery.submit")
-                    }
-                    if let error = challengeError ?? session.errorMessage {
-                        Label(error, systemImage: "exclamationmark.triangle")
-                            .font(.footnote)
-                            .foregroundStyle(SQColor.danger)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("auth.recovery.error")
                     }
                 }
                 .foregroundStyle(SQColor.label)

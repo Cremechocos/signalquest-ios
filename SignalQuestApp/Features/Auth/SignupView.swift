@@ -47,6 +47,12 @@ struct SignupView: View {
                             .textFieldStyle(SQTextFieldStyle())
                             .accessibilityLabel("Email")
                             .accessibilityIdentifier("auth.signup.email")
+                        if let error = challengeError ?? session.errorMessage {
+                            Label(error, systemImage: "exclamationmark.triangle")
+                                .accessibilityIdentifier("auth.signup.error")
+                                .font(.footnote)
+                                .foregroundStyle(SQColor.danger)
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: SQSpace.xs) {
@@ -96,13 +102,6 @@ struct SignupView: View {
                     }
                     .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
                     .tint(SQColor.brandRed)
-
-                    if let error = challengeError ?? session.errorMessage {
-                        Label(error, systemImage: "exclamationmark.triangle")
-                            .accessibilityIdentifier("auth.signup.error")
-                            .font(.footnote)
-                            .foregroundStyle(SQColor.danger)
-                    }
 
                     GradientButton("Créer mon compte", systemImage: "person.crop.circle.badge.plus", isBusy: session.isBusy || submissionID != nil) {
                         // `canSubmit` exige déjà `acceptedTerms` : on transmet
