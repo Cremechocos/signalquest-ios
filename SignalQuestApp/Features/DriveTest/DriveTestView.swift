@@ -175,6 +175,12 @@ final class DriveTestViewModel: ObservableObject {
     /// Opérateur de la SIM active résolu une fois (MCC→marché, operatorKey via IP/ASN
     /// ou MNC). Drive test = cellulaire : on n'affiche que SES antennes.
     private var resolvedSim: (market: String, operatorKey: String)?
+    private struct OperatorNetworkContext: Equatable {
+        let connection: NetworkConnectionKind
+        let viaVPN: Bool
+    }
+    private var operatorNetworkContext: OperatorNetworkContext?
+    private var operatorContextEpoch = 0
     private var simResolveInFlight = false
     /// Back-off de la résolution d'opérateur : instant du dernier échec et nombre
     /// d'échecs consécutifs. Sans cela, un marché non résolvable relançait une
@@ -203,6 +209,7 @@ final class DriveTestViewModel: ObservableObject {
 
     func onAppear() {
         isVPNActive = VPNDetector.isActive()
+        observeOperatorContext(connection: services.networkPath.status.connection, viaVPN: isVPNActive)
         // Pré-remplit le sélecteur d'opérateur sans attendre une position.
         Task { await prepareOperatorSelector() }
         if locationObserverToken == nil {
@@ -254,6 +261,10 @@ final class DriveTestViewModel: ObservableObject {
             locationDenied = false
         }
         measurementRunID = UUID()
+        // Une nouvelle session doit re-détecter l'accès : même SIM, réseau visité
+        // ou VPN peuvent avoir changé pendant que l'écran était fermé.
+        operatorNetworkContext = nil
+        observeOperatorContext(connection: services.networkPath.status.connection, viaVPN: VPNDetector.isActive())
         accumulator = ContinuousSessionAccumulator()
         summary = nil
         testCount = 0
@@ -288,6 +299,9 @@ final class DriveTestViewModel: ObservableObject {
             if !isPausedForWiFi { sessionTask = Task { await runLoop() } }
         }
         observeConnectionForPause()
+        // L'utilisateur peut démarrer sans fix GPS récent : la source opérateur
+        // doit quand même être re-détectée pour cette nouvelle session.
+        Task { await resolveSimOperatorIfNeeded() }
     }
 
     func stop() {
@@ -333,6 +347,10 @@ final class DriveTestViewModel: ObservableObject {
 
     private func handleConnectionChange(_ connection: NetworkConnectionKind) {
         guard isRunning else { return }
+        if observeOperatorContext(connection: connection, viaVPN: VPNDetector.isActive()),
+           let userLocation {
+            Task { await refreshAntennasIfNeeded(around: userLocation) }
+        }
         let onWiFi = Self.isWiFiConnection(connection)
         if onWiFi && !isPausedForWiFi {
             pauseForWiFi()
@@ -493,6 +511,8 @@ final class DriveTestViewModel: ObservableObject {
     /// Mis en cache (`resolvedSim`) : un drive test = une SIM stable. Fallback "ALL"
     /// seulement si rien n'est déterminable (ex. SIM masquée iOS 16.4+ sans carte ouverte).
     private func resolveSimOperatorIfNeeded() async {
+        let currentVPN = VPNDetector.isActive()
+        observeOperatorContext(connection: services.networkPath.status.connection, viaVPN: currentVPN)
         guard resolvedSim == nil, !simResolveInFlight else { return }
         // Back-off. Le seul garde était `resolvedSim == nil`, donc tant que la
         // résolution échouait — le cas NOMINAL à l'étranger, en WiFi ou sous VPN —
@@ -505,10 +525,21 @@ final class DriveTestViewModel: ObservableObject {
             guard Date().timeIntervalSince(last) >= cooldown else { return }
         }
         simResolveInFlight = true
-        defer { simResolveInFlight = false }
+        var attemptEpoch = operatorContextEpoch
+        defer {
+            simResolveInFlight = false
+            // Si l'accès a changé pendant un await, l'ancien résultat a été
+            // écarté ; relancer pour le nouvel accès sans attendre le prochain GPS.
+            if attemptEpoch != operatorContextEpoch {
+                Task { await self.resolveSimOperatorIfNeeded() }
+            }
+        }
 
         services.networkPath.refreshNow()
         let status = services.networkPath.status
+        let viaVpn = VPNDetector.isActive()
+        observeOperatorContext(connection: status.connection, viaVPN: viaVpn)
+        attemptEpoch = operatorContextEpoch
         let payload = await services.markets.registry()
 
         // 1. Marché via le MCC de la SIM (lecture directe, indépendante du WiFi).
@@ -519,7 +550,6 @@ final class DriveTestViewModel: ObservableObject {
         // 2. Opérateur le plus fiable : resolve() (IP/ASN) en cellulaire hors VPN.
         var operatorKey: String?
         var source: OperatorSource?
-        let viaVpn = VPNDetector.isActive()
         if status.connection == .cellular,
            !viaVpn,
            let detected = await services.networkOperator.resolve(viaVpn: false),
@@ -549,22 +579,49 @@ final class DriveTestViewModel: ObservableObject {
            let iso = await reverseGeocodeISOCountry(user) {
             bestEntry = payload.markets.first { $0.countryCode.uppercased() == iso.uppercased() }
         }
+        guard attemptEpoch == operatorContextEpoch else { return }
         if let bestEntry = bestEntry ?? payload.market(forCode: MapMarketStore.localeMarketCode()) {
             marketEntry = bestEntry
             availableOperators = bestEntry.selectableOperators.filter { $0.key.uppercased() != "ALL" }
         }
 
-        guard let operatorKey, let entry, entry.operatorEntry(forKey: operatorKey) != nil else {
+        guard let operatorKey, let source, let entry,
+              entry.operatorEntry(forKey: operatorKey) != nil else {
             simResolveFailures += 1
             lastSimResolveFailureAt = Date()
             return
         }
         let market = entry.marketCode.isEmpty ? entry.code : entry.marketCode
-        resolvedSim = (market, operatorKey)
-        operatorSource = source
-        simOperatorLabel = entry.operatorEntry(forKey: operatorKey)?.shortLabel ?? operatorKey
+        recordResolvedOperator(market: market, operatorKey: operatorKey, source: source,
+            label: entry.operatorEntry(forKey: operatorKey)?.shortLabel ?? operatorKey)
         simResolveFailures = 0
         lastSimResolveFailureAt = nil
+    }
+
+    /// Toute bascule d'accès ou de VPN rend une résolution IP précédente périmée.
+    /// Efface aussi le back-off : le nouvel accès a droit à une résolution immédiate.
+    @discardableResult
+    func observeOperatorContext(connection: NetworkConnectionKind, viaVPN: Bool) -> Bool {
+        let current = OperatorNetworkContext(connection: connection, viaVPN: viaVPN)
+        guard operatorNetworkContext != current else { return false }
+        operatorNetworkContext = current
+        operatorContextEpoch &+= 1
+        resolvedSim = nil
+        operatorSource = nil
+        simOperatorLabel = nil
+        lastFetchOperator = nil
+        lastSimResolveFailureAt = nil
+        simResolveFailures = 0
+        antennas = []
+        recomputeNearest()
+        return true
+    }
+
+    func recordResolvedOperator(market: String, operatorKey: String,
+                                source: OperatorSource, label: String) {
+        resolvedSim = (market, operatorKey)
+        operatorSource = source
+        simOperatorLabel = label
     }
 
     /// Détecte un changement de SIM (PLMN) en cours de session et re-résout l'opérateur
@@ -581,6 +638,8 @@ final class DriveTestViewModel: ObservableObject {
         operatorSource = nil
         simOperatorLabel = nil
         lastFetchOperator = nil
+        lastSimResolveFailureAt = nil
+        simResolveFailures = 0
         await resolveSimOperatorIfNeeded()
     }
 
@@ -808,6 +867,9 @@ final class DriveTestViewModel: ObservableObject {
         services.networkPath.refreshNow()
         let status = services.networkPath.status
         isVPNActive = VPNDetector.isActive()
+        if observeOperatorContext(connection: status.connection, viaVPN: isVPNActive) {
+            Task { await resolveSimOperatorIfNeeded() }
+        }
         let measurementFix = services.location.cachedLocation()
         let location = measurementFix.map {
             Coordinates(

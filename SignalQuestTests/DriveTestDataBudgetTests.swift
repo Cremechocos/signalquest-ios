@@ -127,4 +127,39 @@ final class DriveTestDataBudgetTests: XCTestCase {
         XCTAssertTrue(DriveTestViewModel.isAutomaticTestDue(testCount: 1, secondsWaited: 0, metersMoved: 500,
                           intervalMeters: 500, maxSeconds: 30))
     }
+
+    @MainActor
+    func testMapFilterNeverBecomesDetectedOperatorAfterNetworkOrVPNChange() {
+        let defaults = UserDefaults.standard
+        let previousMarket = defaults.object(forKey: MapMarketStore.marketKey)
+        let previousOperator = defaults.object(forKey: MapMarketStore.operatorKey)
+        defer {
+            if let previousMarket { defaults.set(previousMarket, forKey: MapMarketStore.marketKey) }
+            else { defaults.removeObject(forKey: MapMarketStore.marketKey) }
+            if let previousOperator { defaults.set(previousOperator, forKey: MapMarketStore.operatorKey) }
+            else { defaults.removeObject(forKey: MapMarketStore.operatorKey) }
+        }
+        MapMarketStore.save(market: "FR", operator: "ORANGE") // filtre de consultation A
+
+        let model = DriveTestViewModel(services: AppServices(config: .test))
+        XCTAssertTrue(model.observeOperatorContext(connection: .cellular, viaVPN: false))
+        model.recordResolvedOperator(market: "FR", operatorKey: "BOUYGUES",
+            source: .internetAccess, label: "Bouygues") // accès détecté B
+        XCTAssertEqual(model.displayedOperatorKey, "BOUYGUES")
+        XCTAssertFalse(model.observeOperatorContext(connection: .cellular, viaVPN: false))
+        XCTAssertEqual(model.displayedOperatorKey, "BOUYGUES")
+
+        XCTAssertTrue(model.observeOperatorContext(connection: .cellular, viaVPN: true))
+        XCTAssertNil(model.displayedOperatorKey, "Le filtre ORANGE ne doit pas remplacer l'accès devenu inconnu")
+        XCTAssertNil(model.operatorSource)
+        model.recordResolvedOperator(market: "FR", operatorKey: "BOUYGUES",
+            source: .sim, label: "Bouygues") // seul PLMN SIM disponible
+        XCTAssertEqual(model.displayedOperatorKey, "BOUYGUES")
+
+        XCTAssertTrue(model.observeOperatorContext(connection: .wifi, viaVPN: true))
+        XCTAssertNil(model.displayedOperatorKey)
+        XCTAssertNil(model.operatorSource)
+        XCTAssertTrue(model.observeOperatorContext(connection: .cellular, viaVPN: false))
+        XCTAssertNil(model.displayedOperatorKey, "Une reprise cellulaire exige une nouvelle attribution")
+    }
 }
