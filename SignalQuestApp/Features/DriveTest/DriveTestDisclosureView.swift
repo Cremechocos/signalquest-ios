@@ -42,7 +42,7 @@ struct DriveTestDisclosureView: View {
                         row(
                             icon: "speedometer",
                             title: "Des données mobiles, en quantité",
-                            detail: "Un speedtest consomme son débit multiplié par sa durée : environ 375 Mo à 300 Mb/s. La session s'arrête d'elle-même au plafond que tu as choisi, et le volume consommé s'affiche en direct."
+                            detail: "Le volume consommé s'affiche en direct. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser."
                         )
                         row(
                             icon: "lock.shield",

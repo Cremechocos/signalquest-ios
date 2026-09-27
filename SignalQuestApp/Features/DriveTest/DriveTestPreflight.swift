@@ -276,8 +276,8 @@ struct DriveTestPreflightSheet: View {
         switch issue.id {
         case .locationPermission:
             return issue.action == .requestLocation
-                ? String(localized: "La position est nécessaire pour tracer et géolocaliser la session.")
-                : String(localized: "Active la localisation dans les Réglages pour enregistrer le trajet.")
+                ? String(localized: "La position est nécessaire pour placer chaque speedtest sur le trajet.")
+                : String(localized: "Active la localisation dans les Réglages pour placer les speedtests sur le trajet.")
         case .gpsFix:
             return String(localized: "La position est absente, trop ancienne ou trop imprécise. Elle sera acquise au démarrage.")
         case .storage:
@@ -288,9 +288,7 @@ struct DriveTestPreflightSheet: View {
         case .battery:
             return String(localized: "Batterie à \(issue.value ?? 0) %. Branche le téléphone pour une longue session.")
         case .connectivity:
-            return issue.severity == .blocking
-                ? String(localized: "Le speedtest continu nécessite une connexion réseau.")
-                : String(localized: "La couverture restera enregistrée localement ; les speedtests attendront le retour du réseau.")
+            return String(localized: "Le speedtest continu nécessite une connexion réseau.")
         case .wifi:
             return String(localized: "Les speedtests resteront en pause et reprendront automatiquement en cellulaire.")
         case .constrainedNetwork:

@@ -572,7 +572,7 @@ struct SpeedtestView: View {
                     accessibilityContext: String(localized: "Plafond de données"),
                     selection: $driveDataCapMB
                 )
-                Text("Un speedtest consomme son débit × sa durée : environ 375 Mo à 300 Mb/s sur 10 s. La session s'arrête proprement au plafond et te le dit.")
+                Text("Le volume dépend du débit et de la durée du test. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser.")
                     .font(.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)

@@ -4331,18 +4331,18 @@
         }
       }
     },
-    "Active la localisation dans les Réglages pour enregistrer le trajet.": {
+    "Active la localisation dans les Réglages pour placer les speedtests sur le trajet.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Active la localisation dans les Réglages pour enregistrer le trajet."
+            "value": "Active la localisation dans les Réglages pour placer les speedtests sur le trajet."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Enable location in Settings to record the route."
+            "value": "Enable location in Settings to place speedtests along your route."
           }
         }
       }
@@ -20912,18 +20912,18 @@
         }
       }
     },
-    "La position est nécessaire pour tracer et géolocaliser la session.": {
+    "La position est nécessaire pour placer chaque speedtest sur le trajet.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "La position est nécessaire pour tracer et géolocaliser la session."
+            "value": "La position est nécessaire pour placer chaque speedtest sur le trajet."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Location is needed to map and geotag the session."
+            "value": "Location is needed to place each speedtest along your route."
           }
         }
       }
@@ -39385,36 +39385,36 @@
         }
       }
     },
-    "Un speedtest consomme son débit × sa durée : environ 375 Mo à 300 Mb/s sur 10 s. La session s'arrête proprement au plafond et te le dit.": {
+    "Le volume dépend du débit et de la durée du test. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A speedtest uses its throughput × its duration: about 375 MB at 300 Mbps over 10 s. The session stops cleanly at the cap and tells you."
+            "value": "Usage depends on test speed and duration. The session stops after the test that reaches the data limit; that test can exceed it."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Un speedtest consomme son débit × sa durée : environ 375 Mo à 300 Mb/s sur 10 s. La session s'arrête proprement au plafond et te le dit."
+            "value": "Le volume dépend du débit et de la durée du test. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser."
           }
         }
       }
     },
-    "Un speedtest consomme son débit multiplié par sa durée : environ 375 Mo à 300 Mb/s. La session s'arrête d'elle-même au plafond que tu as choisi, et le volume consommé s'affiche en direct.": {
+    "Le volume consommé s'affiche en direct. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A speedtest uses its throughput multiplied by its duration: about 375 MB at 300 Mbps. The session stops on its own at the cap you chose, and the volume used is shown live."
+            "value": "Data usage is shown live. The session stops after the test that reaches the data limit; that test can exceed it."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Un speedtest consomme son débit multiplié par sa durée : environ 375 Mo à 300 Mb/s. La session s'arrête d'elle-même au plafond que tu as choisi, et le volume consommé s'affiche en direct."
+            "value": "Le volume consommé s'affiche en direct. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser."
           }
         }
       }
