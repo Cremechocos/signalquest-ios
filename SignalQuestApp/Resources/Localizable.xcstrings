@@ -24083,6 +24083,22 @@
         }
       }
     },
+    "Mesurée à": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Measured at"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesurée à"
+          }
+        }
+      }
+    },
     "Mesures": {
       "localizations": {
         "en": {
@@ -29361,6 +29377,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Précédent"
+          }
+        }
+      }
+    },
+    "Précision": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accuracy"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Précision"
           }
         }
       }

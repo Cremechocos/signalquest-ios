@@ -342,6 +342,20 @@ struct LocationBubble: View {
         String(format: "%.4f, %.4f", location.latitude, location.longitude)
     }
 
+    private var observedAtText: String? {
+        guard let observedAt = location.observedAt else { return nil }
+        return "\(String(localized: "Mesurée à")) \(observedAt.formatted(date: .omitted, time: .shortened))"
+    }
+
+    private var accuracyText: String? {
+        guard let accuracy = location.accuracyMeters else { return nil }
+        return "\(String(localized: "Précision")) ±\(Int(accuracy.rounded())) m"
+    }
+
+    private var measurementAccessibilityValue: String {
+        [observedAtText, accuracyText].compactMap { $0 }.joined(separator: ". ")
+    }
+
     var body: some View {
         Button {
             if let url = location.appleMapsURL {
@@ -387,6 +401,18 @@ struct LocationBubble: View {
                             .font(SQType.micro)
                             .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                             .lineLimit(1)
+                        if let observedAtText {
+                            Text(observedAtText)
+                                .font(SQType.caption)
+                                .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if let accuracyText {
+                            Text(accuracyText)
+                                .font(SQType.caption)
+                                .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
@@ -401,6 +427,7 @@ struct LocationBubble: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Position : \(location.place ?? coordinateText). Toucher pour ouvrir dans Plans.")
+        .accessibilityValue(measurementAccessibilityValue)
     }
 }
 

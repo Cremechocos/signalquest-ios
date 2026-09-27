@@ -251,10 +251,17 @@ struct MessageLocationData: Equatable {
         // Android écrit lat/lng ; on accepte aussi latitude/longitude par sûreté.
         guard
             let lat = MessageLocationData.double(loc["lat"] ?? loc["latitude"]),
-            let lng = MessageLocationData.double(loc["lng"] ?? loc["longitude"])
+            let lng = MessageLocationData.double(loc["lng"] ?? loc["longitude"]),
+            lat.isFinite, (-90...90).contains(lat),
+            lng.isFinite, (-180...180).contains(lng)
         else { return nil }
         let place = (loc["place"] as? String)?.trimmingCharacters(in: .whitespaces)
-        let accuracy = double(loc["accuracyMeters"]).flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
+        // Un client ancien ou malformé ne doit pas faire déborder l'affichage
+        // `Int(accuracy)` de la bulle. Au-delà de 1 000 km, l'incertitude ne
+        // porte plus d'information utile : on l'omet plutôt que l'inventer.
+        let accuracy = double(loc["accuracyMeters"]).flatMap {
+            $0.isFinite && (0...1_000_000).contains($0) ? $0 : nil
+        }
         let observedAt = (loc["observedAt"] as? String).flatMap(SQDateParsing.parse)
         return MessageLocationData(latitude: lat, longitude: lng,
             place: (place?.isEmpty == false) ? place : nil,

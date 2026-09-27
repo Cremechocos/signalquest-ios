@@ -21,4 +21,14 @@ final class MessageLocationEvidenceTests: XCTestCase {
         XCTAssertNil(value.accuracyMeters)
         XCTAssertNil(value.observedAt)
     }
+
+    func testInvalidCoordinatesCannotOpenAMapAndUnboundedAccuracyIsOmitted() throws {
+        XCTAssertNil(MessageLocationData.parse(fromMetadataJSON: """
+        {"location":{"lat":120,"lng":2.35,"place":"Invalid"}}
+        """))
+        let value = try XCTUnwrap(MessageLocationData.parse(fromMetadataJSON: """
+        {"location":{"lat":48.85,"lng":2.35,"accuracyMeters":1e99}}
+        """))
+        XCTAssertNil(value.accuracyMeters)
+    }
 }
