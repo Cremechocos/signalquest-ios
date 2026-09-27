@@ -143,11 +143,30 @@ final class DriveTestDataBudgetTests: XCTestCase {
 
         let model = DriveTestViewModel(services: AppServices(config: .test))
         XCTAssertTrue(model.observeOperatorContext(connection: .cellular, viaVPN: false))
-        model.recordResolvedOperator(market: "FR", operatorKey: "BOUYGUES",
-            source: .internetAccess, label: "Bouygues") // accès détecté B
+        model.recordResolvedOperator(market: "FR", operatorKey: "SFR",
+            source: .internetAccess, label: "SFR") // ancien accès
+        let measured = SpeedtestRunResult(label: "Drive Test", downloadMbps: 80,
+            downloadAverageMbps: 80, downloadMaxMbps: 90, durationSeconds: 10,
+            connectionType: .cellular, networkOperatorName: "Bouygues",
+            simPlmn: "20801", marketCode: "FR", operatorKey: "BOUYGUES")
+        XCTAssertTrue(model.reconcileOperatorFromSpeedtest(measured,
+            currentConnection: .cellular, viaVPN: false),
+            "ASN B doit remplacer l'ancien ASN sans changement de connexion ni de SIM")
         XCTAssertEqual(model.displayedOperatorKey, "BOUYGUES")
+        XCTAssertEqual(SpeedtestSubmission.iosPayload(from: measured, streams: 4,
+            deviceModel: "iPhone").operatorKey, "BOUYGUES")
         XCTAssertFalse(model.observeOperatorContext(connection: .cellular, viaVPN: false))
         XCTAssertEqual(model.displayedOperatorKey, "BOUYGUES")
+
+        let unconfirmed = SpeedtestRunResult(label: "Drive Test", downloadMbps: 70,
+            downloadAverageMbps: 70, downloadMaxMbps: 75, durationSeconds: 10,
+            connectionType: .cellular, simPlmn: "20801")
+        XCTAssertTrue(model.reconcileOperatorFromSpeedtest(unconfirmed,
+            currentConnection: .cellular, viaVPN: false))
+        XCTAssertNil(model.displayedOperatorKey,
+            "Un ASN indisponible ne doit pas conserver l'ancien ni reprendre le filtre ORANGE")
+        model.recordResolvedOperator(market: "FR", operatorKey: "BOUYGUES",
+            source: .sim, label: "Bouygues") // seul PLMN SIM disponible
 
         XCTAssertTrue(model.observeOperatorContext(connection: .cellular, viaVPN: true))
         XCTAssertNil(model.displayedOperatorKey, "Le filtre ORANGE ne doit pas remplacer l'accès devenu inconnu")

@@ -490,6 +490,7 @@ final class DriveTestViewModel: ObservableObject {
         antennaFetchInFlight = true
         lastFetchCenter = coordinate
         lastFetchOperator = op
+        let requestEpoch = operatorContextEpoch
         defer { antennaFetchInFlight = false }
 
         let delta = 0.045 // ~5 km de rayon
@@ -498,7 +499,9 @@ final class DriveTestViewModel: ObservableObject {
             east: coordinate.longitude + delta, west: coordinate.longitude - delta
         )
         do {
-            antennas = try await services.antennas.list(bbox: bbox, market: market, operatorName: op, technologies: [])
+            let fetched = try await services.antennas.list(bbox: bbox, market: market, operatorName: op, technologies: [])
+            guard requestEpoch == operatorContextEpoch else { return }
+            antennas = fetched
             recomputeNearest()
         } catch {
             // Silencieux : on conserve les antennes précédemment chargées.
@@ -605,6 +608,11 @@ final class DriveTestViewModel: ObservableObject {
         let current = OperatorNetworkContext(connection: connection, viaVPN: viaVPN)
         guard operatorNetworkContext != current else { return false }
         operatorNetworkContext = current
+        clearResolvedOperator()
+        return true
+    }
+
+    private func clearResolvedOperator() {
         operatorContextEpoch &+= 1
         resolvedSim = nil
         operatorSource = nil
@@ -614,7 +622,6 @@ final class DriveTestViewModel: ObservableObject {
         simResolveFailures = 0
         antennas = []
         recomputeNearest()
-        return true
     }
 
     func recordResolvedOperator(market: String, operatorKey: String,
@@ -622,6 +629,29 @@ final class DriveTestViewModel: ObservableObject {
         resolvedSim = (market, operatorKey)
         operatorSource = source
         simOperatorLabel = label
+    }
+
+    /// Le speedtest interroge IP/ASN pour CHAQUE mesure. Son résultat prime sur
+    /// le cache d'affichage, même si le type d'accès, le VPN et la SIM n'ont pas changé.
+    @discardableResult
+    func reconcileOperatorFromSpeedtest(_ result: SpeedtestRunResult,
+                                        currentConnection: NetworkConnectionKind, viaVPN: Bool) -> Bool {
+        guard currentConnection == .cellular, result.connectionType == .cellular,
+              !viaVPN else { return false }
+        let key = result.operatorKey?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let market = result.marketCode?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let key, !key.isEmpty, let market, !market.isEmpty else {
+            // Sans nouvelle preuve IP, un ancien libellé IP n'est plus confirmé.
+            guard operatorSource == .internetAccess else { return false }
+            clearResolvedOperator()
+            return true
+        }
+        guard resolvedSim?.operatorKey != key || resolvedSim?.market != market
+                || operatorSource != .internetAccess else { return false }
+        clearResolvedOperator()
+        recordResolvedOperator(market: market, operatorKey: key, source: .internetAccess,
+            label: result.networkOperatorName ?? key)
+        return true
     }
 
     /// Détecte un changement de SIM (PLMN) en cours de session et re-résout l'opérateur
@@ -890,6 +920,19 @@ final class DriveTestViewModel: ObservableObject {
         )
         try Task.checkCancellation()
         let measured = rawMeasurement.withDriveTestContext(runID: groupID)
+        // La mesure peut observer un nouvel ASN sans changement de type d'accès
+        // ou de PLMN SIM. Ne pas laisser l'ancien opérateur sur la carte/le bandeau.
+        let currentVPN = VPNDetector.isActive()
+        let currentConnection = services.networkPath.status.connection
+        observeOperatorContext(connection: currentConnection, viaVPN: currentVPN)
+        if reconcileOperatorFromSpeedtest(measured,
+            currentConnection: currentConnection, viaVPN: currentVPN) {
+            if let userLocation {
+                Task { await refreshAntennasIfNeeded(around: userLocation) }
+            } else if displayedOperatorKey == nil {
+                Task { await resolveSimOperatorIfNeeded() }
+            }
+        }
         do {
             // Provenance et groupe sont portés par la mesure ; aucune session
             // de couverture n’est nécessaire pour retrouver le trajet.
