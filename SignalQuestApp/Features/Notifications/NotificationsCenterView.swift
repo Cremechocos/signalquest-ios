@@ -19,11 +19,23 @@ final class NotificationsCenterViewModel: ObservableObject {
     @Published private(set) var failedAction: FailedAction?
 
     private let service: NotificationsServicing
+    private let badge: AppServices?
+    private let accountSession: LocalAccountSession?
     private var loadGeneration = UUID()
     private var actionGeneration = UUID()
-    init(service: NotificationsServicing) { self.service = service }
+    private var isCurrentAccount: Bool {
+        accountSession == nil || LocalAccountScope.sessionSnapshot() == accountSession
+    }
+
+    init(service: NotificationsServicing, badge: AppServices? = nil) {
+        self.service = service
+        self.badge = badge
+        accountSession = LocalAccountScope.sessionSnapshot()
+    }
 
     func load() async {
+        guard isCurrentAccount else { return }
+        let badgeTicket = badge?.notificationBadgeRefreshTicket()
         let generation = UUID()
         loadGeneration = generation
         isLoading = true
@@ -33,37 +45,42 @@ final class NotificationsCenterViewModel: ObservableObject {
         defer { if loadGeneration == generation { isLoading = false } }
         do {
             let page = try await service.list(cursor: nil)
-            guard loadGeneration == generation else { return }
+            guard loadGeneration == generation, isCurrentAccount else { return }
             items = page.notifications
             nextCursor = page.nextCursor
             unreadCount = page.unreadCount ?? page.notifications.filter { $0.read != true }.count
+            if let badgeTicket { badge?.publishNotificationBadge(unreadCount: unreadCount, for: badgeTicket) }
         } catch {
-            guard loadGeneration == generation, !error.isCancellation else { return }
+            guard loadGeneration == generation, isCurrentAccount, !error.isCancellation else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     func loadMore() async {
-        guard let cursor = nextCursor, !isLoading, !isLoadingMore, !isMutating else { return }
+        guard isCurrentAccount, let cursor = nextCursor, !isLoading, !isLoadingMore, !isMutating else { return }
+        let badgeTicket = badge?.notificationBadgeRefreshTicket()
         let generation = loadGeneration
         isLoadingMore = true
         paginationErrorMessage = nil
         defer { if loadGeneration == generation { isLoadingMore = false } }
         do {
             let page = try await service.list(cursor: cursor)
-            guard loadGeneration == generation, nextCursor == cursor else { return }
+            guard loadGeneration == generation, nextCursor == cursor, isCurrentAccount else { return }
             var seen = Set(items.map(\.id))
             items.append(contentsOf: page.notifications.filter { seen.insert($0.id).inserted })
             nextCursor = page.nextCursor == cursor ? nil : page.nextCursor
-            if let count = page.unreadCount { unreadCount = count }
+            if let count = page.unreadCount {
+                unreadCount = count
+                if let badgeTicket { badge?.publishNotificationBadge(unreadCount: count, for: badgeTicket) }
+            }
         } catch {
-            guard loadGeneration == generation, !error.isCancellation else { return }
+            guard loadGeneration == generation, isCurrentAccount, !error.isCancellation else { return }
             paginationErrorMessage = String(localized: "Chargement impossible")
         }
     }
 
     func markRead(_ id: String) async {
-        guard !isMutating, !pendingReadIDs.contains(id),
+        guard isCurrentAccount, !isMutating, !pendingReadIDs.contains(id),
               items.contains(where: { $0.id == id && $0.read != true }) else { return }
         let generation = actionGeneration
         pendingReadIDs.insert(id)
@@ -72,7 +89,7 @@ final class NotificationsCenterViewModel: ObservableObject {
         defer { pendingReadIDs.remove(id) }
         do {
             try await service.markRead(id: id)
-            guard actionGeneration == generation else { return }
+            guard actionGeneration == generation, isCurrentAccount else { return }
             loadGeneration = UUID()
             isLoading = false
             isLoadingMore = false
@@ -80,43 +97,47 @@ final class NotificationsCenterViewModel: ObservableObject {
                 if items[index].read != true { unreadCount = max(0, unreadCount - 1) }
                 items[index] = items[index].withRead(true)
             }
+            if let accountSession { badge?.applyNotificationBadgeMutation(unreadCount: unreadCount, for: accountSession) }
         } catch {
-            guard actionGeneration == generation, !error.isCancellation else { return }
+            guard actionGeneration == generation, isCurrentAccount, !error.isCancellation else { return }
             actionErrorMessage = String(localized: "Action impossible")
             failedAction = .markRead(id)
         }
     }
 
     func markAll() async {
-        guard !isMutating, pendingReadIDs.isEmpty else { return }
+        guard isCurrentAccount, !isMutating, pendingReadIDs.isEmpty else { return }
         isMutating = true
         actionErrorMessage = nil
         failedAction = nil
         defer { isMutating = false }
         do {
             try await service.markAllRead()
+            guard isCurrentAccount else { return }
             actionGeneration = UUID()
             loadGeneration = UUID()
             isLoading = false
             isLoadingMore = false
             items = items.map { $0.withRead(true) }
             unreadCount = 0
+            if let accountSession { badge?.applyNotificationBadgeMutation(unreadCount: 0, for: accountSession) }
             errorMessage = nil
         } catch {
-            guard !error.isCancellation else { return }
+            guard isCurrentAccount, !error.isCancellation else { return }
             actionErrorMessage = String(localized: "Action impossible")
             failedAction = .markAll
         }
     }
 
     func deleteAll() async {
-        guard !isMutating, pendingReadIDs.isEmpty else { return }
+        guard isCurrentAccount, !isMutating, pendingReadIDs.isEmpty else { return }
         isMutating = true
         actionErrorMessage = nil
         failedAction = nil
         defer { isMutating = false }
         do {
             try await service.deleteAll()
+            guard isCurrentAccount else { return }
             actionGeneration = UUID()
             loadGeneration = UUID()
             isLoading = false
@@ -124,9 +145,10 @@ final class NotificationsCenterViewModel: ObservableObject {
             items = []
             nextCursor = nil
             unreadCount = 0
+            if let accountSession { badge?.applyNotificationBadgeMutation(unreadCount: 0, for: accountSession) }
             errorMessage = nil
         } catch {
-            guard !error.isCancellation else { return }
+            guard isCurrentAccount, !error.isCancellation else { return }
             actionErrorMessage = String(localized: "Action impossible")
             failedAction = .deleteAll
         }
@@ -152,8 +174,8 @@ private extension AppNotification {
 struct NotificationsCenterView: View {
     @StateObject private var model: NotificationsCenterViewModel
     @EnvironmentObject private var router: AppRouter
-    init(service: NotificationsServicing) {
-        _model = StateObject(wrappedValue: NotificationsCenterViewModel(service: service))
+    init(service: NotificationsServicing, badge: AppServices? = nil) {
+        _model = StateObject(wrappedValue: NotificationsCenterViewModel(service: service, badge: badge))
     }
 
     init(model: NotificationsCenterViewModel) {

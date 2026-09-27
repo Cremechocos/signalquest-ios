@@ -624,7 +624,7 @@ struct FeedView: View {
             FriendsListView(service: services.friends)
         }
         .navigationDestination(isPresented: $showNotifications) {
-            NotificationsCenterView(service: services.notifications)
+            NotificationsCenterView(service: services.notifications, badge: services)
         }
         .navigationDestination(isPresented: $showCalls) {
             CallHistoryView(service: services.calls)

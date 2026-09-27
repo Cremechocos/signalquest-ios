@@ -792,6 +792,7 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
             center.removeDeliveredNotifications(withIdentifiers: [notification.request.identifier])
             return []
         }
+        Task { @MainActor in await AppServicesHolder.services.refreshNotificationBadge(force: true) }
         return [.banner, .sound, .badge]
     }
 
@@ -847,6 +848,7 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
             )
             UNUserNotificationCenter.current().setBadgeCountCompat(0)
         }
+        Task { @MainActor in await AppServicesHolder.services.refreshNotificationBadge(force: true) }
     }
 }
 

@@ -494,6 +494,26 @@ final class InboxBadgePresentationStateTests: XCTestCase {
         XCTAssertFalse(state.publish(unreadCount: 9, for: ticketA))
         XCTAssertEqual(state.unreadCount, 0)
     }
+
+    func testConfirmedNotificationMutationRejectsEarlierFetchAndOldSession() throws {
+        let sessionA = LocalAccountSession(ownerScopeId: "user:account-a", sessionId: UUID().uuidString)
+        let sessionB = LocalAccountSession(ownerScopeId: "user:account-b", sessionId: UUID().uuidString)
+        var currentSession: LocalAccountSession? = sessionA
+        let state = InboxBadgePresentationState(sessionSnapshot: { currentSession })
+        let staleFetch = try XCTUnwrap(state.beginRefresh(force: true))
+
+        XCTAssertTrue(state.replaceAfterMutation(unreadCount: 3, for: sessionA))
+        XCTAssertFalse(state.publish(unreadCount: 4, for: staleFetch))
+        XCTAssertEqual(state.unreadCount, 3)
+
+        state.reset()
+        currentSession = sessionB
+        XCTAssertFalse(state.replaceAfterMutation(unreadCount: 2, for: sessionA))
+        XCTAssertEqual(state.unreadCount, 0)
+        let currentFetch = try XCTUnwrap(state.beginRefresh(force: false))
+        XCTAssertTrue(state.publish(unreadCount: 6, for: currentFetch))
+        XCTAssertEqual(state.unreadCount, 6)
+    }
 }
 
 @MainActor

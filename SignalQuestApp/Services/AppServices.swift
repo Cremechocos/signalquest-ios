@@ -34,7 +34,17 @@ final class InboxBadgePresentationState {
     @discardableResult
     func publish(unreadCount: Int, for ticket: RefreshTicket, now: Date = Date()) -> Bool {
         guard ticket.generation == generation, sessionSnapshot() == ticket.session else { return false }
-        self.unreadCount = unreadCount
+        self.unreadCount = max(0, unreadCount)
+        lastRefresh = now
+        return true
+    }
+
+    /// Une mutation confirmée prime sur tout GET lancé avant elle.
+    @discardableResult
+    func replaceAfterMutation(unreadCount: Int, for session: LocalAccountSession, now: Date = Date()) -> Bool {
+        guard sessionSnapshot() == session else { return false }
+        generation &+= 1
+        self.unreadCount = max(0, unreadCount)
         lastRefresh = now
         return true
     }
@@ -117,6 +127,8 @@ final class AppServices: ObservableObject {
     /// Nombre de conversations non lues — alimente le badge de l'onglet Messages.
     @Published var unreadConversations = 0
     private let inboxBadgeState = InboxBadgePresentationState()
+    @Published private(set) var unreadNotifications = 0
+    private let notificationBadgeState = InboxBadgePresentationState()
 
     init(config: AppConfig = .current) {
         let credentials = CredentialStore()
@@ -222,12 +234,35 @@ final class AppServices: ObservableObject {
         unreadConversations = inboxBadgeState.unreadCount
     }
 
+    func refreshNotificationBadge(force: Bool = false) async {
+        guard let ticket = notificationBadgeState.beginRefresh(force: force) else { return }
+        guard let page = try? await notifications.list(cursor: nil) else { return }
+        let count = page.unreadCount ?? page.notifications.filter { $0.read != true }.count
+        publishNotificationBadge(unreadCount: count, for: ticket)
+    }
+
+    func notificationBadgeRefreshTicket() -> InboxBadgePresentationState.RefreshTicket? {
+        notificationBadgeState.beginRefresh(force: true)
+    }
+
+    func publishNotificationBadge(unreadCount: Int, for ticket: InboxBadgePresentationState.RefreshTicket) {
+        guard notificationBadgeState.publish(unreadCount: unreadCount, for: ticket) else { return }
+        unreadNotifications = notificationBadgeState.unreadCount
+    }
+
+    func applyNotificationBadgeMutation(unreadCount: Int, for session: LocalAccountSession) {
+        guard notificationBadgeState.replaceAfterMutation(unreadCount: unreadCount, for: session) else { return }
+        unreadNotifications = notificationBadgeState.unreadCount
+    }
+
     /// Efface immédiatement tout état visuel privé de l'ancien compte. Le reset
     /// invalide aussi les requêtes déjà parties et rouvre le throttle pour que le
     /// nouveau compte puisse charger son propre badge sans attendre 20 secondes.
     func resetAccountPresentationState() {
         inboxBadgeState.reset()
         unreadConversations = 0
+        notificationBadgeState.reset()
+        unreadNotifications = 0
         favoriteRefreshTask?.cancel()
         favoriteRefreshTask = nil
         favoriteAntennas.resetForAccountChange()

@@ -623,6 +623,7 @@ struct MainTabView: View {
             consumeIntentRoutes()
             guard let user else { return }
             await services.refreshInboxBadge()
+            await services.refreshNotificationBadge()
             // À l'arrivée (Feed = onglet par défaut) sans @handle : inviter à en choisir un.
             if (user.handle ?? "").isEmpty { showHandleGate = true }
         }
@@ -634,14 +635,24 @@ struct MainTabView: View {
         }
         .onChangeCompat(of: scenePhase) { _, phase in
             if phase == .active {
-                if user != nil { Task { await services.refreshInboxBadge() } }
+                if user != nil {
+                    Task {
+                        await services.refreshInboxBadge(force: true)
+                        await services.refreshNotificationBadge(force: true)
+                    }
+                }
                 consumeIntentRoutes()
             }
         }
         .onChangeCompat(of: router.selectedTab) { _, _ in
             // Changement d'onglet (tap, deep-link, intent) : dock redéployé.
             withAnimation(SQMotion.snappy) { router.isDockMinimized = false }
-            if user != nil { Task { await services.refreshInboxBadge() } }
+            if user != nil {
+                Task {
+                    await services.refreshInboxBadge()
+                    if router.selectedTab == .home { await services.refreshNotificationBadge() }
+                }
+            }
         }
         .onChangeCompat(of: router.isDockHidden) { _, hidden in
             // Retour de conversation : le dock réapparaît toujours déployé

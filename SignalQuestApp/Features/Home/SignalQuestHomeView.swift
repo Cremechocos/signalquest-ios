@@ -111,7 +111,7 @@ struct SignalQuestHomeView: View {
             }
             Spacer()
             if user != nil { NavigationLink {
-                NotificationsCenterView(service: services.notifications)
+                NotificationsCenterView(service: services.notifications, badge: services)
             } label: {
                 Image(systemName: "bell")
                     .font(.system(size: 18, weight: .medium))
@@ -119,9 +119,23 @@ struct SignalQuestHomeView: View {
                     .frame(width: 44, height: 44)
                     .background(SQColor.surface, in: Circle())
                     .sqShadowSoft()
+                    .overlay(alignment: .topTrailing) {
+                        if services.unreadNotifications > 0 {
+                            Text(services.unreadNotifications > 99 ? "99+" : "\(services.unreadNotifications)")
+                                .font(SQFont.body(11, relativeTo: .caption))
+                                .fontWeight(.bold)
+                                .foregroundStyle(SQColor.onAccent)
+                                .padding(.horizontal, 4)
+                                .frame(minWidth: 18, minHeight: 18)
+                                .background(SQColor.brandRed, in: Capsule())
+                                .offset(x: 4, y: -4)
+                                .accessibilityHidden(true)
+                        }
+                    }
             }
             .buttonStyle(SQPressButtonStyle())
             .accessibilityLabel("Notifications")
+            .accessibilityValue(services.unreadNotifications > 0 ? Text(services.unreadNotifications, format: .number) : Text(""))
             }
         }
         .accessibilityElement(children: .contain)
