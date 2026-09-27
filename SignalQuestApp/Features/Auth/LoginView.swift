@@ -67,14 +67,24 @@ struct LoginView: View {
                                     .multilineTextAlignment(.center)
                                     .textFieldStyle(SQTextFieldStyle())
                                     .accessibilityLabel("Code à 6 chiffres")
+                                    .accessibilityIdentifier("login.twoFactor.code")
+                                if let error = session.errorMessage {
+                                    Label(error, systemImage: "exclamationmark.triangle")
+                                        .font(.footnote)
+                                        .foregroundStyle(SQColor.dangerInk)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .accessibilityIdentifier("login.twoFactor.error")
+                                }
                             }
                             GradientButton("Valider le code", systemImage: "checkmark.shield", isBusy: session.isBusy) {
                                 Task { await session.verify2FA(code: code) }
                             }
+                            .accessibilityIdentifier("login.twoFactor.submit")
                             Button("Annuler") { session.cancelTwoFactor() }
                                 .font(SQType.caption)
                                 .foregroundStyle(SQColor.brandRed)
                                 .frame(maxWidth: .infinity)
+                                .accessibilityIdentifier("login.twoFactor.cancel")
                         } else {
                             VStack(alignment: .leading, spacing: SQSpace.xs) {
                                 SQFormFieldLabel("Email")
@@ -101,7 +111,7 @@ struct LoginView: View {
                             accountActions
                         }
 
-                        if let error = session.errorMessage {
+                        if !isTwoFactor, let error = session.errorMessage {
                             Label(error, systemImage: "exclamationmark.triangle")
                                 .font(.footnote)
                                 .foregroundStyle(SQColor.danger)
