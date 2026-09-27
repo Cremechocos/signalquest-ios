@@ -1,5 +1,19 @@
 import Foundation
 
+extension Notification.Name {
+    static let sqPrivacyZoneMapChanged = Notification.Name("sqPrivacyZoneMapChanged")
+}
+
+@MainActor
+enum SQPrivacyZoneMapChange {
+    private(set) static var revision: UInt64 = 0
+
+    static func publish() {
+        revision &+= 1
+        NotificationCenter.default.post(name: .sqPrivacyZoneMapChanged, object: nil)
+    }
+}
+
 enum LastSeenVisibility: String, Codable, CaseIterable, Sendable {
     case friends
     case none
@@ -108,14 +122,14 @@ final class PrivacyService: PrivacyServicing {
 
     func createZone(_ request: CreatePrivacyZoneRequest) async throws -> PrivacyZone {
         let response: PrivacyZoneResponse = try await requestJSON("/api/user/zones", body: request)
-        await invalidatePublicMap()
+        await invalidateMapAfterZoneMutation()
         return response.zone
     }
 
     func updateZone(_ patch: UpdatePrivacyZoneRequest) async throws -> PrivacyZone {
         let response: PrivacyZoneResponse = try await requestJSON("/api/user/zones", method: .patch, body: patch)
         guard response.zone.id == patch.id else { throw APIError.decoding("zone-response-identity-mismatch") }
-        await invalidatePublicMap()
+        await invalidateMapAfterZoneMutation()
         return response.zone
     }
 
@@ -123,7 +137,14 @@ final class PrivacyService: PrivacyServicing {
         let response: ZoneDeletionResponse = try await request(APIEndpoint(path: "/api/user/zones", method: .delete,
             query: [URLQueryItem(name: "id", value: id)]), as: ZoneDeletionResponse.self)
         guard response.success else { throw APIError.decoding("zone-deletion-not-confirmed") }
+        await invalidateMapAfterZoneMutation()
+    }
+
+    private func invalidateMapAfterZoneMutation() async {
         await invalidatePublicMap()
+        await MainActor.run {
+            SQPrivacyZoneMapChange.publish()
+        }
     }
 
     func get() async throws -> SocialPrivacy {

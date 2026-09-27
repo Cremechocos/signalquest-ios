@@ -725,6 +725,26 @@ final class MapExplorerViewModel: ObservableObject {
         dataVersion &+= 1
     }
 
+    /// Une zone privée peut masquer plusieurs mesures et trajets d'un coup.
+    /// Les tuiles déjà affichées disparaissent avant tout rechargement réseau ;
+    /// une réponse antérieure en vol ne peut pas les restaurer.
+    func discardPublicMeasurementsAfterPrivacyZoneChange() {
+        activeLoad = nil
+        isLoading = false
+        speedtestTiles = []
+        coverageTiles = []
+        coverageHeat = []
+        tileLoadIssues.removeValue(forKey: .speedtest)
+        tileLoadIssues.removeValue(forKey: .coverage)
+        snapshot = SocialMapSnapshot(timestamp: snapshot.timestamp, friends: snapshot.friends,
+            photos: snapshot.photos, validations: snapshot.validations, sessions: [],
+            coveragePoints: [], speedtests: [], photosCount: snapshot.photosCount,
+            validationsCount: snapshot.validationsCount, sessionsCount: 0,
+            coveragePointsCount: 0, speedtestsCount: 0, rawCoveragePointsCount: 0,
+            logicalCoveragePointsCount: 0)
+        dataVersion &+= 1
+    }
+
     func load(region: MKCoordinateRegion, zoom: Double, filters: Set<MapDisplayItem.Kind>, lightweight: Bool = true, requestID: UUID? = nil, refresh: Bool = false) async {
         let bounds = MapBounds(
             north: region.center.latitude + region.span.latitudeDelta / 2,
@@ -1540,6 +1560,7 @@ struct MapExplorerView: View {
     @State private var lastRegion: MKCoordinateRegion
     @State private var viewportGate = MapViewportLoadGate()
     @State private var viewportRefreshID = 0
+    @State private var seenPrivacyZoneMapRevision: UInt64 = 0
     @State private var showFilterSheet = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var filterSheetDetent: PresentationDetent = .large
@@ -1836,6 +1857,9 @@ struct MapExplorerView: View {
             refreshMapRender()
             fetchTask = Task { await reloadCurrentRegion() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .sqPrivacyZoneMapChanged).receive(on: DispatchQueue.main)) { _ in
+            handlePrivacyZoneMapChange()
+        }
         .onChangeCompat(of: scenePhase) { _, phase in
             guard phase == .active, router.selectedTab == .map else { return }
             fetchTask?.cancel()
@@ -1851,6 +1875,12 @@ struct MapExplorerView: View {
         .onChangeCompat(of: router.openCommunityOutageId) { _, _ in openCommunityOutageFromNotificationIfNeeded() }
         .onAppear {
             viewportRefreshID &+= 1
+            // L'onglet Carte peut ne pas être monté pendant une modification de zone.
+            // Dans ce cas, aucun observer n'a reçu l'événement : vider puis recharger
+            // au retour, même si l'emprise et le zoom n'ont pas changé.
+            if seenPrivacyZoneMapRevision != SQPrivacyZoneMapChange.revision {
+                handlePrivacyZoneMapChange()
+            }
             services.livePresence.mapDidAppear()
             Task { await services.livePresence.refreshSharingSettings() }
             focusFromRouterIfNeeded()
@@ -4078,6 +4108,17 @@ struct MapExplorerView: View {
         guard !Task.isCancelled else { return }
         await model.load(bounds: viewport.bounds, zoom: viewport.zoom, filters: requestedFilters,
                          requestID: requestID, refresh: true)
+    }
+
+    private func handlePrivacyZoneMapChange() {
+        seenPrivacyZoneMapRevision = SQPrivacyZoneMapChange.revision
+        fetchTask?.cancel()
+        model.discardPublicMeasurementsAfterPrivacyZoneChange()
+        if let kind = selectedItem?.kind, [.session, .coverage, .speedtest].contains(kind) {
+            selectedItem = nil
+        }
+        refreshMapRender()
+        fetchTask = Task { await reloadCurrentRegion() }
     }
 
     /// Fiche d'une cellule observée, avec les autres cellules du même endroit
