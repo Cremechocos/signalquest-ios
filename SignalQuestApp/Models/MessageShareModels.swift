@@ -228,6 +228,9 @@ struct MessageLocationData: Equatable {
     let latitude: Double
     let longitude: Double
     let place: String?
+    /// Absents des anciens messages ; jamais déduits de la date d'envoi serveur.
+    let accuracyMeters: Double?
+    let observedAt: Date?
 
     /// Lien Apple Plans (ouvre la position ; libellé en légende si présent).
     var appleMapsURL: URL? {
@@ -251,7 +254,11 @@ struct MessageLocationData: Equatable {
             let lng = MessageLocationData.double(loc["lng"] ?? loc["longitude"])
         else { return nil }
         let place = (loc["place"] as? String)?.trimmingCharacters(in: .whitespaces)
-        return MessageLocationData(latitude: lat, longitude: lng, place: (place?.isEmpty == false) ? place : nil)
+        let accuracy = double(loc["accuracyMeters"]).flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
+        let observedAt = (loc["observedAt"] as? String).flatMap(SQDateParsing.parse)
+        return MessageLocationData(latitude: lat, longitude: lng,
+            place: (place?.isEmpty == false) ? place : nil,
+            accuracyMeters: accuracy, observedAt: observedAt)
     }
 
     private static func double(_ value: Any?) -> Double? {

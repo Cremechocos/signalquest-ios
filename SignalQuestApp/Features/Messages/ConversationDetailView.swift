@@ -2064,18 +2064,39 @@ struct ConversationDetailView: View {
         guard !isSharingLocation else { return }
         isSharingLocation = true
         defer { isSharingLocation = false }
-        guard let location = await services.location.currentLocation() else {
+        guard let owner = LocalAccountScope.sessionSnapshot() else {
+            errorMessage = String(localized: "Position indisponible")
+            Haptics.error()
+            return
+        }
+        let expectedSessionID = services.api.credentials.snapshot().sessionID
+        guard let location = await services.location.currentLocation(maxAge: 30) else {
             errorMessage = "Position indisponible — autorise la localisation dans les réglages."
             Haptics.error()
             return
         }
         let place = await reverseGeocodedName(location)
+        guard !Task.isCancelled, owner.isCurrent,
+              services.api.credentials.snapshot().sessionID == expectedSessionID,
+              services.location.isUsable(location, maxAge: 30) else {
+            errorMessage = String(localized: "Position indisponible")
+            Haptics.error()
+            return
+        }
         do {
             let sent = try await service.sendLocation(
                 latitude: location.coordinate.latitude,
                 longitude: location.coordinate.longitude,
                 place: place,
-                in: conversation
+                accuracyMeters: location.horizontalAccuracy,
+                observedAt: location.timestamp,
+                in: conversation,
+                expectedSessionID: expectedSessionID,
+                validateBeforeSend: { [locationService = services.location] in
+                    try Task.checkCancellation()
+                    let usable = await locationService.isUsable(location, maxAge: 30)
+                    guard owner.isCurrent, usable else { throw APIError.cancelled }
+                }
             )
             messages = Self.normalized(messages + [sent])
             Haptics.success()
