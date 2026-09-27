@@ -2077,8 +2077,8 @@ struct ConversationDetailView: View {
         }
         let place = await reverseGeocodedName(location)
         guard !Task.isCancelled, owner.isCurrent,
-              services.api.credentials.snapshot().sessionID == expectedSessionID,
-              services.location.isUsable(location, maxAge: 30) else {
+              services.api.credentials.snapshot().sessionID == expectedSessionID else { return }
+        guard services.location.isUsable(location, maxAge: 30) else {
             errorMessage = String(localized: "Position indisponible")
             Haptics.error()
             return
@@ -2101,6 +2101,7 @@ struct ConversationDetailView: View {
             messages = Self.normalized(messages + [sent])
             Haptics.success()
         } catch {
+            guard owner.isCurrent, !error.isCancellation else { return }
             errorMessage = error.localizedDescription
             Haptics.error()
         }
