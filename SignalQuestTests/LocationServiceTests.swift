@@ -93,6 +93,44 @@ final class LocationServiceTests: XCTestCase {
         XCTAssertNil(service.cachedLocation(), "Un vote ne doit pas poster le point après révocation")
     }
 
+    func testDriveTestOpeningDoesNotAddAnExpiredFixToItsTrace() {
+        let (service, _, _, clock) = makeService(immediateTimeout: true)
+        service.receiveLocations([fix()])
+        clock.advance(3_600)
+        XCTAssertNotNil(service.lastLocation, "Le timer d'expiration peut attendre la reprise de l'app")
+
+        let model = DriveTestViewModel(services: AppServices(config: .test, location: service))
+        model.onAppear()
+        XCTAssertNil(model.userLocation)
+        XCTAssertTrue(model.trace.isEmpty)
+        model.onDisappear(isLeavingScreen: true)
+    }
+
+    func testDriveTestOpeningDoesNotAddAFixAfterPermissionRevocation() {
+        let (service, driver, _, _) = makeService(immediateTimeout: true)
+        service.receiveLocations([fix()])
+        driver.authorizationStatus = .denied
+        XCTAssertNotNil(service.lastLocation, "Le callback d'autorisation peut encore être en attente")
+
+        let model = DriveTestViewModel(services: AppServices(config: .test, location: service))
+        model.onAppear()
+        XCTAssertNil(model.userLocation)
+        XCTAssertTrue(model.trace.isEmpty)
+        model.onDisappear(isLeavingScreen: true)
+    }
+
+    func testDriveTestOpeningKeepsAnAuthorizedApproximateFixWithItsRealAccuracy() {
+        let (service, _, _, _) = makeService(immediateTimeout: true)
+        service.receiveLocations([fix(accuracy: 1_000)])
+
+        let model = DriveTestViewModel(services: AppServices(config: .test, location: service))
+        model.onAppear()
+        XCTAssertEqual(model.userLocation?.latitude, 48.85)
+        XCTAssertEqual(model.trace.count, 1)
+        XCTAssertEqual(service.cachedLocation()?.horizontalAccuracy, 1_000)
+        model.onDisappear(isLeavingScreen: true)
+    }
+
     func testAQueuedLocationAfterRevocationCannotRepopulateCacheOrObservers() {
         let (service, tracking, _, _) = makeService()
         var observed = 0
