@@ -19,23 +19,27 @@ final class SessionDetailViewModel: ObservableObject {
         var id: String { generation }
     }
 
-    /// Génération normalisée d'un point (mêmes règles que SessionGenerationColor).
+    /// Génération normalisée d'un point ; « Aucun » exige une absence explicite.
     static func generationKey(_ tech: String?) -> String {
-        let t = (tech ?? "").uppercased()
-        if t.contains("5G") { return "5G" }
-        if t.contains("4G") || t == "LTE" { return "4G" }
-        if t.contains("3G") { return "3G" }
-        if t.contains("2G") { return "2G" }
-        return "Aucun"
+        switch CoverageGenerationBand.band(for: tech) {
+        case .g5: return "5G"
+        case .g4: return "4G"
+        case .g3: return "3G"
+        case .g2: return "2G"
+        case .none:
+            let value = (tech ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            return ["AUCUN", "NONE", "NO SERVICE", "NO_SERVICE", "NOSERVICE"].contains(value)
+                ? "Aucun" : "Inconnu"
+        }
     }
 
-    /// Répartition des points par génération (5G→2G→Aucun) : comptes + pourcentages.
+    /// Répartition des points par génération et état (inconnu ≠ sans réseau).
     var generationBreakdown: [GenerationShare] {
         guard let points = detail?.points, !points.isEmpty else { return [] }
         var counts: [String: Int] = [:]
         for p in points { counts[Self.generationKey(p.tech), default: 0] += 1 }
         let total = points.count
-        return ["5G", "4G", "3G", "2G", "Aucun"].compactMap { gen -> GenerationShare? in
+        return ["5G", "4G", "3G", "2G", "Inconnu", "Aucun"].compactMap { gen -> GenerationShare? in
             guard let c = counts[gen], c > 0 else { return nil }
             return GenerationShare(generation: gen, count: c, pct: Double(c) / Double(total) * 100)
         }
@@ -327,6 +331,7 @@ struct SessionDetailView: View {
             legendDot(SessionGenerationColor.ui("4G"), "4G")
             legendDot(SessionGenerationColor.ui("3G"), "3G")
             legendDot(SessionGenerationColor.ui("2G"), "2G")
+            legendDot(SessionGenerationColor.ui("Inconnu"), "Inconnu")
             legendDot(SessionGenerationColor.ui(nil), "Aucun")
         }
         .font(SQFont.body(11, .medium, relativeTo: .caption2))

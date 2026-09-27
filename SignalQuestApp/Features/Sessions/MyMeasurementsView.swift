@@ -224,6 +224,7 @@ struct MyMeasurementsView: View {
             legendRow(Color(uiColor: SessionGenerationColor.ui("4G")), "4G")
             legendRow(Color(uiColor: SessionGenerationColor.ui("3G")), "3G")
             legendRow(Color(uiColor: SessionGenerationColor.ui("2G")), "2G")
+            legendRow(Color(uiColor: SessionGenerationColor.ui("Inconnu")), "Inconnu")
             legendRow(Color(uiColor: SessionGenerationColor.ui(nil)), "Aucun")
         }
         .padding(SQSpace.sm + 2)
