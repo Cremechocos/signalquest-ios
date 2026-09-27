@@ -181,10 +181,14 @@ struct ProfileView: View {
                     .font(SQFont.display(26, .bold))
                     .foregroundStyle(SQColor.label)
                     .multilineTextAlignment(.center)
+                    .lineLimit(user.name == nil ? 1 : nil)
+                    .truncationMode(.middle)
                     .accessibilityIdentifier("profile.displayName")
                 Text(user.handle.flatMap { $0.isEmpty ? nil : "@\($0)" } ?? "Ajoute un nom d’utilisateur")
                     .font(SQFont.body(14, .medium))
                     .foregroundStyle((user.handle?.isEmpty ?? true) ? SQColor.labelSecondary : SQColor.labelSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
             if user.twoFactorEnabled == true {
                 Text("2FA activée ✓")
