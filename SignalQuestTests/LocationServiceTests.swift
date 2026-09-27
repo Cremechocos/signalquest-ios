@@ -176,6 +176,33 @@ final class LocationServiceTests: XCTestCase {
                       "Ne pas calculer d'itinéraire après révocation système")
     }
 
+    func testCarPlayNetworkResponseDoesNotRenderAfterFixExpires() async throws {
+        let (service, _, _, clock) = makeService()
+        service.receiveLocations([fix()])
+        let captured = await service.currentLocation()
+        let location = try XCTUnwrap(captured)
+
+        var renderCount = 0
+        XCTAssertTrue(CarPlayLocationRenderGate.commit(location, service: service) { renderCount += 1 })
+        clock.advance(LocationService.defaultMaxLocationAge)
+        XCTAssertNotNil(service.lastLocation, "La réponse réseau peut précéder le timer d'expiration")
+        XCTAssertFalse(CarPlayLocationRenderGate.commit(location, service: service) { renderCount += 1 })
+        XCTAssertEqual(renderCount, 1, "Ne pas repeindre Ici, POI ou comparaison depuis une réponse périmée")
+    }
+
+    func testCarPlayNetworkResponseDoesNotRenderAfterPermissionRevocation() async throws {
+        let (service, driver, _, _) = makeService()
+        service.receiveLocations([fix()])
+        let captured = await service.currentLocation()
+        let location = try XCTUnwrap(captured)
+
+        driver.authorizationStatus = .denied
+        XCTAssertNotNil(service.lastLocation, "Le callback de révocation peut encore attendre")
+        var renderCount = 0
+        XCTAssertFalse(CarPlayLocationRenderGate.commit(location, service: service) { renderCount += 1 })
+        XCTAssertEqual(renderCount, 0, "Ne pas afficher un ancien résultat après révocation")
+    }
+
     func testDriveTestTraceStopsWithSessionAndClearsOnRestart() {
         let (service, _, _, clock) = makeService(immediateTimeout: true)
         service.receiveLocations([fix()])

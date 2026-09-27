@@ -3,6 +3,18 @@ import Combine
 import CoreLocation
 import MapKit
 
+@MainActor
+enum CarPlayLocationRenderGate {
+    /// Une réponse réseau peut arriver après expiration du fix ou révocation GPS.
+    /// Le contrôle et la mutation restent synchrones sur le main actor.
+    @discardableResult
+    static func commit(_ fix: CLLocation, service: LocationService, update: () -> Void) -> Bool {
+        guard service.isUsable(fix) else { return false }
+        update()
+        return true
+    }
+}
+
 /// Pilote la surface CarPlay : pile de templates, carte, chargement, cycle de vie.
 ///
 /// Le délégué de scène se contente de le créer et de le détruire ; toute la
@@ -348,7 +360,11 @@ final class CarPlayCoordinator {
             } else {
                 location = await services.location.currentLocation()
             }
-            guard let location, !Task.isCancelled, isCurrent(.poi, generation) else { return }
+            guard !Task.isCancelled, isCurrent(.poi, generation) else { return }
+            guard let location else {
+                poiTemplate.setPointsOfInterest([], selectedIndex: NSNotFound)
+                return
+            }
 
             let coordinate = location.coordinate
             let delta = 0.045
@@ -363,13 +379,21 @@ final class CarPlayCoordinator {
             ) else { return }
             guard !Task.isCancelled, isCurrent(.poi, generation) else { return }
 
-            let payloads = sites.compactMap { Self.payload(for: $0) }
-            let entries = CarPlayPOIBuilder.entries(from: payloads, userLocation: location)
-            poiTemplate.setPointsOfInterest(
-                CarPlayPOIBuilder.points(from: entries, userLocation: location,
-                                         actions: poiActions()),
-                selectedIndex: NSNotFound
-            )
+            let update = {
+                let payloads = sites.compactMap { Self.payload(for: $0) }
+                let entries = CarPlayPOIBuilder.entries(from: payloads, userLocation: location)
+                poiTemplate.setPointsOfInterest(
+                    CarPlayPOIBuilder.points(from: entries, userLocation: location,
+                                             actions: self.poiActions()),
+                    selectedIndex: NSNotFound
+                )
+            }
+            // Un centre choisi sur la carte reste une intention manuelle ; seul
+            // le point GPS doit encore être autorisé et frais après le réseau.
+            if center != nil { update() }
+            else if !CarPlayLocationRenderGate.commit(location, service: services.location, update: update) {
+                poiTemplate.setPointsOfInterest([], selectedIndex: NSNotFound)
+            }
         }
     }
 
@@ -723,40 +747,54 @@ final class CarPlayCoordinator {
             // été pris. L'ancien `guard lastLocation else { return }` laissait
             // donc l'écran phare figé sur une seule ligne, sans message ni
             // reprise — précisément dans le cas nominal.
-            guard let location = await services.location.currentLocation() else { return }
+            let location = await services.location.currentLocation()
             guard !Task.isCancelled, isCurrent(.here, generation) else { return }
+            guard let location else {
+                showHereWithoutLocation(into: template)
+                return
+            }
             let input = await hereInput(at: location)
             guard !Task.isCancelled, isCurrent(.here, generation) else { return }
-            let filled = NearestAntennaTemplateBuilder.make(
-                input: input,
-                actions: .init(
-                    // Comme « Y aller », conditionné à la présence d'une carte :
-                    // sans elle, ce bouton promettait un recentrage et se
-                    // contentait de fermer la fiche.
-                    showOnMap: isShowingMap ? input.nearestSite.flatMap { site -> (() -> Void)? in
-                        guard let lat = site.latitude, let lon = site.longitude else { return nil }
-                        return { [weak self] in
-                            self?.mapController?.center(on: .init(latitude: lat, longitude: lon))
-                            self?.interface.pop(animated: true)
-                        }
-                    } : nil,
-                    navigate: isShowingMap ? input.nearestSite.flatMap { site -> (() -> Void)? in
-                        guard let lat = site.latitude, let lon = site.longitude else { return nil }
-                        return { [weak self] in
-                            self?.startNavigation(
-                                to: .init(latitude: lat, longitude: lon),
-                                title: String(localized: "Site \(site.siteId ?? site.id)")
-                            )
-                        }
-                    } : nil,
-                    compareOperators: { [weak self] in self?.showOperatorComparison() }
+            let didRender = CarPlayLocationRenderGate.commit(location, service: services.location) {
+                let filled = NearestAntennaTemplateBuilder.make(
+                    input: input,
+                    actions: .init(
+                        // Comme « Y aller », conditionné à la présence d'une carte :
+                        // sans elle, ce bouton promettait un recentrage et se
+                        // contentait de fermer la fiche.
+                        showOnMap: isShowingMap ? input.nearestSite.flatMap { site -> (() -> Void)? in
+                            guard let lat = site.latitude, let lon = site.longitude else { return nil }
+                            return { [weak self] in
+                                self?.mapController?.center(on: .init(latitude: lat, longitude: lon))
+                                self?.interface.pop(animated: true)
+                            }
+                        } : nil,
+                        navigate: isShowingMap ? input.nearestSite.flatMap { site -> (() -> Void)? in
+                            guard let lat = site.latitude, let lon = site.longitude else { return nil }
+                            return { [weak self] in
+                                self?.startNavigation(
+                                    to: .init(latitude: lat, longitude: lon),
+                                    title: String(localized: "Site \(site.siteId ?? site.id)")
+                                )
+                            }
+                        } : nil,
+                        compareOperators: { [weak self] in self?.showOperatorComparison() }
+                    )
                 )
-            )
-            // Mise à jour EN PLACE, comme pour les fiches : re-pousser empilerait
-            // deux écrans identiques.
-            template.items = filled.items
-            template.actions = filled.actions
+                // Mise à jour EN PLACE, comme pour les fiches : re-pousser empilerait
+                // deux écrans identiques.
+                template.items = filled.items
+                template.actions = filled.actions
+            }
+            if !didRender {
+                showHereWithoutLocation(into: template)
+            }
         }
+    }
+
+    private func showHereWithoutLocation(into template: CPInformationTemplate) {
+        template.items = NearestAntennaTemplateBuilder.itemsWithoutLocation(path: services.networkPath.status)
+        template.actions = []
     }
 
     /// Classement des opérateurs à l'endroit où l'on se trouve.
@@ -790,17 +828,26 @@ final class CarPlayCoordinator {
                 maxAge: nil
             )
             guard !Task.isCancelled, isCurrent(.comparison, generation) else { return }
-            guard !stats.isEmpty else {
+            let didRender = CarPlayLocationRenderGate.commit(location, service: services.location) {
+                if stats.isEmpty {
+                    CarPlayListPlaceholder.applyEmpty(
+                        to: template,
+                        title: String(localized: "Pas assez de mesures"),
+                        subtitle: String(localized: "La communauté n'a pas encore assez mesuré cette zone.")
+                    )
+                } else {
+                    template.updateSections([
+                        CPListSection(items: OperatorComparisonTemplateBuilder.items(for: stats, metric: .download))
+                    ])
+                }
+            }
+            if !didRender {
                 CarPlayListPlaceholder.applyEmpty(
                     to: template,
-                    title: String(localized: "Pas assez de mesures"),
-                    subtitle: String(localized: "La communauté n'a pas encore assez mesuré cette zone.")
+                    title: String(localized: "Position inconnue"),
+                    subtitle: String(localized: "Autorise la localisation pour comparer les opérateurs.")
                 )
-                return
             }
-            template.updateSections([
-                CPListSection(items: OperatorComparisonTemplateBuilder.items(for: stats, metric: .download))
-            ])
         }
     }
 

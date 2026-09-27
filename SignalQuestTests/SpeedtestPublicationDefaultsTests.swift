@@ -139,6 +139,35 @@ final class SpeedtestPublicationDefaultsTests: XCTestCase {
         XCTAssertTrue(pending.isEmpty)
     }
 
+    func testPendingPublicationReplaysOnlyForItsOwnerAfterAccountSwitch() async throws {
+        let f = try fixture(user: "publication-owner-a")
+        let aResult = result(coordinate: Coordinates(latitude: 45.1876543, longitude: 5.7245678))
+        await requireQueuedFailure { try await f.service.save(aResult) }
+        XCTAssertEqual(f.recorder.count, 1)
+
+        LocalAccountScope.activate(userId: "publication-owner-b")
+        try f.credentials.setAccessToken(token(user: "publication-owner-b"))
+        try await f.recreatedService().retryPendingSavesReporting()
+        XCTAssertEqual(f.recorder.count, 1, "B must not replay A's queued measurement")
+
+        let bResult = result(coordinate: Coordinates(latitude: 48.8566123, longitude: 2.3522456))
+        await requireQueuedFailure { try await f.service.save(bResult) }
+        let bBody = try f.recorder.lastBody()
+        XCTAssertEqual(bBody["clientSubmissionId"] as? String, bResult.id.uuidString)
+        XCTAssertEqual((bBody["coordinates"] as? [String: Double])?["latitude"], bResult.coordinate?.latitude)
+        XCTAssertEqual(bBody["isVisibleOnMap"] as? Bool, true)
+        XCTAssertEqual(bBody["shareExactLocation"] as? Bool, true)
+
+        LocalAccountScope.activate(userId: "publication-owner-a")
+        try f.credentials.setAccessToken(token(user: "publication-owner-a"))
+        await requireQueuedFailure { try await f.recreatedService().retryPendingSavesReporting() }
+        let aBody = try f.recorder.lastBody()
+        XCTAssertEqual(aBody["clientSubmissionId"] as? String, aResult.id.uuidString)
+        XCTAssertEqual((aBody["coordinates"] as? [String: Double])?["latitude"], aResult.coordinate?.latitude)
+        let pending = await f.store.loadAll()
+        XCTAssertEqual(Set(pending.compactMap(\.ownerScopeId)), ["user:publication-owner-a", "user:publication-owner-b"])
+    }
+
     func testDriveMetadataSurvivesQueuedRetryWithoutCreatingCoverageAssociation() async throws {
         let f = try fixture(user: "drive-origin-owner")
         let original = result()
