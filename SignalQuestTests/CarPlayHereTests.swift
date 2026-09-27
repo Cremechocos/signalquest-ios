@@ -74,6 +74,21 @@ final class CarPlayHereTests: XCTestCase {
         XCTAssertFalse(antenna?.detail?.isEmpty ?? true)
     }
 
+    func testMissingLocationKeepsConnectionWithoutLocalClaims() throws {
+        let path = cellularPath()
+        let normal = NearestAntennaTemplateBuilder.items(for: .init(path: path, quality: quality()))
+        let unavailable = NearestAntennaTemplateBuilder.itemsWithoutLocation(path: path)
+
+        XCTAssertEqual(unavailable.map(\.title), [String(localized: "Position inconnue"),
+                                                  String(localized: "Connexion")])
+        XCTAssertEqual(
+            unavailable.last?.detail,
+            try XCTUnwrap(normal.first { $0.title == String(localized: "Connexion") }).detail
+        )
+        XCTAssertFalse(unavailable.contains { $0.title == String(localized: "Réseau ici") })
+        XCTAssertFalse(unavailable.contains { $0.title == String(localized: "Antenne la plus proche") })
+    }
+
     /// Distance ET direction : la distance seule ne dit pas où regarder.
     func testDistanceIsPairedWithADirection() throws {
         let items = NearestAntennaTemplateBuilder.items(
