@@ -35,27 +35,38 @@ final class AuthFormsQATests: XCTestCase {
     }
 
     func testEnglishRecoveryServerErrorRequiresExplicitRetryAndPreservesEmail() async throws {
+        try await runRecoveryServerError(locale: "en", email: "recovery-en@example.invalid")
+    }
+
+    func testFrenchRecoveryServerErrorRequiresExplicitRetryAndPreservesEmail() async throws {
+        try await runRecoveryServerError(locale: "fr", email: "recovery-fr@example.invalid")
+    }
+
+    private func runRecoveryServerError(locale: String, email: String) async throws {
         try await configure("first-error")
-        let app = launch("en")
+        let app = launch(locale)
         try tap(app.buttons["login.recovery"], in: app)
-        try fill(app.textFields["auth.recovery.email"], "recovery-en@example.invalid", in: app)
+        try fill(app.textFields["auth.recovery.email"], email, in: app)
         try tap(app.buttons["auth.recovery.submit"], in: app)
         let error = app.descendants(matching: .any)["auth.recovery.error"].firstMatch
         XCTAssertTrue(error.waitForExistence(timeout: 20))
+        XCTAssertEqual(error.label, locale == "fr"
+            ? "Service momentanément indisponible. Réessaie plus tard."
+            : "Service temporarily unavailable. Try again later.")
         XCTAssertLessThan(error.frame.minY - app.textFields["auth.recovery.email"].frame.maxY, 40,
                           "Recovery error must stay beside the email field")
         XCTAssertFalse(app.staticTexts["auth.recovery.sent"].exists)
-        XCTAssertEqual(app.textFields["auth.recovery.email"].value as? String, "recovery-en@example.invalid")
+        XCTAssertEqual(app.textFields["auth.recovery.email"].value as? String, email)
         let before = try await metrics()
         XCTAssertEqual(before.forgot, 1, "An uncertain POST must not retry itself")
-        capture("auth-recovery-en-error")
+        capture("auth-recovery-\(locale)-error")
         try tap(app.buttons["auth.recovery.submit"], in: app)
         XCTAssertTrue(app.staticTexts["auth.recovery.sent"].waitForExistence(timeout: 20))
         let after = try await metrics()
         XCTAssertEqual(after.forgot, 2)
         XCTAssertEqual(after.challenges, 2, "The explicit retry must load the challenge page again")
         XCTAssertFalse(after.tokenInURL)
-        capture("auth-recovery-en-retry-ack")
+        capture("auth-recovery-\(locale)-retry-ack")
         app.terminate()
     }
 
@@ -80,8 +91,16 @@ final class AuthFormsQATests: XCTestCase {
     }
 
     func testSignupConsentAndServerRejectionKeepTheDraftForRetry() async throws {
+        try await runSignupServerRejection(locale: "en")
+    }
+
+    func testFrenchSignupConsentAndServerRejectionKeepTheDraftForRetry() async throws {
+        try await runSignupServerRejection(locale: "fr")
+    }
+
+    private func runSignupServerRejection(locale: String) async throws {
         try await configure("disabled")
-        let app = launch("en")
+        let app = launch(locale)
         try tap(app.buttons["login.signup"], in: app)
         try fill(app.textFields["auth.signup.name"], "Synthetic QA", in: app)
         try fill(app.textFields["auth.signup.email"], "signup@example.invalid", in: app)
@@ -94,6 +113,9 @@ final class AuthFormsQATests: XCTestCase {
         try tap(submit, in: app)
         let signupError = app.descendants(matching: .any)["auth.signup.error"].firstMatch
         XCTAssertTrue(signupError.waitForExistence(timeout: 20))
+        XCTAssertEqual(signupError.label, locale == "fr"
+            ? "Cette adresse est déjà utilisée. Connecte-toi ou réinitialise ton mot de passe."
+            : "This email address is already in use. Sign in or reset your password.")
         XCTAssertLessThan(signupError.frame.minY - app.textFields["auth.signup.email"].frame.maxY, 40,
                           "Signup error must stay beside the email field")
         let first = try await metrics()
@@ -103,7 +125,7 @@ final class AuthFormsQATests: XCTestCase {
         XCTAssertEqual(app.textFields["auth.signup.name"].value as? String, "Synthetic QA")
         XCTAssertEqual(app.textFields["auth.signup.email"].value as? String, "signup@example.invalid")
         XCTAssertTrue(submit.isEnabled, "Matching passwords and consent must remain valid after rejection")
-        capture("auth-signup-en-error-preserved")
+        capture("auth-signup-\(locale)-error-preserved")
         try tap(submit, in: app)
         let error = app.descendants(matching: .any)["auth.signup.error"].firstMatch
         XCTAssertTrue(error.waitForExistence(timeout: 20))
