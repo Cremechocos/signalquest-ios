@@ -128,6 +128,84 @@ final class NotificationsHTTPQATests: XCTestCase {
         app.terminate()
     }
 
+    /// Vérifie le badge global de la cloche contre le compteur API, sans push réel.
+    func testHomeBellBadgeReflectsReadAndRelaunch() async throws {
+        #if !targetEnvironment(simulator)
+        throw XCTSkip("Recette loopback uniquement sur simulateur")
+        #endif
+        continueAfterFailure = false
+        let environment = ProcessInfo.processInfo.environment
+        func input(_ name: String) -> String? { environment[name] ?? environment["TEST_RUNNER_\(name)"] }
+        guard let statePath = input("SQ_RECIPE_STATE"),
+              let fixturePath = input("SQ_RECIPE_FIXTURE"),
+              let appPath = input("SQ_RECIPE_APP_BUNDLE_PATH") else {
+            throw XCTSkip("Banc PRE-02 et binaire Beta isolé requis")
+        }
+        let state = URL(fileURLWithPath: statePath, isDirectory: true).standardizedFileURL
+        let fixtureURL = URL(fileURLWithPath: fixturePath).standardizedFileURL
+        let marker = try JSONDecoder().decode(RecipeMarker.self,
+            from: Data(contentsOf: state.appendingPathComponent("recipe.json")))
+        let fixture = try JSONDecoder().decode(RecipeFixture.self, from: Data(contentsOf: fixtureURL))
+        let expectedURL = URL(string: "http://127.0.0.1:49141")!
+        let bundle = try XCTUnwrap(Bundle(path: appPath))
+        guard state.path.hasPrefix("/Users/alexandregermain/Site/qa/"),
+              fixtureURL.deletingLastPathComponent() == state,
+              marker.kind == "signalquest-ios-synthetic-v1",
+              marker.database == "sq_ios_recipe_test",
+              marker.ports["proxy"] == 49141,
+              fixture.baseURL == expectedURL,
+              fixture.expectedUserID == "ios_recipe_user_a",
+              bundle.bundleIdentifier == "fr.signalquest.ios.beta",
+              bundle.object(forInfoDictionaryKey: "SQ_API_BASE_URL") as? String == expectedURL.absoluteString,
+              bundle.object(forInfoDictionaryKey: "SQ_APP_BASE_URL") as? String == expectedURL.absoluteString else {
+            XCTFail("Recette refusée hors backend et binaire synthétiques")
+            return
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: state.appendingPathComponent("fault.json").path))
+        let initial = try await page(cursor: nil, fixture: fixture)
+        XCTAssertGreaterThan(initial.unreadCount, 0)
+
+        let reset = XCUIApplication()
+        reset.launchArguments = ["--reset-auth", "--reset-onboarding"]
+        reset.sqLaunch(locale: "fr")
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: reset)
+        reset.terminate()
+
+        var app = launchAuthenticated(fixture: fixture, locale: "fr")
+        assertBellCount(initial.unreadCount, in: app)
+        capture(app, "home-bell-before-fr")
+
+        if input("SQ_BADGE_QA_DEVICE") != "ipad" {
+            openActivity(in: app)
+            let unreadTitle = try XCTUnwrap(initial.notifications.first(where: { !$0.read })?.title)
+            let row = app.staticTexts[unreadTitle]
+            XCTAssertTrue(row.waitForExistence(timeout: 20))
+            row.tap()
+            let after = try await waitForUnread(initial.unreadCount - 1, fixture: fixture)
+            XCTAssertEqual(after, initial.unreadCount - 1)
+            if app.buttons["Notifications"].exists {
+                assertBellCount(after, in: app)
+                capture(app, "home-bell-after-read-fr")
+            }
+            app.terminate()
+
+            app = launchAuthenticated(fixture: fixture, locale: "en")
+            assertBellCount(after, in: app)
+            capture(app, "home-bell-relaunch-en")
+        }
+        app.terminate()
+    }
+
+    private func assertBellCount(_ count: Int, in app: XCUIApplication) {
+        let bell = app.buttons["Notifications"]
+        XCTAssertTrue(bell.waitForExistence(timeout: 25))
+        let expected = "\(count)"
+        let value = expectation(for: NSPredicate(format: "value == %@", expected),
+                                evaluatedWith: bell)
+        wait(for: [value], timeout: 25)
+        XCTAssertEqual(bell.value as? String, expected)
+    }
+
     private func page(cursor: String?, fixture: RecipeFixture) async throws -> Page {
         var components = URLComponents(url: fixture.baseURL.appendingPathComponent("api/notifications"),
                                        resolvingAgainstBaseURL: false)!
