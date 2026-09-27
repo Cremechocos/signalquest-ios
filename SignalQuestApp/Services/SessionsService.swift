@@ -728,8 +728,15 @@ final class SwiftDataCoverageSessionStore: CoverageSessionStoring, @unchecked Se
                 try context.save()
             }
             let backupURL = legacyURL.appendingPathExtension("migrated")
-            try? fileManager.removeItem(at: backupURL)
-            try? fileManager.moveItem(at: legacyURL, to: backupURL)
+            var availableBackupURL = backupURL
+            var suffix = 1
+            while fileManager.fileExists(atPath: availableBackupURL.path) {
+                availableBackupURL = backupURL.appendingPathExtension(String(suffix))
+                suffix += 1
+            }
+            // Un ancien backup peut provenir d'un précédent cycle de migration.
+            // Ne jamais le supprimer pour archiver un nouveau JSON iOS 16.
+            try? fileManager.moveItem(at: legacyURL, to: availableBackupURL)
         } catch {
             // Échec → on garde le JSON legacy intact (réessayé au prochain lancement).
         }

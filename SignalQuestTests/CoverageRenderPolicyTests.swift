@@ -307,6 +307,28 @@ final class CoverageSessionQueueTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
     }
 
+    func testSwiftDataMigrationKeepsEarlierJSONBackup() throws {
+        guard #available(iOS 17, *) else { throw XCTSkip("SwiftData coverage store requires iOS 17") }
+        let legacyURL = try makeTemporaryQueueURL()
+        let backupURL = legacyURL.appendingPathExtension("migrated")
+        let storeURL = legacyURL.deletingLastPathComponent().appendingPathComponent("CoverageSessions.store")
+        let older = makeSession(id: UUID(), startTime: 1_000, endTime: 2_000,
+                                showOnMap: false, points: [makePoint(timestamp: 1_000), makePoint(timestamp: 2_000)])
+        let newer = makeSession(id: UUID(), startTime: 3_000, endTime: 4_000,
+                                showOnMap: false, points: [makePoint(timestamp: 3_000), makePoint(timestamp: 4_000)])
+        try CoverageSessionQueue(fileURL: backupURL).upsert(older, state: .queued)
+        try CoverageSessionQueue(fileURL: legacyURL).upsert(newer, state: .queued)
+        let olderBytes = try Data(contentsOf: backupURL)
+        let newerBytes = try Data(contentsOf: legacyURL)
+
+        let store = try XCTUnwrap(SwiftDataCoverageSessionStore(storeURL: storeURL, legacyFileURL: legacyURL))
+
+        XCTAssertEqual(try Data(contentsOf: backupURL), olderBytes)
+        XCTAssertEqual(try Data(contentsOf: backupURL.appendingPathExtension("1")), newerBytes)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.path))
+        XCTAssertEqual(try store.allPending().map(\.upload.sessionId), [newer.sessionId])
+    }
+
     func testFinalizedSnapshotCannotBeDowngradedByOlderDraft() throws {
         let fileURL = try makeTemporaryQueueURL()
         let id = UUID()
