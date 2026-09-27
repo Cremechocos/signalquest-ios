@@ -2,6 +2,47 @@ import XCTest
 
 @MainActor
 final class AuthFieldLabelsQATests: XCTestCase {
+    func testFrenchSignupWaitsForConfirmationInOLEDAtAccessibilityXXXL() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        SignalQuestUITestSupport.launch(app,
+            arguments: ["--reset-auth", "--reset-onboarding", "-app_pure_black", "YES",
+                        "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"],
+            locale: "fr")
+        XCTAssertLessThan(app.frame.width, 600, "Run this recipe on iPhone")
+        let signup = app.buttons["login.signup"]
+        XCTAssertTrue(signup.waitForExistence(timeout: 15))
+        signup.tap()
+
+        let password = app.secureTextFields["auth.signup.password"]
+        let confirmation = app.secureTextFields["auth.signup.confirmation"]
+        XCTAssertTrue(password.waitForExistence(timeout: 10))
+        password.tap()
+        password.typeText("SyntheticPass-2026!")
+        let mismatch = app.staticTexts["Les deux mots de passe ne correspondent pas."]
+        XCTAssertFalse(mismatch.exists, "Do not claim a mismatch before confirmation has been entered")
+
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(confirmation, in: app))
+        if confirmation.frame.minY < 110 {
+            let scroll = app.scrollViews.firstMatch
+            scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.3))
+                .press(forDuration: 0.1,
+                       thenDragTo: scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.55)))
+        }
+        XCTAssertGreaterThanOrEqual(confirmation.frame.minY, 110,
+                                    "Confirmation must be below the navigation bar before tapping")
+        confirmation.tap()
+        confirmation.typeText("OtherPass-2026!")
+        XCTAssertTrue(mismatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(mismatch, in: app))
+        XCTAssertLessThanOrEqual(mismatch.frame.minY - confirmation.frame.maxY, 40)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "signup-confirmation-mismatch-fr-oled-axxxl"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testFrenchLoginAndSignupKeepLabelsAfterTyping() {
         continueAfterFailure = false
         let app = launch(locale: "fr")
