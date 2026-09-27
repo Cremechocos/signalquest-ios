@@ -2,6 +2,32 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
+/// Borne le coût MapKit en conservant les extrémités et les virages les plus
+/// significatifs du trajet entier. La distance est comptée avant simplification.
+enum DriveTraceSampler {
+    static func append(_ coordinate: CLLocationCoordinate2D, to trace: inout [CLLocationCoordinate2D], maxPoints: Int) {
+        guard maxPoints >= 2 else { return }
+        trace.append(coordinate)
+        while trace.count > maxPoints {
+            let projected = trace.map { MKMapPoint($0) }
+            var leastArea = Double.infinity
+            var leastImportantIndex = 1
+            for index in 1..<(trace.count - 1) {
+                let previous = projected[index - 1]
+                let current = projected[index]
+                let next = projected[index + 1]
+                let area = abs((current.x - previous.x) * (next.y - previous.y)
+                    - (current.y - previous.y) * (next.x - previous.x))
+                if area < leastArea {
+                    leastArea = area
+                    leastImportantIndex = index
+                }
+            }
+            trace.remove(at: leastImportantIndex)
+        }
+    }
+}
+
 /// Mini-carte MapKit du mode Drive Test (Apple Plan natif) : puck utilisateur (suivi),
 /// antennes proches, cônes de secteur de l'antenne la plus proche (vert = dans le lobe,
 /// orange = hors lobe), trace du parcours, points speedtest tappables (par débit).
@@ -60,7 +86,7 @@ struct DriveTestMapView: UIViewRepresentable {
         private var tracePolyline: MKPolyline?
         private var lastAntennaSig = 0
         private var lastConeSig = ""
-        private var lastTraceCount = -1
+        private var lastTrace: [CLLocationCoordinate2D] = []
         private var lastSpeedtestCount = -1
         private var appliedBackdrop: MapBackdrop?
         private var tileOverlay: MKTileOverlay?
@@ -140,8 +166,10 @@ struct DriveTestMapView: UIViewRepresentable {
 
         // MARK: Trace du parcours
         private func syncTrace(_ trace: [CLLocationCoordinate2D], on map: MKMapView) {
-            guard trace.count != lastTraceCount else { return }
-            lastTraceCount = trace.count
+            guard !trace.elementsEqual(lastTrace, by: {
+                $0.latitude == $1.latitude && $0.longitude == $1.longitude
+            }) else { return }
+            lastTrace = trace
             if let t = tracePolyline { map.removeOverlay(t); tracePolyline = nil }
             guard trace.count >= 2 else { return }
             var coords = trace

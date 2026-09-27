@@ -282,6 +282,7 @@ final class DriveTestViewModel: ObservableObject {
         distanceMeters = 0
         lastTestCoordinate = nil
         manualTestRequested = false
+        trace.removeAll()
         speedtestTrail.removeAll()
         liveMbps = 0
         livePhase = .idle
@@ -405,16 +406,16 @@ final class DriveTestViewModel: ObservableObject {
     }
 
     private func appendTrace(_ coordinate: CLLocationCoordinate2D) {
+        guard isRunning else { return }
         if let last = trace.last {
             let moved = CLLocation(latitude: last.latitude, longitude: last.longitude)
                 .distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
             if moved < 8 { return } // ignore le bruit GPS sous 8 m
             // Distance cumulée sur la trace RÉELLE (points retenus, donc déjà
             // débruités) : ni le trajet à vol d'oiseau, ni la somme du bruit GPS.
-            if isRunning { distanceMeters += moved }
+            distanceMeters += moved
         }
-        trace.append(coordinate)
-        if trace.count > traceCap { trace.removeFirst(trace.count - traceCap) }
+        DriveTraceSampler.append(coordinate, to: &trace, maxPoints: traceCap)
     }
 
     /// Conserve les résultats géolocalisés du trajet pour ouvrir leur détail.
