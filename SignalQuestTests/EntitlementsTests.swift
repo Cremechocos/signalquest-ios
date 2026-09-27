@@ -182,6 +182,28 @@ final class EntitlementsTests: XCTestCase {
         XCTAssertEqual(EntitlementsStore.subscriptionEndpoint, "/api/billing/subscription")
     }
 
+    @MainActor
+    func testPremiumSnapshotDoesNotFollowAccountAfterLogout() async {
+        let previousUserID = LocalAccountScope.currentUserId
+        defer {
+            LocalAccountScope.deactivate()
+            if let previousUserID { LocalAccountScope.activate(userId: previousUserID) }
+        }
+
+        LocalAccountScope.deactivate()
+        LocalAccountScope.activate(userId: "entitlement-A-\(UUID().uuidString)")
+        let store = EntitlementsStore(api: AccountScopedSubscriptionAPIStub(), observesTransactions: false)
+        await store.refreshBackendSnapshot()
+        XCTAssertEqual(store.confirmedServerTier, .premium)
+
+        LocalAccountScope.deactivate()
+        LocalAccountScope.activate(userId: "entitlement-B-\(UUID().uuidString)")
+        XCTAssertEqual(store.serverState, .idle)
+        XCTAssertEqual(store.confirmedServerTier, .free)
+        await store.refreshBackendSnapshot()
+        XCTAssertEqual(store.confirmedServerTier, .free)
+    }
+
     private func decodeResponse(_ json: String) throws -> BillingSubscriptionResponse {
         try JSONDecoder.signalQuest.decode(BillingSubscriptionResponse.self, from: Data(json.utf8))
     }
@@ -232,4 +254,26 @@ final class EntitlementsTests: XCTestCase {
             XCTAssertFalse(eligibility.userMessage.contains("snapshot."), "\(eligibility)")
         }
     }
+}
+
+private actor AccountScopedSubscriptionAPIStub: APIClientProtocol {
+    private var reads = 0
+
+    func request<T: Decodable>(_ endpoint: APIEndpoint, as type: T.Type) async throws -> T {
+        guard endpoint.path == EntitlementsStore.subscriptionEndpoint else {
+            throw URLError(.badURL)
+        }
+        reads += 1
+        let json = reads == 1
+            ? #"{"tier":"premium","purchases":[]}"#
+            : #"{"tier":"free","purchases":[]}"#
+        return try JSONDecoder.signalQuest.decode(type, from: Data(json.utf8))
+    }
+
+    func request(_ endpoint: APIEndpoint) async throws { throw URLError(.badURL) }
+
+    func uploadMultipart<T: Decodable>(
+        path: String, fields: [String: String], fileField: String,
+        fileName: String, mimeType: String, data: Data, as type: T.Type
+    ) async throws -> T { throw URLError(.badURL) }
 }

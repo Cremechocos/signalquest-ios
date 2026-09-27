@@ -331,9 +331,18 @@ final class EntitlementsStore: ObservableObject {
 
     @Published private(set) var products: [SignalQuestSubscriptionProduct: Product] = [:]
     @Published private(set) var productLoadMessage: String?
-    @Published private(set) var serverState: ServerEntitlementState = .idle
+    @Published private var storedServerState: ServerEntitlementState = .idle
     @Published private(set) var localEntitlementTier: SupporterTier = .free
     @Published private(set) var operation: StoreKitOperationState = .idle
+    private var serverStateSession: LocalAccountSession?
+
+    /// Un snapshot du compte A ne doit jamais être présenté comme le droit de B
+    /// après une déconnexion, même si le store survit au changement de session.
+    var serverState: ServerEntitlementState {
+        guard let session = LocalAccountScope.sessionSnapshot(),
+              session == serverStateSession else { return .idle }
+        return storedServerState
+    }
 
     private let api: APIClientProtocol
     private let purchasesEnabled: Bool
@@ -401,16 +410,27 @@ final class EntitlementsStore: ObservableObject {
     }
 
     func refreshBackendSnapshot() async {
-        serverState = .loading
+        guard let session = LocalAccountScope.sessionSnapshot() else {
+            serverStateSession = nil
+            storedServerState = .idle
+            return
+        }
+        publishServerState(.loading, for: session)
         do {
             let response = try await api.request(
                 APIEndpoint(path: Self.subscriptionEndpoint),
                 as: BillingSubscriptionResponse.self
             )
-            serverState = .available(EntitlementSnapshot(response: response))
+            publishServerState(.available(EntitlementSnapshot(response: response)), for: session)
         } catch {
-            serverState = .unavailable(error.localizedDescription)
+            publishServerState(.unavailable(error.localizedDescription), for: session)
         }
+    }
+
+    private func publishServerState(_ state: ServerEntitlementState, for session: LocalAccountSession) {
+        guard LocalAccountScope.sessionSnapshot() == session else { return }
+        serverStateSession = session
+        storedServerState = state
     }
 
     func refreshStoreKitState() async {
@@ -419,6 +439,7 @@ final class EntitlementsStore: ObservableObject {
     }
 
     func purchase(_ identifier: SignalQuestSubscriptionProduct) async {
+        let accountSession = LocalAccountScope.sessionSnapshot()
         let currentEligibility = eligibility
         guard currentEligibility.canPurchase else {
             operation = .failed(currentEligibility.userMessage)
@@ -442,8 +463,10 @@ final class EntitlementsStore: ObservableObject {
                 guard transaction.productID == identifier.rawValue else {
                     throw EntitlementsError.unexpectedProduct
                 }
+                guard let accountSession, LocalAccountScope.sessionSnapshot() == accountSession else { throw CancellationError() }
                 let snapshot = try await synchronizer.synchronize(Self.proof(for: verification, transaction: transaction))
-                serverState = .available(snapshot)
+                guard LocalAccountScope.sessionSnapshot() == accountSession else { throw CancellationError() }
+                publishServerState(.available(snapshot), for: accountSession)
                 await transaction.finish()
                 await refreshLocalEntitlements()
                 operation = .succeeded("Abonnement \(snapshot.tier.displayName) activé sur ton compte.")
@@ -533,17 +556,20 @@ final class EntitlementsStore: ObservableObject {
 
     private func handleTransactionUpdate(_ result: VerificationResult<Transaction>) async {
         guard let transaction = try? Self.verified(result),
-              SignalQuestSubscriptionProduct(rawValue: transaction.productID) != nil
+              SignalQuestSubscriptionProduct(rawValue: transaction.productID) != nil,
+              let accountSession = LocalAccountScope.sessionSnapshot()
         else { return }
 
         await refreshLocalEntitlements()
+        guard LocalAccountScope.sessionSnapshot() == accountSession else { return }
         guard let synchronizer, serverVerificationEnabled else {
             operation = .failed(PurchaseEligibility.existingLocalAppStoreEntitlement(localEntitlementTier).userMessage)
             return
         }
         do {
             let snapshot = try await synchronizer.synchronize(Self.proof(for: result, transaction: transaction))
-            serverState = .available(snapshot)
+            guard LocalAccountScope.sessionSnapshot() == accountSession else { return }
+            publishServerState(.available(snapshot), for: accountSession)
             await transaction.finish()
         } catch {
             // Ne pas terminer la transaction : StoreKit la rejouera quand la
@@ -553,14 +579,17 @@ final class EntitlementsStore: ObservableObject {
     }
 
     private func synchronizeCurrentEntitlements() async throws {
-        guard let synchronizer, serverVerificationEnabled else {
+        guard let synchronizer, serverVerificationEnabled,
+              let accountSession = LocalAccountScope.sessionSnapshot() else {
             throw EntitlementsError.transactionDeliveryUnavailable
         }
         for await result in Transaction.currentEntitlements {
             let transaction = try Self.verified(result)
             guard SignalQuestSubscriptionProduct(rawValue: transaction.productID) != nil else { continue }
+            guard LocalAccountScope.sessionSnapshot() == accountSession else { throw CancellationError() }
             let snapshot = try await synchronizer.synchronize(Self.proof(for: result, transaction: transaction))
-            serverState = .available(snapshot)
+            guard LocalAccountScope.sessionSnapshot() == accountSession else { throw CancellationError() }
+            publishServerState(.available(snapshot), for: accountSession)
             await transaction.finish()
         }
     }

@@ -286,8 +286,7 @@ struct SentinelleView: View {
             if model.isLoading && model.targets.isEmpty {
                 loadingState
             } else if model.accessDenied && model.following.isEmpty {
-                if services.entitlements.confirmedServerTier == .premium
-                    || services.entitlements.localEntitlementTier == .premium {
+                if services.entitlements.confirmedServerTier == .premium {
                     premiumActivationPending
                 } else {
                     premiumUpsell
