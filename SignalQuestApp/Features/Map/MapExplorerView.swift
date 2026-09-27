@@ -3782,9 +3782,21 @@ struct MapExplorerView: View {
         minCount: Int,
         label: (Int) -> String
     ) -> [MapAnnotationPayload] {
-        guard mapZoom < 14, payloads.count > minCount else { return payloads }
+        Self.clusteredPayloads(from: payloads, kind: kind, idPrefix: idPrefix,
+                               minCount: minCount, zoom: mapZoom, label: label)
+    }
+
+    static func clusteredPayloads(
+        from payloads: [MapAnnotationPayload],
+        kind: MapDisplayItem.Kind,
+        idPrefix: String,
+        minCount: Int,
+        zoom: Double,
+        label: (Int) -> String
+    ) -> [MapAnnotationPayload] {
+        guard zoom < 14, payloads.count > minCount else { return payloads }
         let cellSize: Double
-        switch mapZoom {
+        switch zoom {
         case ..<11:
             cellSize = 0.08
         case ..<12.5:
@@ -3803,12 +3815,14 @@ struct MapExplorerView: View {
             )
         }
 
-        return groups.values.map { group in
+        return groups.map { cell, group in
             guard group.count > 1 else { return group[0] }
             let lat = group.reduce(0) { $0 + $1.coordinate.latitude } / Double(group.count)
             let lng = group.reduce(0) { $0 + $1.coordinate.longitude } / Double(group.count)
             return MapAnnotationPayload(
-                id: "\(idPrefix)-cluster-\(Int(lat / cellSize))-\(Int(lng / cellSize))",
+                // The grouping uses floor. Truncating a negative centroid toward
+                // zero gives the same ID as the adjacent positive cell at 0.
+                id: "\(idPrefix)-cluster-\(cell.lat)-\(cell.lng)",
                 kind: kind,
                 title: label(group.count),
                 subtitle: "Zoomer pour le détail",

@@ -6,6 +6,36 @@ import MapKit
 /// Exercises the actual representable and MKMapView inside a UIWindow.
 @MainActor
 final class MapNativeViewportTests: XCTestCase {
+    func testAdjacentClusterCellsAcrossEquatorKeepDistinctStableAnnotationIDs() {
+        func marker(_ id: String, _ latitude: Double) -> MapAnnotationPayload {
+            MapAnnotationPayload(
+                id: id, kind: .customSite, title: id, subtitle: "",
+                coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: 0.02),
+                metric: nil, backendId: nil, details: nil, antennaId: nil,
+                clusterCount: nil, azimuths: [], showsAzimuths: false
+            )
+        }
+        let points = [marker("south-1", -0.06), marker("south-2", -0.05),
+                      marker("north-1", 0.02), marker("north-2", 0.03)]
+        func clusters(_ values: [MapAnnotationPayload]) -> [MapAnnotationPayload] {
+            MapExplorerView.clusteredPayloads(
+                from: values, kind: .customSite, idPrefix: "custom-site",
+                minCount: 1, zoom: 10, label: { "\($0) sites" }
+            )
+        }
+
+        let initial = clusters(points)
+        let ids = Set(initial.map(\.id))
+        XCTAssertEqual(initial.count, 2)
+        XCTAssertEqual(ids, ["custom-site-cluster--1-0", "custom-site-cluster-0-0"])
+        XCTAssertEqual(initial.map(\.clusterCount).compactMap { $0 }.sorted(), [2, 2])
+
+        // A small pan can change a cell's centroid without changing its identity.
+        let moved = clusters(points + [marker("south-3", -0.07)])
+        XCTAssertEqual(Set(moved.map(\.id)), ids)
+        XCTAssertEqual(moved.map(\.clusterCount).compactMap { $0 }.sorted(), [2, 3])
+    }
+
     func testRenderUpdatesDoNotAccumulateSafeAreaIntoOrnamentMargins() async throws {
         let fixture = try Fixture()
         defer { fixture.close() }
