@@ -503,7 +503,9 @@ struct CommunityOutageDetailSheet: View {
         guard !voting else { return }
         voting = true
         errorMessage = nil
-        let here = services.location.lastLocation
+        // Le serveur vérifie l'éligibilité du vote depuis ce point : ne pas lui
+        // présenter une ancienne position si le GPS ou l'autorisation a disparu.
+        let here = services.location.cachedLocation()
         do {
             let response = try await service.vote(
                 outageId: outage.id,

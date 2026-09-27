@@ -1,6 +1,21 @@
 import SwiftUI
 
 @MainActor
+final class LocalCoverageArchiveViewModel: ObservableObject {
+    @Published private(set) var snapshot = LocalCoverageArchiveSnapshot(entries: [], unreadableSources: 0)
+    @Published private(set) var isLoading = false
+
+    func reload() async {
+        isLoading = true
+        let loaded = await Task.detached(priority: .utility) {
+            LocalCoverageArchiveReader.load()
+        }.value
+        snapshot = loaded
+        isLoading = false
+    }
+}
+
+@MainActor
 final class SessionsListViewModel: ObservableObject {
     @Published var sessions: [CoverageSession] = []
     @Published var isLoading = false
@@ -55,6 +70,14 @@ final class SessionsListViewModel: ObservableObject {
         filtered.isEmpty && !isLoading && !hasMore && errorMessage == nil
     }
 
+    var showsLocalCoverageArchive: Bool { filter != .driveTest }
+
+    func showsEmptyState(archive: LocalCoverageArchiveSnapshot, archiveIsLoading: Bool) -> Bool {
+        guard isExhaustedEmpty else { return false }
+        guard showsLocalCoverageArchive else { return true }
+        return !archiveIsLoading && archive.entries.isEmpty && archive.unreadableSources == 0
+    }
+
     func reload() async {
         let generation = UUID()
         requestGeneration = generation
@@ -100,6 +123,7 @@ final class SessionsListViewModel: ObservableObject {
 /// synchronisées entre Android et iOS via le compte.
 struct SessionsListView: View {
     @StateObject private var model: SessionsListViewModel
+    @StateObject private var archiveModel = LocalCoverageArchiveViewModel()
 
     init(service: SessionsServicing) {
         _model = StateObject(wrappedValue: SessionsListViewModel(service: service))
@@ -115,7 +139,7 @@ struct SessionsListView: View {
                 .padding(.horizontal, -SQSpace.lg)
                 .padding(.bottom, SQSpace.xs)
 
-                if model.isExhaustedEmpty {
+                if model.showsEmptyState(archive: archiveModel.snapshot, archiveIsLoading: archiveModel.isLoading) {
                     EmptyStateView(
                         title: "Aucune session",
                         message: model.sessions.isEmpty
@@ -160,6 +184,35 @@ struct SessionsListView: View {
                         }
                     }
                 }
+
+                if model.showsLocalCoverageArchive && !archiveModel.snapshot.entries.isEmpty {
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        Text("Archives locales")
+                            .font(SQType.heading)
+                            .foregroundStyle(SQColor.label)
+                        Text("Anciennes captures de couverture conservées sur cet appareil. Elles ne sont plus envoyées.")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    .padding(.top, SQSpace.lg)
+                    .accessibilityIdentifier("sessions.localArchives")
+
+                    ForEach(archiveModel.snapshot.entries) { archive in
+                        NavigationLink {
+                            LocalCoverageArchiveDetailView(archive: archive)
+                        } label: {
+                            LocalCoverageArchiveRow(archive: archive)
+                        }
+                        .buttonStyle(SQPressButtonStyle())
+                    }
+                }
+
+                if model.showsLocalCoverageArchive && archiveModel.snapshot.unreadableSources > 0 {
+                    Label("Certaines archives locales sont illisibles. Les fichiers ont été conservés.", systemImage: "exclamationmark.triangle")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.warning)
+                        .accessibilityIdentifier("sessions.localArchives.error")
+                }
             }
             .padding(.horizontal, SQSpace.lg)
             .padding(.top, SQSpace.md)
@@ -169,13 +222,99 @@ struct SessionsListView: View {
         .signalQuestBackground()
         .navigationTitle("Mes sessions")
         .toolbarTitleInlineCompat()
-        .refreshable { await model.reload() }
+        .refreshable {
+            await archiveModel.reload()
+            await model.reload()
+        }
         .overlay {
-            if model.isLoading && model.sessions.isEmpty {
+            if model.isLoading && model.sessions.isEmpty &&
+                (!model.showsLocalCoverageArchive || archiveModel.snapshot.entries.isEmpty) {
                 ProgressView().tint(SQColor.brandRed)
             }
         }
         .task { if model.sessions.isEmpty { await model.reload() } }
+        .task { await archiveModel.reload() }
+    }
+}
+
+private struct LocalCoverageArchiveRow: View {
+    let archive: LocalCoverageArchive
+
+    var body: some View {
+        HStack(spacing: SQSpace.md) {
+            Image(systemName: "archivebox")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(SQColor.accentInk)
+                .frame(width: 42, height: 42)
+                .background(SQColor.accentSoft, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text(archive.state == .recording ? LocalizedStringKey("Brouillon de couverture") : LocalizedStringKey("Ancienne capture de couverture"))
+                    .font(SQFont.body(15.5, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.label)
+                Text(Date(timeIntervalSince1970: Double(archive.startTime) / 1_000), format: .dateTime.day().month().year().hour().minute())
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            Spacer(minLength: SQSpace.sm)
+            Image(systemName: "chevron.right")
+                .foregroundStyle(SQColor.labelTertiary)
+                .accessibilityHidden(true)
+        }
+        .padding(SQSpace.md + 2)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqShadowSoft()
+        .contentShape(Rectangle())
+        .accessibilityIdentifier("sessions.localArchive.row")
+    }
+}
+
+private struct LocalCoverageArchiveDetailView: View {
+    let archive: LocalCoverageArchive
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                Text("Archive conservée sur cet appareil")
+                    .font(SQType.heading)
+                    .foregroundStyle(SQColor.label)
+                Text("Cette consultation reste sur cet appareil et n’envoie aucune coordonnée.")
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.labelSecondary)
+
+                VStack(alignment: .leading, spacing: SQSpace.md) {
+                    Label(archive.state == .recording ? LocalizedStringKey("Brouillon interrompu") : LocalizedStringKey("Capture terminée"), systemImage: "archivebox")
+                    HStack {
+                        Text("Points enregistrés")
+                        Spacer()
+                        Text(archive.pointCount, format: .number)
+                    }
+                    HStack {
+                        Text("Début")
+                        Spacer()
+                        Text(Date(timeIntervalSince1970: Double(archive.startTime) / 1_000), format: .dateTime.day().month().year().hour().minute())
+                    }
+                    if archive.endTime > archive.startTime {
+                        HStack {
+                            Text("Fin")
+                            Spacer()
+                            Text(Date(timeIntervalSince1970: Double(archive.endTime) / 1_000), format: .dateTime.day().month().year().hour().minute())
+                        }
+                    }
+                }
+                .font(SQType.body)
+                .foregroundStyle(SQColor.label)
+                .padding(SQSpace.lg)
+                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                .sqShadowSoft()
+            }
+            .padding(SQSpace.lg)
+            .sqReadableWidth()
+        }
+        .signalQuestBackground()
+        .navigationTitle("Archive locale")
+        .toolbarTitleInlineCompat()
+        .accessibilityIdentifier("sessions.localArchive.detail")
     }
 }
 

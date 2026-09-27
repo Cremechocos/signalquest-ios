@@ -359,6 +359,57 @@ final class CoverageSessionQueueTests: XCTestCase {
         XCTAssertEqual(try store.allPending().map(\.upload.sessionId), [newer.sessionId])
     }
 
+    func testLocalArchiveReadsJSONAndBackupsWithoutChangingFiles() throws {
+        let directory = try makeTemporaryQueueURL().deletingLastPathComponent()
+        let currentURL = directory.appendingPathComponent("PendingCoverageSessions.json")
+        let backupURL = currentURL.appendingPathExtension("migrated")
+        let unreadableURL = currentURL.appendingPathExtension("migrated.1")
+        let id = UUID()
+        let older = makeSession(id: id, startTime: 1_000, endTime: 1_000,
+                                showOnMap: false, points: [makePoint(timestamp: 1_000)])
+        let newer = makeSession(id: id, startTime: 1_000, endTime: 3_000,
+                                showOnMap: false, points: [makePoint(timestamp: 1_000), makePoint(timestamp: 3_000)])
+        let other = makeSession(id: UUID(), startTime: 4_000, endTime: 4_000,
+                                showOnMap: false, points: [makePoint(timestamp: 4_000)])
+        try CoverageSessionQueue(fileURL: currentURL).upsert(older, state: .recording)
+        try CoverageSessionQueue(fileURL: backupURL).upsert(newer, state: .queued)
+        try CoverageSessionQueue(fileURL: backupURL).upsert(other, state: .recording)
+        try Data("invalid archive".utf8).write(to: unreadableURL)
+        let originalFiles = try [currentURL, backupURL, unreadableURL].map { try Data(contentsOf: $0) }
+
+        let snapshot = LocalCoverageArchiveReader.load(directory: directory)
+
+        XCTAssertEqual(snapshot.entries.count, 2)
+        XCTAssertEqual(snapshot.entries.first?.id, other.sessionId)
+        XCTAssertEqual(snapshot.entries.last?.id, id)
+        XCTAssertEqual(snapshot.entries.last?.pointCount, 2)
+        XCTAssertEqual(snapshot.entries.last?.state, .queued)
+        XCTAssertEqual(snapshot.unreadableSources, 1)
+        XCTAssertEqual(try [currentURL, backupURL, unreadableURL].map { try Data(contentsOf: $0) }, originalFiles)
+    }
+
+    func testLocalArchiveReadsSwiftDataAndLegacyJSONWithoutMigrating() throws {
+        guard #available(iOS 17, *) else { throw XCTSkip("SwiftData coverage store requires iOS 17") }
+        let directory = try makeTemporaryQueueURL().deletingLastPathComponent()
+        let legacyURL = directory.appendingPathComponent("PendingCoverageSessions.json")
+        let storeURL = directory.appendingPathComponent("CoverageSessions.store")
+        let databaseSession = makeSession(id: UUID(), startTime: 1_000, endTime: 2_000,
+                                          showOnMap: false, points: [makePoint(timestamp: 1_000), makePoint(timestamp: 2_000)])
+        let jsonSession = makeSession(id: UUID(), startTime: 3_000, endTime: 4_000,
+                                      showOnMap: false, points: [makePoint(timestamp: 3_000), makePoint(timestamp: 4_000)])
+        let store = try XCTUnwrap(SwiftDataCoverageSessionStore(storeURL: storeURL, migrateLegacy: false))
+        try store.upsert(databaseSession, state: .queued)
+        try CoverageSessionQueue(fileURL: legacyURL).upsert(jsonSession, state: .recording)
+        let originalJSON = try Data(contentsOf: legacyURL)
+
+        let snapshot = LocalCoverageArchiveReader.load(directory: directory, storeURL: storeURL)
+
+        XCTAssertEqual(Set(snapshot.entries.map(\.id)), Set([databaseSession.sessionId, jsonSession.sessionId]))
+        XCTAssertEqual(snapshot.unreadableSources, 0)
+        XCTAssertEqual(try Data(contentsOf: legacyURL), originalJSON)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.appendingPathExtension("migrated").path))
+    }
+
     func testFinalizedSnapshotCannotBeDowngradedByOlderDraft() throws {
         let fileURL = try makeTemporaryQueueURL()
         let id = UUID()

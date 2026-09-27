@@ -46259,6 +46259,83 @@
         "fr": { "stringUnit": { "state": "translated", "value": "Cette réponse sera envoyée dans une conversation privée non chiffrée de bout en bout." } },
         "en": { "stringUnit": { "state": "translated", "value": "This reply will be sent in a private conversation without end-to-end encryption." } }
       }
+    },
+    "Archives locales": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Archives locales" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Local archives" } }
+      }
+    },
+    "Anciennes captures de couverture conservées sur cet appareil. Elles ne sont plus envoyées.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Anciennes captures de couverture conservées sur cet appareil. Elles ne sont plus envoyées." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Old coverage captures kept on this device. They are no longer sent." } }
+      }
+    },
+    "Certaines archives locales sont illisibles. Les fichiers ont été conservés.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Certaines archives locales sont illisibles. Les fichiers ont été conservés." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Some local archives could not be read. The files were kept." } }
+      }
+    },
+    "Brouillon de couverture": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Brouillon de couverture" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Coverage draft" } }
+      }
+    },
+    "Ancienne capture de couverture": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Ancienne capture de couverture" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Old coverage capture" } }
+      }
+    },
+    "Archive conservée sur cet appareil": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Archive conservée sur cet appareil" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Archive kept on this device" } }
+      }
+    },
+    "Cette consultation reste sur cet appareil et n’envoie aucune coordonnée.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Cette consultation reste sur cet appareil et n’envoie aucune coordonnée." } },
+        "en": { "stringUnit": { "state": "translated", "value": "Viewing this stays on this device and sends no coordinates." } }
+      }
+    },
+    "Brouillon interrompu": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Brouillon interrompu" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Interrupted draft" } }
+      }
+    },
+    "Capture terminée": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Capture terminée" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Completed capture" } }
+      }
+    },
+    "Points enregistrés": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Points enregistrés" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Recorded points" } }
+      }
+    },
+    "Archive locale": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Archive locale" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Local archive" } }
+      }
     }
   },
   "version": "1.0"

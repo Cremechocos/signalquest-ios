@@ -563,7 +563,7 @@ final class SwiftDataCoverageSessionStore: CoverageSessionStoring, @unchecked Se
     private let decoder = JSONDecoder.signalQuest
 
     /// `init?` : si le `ModelContainer` ne peut pas être créé, la fabrique retombe sur JSON.
-    init?(storeURL: URL? = nil, legacyFileURL: URL? = nil) {
+    init?(storeURL: URL? = nil, legacyFileURL: URL? = nil, migrateLegacy: Bool = true) {
         let fileManager = FileManager.default
         let resolvedStoreURL: URL
         if let storeURL {
@@ -581,7 +581,9 @@ final class SwiftDataCoverageSessionStore: CoverageSessionStoring, @unchecked Se
         } catch {
             return nil
         }
-        migrateLegacyJSONIfNeeded(explicitURL: legacyFileURL)
+        if migrateLegacy {
+            migrateLegacyJSONIfNeeded(explicitURL: legacyFileURL)
+        }
     }
 
     func upsert(_ upload: CoverageSessionUpload, state requestedState: CoverageSessionQueueState) throws {
@@ -741,4 +743,81 @@ final class SwiftDataCoverageSessionStore: CoverageSessionStoring, @unchecked Se
     }
 
     private static func nowMs() -> Int { Int(Date().timeIntervalSince1970 * 1_000) }
+}
+
+/// Consultation locale des anciennes captures iOS. Aucune méthode d'écriture ou
+/// d'envoi n'est appelée ; les coordonnées restent dans les fichiers de l'app.
+struct LocalCoverageArchive: Identifiable, Sendable {
+    let id: UUID
+    let startTime: Int
+    let endTime: Int
+    let pointCount: Int
+    let state: CoverageSessionQueueState
+    let updatedAtMs: Int
+
+    init(_ pending: PendingCoverageSession) {
+        id = pending.upload.sessionId
+        startTime = pending.upload.startTime
+        endTime = pending.upload.endTime
+        pointCount = pending.upload.points.count
+        state = pending.state
+        updatedAtMs = pending.updatedAtMs
+    }
+}
+
+struct LocalCoverageArchiveSnapshot: Sendable {
+    let entries: [LocalCoverageArchive]
+    let unreadableSources: Int
+}
+
+enum LocalCoverageArchiveReader {
+    static func load(directory: URL? = nil, storeURL: URL? = nil) -> LocalCoverageArchiveSnapshot {
+        let fileManager = FileManager.default
+        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let archiveDirectory = directory ?? appSupport.appendingPathComponent("SignalQuest", isDirectory: true)
+        let swiftDataURL = storeURL ?? archiveDirectory.appendingPathComponent("CoverageSessions.store")
+        var entriesByID: [UUID: LocalCoverageArchive] = [:]
+        var unreadableSources = 0
+
+        func add(_ sessions: [PendingCoverageSession]) {
+            for pending in sessions {
+                let entry = LocalCoverageArchive(pending)
+                if let previous = entriesByID[entry.id] {
+                    // Une sauvegarde peut être plus récente que la copie migrée.
+                    guard entry.pointCount > previous.pointCount ||
+                        (entry.pointCount == previous.pointCount && entry.updatedAtMs > previous.updatedAtMs) else { continue }
+                }
+                entriesByID[entry.id] = entry
+            }
+        }
+
+        if #available(iOS 17, *), fileManager.fileExists(atPath: swiftDataURL.path) {
+            if let store = SwiftDataCoverageSessionStore(storeURL: swiftDataURL, migrateLegacy: false),
+               let sessions = try? store.allPending() {
+                add(sessions)
+            } else {
+                unreadableSources += 1
+            }
+        }
+
+        let legacyName = "PendingCoverageSessions.json"
+        let filenames = (try? fileManager.contentsOfDirectory(atPath: archiveDirectory.path)) ?? []
+        for filename in filenames.sorted() where filename == legacyName || filename == legacyName + ".migrated" || filename.hasPrefix(legacyName + ".migrated.") {
+            let fileURL = archiveDirectory.appendingPathComponent(filename)
+            if let sessions = try? CoverageSessionQueue(fileURL: fileURL).allPending() {
+                add(sessions)
+            } else {
+                unreadableSources += 1
+            }
+        }
+
+        return LocalCoverageArchiveSnapshot(
+            entries: entriesByID.values.sorted {
+                if $0.startTime != $1.startTime { return $0.startTime > $1.startTime }
+                return $0.id.uuidString < $1.id.uuidString
+            },
+            unreadableSources: unreadableSources
+        )
+    }
 }
