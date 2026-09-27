@@ -70,6 +70,14 @@ final class SessionsListViewModel: ObservableObject {
         filtered.isEmpty && !isLoading && !hasMore && errorMessage == nil
     }
 
+    var showsLocalCoverageArchive: Bool { filter != .driveTest }
+
+    func showsEmptyState(archive: LocalCoverageArchiveSnapshot, archiveIsLoading: Bool) -> Bool {
+        guard isExhaustedEmpty else { return false }
+        guard showsLocalCoverageArchive else { return true }
+        return !archiveIsLoading && archive.entries.isEmpty && archive.unreadableSources == 0
+    }
+
     func reload() async {
         let generation = UUID()
         requestGeneration = generation
@@ -131,7 +139,7 @@ struct SessionsListView: View {
                 .padding(.horizontal, -SQSpace.lg)
                 .padding(.bottom, SQSpace.xs)
 
-                if model.isExhaustedEmpty && !archiveModel.isLoading && archiveModel.snapshot.entries.isEmpty {
+                if model.showsEmptyState(archive: archiveModel.snapshot, archiveIsLoading: archiveModel.isLoading) {
                     EmptyStateView(
                         title: "Aucune session",
                         message: model.sessions.isEmpty
@@ -177,7 +185,7 @@ struct SessionsListView: View {
                     }
                 }
 
-                if !archiveModel.snapshot.entries.isEmpty {
+                if model.showsLocalCoverageArchive && !archiveModel.snapshot.entries.isEmpty {
                     VStack(alignment: .leading, spacing: SQSpace.xs) {
                         Text("Archives locales")
                             .font(SQType.heading)
@@ -199,7 +207,7 @@ struct SessionsListView: View {
                     }
                 }
 
-                if archiveModel.snapshot.unreadableSources > 0 {
+                if model.showsLocalCoverageArchive && archiveModel.snapshot.unreadableSources > 0 {
                     Label("Certaines archives locales sont illisibles. Les fichiers ont été conservés.", systemImage: "exclamationmark.triangle")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.warning)
@@ -219,7 +227,8 @@ struct SessionsListView: View {
             await model.reload()
         }
         .overlay {
-            if model.isLoading && model.sessions.isEmpty && archiveModel.snapshot.entries.isEmpty {
+            if model.isLoading && model.sessions.isEmpty &&
+                (!model.showsLocalCoverageArchive || archiveModel.snapshot.entries.isEmpty) {
                 ProgressView().tint(SQColor.brandRed)
             }
         }

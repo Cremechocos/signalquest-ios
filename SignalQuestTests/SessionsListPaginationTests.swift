@@ -60,6 +60,39 @@ final class SessionsListPaginationTests: XCTestCase {
         XCTAssertTrue(model.isExhaustedEmpty)
     }
 
+    func testDriveTestFilterHidesLocalCoverageArchivesAndKeepsItsEmptyState() async throws {
+        let emptyPage = try page([], hasMore: false)
+        let model = SessionsListViewModel { _, _ in
+            try JSONDecoder().decode(SessionsListResponse.self, from: emptyPage)
+        }
+        await model.reload()
+        let upload = CoverageSessionUpload(
+            sessionId: UUID(), startTime: 1_000, endTime: 2_000,
+            showOnMap: false, points: []
+        )
+        let archive = LocalCoverageArchiveSnapshot(
+            entries: [LocalCoverageArchive(PendingCoverageSession(
+                upload: upload, state: .queued, updatedAtMs: 2_000
+            ))],
+            unreadableSources: 0
+        )
+        let unreadableOnly = LocalCoverageArchiveSnapshot(entries: [], unreadableSources: 1)
+
+        model.filter = .driveTest
+        XCTAssertFalse(model.showsLocalCoverageArchive)
+        XCTAssertTrue(model.showsEmptyState(archive: archive, archiveIsLoading: false))
+        XCTAssertTrue(model.showsEmptyState(archive: unreadableOnly, archiveIsLoading: false))
+
+        model.filter = .all
+        XCTAssertTrue(model.showsLocalCoverageArchive)
+        XCTAssertFalse(model.showsEmptyState(archive: archive, archiveIsLoading: false))
+        XCTAssertFalse(model.showsEmptyState(archive: unreadableOnly, archiveIsLoading: false))
+
+        model.filter = .coverage
+        XCTAssertTrue(model.showsLocalCoverageArchive)
+        XCTAssertFalse(model.showsEmptyState(archive: archive, archiveIsLoading: false))
+    }
+
     func testOlderReloadCannotReplaceANewerResult() async throws {
         let older = try page([("old", "manual")], hasMore: false)
         let newer = try page([("new", "drive_test")], hasMore: false)
