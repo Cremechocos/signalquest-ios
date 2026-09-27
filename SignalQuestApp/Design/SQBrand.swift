@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Couleurs de marque non thémées portées de la DA web
 /// (map-nextjs/lib/operator-colors.ts et app/globals.css). Ces valeurs sont
@@ -104,6 +105,33 @@ enum SQBrand {
 
     static func operatorBadgeForeground(_ rawName: String?) -> Color {
         operatorColors(rawName).badgeForeground
+    }
+
+    /// Le registre de marché peut fournir toute couleur hex, hors de notre palette.
+    /// Choisir l'encre sur le fond réellement peint plutôt que sur le thème.
+    static func operatorBadgeForeground(for background: Color, colorScheme: ColorScheme) -> Color {
+        let style: UIUserInterfaceStyle = colorScheme == .dark ? .dark : .light
+        let resolved = UIColor(background).resolvedColor(
+            with: UITraitCollection(userInterfaceStyle: style)
+        )
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        guard resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
+            return .black
+        }
+
+        func linear(_ channel: CGFloat) -> Double {
+            let value = Double(channel)
+            return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+
+        let luminance = 0.2126 * linear(red)
+            + 0.7152 * linear(green)
+            + 0.0722 * linear(blue)
+        // Seuil où noir et blanc ont le même contraste WCAG (≈ 4,58:1).
+        return luminance >= 0.1791287847 ? .black : .white
     }
 
     /// Nom d'affichage de l'opérateur, ou `nil` quand la clé n'est pas reconnue.

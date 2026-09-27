@@ -18,6 +18,7 @@ struct MapPhotoViewer: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var photo: Photo?
     @State private var comments: [PhotoComment] = []
@@ -113,12 +114,15 @@ struct MapPhotoViewer: View {
     private var header: some View {
         HStack(spacing: SQSpace.sm) {
             if let operatorName {
+                let accent = operatorAccent(operatorName)
                 Text(operatorName)
                     .font(SQFont.body(12, .semibold))
-                    .foregroundStyle(SQColor.onAccent)
+                    .foregroundStyle(SQBrand.operatorBadgeForeground(
+                        for: accent, colorScheme: colorScheme
+                    ))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(operatorAccent(operatorName), in: Capsule(style: .continuous))
+                    .background(accent, in: Capsule(style: .continuous))
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(siteTitle)

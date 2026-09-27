@@ -18,6 +18,27 @@ final class OperatorBadgeContrastTests: XCTestCase {
         }
     }
 
+    func testRegistryOperatorBadgeMeetsNormalTextContrastInBothAppearances() {
+        // La fiche photo ouverte depuis la carte utilise les couleurs du registre,
+        // qui peuvent différer de SQBrand (dont le clair Orange avait régressé).
+        let registryColors: [UInt32] = [0xFF6B35, 0xE2001A, 0x8B5CF6, 0x0EA5E9, 0x777777]
+        for appearance in [UIUserInterfaceStyle.light, .dark] {
+            let traits = UITraitCollection(userInterfaceStyle: appearance)
+            let scheme: ColorScheme = appearance == .dark ? .dark : .light
+            for hex in registryColors {
+                let background = Color(hex: hex)
+                let foreground = SQBrand.operatorBadgeForeground(
+                    for: background, colorScheme: scheme
+                )
+                let ratio = contrastRatio(
+                    UIColor(foreground).resolvedColor(with: traits),
+                    UIColor(background).resolvedColor(with: traits)
+                )
+                XCTAssertGreaterThanOrEqual(ratio, 4.5, "#\(String(hex, radix: 16)), \(appearance): \(ratio)")
+            }
+        }
+    }
+
     private func contrastRatio(_ first: UIColor, _ second: UIColor) -> Double {
         let a = luminance(first)
         let b = luminance(second)
