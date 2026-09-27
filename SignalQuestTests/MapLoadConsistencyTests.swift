@@ -81,6 +81,63 @@ final class MapLoadConsistencyTests: XCTestCase {
         XCTAssertEqual(coverageAge, 0)
     }
 
+    func testNetworkReturnRecoversFailedMapOnceOnlyWhileVisible() async throws {
+        let (model, service) = makeModel()
+        let started = expectation(description: "offline map request")
+        await service.expectSpeedtest("SFR", started: started)
+        let failedLoad = Task { await model.load(bounds: bounds, zoom: 14, filters: [.speedtest]) }
+        await fulfillment(of: [started], timeout: 2)
+        await service.finishSpeedtest("SFR", result: .failure(APIError.transport("offline")))
+        await failedLoad.value
+        XCTAssertNotNil(model.errorMessage)
+
+        await service.setImmediateSpeedtests([try speedtestTile("recovered")])
+        await model.recoverAfterNetworkReturn(wasOnline: false, isOnline: true, isVisible: true,
+                                              bounds: bounds, zoom: 14, filters: [.speedtest])
+        XCTAssertEqual(model.speedtestTiles.flatMap(\.markers).map(\.id), ["recovered"])
+        XCTAssertNil(model.errorMessage)
+        let recoveredRequests = await service.speedtestRequestCount
+        let recoveredMaxAge = await service.lastSpeedtestMaxAge
+        XCTAssertEqual(recoveredRequests, 2)
+        XCTAssertEqual(recoveredMaxAge, 0)
+
+        await model.recoverAfterNetworkReturn(wasOnline: true, isOnline: true, isVisible: true,
+                                              bounds: bounds, zoom: 14, filters: [.speedtest])
+        await model.recoverAfterNetworkReturn(wasOnline: false, isOnline: true, isVisible: true,
+                                              bounds: bounds, zoom: 14, filters: [.speedtest])
+        let healthyRequests = await service.speedtestRequestCount
+        XCTAssertEqual(healthyRequests, 2, "A healthy map must not loop on network updates")
+
+        model.errorMessage = "offline again"
+        await model.recoverAfterNetworkReturn(wasOnline: false, isOnline: true, isVisible: false,
+                                              bounds: bounds, zoom: 14, filters: [.speedtest])
+        let offscreenRequests = await service.speedtestRequestCount
+        XCTAssertEqual(offscreenRequests, 2, "An offscreen map must not fetch")
+    }
+
+    func testNetworkReturnSupersedesPendingOfflineLoadAndRejectsItsLateError() async throws {
+        let (model, service) = makeModel()
+        let started = expectation(description: "offline request still pending")
+        await service.expectSpeedtest("SFR", started: started)
+        let oldLoad = Task { await model.load(bounds: bounds, zoom: 14, filters: [.speedtest]) }
+        await fulfillment(of: [started], timeout: 2)
+        XCTAssertTrue(model.isLoading)
+
+        await service.setImmediateSpeedtests([try speedtestTile("recovered")])
+        await model.recoverAfterNetworkReturn(wasOnline: false, isOnline: true, isVisible: true,
+                                              bounds: bounds, zoom: 14, filters: [.speedtest])
+        XCTAssertEqual(model.speedtestTiles.flatMap(\.markers).map(\.id), ["recovered"])
+        XCTAssertNil(model.errorMessage)
+
+        await service.finishSpeedtest("SFR", result: .failure(APIError.transport("late offline failure")))
+        await oldLoad.value
+        XCTAssertEqual(model.speedtestTiles.flatMap(\.markers).map(\.id), ["recovered"])
+        XCTAssertNil(model.errorMessage)
+        XCTAssertFalse(model.isLoading)
+        let requests = await service.speedtestRequestCount
+        XCTAssertEqual(requests, 2)
+    }
+
     func testDirectLoadCompletedLastCannotOverwriteNewerResult() async throws {
         let (model, service) = makeModel()
         let aStarted = expectation(description: "A started")

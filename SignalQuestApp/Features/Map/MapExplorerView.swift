@@ -218,6 +218,19 @@ final class MapExplorerViewModel: ObservableObject {
         isLoading = false
     }
 
+    /// Une reconnexion ne relance que la carte visible et incomplète. Le
+    /// rafraîchissement force les tuiles, car un cache chaud peut masquer la reprise.
+    func recoverAfterNetworkReturn(wasOnline: Bool, isOnline: Bool, isVisible: Bool,
+                                   bounds: MapBounds?, zoom: Double,
+                                   filters: Set<MapDisplayItem.Kind>) async {
+        guard !wasOnline, isOnline, isVisible, let bounds,
+              errorMessage != nil || !hasCurrentResponse else { return }
+        let requestID = prepareLoad(filters: filters)
+        await mapService.invalidateTiles()
+        guard !Task.isCancelled else { return }
+        await load(bounds: bounds, zoom: zoom, filters: filters, requestID: requestID, refresh: true)
+    }
+
     private func isCurrentLoad(_ id: UUID, context: LoadContext) -> Bool {
         activeLoad?.id == id
             && context == loadContext(filters: context.filters, lightweight: context.lightweight)
@@ -1505,6 +1518,7 @@ struct MapExplorerView: View {
     @StateObject private var model: MapExplorerViewModel
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var networkPath: NetworkPathMonitor
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -1864,6 +1878,20 @@ struct MapExplorerView: View {
             guard phase == .active, router.selectedTab == .map else { return }
             fetchTask?.cancel()
             fetchTask = Task { await reloadCurrentRegion() }
+        }
+        .onChangeCompat(of: networkPath.isOnline) { wasOnline, isOnline in
+            guard !wasOnline, isOnline, scenePhase == .active, router.selectedTab == .map,
+                  let viewport = viewportGate.admitted,
+                  model.errorMessage != nil || !model.hasCurrentResponse else { return }
+            fetchTask?.cancel()
+            let requestedFilters = filters
+            fetchTask = Task {
+                await model.recoverAfterNetworkReturn(
+                    wasOnline: wasOnline, isOnline: isOnline,
+                    isVisible: scenePhase == .active && router.selectedTab == .map,
+                    bounds: viewport.bounds, zoom: viewport.zoom, filters: requestedFilters
+                )
+            }
         }
         // Notification/deep link antenne : ouvre la fiche du site demandé.
         .onChangeCompat(of: router.openSiteId) { _, _ in openSiteFromRouterIfNeeded() }
