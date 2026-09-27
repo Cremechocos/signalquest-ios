@@ -37,15 +37,8 @@ struct TwoFactorSetupView: View {
                     .accessibilityIdentifier("two-factor.setup.loading")
                 }
 
-                if let message = model.errorMessage {
-                    Label(message, systemImage: "exclamationmark.triangle.fill")
-                        .font(SQType.subhead)
-                        .foregroundStyle(SQColor.dangerInk)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(SQSpace.lg)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.xl))
-                        .accessibilityIdentifier("two-factor.setup.error")
+                if let message = model.errorMessage, model.phase != .ready {
+                    errorBanner(message)
                 }
 
                 if model.phase == .loadFailed || model.phase == .needsNewSetup {
@@ -179,6 +172,9 @@ struct TwoFactorSetupView: View {
                     let filtered = String(value.unicodeScalars.filter { (48...57).contains($0.value) }.prefix(6).map(Character.init))
                     if value != filtered { model.code = filtered }
                 }
+            if let message = model.errorMessage, model.phase == .ready {
+                errorBanner(message)
+            }
             GradientButton("Activer la 2FA", systemImage: "lock.shield.fill", isBusy: model.phase == .confirming) {
                 codeFocused = false
                 Task { await model.confirm() }
@@ -186,6 +182,17 @@ struct TwoFactorSetupView: View {
             .disabled(!model.canConfirm)
             .accessibilityIdentifier("two-factor.setup.confirm")
         }
+    }
+
+    private func errorBanner(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(SQType.subhead)
+            .foregroundStyle(SQColor.dangerInk)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(SQSpace.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.xl))
+            .accessibilityIdentifier("two-factor.setup.error")
     }
 
     private var confirmation: some View {
