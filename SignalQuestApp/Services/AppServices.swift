@@ -827,7 +827,9 @@ final class ConversationLiveShareCoordinator: ObservableObject {
                         heading: $0.course >= 0 ? $0.course : nil
                     )
                 },
-                at: ISO8601DateFormatter().string(from: Date())
+                // `at` est l'heure d'observation du lieu, pas celle du heartbeat.
+                // Sinon un fix encore admissible mais âgé paraît pris à l'instant.
+                at: ISO8601DateFormatter().string(from: admissibleLocation?.timestamp ?? Date())
             )
             do {
                 if session.e2eeV2Required == true {
