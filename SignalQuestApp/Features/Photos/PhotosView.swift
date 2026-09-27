@@ -1451,7 +1451,7 @@ struct AntennaSitePickerSheet: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        if let location = locationService.lastLocation {
+                        if let location = locationService.cachedLocation() {
                             let target = MKCoordinateRegion(
                                 center: location.coordinate,
                                 span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
@@ -1477,6 +1477,7 @@ struct AntennaSitePickerSheet: View {
                 }
             }
             .onReceive(locationService.$lastLocation.compactMap { $0 }) { location in
+                guard locationService.isUsable(location) else { return }
                 let target = MKCoordinateRegion(
                     center: location.coordinate,
                     span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)

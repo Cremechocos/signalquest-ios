@@ -670,7 +670,7 @@ struct SpeedtestView: View {
                             // Dernière position CONNUE, jamais une demande : ouvrir
                             // le sélecteur ne doit ni déclencher le prompt système
                             // ni attendre un fix. `nil` = tri par distance masqué.
-                            userLocation: services.location.lastLocation.map {
+                            userLocation: services.location.cachedLocation().map {
                                 Coordinates(
                                     latitude: $0.coordinate.latitude,
                                     longitude: $0.coordinate.longitude

@@ -65,7 +65,7 @@ final class CarPlayDashboardSceneDelegate: UIResponder, CPTemplateApplicationDas
         locationObserver = services.location.addLocationObserver { [weak self] location in
             self?.reloadIfNeeded(around: location.coordinate)
         }
-        if let location = services.location.lastLocation {
+        if let location = services.location.cachedLocation() {
             reloadIfNeeded(around: location.coordinate)
         }
     }

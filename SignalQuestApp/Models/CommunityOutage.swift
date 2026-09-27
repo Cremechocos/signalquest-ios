@@ -488,7 +488,8 @@ struct OutageRadioCapture: Encodable, Equatable {
     let v: Int
     let platform: String
     let capturedAt: String
-    /// `in_service`, `out_of_service` ou `unknown` — déduit du chemin réseau, pas du modem.
+    /// iOS émet `in_service` si le chemin cellulaire fonctionne, sinon `unknown`.
+    /// `out_of_service` ne se déduit pas d'un chemin Internet indisponible.
     let state: String
     let fallbackTechnology: String?
     let connection: String?

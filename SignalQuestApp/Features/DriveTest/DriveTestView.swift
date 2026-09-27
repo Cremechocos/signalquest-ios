@@ -1614,6 +1614,7 @@ struct DriveTestView: View {
     }
 
     private func makePreflightSnapshot() -> DriveTestPreflightSnapshot {
+        services.location.refreshAuthorization()
         let authorization: DriveTestPreflightSnapshot.LocationAuthorization
         switch services.location.authorizationStatus {
         case .authorizedAlways, .authorizedWhenInUse:
@@ -1624,7 +1625,7 @@ struct DriveTestView: View {
             authorization = .denied
         }
 
-        let location = services.location.lastLocation
+        let location = services.location.cachedLocation()
         let locationAge = location.map { max(0, Date().timeIntervalSince($0.timestamp)) }
         let status = services.networkPath.status
         let battery = Self.currentBatterySnapshot()

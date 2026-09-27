@@ -1658,7 +1658,7 @@ struct MapExplorerView: View {
             PlannedDetailSheet(site: site, operatorLabel: model.operatorLabel(site.operator ?? "ALL"), operatorAccent: model.operatorAccent(site.operator ?? "ALL"))
         }
         .sheet(item: $selectedFriend) { friend in
-            FriendLiveSheet(friend: friend, userLocation: services.location.lastLocation)
+            FriendLiveSheet(friend: friend, userLocation: services.location.cachedLocation())
                 .presentationDetents([.medium, .large])
                 .presentationBackgroundCompat(SQColor.bg)
         }

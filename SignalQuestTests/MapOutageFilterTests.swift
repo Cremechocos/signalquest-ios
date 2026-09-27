@@ -722,7 +722,23 @@ final class MapOutageFilterTests: XCTestCase {
             status: .unknown, isOnline: false, position: nil
         )
         XCTAssertEqual(capture.platform, "ios")
-        XCTAssertEqual(capture.state, "out_of_service", "Hors ligne : le constat, pas une supposition")
+        XCTAssertEqual(capture.state, "unknown", "Hors ligne IP ne prouve pas l'absence de service cellulaire")
+        XCTAssertEqual(OutageRadioCaptureBuilder.previewText(status: .unknown, isOnline: false),
+                       "Connexion indisponible · État du réseau inconnu")
+    }
+
+    func testUnavailableIPPathDoesNotTurnStaleCellularMetadataIntoNoService() {
+        let lastCellular = NetworkPathStatus(
+            connection: .cellular, cellularTechnology: .fourG, operatorName: "Orange",
+            operatorMcc: nil, operatorMnc: nil, isExpensive: true, isConstrained: false
+        )
+        let capture = OutageRadioCaptureBuilder.make(
+            status: lastCellular, isOnline: false, position: nil
+        )
+        XCTAssertEqual(capture.state, "unknown")
+        XCTAssertNil(capture.fallbackTechnology)
+        XCTAssertNil(capture.operator?.name)
+        XCTAssertEqual(capture.connection, "other")
     }
 
     /// Le Wi-Fi ne dit RIEN du réseau mobile : prétendre qu'il fonctionne serait faux.
