@@ -349,7 +349,7 @@ struct LocationBubble: View {
 
     private var accuracyText: String? {
         guard let accuracy = location.accuracyMeters else { return nil }
-        return "\(String(localized: "Précision")) ±\(Int(accuracy.rounded())) m"
+        return "\(String(localized: "Précision")) ±\(SQUnits.distance(meters: accuracy))"
     }
 
     private var measurementAccessibilityValue: String {
