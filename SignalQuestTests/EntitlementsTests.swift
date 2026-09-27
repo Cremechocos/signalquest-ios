@@ -183,7 +183,7 @@ final class EntitlementsTests: XCTestCase {
     }
 
     @MainActor
-    func testPremiumSnapshotDoesNotFollowAccountAfterLogout() async {
+    func testPremiumSnapshotAndOperationDoNotFollowAccountAfterLogout() async {
         let previousUserID = LocalAccountScope.currentUserId
         defer {
             LocalAccountScope.deactivate()
@@ -195,13 +195,30 @@ final class EntitlementsTests: XCTestCase {
         let store = EntitlementsStore(api: AccountScopedSubscriptionAPIStub(), observesTransactions: false)
         await store.refreshBackendSnapshot()
         XCTAssertEqual(store.confirmedServerTier, .premium)
+        await store.purchase(.premiumMonthly)
+        if case .failed = store.operation {} else { XCTFail("Le droit déjà actif doit bloquer un second achat") }
 
         LocalAccountScope.deactivate()
         LocalAccountScope.activate(userId: "entitlement-B-\(UUID().uuidString)")
         XCTAssertEqual(store.serverState, .idle)
         XCTAssertEqual(store.confirmedServerTier, .free)
+        XCTAssertEqual(store.operation, .idle)
         await store.refreshBackendSnapshot()
         XCTAssertEqual(store.confirmedServerTier, .free)
+    }
+
+    @MainActor
+    func testPurchaseWithoutAccountDoesNotStartStoreKitOperation() async {
+        let previousUserID = LocalAccountScope.currentUserId
+        defer {
+            LocalAccountScope.deactivate()
+            if let previousUserID { LocalAccountScope.activate(userId: previousUserID) }
+        }
+
+        LocalAccountScope.deactivate()
+        let store = EntitlementsStore(api: AccountScopedSubscriptionAPIStub(), observesTransactions: false)
+        await store.purchase(.premiumMonthly)
+        XCTAssertEqual(store.operation, .idle)
     }
 
     private func decodeResponse(_ json: String) throws -> BillingSubscriptionResponse {

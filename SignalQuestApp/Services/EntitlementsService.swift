@@ -333,8 +333,9 @@ final class EntitlementsStore: ObservableObject {
     @Published private(set) var productLoadMessage: String?
     @Published private var storedServerState: ServerEntitlementState = .idle
     @Published private(set) var localEntitlementTier: SupporterTier = .free
-    @Published private(set) var operation: StoreKitOperationState = .idle
+    @Published private var storedOperation: StoreKitOperationState = .idle
     private var serverStateSession: LocalAccountSession?
+    private var operationSession: LocalAccountSession?
 
     /// Un snapshot du compte A ne doit jamais être présenté comme le droit de B
     /// après une déconnexion, même si le store survit au changement de session.
@@ -342,6 +343,12 @@ final class EntitlementsStore: ObservableObject {
         guard let session = LocalAccountScope.sessionSnapshot(),
               session == serverStateSession else { return .idle }
         return storedServerState
+    }
+
+    var operation: StoreKitOperationState {
+        guard let session = LocalAccountScope.sessionSnapshot(),
+              session == operationSession else { return .idle }
+        return storedOperation
     }
 
     private let api: APIClientProtocol
@@ -433,52 +440,59 @@ final class EntitlementsStore: ObservableObject {
         storedServerState = state
     }
 
+    private func publishOperation(_ state: StoreKitOperationState, for session: LocalAccountSession) {
+        guard LocalAccountScope.sessionSnapshot() == session else { return }
+        operationSession = session
+        storedOperation = state
+    }
+
     func refreshStoreKitState() async {
         await loadProducts()
         await refreshLocalEntitlements()
     }
 
     func purchase(_ identifier: SignalQuestSubscriptionProduct) async {
-        let accountSession = LocalAccountScope.sessionSnapshot()
+        // Un achat Apple ne doit jamais démarrer sans compte SignalQuest actif.
+        guard let accountSession = LocalAccountScope.sessionSnapshot() else { return }
         let currentEligibility = eligibility
         guard currentEligibility.canPurchase else {
-            operation = .failed(currentEligibility.userMessage)
+            publishOperation(.failed(currentEligibility.userMessage), for: accountSession)
             return
         }
         guard let product = products[identifier] else {
-            operation = .failed(EntitlementsError.productUnavailable.localizedDescription)
+            publishOperation(.failed(EntitlementsError.productUnavailable.localizedDescription), for: accountSession)
             return
         }
         guard let synchronizer else {
-            operation = .failed(EntitlementsError.transactionDeliveryUnavailable.localizedDescription)
+            publishOperation(.failed(EntitlementsError.transactionDeliveryUnavailable.localizedDescription), for: accountSession)
             return
         }
 
-        operation = .purchasing(identifier)
+        publishOperation(.purchasing(identifier), for: accountSession)
         do {
             let result = try await product.purchase()
+            guard LocalAccountScope.sessionSnapshot() == accountSession else { return }
             switch result {
             case .success(let verification):
                 let transaction = try Self.verified(verification)
                 guard transaction.productID == identifier.rawValue else {
                     throw EntitlementsError.unexpectedProduct
                 }
-                guard let accountSession, LocalAccountScope.sessionSnapshot() == accountSession else { throw CancellationError() }
                 let snapshot = try await synchronizer.synchronize(Self.proof(for: verification, transaction: transaction))
                 guard LocalAccountScope.sessionSnapshot() == accountSession else { throw CancellationError() }
                 publishServerState(.available(snapshot), for: accountSession)
                 await transaction.finish()
                 await refreshLocalEntitlements()
-                operation = .succeeded("Abonnement \(snapshot.tier.displayName) activé sur ton compte.")
+                publishOperation(.succeeded("Abonnement \(snapshot.tier.displayName) activé sur ton compte."), for: accountSession)
             case .pending:
-                operation = .pending
+                publishOperation(.pending, for: accountSession)
             case .userCancelled:
-                operation = .idle
+                publishOperation(.idle, for: accountSession)
             @unknown default:
-                operation = .failed("Réponse App Store inconnue. Réessaie plus tard.")
+                publishOperation(.failed("Réponse App Store inconnue. Réessaie plus tard."), for: accountSession)
             }
         } catch {
-            operation = .failed(error.localizedDescription)
+            publishOperation(.failed(error.localizedDescription), for: accountSession)
         }
     }
 
@@ -486,27 +500,32 @@ final class EntitlementsStore: ObservableObject {
     /// Sans synchroniseur serveur, la restauration locale reste visible mais
     /// aucun droit multiplateforme n'est prétendu comme actif.
     func restorePurchases() async {
-        operation = .restoring
+        guard let accountSession = LocalAccountScope.sessionSnapshot() else { return }
+        publishOperation(.restoring, for: accountSession)
         do {
             try await AppStore.sync()
+            guard LocalAccountScope.sessionSnapshot() == accountSession else { return }
             await refreshLocalEntitlements()
+            guard LocalAccountScope.sessionSnapshot() == accountSession else { return }
             if serverVerificationReady {
                 try await synchronizeCurrentEntitlements()
             }
             await refreshBackendSnapshot()
+            guard LocalAccountScope.sessionSnapshot() == accountSession else { return }
             if localEntitlementTier != .free, !serverVerificationReady {
-                operation = .failed(PurchaseEligibility.existingLocalAppStoreEntitlement(localEntitlementTier).userMessage)
+                publishOperation(.failed(PurchaseEligibility.existingLocalAppStoreEntitlement(localEntitlementTier).userMessage), for: accountSession)
             } else {
-                operation = .succeeded("Achats restaurés et droits vérifiés.")
+                publishOperation(.succeeded("Achats restaurés et droits vérifiés."), for: accountSession)
             }
         } catch {
-            operation = .failed(error.localizedDescription)
+            publishOperation(.failed(error.localizedDescription), for: accountSession)
         }
     }
 
     func clearOperationMessage() {
         guard !operation.isBusy else { return }
-        operation = .idle
+        guard let accountSession = LocalAccountScope.sessionSnapshot() else { return }
+        publishOperation(.idle, for: accountSession)
     }
 
     private func loadProducts() async {
@@ -563,7 +582,7 @@ final class EntitlementsStore: ObservableObject {
         await refreshLocalEntitlements()
         guard LocalAccountScope.sessionSnapshot() == accountSession else { return }
         guard let synchronizer, serverVerificationEnabled else {
-            operation = .failed(PurchaseEligibility.existingLocalAppStoreEntitlement(localEntitlementTier).userMessage)
+            publishOperation(.failed(PurchaseEligibility.existingLocalAppStoreEntitlement(localEntitlementTier).userMessage), for: accountSession)
             return
         }
         do {
@@ -574,7 +593,7 @@ final class EntitlementsStore: ObservableObject {
         } catch {
             // Ne pas terminer la transaction : StoreKit la rejouera quand la
             // livraison backend sera de nouveau disponible.
-            operation = .failed(error.localizedDescription)
+            publishOperation(.failed(error.localizedDescription), for: accountSession)
         }
     }
 
