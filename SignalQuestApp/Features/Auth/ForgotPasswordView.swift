@@ -53,7 +53,7 @@ struct ForgotPasswordView: View {
                             if let error = challengeError ?? session.errorMessage {
                                 Label(error, systemImage: "exclamationmark.triangle")
                                     .font(.footnote)
-                                    .foregroundStyle(SQColor.danger)
+                                    .foregroundStyle(SQColor.dangerInk)
                                     .fixedSize(horizontal: false, vertical: true)
                                     .accessibilityIdentifier("auth.recovery.error")
                             }

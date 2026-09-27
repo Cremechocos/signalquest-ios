@@ -51,7 +51,7 @@ struct SignupView: View {
                             Label(error, systemImage: "exclamationmark.triangle")
                                 .accessibilityIdentifier("auth.signup.error")
                                 .font(.footnote)
-                                .foregroundStyle(SQColor.danger)
+                                .foregroundStyle(SQColor.dangerInk)
                         }
                     }
 

@@ -114,7 +114,7 @@ struct LoginView: View {
                         if !isTwoFactor, let error = session.errorMessage {
                             Label(error, systemImage: "exclamationmark.triangle")
                                 .font(.footnote)
-                                .foregroundStyle(SQColor.danger)
+                                .foregroundStyle(SQColor.dangerInk)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
@@ -303,7 +303,7 @@ struct LoginView: View {
                     if let error = session.errorMessage {
                         Label(error, systemImage: "exclamationmark.triangle")
                             .font(.footnote)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                     }
                     GradientButton("Continuer avec Apple", systemImage: "apple.logo", isBusy: session.isBusy) {
                         Task {
@@ -408,7 +408,7 @@ struct GuestSpeedtestReceiptsView: View {
             if let errorMessage {
                 Section {
                     Label(errorMessage, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(SQColor.danger)
+                        .foregroundStyle(SQColor.dangerInk)
                 }
             }
         }

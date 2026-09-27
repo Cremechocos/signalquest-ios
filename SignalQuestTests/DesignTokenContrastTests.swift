@@ -105,6 +105,7 @@ final class DesignTokenContrastTests: XCTestCase {
     func testSemanticTokensMeetAA() {
         assertMinimum(UIColor(SQColor.warning), named: "warning", atLeast: 4.5)
         assertMinimum(UIColor(SQColor.success), named: "success", atLeast: 4.5)
+        assertMinimum(UIColor(SQColor.dangerInk), named: "dangerInk", atLeast: 4.5)
     }
 
     /// `brandRed` et `danger` portent l'identité de marque : ils restent
