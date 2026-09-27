@@ -12,7 +12,17 @@ final class PasswordResetFieldFeedbackQATests: XCTestCase {
             lengthError: "The password must be at least 8 characters.")
     }
 
-    private func run(locale: String, passwordLabel: String, lengthError: String) {
+    /// Run with a dark simulator appearance. The in-app OLED preference and
+    /// accessibility text size exercise the actual rendered form, not tokens.
+    func testEnglishResetErrorOLEDAtAccessibilityXXXL() {
+        run(locale: "en", passwordLabel: "New password",
+            lengthError: "The password must be at least 8 characters.",
+            extraArguments: ["-app_pure_black", "YES",
+                             "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+    }
+
+    private func run(locale: String, passwordLabel: String, lengthError: String,
+                     extraArguments: [String] = []) {
         #if !targetEnvironment(simulator)
         XCTFail("This recipe requires a simulator-only debug route")
         return
@@ -21,9 +31,11 @@ final class PasswordResetFieldFeedbackQATests: XCTestCase {
         let app = XCUIApplication()
         defer { app.terminate() }
         SignalQuestUITestSupport.launch(app,
-            arguments: ["--reset-auth", "--reset-onboarding", "--qa-password-reset-form"],
+            arguments: ["--reset-auth", "--reset-onboarding", "--qa-password-reset-form"] + extraArguments,
             locale: locale)
-        if locale == "en" { XCTAssertGreaterThan(app.frame.width, 600, "Run this recipe on iPad") }
+        if locale == "en" && extraArguments.isEmpty {
+            XCTAssertGreaterThan(app.frame.width, 600, "Run this recipe on iPad")
+        }
 
         let password = app.secureTextFields["auth.reset.password"]
         let confirmation = app.secureTextFields["auth.reset.confirmation"]
@@ -43,8 +55,14 @@ final class PasswordResetFieldFeedbackQATests: XCTestCase {
         XCTAssertFalse(app.buttons["auth.reset.submit"].isEnabled)
 
         let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.name = "reset-password-length-error-\(locale)"
+        screenshot.name = "reset-password-length-error-\(locale)\(extraArguments.isEmpty ? "" : "-oled-axxxl")"
         screenshot.lifetime = .keepAlways
         add(screenshot)
+
+        if !extraArguments.isEmpty {
+            XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(issue, in: app))
+            XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(app.buttons["auth.reset.submit"], in: app),
+                          "The submit action remains reachable at accessibility XXXL")
+        }
     }
 }
