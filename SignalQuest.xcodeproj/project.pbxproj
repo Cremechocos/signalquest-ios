@@ -458,6 +458,7 @@
 		B9D52362A2FFC61D1DC2E2B0 /* AppStoreSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 057F3D0D16C169E912292708 /* AppStoreSyncTests.swift */; };
 		B9EF819D7C25F55340BA9BCB /* PasswordResetLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4206EF6BFCD2CCF04B359CA /* PasswordResetLinkTests.swift */; };
 		BA3FFF639F273E45CBB1D64D /* APIEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC51F8CACA66BE964E15F919 /* APIEndpoint.swift */; };
+		BA857968D702E592782F1407 /* MessageLocationTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C999B6F676082F3D0E84469 /* MessageLocationTransportTests.swift */; };
 		BA8A3EC30454B762CADD63FC /* SQUnits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83C9EF44824936928E504EF7 /* SQUnits.swift */; };
 		BB43E08A6DDF3E6F594B81FF /* AppLockController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3300B0156FFEE46C1CC81882 /* AppLockController.swift */; };
 		BB6E1D18529AF1CB880F1817 /* CommunityOutagesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B07689CEE23E4CB2951068 /* CommunityOutagesListView.swift */; };
@@ -846,6 +847,7 @@
 		4A392F27A37DB201C942F22D /* MessageSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageSyncEngine.swift; sourceTree = "<group>"; };
 		4A82FDDDBCE3DAE2BB286C11 /* AntennaSightOriginTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaSightOriginTests.swift; sourceTree = "<group>"; };
 		4C859D91AFCEFBFEE4E43C47 /* ANFRModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRModels.swift; sourceTree = "<group>"; };
+		4C999B6F676082F3D0E84469 /* MessageLocationTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageLocationTransportTests.swift; sourceTree = "<group>"; };
 		4D3F7311EB7FEBC85F9AD1E6 /* CustomSiteDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomSiteDraftTests.swift; sourceTree = "<group>"; };
 		4D6FCF33D099D13C7BDE8E51 /* MessageLocationEvidenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageLocationEvidenceTests.swift; sourceTree = "<group>"; };
 		4DBC54E804678243BC1BCC4C /* AuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthModels.swift; sourceTree = "<group>"; };
@@ -2268,6 +2270,7 @@
 				EEAF7F0495FE8D2DDDA7419C /* MapViewportServiceTests.swift */,
 				43A01E23F145B917FF35CD53 /* MentionAutocompleteTests.swift */,
 				4D6FCF33D099D13C7BDE8E51 /* MessageLocationEvidenceTests.swift */,
+				4C999B6F676082F3D0E84469 /* MessageLocationTransportTests.swift */,
 				2889EBCE5E9340D9FFD22A58 /* MobileChallengeTests.swift */,
 				19FA544154E6FF447F4F8F30 /* MobileChallengeWebKitTests.swift */,
 				A9594367DF3047FDF3B240AB /* MockURLProtocol.swift */,
@@ -3292,6 +3295,7 @@
 				13135940288C095189022C0B /* MapViewportServiceTests.swift in Sources */,
 				1E85BE17631EC5FEDBB2967B /* MentionAutocompleteTests.swift in Sources */,
 				C8E54732763FF7519FA15DB8 /* MessageLocationEvidenceTests.swift in Sources */,
+				BA857968D702E592782F1407 /* MessageLocationTransportTests.swift in Sources */,
 				5DC1493BF0982F01C75C24A8 /* MobileChallengeTests.swift in Sources */,
 				F79BD7537FC8AD69A4528541 /* MobileChallengeWebKitTests.swift in Sources */,
 				FA8A1167522105F2D6EBEFB7 /* MockURLProtocol.swift in Sources */,
