@@ -18,7 +18,7 @@ struct SignalQuestHomeView: View {
     @State private var pulse: NetworkPulse?
     @State private var nearbyMeasures: [AndroidSpeedtestMarker] = []
     @State private var userLocation: CLLocation?
-    /// Verdict de qualité réseau (opérateur SIM, données communautaires) qui pilote
+    /// Verdict de qualité réseau (opérateur identifié, données communautaires) qui pilote
     /// la pastille d'état. `nil` = pas encore chargé ou zone sans mesures.
     @State private var networkQuality: NearbyNetworkQuality?
     /// Sheet expliquant la source et le calcul du verdict réseau.
@@ -276,7 +276,7 @@ struct SignalQuestHomeView: View {
     private var isOnline: Bool { services.networkPath.isOnline }
 
     // Priorité du verdict affiché : hors-ligne → mode données réduites (contrainte
-    // système réelle) → qualité communautaire de l'opérateur SIM → état neutre en
+    // système réelle) → qualité communautaire de l'opérateur identifié → état neutre en
     // attendant les données. On n'annonce plus « au top » par défaut : le libellé
     // vert ne s'affiche que si les mesures de la zone le confirment.
 
@@ -289,14 +289,15 @@ struct SignalQuestHomeView: View {
 
     private var networkSubtitle: String {
         guard isOnline else { return String(localized: "Vérifie ta connexion") }
-        // Verdict dispo (hors mode données réduites) : opérateur SIM + le débit
+        // Verdict dispo (hors mode données réduites) : opérateur + provenance + débit
         // médian communautaire. Le détail RSRP vit dans la sheet explicative
         // (peu lisible en un coup d'œil sur la pastille).
         if !networkStatus.isConstrained, let quality = networkQuality {
+            let operatorAndSource = "\(quality.operatorLabel) · \(quality.operatorSource.shortLabel)"
             if let mbps = quality.medianDownloadMbps {
-                return "\(quality.operatorLabel) · \(mbps) Mbps"
+                return "\(operatorAndSource) · \(mbps) Mbps"
             }
-            return "\(quality.operatorLabel) · \(quality.sampleCount) mesures"
+            return "\(operatorAndSource) · \(quality.sampleCount) mesures"
         }
         switch networkStatus.connection {
         case .cellular:
@@ -730,7 +731,7 @@ struct SignalQuestHomeView: View {
     }
 
     /// Charge le pouls réseau, les dernières mesures communautaires et le verdict
-    /// de qualité (opérateur SIM) autour de la position. Best-effort : sans
+    /// de qualité (opérateur identifié) autour de la position. Best-effort : sans
     /// position ou sans données, la section reste masquée et la pastille retombe
     /// sur un état neutre (jamais d'erreur affichée sur l'Accueil).
     /// `forceFresh` (pull-to-refresh) contourne le cache de tuiles.

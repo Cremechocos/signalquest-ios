@@ -15,7 +15,7 @@ final class CarPlayHereTests: XCTestCase {
         NearbyNetworkQuality(
             level: level, signalBand: level, speedBand: level,
             medianRsrpDbm: -108, medianDownloadMbps: 12,
-            operatorLabel: "Orange", operatorKey: "ORANGE",
+            operatorLabel: "Orange", operatorKey: "ORANGE", operatorSource: .ipAsn,
             sampleCount: samples, radiusMeters: 1000
         )
     }

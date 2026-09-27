@@ -25868,6 +25868,38 @@
         }
       }
     },
+    "Opérateur déduit du PLMN de la SIM. En itinérance, il peut différer du réseau radio utilisé.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carrier inferred from the SIM PLMN. When roaming, it may differ from the radio network in use."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opérateur déduit du PLMN de la SIM. En itinérance, il peut différer du réseau radio utilisé."
+          }
+        }
+      }
+    },
+    "Opérateur estimé par l'accès Internet mobile (IP/ASN). En itinérance, cela ne confirme pas le réseau radio servant.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carrier estimated from mobile Internet access (IP/ASN). When roaming, this does not confirm the serving radio network."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opérateur estimé par l'accès Internet mobile (IP/ASN). En itinérance, cela ne confirme pas le réseau radio servant."
+          }
+        }
+      }
+    },
     "Opérateur du relevé inconnu : impossible de rattacher cette identification.": {
       "localizations": {
         "fr": {

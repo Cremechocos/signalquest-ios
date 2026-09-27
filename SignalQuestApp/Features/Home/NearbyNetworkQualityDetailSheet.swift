@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Explique le verdict « Réseau … » de l'Accueil : d'où viennent les données
-/// (mesures communautaires filtrées sur l'opérateur SIM, dans un rayon donné) et
+/// (mesures communautaires filtrées sur un opérateur identifié, dans un rayon donné) et
 /// comment il est calculé (le moins bon de la couverture et du débit). Lecture seule.
 struct NearbyNetworkQualityDetailSheet: View {
     let quality: NearbyNetworkQuality
@@ -13,6 +13,7 @@ struct NearbyNetworkQualityDetailSheet: View {
                 VStack(spacing: SQSpace.lg) {
                     hero
                     intro
+                    operatorSourceNote
                     criteriaCard
                     verdictRuleCard
                     footerNote
@@ -75,6 +76,23 @@ struct NearbyNetworkQualityDetailSheet: View {
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, SQSpace.sm)
+    }
+
+    @ViewBuilder
+    private var operatorSourceNote: some View {
+        Group {
+            switch quality.operatorSource {
+            case .ipAsn:
+                Text("Opérateur estimé par l'accès Internet mobile (IP/ASN). En itinérance, cela ne confirme pas le réseau radio servant.")
+            case .simPlmn:
+                Text("Opérateur déduit du PLMN de la SIM. En itinérance, il peut différer du réseau radio utilisé.")
+            }
+        }
+        .font(SQFont.body(12))
+        .foregroundStyle(SQColor.labelSecondary)
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, SQSpace.sm)
     }
 
     // MARK: Les deux critères

@@ -1423,6 +1423,18 @@ extension RadioLogsTests {
         XCTAssertEqual(selected("20808", detected: orange, isCellular: false), "SFR", "L'ASN Wi-Fi ne remplace pas la SIM")
         XCTAssertEqual(selected("20808", detected: orange, viaVpn: true), "SFR", "L'ASN du VPN est ignoré")
         XCTAssertEqual(selected("23415", detected: orange), "ORANGE", "En itinérance, l'ASN visité valide prime")
+        XCTAssertEqual(NearbyNetworkQualityService.selectOperatorWithSource(
+            market: france, isCellular: true, viaVpn: false,
+            detected: orange, simPlmn: "20808"
+        )?.source, .ipAsn)
+        XCTAssertEqual(NearbyNetworkQualityService.selectOperatorWithSource(
+            market: france, isCellular: false, viaVpn: false,
+            detected: orange, simPlmn: "20808"
+        )?.source, .simPlmn)
+        XCTAssertEqual(NearbyNetworkQualityService.selectOperatorWithSource(
+            market: france, isCellular: true, viaVpn: true,
+            detected: orange, simPlmn: "20808"
+        )?.source, .simPlmn)
         for plmn in ["208008", "20838", "23415", nil] as [String?] {
             XCTAssertNil(selected(plmn), plmn ?? "absent")
         }
