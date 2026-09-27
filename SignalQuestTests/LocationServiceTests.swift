@@ -126,8 +126,33 @@ final class LocationServiceTests: XCTestCase {
         let model = DriveTestViewModel(services: AppServices(config: .test, location: service))
         model.onAppear()
         XCTAssertEqual(model.userLocation?.latitude, 48.85)
-        XCTAssertEqual(model.trace.count, 1)
+        XCTAssertTrue(model.trace.isEmpty, "La trace ne commence qu'avec une session Drive Test")
         XCTAssertEqual(service.cachedLocation()?.horizontalAccuracy, 1_000)
+        model.onDisappear(isLeavingScreen: true)
+    }
+
+    func testDriveTestTraceStopsWithSessionAndClearsOnRestart() {
+        let (service, _, _, clock) = makeService(immediateTimeout: true)
+        service.receiveLocations([fix()])
+        let model = DriveTestViewModel(services: AppServices(config: .test, location: service))
+        model.onAppear()
+        model.start()
+        clock.advance(1)
+        service.receiveLocations([fix(latitude: 48.851, at: clock.value)])
+        XCTAssertEqual(model.trace.last?.latitude, 48.851)
+
+        model.stop()
+        let completedTrace = model.trace
+        let completedDistance = model.distanceMeters
+        clock.advance(1)
+        service.receiveLocations([fix(latitude: 48.852, at: clock.value)])
+        XCTAssertEqual(model.trace.map(\.latitude), completedTrace.map(\.latitude))
+        XCTAssertEqual(model.distanceMeters, completedDistance)
+
+        model.start()
+        XCTAssertTrue(model.trace.isEmpty)
+        XCTAssertEqual(model.distanceMeters, 0)
+        model.stop()
         model.onDisappear(isLeavingScreen: true)
     }
 

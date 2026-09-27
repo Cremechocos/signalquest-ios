@@ -1,4 +1,5 @@
 import XCTest
+import MapKit
 @testable import SignalQuest
 
 /// Compteur de données d'un Drive Test.
@@ -180,5 +181,54 @@ final class DriveTestDataBudgetTests: XCTestCase {
         XCTAssertNil(model.operatorSource)
         XCTAssertTrue(model.observeOperatorContext(connection: .cellular, viaVPN: false))
         XCTAssertNil(model.displayedOperatorKey, "Une reprise cellulaire exige une nouvelle attribution")
+    }
+}
+
+final class DriveTestTraceTests: XCTestCase {
+    func testLongSessionKeepsBothEndsAndMajorTurnWithinMapLimit() {
+        var trace: [CLLocationCoordinate2D] = []
+        let corner = CLLocationCoordinate2D(latitude: 48.95, longitude: 2.38)
+        let coordinates = (0..<1_201).map { index -> CLLocationCoordinate2D in
+            if index == 300 { return corner }
+            return CLLocationCoordinate2D(latitude: 48.85, longitude: 2.35 + Double(index) * 0.0001)
+        }
+
+        for coordinate in coordinates {
+            DriveTraceSampler.append(coordinate, to: &trace, maxPoints: 600)
+            XCTAssertLessThanOrEqual(trace.count, 600)
+        }
+
+        XCTAssertEqual(trace.first?.longitude, coordinates.first?.longitude)
+        XCTAssertEqual(trace.last?.longitude, coordinates.last?.longitude)
+        XCTAssertTrue(trace.contains { $0.latitude == corner.latitude && $0.longitude == corner.longitude })
+        XCTAssertTrue(trace.contains { $0.longitude < 2.40 && $0.longitude > 2.35 },
+            "Le parcours ancien ne doit pas disparaître lorsque la limite est atteinte")
+    }
+
+    @MainActor
+    func testMapRedrawsLatestPositionWhenTraceCountStaysAtLimit() throws {
+        let map = MKMapView(frame: .zero)
+        let coordinator = DriveTestMapView.Coordinator(onSelectSite: { _ in }, onSelectSpeedtest: { _ in })
+        var trace = (0..<600).map {
+            CLLocationCoordinate2D(latitude: 48.85, longitude: 2.35 + Double($0) * 0.0001)
+        }
+        func sync() {
+            coordinator.sync(antennas: [], trace: trace, speedtestTrail: [],
+                highlightedSiteId: nil, userLocation: nil, operatorPalette: [:], displayedKey: nil, on: map)
+        }
+
+        sync()
+        let firstLine = try XCTUnwrap(map.overlays.compactMap { $0 as? MKPolyline }.first)
+        let next = CLLocationCoordinate2D(latitude: 48.86, longitude: 2.42)
+        DriveTraceSampler.append(next, to: &trace, maxPoints: 600)
+        XCTAssertEqual(trace.count, 600)
+        sync()
+
+        let currentLine = try XCTUnwrap(map.overlays.compactMap { $0 as? MKPolyline }.first)
+        XCTAssertFalse(firstLine === currentLine)
+        var last = CLLocationCoordinate2D()
+        currentLine.getCoordinates(&last, range: NSRange(location: currentLine.pointCount - 1, length: 1))
+        XCTAssertEqual(last.latitude, next.latitude, accuracy: 0.0000001)
+        XCTAssertEqual(last.longitude, next.longitude, accuracy: 0.0000001)
     }
 }
