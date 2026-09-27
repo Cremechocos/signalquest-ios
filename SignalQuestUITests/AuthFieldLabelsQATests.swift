@@ -91,6 +91,41 @@ final class AuthFieldLabelsQATests: XCTestCase {
         }
     }
 
+    func testIPadTabMovesSignupInputFromNameToEmailInFrenchAndEnglish() {
+        continueAfterFailure = false
+        for locale in ["fr", "en"] {
+            let app = launch(locale: locale)
+            defer { app.terminate() }
+            XCTAssertGreaterThan(app.frame.width, 600, "Run this keyboard-navigation recipe on iPad")
+
+            let signup = app.buttons["login.signup"]
+            XCTAssertTrue(signup.waitForExistence(timeout: 10))
+            signup.tap()
+            let name = app.textFields["auth.signup.name"]
+            let email = app.textFields["auth.signup.email"]
+            XCTAssertTrue(name.waitForExistence(timeout: 10))
+            XCTAssertTrue(email.exists)
+            name.tap()
+            name.typeText("QA")
+
+            name.typeKey(.tab, modifierFlags: [])
+            let focus = XCTAttachment(string: email.debugDescription)
+            focus.name = "signup-ipad-tab-ax-\(locale)"
+            focus.lifetime = .keepAlways
+            add(focus)
+            // typeText requires keyboard focus; it does not tap the Email field.
+            email.typeText("ipad-\(locale)@example.invalid")
+            XCTAssertEqual(name.value as? String, "QA")
+            XCTAssertEqual(email.value as? String, "ipad-\(locale)@example.invalid")
+            XCTAssertEqual(email.label, "Email")
+
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.name = "signup-ipad-tab-input-\(locale)"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+        }
+    }
+
     private func launch(locale: String) -> XCUIApplication {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth", "--reset-onboarding"], locale: locale)
