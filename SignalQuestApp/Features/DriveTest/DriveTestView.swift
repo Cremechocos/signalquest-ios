@@ -837,7 +837,9 @@ final class DriveTestViewModel: ObservableObject {
             String(localized: "\(Int(distanceMeters.rounded())) m parcourus")
         ]
         do {
-            parts.append(String(localized: "\(testCount) test"))
+            // `testCount` inclut les tentatives échouées ou interrompues ; seul
+            // l'accumulateur compte les mesures réellement terminées.
+            parts.append(String(localized: "\(accumulator.count) test"))
             parts.append(String(localized: "\(Self.formattedBytes(sessionBytes)) de données"))
         }
 
