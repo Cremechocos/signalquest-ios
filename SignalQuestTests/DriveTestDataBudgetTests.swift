@@ -114,4 +114,17 @@ final class DriveTestDataBudgetTests: XCTestCase {
             connectionType: .cellular)
         XCTAssertNil(DriveSpeedtestPoint(result: result))
     }
+
+    func testLostGpsDoesNotStartUnlimitedSpeedtests() {
+        XCTAssertTrue(DriveTestViewModel.isAutomaticTestDue(testCount: 0, secondsWaited: 0, metersMoved: nil,
+                          intervalMeters: 500, maxSeconds: 30))
+        XCTAssertFalse(DriveTestViewModel.isAutomaticTestDue(testCount: 1, secondsWaited: 0, metersMoved: nil,
+                           intervalMeters: 500, maxSeconds: 30))
+        XCTAssertFalse(DriveTestViewModel.isAutomaticTestDue(testCount: 1, secondsWaited: 29, metersMoved: nil,
+                           intervalMeters: 500, maxSeconds: 30))
+        XCTAssertTrue(DriveTestViewModel.isAutomaticTestDue(testCount: 1, secondsWaited: 30, metersMoved: nil,
+                          intervalMeters: 500, maxSeconds: 30))
+        XCTAssertTrue(DriveTestViewModel.isAutomaticTestDue(testCount: 1, secondsWaited: 0, metersMoved: 500,
+                          intervalMeters: 500, maxSeconds: 30))
+    }
 }

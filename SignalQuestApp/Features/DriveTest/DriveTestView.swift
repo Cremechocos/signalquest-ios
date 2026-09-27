@@ -320,8 +320,8 @@ final class DriveTestViewModel: ObservableObject {
 
     /// Observe le type de connexion : en WiFi, la session se met en pause (réseau non
     /// représentatif du mobile) ; elle reprend dès le retour en cellulaire / zone réelle.
-    /// Une vraie zone blanche (`.other`) n'est PAS une pause : « Aucun signal » est une
-    /// mesure de couverture valide.
+    /// Une vraie zone blanche (`.other`) n'est PAS une pause : on laisse le
+    /// speedtest constater l'absence de service sans créer de point de couverture.
     private func observeConnectionForPause() {
         pathCancellable = services.networkPath.$status
             .map(\.connection)
@@ -621,7 +621,7 @@ final class DriveTestViewModel: ObservableObject {
             testCount += 1
             errorMessage = nil
             statusLabel = "Test \(testCount) en cours…"
-            lastTestCoordinate = services.location.lastLocation?.coordinate ?? userLocation
+            lastTestCoordinate = services.location.cachedLocation()?.coordinate
             do {
                 let result = try await runOneTest()
                 if let measuredCoordinate = result.coordinate {
@@ -634,6 +634,9 @@ final class DriveTestViewModel: ObservableObject {
                 accumulator.add(result)
                 summary = accumulator.summary(truncatedAt: nil)
                 statusLabel = "Test \(testCount) terminé"
+                if result.coordinate == nil, errorMessage == nil {
+                    errorMessage = String(localized: "Position indisponible")
+                }
             } catch is CancellationError {
                 break
             } catch {
@@ -677,22 +680,32 @@ final class DriveTestViewModel: ObservableObject {
                 manualTestRequested = false
                 return true
             }
-            // Premier test de la session : rien à attendre.
-            guard let origin = lastTestCoordinate else { return true }
-
             // Déclencheur DISTANCE — on roule, on mesure plus tôt.
             var metersRemaining: Double?
-            if let current = services.location.lastLocation?.coordinate ?? userLocation {
+            var metersMoved: Double?
+            if let origin = lastTestCoordinate,
+               let current = services.location.cachedLocation()?.coordinate {
                 let moved = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
                     .distance(from: CLLocation(latitude: current.latitude, longitude: current.longitude))
-                if moved >= testIntervalMeters { return true }
-                metersRemaining = (testIntervalMeters - moved).rounded()
+                if moved.isFinite {
+                    metersMoved = moved
+                    metersRemaining = max(0, testIntervalMeters - moved).rounded()
+                }
             }
+
+            // Le premier test part immédiatement. Ensuite, perdre le GPS ne doit
+            // jamais transformer une session en boucle de tests sans pause.
+            if Self.isAutomaticTestDue(
+                testCount: testCount,
+                secondsWaited: secondsWaited,
+                metersMoved: metersMoved,
+                intervalMeters: testIntervalMeters,
+                maxSeconds: Self.maxSecondsBetweenTests
+            ) { return true }
 
             // Déclencheur TEMPS — garantit que la session avance à l'arrêt, et même
             // sans le moindre point GPS.
             let secondsRemaining = Self.maxSecondsBetweenTests - secondsWaited
-            if secondsRemaining <= 0 { return true }
 
             // Toujours dire ce qu'on attend : c'est l'absence de ce retour qui faisait
             // passer un comportement voulu pour une panne.
@@ -708,6 +721,18 @@ final class DriveTestViewModel: ObservableObject {
             secondsWaited += 1
         }
         return false
+    }
+
+    nonisolated static func isAutomaticTestDue(
+        testCount: Int,
+        secondsWaited: Int,
+        metersMoved: Double?,
+        intervalMeters: Double,
+        maxSeconds: Int
+    ) -> Bool {
+        if testCount == 0 { return true }
+        if let metersMoved, metersMoved.isFinite, metersMoved >= intervalMeters { return true }
+        return secondsWaited >= maxSeconds
     }
 
     /// Déclenche un test sans attendre la distance — pour un arrêt volontaire
@@ -747,8 +772,8 @@ final class DriveTestViewModel: ObservableObject {
         return sessionBytes >= cap
     }
 
-    /// Arrêt au plafond : la session se termine comme un arrêt manuel (la
-    /// couverture déjà capturée part normalement), mais l'état le DIT.
+    /// Arrêt au plafond : la session se termine comme un arrêt manuel et les
+    /// speedtests déjà mesurés restent conservés, mais l'état le DIT.
     private func stopForDataCap() {
         stoppedByDataCap = true
         stop()
@@ -783,14 +808,13 @@ final class DriveTestViewModel: ObservableObject {
         services.networkPath.refreshNow()
         let status = services.networkPath.status
         isVPNActive = VPNDetector.isActive()
-        let lastLocation = services.location.lastLocation
-        let coordinate = lastLocation?.coordinate ?? userLocation
-        let location = coordinate.map {
+        let measurementFix = services.location.cachedLocation()
+        let location = measurementFix.map {
             Coordinates(
-                latitude: $0.latitude,
-                longitude: $0.longitude,
-                accuracy: lastLocation.map { max(0, $0.horizontalAccuracy) },
-                observedAt: lastLocation?.timestamp
+                latitude: $0.coordinate.latitude,
+                longitude: $0.coordinate.longitude,
+                accuracy: max(0, $0.horizontalAccuracy),
+                observedAt: $0.timestamp
             )
         }
         let settings = makeSettings()
