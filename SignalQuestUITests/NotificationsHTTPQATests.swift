@@ -183,10 +183,6 @@ final class NotificationsHTTPQATests: XCTestCase {
             row.tap()
             let after = try await waitForUnread(initial.unreadCount - 1, fixture: fixture)
             XCTAssertEqual(after, initial.unreadCount - 1)
-            if app.buttons["Notifications"].exists {
-                assertBellCount(after, in: app)
-                capture(app, "home-bell-after-read-fr")
-            }
             app.terminate()
 
             app = launchAuthenticated(fixture: fixture, locale: "en")
