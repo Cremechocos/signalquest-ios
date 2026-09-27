@@ -217,10 +217,12 @@ final class DriveTestViewModel: ObservableObject {
                 self?.apply(coordinate: location.coordinate)
             }
         }
-        // Position initiale (sans déclencher de prompt si pas déjà autorisé).
+        // Position initiale admise (sans déclencher de prompt si pas déjà autorisé).
+        // `lastLocation` peut survivre au timer d'expiration ou à une révocation
+        // encore non livrée par le delegate : ne pas l'ajouter à la trace.
         guard services.location.authorizationStatus == .authorizedWhenInUse
             || services.location.authorizationStatus == .authorizedAlways else { return }
-        if let cached = services.location.lastLocation { apply(coordinate: cached.coordinate) }
+        if let cached = services.location.cachedLocation() { apply(coordinate: cached.coordinate) }
         Task {
             if let loc = await services.location.currentLocation(timeoutSeconds: 5) {
                 apply(coordinate: loc.coordinate)

@@ -116,7 +116,7 @@ final class AppServices: ObservableObject {
     let router: AppRouter
     let callManager: CallManager
     let sse: SSEClient
-    let location = LocationService()
+    let location: LocationService
     let networkPath = NetworkPathMonitor()
     /// Émetteur de la position/présence live pour la carte des amis.
     let livePresence: LivePresenceService
@@ -130,7 +130,8 @@ final class AppServices: ObservableObject {
     @Published private(set) var unreadNotifications = 0
     private let notificationBadgeState = InboxBadgePresentationState()
 
-    init(config: AppConfig = .current) {
+    init(config: AppConfig = .current, location: LocationService = LocationService()) {
+        self.location = location
         let credentials = CredentialStore()
         let api = APIClient(config: config, credentials: credentials)
         self.api = api
