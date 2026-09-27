@@ -785,36 +785,50 @@ final class ConversationLiveShareCoordinator: ObservableObject {
         let status = networkPath.status
         let sim = networkPath.simPLMN()
         let activeSimPlmn = status.connection == .cellular ? (status.simPlmn ?? sim.plmn) : nil
-        let payload = LiveSharePayload(
-            radio: LiveShareRadio(
-                connectionType: status.speedtestConnectionType,
-                technology: status.cellularTechnology?.displayName,
-                // CoreTelephony décrit la SIM, pas nécessairement le réseau
-                // visité. Aucun PLMN servant n'est donc fabriqué en roaming.
-                operatorName: nil,
-                mcc: nil,
-                mnc: nil,
-                observedPlmn: nil,
-                simPlmn: activeSimPlmn,
-                simOperatorName: status.operatorName,
-                networkIdentitySource: activeSimPlmn == nil ? nil : "SIM"
-            ),
-            location: currentLocation.map {
-                LiveShareLocation(
-                    latitude: $0.coordinate.latitude,
-                    longitude: $0.coordinate.longitude,
-                    accuracy: $0.horizontalAccuracy >= 0 ? $0.horizontalAccuracy : nil,
-                    altitude: $0.verticalAccuracy >= 0 ? $0.altitude : nil,
-                    speed: $0.speed >= 0 ? $0.speed : nil,
-                    heading: $0.course >= 0 ? $0.course : nil
-                )
-            },
-            at: ISO8601DateFormatter().string(from: Date())
+        let radio = LiveShareRadio(
+            connectionType: status.speedtestConnectionType,
+            technology: status.cellularTechnology?.displayName,
+            // CoreTelephony décrit la SIM, pas nécessairement le réseau
+            // visité. Aucun PLMN servant n'est donc fabriqué en roaming.
+            operatorName: nil,
+            mcc: nil,
+            mnc: nil,
+            observedPlmn: nil,
+            simPlmn: activeSimPlmn,
+            simOperatorName: status.operatorName,
+            networkIdentitySource: activeSimPlmn == nil ? nil : "SIM"
         )
 
         var sawSuccess = false
+        var lastSentLocation: CLLocation?
         for session in publishableSessions {
             guard appIsActive, !Task.isCancelled else { break }
+            // Un callback GPS ancien peut survivre dans `lastObservedLocation`.
+            // Revalider juste avant CHAQUE envoi, y compris après un await pour
+            // une autre session : révocation/expiration => localisation absente.
+            let admissibleLocation = currentLocation.flatMap {
+                location.isUsable($0, maxAge: 30) ? $0 : nil
+            }
+            // Le contrat E2EE v2 exige une position chiffrée : sans fix admis,
+            // attendre le prochain relevé plutôt que recycler une ancienne position.
+            if session.e2eeV2Required == true, admissibleLocation == nil {
+                errorMessage = String(localized: "Position indisponible")
+                continue
+            }
+            let payload = LiveSharePayload(
+                radio: radio,
+                location: admissibleLocation.map {
+                    LiveShareLocation(
+                        latitude: $0.coordinate.latitude,
+                        longitude: $0.coordinate.longitude,
+                        accuracy: $0.horizontalAccuracy >= 0 ? $0.horizontalAccuracy : nil,
+                        altitude: $0.verticalAccuracy >= 0 ? $0.altitude : nil,
+                        speed: $0.speed >= 0 ? $0.speed : nil,
+                        heading: $0.course >= 0 ? $0.course : nil
+                    )
+                },
+                at: ISO8601DateFormatter().string(from: Date())
+            )
             do {
                 if session.e2eeV2Required == true {
                     try await service.updateE2eeLiveShare(session: session, payload: payload)
@@ -827,6 +841,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
                 }
                 payloadsBySessionID[session.id] = payload
                 sawSuccess = true
+                lastSentLocation = admissibleLocation
             } catch {
                 errorMessage = "Partage en direct interrompu : \(error.localizedDescription)"
                 if case APIError.http(let status, _, _, _, _) = error,
@@ -837,7 +852,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
         }
         if sawSuccess {
             lastPublishedAt = Date()
-            lastPublishedLocation = currentLocation
+            lastPublishedLocation = lastSentLocation
             errorMessage = nil
         }
         if publishableSessions.isEmpty { stopPublisher() }
