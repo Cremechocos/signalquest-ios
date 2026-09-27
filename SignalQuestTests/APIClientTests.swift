@@ -272,6 +272,15 @@ final class APIClientTests: XCTestCase {
         )
     }
 
+    func testInvalidTwoFactorCodeDoesNotExposeServerLanguage() {
+        let message = APIError.userFacingMessage(
+            status: 400, code: "INVALID_2FA_CODE", serverMessage: "Code de vérification invalide"
+        )
+        XCTAssertEqual(message,
+                       String(localized: "Le code est incorrect. Saisis les six chiffres affichés dans ton application d’authentification."))
+        XCTAssertNotEqual(message, "Code de vérification invalide")
+    }
+
     // MARK: - Sprint 1 : idempotence & throttling (429/503)
 
     func testAccountSwitchCancels401AndThrottleRetriesBeforeTheyCanUseAccountB() async throws {

@@ -106,6 +106,7 @@ enum APIError: Error, LocalizedError, Equatable {
         "INVALID_RESET_LINK": String(localized: "Ce lien est invalide ou déjà utilisé. Demande un nouveau lien."),
         "RESET_LINK_ALREADY_USED": String(localized: "Ce lien est invalide ou déjà utilisé. Demande un nouveau lien."),
         "RESET_LINK_EXPIRED": String(localized: "Ce lien a expiré. Demande un nouveau lien."),
+        "INVALID_2FA_CODE": String(localized: "Le code est incorrect. Saisis les six chiffres affichés dans ton application d’authentification."),
         "EMAIL_ALREADY_USED": String(localized: "Cette adresse est déjà utilisée. Connecte-toi ou réinitialise ton mot de passe."),
         "EMAIL_NOT_VERIFIED": String(localized: "Confirme ton adresse e-mail pour publier ou contacter la communauté. Ouvre le lien reçu ou demande-en un nouveau depuis Profil."),
 

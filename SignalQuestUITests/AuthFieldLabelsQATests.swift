@@ -58,6 +58,12 @@ final class AuthFieldLabelsQATests: XCTestCase {
             let email = app.textFields["Email"]
             XCTAssertTrue(email.waitForExistence(timeout: 15))
             XCTAssertLessThan(email.frame.width, 600, "Login field stretches across the iPad")
+            email.tap()
+            email.typeText("ipad-\(locale)@example.invalid")
+            XCTAssertEqual(email.label, "Email")
+            XCTAssertEqual(email.value as? String, "ipad-\(locale)@example.invalid")
+            XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(app.buttons["login.submit"], in: app),
+                          "Submit action remains reachable while editing at maximum text size")
 
             let recovery = app.buttons["login.recovery"]
             let signup = app.buttons["login.signup"]

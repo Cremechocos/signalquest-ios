@@ -17,6 +17,14 @@ final class TwoFactorLoginFieldQATests: XCTestCase {
     func testEnglishFailureStaysBesideCode() async throws { try await run(locale: "en", label: "6-digit code") }
 
     func testFrenchFailureWithoutPasswordSheet() async throws {
+        try await runDirect(locale: "fr", label: "Code à 6 chiffres")
+    }
+
+    func testEnglishFailureWithoutPasswordSheetOnIPad() async throws {
+        try await runDirect(locale: "en", label: "6-digit code")
+    }
+
+    private func runDirect(locale: String, label: String) async throws {
         let healthURL = URL(string: "https://127.0.0.1:4325/health")!
         let (health, response) = try await URLSession.shared.data(from: healthURL)
         XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
@@ -25,22 +33,26 @@ final class TwoFactorLoginFieldQATests: XCTestCase {
         let app = XCUIApplication()
         defer { app.terminate() }
         SignalQuestUITestSupport.launch(app,
-            arguments: ["--reset-auth", "--reset-onboarding", "--qa-two-factor-login"], locale: "fr")
+            arguments: ["--reset-auth", "--reset-onboarding", "--qa-two-factor-login"], locale: locale)
+        if locale == "en" { XCTAssertGreaterThan(app.frame.width, 600, "Run this recipe on iPad") }
         let code = app.textFields["login.twoFactor.code"]
         XCTAssertTrue(code.waitForExistence(timeout: 15))
-        XCTAssertEqual(code.label, "Code à 6 chiffres")
+        XCTAssertEqual(code.label, label)
         code.tap(); code.typeText("123456")
-        XCTAssertEqual(code.label, "Code à 6 chiffres", "Accessible name must survive input")
+        XCTAssertEqual(code.label, label, "Accessible name must survive input")
         app.buttons["login.twoFactor.submit"].tap()
 
         let error = app.descendants(matching: .any)["login.twoFactor.error"].firstMatch
         XCTAssertTrue(error.waitForExistence(timeout: 15))
-        XCTAssertTrue(error.label.contains("Code de vérification invalide"), "Expected server error, not a local mock")
+        let expectedError = locale == "fr"
+            ? "Le code est incorrect. Saisis les six chiffres affichés dans ton application d’authentification."
+            : "The code is incorrect. Enter the six digits shown in your authenticator app."
+        XCTAssertTrue(error.label.contains(expectedError), "Server code must be explained in the app language")
         XCTAssertGreaterThanOrEqual(error.frame.minY, code.frame.maxY)
         XCTAssertLessThanOrEqual(error.frame.minY - code.frame.maxY, 40)
         XCTAssertTrue(app.buttons["login.twoFactor.cancel"].exists)
         let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.name = "two-factor-login-error-fr-direct-qa"
+        screenshot.name = "two-factor-login-error-\(locale)-direct-qa"
         screenshot.lifetime = .keepAlways
         add(screenshot)
     }
