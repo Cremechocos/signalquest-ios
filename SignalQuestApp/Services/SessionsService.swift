@@ -331,16 +331,16 @@ final class CoverageSessionQueue: CoverageSessionStoring, @unchecked Sendable {
 
     /// Au lancement suivant, une session restée "recording" provient d'une
     /// terminaison brutale. Elle devient envoyable avec le dernier point comme fin.
-    /// Les brouillons de moins de deux points sont inutilisables par le backend.
+    /// Les brouillons de moins de deux points restent archivés : ils ne peuvent
+    /// pas être envoyés, mais leur suppression ferait perdre une ancienne mesure.
     func recoverInterruptedRecordings() throws {
         try withLock {
             var snapshot = try readUnlocked()
             var didChange = false
-            snapshot.sessions = snapshot.sessions.compactMap { pending in
+            snapshot.sessions = snapshot.sessions.map { pending in
                 guard pending.state == .recording else { return pending }
                 guard pending.upload.points.count >= 2, let last = pending.upload.points.last else {
-                    didChange = true
-                    return nil
+                    return pending
                 }
                 var recovered = pending
                 recovered.upload.endTime = max(recovered.upload.startTime, last.timestamp)
@@ -633,8 +633,6 @@ final class SwiftDataCoverageSessionStore: CoverageSessionStoring, @unchecked Se
             for entity in try context.fetch(descriptor) {
                 guard let upload = try? decoder.decode(CoverageSessionUpload.self, from: entity.payload) else { continue }
                 guard upload.points.count >= 2, let last = upload.points.last else {
-                    context.delete(entity)
-                    didChange = true
                     continue
                 }
                 var recovered = upload

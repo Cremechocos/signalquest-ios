@@ -242,6 +242,36 @@ final class CoverageSessionQueueTests: XCTestCase {
         XCTAssertFalse(recovered.upload.showOnMap, "Le choix privé doit survivre au relaunch")
     }
 
+    func testIncompleteLegacyJSONDraftSurvivesRecovery() throws {
+        let fileURL = try makeTemporaryQueueURL()
+        let upload = makeSession(id: UUID(), startTime: 1_000, endTime: 1_000,
+                                 showOnMap: false, points: [makePoint(timestamp: 1_000)])
+        let queue = CoverageSessionQueue(fileURL: fileURL)
+        try queue.upsert(upload, state: .recording)
+        let original = try Data(contentsOf: fileURL)
+
+        try queue.recoverInterruptedRecordings()
+
+        XCTAssertEqual(try Data(contentsOf: fileURL), original)
+        XCTAssertEqual(try queue.allPending().first?.upload.sessionId, upload.sessionId)
+        XCTAssertEqual(try queue.allPending().first?.state, .recording)
+    }
+
+    func testIncompleteLegacySwiftDataDraftSurvivesRecovery() throws {
+        guard #available(iOS 17, *) else { throw XCTSkip("SwiftData coverage store requires iOS 17") }
+        let legacyURL = try makeTemporaryQueueURL()
+        let storeURL = legacyURL.deletingLastPathComponent().appendingPathComponent("CoverageSessions.store")
+        let store = try XCTUnwrap(SwiftDataCoverageSessionStore(storeURL: storeURL, legacyFileURL: legacyURL))
+        let upload = makeSession(id: UUID(), startTime: 1_000, endTime: 1_000,
+                                 showOnMap: false, points: [makePoint(timestamp: 1_000)])
+        try store.upsert(upload, state: .recording)
+        let original = try store.allPending()
+
+        try store.recoverInterruptedRecordings()
+
+        XCTAssertEqual(try store.allPending(), original)
+    }
+
     func testRetiredCoveragePreservesOldDraftsWithoutUploadingOrRecoveringThem() async throws {
         for state: CoverageSessionQueueState in [.recording, .queued] {
             let fileURL = try makeTemporaryQueueURL()
