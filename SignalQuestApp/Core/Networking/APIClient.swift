@@ -7,6 +7,10 @@ extension Notification.Name {
     /// glissant). `AuthSessionViewModel` l'observe pour re-router globalement vers
     /// l'écran de login au lieu de laisser des écritures échouer en silence (ROB-02).
     static let sqAuthSessionExpired = Notification.Name("fr.signalquest.ios.authSessionExpired")
+    /// Émis quand une action sortante reçoit 403 `EMAIL_NOT_VERIFIED`. L'objet est
+    /// le `sessionID` des identifiants qui ont reçu le refus. Un serveur qui
+    /// n'expose pas `emailVerified` laissait sinon Profil sans lien de confirmation.
+    static let sqEmailVerificationRequired = Notification.Name("fr.signalquest.ios.emailVerificationRequired")
 }
 
 /// Le contexte est vérifié à l'émission ET lorsque le main actor traite le
@@ -494,6 +498,10 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
                 notifySessionExpired(for: retryContext)
                 throw APIError.http(status: retryStatus, code: retryCode, message: retryMessage, requestId: retryRequestId, retryAfter: retryRetryAfter)
             }
+        } catch APIError.http(let status, let code, let message, let requestId, let retryAfter)
+            where status == 403 && code == "EMAIL_NOT_VERIFIED" {
+            NotificationCenter.default.post(name: .sqEmailVerificationRequired, object: sent.sessionID)
+            throw APIError.http(status: status, code: code, message: message, requestId: requestId, retryAfter: retryAfter)
         } catch APIError.http(let status, let code, let message, let requestId, let retryAfter)
             where (status == 429 || status == 503) && attempt < Self.maxThrottleRetries {
             // Rate-limited / unavailable: back off (honoring a reasonable Retry-After)

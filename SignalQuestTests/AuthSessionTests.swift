@@ -376,6 +376,34 @@ final class AuthSessionTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(mock.clearLocalSessionCount, 1)
     }
 
+    /// Un serveur sans `emailVerified` dans `/api/auth/me` ne laisse que le 403 comme
+    /// preuve : il doit faire apparaître la carte de confirmation de Profil, pour ce
+    /// seul compte, et une relecture du profil reste l'autorité ensuite.
+    func testEmailNotVerifiedRefusalRevealsConfirmationOnlyForItsSession() async throws {
+        let mock = MockAuthService()
+        let sessionA = UUID()
+        mock.storedCredentials = true
+        mock.credentialID = sessionA
+        mock.meResult = .success(.mock)
+        let vm = AuthSessionViewModel(service: mock)
+        await vm.bootstrap()
+        guard case .authenticated(let initial) = vm.state else { return XCTFail("session attendue") }
+        XCTAssertFalse(initial.isEmailVerificationPending)
+
+        vm.noteEmailVerificationRequired(credentialSessionID: UUID())
+        guard case .authenticated(let unchanged) = vm.state else { return XCTFail("session attendue") }
+        XCTAssertFalse(unchanged.isEmailVerificationPending, "Un refus d'une autre session ne touche pas ce compte")
+
+        NotificationCenter.default.post(name: .sqEmailVerificationRequired, object: sessionA)
+        guard case .authenticated(let pending) = vm.state else { return XCTFail("session attendue") }
+        XCTAssertTrue(pending.isEmailVerificationPending)
+        XCTAssertFalse(mock.cacheUserCalls.contains { $0.emailVerified == false }, "L'indice n'est jamais mis en cache")
+
+        await vm.refreshUser()
+        guard case .authenticated(let refreshed) = vm.state else { return XCTFail("session attendue") }
+        XCTAssertFalse(refreshed.isEmailVerificationPending, "La relecture du profil fait autorité")
+    }
+
     // MARK: ROB-02 — signal global de session expirée
 
     func testSessionExpiredNotificationRoutesToLogin() async throws {

@@ -497,6 +497,7 @@ final class AuthSessionViewModel: ObservableObject {
     // aucune autre référence n'existe) → `nonisolated(unsafe)` sûr pour permettre le
     // retrait de l'observateur depuis le deinit nonisolé.
     private nonisolated(unsafe) var sessionExpiredObserver: NSObjectProtocol?
+    private nonisolated(unsafe) var emailVerificationObserver: NSObjectProtocol?
 
     init(service: AuthServicing) {
         self.service = service
@@ -513,12 +514,31 @@ final class AuthSessionViewModel: ObservableObject {
             guard let expiration = notification.object as? AuthSessionExpiration else { return }
             MainActor.assumeIsolated { self?.handleSessionExpired(expiration) }
         }
+        emailVerificationObserver = NotificationCenter.default.addObserver(
+            forName: .sqEmailVerificationRequired, object: nil, queue: .main
+        ) { [weak self] notification in
+            guard let sessionID = notification.object as? UUID else { return }
+            MainActor.assumeIsolated { self?.noteEmailVerificationRequired(credentialSessionID: sessionID) }
+        }
     }
 
     deinit {
         if let sessionExpiredObserver {
             NotificationCenter.default.removeObserver(sessionExpiredObserver)
         }
+        if let emailVerificationObserver {
+            NotificationCenter.default.removeObserver(emailVerificationObserver)
+        }
+    }
+
+    /// Le refus du serveur prouve une adresse non confirmée : Profil affiche alors
+    /// sa carte de renvoi du lien, même si `/api/auth/me` n'expose pas encore le champ.
+    /// Rien n'est mis en cache ; la prochaine relecture du profil fait autorité.
+    func noteEmailVerificationRequired(credentialSessionID: UUID) {
+        guard service.credentialSessionID() == credentialSessionID,
+              case .authenticated(var user) = state, user.emailVerified != false else { return }
+        user.emailVerified = false
+        state = .authenticated(user)
     }
 
     /// ROB-02 : bascule vers login sur session expirée. `.loggedOut` est posé AVANT

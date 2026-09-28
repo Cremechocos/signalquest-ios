@@ -244,6 +244,27 @@ final class APIClientTests: XCTestCase {
         }
     }
 
+    func testEmailNotVerifiedRefusalIsSignalledWithItsCredentialSession() async throws {
+        let client = APIClient(config: .test, cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore()), session: Self.mockSession())
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 403, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"error":"Confirmez votre adresse e-mail","code":"EMAIL_NOT_VERIFIED"}"#.utf8))
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+        let signalled = expectation(forNotification: .sqEmailVerificationRequired, object: nil) { note in
+            note.object as? UUID == client.credentials.snapshot().sessionID
+        }
+
+        do {
+            let _: SuccessResponse = try await client.request(APIEndpoint(path: "/api/social/v2/posts", method: .post), as: SuccessResponse.self)
+            XCTFail("Expected APIError")
+        } catch APIError.http(let status, let code, _, _, _) {
+            XCTAssertEqual(status, 403)
+            XCTAssertEqual(code, "EMAIL_NOT_VERIFIED")
+        }
+        await fulfillment(of: [signalled], timeout: 1)
+    }
+
     /// Un message serveur brut (trace ORM/SQL) sur un 5xx ne doit JAMAIS être affiché :
     /// on retombe sur le repli neutre. Régression du leak « Invalid `prisma.$queryRaw()` ».
     func testServerErrorMessageIsNotLeakedToUser() {
