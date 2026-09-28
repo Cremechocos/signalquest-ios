@@ -93,21 +93,10 @@ struct GradientButton: View {
             .frame(maxWidth: .infinity)
             .frame(minHeight: SQSpace.primaryActionHeight)
             .foregroundStyle(foreground)
-            .background {
-                switch style {
-                case .primary, .accent:
-                    Capsule(style: .continuous).fill(background)
-                default:
-                    RoundedRectangle(cornerRadius: SQRadius.control, style: .continuous)
-                        .fill(background)
-                }
-            }
-            .overlay {
-                if style == .secondary {
-                    RoundedRectangle(cornerRadius: SQRadius.control, style: .continuous)
-                        .strokeBorder(SQColor.controlOutline, lineWidth: 1)
-                }
-            }
+            // Charte Crème : capsules pour tous les styles, secondaire = surface
+            // posée sur une ombre douce, aucune bordure (DESIGN.md › Buttons).
+            .background(background, in: Capsule(style: .continuous))
+            .modifier(GradientButtonShadow(style: isEnabled ? style : .ghost))
         }
         .disabled(isBusy)
         .buttonStyle(SQPressButtonStyle())
@@ -131,6 +120,17 @@ struct GradientButton: View {
         case .secondary: return AnyShapeStyle(SQColor.surface)
         case .ghost: return AnyShapeStyle(Color.clear)
         case .destructive: return AnyShapeStyle(SQColor.dangerSoft)
+        }
+    }
+}
+
+private struct GradientButtonShadow: ViewModifier {
+    let style: GradientButton.Style
+
+    func body(content: Content) -> some View {
+        switch style {
+        case .secondary: content.sqShadowSoft()
+        case .primary, .accent, .ghost, .destructive: content
         }
     }
 }

@@ -236,9 +236,9 @@ private enum OnboardingCopy: String {
     case exploreTitle = "Comprends ton réseau"
     case exploreBody = "Antennes, couverture, mesures : retrouve les données disponibles autour de toi et découvre leur origine."
     case measureTitle = "Mesure et partage"
-    case measureBody = "Les speedtests cellulaires compatibles sont publiés automatiquement à leur position exacte, si elle est disponible. Tes zones privées restent protégées."
+    case measureBody = "Tes speedtests en réseau mobile apparaissent sur la carte, à l’endroit où tu les fais. Tes zones privées restent protégées et tu peux masquer une mesure."
     case internationalTitle = "Une carte qui se construit ensemble"
-    case internationalBody = "D’un pays à l’autre, les données varient. Antennes officielles et contributions se complètent lorsqu’elles sont disponibles. Une zone sans données peut afficher une carte vide."
+    case internationalBody = "D’un pays à l’autre, antennes officielles et contributions de la communauté se complètent pour dessiner la carte."
     case openMap = "Explorer la carte"
     case openMeasure = "Mesurer mon réseau"
     case guestHint = "Tu peux commencer sans créer de compte."
@@ -390,11 +390,13 @@ private struct OnboardingSceneView: View {
 
     var body: some View {
         ZStack {
+            // Le halo s'éteint avant les bords de la scène (240 pt de haut) :
+            // au-delà, le cadre le coupait net en rectangle.
             RadialGradient(
                 colors: [SQColor.brandRed.opacity(0.14), .clear],
                 center: .center,
                 startRadius: 8,
-                endRadius: 150
+                endRadius: 116
             )
             switch scene {
             case .radioWaves: RadioWavesScene(active: active)
@@ -686,7 +688,8 @@ private struct OnboardingPageIndicator: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HStack(spacing: SQSpace.sm) {
+        // Les cibles de 44 pt se touchent : l'écart visible reste celui des points.
+        HStack(spacing: 0) {
             ForEach(0..<count, id: \.self) { index in
                 Button {
                     onTap(index)
@@ -709,10 +712,10 @@ private struct OnboardingPageIndicator: View {
 
 // MARK: - CTA
 
-/// Bouton principal du pager. Mêmes métriques que `GradientButton` (50 pt,
-/// coins nets, Archivo Bold, rouge plein) mais le libellé « Suivant » ↔
-/// « Commencer » change via une vraie transition — l'ancien morphing dans la
-/// transaction du TabView superposait les deux textes en un état illisible.
+/// Bouton principal du pager. Même capsule et même hauteur que `GradientButton`,
+/// en brique, mais le libellé « Suivant » ↔ « Commencer » change via une vraie
+/// transition — l'ancien morphing dans la transaction du TabView superposait
+/// les deux textes en un état illisible.
 private struct OnboardingCTA: View {
     @Environment(\.locale) private var locale
     let isLastPage: Bool
@@ -735,9 +738,9 @@ private struct OnboardingCTA: View {
             }
             .animation(reduceMotion ? .easeOut(duration: 0.15) : SQMotion.snappy, value: isLastPage)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, SQSpace.md + 3)
+            .frame(minHeight: SQSpace.primaryActionHeight)
             .foregroundStyle(SQColor.onAccent)
-            .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+            .background(SQColor.brandRed, in: Capsule(style: .continuous))
         }
         .buttonStyle(SQPressButtonStyle())
     }

@@ -455,7 +455,7 @@ struct AntennaReportImageViewer: View {
                     .onTapGesture(count: 2) { toggleZoom() }
                     .accessibilityLabel("Photo en plein écran")
                     .accessibilityAddTraits(.isImage)
-                    .accessibilityValue(scale > 1 ? "Zoom \(Int((scale * 100).rounded())) %" : "Taille adaptée")
+                    .accessibilityValue(scale > 1 ? Text("Zoom \(Int((scale * 100).rounded())) %") : Text("Taille adaptée"))
                     .accessibilityAction(named: Text("Agrandir")) { zoomIn() }
                     .accessibilityAction(named: Text("Réduire")) { zoomOut() }
                     .accessibilityAction(named: Text("Taille adaptée")) { resetZoom(animated: true) }

@@ -6,9 +6,6 @@ import UIKit
 enum SQColor {
     /// Alias utilisé par les actions partagées ; conserve l'accent Crème existant.
     static let accent = brandRed
-    static let controlOutline = fieldAwareLabel(
-        asset: "ControlOutline", highLight: (0x4F, 0x5B, 0x70), highDark: (0xB8, 0xC3, 0xD6)
-    )
     // MARK: Brand
     /// Brique signature de la DA « Crème & Terre cuite ». Accent primaire unique.
     static let brandRed = Color("BrandRed")

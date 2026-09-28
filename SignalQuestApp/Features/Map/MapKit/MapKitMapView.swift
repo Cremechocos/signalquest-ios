@@ -326,7 +326,7 @@ struct MapKitMapView: UIViewRepresentable {
                 summary.accessibilityLabel = String(
                     localized: "\(exposed.count) mesures de débit proches sur \(visible.count) visibles"
                 )
-                summary.accessibilityHint = String(localized: "Zoomez pour réduire le nombre de mesures")
+                summary.accessibilityHint = String(localized: "Zoome pour réduire le nombre de mesures")
                 summary.accessibilityTraits = .staticText
                 summary.accessibilityFrameInContainerSpace = CGRect(
                     x: max(0, container.bounds.midX - 1),

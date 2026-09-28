@@ -194,8 +194,8 @@ final class OnboardingAnimationQATests: XCTestCase {
         XCTAssertFalse(app.textFields.firstMatch.exists, "Login must not remain under the introduction")
         let scenes = ["radioWaves", "speedDial", "liveMap"]
         let expected = locale == "fr"
-            ? ["données disponibles", "publiés automatiquement", "les données varient"]
-            : ["data available", "published automatically", "Data varies"]
+            ? ["données disponibles", "apparaissent sur la carte", "D’un pays à l’autre"]
+            : ["data available", "appear on the map", "From one country to the next"]
         for index in scenes.indices {
             let slide = app.descendants(matching: .any)["onboarding.slide.\(scenes[index])"].firstMatch
             XCTAssertTrue(slide.waitForExistence(timeout: 5))
@@ -212,7 +212,7 @@ final class OnboardingAnimationQATests: XCTestCase {
             XCTAssertGreaterThanOrEqual(indicator.frame.height, 44)
             XCTAssertGreaterThanOrEqual(indicator.frame.width, 44)
             if index == 2 {
-                XCTAssertTrue(slide.label.contains(locale == "fr" ? "carte vide" : "empty map"))
+                XCTAssertTrue(slide.label.contains(locale == "fr" ? "contributions de la communauté" : "community contributions"))
             }
             if largeText { app.swipeUp() }
             if index < 2 {
