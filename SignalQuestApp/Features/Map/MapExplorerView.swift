@@ -1213,7 +1213,7 @@ final class MapExplorerViewModel: ObservableObject {
         let speedtestCount = speedtestTiles.reduce(0) { $0 + $1.markers.count }
         let coverageCount = coverageTiles.reduce(0) { $0 + $1.points.count }
         MapDiagnosticsLog.logger.info(
-            "load \(id.uuidString, privacy: .public) version=\(self.dataVersion) antennas=\(self.antennas.count) speedtests=\(speedtestCount) coverage=\(coverageCount) photos=\(self.publicPhotos.count) failedTiles=\(failedTiles) retainedTiles=\(retainedTiles) error=\(self.errorMessage != nil) complete=\(self.hasCurrentResponse)"
+            "load \(id.uuidString, privacy: .public) version=\(self.dataVersion) antennas=\(self.antennas.count) antennaClusters=\(self.antennaClusters.count) speedtests=\(speedtestCount) coverage=\(coverageCount) photos=\(self.publicPhotos.count) failedTiles=\(failedTiles) retainedTiles=\(retainedTiles) error=\(self.errorMessage != nil) complete=\(self.hasCurrentResponse)"
         )
     }
 
@@ -1685,6 +1685,7 @@ struct MapExplorerView: View {
                 selection: filterSelection,
                 allMarkets: model.registryMarkets,
                 dromRegion: model.currentDromRegion,
+                showsFriendsLayer: services.auth.hasStoredCredentials(),
                 onApply: applyFilterSelection
             )
             .presentationDetents([.medium, .large], selection: $filterSheetDetent)

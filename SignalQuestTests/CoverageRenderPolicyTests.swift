@@ -10,7 +10,8 @@ final class CoverageRenderPolicyTests: XCTestCase {
         let tile = try JSONDecoder.signalQuest.decode(AndroidCoverageTileResponse.self, from: bytes)
         let mode = CoverageRenderPolicy.mode(for: tile, selectedBands: [7])
         let visibleIDs = mode.useClusters ? tile.clusters.map(\.id) : []
-        XCTAssertEqual(visibleIDs, ["lte-band7"], "A verified overview must not disappear when its band is selected")
+        // L'identifiant serveur (« lte-band7 », répété dans chaque tuile) est préfixé par sa tuile.
+        XCTAssertEqual(visibleIDs, ["8/130/87:lte-band7"], "A verified overview must not disappear when its band is selected")
     }
 
     func testAggregatedPointKeepsItsSecondaryBandAndExcludesAnAbsentBand() throws {

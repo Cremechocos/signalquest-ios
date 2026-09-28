@@ -55,14 +55,22 @@ final class MapOutageFilterTests: XCTestCase {
         return payload.markets
     }
 
-    private func sheet(market: String, markets: [MarketRegistryEntry]) -> MapAdvancedFilterSheet {
+    private func sheet(market: String, markets: [MarketRegistryEntry], signedIn: Bool = true) -> MapAdvancedFilterSheet {
         var selection = MapFilterSelection.defaults(market: market, operatorName: "ALL")
         selection.azimuthStyle = .lobes
         selection.speedtestDays = 30
         selection.coverageDays = 30
         selection.includeObserved = false
         selection.plannedStatuses = []
-        return MapAdvancedFilterSheet(selection: selection, allMarkets: markets, dromRegion: nil, onApply: { _ in true })
+        return MapAdvancedFilterSheet(selection: selection, allMarkets: markets, dromRegion: nil,
+                                      showsFriendsLayer: signedIn, onApply: { _ in true })
+    }
+
+    /// Un invité n'a pas d'amis à afficher : la puce « Amis » ne lui est pas proposée.
+    func testFriendsChipIsOnlyOfferedWithAnAccount() throws {
+        let markets = try registry()
+        XCTAssertTrue(sheet(market: "FR", markets: markets).layerOptions.map(\.0).contains(.friend))
+        XCTAssertFalse(sheet(market: "FR", markets: markets, signedIn: false).layerOptions.map(\.0).contains(.friend))
     }
 
     /// Aucune puce ne doit porter `.communityOutage` : ce genre est un MARQUEUR, pas une case.

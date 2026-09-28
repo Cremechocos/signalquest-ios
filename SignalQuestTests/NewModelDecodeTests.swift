@@ -363,4 +363,40 @@ final class NewModelDecodeTests: XCTestCase {
         XCTAssertFalse(response.supported)
         XCTAssertTrue(response.incidents.isEmpty)
     }
+
+    /// MAP-DATA-01 : le serveur numérote les clusters par cellule À L'INTÉRIEUR
+    /// d'une tuile (« 0:0 » … « 2:2 »), donc le même identifiant revient dans
+    /// chaque tuile. Dédoublonnées par identifiant, 9 tuiles n'affichaient plus
+    /// que 9 clusters sur 81 et la carte de Paris restait presque vide.
+    func testTileClustersKeepDistinctIdentitiesAcrossNeighbouringTiles() throws {
+        func json(x: Int, extra: String) -> Data {
+            Data("""
+            {"tile":{"z":12,"x":\(x),"y":1409},\(extra)
+             "clusters":[{"id":"0:0","lat":48.81,"lng":2.30,"count":49},
+                         {"id":"2:2","lat":48.85,"lng":2.35,"count":173}]}
+            """.utf8)
+        }
+        let decoder = JSONDecoder.signalQuest
+        let antennas = try [2074, 2075].map {
+            try decoder.decode(AndroidAntennaTileResponse.self, from: json(x: $0, extra: #""markers":[],"#))
+        }
+        let coverage = try [2074, 2075].map {
+            try decoder.decode(AndroidCoverageTileResponse.self, from: json(x: $0, extra: #""points":[],"#))
+        }
+        let speedtests = try [2074, 2075].map {
+            try decoder.decode(AndroidSpeedtestTileResponse.self, from: json(x: $0, extra: #""markers":[],"#))
+        }
+        let communitySites = try [2074, 2075].map {
+            try decoder.decode(AndroidCommunitySiteTileResponse.self, from: json(x: $0, extra: #""markers":[],"#))
+        }
+
+        for ids in [antennas.flatMap(\.clusters).map(\.id), coverage.flatMap(\.clusters).map(\.id),
+                    speedtests.flatMap(\.clusters).map(\.id), communitySites.flatMap(\.clusters).map(\.id)] {
+            XCTAssertEqual(Set(ids).count, 4, "Deux tuiles voisines ne doivent partager aucun identifiant : \(ids)")
+        }
+        XCTAssertEqual(antennas[0].clusters.map(\.id), ["12/2074/1409:0:0", "12/2074/1409:2:2"])
+        // Seul l'identifiant change : position et effectif restent ceux du serveur.
+        XCTAssertEqual(antennas[1].clusters[1].count, 173)
+        XCTAssertEqual(antennas[1].clusters[1].lat, 48.85)
+    }
 }

@@ -9,16 +9,20 @@ struct MapAdvancedFilterSheet: View {
     @State private var adjustmentNotice = false
     @State private var applyError: String?
     let allMarkets: [MarketRegistryEntry]
+    /// Sans compte, la couche Amis ne peut rien afficher : on ne la propose pas.
+    let showsFriendsLayer: Bool
     let onApply: (MapFilterSelection) -> Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(selection: MapFilterSelection, allMarkets: [MarketRegistryEntry],
-         dromRegion: DromRegion?, onApply: @escaping (MapFilterSelection) -> Bool) {
+         dromRegion: DromRegion?, showsFriendsLayer: Bool = true,
+         onApply: @escaping (MapFilterSelection) -> Bool) {
         _baseline = State(initialValue: selection)
         _draft = State(initialValue: selection)
         _originalDromRegion = State(initialValue: dromRegion)
         self.allMarkets = allMarkets
+        self.showsFriendsLayer = showsFriendsLayer
         self.onApply = onApply
     }
 
@@ -142,6 +146,7 @@ struct MapAdvancedFilterSheet: View {
             (.coverage, String(localized: "Couverture"), "dot.radiowaves.left.and.right"),
             (.outage, String(localized: "Pannes"), "exclamationmark.triangle")
         ]
+        if !showsFriendsLayer { options.removeAll { $0.0 == .friend } }
         if plannedAvailable || draft.layers.contains(.planned) {
             options.append((.planned, String(localized: "Prévisionnels"), "calendar.badge.clock"))
         }

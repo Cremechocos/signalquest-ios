@@ -63,6 +63,21 @@ final class CarPlayMapTests: XCTestCase {
         XCTAssertEqual(Set(payloads.map(\.id)).count, 3)
     }
 
+    /// Le serveur réutilise « 0:0 » … « 2:2 » dans chaque tuile : deux tuiles
+    /// voisines doivent pourtant donner deux groupes distincts à l'écran.
+    func testAntennaClustersFromNeighbouringTilesKeepDistinctIdentities() throws {
+        let tiles = try [8000, 8001].map { x in
+            try JSONDecoder.signalQuest.decode(AndroidAntennaTileResponse.self, from: Data("""
+            {"tile":{"z":12,"x":\(x),"y":5600},"markers":[],
+             "clusters":[{"id":"0:0","lat":48.81,"lng":2.30,"count":49},
+                         {"id":"0:1","lat":48.82,"lng":2.33,"count":60}]}
+            """.utf8))
+        }
+        let payloads = CarPlayLayerController.antennaPayloads(from: tiles, zoom: 12)
+        XCTAssertEqual(payloads.count, 4)
+        XCTAssertEqual(Set(payloads.map(\.id)).count, 4)
+    }
+
     /// Même seuil que la carte iPhone : au-dessous de z13, pas de lobes.
     func testAzimuthsOnlyShowWhenZoomedIn() throws {
         let tile = try decodeAntennaTile(markerIds: ["A"])

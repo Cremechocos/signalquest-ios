@@ -707,6 +707,15 @@ struct AndroidMapCluster: Codable, Identifiable, Equatable, Sendable {
         source = c.decodeFlexibleString(forKey: .source)
         latestTimestamp = try? c.decodeIfPresent(Date.self, forKey: .latestTimestamp)
     }
+
+    /// Le serveur numérote les clusters par cellule À L'INTÉRIEUR d'une tuile
+    /// (« 0:0 » … « 2:2 ») : le même identifiant revient dans chaque tuile.
+    /// Préfixé par sa tuile, il reste unique sur toute la carte ; sinon le
+    /// dédoublonnage par identifiant ne gardait qu'un cluster par cellule.
+    func scoped(to tile: AndroidMapTile) -> AndroidMapCluster {
+        AndroidMapCluster(id: "\(tile.z)/\(tile.x)/\(tile.y):\(id)", lat: lat, lng: lng, count: count,
+                          avgRsrp: avgRsrp, tech: tech, source: source, latestTimestamp: latestTimestamp)
+    }
 }
 
 struct AndroidAntennaTileResponse: Decodable, Equatable, Sendable {
@@ -714,6 +723,20 @@ struct AndroidAntennaTileResponse: Decodable, Equatable, Sendable {
     let market: String?
     let clusters: [AndroidMapCluster]
     let markers: [AndroidAntennaMarker]
+}
+
+// Décodeur en extension : l'initialiseur memberwise utilisé par les tests reste disponible.
+extension AndroidAntennaTileResponse {
+    enum CodingKeys: String, CodingKey { case tile, market, clusters, markers }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let tile = try c.decode(AndroidMapTile.self, forKey: .tile)
+        self.init(tile: tile,
+                  market: try c.decodeIfPresent(String.self, forKey: .market),
+                  clusters: try c.decode([AndroidMapCluster].self, forKey: .clusters).map { $0.scoped(to: tile) },
+                  markers: try c.decode([AndroidAntennaMarker].self, forKey: .markers))
+    }
 }
 
 struct AndroidAntennaMarker: Decodable, Identifiable, Equatable, Sendable {
@@ -862,6 +885,17 @@ struct AndroidSpeedtestTileResponse: Decodable, Equatable, Sendable {
         self.markers = markers
         self.stats = stats
     }
+
+    enum CodingKeys: String, CodingKey { case tile, clusters, markers, stats }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let tile = try c.decode(AndroidMapTile.self, forKey: .tile)
+        self.init(tile: tile,
+                  clusters: try c.decode([AndroidMapCluster].self, forKey: .clusters).map { $0.scoped(to: tile) },
+                  markers: try c.decode([AndroidSpeedtestMarker].self, forKey: .markers),
+                  stats: try c.decodeIfPresent(AndroidSpeedtestStats.self, forKey: .stats))
+    }
 }
 
 /// Pagination des tuiles speedtest (`stats.hasMore` / `nextOffset`). Le backend
@@ -900,6 +934,19 @@ struct AndroidCoverageTileResponse: Decodable, Equatable, Sendable {
     let clusters: [AndroidMapCluster]
 }
 
+extension AndroidCoverageTileResponse {
+    enum CodingKeys: String, CodingKey { case tile, points, stats, clusters }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let tile = try c.decode(AndroidMapTile.self, forKey: .tile)
+        self.init(tile: tile,
+                  points: try c.decode([AndroidCoveragePoint].self, forKey: .points),
+                  stats: try c.decodeIfPresent(AndroidCoverageStats.self, forKey: .stats),
+                  clusters: try c.decode([AndroidMapCluster].self, forKey: .clusters).map { $0.scoped(to: tile) })
+    }
+}
+
 struct AndroidCoveragePoint: Decodable, Identifiable, Equatable, Sendable {
     let id: String
     let lat: Double
@@ -931,8 +978,9 @@ struct AndroidCommunitySiteTileResponse: Decodable, Equatable, Sendable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        tile = (try? c.decode(AndroidMapTile.self, forKey: .tile)) ?? AndroidMapTile(z: 0, x: 0, y: 0)
-        clusters = c.decodeLossyArray([AndroidMapCluster].self, forKey: .clusters)
+        let tile = (try? c.decode(AndroidMapTile.self, forKey: .tile)) ?? AndroidMapTile(z: 0, x: 0, y: 0)
+        self.tile = tile
+        clusters = c.decodeLossyArray([AndroidMapCluster].self, forKey: .clusters).map { $0.scoped(to: tile) }
         markers = c.decodeLossyArray([AndroidCommunitySiteMarker].self, forKey: .markers)
     }
 }
