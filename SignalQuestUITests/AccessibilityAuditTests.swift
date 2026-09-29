@@ -137,7 +137,10 @@ final class AccessibilityAuditTests: XCTestCase {
                 "community.header.action.", "feed.metadata", "speedtest.metric.",
                 "profile.progression.tile.", "feed.hashtag", "home.network.title",
                 "map.friends.count", "map.friends.empty",
-                "map.status.text", "state.error.title"
+                "map.status.text", "state.error.title",
+                // Encre sur la carte et sur la tuile du pouls (Lot 4a) :
+                // `testBodyTextTokensMeetAA`, plus de 11:1.
+                "home.nearby.context", "home.pulse.unit"
             ]
             if issue.auditType == .contrast,
                provenContrastIdentifiers.contains(where: name.hasPrefix) {
@@ -145,8 +148,11 @@ final class AccessibilityAuditTests: XCTestCase {
             }
             // Un nœud SwiftUI sans élément ni frame ne permet aucune action
             // utilisateur et correspond ici aux séparateurs/fonds décoratifs.
+            // Accueil (Lot 4a) : deux nœuds de ce type depuis « Autour de toi » ;
+            // ni les points de couleur ni les ⓘ (expériences du 29/09), et chaque
+            // texte de l'écran est audité sous son propre identifiant.
             if element == nil, name == "sans nom", issue.auditType == .contrast,
-               screen.hasPrefix("Communauté") || screen.hasPrefix("Profil") {
+               screen.hasPrefix("Communauté") || screen.hasPrefix("Profil") || screen.hasPrefix("Accueil") {
                 return exclude("fond décoratif sans élément ni action ; texte testé séparément", name, issue.auditType)
             }
             // Ces avertissements sont des prédictions à taille normale. Ils ne

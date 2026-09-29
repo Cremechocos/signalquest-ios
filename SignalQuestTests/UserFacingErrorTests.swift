@@ -35,6 +35,15 @@ final class UserFacingErrorTests: XCTestCase {
         XCTAssertEqual(system.userFacingMessage, "Accès à la photothèque refusé.")
     }
 
+    func testKeychainFailuresNoLongerShowTheirStatusCode() {
+        for error in [KeychainError.unexpectedStatus(-34018), .invalidData] {
+            let message = error.userFacingMessage
+            XCTAssertFalse(message.contains("Keychain"), message)
+            XCTAssertFalse(message.contains("-34018"), message)
+            XCTAssertTrue(message.hasPrefix("Le stockage sécurisé"), message)
+        }
+    }
+
     func testSilentInternalErrorsNeverExposeTheirTypeName() {
         let encryption = E2EEV2MessageCryptoError.invalidEnvelope.userFacingMessage
         XCTAssertTrue(encryption.hasPrefix("Le chiffrement n’a pas abouti"), encryption)

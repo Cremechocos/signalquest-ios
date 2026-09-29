@@ -75,13 +75,26 @@ enum SQDateParsing {
     private static let localWithFraction = makeLocal("yyyy-MM-dd'T'HH:mm:ss.SSS")
     private static let localNoFraction = makeLocal("yyyy-MM-dd'T'HH:mm:ss")
     private static let dateOnly = makeLocal("yyyy-MM-dd")
+    private static let parisWithFraction = makeLocal("yyyy-MM-dd'T'HH:mm:ss.SSS", timeZone: TimeZone(identifier: "Europe/Paris"))
+    private static let parisNoFraction = makeLocal("yyyy-MM-dd'T'HH:mm:ss", timeZone: TimeZone(identifier: "Europe/Paris"))
 
-    private static func makeLocal(_ format: String) -> DateFormatter {
+    private static func makeLocal(_ format: String, timeZone: TimeZone? = TimeZone(secondsFromGMT: 0)) -> DateFormatter {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(secondsFromGMT: 0)
+        f.timeZone = timeZone
         f.dateFormat = format
         return f
+    }
+
+    /// Dates de l'historique des speedtests (`/api/user/speedtests`) : le serveur
+    /// stocke l'heure de Paris et l'envoie sans fuseau (`toParisISOString`), pour
+    /// que le web l'affiche telle quelle. Lue en UTC comme les autres dates sans
+    /// fuseau, elle tombait une à deux heures dans le futur. Une valeur qui porte
+    /// son fuseau garde la lecture commune.
+    static func parseParisWallClock(_ value: String) -> Date? {
+        if let date = parisWithFraction.date(from: value) { return date }
+        if let date = parisNoFraction.date(from: value) { return date }
+        return parse(value)
     }
 
     /// Accélère uniquement les formes UTC canoniques validées. Pour toutes les

@@ -46,13 +46,11 @@ enum KeychainError: Error, LocalizedError, Equatable {
     case unexpectedStatus(OSStatus)
     case invalidData
 
+    /// Message montré à l'écran : le code du trousseau ne dit rien à
+    /// l'utilisateur (TRX-26). Les journaux gardent le cas et son code
+    /// (`\(error)` affiche `unexpectedStatus(-34018)`).
     var errorDescription: String? {
-        switch self {
-        case .unexpectedStatus(let status):
-            return "Keychain status \(status)"
-        case .invalidData:
-            return "Invalid keychain data"
-        }
+        String(localized: "Le stockage sécurisé de cet appareil n’a pas répondu. Réessaie ; si le problème revient, redémarre l’app.")
     }
 }
 

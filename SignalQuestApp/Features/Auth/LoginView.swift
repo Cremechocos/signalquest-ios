@@ -1,8 +1,31 @@
 import SwiftUI
 import AuthenticationServices
 
+/// Pourquoi l'écran de connexion apparaît dans un onglet réservé aux membres :
+/// l'invité y lit ce qu'il y trouvera, au lieu d'un simple mur (TRX-19).
+enum LoginContext {
+    case community, profile
+
+    var title: String {
+        switch self {
+        case .community: return String(localized: "Rejoins la communauté")
+        case .profile: return String(localized: "Ton espace SignalQuest")
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .community:
+            return String(localized: "Le fil, l’entraide entre membres et la messagerie demandent un compte gratuit.")
+        case .profile:
+            return String(localized: "Un compte gratuit garde tes mesures, tes points et tes réglages, sur iPhone comme sur Android.")
+        }
+    }
+}
+
 struct LoginView: View {
     let onContinueAsGuest: (() -> Void)?
+    let context: LoginContext?
 
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var services: AppServices
@@ -26,8 +49,9 @@ struct LoginView: View {
         let fullName: String?
     }
 
-    init(onContinueAsGuest: (() -> Void)? = nil) {
+    init(onContinueAsGuest: (() -> Void)? = nil, context: LoginContext? = nil) {
         self.onContinueAsGuest = onContinueAsGuest
+        self.context = context
     }
 
     var body: some View {
@@ -145,6 +169,9 @@ struct LoginView: View {
             .signalQuestHeroBackground()
             .onAppear {
                 appeared = true
+                // « Créer un compte » en fin d'onboarding : l'inscription s'ouvre
+                // directement, la connexion reste derrière si on la referme.
+                if onboardingEntry.consumeSignupRequest() { showSignup = true }
             }
             .sheet(isPresented: $showSignup) {
                 NavigationStack { SignupView() }
@@ -349,12 +376,22 @@ struct LoginView: View {
                 .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text("SignalQuest")
-                    .font(SQType.display)
-                    .foregroundStyle(SQColor.label)
-                Text("Mesure, comprends et partage ton réseau")
-                    .font(SQType.subhead)
-                    .foregroundStyle(SQColor.labelSecondary)
+                if let context {
+                    Text(verbatim: context.title)
+                        .font(SQType.display)
+                        .foregroundStyle(SQColor.label)
+                    Text(verbatim: context.message)
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("SignalQuest")
+                        .font(SQType.display)
+                        .foregroundStyle(SQColor.label)
+                    Text("Mesure, comprends et partage ton réseau")
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
             }
         }
         .padding(.top, SQSpace.huge + SQSpace.sm)

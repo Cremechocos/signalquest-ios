@@ -4826,6 +4826,22 @@
         }
       }
     },
+    "Activer la localisation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on location"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer la localisation"
+          }
+        }
+      }
+    },
     "Activer le haut-parleur" : {
       "localizations" : {
         "en" : {
@@ -6380,23 +6396,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Antennes"
-          }
-        }
-      }
-    },
-    "Antennes & couverture" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Antennas & coverage"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Antennes & couverture"
           }
         }
       }
@@ -8626,23 +8625,6 @@
         }
       }
     },
-    "Aucune mesure locale" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No local measurement"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucune mesure locale"
-          }
-        }
-      }
-    },
     "Aucune mesure ni identification partagée récemment." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -8656,6 +8638,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune mesure ni identification partagée récemment."
+          }
+        }
+      }
+    },
+    "Aucune mesure pour l’instant" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No measurements yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune mesure pour l’instant"
           }
         }
       }
@@ -9137,6 +9136,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Autorise la localisation pour comparer les opérateurs."
+          }
+        }
+      }
+    },
+    "Autorise la localisation pour voir les mesures, les pannes et l’opérateur le plus rapide à moins d’un kilomètre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow location to see measurements, outages and the fastest carrier within 1 km."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autorise la localisation pour voir les mesures, les pannes et l’opérateur le plus rapide à moins d’un kilomètre."
           }
         }
       }
@@ -13501,6 +13516,22 @@
         }
       }
     },
+    "Compare les opérateurs autour de toi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare carriers around you"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare les opérateurs autour de toi"
+          }
+        }
+      }
+    },
     "Comparer" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13600,7 +13631,7 @@
       }
     },
     "Comprends ton réseau" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15750,7 +15781,7 @@
       }
     },
     "D’un pays à l’autre, antennes officielles et contributions de la communauté se complètent pour dessiner la carte." : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15959,7 +15990,7 @@
       }
     },
     "Débit & latence" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -17102,7 +17133,6 @@
       }
     },
     "Dernière mesure" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -20471,7 +20501,7 @@
       }
     },
     "Étape %lld sur %lld" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -20974,23 +21004,6 @@
         }
       }
     },
-    "Explorer la carte" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Explore the map"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Explorer la carte"
-          }
-        }
-      }
-    },
     "Explorer la carte sans compte" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -21185,23 +21198,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fiable"
-          }
-        }
-      }
-    },
-    "Fil & entraide" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Feed & community"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fil & entraide"
           }
         }
       }
@@ -21499,6 +21495,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "fuseau entièrement libre"
+          }
+        }
+      }
+    },
+    "Gbit/s" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gbps"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gbit/s"
           }
         }
       }
@@ -23586,7 +23598,8 @@
         }
       }
     },
-    "J'ai déjà un compte" : {
+    "J’ai déjà un compte" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -23597,7 +23610,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "J'ai déjà un compte"
+            "value" : "J’ai déjà un compte"
           }
         }
       }
@@ -24986,6 +24999,22 @@
         }
       }
     },
+    "La localisation est désactivée pour SignalQuest. Active-la dans les Réglages pour voir les mesures et les pannes à moins d’un kilomètre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location is turned off for SignalQuest. Turn it on in Settings to see measurements and outages within 1 km."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La localisation est désactivée pour SignalQuest. Active-la dans les Réglages pour voir les mesures et les pannes à moins d’un kilomètre."
+          }
+        }
+      }
+    },
     "La mesure s’est interrompue en cours de route. Réessaie dans un instant." : {
       "localizations" : {
         "en" : {
@@ -25510,7 +25539,7 @@
       }
     },
     "Lance un premier test pour créer ton repère." : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -26046,6 +26075,22 @@
         }
       }
     },
+    "Le fil, l’entraide entre membres et la messagerie demandent un compte gratuit." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The feed, help between members and messaging need a free account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le fil, l’entraide entre membres et la messagerie demandent un compte gratuit."
+          }
+        }
+      }
+    },
     "Le filtre de fréquence n’est pas disponible pour ces données. Zoome ou retire ce filtre pour les consulter." : {
       "localizations" : {
         "en" : {
@@ -26242,6 +26287,22 @@
         }
       }
     },
+    "Le plus rapide" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fastest"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le plus rapide"
+          }
+        }
+      }
+    },
     "Le point de départ domine le site de %lld m." : {
       "localizations" : {
         "en" : {
@@ -26367,6 +26428,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le registre v2 est consultable, mais aucun message n’est présenté comme E2EE v2 avant la fin de la revue de sécurité externe."
+          }
+        }
+      }
+    },
+    "Le réseau autour de toi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The network around you"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le réseau autour de toi"
           }
         }
       }
@@ -26674,6 +26751,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le statut de présence n’est pas encore chargé."
+          }
+        }
+      }
+    },
+    "Le stockage sécurisé de cet appareil n’a pas répondu. Réessaie ; si le problème revient, redémarre l’app." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device’s secure storage didn’t respond. Try again; if it keeps happening, restart the app."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le stockage sécurisé de cet appareil n’a pas répondu. Réessaie ; si le problème revient, redémarre l’app."
           }
         }
       }
@@ -28525,6 +28618,22 @@
         }
       }
     },
+    "Mbit/s" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mbps"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mbit/s"
+          }
+        }
+      }
+    },
     "Mbps" : {
       "localizations" : {
         "en" : {
@@ -29453,7 +29562,7 @@
       }
     },
     "Mesure et partage" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -29545,23 +29654,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mesurer la connexion"
-          }
-        }
-      }
-    },
-    "Mesurer mon réseau" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Measure my network"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mesurer mon réseau"
           }
         }
       }
@@ -33988,7 +34080,7 @@
       }
     },
     "Passer" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -37991,6 +38083,22 @@
         }
       }
     },
+    "Réception typique" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Typical download"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réception typique"
+          }
+        }
+      }
+    },
     "Recevoir un code par e-mail" : {
       "localizations" : {
         "en" : {
@@ -38896,6 +39004,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rejeté"
+          }
+        }
+      }
+    },
+    "Rejoins la communauté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Join the community"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rejoins la communauté"
           }
         }
       }
@@ -42495,6 +42619,22 @@
         }
       }
     },
+    "Signal · %lld dBm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal · %lld dBm"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal · %lld dBm"
+          }
+        }
+      }
+    },
     "Signal médian" : {
       "localizations" : {
         "en" : {
@@ -42591,6 +42731,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Signalée par"
+          }
+        }
+      }
+    },
+    "Signalées par la communauté" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reported by the community"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signalées par la communauté"
           }
         }
       }
@@ -45780,7 +45937,7 @@
       }
     },
     "Tes speedtests en réseau mobile apparaissent sur la carte, à l’endroit où tu les fais. Tes zones privées restent protégées et tu peux masquer une mesure." : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -46008,6 +46165,23 @@
         }
       }
     },
+    "Tests pendant un trajet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tests during a trip"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tests pendant un trajet"
+          }
+        }
+      }
+    },
     "Tilt" : {
       "localizations" : {
         "en" : {
@@ -46183,6 +46357,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ton droit Premium est détecté. Sentinelle ne l’a pas encore pris en compte."
+          }
+        }
+      }
+    },
+    "Ton espace SignalQuest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your SignalQuest space"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton espace SignalQuest"
           }
         }
       }
@@ -47328,23 +47518,6 @@
         }
       }
     },
-    "Tu peux commencer sans créer de compte." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You can start without creating an account."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu peux commencer sans créer de compte."
-          }
-        }
-      }
-    },
     "Tu peux maintenant te connecter avec ton nouveau mot de passe." : {
       "localizations" : {
         "en" : {
@@ -47406,6 +47579,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tu peux te connecter avec Apple, même en masquant ton e-mail."
+          }
+        }
+      }
+    },
+    "Tu pourras changer de nom d’utilisateur dans 1 jour." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You'll be able to change your username in 1 day."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pourras changer de nom d’utilisateur dans 1 jour."
+          }
+        }
+      }
+    },
+    "Tu pourras changer de nom d’utilisateur dans %lld jours." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You'll be able to change your username in %lld days."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pourras changer de nom d’utilisateur dans %lld jours."
           }
         }
       }
@@ -47604,6 +47809,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un code à usage unique sera envoyé à %@."
+          }
+        }
+      }
+    },
+    "Un compte gratuit garde tes mesures, tes points et tes réglages, sur iPhone comme sur Android." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A free account keeps your measurements, points and settings, on iPhone and Android alike."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un compte gratuit garde tes mesures, tes points et tes réglages, sur iPhone comme sur Android."
           }
         }
       }
@@ -49694,23 +49915,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vous ne pouvez pas confirmer votre propre signalement."
-          }
-        }
-      }
-    },
-    "Vous pourrez changer de nom d’utilisateur dans 1 jour." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You'll be able to change your username in 1 day."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous pourrez changer de nom d’utilisateur dans 1 jour."
           }
         }
       }

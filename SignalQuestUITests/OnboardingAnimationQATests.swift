@@ -6,12 +6,15 @@ import XCTest
 ///    à l'extérieur capture chaque transition.
 /// 2. Vérifie que tuer l'app sans terminer l'onboarding ne le marque PAS
 ///    complété (régression du binding `fullScreenCover`).
-/// 3. Termine par « Commencer » et vérifie que l'onboarding ne revient plus.
+/// 3. Termine par l'un des trois choix du dernier écran (inscription,
+///    connexion, invité) et vérifie que l'onboarding ne revient plus.
 /// Nécessite une installation fraîche (sq.hasCompletedOnboarding absent/false).
 @MainActor
 final class OnboardingAnimationQATests: XCTestCase {
+    private enum Exit { case signUp, signIn, guest }
+
     func testCurrentOnboardingFrenchCopyAndCompletion() throws {
-        try checkLocalizedTour(locale: "fr", destination: "map")
+        try checkLocalizedTour(locale: "fr")
     }
 
     func testCurrentOnboardingEnglishCopyAndCompletion() throws {
@@ -22,12 +25,28 @@ final class OnboardingAnimationQATests: XCTestCase {
         try checkLocalizedTour(locale: "en", largeText: true)
     }
 
-    func testFirstChoiceFrenchMeasure() throws {
-        try checkLocalizedTour(locale: "fr", destination: "measure")
+    func testCreateAccountChoiceFrenchOpensRegistration() throws {
+        try checkLocalizedTour(locale: "fr", exit: .signUp)
     }
 
-    func testFirstChoiceEnglishMap() throws {
-        try checkLocalizedTour(locale: "en", destination: "map")
+    func testSignInChoiceEnglishOpensLogin() throws {
+        try checkLocalizedTour(locale: "en", exit: .signIn)
+    }
+
+    /// « Passer » ne termine plus l'onboarding : il amène aux trois choix.
+    func testSkipLeadsToTheThreeChoices() throws {
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        app.launchArguments = ["--reset-auth", "--reset-onboarding"]
+        app.sqLaunch(locale: "fr")
+        let skip = app.buttons["onboarding.skip"]
+        XCTAssertTrue(skip.waitForExistence(timeout: 20))
+        skip.tap()
+        XCTAssertTrue(app.buttons["onboarding.createAccount"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["onboarding.signIn"].exists)
+        XCTAssertTrue(app.buttons["onboarding.continueAsGuest"].exists)
+        XCTAssertFalse(skip.exists, "Skip disappears once the choices are shown")
+        XCTAssertFalse(app.buttons["login.submit"].exists, "Skipping must not decide for the user")
     }
 
     func testGuestApplicationFrenchNavigationAndPersistence() throws {
@@ -124,10 +143,14 @@ final class OnboardingAnimationQATests: XCTestCase {
         let next = app.buttons["Suivant"]
         XCTAssertTrue(next.waitForExistence(timeout: 20))
         next.tap(); next.tap()
-        let choice = app.buttons[destination == "map" ? "onboarding.openMap" : "onboarding.openMeasure"]
+        let choice = app.buttons["onboarding.continueAsGuest"]
         XCTAssertTrue(choice.waitForExistence(timeout: 5))
         for _ in 0..<6 where !choice.isHittable { app.swipeUp() }
         choice.tap()
+        if destination == "measure" {
+            let measure = SignalQuestUITestSupport.tab(named: "Tester", in: app)
+            XCTAssertTrue(measure.waitForExistence(timeout: 20)); measure.tap()
+        }
         let profile = SignalQuestUITestSupport.tab(named: "Profil", in: app)
         XCTAssertTrue(profile.waitForExistence(timeout: 20)); profile.tap()
         let email = app.textFields.firstMatch
@@ -181,7 +204,7 @@ final class OnboardingAnimationQATests: XCTestCase {
         add(shot)
     }
 
-    private func checkLocalizedTour(locale: String, largeText: Bool = false, destination: String = "measure") throws {
+    private func checkLocalizedTour(locale: String, largeText: Bool = false, exit: Exit = .guest) throws {
         let app = XCUIApplication()
         defer { app.terminate() }
         app.launchArguments = ["--reset-auth", "--reset-onboarding"]
@@ -218,7 +241,7 @@ final class OnboardingAnimationQATests: XCTestCase {
             if index < 2 {
                 for _ in 0..<6 where !next.isHittable { app.swipeUp() }
             } else {
-                let lastChoice = app.buttons["onboarding.openMeasure"]
+                let lastChoice = app.buttons["onboarding.continueAsGuest"]
                 for _ in 0..<6 where !lastChoice.isHittable || lastChoice.frame.maxY > app.frame.maxY - 8 { app.swipeUp() }
             }
             let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -227,37 +250,57 @@ final class OnboardingAnimationQATests: XCTestCase {
             add(shot)
             if index < 2 { XCTAssertTrue(next.isHittable); next.tap() }
         }
-        let map = app.buttons["onboarding.openMap"]
-        let measure = app.buttons["onboarding.openMeasure"]
-        XCTAssertTrue(map.waitForExistence(timeout: 5))
-        XCTAssertTrue(measure.isHittable)
-        XCTAssertLessThanOrEqual(map.frame.maxY, measure.frame.minY, "Discovery actions must not overlap")
-        XCTAssertGreaterThanOrEqual(map.frame.height, 44)
-        XCTAssertGreaterThanOrEqual(measure.frame.height, 44)
+        let create = app.buttons["onboarding.createAccount"]
+        let signIn = app.buttons["onboarding.signIn"]
+        let guest = app.buttons["onboarding.continueAsGuest"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        XCTAssertTrue(signIn.isHittable)
+        XCTAssertTrue(guest.isHittable)
+        XCTAssertLessThanOrEqual(create.frame.maxY, signIn.frame.minY, "Account actions must not overlap")
+        XCTAssertLessThanOrEqual(signIn.frame.maxY, guest.frame.minY)
+        for choice in [create, signIn, guest] { XCTAssertGreaterThanOrEqual(choice.frame.height, 44) }
         if largeText && app.frame.width <= 400 {
-            XCTAssertGreaterThan(map.frame.height, 80, "Large multiline labels need an expanded action frame")
-            XCTAssertGreaterThan(measure.frame.height, 80)
+            XCTAssertGreaterThan(create.frame.height, 80, "Large multiline labels need an expanded action frame")
+            XCTAssertGreaterThan(signIn.frame.height, 80)
         }
-        XCTAssertEqual(map.label, locale == "fr" ? "Explorer la carte" : "Explore the map")
-        XCTAssertEqual(measure.label, locale == "fr" ? "Mesurer mon réseau" : "Measure my network")
-        (destination == "map" ? map : measure).tap()
-        let selected = SignalQuestUITestSupport.tab(named: destination == "map"
-            ? (locale == "fr" ? "Carte" : "Map") : (locale == "fr" ? "Tester" : "Test"), in: app)
-        XCTAssertTrue(selected.waitForExistence(timeout: 20))
-        XCTAssertTrue(selected.isSelected)
-        XCTAssertFalse(app.textFields["Email"].isHittable)
-        XCTAssertFalse(app.buttons["guest.close"].exists)
-        XCTAssertFalse(app.alerts.firstMatch.exists, "A destination must not request a permission by itself")
-        let profile = SignalQuestUITestSupport.tab(named: locale == "fr" ? "Profil" : "Profile", in: app)
-        profile.tap()
-        XCTAssertTrue(app.buttons["login.submit"].waitForExistence(timeout: 20))
-        XCTAssertFalse(app.buttons["login.guestMap"].exists)
-        XCTAssertFalse(app.buttons["login.guestMeasure"].exists)
-        app.terminate()
-        app.launchArguments = []
-        app.sqLaunch(locale: locale)
-        XCTAssertTrue(SignalQuestUITestSupport.tab(named: locale == "fr" ? "Carte" : "Map", in: app)
-            .waitForExistence(timeout: 20), "Guest access must persist after relaunch")
+        XCTAssertEqual(create.label, locale == "fr" ? "Créer un compte" : "Create an account")
+        XCTAssertEqual(signIn.label, locale == "fr" ? "J’ai déjà un compte" : "I already have an account")
+        XCTAssertEqual(guest.label, locale == "fr" ? "Continuer sans compte" : "Continue without an account")
+        XCTAssertFalse(app.buttons["onboarding.skip"].exists, "The last screen only offers its three choices")
+        switch exit {
+        case .signUp:
+            create.tap()
+            XCTAssertTrue(app.textFields["auth.signup.email"].waitForExistence(timeout: 20),
+                          "Create an account must open the registration form")
+            app.terminate()
+            app.launchArguments = []
+            app.sqLaunch(locale: locale)
+            XCTAssertTrue(app.buttons["login.submit"].waitForExistence(timeout: 20))
+            XCTAssertFalse(app.textFields["auth.signup.email"].exists, "Registration only opens right after the introduction")
+        case .signIn:
+            signIn.tap()
+            XCTAssertTrue(app.buttons["login.submit"].waitForExistence(timeout: 20))
+            XCTAssertTrue(app.buttons["login.continueGuest"].exists)
+            XCTAssertFalse(app.textFields["auth.signup.email"].exists)
+        case .guest:
+            guest.tap()
+            let map = SignalQuestUITestSupport.tab(named: locale == "fr" ? "Carte" : "Map", in: app)
+            XCTAssertTrue(map.waitForExistence(timeout: 20))
+            XCTAssertTrue(map.isSelected)
+            XCTAssertFalse(app.textFields["Email"].isHittable)
+            XCTAssertFalse(app.buttons["guest.close"].exists)
+            XCTAssertFalse(app.alerts.firstMatch.exists, "A destination must not request a permission by itself")
+            let profile = SignalQuestUITestSupport.tab(named: locale == "fr" ? "Profil" : "Profile", in: app)
+            profile.tap()
+            XCTAssertTrue(app.buttons["login.submit"].waitForExistence(timeout: 20))
+            XCTAssertFalse(app.buttons["login.guestMap"].exists)
+            XCTAssertFalse(app.buttons["login.guestMeasure"].exists)
+            app.terminate()
+            app.launchArguments = []
+            app.sqLaunch(locale: locale)
+            XCTAssertTrue(SignalQuestUITestSupport.tab(named: locale == "fr" ? "Carte" : "Map", in: app)
+                .waitForExistence(timeout: 20), "Guest access must persist after relaunch")
+        }
         XCTAssertFalse(app.buttons["onboarding.page.0"].exists)
     }
 
@@ -300,7 +343,7 @@ final class OnboardingAnimationQATests: XCTestCase {
         print("QA_SWIPE_TO_SLIDE3")
         sleep(4)
 
-        let start = app.buttons["onboarding.openMap"]
+        let start = app.buttons["onboarding.createAccount"]
         XCTAssertTrue(start.waitForExistence(timeout: 5), "Bouton final absent sur la 3e slide")
 
         // Kill sans terminer : au relancement l'onboarding doit ENCORE être là
@@ -314,8 +357,12 @@ final class OnboardingAnimationQATests: XCTestCase {
         )
         print("QA_SURVIVES_RELAUNCH")
 
-        // Terminer pour de vrai : Passer n'existe que hors dernière slide.
+        // Terminer pour de vrai : « Passer » mène au dernier écran, puis
+        // « J’ai déjà un compte » ouvre la connexion.
         button("Passer").tap()
+        let signIn = app.buttons["onboarding.signIn"]
+        XCTAssertTrue(signIn.waitForExistence(timeout: 5), "Passer doit mener aux trois choix")
+        signIn.tap()
         // Le bootstrap de session (.checking) peut durer plusieurs secondes au
         // premier démarrage : on attend l'écran de connexion largement.
         XCTAssertTrue(

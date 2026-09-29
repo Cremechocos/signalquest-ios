@@ -4,7 +4,7 @@ import CoreLocation
 /// Accueil « Crème & Terre cuite » : salutation, état réseau en direct,
 /// grille 2×2 d'actions (Tester en tuile accent), données communautaires
 /// AUTOUR DE LA POSITION (pouls + dernières mesures proches) et dernière
-/// mesure locale. Le feed social reste dans Communauté.
+/// mesure, locale ou du compte. Le feed social reste dans Communauté.
 struct SignalQuestHomeView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
@@ -35,6 +35,16 @@ struct SignalQuestHomeView: View {
     /// trouve en ouvrant la carte, en allumant le bon filtre et en visant le bon pylône — soit
     /// trois gestes que quelqu'un dont le réseau vient de tomber ne fera pas.
     @State private var nearbyOutage: CommunityOutage?
+    /// Liste des pannes ouverte depuis la tuile « Pannes ».
+    @State private var showOutages = false
+    /// Dernier test du compte côté serveur : l'historique local est vide après une
+    /// réinstallation ou sur un nouvel iPhone, et ne voit pas les tests faits sur
+    /// Android (UI-06, UI-12).
+    @State private var accountLatest: SocialShareableSpeedtest?
+    @State private var lastAccountRefreshAt: Date = .distantPast
+    /// Suit l'autorisation de localisation pour afficher, ou retirer, l'invitation
+    /// à l'activer (TRX-19). `nil` tant que le service ne l'a pas encore publiée.
+    @State private var locationStatus: CLAuthorizationStatus?
 
     private var gridColumns: [GridItem] {
         if dynamicTypeSize.isAccessibilitySize {
@@ -59,6 +69,7 @@ struct SignalQuestHomeView: View {
                 networkSummary
                 outageBanner
                 actionsGrid
+                locationPrompt
                 nearbySection
                 latestMeasurementSection
             }
@@ -87,6 +98,23 @@ struct SignalQuestHomeView: View {
         .onChangeCompat(of: router.selectedTab) { _, tab in
             if tab == .home { Task { await refreshNearby(forceFresh: false) } }
         }
+        .navigationDestination(isPresented: $showOutages) {
+            CommunityOutagesListView(service: services.communityOutages, markets: services.markets)
+        }
+        .onReceive(services.location.$authorizationStatus) { status in
+            let previous = locationStatus
+            locationStatus = status
+            // Autorisation tout juste accordée : « Autour de toi » se remplit sans
+            // attendre le prochain retour sur l'onglet. La première valeur reçue
+            // n'est pas un changement : `.task` charge déjà l'écran.
+            if let previous, !Self.isAuthorized(previous), Self.isAuthorized(status) {
+                Task { await refreshNearby(forceFresh: true) }
+            }
+        }
+    }
+
+    private static func isAuthorized(_ status: CLAuthorizationStatus) -> Bool {
+        status == .authorizedWhenInUse || status == .authorizedAlways
     }
 
     private var firstName: String {
@@ -118,6 +146,10 @@ struct SignalQuestHomeView: View {
                 Text(firstName)
                     .font(SQType.display)
                     .foregroundStyle(SQColor.label)
+                    // Aux plus grandes tailles, « SignalQuest » se coupait en
+                    // « SignalQu / est » : le nom rétrécit plutôt (UI-16).
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
             }
             Spacer()
             if user != nil { NavigationLink {
@@ -313,13 +345,17 @@ struct SignalQuestHomeView: View {
         if !networkStatus.isConstrained, let quality = networkQuality {
             let operatorAndSource = "\(quality.operatorLabel) · \(quality.operatorSource.shortLabel)"
             if let mbps = quality.medianDownloadMbps {
-                return "\(operatorAndSource) · \(mbps) Mbps"
+                return "\(operatorAndSource) · \(SQUnits.throughput(mbps: Double(mbps)))"
             }
             return "\(operatorAndSource) · " + String(localized: "\(quality.sampleCount) mesures")
         }
         switch networkStatus.connection {
         case .cellular:
-            let tech = networkStatus.cellularTechnology?.displayName
+            // « 5G » suffit en un coup d'œil : la nuance NSA/SA, sans explication
+            // possible sur cette ligne, reste aux écrans de mesure (TRX-28).
+            let tech = networkStatus.cellularTechnology.map {
+                $0 == .fiveGNSA || $0 == .fiveGSA ? "5G" : $0.displayName
+            }
             return [String(localized: "Cellulaire"), tech, networkStatus.operatorName]
                 .compactMap { $0 }
                 .joined(separator: " · ")
@@ -352,6 +388,8 @@ struct SignalQuestHomeView: View {
 
     // MARK: Grille 2×2 d'actions
 
+    /// « Tester » reste la tuile principale ; les trois autres mènent là où la barre
+    /// d'onglets ne va pas en un geste. Carte et Communauté la doublaient (UI-06).
     private var actionsGrid: some View {
         LazyVGrid(columns: gridColumns, spacing: 14) {
             actionTile(
@@ -363,19 +401,22 @@ struct SignalQuestHomeView: View {
             ) { router.selectedTab = .speed }
 
             actionTile(
-                identifier: "map",
-                title: "Carte",
-                subtitle: "Antennes & couverture",
-                systemImage: "map"
-            ) { router.selectedTab = .map }
+                identifier: "driveTest",
+                title: "Drive Test",
+                subtitle: "Tests pendant un trajet",
+                systemImage: "location.north.line.fill"
+            ) {
+                // Même chemin que le raccourci Siri : l'onglet Tester ouvre le Drive Test.
+                router.selectedTab = .speed
+                router.pendingDriveTest = true
+            }
 
             actionTile(
-                identifier: "community",
-                title: "Communauté",
-                // Comme Messages : l'onglet mène à la connexion pour un invité.
-                subtitle: user == nil ? String(localized: "Connexion requise") : "Fil & entraide",
-                systemImage: "person.2"
-            ) { router.selectedTab = .community }
+                identifier: "outages",
+                title: "Pannes",
+                subtitle: "Signalées par la communauté",
+                systemImage: "exclamationmark.triangle"
+            ) { showOutages = true }
 
             actionTile(
                 identifier: "messages",
@@ -480,6 +521,60 @@ struct SignalQuestHomeView: View {
         .accessibilityIdentifier("home.action.\(identifier)")
     }
 
+    // MARK: Invitation à la localisation
+
+    /// Sans position, « Autour de toi » restait masqué sans rien proposer (TRX-19).
+    /// La demande système ne part que sur ce bouton, jamais d'elle-même (UXP-01) ;
+    /// refusée, elle ne reviendrait plus : le bouton ouvre alors les Réglages.
+    /// Réservée aux membres : pour un invité, le pouls et les mesures récentes
+    /// répondent 401, la carte promettrait ce qui n'arrivera pas.
+    @ViewBuilder
+    private var locationPrompt: some View {
+        let status = locationStatus ?? services.location.authorizationStatus
+        let nearbyIsEmpty = pulse?.hasData != true && nearbyMeasures.isEmpty
+        if user != nil, nearbyIsEmpty, status == .notDetermined || status == .denied {
+            HStack(alignment: .top, spacing: SQSpace.md) {
+                Image(systemName: status == .denied ? "location.slash" : "location")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(SQColor.brandRed)
+                    .frame(width: 40, height: 40)
+                    .background(SQColor.accentSoft, in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    Text("Le réseau autour de toi")
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.label)
+                    Text(status == .denied
+                         ? "La localisation est désactivée pour SignalQuest. Active-la dans les Réglages pour voir les mesures et les pannes à moins d’un kilomètre."
+                         : "Autorise la localisation pour voir les mesures, les pannes et l’opérateur le plus rapide à moins d’un kilomètre.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        Haptics.selection()
+                        if status == .denied {
+                            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                            UIApplication.shared.open(url)
+                        } else {
+                            services.location.requestWhenInUse()
+                        }
+                    } label: {
+                        Text(status == .denied ? "Ouvrir les Réglages" : "Activer la localisation")
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("home.location.enable")
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(SQSpace.lg)
+            .sqCardBackground()
+        }
+    }
+
     // MARK: Autour de toi — données communautaires proches
 
     @ViewBuilder
@@ -528,7 +623,9 @@ struct SignalQuestHomeView: View {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: SQSpace.sm) { pulseTiles(pulse) }
             } else {
+                // Tuiles de même hauteur, même quand un libellé passe sur deux lignes.
                 HStack(spacing: SQSpace.sm + 2) { pulseTiles(pulse) }
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .accessibilityElement(children: .contain)
@@ -545,49 +642,75 @@ struct SignalQuestHomeView: View {
         }
     }
 
+    /// Le verdict en mots d'abord, la mesure brute ensuite : « -97 dBm » ou
+    /// « meilleur op. » ne disaient rien à un débutant (MES-20). Le point reprend
+    /// la couleur de l'échelle commune ; le texte reste à l'encre.
     @ViewBuilder
     private func pulseTiles(_ pulse: NetworkPulse) -> some View {
         if let rsrp = pulse.avgRsrpDbm {
-            // Clé de lecture du dBm (négatif, contre-intuitif) directement sur la
-            // tuile grand public : plus proche de 0 = meilleur signal (INT-16).
-            pulseTileButton(value: "\(rsrp)", unit: "dBm", metric: .signal)
+            let signal = SQQualityScale.Signal(rsrp: Double(rsrp))
+            pulseTileButton(value: signal.label, caption: String(localized: "Signal · \(rsrp) dBm"),
+                            dot: signal.color, metric: .signal, term: .rsrp)
         }
         if let median = pulse.medianDownloadMbps {
-            pulseTileButton(value: "\(median)", unit: String(localized: "Mbps médian"), metric: .download)
+            let tier = SQQualityScale.Throughput(mbps: Double(median))
+            pulseTileButton(value: SQUnits.throughput(mbps: Double(median)),
+                            caption: String(localized: "Réception typique"),
+                            dot: tier.color, metric: .download, term: .download)
         }
         if let best = pulse.bestOperator, !best.isEmpty {
-            pulseTileButton(value: best, unit: String(localized: "meilleur op."), metric: .download)
+            pulseTileButton(value: best, caption: String(localized: "Le plus rapide"), metric: .download)
         }
     }
 
     /// Tuile du pouls, cliquable vers la comparaison des opérateurs sur sa métrique
-    /// (dBm → signal, Mb/s & meilleur op. → débit).
-    private func pulseTileButton(value: String, unit: String, metric: NearbyOperatorMetric) -> some View {
+    /// (signal → signal, réception et opérateur le plus rapide → débit). Le ⓘ est
+    /// posé par-dessus la tuile, pas dedans : un bouton dans un bouton ne répond pas.
+    private func pulseTileButton(value: String, caption: String, dot: Color? = nil,
+                                 metric: NearbyOperatorMetric, term: SQTerm? = nil) -> some View {
         Button {
             guard userLocation != nil else { return }
             Haptics.selection()
             comparisonMetric = metric
             showOperatorComparison = true
         } label: {
-            pulseTile(value: value, unit: unit)
+            pulseTile(value: value, caption: caption, dot: dot)
         }
         .buttonStyle(.plain)
         .disabled(userLocation == nil)
+        .accessibilityLabel(Text(verbatim: "\(caption) : \(value)"))
+        .accessibilityHint(Text("Compare les opérateurs autour de toi"))
+        .overlay(alignment: .topTrailing) {
+            if let term {
+                SQInfoButton(term: term)
+                    .padding(SQSpace.xs)
+            }
+        }
     }
 
-    private func pulseTile(value: String, unit: String) -> some View {
+    private func pulseTile(value: String, caption: String, dot: Color?) -> some View {
         VStack(spacing: 2) {
-            Text(value)
-                .font(SQFont.display(17, .bold))
-                .foregroundStyle(SQColor.brandRed)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .accessibilityIdentifier("home.pulse.value")
-            Text(LocalizedStringKey(unit))
-                .font(SQFont.body(11))
-                .foregroundStyle(SQColor.labelSecondary)
+            HStack(spacing: 5) {
+                if let dot {
+                    Circle()
+                        .fill(dot)
+                        .frame(width: 8, height: 8)
+                        .accessibilityHidden(true)
+                }
+                Text(value)
+                    .font(SQFont.display(17, .bold))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .accessibilityIdentifier("home.pulse.value")
+            }
+            Text(caption)
+                .font(SQType.micro)
+                // À l'encre : le gris secondaire (5,2:1 sur la tuile) tombait sous
+                // 4,5:1 une fois rendu à 12 pt. La hiérarchie tient par la taille.
+                .foregroundStyle(SQColor.label)
                 // Trois tuiles se partagent la largeur : à Dynamic Type élevé,
-                // « Mbps médian » ne tient plus et se tronquait silencieusement
+                // le libellé ne tenait plus et se tronquait silencieusement
                 // (relevé par `performAccessibilityAudit`). La valeur avait déjà
                 // son repli, pas le libellé.
                 .lineLimit(2)
@@ -595,8 +718,12 @@ struct SignalQuestHomeView: View {
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("home.pulse.unit")
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, SQSpace.sm + 2)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Bande haute réservée au ⓘ posé dans le coin : sans elle, il chevauchait
+        // une valeur longue (« 120 Mbit/s »).
+        .padding(.top, SQSpace.lg + 2)
+        .padding(.bottom, SQSpace.sm + 2)
+        .padding(.horizontal, SQSpace.xs)
         .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
@@ -607,35 +734,42 @@ struct SignalQuestHomeView: View {
             router.selectedTab = .map
         } label: {
             HStack(spacing: SQSpace.md) {
+                // Texte à l'encre sur une teinte douce, couleur de la techno portée
+                // par l'anneau : en blanc sur la teinte pleine, « 4G » restait sous
+                // 4,5:1 (3,7:1 sur le bleu), comme la pastille du verdict (TRX-04).
+                let tint = TechAccent.color(for: measure.tech)
                 ZStack {
-                    Circle().fill(TechAccent.color(for: measure.tech))
+                    Circle().fill(tint.opacity(0.16))
+                    Circle().strokeBorder(tint, lineWidth: 2)
                     if let label = Self.techShortLabel(measure.tech) {
                         Text(LocalizedStringKey(label))
-                            .font(SQFont.body(12, .bold))
-                            .foregroundStyle(SQColor.onAccent)
+                            .font(SQFont.body(13, .bold))
+                            .foregroundStyle(SQColor.label)
                     } else {
                         // Techno inconnue (ex. « CELLULAR » brut) : icône antenne.
                         Image(systemName: "antenna.radiowaves.left.and.right")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(SQColor.onAccent)
+                            .foregroundStyle(SQColor.label)
                     }
                 }
                 .frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 5) {
-                        Text("\(Int(measure.downloadMbps)) Mbps")
+                        Text(verbatim: SQUnits.throughput(mbps: measure.downloadMbps))
                             .font(SQFont.body(15, .semibold))
                             .foregroundStyle(SQColor.label)
                         if let ping = measure.pingMs {
-                            Text("· \(Int(ping)) ms")
+                            Text(verbatim: "· \(SQUnits.milliseconds(ping))")
                                 .font(SQFont.body(13))
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
                     }
+                    // Encre et retour à la ligne : en gris sur une ligne, le contexte
+                    // manquait de contraste et se coupait aux grandes tailles.
                     Text(nearbyContext(for: measure))
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("home.nearby.context")
                 }
                 Spacer()
@@ -679,37 +813,74 @@ struct SignalQuestHomeView: View {
 
     // MARK: Dernière mesure
 
+    /// Ce que montre la carte « Dernière mesure », quelle que soit sa source.
+    private struct DisplayedMeasurement {
+        let date: Date?
+        let downloadMbps: Double
+        let latencyMs: Double?
+        let technology: String?
+    }
+
+    /// Le test le plus récent entre l'historique local, le plus détaillé, et le
+    /// compte, qui voit aussi les tests d'un autre appareil ou d'avant une
+    /// réinstallation (UI-06, UI-12).
+    private var displayedMeasurement: DisplayedMeasurement? {
+        let local = latestMeasurement.map {
+            DisplayedMeasurement(date: $0.createdAt, downloadMbps: $0.downloadAverageMbps,
+                                 latencyMs: $0.pingMinMs ?? $0.pingMs, technology: measurementTech($0))
+        }
+        let account = accountLatest.flatMap { test -> DisplayedMeasurement? in
+            guard let download = test.downloadSpeed else { return nil }
+            return DisplayedMeasurement(date: test.timestamp, downloadMbps: download,
+                                        latencyMs: test.ping, technology: Self.techShortLabel(test.networkType))
+        }
+        guard let account else { return local }
+        guard let local, let localDate = local.date else { return account }
+        // Le même test, envoyé au serveur, revient avec quelques secondes d'écart :
+        // le local, plus détaillé, garde la priorité à égalité.
+        if let accountDate = account.date, accountDate > localDate.addingTimeInterval(60) { return account }
+        return local
+    }
+
     @ViewBuilder
     private var latestMeasurementSection: some View {
-        if let measurement = latestMeasurement {
+        if let measurement = displayedMeasurement {
             Button {
                 Haptics.selection()
                 router.selectedTab = .speed
             } label: {
                 HStack(spacing: SQSpace.md) {
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Dernière mesure · \(measurement.createdAt.formatted(date: .abbreviated, time: .shortened))")
-                            .font(SQFont.body(13.5))
-                            .foregroundStyle(SQColor.labelSecondary)
+                        Group {
+                            if let date = measurement.date {
+                                // Relative, comme « Autour de toi » : la date complète
+                                // avec l'année passait sur deux lignes.
+                                Text("Dernière mesure · \(date.formatted(.relative(presentation: .named)))")
+                            } else {
+                                Text("Dernière mesure")
+                            }
+                        }
+                        .font(SQFont.body(13.5))
+                        .foregroundStyle(SQColor.labelSecondary)
                         HStack(alignment: .firstTextBaseline, spacing: 5) {
-                            Text(measurement.downloadAverageMbps.formatted(.number.precision(.fractionLength(0))))
+                            Text(verbatim: SQUnits.throughputValue(mbps: measurement.downloadMbps))
                                 .font(SQFont.display(30, .bold))
                                 .foregroundStyle(SQColor.label)
-                            Text("Mbps")
+                            Text(verbatim: SQUnits.throughputUnit(mbps: measurement.downloadMbps))
                                 .font(SQFont.body(15, .medium))
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
                     }
                     Spacer()
-                    if let ping = measurement.pingMinMs ?? measurement.pingMs {
-                        Text("\(ping.formatted(.number.precision(.fractionLength(0)))) ms")
+                    if let latency = measurement.latencyMs {
+                        Text(verbatim: SQUnits.milliseconds(latency))
                             .font(SQFont.body(13, .semibold))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .foregroundStyle(SQColor.label)
                             .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
                     }
-                    if let tech = measurementTech(measurement) {
+                    if let tech = measurement.technology {
                         Text(tech)
                             .font(SQFont.body(13, .semibold))
                             .padding(.horizontal, 14)
@@ -724,10 +895,11 @@ struct SignalQuestHomeView: View {
                 .contentShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
             }
             .buttonStyle(SQPressButtonStyle())
-            .accessibilityLabel("Dernière mesure : \(Int(measurement.downloadAverageMbps)) mégabits par seconde. Ouvre le Speedtest.")
+            .accessibilityLabel("Dernière mesure : \(Int(measurement.downloadMbps)) mégabits par seconde. Ouvre le Speedtest.")
+            .accessibilityIdentifier("home.latestMeasurement")
         } else {
             EmptyStateView(
-                title: "Aucune mesure locale",
+                title: "Aucune mesure pour l’instant",
                 message: "Lance un premier test pour créer ton repère.",
                 systemImage: "waveform.path.ecg"
             )
@@ -751,7 +923,27 @@ struct SignalQuestHomeView: View {
         services.networkPath.refreshNow()
         networkStatus = services.networkPath.status
         latestMeasurement = await services.speedtest.history().first
+        async let account: Void = refreshAccountLatest(forceFresh: forceFresh)
         await refreshNearby(forceFresh: forceFresh)
+        await account
+    }
+
+    /// Dernier test du compte. Silencieux : hors ligne ou en erreur, l'historique
+    /// local suffit. Même retenue que « Autour de toi » : `refresh()` repart à
+    /// chaque retour au premier plan.
+    private func refreshAccountLatest(forceFresh: Bool) async {
+        guard user != nil else { return }
+        if AppEnvironment.usesDemoData {
+            accountLatest = SocialShareableSpeedtest(
+                id: "demo", downloadSpeed: 214.6, uploadSpeed: 48.2, ping: 18,
+                networkType: "5G", mobileOperator: "Orange", timestamp: Date().addingTimeInterval(-3_600))
+            return
+        }
+        if !forceFresh, Date().timeIntervalSince(lastAccountRefreshAt) < 60 { return }
+        lastAccountRefreshAt = Date()
+        if let latest = try? await services.feed.myLatestSpeedtest() {
+            accountLatest = latest
+        }
     }
 
     /// Charge le pouls réseau, les dernières mesures communautaires et le verdict
@@ -760,6 +952,10 @@ struct SignalQuestHomeView: View {
     /// sur un état neutre (jamais d'erreur affichée sur l'Accueil).
     /// `forceFresh` (pull-to-refresh) contourne le cache de tuiles.
     private func refreshNearby(forceFresh: Bool) async {
+        if AppEnvironment.usesDemoData {
+            applyDemoNearby()
+            return
+        }
         // Throttle : refresh() est relancé à CHAQUE foreground + retour d'onglet.
         // Sans garde, pouls et mesures récentes repartaient sur le réseau à chaque
         // fois. On tolère 20 s entre deux rafraîchissements réels (PERF-HOME-01).
@@ -813,6 +1009,25 @@ struct SignalQuestHomeView: View {
                 .map { $0.0 }
         }
         networkQuality = await qualityTask
+    }
+
+    /// Démo (`--demo-data`, tours de captures) : « Autour de toi » rempli sans
+    /// réseau, avec le pouls de démo du fil (Lyon) et trois mesures proches.
+    private func applyDemoNearby() {
+        let now = Date()
+        userLocation = CLLocation(latitude: 45.764, longitude: 4.8357)
+        pulse = .demo
+        nearbyMeasures = [
+            AndroidSpeedtestMarker(id: "demo-1", lat: 45.7652, lng: 4.8371, downloadMbps: 312.4, uploadMbps: 54.1,
+                                   pingMs: 17, tech: "5G", band: 78, frequency: nil,
+                                   timestamp: now.addingTimeInterval(-1_200), operator: "Orange"),
+            AndroidSpeedtestMarker(id: "demo-2", lat: 45.7629, lng: 4.8331, downloadMbps: 86.7, uploadMbps: 21.3,
+                                   pingMs: 26, tech: "4G", band: 3, frequency: nil,
+                                   timestamp: now.addingTimeInterval(-5_400), operator: "SFR"),
+            AndroidSpeedtestMarker(id: "demo-3", lat: 45.7668, lng: 4.8322, downloadMbps: 8.4, uploadMbps: 2.2,
+                                   pingMs: 61, tech: "4G", band: 20, frequency: nil,
+                                   timestamp: now.addingTimeInterval(-14_400), operator: "Free"),
+        ]
     }
 
     /// La panne signalée la plus pertinente autour de la position, ou `nil`.

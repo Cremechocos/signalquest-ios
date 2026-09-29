@@ -2,7 +2,8 @@ import SwiftUI
 
 /// Feuille de choix / changement du @handle (identifiant unique de mention), avec
 /// vérification de disponibilité en temps réel et gestion du cooldown 30 j. Réutilisée
-/// par le Feed (gate à l'arrivée si aucun handle) et l'édition de profil.
+/// à l'entrée dans Communauté si aucun handle (`HandleGatePolicy`) et par l'édition
+/// de profil.
 struct ChooseHandleSheet: View {
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
@@ -163,8 +164,8 @@ struct ChooseHandleSheet: View {
 
     private static func cooldownMessage(_ days: Int) -> String {
         days <= 1
-            ? "Vous pourrez changer de nom d’utilisateur dans 1 jour."
-            : "Vous pourrez changer de nom d’utilisateur dans \(days) jours."
+            ? String(localized: "Tu pourras changer de nom d’utilisateur dans 1 jour.")
+            : String(localized: "Tu pourras changer de nom d’utilisateur dans \(days) jours.")
     }
 
     /// Normalisation client (aperçu + longueur min) alignée sur le backend :
@@ -188,4 +189,25 @@ struct ChooseHandleSheet: View {
         while let l = result.last, l == "-" || l == "." || l == "_" { result.removeLast() }
         return String(result.prefix(32))
     }
+}
+
+/// Quand proposer de choisir un @pseudo : en entrant dans Communauté, où il sert
+/// aux mentions, et non dès l'arrivée, où la feuille s'empilait sur la demande de
+/// notifications et la confirmation d'e-mail (TRX-20). Refermée sans choix, elle
+/// attend une semaine au lieu de revenir à chaque lancement.
+enum HandleGatePolicy {
+    static let interval: TimeInterval = 7 * 24 * 3600
+
+    static func shouldPresent(handle: String?, userID: String, now: Date = Date(),
+                              defaults: UserDefaults = .standard) -> Bool {
+        guard (handle ?? "").isEmpty else { return false }
+        guard let last = defaults.object(forKey: key(for: userID)) as? Date else { return true }
+        return now.timeIntervalSince(last) >= interval
+    }
+
+    static func markPresented(userID: String, now: Date = Date(), defaults: UserDefaults = .standard) {
+        defaults.set(now, forKey: key(for: userID))
+    }
+
+    private static func key(for userID: String) -> String { "sq.handleGate.lastShown.\(userID)" }
 }

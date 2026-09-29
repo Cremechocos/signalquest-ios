@@ -62,6 +62,18 @@ final class QualityScaleTests: XCTestCase {
         XCTAssertEqual(SQUnits.throughputValue(mbps: .nan, locale: fr), "—")
     }
 
+    /// Le lexique veut « Mbps » en anglais ; les unités manquaient au catalogue,
+    /// l'anglais affichait donc « Mbit/s ». Lu dans le fichier compilé : cette
+    /// suite tourne en français.
+    func testEnglishWritesMbpsAndGbps() throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "Localizable", withExtension: "strings",
+            subdirectory: "en.lproj"))
+        let english = try XCTUnwrap(PropertyListSerialization.propertyList(
+            from: Data(contentsOf: url), options: [], format: nil) as? [String: String])
+        XCTAssertEqual(english["Mbit/s"], "Mbps")
+        XCTAssertEqual(english["Gbit/s"], "Gbps")
+    }
+
     func testRangeLabelsDescribeEachTier() {
         XCTAssertTrue(SQQualityScale.Throughput.exceptional.rangeLabel.hasSuffix("+"))
         XCTAssertTrue(SQQualityScale.Throughput.verySlow.rangeLabel.hasPrefix("< "))

@@ -55,12 +55,9 @@ final class OledTourQATests: XCTestCase {
         settle(app)
         capture("01-onboarding")
 
-        // L'onboarding se saute dans les deux langues (l'app est bilingue).
-        let skip = app.buttons["Passer"].exists ? app.buttons["Passer"] : app.buttons["Skip"]
-        if skip.waitForExistence(timeout: 3) {
-            skip.tap()
-            settle(app)
-        }
+        // L'onboarding se termine vers la connexion, dans les deux langues.
+        SignalQuestUITestSupport.completeOnboardingIfNeeded(in: app)
+        settle(app)
         capture("02-connexion")
 
         for label in ["Créer un compte", "S'inscrire", "Sign up"] {

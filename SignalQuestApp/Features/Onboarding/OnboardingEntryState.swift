@@ -33,6 +33,10 @@ final class OnboardingEntryState: ObservableObject {
     @Published private(set) var hasCompleted: Bool
     @Published private(set) var pending: OnboardingEntryRequest?
     @Published private(set) var guestPresentationRevision = 0
+    /// « Créer un compte » en fin d'onboarding : l'écran de connexion qui suit
+    /// ouvre directement l'inscription. Gardé en mémoire seulement : un
+    /// relancement repart de la connexion, jamais d'une feuille surprise.
+    private(set) var opensSignup = false
     private var preferredGuestSceneID: UUID?
     private var guestReservation: (id: UUID, sceneID: UUID, requestID: UUID)?
     private let defaults: UserDefaults
@@ -47,7 +51,7 @@ final class OnboardingEntryState: ObservableObject {
         } : nil
     }
 
-    func finish(destination: OnboardingEntryDestination?, sceneID: UUID? = nil) {
+    func finish(destination: OnboardingEntryDestination?, sceneID: UUID? = nil, opensSignup: Bool = false) {
         guard !hasCompleted else { return }
         let request = destination.map { OnboardingEntryRequest(destination: $0) }
         if let request, let data = try? JSONEncoder().encode(request) {
@@ -57,8 +61,17 @@ final class OnboardingEntryState: ObservableObject {
         }
         defaults.set(true, forKey: Self.completionKey)
         preferredGuestSceneID = request == nil ? nil : sceneID
+        // Une destination invité ne passe pas par la connexion : rien à ouvrir.
+        self.opensSignup = request == nil && opensSignup
         pending = request
         hasCompleted = true
+    }
+
+    /// Lue une seule fois, par le premier écran de connexion affiché ensuite.
+    func consumeSignupRequest() -> Bool {
+        guard opensSignup else { return false }
+        opensSignup = false
+        return true
     }
 
     /// Le callback d'une ancienne présentation ne consomme pas un autre choix.

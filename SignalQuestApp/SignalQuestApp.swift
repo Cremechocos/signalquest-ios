@@ -631,8 +631,6 @@ struct MainTabView: View {
             guard let user else { return }
             await services.refreshInboxBadge()
             await services.refreshNotificationBadge()
-            // À l'arrivée (Feed = onglet par défaut) sans @handle : inviter à en choisir un.
-            if (user.handle ?? "").isEmpty { showHandleGate = true }
         }
         .sheet(isPresented: $showHandleGate) {
             ChooseHandleSheet(onSuccess: { _ in Task { await session.refreshUser() } })
@@ -651,9 +649,17 @@ struct MainTabView: View {
                 consumeIntentRoutes()
             }
         }
-        .onChangeCompat(of: router.selectedTab) { _, _ in
+        .onChangeCompat(of: router.selectedTab) { _, tab in
             // Changement d'onglet (tap, deep-link, intent) : dock redéployé.
             withAnimation(SQMotion.snappy) { router.isDockMinimized = false }
+            // Le @pseudo sert aux mentions : il se propose en entrant dans
+            // Communauté, pas à l'arrivée (TRX-20). Un lien vers un contenu passe
+            // avant la feuille.
+            if tab == .community, let user, !router.hasPendingContentRoute,
+               HandleGatePolicy.shouldPresent(handle: user.handle, userID: user.id) {
+                HandleGatePolicy.markPresented(userID: user.id)
+                showHandleGate = true
+            }
             if user != nil {
                 Task {
                     await services.refreshInboxBadge()
@@ -718,7 +724,7 @@ struct MainTabView: View {
         if user != nil {
             NavigationStack { FeedView(service: services.feed, location: services.location) }
         } else {
-            LoginView()
+            LoginView(context: .community)
         }
     }
 
@@ -727,7 +733,7 @@ struct MainTabView: View {
         if let user {
             NavigationStack { ProfileView(user: user) }
         } else {
-            LoginView()
+            LoginView(context: .profile)
         }
     }
 

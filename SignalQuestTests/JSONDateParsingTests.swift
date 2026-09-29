@@ -18,6 +18,21 @@ final class JSONDateParsingTests: XCTestCase {
         }
     }
 
+    /// `/api/user/speedtests` envoie l'heure de Paris sans fuseau : lue en UTC,
+    /// le dernier test du compte tombait deux heures dans le futur sur l'Accueil.
+    func testSpeedtestHistoryTimestampsAreParisWallClock() throws {
+        let summer = Date(timeIntervalSince1970: 1_790_703_600)   // 29/09/2026 17:40 UTC
+        XCTAssertEqual(SQDateParsing.parseParisWallClock("2026-09-29T19:40:00.000"), summer)
+        XCTAssertEqual(SQDateParsing.parseParisWallClock("2026-09-29T19:40:00"), summer)
+        XCTAssertEqual(SQDateParsing.parseParisWallClock("2026-09-29T17:40:00.000Z"), summer,
+                       "A value that carries its zone keeps the common reading")
+        XCTAssertEqual(SQDateParsing.parseParisWallClock("2026-01-15T09:05:00.000"),
+                       Date(timeIntervalSince1970: 1_768_464_300), "Winter time is UTC+1")
+        let json = #"{"speedtests":[{"id":"t1","downloadSpeed":64.3,"timestamp":"2026-09-29T19:40:00.000"}]}"#
+        let decoded = try JSONDecoder.signalQuest.decode(UserSpeedtestsResponse.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.speedtests.first?.timestamp, summer)
+    }
+
     func testCanonicalUTCPreservesExactDatesAcrossEpochAndYearBoundaries() {
         var inputs = Self.canonicalInputs(count: 128, milliseconds: true)
         inputs += Self.canonicalInputs(count: 128, milliseconds: false)

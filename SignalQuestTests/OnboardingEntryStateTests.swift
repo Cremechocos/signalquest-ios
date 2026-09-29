@@ -32,6 +32,27 @@ final class OnboardingEntryStateTests: XCTestCase {
         XCTAssertTrue(OnboardingEntryState(defaults: defaults).hasCompleted)
     }
 
+    func testCreateAccountOpensSignupOnceAndNeverAfterRestart() async throws {
+        let (defaults, name) = try store(); defer { defaults.removePersistentDomain(forName: name) }
+        let state = OnboardingEntryState(defaults: defaults)
+        state.finish(destination: nil, opensSignup: true)
+        XCTAssertTrue(state.hasCompleted)
+        XCTAssertNil(state.pending, "Signing up goes through the login screen, not a guest destination")
+        XCTAssertTrue(state.consumeSignupRequest())
+        XCTAssertFalse(state.consumeSignupRequest(), "A second login screen must not reopen the form")
+        XCTAssertFalse(OnboardingEntryState(defaults: defaults).consumeSignupRequest(),
+                       "A relaunch starts from the login screen")
+    }
+
+    func testGuestAndSignInExitsNeverOpenSignup() async throws {
+        for destination in [OnboardingEntryDestination.map, nil] {
+            let (defaults, name) = try store(); defer { defaults.removePersistentDomain(forName: name) }
+            let state = OnboardingEntryState(defaults: defaults)
+            state.finish(destination: destination, opensSignup: destination != nil)
+            XCTAssertFalse(state.consumeSignupRequest())
+        }
+    }
+
     func testSkipCompletesWithoutSelectingOrStartingAnything() async throws {
         let (defaults, name) = try store(); defer { defaults.removePersistentDomain(forName: name) }
         let state = OnboardingEntryState(defaults: defaults)

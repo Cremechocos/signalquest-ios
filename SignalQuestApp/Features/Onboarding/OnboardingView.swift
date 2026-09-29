@@ -7,8 +7,8 @@ import SwiftUI
 /// dont le binding (`set: { if !$0 { hasCompletedOnboarding = true } }`)
 /// marquait l'onboarding « complété » dès que la présentation était démontée
 /// — y compris sans aucune interaction (kill de l'app, présentation avortée
-/// au premier lancement). Ici, seul le geste explicite de l'utilisateur
-/// (« Commencer » / « Passer ») écrit le flag.
+/// au premier lancement). Ici, seul un choix explicite du dernier écran
+/// (s'inscrire, se connecter ou continuer sans compte) écrit le flag.
 struct OnboardingHost<Content: View>: View {
     @EnvironmentObject private var entry: OnboardingEntryState
     @EnvironmentObject private var versionPolicy: VersionPolicyService
@@ -24,9 +24,13 @@ struct OnboardingHost<Content: View>: View {
     var body: some View {
         ZStack {
             if !entry.hasCompleted && !versionPolicy.state.blocksApp {
-                OnboardingView { destination in
+                OnboardingView { exit in
                     withAnimation(reduceMotion ? .easeOut(duration: 0.2) : SQMotion.smooth) {
-                        entry.finish(destination: destination, sceneID: sceneID)
+                        switch exit {
+                        case .signUp: entry.finish(destination: nil, sceneID: sceneID, opensSignup: true)
+                        case .signIn: entry.finish(destination: nil, sceneID: sceneID)
+                        case .guest: entry.finish(destination: .map, sceneID: sceneID)
+                        }
                     }
                 }
                 .transition(
@@ -53,7 +57,11 @@ struct OnboardingHost<Content: View>: View {
 /// sélection programmatiques (bug « animation tronquée », juil. 2026) — ici le
 /// bouton et le swipe passent par le même offset animé au ressort.
 struct OnboardingView: View {
-    let onFinish: (OnboardingEntryDestination?) -> Void
+    /// Les trois sorties du dernier écran (TRX-19). L'invité découvre la carte,
+    /// sujet de la dernière slide.
+    enum Exit: Equatable { case signUp, signIn, guest }
+
+    let onFinish: (Exit) -> Void
 
     @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -143,14 +151,20 @@ struct OnboardingView: View {
                 .foregroundStyle(SQColor.label)
                 .accessibilityHidden(true)
             Spacer()
-            Button { onFinish(nil) } label: { Text(verbatim: OnboardingCopy.skip.localized(locale)) }
+            // « Passer » mène au dernier écran et à ses trois choix : sauter
+            // l'introduction ne doit pas décider à la place de l'utilisateur
+            // entre compte et découverte (TRX-19).
+            Button { goTo(pages.count - 1) } label: {
+                Text(verbatim: OnboardingCopy.skip.localized(locale))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
                 .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
                 .tint(SQColor.labelSecondary)
-                // Sur la dernière slide le CTA « Commencer » fait ce travail :
-                // on efface « Passer » plutôt que d'offrir deux sorties.
                 .opacity(isLastPage ? 0 : 1)
                 .disabled(isLastPage)
                 .accessibilityHidden(isLastPage)
+                .accessibilityIdentifier("onboarding.skip")
                 .animation(.easeOut(duration: 0.18), value: isLastPage)
         }
         .padding(.horizontal, SQSpace.xl)
@@ -164,18 +178,26 @@ struct OnboardingView: View {
             OnboardingPageIndicator(count: pages.count, current: page) { goTo($0) }
             if isLastPage {
                 VStack(spacing: SQSpace.sm) {
-                    GradientButton(OnboardingCopy.openMap.localized(locale), systemImage: "map", allowsMultiline: true) {
-                        onFinish(.map)
+                    GradientButton(OnboardingCopy.createAccount.localized(locale), systemImage: "person.badge.plus", allowsMultiline: true) {
+                        onFinish(.signUp)
                     }
-                    .accessibilityIdentifier("onboarding.openMap")
-                    GradientButton(OnboardingCopy.openMeasure.localized(locale), systemImage: "speedometer", style: .secondary, allowsMultiline: true) {
-                        onFinish(.measure)
+                    .accessibilityIdentifier("onboarding.createAccount")
+                    GradientButton(OnboardingCopy.signIn.localized(locale), systemImage: "person.crop.circle", style: .secondary, allowsMultiline: true) {
+                        onFinish(.signIn)
                     }
-                    .accessibilityIdentifier("onboarding.openMeasure")
-                    Text(verbatim: OnboardingCopy.guestHint.localized(locale))
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("onboarding.signIn")
+                    // Découvrir sans compte reste possible, sans rivaliser
+                    // avec les deux actions principales.
+                    Button { onFinish(.guest) } label: {
+                        Text(verbatim: OnboardingCopy.continueAsGuest.localized(locale))
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.accentInk)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("onboarding.continueAsGuest")
                 }
             } else {
                 OnboardingCTA(isLastPage: false) { goTo(page + 1) }
@@ -241,9 +263,9 @@ private enum OnboardingCopy: String {
     case measureBody = "Tes speedtests en réseau mobile apparaissent sur la carte, à l’endroit où tu les fais. Tes zones privées restent protégées et tu peux masquer une mesure."
     case internationalTitle = "Une carte qui se construit ensemble"
     case internationalBody = "D’un pays à l’autre, antennes officielles et contributions de la communauté se complètent pour dessiner la carte."
-    case openMap = "Explorer la carte"
-    case openMeasure = "Mesurer mon réseau"
-    case guestHint = "Tu peux commencer sans créer de compte."
+    case createAccount = "Créer un compte"
+    case signIn = "J’ai déjà un compte"
+    case continueAsGuest = "Continuer sans compte"
     case skip = "Passer"
     case next = "Suivant"
     case start = "Commencer"

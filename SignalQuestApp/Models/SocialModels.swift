@@ -852,7 +852,12 @@ struct SocialShareableSpeedtest: Codable, Identifiable, Equatable {
         ping = try? c.decodeIfPresent(Double.self, forKey: .ping)
         networkType = c.decodeFlexibleString(forKey: .networkType)
         mobileOperator = c.decodeFlexibleString(forKey: .mobileOperator)
-        timestamp = try? c.decodeIfPresent(Date.self, forKey: .timestamp)
+        // Heure de Paris sans fuseau : voir `SQDateParsing.parseParisWallClock`.
+        if let raw = try? c.decodeIfPresent(String.self, forKey: .timestamp) {
+            timestamp = SQDateParsing.parseParisWallClock(raw)
+        } else {
+            timestamp = try? c.decodeIfPresent(Date.self, forKey: .timestamp)
+        }
     }
 }
 
