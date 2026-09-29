@@ -37,6 +37,7 @@ struct ConversationDetailView: View {
     @State private var replyTarget: MessageItem?
     @State private var editTarget: MessageItem?
     @State private var errorMessage: String?
+    @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
     @State private var isSending = false
     @State private var showUnlockSheet = false
     @State private var showE2EECallUnavailable = false
@@ -45,6 +46,16 @@ struct ConversationDetailView: View {
     /// présence ne démarrent pour une conversation qui n'est plus affichée (SOC-03).
     @State private var isOnScreen = false
     @State private var isE2EEUnlocked = false
+    @State private var showEncryptionInfo = false
+    /// Suivi du bas de la conversation : un message qui arrive pendant la
+    /// lecture de l'historique n'y ramène plus de force (SOC-20).
+    @State private var isNearBottom = true
+    @State private var hasUnseenMessages = false
+    /// Actions destructives confirmées avant exécution (SOC-22).
+    @State private var pendingDeletion: PendingMessageDeletion?
+    @State private var reportTarget: MessageItem?
+    @State private var confirmBlockOther = false
+    @State private var pendingBlockSenderId: String?
     @State private var decryptedMessages: [String: String] = [:]
     /// MSG-API-01 — statut d'envoi optimiste, indexé par id LOCAL de bulle.
     /// Absent = message confirmé (rendu normal). `.sending` pendant l'appel
@@ -227,6 +238,7 @@ struct ConversationDetailView: View {
                                         .foregroundStyle(SQColor.labelSecondary)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, SQSpace.sm)
+                                        .accessibilityIdentifier("conversation.stamp")
                                 }
                                 messageBubble(
                                     message,
@@ -245,6 +257,10 @@ struct ConversationDetailView: View {
                             .animation(SQMotion.standard, value: highlightedMessageId)
                         }
                         readReceiptFooter
+                        Color.clear
+                            .frame(height: 1)
+                            .onAppear { isNearBottom = true; hasUnseenMessages = false }
+                            .onDisappear { isNearBottom = false }
                         if let errorMessage {
                             ErrorStateView(title: "Messages indisponibles", message: errorMessage) {
                                 Task { await load() }
@@ -253,11 +269,42 @@ struct ConversationDetailView: View {
                         }
                     }
                     .padding()
+                    // iPad : bulles dans une colonne lisible (SOC-27).
+                    .sqReadableWidth()
                 }
                 // On suit le DERNIER id (pas le count) : prepender d'anciens messages
                 // ne doit pas refaire défiler vers le bas.
                 .onChangeCompat(of: messages.last?.id) { _, _ in
-                    if let last = messages.last { withAnimation(SQMotion.standard) { proxy.scrollTo(last.id, anchor: .bottom) } }
+                    guard let last = messages.last else { return }
+                    let mine = last.id.hasPrefix("local-") || last.senderId == currentUserId
+                    if isNearBottom || mine {
+                        withAnimation(SQMotion.standard) { proxy.scrollTo(last.id, anchor: .bottom) }
+                    } else {
+                        hasUnseenMessages = true
+                    }
+                }
+                .overlay(alignment: .bottom) {
+                    if hasUnseenMessages {
+                        Button {
+                            Haptics.selection()
+                            hasUnseenMessages = false
+                            if let last = messages.last { withAnimation(SQMotion.standard) { proxy.scrollTo(last.id, anchor: .bottom) } }
+                        } label: {
+                            Label("Nouveaux messages", systemImage: "arrow.down")
+                                .font(SQFont.body(13, .semibold))
+                                .foregroundStyle(SQColor.onAccent)
+                                .padding(.horizontal, SQSpace.md)
+                                .padding(.vertical, SQSpace.sm)
+                                .background(SQColor.brandRed, in: Capsule(style: .continuous))
+                                .sqShadowSoft()
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.bottom, SQSpace.sm)
+                        .transition(.opacity)
+                        .accessibilityIdentifier("conversation.newMessages")
+                    }
                 }
                 // MSG-FLUIDITY-01 — Réancre sur le message qui était en tête avant
                 // le prepend, SANS animation, pour que charger d'anciens messages ne
@@ -278,6 +325,7 @@ struct ConversationDetailView: View {
             // Android — auparavant dans l'en-tête, désormais en bas de conversation).
             typingIndicator
                 .padding(.horizontal)
+                .sqReadableWidth()
             if !isE2EE, let currentUserId {
                 LiveShareConversationBar(
                     coordinator: services.liveShare,
@@ -287,13 +335,24 @@ struct ConversationDetailView: View {
                 )
                 .padding(.horizontal)
                 .padding(.bottom, SQSpace.xs)
+                .sqReadableWidth()
             }
             composer
+                .sqReadableWidth()
         }
+        // Barre masquée pour l'en-tête maison ; le balayage retour, que UIKit
+        // coupe avec la barre, est rétabli (SOC-30).
         .toolbar(.hidden, for: .navigationBar)
-        .navigationBarBackButtonHidden(true)
+        .sqKeepsSwipeBack()
+        .onAppear { OpenConversationTracker.opened(conversation.id) }
+        .onDisappear { OpenConversationTracker.closed(conversation.id) }
         .navigationDestination(isPresented: $showSearch) {
-            MessageSearchView(conversation: conversation, service: service, e2ee: e2ee) { messageId in
+            MessageSearchView(
+                conversation: conversation, service: service, e2ee: e2ee,
+                localCorpus: isE2EE
+                    ? messages.compactMap { message in decryptedMessages[message.id].map { (message: message, text: $0) } }
+                    : nil
+            ) { messageId in
                 handleSearchSelection(messageId)
             }
         }
@@ -305,6 +364,36 @@ struct ConversationDetailView: View {
         }
         .sheet(item: $threadTarget) { target in
             ThreadView(parentMessage: target, conversation: conversation, service: service, e2ee: e2ee)
+        }
+        // SOC-22 : supprimer ou bloquer ne partent plus d'un seul toucher.
+        .confirmationDialog(
+            pendingDeletion?.forEveryone == true ? "Supprimer ce message pour tout le monde ?" : "Supprimer ce message pour toi ?",
+            isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
+            titleVisibility: .visible,
+            presenting: pendingDeletion
+        ) { pending in
+            Button(pending.forEveryone ? "Supprimer pour tous" : "Supprimer pour moi", role: .destructive) {
+                Task { await delete(message: pending.message, forEveryone: pending.forEveryone) }
+            }
+        } message: { pending in
+            Text(pending.forEveryone
+                 ? "Le message disparaîtra aussi chez les autres membres."
+                 : "Le message disparaîtra de ton côté seulement.")
+        }
+        .confirmationDialog("Bloquer \(conversationTitle) ?", isPresented: $confirmBlockOther, titleVisibility: .visible) {
+            Button("Bloquer", role: .destructive) { Task { await blockOther() } }
+        } message: {
+            Text("Tu ne recevras plus ses messages.")
+        }
+        .confirmationDialog(
+            "Bloquer cet expéditeur ?",
+            isPresented: Binding(get: { pendingBlockSenderId != nil }, set: { if !$0 { pendingBlockSenderId = nil } }),
+            titleVisibility: .visible,
+            presenting: pendingBlockSenderId
+        ) { senderId in
+            Button("Bloquer", role: .destructive) { Task { await blockSender(userId: senderId) } }
+        } message: { _ in
+            Text("Tu ne recevras plus ses messages, dans ce groupe comme ailleurs.")
         }
         .sheet(isPresented: $showSchedulePicker) {
             ScheduleMessageSheet(conversation: conversation, service: service, e2ee: e2ee, initialText: scheduleSeedText) {
@@ -337,6 +426,16 @@ struct ConversationDetailView: View {
         .sheet(isPresented: $showReportUser) {
             if let id = otherParticipantId {
                 ReportSheet(target: .profile(id), service: services.reports)
+            }
+        }
+        .sheet(item: $reportTarget) { message in
+            ReportSheet(
+                reasons: ReportReason.messageReasons,
+                notice: isE2EE
+                    ? String(localized: "Conversation chiffrée : pour vérifier ce signalement, l’équipe de modération recevra la clé de cette conversation, chiffrée pour elle seule. Elle pourra alors en lire les messages.")
+                    : nil
+            ) { reason, comment in
+                try await report(message, reason: reason, comment: comment)
             }
         }
         .sheet(isPresented: $showGroupSettings, onDismiss: { if leftGroup { dismiss() } }) {
@@ -453,30 +552,68 @@ struct ConversationDetailView: View {
             .frame(width: 44, height: 44)
             .accessibilityLabel("Retour")
 
-            SQAvatar(
-                url: conversation.groupPhotoUrl ?? otherParticipantAvatarURL,
-                name: conversationTitle,
-                size: 42
-            )
-            .accessibilityHidden(true)
+            // Avatar, nom et statut forment un seul élément VoiceOver : seule,
+            // l'initiale masquée de l'avatar restait un texte non exposé. En
+            // conversation chiffrée, le double-tap ouvre l'explication.
+            HStack(spacing: SQSpace.md) {
+                SQAvatar(
+                    url: conversation.groupPhotoUrl ?? otherParticipantAvatarURL,
+                    name: conversationTitle,
+                    size: 42
+                )
+                .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 5) {
-                    Text(conversationTitle)
-                        .font(SQFont.body(16, .semibold))
-                        .foregroundStyle(SQColor.label)
-                        .lineLimit(1)
-                    SQUserBadges(
-                        badges: conversation.otherParticipantBadges(excluding: currentUserId),
-                        size: 12
-                    )
-                }
-                if otherIsOnline {
-                    Text("en ligne")
-                        .font(SQFont.body(12))
-                        .foregroundStyle(SQColor.success)
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 5) {
+                        // Deux lignes, puis réduction : en très grand texte, le nom
+                        // était coupé.
+                        Text(conversationTitle)
+                            .font(SQFont.body(16, .semibold))
+                            .foregroundStyle(SQColor.label)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.6)
+                            .accessibilityIdentifier("conversation.title")
+                        SQUserBadges(
+                            badges: conversation.otherParticipantBadges(excluding: currentUserId),
+                            size: 12
+                        )
+                    }
+                    if otherIsOnline || isE2EE {
+                        HStack(spacing: 4) {
+                            if otherIsOnline {
+                                Text("en ligne")
+                                    .font(SQFont.body(12))
+                                    .foregroundStyle(SQColor.success)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.6)
+                                    .accessibilityIdentifier("conversation.status")
+                            }
+                            // La limite du chiffrement reste visible dans la conversation
+                            // même, et s'explique au toucher (SOC-07).
+                            if isE2EE {
+                                // Cible de 44 pt sans grandir l'en-tête : la marge
+                                // appartient au bouton, puis est rendue à la mise en page.
+                                Button { showEncryptionInfo = true } label: {
+                                    Label("Chiffrée · texte seulement", systemImage: "lock.fill")
+                                        .font(SQFont.body(12))
+                                        .foregroundStyle(SQColor.labelSecondary)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.6)
+                                        .padding(.vertical, 14)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.vertical, -14)
+                                .accessibilityHint("Explique ce que protège le chiffrement")
+                                .accessibilityIdentifier("conversation.encryption.info")
+                            }
+                        }
+                    }
                 }
             }
+            .accessibilityElement(children: .combine)
+            .modifier(EncryptionInfoAction(isEnabled: isE2EE) { showEncryptionInfo = true })
+            .sheet(isPresented: $showEncryptionInfo) { SQGlossarySheet(term: .endToEndEncryption) }
 
             Spacer(minLength: SQSpace.sm)
 
@@ -540,9 +677,9 @@ struct ConversationDetailView: View {
                 }
                 if otherParticipantId != nil {
                     Button(role: .destructive) { showReportUser = true } label: {
-                        Label("Signaler", systemImage: "flag")
+                        Label("Signaler le profil", systemImage: "flag")
                     }
-                    Button(role: .destructive) { Task { await blockOther() } } label: {
+                    Button(role: .destructive) { confirmBlockOther = true } label: {
                         Label("Bloquer", systemImage: "hand.raised")
                     }
                 }
@@ -584,7 +721,7 @@ struct ConversationDetailView: View {
         VStack(spacing: 0) {
             if let replyTarget {
                 quoteBar(
-                    title: "Répondre à \(replyTarget.sender?.displayName ?? "message")",
+                    title: replyTitle(for: replyTarget),
                     text: displayedContent(for: replyTarget)
                 ) { self.replyTarget = nil }
             }
@@ -641,13 +778,20 @@ struct ConversationDetailView: View {
         }
     }
 
-    private func quoteBar(title: String, text: String, onClose: @escaping () -> Void) -> some View {
+    /// Clé « Répondre à %@ » : le titre construit en `String` cherchait
+    /// « Répondre à Alice » dans le catalogue et restait en français.
+    private func replyTitle(for message: MessageItem) -> LocalizedStringKey {
+        if let name = message.sender?.displayName { return "Répondre à \(name)" }
+        return "Répondre au message"
+    }
+
+    private func quoteBar(title: LocalizedStringKey, text: String, onClose: @escaping () -> Void) -> some View {
         HStack(spacing: SQSpace.sm) {
             RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(SQColor.brandRed)
                 .frame(width: 3, height: 32)
             VStack(alignment: .leading, spacing: 2) {
-                Text(LocalizedStringKey(title))
+                Text(title)
                     .font(SQType.micro)
                     .foregroundStyle(SQColor.brandRed)
                 Text(text)
@@ -766,8 +910,9 @@ struct ConversationDetailView: View {
                 }
                 if message.editedAt != nil { Text("modifié") }
             }
-            .font(SQFont.body(10.5))
+            .font(SQFont.body(12, relativeTo: .caption2))
             .foregroundStyle(SQColor.labelSecondary)
+            .accessibilityIdentifier("message.time")
         }
     }
 
@@ -780,6 +925,7 @@ struct ConversationDetailView: View {
             let hasInteractiveContent =
                 (card?.socialPostId != nil && !AppEnvironment.usesDemoData)
                 || message.attachments.contains { $0.url != nil && isImageAttachment($0) }
+            let spokenSummary = spokenTextSummary(for: message, mine: mine, card: card)
             return VStack(alignment: mine ? .trailing : .leading, spacing: SQSpace.xs + 1) {
                 if !mine, conversation.isGroup, isGroupStart, let name = message.sender?.displayName {
                     Text(name)
@@ -862,27 +1008,32 @@ struct ConversationDetailView: View {
                         Text(text)
                             .font(SQType.body)
                             .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
+                            .accessibilityIdentifier("message.text")
                     }
                     if let transcription = transcriptions[message.id], !transcription.isEmpty {
                         transcriptionView(transcription, mine: mine)
                     }
                 }
+                // Heure en 12 pt et encre pleine : à 10,5 pt et 60 % d'opacité,
+                // elle passait sous le contraste AA (SOC-31, TRX-12).
                 HStack(spacing: SQSpace.xs) {
                     if let created = message.createdAt {
                         Text(created, format: .dateTime.hour().minute())
-                            .font(SQFont.body(10.5))
-                            .foregroundStyle((mine ? SQColor.onAccent : SQColor.label).opacity(0.6))
+                            .font(SQFont.body(12, relativeTo: .caption2))
+                            .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                            .accessibilityIdentifier("message.time")
                     }
                     if message.expiresAt != nil && message.deletedAt == nil {
                         Image(systemName: "timer")
-                            .font(.system(size: 10))
-                            .foregroundStyle((mine ? SQColor.onAccent : SQColor.label).opacity(0.6))
+                            .font(.system(size: 11))
+                            .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                             .accessibilityLabel("Message éphémère")
                     }
                     if message.editedAt != nil && message.deletedAt == nil {
                         Text("modifié")
-                            .font(SQFont.body(10.5))
-                            .foregroundStyle((mine ? SQColor.onAccent : SQColor.label).opacity(0.6))
+                            .font(SQFont.body(12, relativeTo: .caption2))
+                            .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                            .accessibilityIdentifier("message.time.edited")
                     }
                     sendStatusIndicator(for: message)
                 }
@@ -890,7 +1041,30 @@ struct ConversationDetailView: View {
             .padding(.vertical, 11)
             .padding(.horizontal, 15)
             .background(mine ? SQColor.brandRed : SQColor.surface, in: bubbleShape(mine: mine))
-            .accessibilityElement(children: hasInteractiveContent ? .contain : .combine)
+            .modifier(SpokenBubble(summary: spokenSummary, interactive: hasInteractiveContent))
+    }
+
+    /// Ce que VoiceOver lit pour une bulle de texte : qui a écrit, le texte,
+    /// puis l'heure. En conversation à deux, l'expéditeur n'était jamais
+    /// annoncé (SOC-31). `nil` pour les contenus riches (carte, sondage,
+    /// citation, pièce jointe), qui gardent leurs propres éléments.
+    private func spokenTextSummary(for message: MessageItem, mine: Bool, card: ShareCardData?) -> String? {
+        guard card == nil,
+              message.attachments.isEmpty,
+              quotedMessage(for: message) == nil,
+              location(for: message) == nil,
+              pollsByMessageId[message.id] == nil else { return nil }
+        let sender = mine ? String(localized: "Toi") : (message.sender?.displayName ?? String(localized: "Membre"))
+        let body = message.deletedAt != nil ? String(localized: "Message supprimé") : displayedContent(for: message)
+        var parts = [String(localized: "\(sender) : \(body)")]
+        if let transcription = transcriptions[message.id], !transcription.isEmpty { parts.append(transcription) }
+        if let created = message.createdAt { parts.append(created.formatted(.dateTime.hour().minute())) }
+        if message.deletedAt == nil {
+            if message.editedAt != nil { parts.append(String(localized: "modifié")) }
+            if message.expiresAt != nil { parts.append(String(localized: "Message éphémère")) }
+        }
+        if sendStatus[message.id] == .sending { parts.append(String(localized: "Envoi en cours")) }
+        return parts.joined(separator: ", ")
     }
 
     /// Capsules de réactions posées, regroupées par emoji, chevauchant le bas de
@@ -928,7 +1102,10 @@ struct ConversationDetailView: View {
                         .sqShadowSoft()
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(reaction.count) réaction\(reaction.count > 1 ? "s" : "") \(reaction.emoji)\(reaction.mine ? ", dont la tienne" : "")")
+                    .disabled(isE2EE)
+                    .accessibilityLabel(reaction.mine
+                        ? String(localized: "Réaction \(reaction.emoji) : \(reaction.count), dont la tienne")
+                        : String(localized: "Réaction \(reaction.emoji) : \(reaction.count)"))
                     .accessibilityHint(reaction.mine ? "Toucher pour retirer ta réaction" : "Toucher pour réagir aussi")
                 }
             }
@@ -953,24 +1130,42 @@ struct ConversationDetailView: View {
     /// Échec d'envoi : capsule dangerSoft sous la bulle, tappable pour rejouer
     /// l'envoi (même Idempotency-Key, donc sans doublon serveur).
     private func failedRetryRow(for message: MessageItem) -> some View {
-        Button {
-            Haptics.medium()
-            Task { await performSend(localId: message.id) }
-        } label: {
-            HStack(spacing: SQSpace.xs) {
-                Image(systemName: "exclamationmark.circle.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                Text("Échec de l’envoi · Renvoyer")
-                    .font(SQType.micro.weight(.semibold))
+        HStack(spacing: SQSpace.xs) {
+            Button {
+                Haptics.medium()
+                Task { await performSend(localId: message.id) }
+            } label: {
+                HStack(spacing: SQSpace.xs) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("Non envoyé · Renvoyer")
+                        .font(SQType.micro.weight(.semibold))
+                }
+                .foregroundStyle(SQColor.dangerInk)
+                .padding(.horizontal, SQSpace.sm + 2)
+                .padding(.vertical, 5)
+                .background(SQColor.dangerSoft, in: Capsule(style: .continuous))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
-            .foregroundStyle(SQColor.dangerInk)
-            .padding(.horizontal, SQSpace.sm + 2)
-            .padding(.vertical, 5)
-            .background(SQColor.dangerSoft, in: Capsule(style: .continuous))
-            .contentShape(Capsule(style: .continuous))
+            .buttonStyle(.plain)
+            .accessibilityLabel("Message non envoyé. Renvoyer.")
+            // Un message qui ne partira plus (exclu du groupe, conversation
+            // supprimée) doit pouvoir s'effacer (SOC-04).
+            Button {
+                Haptics.selection()
+                Task { await discardFailed(localId: message.id) }
+            } label: {
+                Text("Supprimer")
+                    .font(SQType.micro.weight(.semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .padding(.horizontal, SQSpace.sm)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Supprimer le message non envoyé")
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Échec de l'envoi. Appuyer pour réessayer.")
     }
 
     /// Indicateur « N réponses » affiché sous une bulle qui a des réponses de
@@ -1029,13 +1224,18 @@ struct ConversationDetailView: View {
         // Rangée d'emojis compacte en tête du menu contextuel : palette
         // horizontale native sur iOS 17+ (rendu type iMessage, dim léger, pas de
         // fond plein écran), boutons classiques en repli iOS 16.
-        if #available(iOS 17.0, *) {
-            ControlGroup { reactionMenuButtons(for: message) }
-                .controlGroupStyle(.palette)
-        } else {
-            reactionMenuButtons(for: message)
+        // Pas de réactions en conversation chiffrée tant qu'elles ne sont pas
+        // chiffrées : la réaction s'affichait puis disparaissait avec une erreur
+        // (SOC-07).
+        if !isE2EE {
+            if #available(iOS 17.0, *) {
+                ControlGroup { reactionMenuButtons(for: message) }
+                    .controlGroupStyle(.palette)
+            } else {
+                reactionMenuButtons(for: message)
+            }
+            Divider()
         }
-        Divider()
         Button {
             editTarget = nil
             replyTarget = message
@@ -1109,22 +1309,31 @@ struct ConversationDetailView: View {
                 Label("Modifier", systemImage: "pencil")
             }
             Button(role: .destructive) {
-                Task { await delete(message: message, forEveryone: true) }
+                pendingDeletion = PendingMessageDeletion(message: message, forEveryone: true)
             } label: {
                 Label("Supprimer pour tous", systemImage: "trash")
             }
         }
         Button(role: .destructive) {
-            Task { await delete(message: message, forEveryone: false) }
+            pendingDeletion = PendingMessageDeletion(message: message, forEveryone: false)
         } label: {
             Label("Supprimer pour moi", systemImage: "trash.slash")
+        }
+        // Signaler un message, en 1:1 comme en groupe (Guideline 1.2, SOC-12).
+        if !mine, message.deletedAt == nil, !message.id.hasPrefix("local-") {
+            Divider()
+            Button(role: .destructive) {
+                reportTarget = message
+            } label: {
+                Label("Signaler le message", systemImage: "flag")
+            }
         }
         // Blocage par expéditeur dans les groupes (Guideline 1.2) — en 1:1 le
         // blocage est déjà accessible depuis la barre d'outils.
         if !mine, conversation.isGroup, let senderId = message.senderId {
             Divider()
             Button(role: .destructive) {
-                Task { await blockSender(userId: senderId) }
+                pendingBlockSenderId = senderId
             } label: {
                 Label("Bloquer l’expéditeur", systemImage: "hand.raised")
             }
@@ -1150,6 +1359,11 @@ struct ConversationDetailView: View {
         ForEach(message.attachments.filter { $0.url != nil }) { attachment in
             if isImageAttachment(attachment) {
                 attachmentImage(attachment, message: message, mine: mine, standalone: standalone)
+            } else if isAudioAttachment(attachment), let url = attachment.url {
+                // Lue dans l'app : elle s'ouvrait comme un fichier hors de l'app (SOC-06).
+                RemoteVoiceNoteBubble(attachment: attachment, remoteURL: url, mine: mine)
+                    .padding(.horizontal, SQSpace.sm)
+                    .padding(.vertical, SQSpace.xs)
             } else if let url = attachment.url {
                 attachmentFileRow(attachment, url: url, mine: mine)
             }
@@ -1158,6 +1372,10 @@ struct ConversationDetailView: View {
 
     private func isImageAttachment(_ attachment: MessageAttachment) -> Bool {
         attachment.kind.uppercased() == "IMAGE" || (attachment.contentType?.hasPrefix("image/") ?? false)
+    }
+
+    private func isAudioAttachment(_ attachment: MessageAttachment) -> Bool {
+        attachment.kind.uppercased() == "AUDIO" || (attachment.contentType?.hasPrefix("audio/") ?? false)
     }
 
     /// Vrai quand le message se réduit à UNE photo (sans légende ni carte de
@@ -1212,7 +1430,10 @@ struct ConversationDetailView: View {
             .contentShape(shape)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Photo envoyée")
+        // « Photo envoyée » se disait aussi des photos reçues (SOC-31).
+        .accessibilityLabel(mine
+            ? String(localized: "Ta photo")
+            : String(localized: "Photo de \(message.sender?.displayName ?? String(localized: "Membre"))"))
         .accessibilityHint("Toucher pour afficher en plein écran")
     }
 
@@ -1242,7 +1463,7 @@ struct ConversationDetailView: View {
                         .accessibilityLabel("Message éphémère")
                 }
                 Text(created, format: .dateTime.hour().minute())
-                    .font(SQFont.body(10.5, .medium))
+                    .font(SQFont.body(12, .medium, relativeTo: .caption2))
             }
             .foregroundStyle(Color.white.opacity(0.95))
             .padding(.horizontal, SQSpace.sm)
@@ -1287,7 +1508,9 @@ struct ConversationDetailView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Pièce jointe \(attachment.fileName ?? "fichier"), \(fileMetaLine(attachment)). Toucher pour ouvrir.")
+        .accessibilityLabel(attachment.fileName.map { String(localized: "Pièce jointe \($0), \(fileMetaLine(attachment))") }
+            ?? String(localized: "Pièce jointe, \(fileMetaLine(attachment))"))
+        .accessibilityHint("Toucher pour ouvrir")
     }
 
     /// « 1,2 Mo · PDF » — taille + extension lisibles sous le nom du fichier.
@@ -1424,9 +1647,11 @@ struct ConversationDetailView: View {
             let sameDay = Calendar.current.isDate(date, inSameDayAs: previousDate)
             guard !sameDay || date.timeIntervalSince(previousDate) > 3600 else { return nil }
         }
-        let time = date.formatted(date: .omitted, time: .shortened)
-        if Calendar.current.isDateInToday(date) { return "Aujourd’hui \(time)" }
-        if Calendar.current.isDateInYesterday(date) { return "Hier \(time)" }
+        // Même format que l'heure des bulles (« 00:04 », pas « 0:04 »).
+        let time = date.formatted(.dateTime.hour().minute())
+        // Traduits : l'app anglaise affichait « Aujourd’hui » et « Hier » (SOC-28).
+        if Calendar.current.isDateInToday(date) { return String(localized: "Aujourd’hui \(time)") }
+        if Calendar.current.isDateInYesterday(date) { return String(localized: "Hier \(time)") }
         return "\(date.formatted(.dateTime.weekday(.wide).day().month(.wide))) \(time)"
     }
 
@@ -1529,7 +1754,7 @@ struct ConversationDetailView: View {
             // ne sont pas encore sur le serveur : un rechargement ne doit pas les
             // faire disparaître.
             let localPending = messages.filter { pendingSends[$0.id] != nil }
-            messages = Self.normalized(page.messages + localPending)
+            messages = Self.normalized(page.messages + localPending + (await restoredFailedMessages()))
             olderCursor = (page.hasMore ?? (page.nextCursor != nil)) ? page.nextCursor : nil
             readReceipts = page.readReceipts ?? []
             errorMessage = nil
@@ -1540,6 +1765,34 @@ struct ConversationDetailView: View {
         } catch {
             errorMessage = error.userFacingMessage
         }
+    }
+
+    /// Erreur d'une action (envoi, réaction, appel…) : bandeau passager. Seul
+    /// l'échec du chargement affiche « Messages indisponibles », dont le bouton
+    /// recharge la conversation ; une erreur d'appel s'y retrouvait (SOC-14).
+    private func showActionError(_ message: String) {
+        inAppNotifications.showError(message)
+    }
+
+    /// Signalement d'un message (SOC-12). En conversation chiffrée, la clé de
+    /// la conversation part chiffrée pour la seule modération, comme sur le
+    /// web ; la feuille le dit avant l'envoi.
+    private func report(_ message: MessageItem, reason: ReportReason, comment: String?) async throws {
+        var wrappedKey: String?
+        if isE2EE {
+            guard let e2ee else { throw E2EEError.locked }
+            wrappedKey = try await e2ee.moderationWrappedConversationKey(conversationId: conversation.id)
+        }
+        try await service.reportMessages(
+            messageIds: [message.id],
+            reason: reason.rawValue,
+            details: comment,
+            moderationWrappedKeyB64: wrappedKey
+        )
+        inAppNotifications.show(SQInAppNotificationItem(
+            body: String(localized: "Signalement envoyé. Merci, l’équipe de modération va l’examiner."),
+            variant: .success
+        ))
     }
 
     /// Pagination ascendante : charge la page de messages plus anciens et la
@@ -1696,16 +1949,33 @@ struct ConversationDetailView: View {
     // MARK: Messagerie avancée — actions
 
     private func handleSearchSelection(_ messageId: String) {
-        // Si le message est déjà chargé on scrolle directement ; sinon on recharge
-        // puis on tente le scroll (cas d'un vieux message hors page courante).
         if messages.contains(where: { $0.id == messageId }) {
-            scrollTargetId = messageId
-        } else {
-            Task {
-                await load()
-                scrollTargetId = messageId
-            }
+            revealMessage(messageId)
+            return
         }
+        // Message plus ancien que les pages chargées : on remonte l'historique
+        // jusqu'à lui (dix pages au plus), puis on y défile. Recharger la
+        // première page ne menait à rien (SOC-21).
+        Task {
+            var pages = 0
+            while !messages.contains(where: { $0.id == messageId }), olderCursor != nil, pages < 10 {
+                while isLoadingOlder { try? await Task.sleep(for: .milliseconds(100)) }
+                await loadOlder()
+                pages += 1
+            }
+            guard messages.contains(where: { $0.id == messageId }) else {
+                showActionError(String(localized: "Ce message est trop ancien pour être affiché ici."))
+                return
+            }
+            // Laisse le réancrage de l'historique inséré se faire avant de défiler.
+            try? await Task.sleep(for: .milliseconds(150))
+            revealMessage(messageId)
+        }
+    }
+
+    private func revealMessage(_ id: String) {
+        scrollTargetId = id
+        highlightMessage(id)
     }
 
     private func loadPinned() async {
@@ -1736,7 +2006,7 @@ struct ConversationDetailView: View {
             await loadPinned()
             Haptics.success()
         } catch {
-            errorMessage = error.userFacingMessage
+            showActionError(error.userFacingMessage)
             Haptics.error()
         }
     }
@@ -1747,7 +2017,7 @@ struct ConversationDetailView: View {
             pinnedMessages.removeAll { $0.messageId == message.id }
             Haptics.success()
         } catch {
-            errorMessage = error.userFacingMessage
+            showActionError(error.userFacingMessage)
             Haptics.error()
         }
     }
@@ -1760,10 +2030,10 @@ struct ConversationDetailView: View {
                let text = transcription.text, !text.isEmpty {
                 transcriptions[message.id] = text
             } else {
-                errorMessage = String(localized: "Aucune transcription disponible pour ce message.")
+                showActionError(String(localized: "Aucune transcription disponible pour ce message."))
             }
         } catch {
-            errorMessage = error.userFacingMessage
+            showActionError(error.userFacingMessage)
         }
     }
 
@@ -1811,7 +2081,7 @@ struct ConversationDetailView: View {
             pollsByMessageId[messageId] = mergePollTexts(updated, messageId: messageId)
             Haptics.selection()
         } catch {
-            errorMessage = error.userFacingMessage
+            showActionError(error.userFacingMessage)
             Haptics.error()
         }
     }
@@ -1822,7 +2092,7 @@ struct ConversationDetailView: View {
             pollsByMessageId[messageId] = mergePollTexts(updated, messageId: messageId)
             Haptics.success()
         } catch {
-            errorMessage = error.userFacingMessage
+            showActionError(error.userFacingMessage)
             Haptics.error()
         }
     }
@@ -1866,7 +2136,7 @@ struct ConversationDetailView: View {
                 await load()
                 Haptics.success()
             } catch {
-                errorMessage = error.userFacingMessage
+                showActionError(error.userFacingMessage)
                 Haptics.error()
             }
             return
@@ -1896,14 +2166,16 @@ struct ConversationDetailView: View {
         guard let pending = pendingSends[localId] else { return }
         sendStatus[localId] = .sending
         do {
-            let sent = try await service.sendText(
-                pending.text,
-                in: conversation,
-                replyToId: pending.replyToId,
-                e2ee: e2ee,
-                idempotencyKey: pending.idempotencyKey,
-                ttlSeconds: pending.ttlSeconds
-            )
+            let sent = pending.restored
+                ? try await service.resendPendingText(clientRequestId: pending.idempotencyKey)
+                : try await service.sendText(
+                    pending.text,
+                    in: conversation,
+                    replyToId: pending.replyToId,
+                    e2ee: e2ee,
+                    idempotencyKey: pending.idempotencyKey,
+                    ttlSeconds: pending.ttlSeconds
+                )
             // Remplace la bulle optimiste par la réponse serveur (id réel,
             // horodatage serveur, état chiffré). On garde le texte déchiffré en
             // cache pour un affichage immédiat sans aller-retour de décryptage.
@@ -1928,7 +2200,37 @@ struct ConversationDetailView: View {
     /// Construit une bulle locale en clair (jamais persistée) affichée le temps
     /// de l'aller-retour serveur. Non chiffrée : `displayedContent` lit
     /// directement `content`, ce qui évite tout décryptage pour la bulle locale.
-    private func makeOptimisticMessage(id: String, text: String, replyToId: String?, ttlSeconds: Int = 0) -> MessageItem {
+    /// Messages refusés restés dans la file d'envoi durable : ils disparaissaient
+    /// en quittant la conversation, alors que la file les gardait (SOC-04).
+    private func restoredFailedMessages() async -> [MessageItem] {
+        let known = Set(pendingSends.values.map(\.idempotencyKey))
+        var restored: [MessageItem] = []
+        for record in await service.pendingTextMessages(conversationId: conversation.id)
+        where record.failureReason != nil && !known.contains(record.clientRequestId) {
+            let localId = "local-\(record.clientRequestId)"
+            let text = record.request.content ?? ""
+            pendingSends[localId] = PendingSend(
+                text: text, replyToId: record.request.replyToId, idempotencyKey: record.clientRequestId,
+                ttlSeconds: record.request.ttlSeconds ?? 0, restored: true
+            )
+            sendStatus[localId] = .failed
+            let shown = record.request.e2ee != nil ? String(localized: "Message chiffré non envoyé") : text
+            restored.append(makeOptimisticMessage(id: localId, text: shown, replyToId: record.request.replyToId, createdAt: record.createdAt))
+        }
+        return restored
+    }
+
+    /// « Supprimer » sur un message non envoyé : il quitte aussi la file durable.
+    private func discardFailed(localId: String) async {
+        if let pending = pendingSends[localId] {
+            await service.discardPendingText(clientRequestId: pending.idempotencyKey)
+        }
+        pendingSends[localId] = nil
+        sendStatus[localId] = nil
+        withAnimation(SQMotion.fast) { messages.removeAll { $0.id == localId } }
+    }
+
+    private func makeOptimisticMessage(id: String, text: String, replyToId: String?, ttlSeconds: Int = 0, createdAt: Date = Date()) -> MessageItem {
         MessageItem(
             id: id,
             conversationId: conversation.id,
@@ -1940,7 +2242,7 @@ struct ConversationDetailView: View {
             e2eeCiphertextB64: nil,
             e2eeAadB64: nil,
             metadata: nil,
-            createdAt: Date(),
+            createdAt: createdAt,
             editedAt: nil,
             deletedAt: nil,
             expiresAt: ttlSeconds > 0 ? Date().addingTimeInterval(TimeInterval(ttlSeconds)) : nil,
@@ -1988,7 +2290,7 @@ struct ConversationDetailView: View {
             replyTarget = nil
             Haptics.success()
         } catch {
-            errorMessage = error.userFacingMessage
+            showActionError(error.userFacingMessage)
             Haptics.error()
         }
     }
@@ -2029,7 +2331,7 @@ struct ConversationDetailView: View {
             replyTarget = nil
             Haptics.success()
         } catch {
-            errorMessage = error.userFacingMessage
+            showActionError(error.userFacingMessage)
             Haptics.error()
         }
     }
@@ -2078,7 +2380,7 @@ struct ConversationDetailView: View {
             // Échec : on remet l'état d'avant plutôt que d'afficher une
             // réaction que le serveur n'a pas enregistrée.
             messages = messages.map { $0.id == message.id ? message : $0 }
-            errorMessage = error.userFacingMessage
+            showActionError(error.userFacingMessage)
         }
     }
 
@@ -2110,13 +2412,15 @@ struct ConversationDetailView: View {
                 messages.removeAll { $0.id == message.id }
             }
         } catch {
-            errorMessage = error.userFacingMessage
+            showActionError(error.userFacingMessage)
         }
     }
 
     private func markRead() async {
         guard let last = messages.last else { return }
         try? await service.markRead(conversationId: conversation.id, lastMessageId: last.id)
+        // Le badge restait allumé jusqu'au prochain rafraîchissement (SOC-23).
+        await services.refreshInboxBadge(force: true)
     }
 
     // MARK: Partage de position (parité Android)
@@ -2126,13 +2430,13 @@ struct ConversationDetailView: View {
         isSharingLocation = true
         defer { isSharingLocation = false }
         guard let owner = LocalAccountScope.sessionSnapshot() else {
-            errorMessage = String(localized: "Position indisponible")
+            showActionError(String(localized: "Position indisponible"))
             Haptics.error()
             return
         }
         let expectedSessionID = services.api.credentials.snapshot().sessionID
         guard let location = await services.location.currentLocation(maxAge: 30) else {
-            errorMessage = String(localized: "Position indisponible — autorise la localisation dans les réglages.")
+            showActionError(String(localized: "Position indisponible — autorise la localisation dans les réglages."))
             Haptics.error()
             return
         }
@@ -2140,7 +2444,7 @@ struct ConversationDetailView: View {
         guard !Task.isCancelled, owner.isCurrent,
               services.api.credentials.snapshot().sessionID == expectedSessionID else { return }
         guard services.location.isUsable(location, maxAge: 30) else {
-            errorMessage = String(localized: "Position indisponible")
+            showActionError(String(localized: "Position indisponible"))
             Haptics.error()
             return
         }
@@ -2163,7 +2467,7 @@ struct ConversationDetailView: View {
             Haptics.success()
         } catch {
             guard owner.isCurrent, !error.isCancellation else { return }
-            errorMessage = error.userFacingMessage
+            showActionError(error.userFacingMessage)
             Haptics.error()
         }
     }
@@ -2187,7 +2491,7 @@ struct ConversationDetailView: View {
             try await service.saveMessage(messageId: message.id)
             Haptics.success()
         } catch {
-            errorMessage = error.userFacingMessage
+            showActionError(error.userFacingMessage)
             Haptics.error()
         }
     }
@@ -2218,17 +2522,17 @@ struct ConversationDetailView: View {
             conversationE2EE: isE2EE,
             verifiedV2: verifiedV2
         ) else {
-            errorMessage = String(localized: "Cet appel nécessite E2EE v2 vérifié. Aucun appel non chiffré de bout en bout n’a été lancé.")
+            showActionError(String(localized: "Les appels ne sont pas encore chiffrés de bout en bout : aucun appel n’a été lancé dans cette conversation chiffrée."))
             Haptics.error()
             return
         }
         guard conversation.participants.count >= 2 else {
-            errorMessage = String(localized: "Aucun autre participant n’est disponible pour cet appel.")
+            showActionError(String(localized: "Aucun autre participant n’est disponible pour cet appel."))
             Haptics.error()
             return
         }
         guard CallLifecyclePolicy.canStartCall(participantCount: conversation.participants.count) else {
-            errorMessage = String(localized: "Les appels de groupe sont limités à 8 participants.")
+            showActionError(String(localized: "Les appels de groupe sont limités à 8 participants."))
             Haptics.error()
             return
         }
@@ -2259,7 +2563,7 @@ struct ConversationDetailView: View {
             try await services.friends.block(userId: id)
             Haptics.success()
         } catch {
-            errorMessage = error.userFacingMessage
+            showActionError(error.userFacingMessage)
             Haptics.error()
         }
     }
@@ -2270,7 +2574,7 @@ struct ConversationDetailView: View {
             try await services.friends.block(userId: userId)
             Haptics.success()
         } catch {
-            errorMessage = error.userFacingMessage
+            showActionError(error.userFacingMessage)
             Haptics.error()
         }
     }
@@ -2388,19 +2692,35 @@ private struct LiveShareConversationBar: View {
     var body: some View {
         if !sessions.isEmpty || coordinator.errorMessage != nil {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
-                HStack(spacing: SQSpace.sm) {
-                    Image(systemName: "dot.radiowaves.left.and.right")
-                        .foregroundStyle(SQColor.brandRed)
-                        .accessibilityHidden(true)
-                    Text("Partage en direct")
-                        .font(SQType.caption.weight(.semibold))
-                        .foregroundStyle(SQColor.label)
-                    Spacer()
-                    Button("Gérer", action: onManage)
-                        .font(SQType.caption.weight(.semibold))
-                        .buttonStyle(.plain)
-                        .foregroundStyle(SQColor.brandRed)
+                // Toute la ligne ouvre la gestion : une cible de 44 pt sans
+                // agrandir le seul mot « Gérer » (34 × 16 pt en brique, SOC-31).
+                Button(action: onManage) {
+                    HStack(spacing: SQSpace.sm) {
+                        Image(systemName: "dot.radiowaves.left.and.right")
+                            .foregroundStyle(SQColor.brandRed)
+                            .accessibilityHidden(true)
+                        Text("Partage en direct")
+                            .font(SQType.caption.weight(.semibold))
+                            .foregroundStyle(SQColor.label)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .layoutPriority(1)
+                            .accessibilityIdentifier("liveshare.title")
+                        Spacer()
+                        Text("Gérer")
+                            .font(SQType.caption.weight(.semibold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .fixedSize()
+                            .accessibilityIdentifier("liveshare.manage.label")
+                    }
+                    // Cible de 44 pt, marge rendue ensuite à la mise en page :
+                    // la barre garde sa hauteur.
+                    .padding(.vertical, 14)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .padding(.vertical, -14)
+                .accessibilityLabel("Gérer le partage en direct")
+                .accessibilityIdentifier("liveshare.manage")
 
                 ForEach(sessions.prefix(3)) { session in
                     TimelineView(.periodic(from: .now, by: 5)) { timeline in
@@ -2438,7 +2758,8 @@ private struct LiveShareConversationBar: View {
                     Text(error)
                         .font(SQType.micro)
                         .foregroundStyle(SQColor.dangerInk)
-                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("liveshare.error")
                 }
             }
             .padding(SQSpace.sm + 2)
@@ -2477,12 +2798,13 @@ private struct LiveShareConversationBar: View {
     private func summary(for session: LiveShareSession) -> String {
         if session.status == "pending" {
             return session.sharerId == currentUserId
-                ? "\(name(for: session.requesterId)) demande votre position"
-                : "Demande envoyée à \(name(for: session.sharerId))"
+                ? String(localized: "\(name(for: session.requesterId)) demande ta position")
+                : String(localized: "Demande envoyée à \(name(for: session.sharerId))")
         }
+        // Tutoiement et traduction, comme le reste de l'app (SOC-28).
         return session.sharerId == currentUserId
-            ? "Vous partagez avec \(name(for: session.requesterId))"
-            : "\(name(for: session.sharerId)) partage avec vous"
+            ? String(localized: "Tu partages avec \(name(for: session.requesterId))")
+            : String(localized: "\(name(for: session.sharerId)) partage avec toi")
     }
 
     private func detail(for session: LiveShareSession, at now: Date) -> String? {
@@ -2509,7 +2831,7 @@ private struct LiveShareConversationBar: View {
     }
 
     private func name(for userId: String) -> String {
-        if userId == currentUserId { return "vous" }
+        if userId == currentUserId { return String(localized: "toi") }
         if let name = conversation.participants.first(where: { $0.userId == userId })?.user.displayName,
            !name.isEmpty { return name }
         return "un participant"
@@ -2819,12 +3141,12 @@ private struct LiveShareSessionCard: View {
     private var title: String {
         if session.status == "pending" {
             return isIncomingRequest
-                ? "\(name(for: session.requesterId)) demande votre partage"
-                : "Demande envoyée à \(name(for: session.sharerId))"
+                ? String(localized: "\(name(for: session.requesterId)) demande ton partage")
+                : String(localized: "Demande envoyée à \(name(for: session.sharerId))")
         }
         return session.sharerId == currentUserId
-            ? "Vous partagez avec \(name(for: session.requesterId))"
-            : "\(name(for: session.sharerId)) partage avec vous"
+            ? String(localized: "Tu partages avec \(name(for: session.requesterId))")
+            : String(localized: "\(name(for: session.sharerId)) partage avec toi")
     }
 
     private var radioLine: String? {
@@ -2841,7 +3163,7 @@ private struct LiveShareSessionCard: View {
     }
 
     private func name(for userId: String) -> String {
-        if userId == currentUserId { return "vous" }
+        if userId == currentUserId { return String(localized: "toi") }
         return conversation.participants.first(where: { $0.userId == userId })?.user.displayName
             ?? (userId == session.requesterId ? session.requester?.name : session.sharer?.name)
             ?? "un participant"
@@ -2900,4 +3222,44 @@ private struct LiveShareMapPoint: Identifiable {
     init(location: LiveShareLocation) {
         coordinate = CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude)
     }
+}
+
+/// Suppression demandée depuis le menu d'un message, en attente de confirmation.
+/// Action VoiceOver nommée de l'en-tête d'une conversation chiffrée : le
+/// bouton « Chiffrée · texte seulement » est fondu dans l'élément combiné.
+private struct EncryptionInfoAction: ViewModifier {
+    let isEnabled: Bool
+    let action: () -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content.accessibilityAction(named: Text("Ce que protège le chiffrement"), action)
+        } else {
+            content
+        }
+    }
+}
+
+/// Bulle lue d'un seul tenant par VoiceOver quand un résumé existe ; sinon
+/// ses éléments sont combinés, ou gardés séparés s'ils sont interactifs.
+private struct SpokenBubble: ViewModifier {
+    let summary: String?
+    let interactive: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let summary, !interactive {
+            content
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(Text(verbatim: summary))
+        } else {
+            content.accessibilityElement(children: interactive ? .contain : .combine)
+        }
+    }
+}
+
+private struct PendingMessageDeletion {
+    let message: MessageItem
+    let forEveryone: Bool
 }

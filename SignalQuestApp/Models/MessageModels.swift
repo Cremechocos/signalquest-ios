@@ -403,6 +403,17 @@ struct MessageReaction: Codable, Equatable {
     let userId: String
 }
 
+extension MessageConversation {
+    /// Règle unique de non-lu, pour la liste ET le badge : son propre dernier
+    /// message ne compte pas (SOC-23).
+    func isUnread(currentUserId: String?) -> Bool {
+        guard let last = lastMessage, last.senderId != currentUserId,
+              let lastAt = lastMessageAt else { return false }
+        if let read = lastReadAt { return lastAt > read }
+        return true
+    }
+}
+
 struct MessageItem: Decodable, Identifiable, Equatable {
     let id: String
     let conversationId: String?
@@ -611,6 +622,12 @@ struct MessageSearchResult: Decodable, Identifiable, Equatable {
     var id: String { message.id }
 
     enum CodingKeys: String, CodingKey { case conversation }
+
+    /// Résultat trouvé sur l'appareil (conversation chiffrée, E2E-04).
+    init(message: MessageItem, conversation: SearchConversationContext? = nil) {
+        self.message = message
+        self.conversation = conversation
+    }
 
     init(from decoder: Decoder) throws {
         // Le backend renvoie le message à plat (mêmes clés que MessageItem) avec

@@ -4,6 +4,10 @@ import CommonCrypto
 import Security
 import Combine
 
+private struct ModerationPublicKeyResponse: Decodable {
+    let publicKeyJwk: String
+}
+
 enum E2EEError: Error, LocalizedError, Equatable {
     case locked
     case unsupported(String)
@@ -16,19 +20,19 @@ enum E2EEError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .locked:
-            return String(localized: "Conversation chiffrée non encore supportée/déverrouillée sur iOS")
+            return String(localized: "Déverrouille tes messages chiffrés pour continuer.")
         case .unsupported(let value):
             return value
         case .invalidKey:
-            return String(localized: "Clé E2EE invalide")
+            return String(localized: "Clé de chiffrement invalide.")
         case .wrongPassword:
             return String(localized: "Mot de passe incorrect. Réessaie.")
         case .decryptFailed:
             return String(localized: "Déchiffrement impossible")
         case .keyGenerationFailed:
-            return String(localized: "Génération de la clé E2EE impossible")
+            return String(localized: "Impossible de créer ta clé de chiffrement. Réessaie.")
         case .staleKey:
-            return String(localized: "Clé de conversation obsolète — re-partage nécessaire")
+            return String(localized: "La clé de cette conversation a changé. Elle sera mise à jour à la prochaine ouverture.")
         }
     }
 }
@@ -58,6 +62,7 @@ protocol E2EEServicing: Sendable {
     /// renvoyée dans le payload et utilisée telle quelle au déchiffrement.
     func encryptText(conversationId: String, text: String, aad: Data) async throws -> E2EEPayload
     func decryptText(conversationId: String, message: MessageItem) async throws -> String
+    func moderationWrappedConversationKey(conversationId: String) async throws -> String?
     /// Logout revokes access and clears RAM/legacy v1, but keeps owner-scoped v2 vaults.
     func lockLocalKeys() async
     func lockLocalKeys(expectedSession: LocalAccountSession?) async
@@ -491,6 +496,34 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
         }
         guard raw.count == 32 else { throw E2EEError.invalidKey }
         return raw
+    }
+
+    /// Clé de la conversation, chiffrée pour la seule équipe de modération et
+    /// jointe à un signalement : sans elle, un message chiffré signalé reste
+    /// illisible pour les modérateurs (SOC-12). Même format que le web
+    /// (RSA-OAEP-SHA256, base64). `nil` quand le serveur n'a pas de clé de
+    /// modération : le signalement part alors sans.
+    func moderationWrappedConversationKey(conversationId: String) async throws -> String? {
+        let raw = try await conversationKeyData(conversationId: conversationId)
+        let response: ModerationPublicKeyResponse
+        do {
+            response = try await api.request(
+                APIEndpoint(path: "/api/e2ee/moderation-public-key"),
+                as: ModerationPublicKeyResponse.self
+            )
+        } catch APIError.http(let status, _, _, _, _) where status == 404 {
+            return nil
+        }
+        return try Self.wrapForModeration(rawKey: raw, publicJwk: response.publicKeyJwk)
+    }
+
+    static func wrapForModeration(rawKey: Data, publicJwk: String) throws -> String {
+        guard let publicKey = try publicSecKey(from: publicJwk) else { throw E2EEError.invalidKey }
+        var error: Unmanaged<CFError>?
+        guard let wrapped = SecKeyCreateEncryptedData(publicKey, .rsaEncryptionOAEPSHA256, rawKey as CFData, &error) as Data? else {
+            throw E2EEError.invalidKey
+        }
+        return wrapped.base64EncodedString()
     }
 
     /// Wrappe une clé de conversation (32 octets) avec la clé publique RSA d'un

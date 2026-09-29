@@ -166,6 +166,8 @@ struct ProfileView: View {
     private func consumeE2EEApprovalDeepLink() {
         guard let id = router.openE2EEDeviceApprovalId else { return }
         router.openE2EEDeviceApprovalId = nil
+        // Même règle que l'entrée des Réglages (E2E-03).
+        guard E2EEV2RuntimeWriteGate.enabled else { return }
         deepLinkE2EEApproval = E2EEDeviceApprovalDeepLink(id: id)
     }
 

@@ -14,9 +14,12 @@ enum ReportReason: String, CaseIterable, Identifiable {
         case .privacy: return String(localized: "Atteinte à la vie privée")
         case .illegal: return String(localized: "Contenu illégal")
         case .misleading: return String(localized: "Désinformation")
-        case .other: return "Autre"
+        case .other: return String(localized: "Autre")
         }
     }
+
+    /// Motifs proposés pour un message, alignés sur le web.
+    static let messageReasons: [ReportReason] = [.spam, .harassment, .illegal, .other]
 }
 
 /// Cible d'un signalement.

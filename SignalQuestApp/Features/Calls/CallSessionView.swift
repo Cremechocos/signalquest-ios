@@ -21,31 +21,154 @@ struct CallScreen: View {
     var body: some View {
         ZStack {
             callBackground
-            VStack(spacing: SQSpace.lg) {
-                callHeader
-                if callManager.activeCall?.hasVideo == true {
-                    videoStage
-                } else {
-                    Spacer(minLength: SQSpace.lg)
-                    centralAvatar
-                    Spacer(minLength: SQSpace.lg)
-                }
-                if let error = liveKit.mediaErrorMessage {
-                    Text(error)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.danger)
-                        .multilineTextAlignment(.center)
-                }
-                controls
-                Text("Audio et vidéo transportés par LiveKit.")
-                    .font(SQType.micro)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .accessibilityLabel("Les appels utilisent le transport LiveKit")
+            if callManager.activeCall == nil, let notice = callManager.endNotice {
+                endStage(notice)
+            } else {
+                callStage
             }
-            .padding(.horizontal, SQSpace.lg)
-            .padding(.vertical, SQSpace.xl)
         }
         .preferredColorScheme(.dark)
+    }
+
+    private var callStage: some View {
+        VStack(spacing: SQSpace.lg) {
+            topBar
+            callHeader
+            if callManager.activeCall?.hasVideo == true {
+                videoStage
+            } else {
+                Spacer(minLength: SQSpace.lg)
+                centralAvatar
+                Spacer(minLength: SQSpace.lg)
+            }
+            if let error = liveKit.mediaErrorMessage {
+                Text(error)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.danger)
+                    .multilineTextAlignment(.center)
+            }
+            controls
+            encryptionNote
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.xl)
+    }
+
+    /// Réduire : l'appel continue et un bandeau en haut de l'app permet d'y
+    /// revenir. Sans ce bouton, impossible de lire un message pendant un appel.
+    private var topBar: some View {
+        HStack {
+            if callManager.activeCall != nil {
+                Button {
+                    Haptics.light()
+                    callManager.minimizeCallScreen()
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(SQColor.label)
+                        .frame(width: 44, height: 44)
+                        .background(SQColor.surface, in: Circle())
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .accessibilityLabel("Réduire l’appel")
+                .accessibilityHint("L’appel continue. Touche le bandeau en haut de l’écran pour revenir.")
+                .accessibilityIdentifier("call.minimize")
+            }
+            Spacer()
+        }
+    }
+
+    /// Ce que protège l'appel, dit simplement. Aucun appel n'est encore
+    /// chiffré de bout en bout, même dans une conversation chiffrée (E2E-02) ;
+    /// le pied de page parlait du transport « LiveKit » (SOC-13).
+    private var encryptionNote: some View {
+        let title: LocalizedStringKey = liveKit.isE2EEVerified
+            ? "Appel chiffré de bout en bout"
+            : "Appel non chiffré de bout en bout"
+        return HStack(spacing: 0) {
+            Label(title, systemImage: liveKit.isE2EEVerified ? "lock.fill" : "lock.open")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+            SQInfoButton(term: .endToEndEncryption)
+        }
+        .accessibilityIdentifier("call.encryption")
+    }
+
+    /// Fin d'appel expliquée : pas de réponse, ou échec dit en clair, avec
+    /// « Rappeler » (SOC-13). L'écran se fermait sans rien dire.
+    private func endStage(_ notice: CallManager.EndNotice) -> some View {
+        VStack(spacing: SQSpace.lg) {
+            Spacer(minLength: SQSpace.lg)
+            SQAvatar(url: nil, name: notice.handle.isEmpty ? "?" : notice.handle, size: 120)
+                .accessibilityHidden(true)
+            VStack(spacing: SQSpace.sm) {
+                if !notice.handle.isEmpty {
+                    Text(notice.handle)
+                        .font(SQType.display)
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+                Text(notice.title)
+                    .font(SQType.heading)
+                    .foregroundStyle(SQColor.label)
+                if let message = notice.message {
+                    Text(message)
+                        .font(SQType.body)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier("call.end.notice")
+            Spacer(minLength: SQSpace.lg)
+            HStack(alignment: .top, spacing: SQSpace.xxl) {
+                labeledControl("Fermer", identifier: "call.end.close", systemImage: "xmark", tint: SQColor.label) {
+                    callManager.dismissEndNotice()
+                }
+                if notice.conversationId != nil {
+                    labeledControl(
+                        "Rappeler",
+                        identifier: "call.end.redial",
+                        systemImage: notice.hasVideo ? "video.fill" : "phone.fill",
+                        tint: SQColor.onAccent,
+                        fill: SQColor.brandRed
+                    ) {
+                        callManager.redial()
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.xl)
+        .onAppear {
+#if os(iOS)
+            let announcement = [notice.title, notice.message].compactMap { $0 }.joined(separator: ". ")
+            UIAccessibility.post(notification: .announcement, argument: announcement)
+#endif
+        }
+    }
+
+    private func labeledControl(
+        _ title: LocalizedStringKey,
+        identifier: String,
+        systemImage: String,
+        tint: Color,
+        fill: Color = SQColor.surface,
+        action: @escaping () -> Void
+    ) -> some View {
+        VStack(spacing: SQSpace.xs) {
+            controlButton(systemImage: systemImage, tint: tint, fill: fill, action: action)
+                .accessibilityLabel(title)
+                .accessibilityIdentifier(identifier)
+            Text(title)
+                .font(SQType.micro)
+                .foregroundStyle(SQColor.labelSecondary)
+                .accessibilityHidden(true)
+                .accessibilityIdentifier("call.end.caption")
+        }
     }
 
     private var callHeader: some View {
@@ -169,14 +292,34 @@ struct CallScreen: View {
     }
 #endif
 
+    /// « En appel » n'apparaît qu'une fois quelqu'un connecté, avec la durée ;
+    /// avant, c'est la sonnerie. Le message brut du transport n'est plus
+    /// affiché (SOC-13).
     @ViewBuilder
     private var statusText: some View {
         switch liveKit.state {
         case .idle: Text("Préparation…")
         case .connecting: Text("Connexion…")
-        case .connected: Text("En appel")
-        case .failed(let message): Text("Erreur : \(message)")
+        case .connected:
+            if liveKit.isReconnecting {
+                Text("Reconnexion…")
+            } else if let joinedAt = liveKit.remoteJoinedAt {
+                Text("En appel") + Text(verbatim: " · ") + Text(joinedAt, style: .timer).monospacedDigit()
+            } else if callManager.activeCall?.isOutgoing == true {
+                Text("Sonnerie…")
+            } else {
+                Text("Connexion…")
+            }
+        case .failed: Text("Appel interrompu")
         case .ended: Text("Appel terminé")
+        }
+    }
+
+    private var isWaiting: Bool {
+        switch liveKit.state {
+        case .idle, .connecting: return true
+        case .connected: return liveKit.isReconnecting || liveKit.remoteJoinedAt == nil
+        case .failed, .ended: return false
         }
     }
 
@@ -185,13 +328,12 @@ struct CallScreen: View {
     /// (initiate + handshake LiveKit) n'est pas instantanée. iOS-16-safe.
     @ViewBuilder
     private var statusGlyph: some View {
-        switch liveKit.state {
-        case .idle, .connecting:
+        if isWaiting {
             ProgressView()
                 .controlSize(.small)
                 .tint(SQColor.label)
                 .accessibilityHidden(true)
-        default:
+        } else {
             Image(systemName: (callManager.activeCall?.hasVideo ?? false) ? "video.fill" : "phone.fill")
                 .foregroundStyle(SQColor.brandRed)
                 .accessibilityHidden(true)
@@ -261,6 +403,52 @@ struct CallScreen: View {
                 .sqShadowSoft()
         }
         .buttonStyle(SQPressButtonStyle())
+    }
+}
+
+/// Bandeau « Appel en cours » quand l'écran d'appel est réduit (SOC-13).
+struct ActiveCallBanner: View {
+    @ObservedObject var callManager: CallManager
+    @ObservedObject var liveKit: LiveKitClient
+
+    init(callManager: CallManager) {
+        _callManager = ObservedObject(wrappedValue: callManager)
+        _liveKit = ObservedObject(wrappedValue: callManager.liveKit)
+    }
+
+    var body: some View {
+        if let call = callManager.activeCall, !callManager.showCallScreen, call.isOutgoing || call.isAnswered {
+            Button {
+                Haptics.light()
+                callManager.restoreCallScreen()
+            } label: {
+                HStack(spacing: SQSpace.sm) {
+                    Image(systemName: call.hasVideo ? "video.fill" : "phone.fill")
+                    Text(verbatim: call.handle)
+                        .lineLimit(1)
+                    if let joinedAt = liveKit.remoteJoinedAt {
+                        Text(joinedAt, style: .timer)
+                            .monospacedDigit()
+                    } else {
+                        Text("Sonnerie…")
+                    }
+                }
+                .font(SQType.subhead.weight(.semibold))
+                .foregroundStyle(SQColor.onAccent)
+                .padding(.horizontal, SQSpace.lg)
+                .frame(minHeight: 44)
+                .background(SQColor.brandRed, in: Capsule(style: .continuous))
+                .sqShadowSoft()
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .padding(.horizontal, SQSpace.lg)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(String(localized: "Appel en cours avec \(call.handle)"))
+            .accessibilityHint("Revenir à l’appel")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("call.banner")
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
     }
 }
 

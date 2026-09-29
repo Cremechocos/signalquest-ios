@@ -233,8 +233,20 @@ final class CallManager: NSObject, ObservableObject {
         }
     }
 
+    /// Fin d'appel à expliquer : l'écran d'appel reste ouvert avec ce message
+    /// au lieu de se fermer sans rien dire (SOC-13).
+    struct EndNotice: Equatable {
+        let title: String
+        let message: String?
+        let handle: String
+        let conversationId: String?
+        let hasVideo: Bool
+        let requiresE2EE: Bool
+    }
+
     @Published private(set) var activeCall: ActiveCall?
     @Published var showCallScreen = false
+    @Published private(set) var endNotice: EndNotice?
 
     let liveKit = LiveKitClient()
 
@@ -289,6 +301,7 @@ final class CallManager: NSObject, ObservableObject {
         requiresE2EE: Bool = false
     ) {
         guard activeCall == nil else { return }
+        endNotice = nil
         liveKit.prepareForCall()
         let uuid = UUID()
         let hasVideo = mode.lowercased() == "video"
@@ -309,7 +322,9 @@ final class CallManager: NSObject, ObservableObject {
             Task { @MainActor in
                 guard let self, self.activeCall?.id == uuid else { return }
                 self.logger.error("startCall request failed: \(error.localizedDescription, privacy: .public)")
-                await self.tearDown()
+                await self.tearDown(notice: self.failureNotice(
+                    message: String(localized: "L’appel n’a pas pu démarrer. Réessaie dans un instant.")
+                ))
             }
         }
     }
@@ -317,6 +332,7 @@ final class CallManager: NSObject, ObservableObject {
     /// User taps hang-up in the in-app call screen.
     func endActiveCall() {
         guard let call = activeCall else {
+            endNotice = nil
             showCallScreen = false
             return
         }
@@ -339,6 +355,82 @@ final class CallManager: NSObject, ObservableObject {
         guard let call = activeCall else { return }
         let action = CXSetMutedCallAction(call: call.id, muted: muted)
         callController.request(CXTransaction(action: action)) { _ in }
+    }
+
+    /// Réduit l'écran d'appel : l'appel continue, un bandeau permet d'y revenir.
+    func minimizeCallScreen() {
+        guard activeCall != nil else { return }
+        showCallScreen = false
+    }
+
+    func restoreCallScreen() {
+        guard let call = activeCall, call.isOutgoing || call.isAnswered else { return }
+        showCallScreen = true
+    }
+
+    func dismissEndNotice() {
+        endNotice = nil
+        if activeCall == nil { showCallScreen = false }
+    }
+
+    /// « Rappeler » depuis l'écran de fin : même conversation, même mode.
+    func redial() {
+        guard activeCall == nil, let notice = endNotice, let conversationId = notice.conversationId else { return }
+        startOutgoingCall(
+            conversationId: conversationId,
+            mode: notice.hasVideo ? "video" : "audio",
+            displayName: notice.handle,
+            requiresE2EE: notice.requiresE2EE
+        )
+    }
+
+    #if DEBUG
+    func presentQAEndNotice() {
+        guard activeCall == nil else { return }
+        endNotice = EndNotice(
+            title: String(localized: "Pas de réponse"),
+            message: nil,
+            handle: "Camille",
+            conversationId: "qa-conversation",
+            hasVideo: false,
+            requiresE2EE: false
+        )
+        showCallScreen = true
+    }
+    #endif
+
+    /// Texte montré quand un appel échoue. Jamais le message brut du transport
+    /// ni son nom : « Erreur : could not establish pc connection » (SOC-13).
+    nonisolated static func failureMessage(for error: Error) -> String? {
+        if error.isCancellation { return nil }
+        if let callError = error as? CallError {
+            switch callError {
+            case .e2eeUnavailable, .untrustedE2EESession:
+                return String(localized: "La vérification du chiffrement de l’appel a échoué. Aucun appel n’a été passé.")
+            case .connectionEnded:
+                return String(localized: "L’appel s’est terminé pendant la connexion.")
+            case .missingCredentials, .connectionFailed:
+                return String(localized: "Connexion à l’appel impossible. Vérifie ta connexion et réessaie.")
+            }
+        }
+        return error.userFacingMessage
+    }
+
+    private func failureNotice(for error: Error) -> EndNotice? {
+        guard let message = Self.failureMessage(for: error) else { return nil }
+        return failureNotice(message: message)
+    }
+
+    private func failureNotice(message: String) -> EndNotice? {
+        guard let call = activeCall else { return nil }
+        return EndNotice(
+            title: String(localized: "Appel impossible"),
+            message: message,
+            handle: call.handle,
+            conversationId: call.conversationId,
+            hasVideo: call.hasVideo,
+            requiresE2EE: call.isOutgoing && call.requiresE2EE == true
+        )
     }
 
     // MARK: Incoming
@@ -450,6 +542,11 @@ final class CallManager: NSObject, ObservableObject {
             return
         }
 
+        // Un appel reçu remplace l'écran de fin d'un appel précédent.
+        if endNotice != nil {
+            endNotice = nil
+            showCallScreen = false
+        }
         activeCall = ActiveCall(
             id: uuid,
             callId: callId,
@@ -646,13 +743,15 @@ final class CallManager: NSObject, ObservableObject {
         }
     }
 
-    private func tearDown() async {
+    private func tearDown(notice: EndNotice? = nil) async {
         incomingReconciliationTask?.cancel()
         incomingReconciliationTask = nil
         if let callId = activeCall?.callId { markRecentlyTerminated(callId) }
         await liveKit.disconnect()
         activeCall = nil
-        showCallScreen = false
+        // Avec un message, l'écran reste ouvert sur la fin d'appel (SOC-13).
+        endNotice = notice
+        showCallScreen = notice != nil
     }
 
     /// CALL-RTC-02 : retire de CallKit un appel déjà rapporté quand la fin n'est
@@ -736,10 +835,21 @@ final class CallManager: NSObject, ObservableObject {
     /// on nettoie. On NE rappelle PAS le backend : le distant a déjà clos la session.
     private func handleRemoteDisconnect() {
         guard let call = activeCall else { return }
-        reportCallEnded(call.id, reason: .remoteEnded)
+        // Personne n'a décroché (refus, sonnerie écoulée) : on le dit au lieu
+        // de fermer l'écran comme si l'appel avait eu lieu (SOC-13).
+        let unanswered = call.isOutgoing && liveKit.remoteJoinedAt == nil
+        let notice = unanswered ? EndNotice(
+            title: String(localized: "Pas de réponse"),
+            message: nil,
+            handle: call.handle,
+            conversationId: call.conversationId,
+            hasVideo: call.hasVideo,
+            requiresE2EE: call.requiresE2EE == true
+        ) : nil
+        reportCallEnded(call.id, reason: unanswered ? .unanswered : .remoteEnded)
         Task {
             await notifyBackendCallTerminated(call)
-            await tearDown()
+            await tearDown(notice: notice)
         }
     }
 
@@ -747,9 +857,10 @@ final class CallManager: NSObject, ObservableObject {
         guard let call = activeCall, !call.isEnding else { return }
         activeCall?.isEnding = true
         reportCallEnded(call.id, reason: .failed)
+        let notice = failureNotice(message: String(localized: "L’appel a été coupé : la vérification du chiffrement a échoué."))
         Task {
             await notifyBackendCallTerminated(call)
-            await tearDown()
+            await tearDown(notice: notice)
         }
     }
 
@@ -918,9 +1029,10 @@ extension CallManager: CXProviderDelegate {
                 action.fulfill()
             } catch {
                 self.logger.error("initiate failed: \(error.localizedDescription, privacy: .public)")
+                let notice = self.failureNotice(for: error)
                 if let call = self.activeCall { await self.notifyBackendCallTerminated(call) }
                 action.fail()
-                await self.tearDown()
+                await self.tearDown(notice: notice)
             }
         }
     }
@@ -947,9 +1059,10 @@ extension CallManager: CXProviderDelegate {
                 // action.fail() ne le retire pas → on le clôt explicitement pour ne
                 // pas laisser une entrée d'appel fantôme côté système.
                 if let id = self.activeCall?.id { self.reportCallEnded(id, reason: .failed) }
+                let notice = self.failureNotice(for: error)
                 if let call = self.activeCall { await self.notifyBackendCallTerminated(call) }
                 action.fail()
-                await self.tearDown()
+                await self.tearDown(notice: notice)
             }
         }
     }
@@ -964,6 +1077,7 @@ extension CallManager: CXProviderDelegate {
             // (sortant ou décroché), factorisé dans notifyBackendCallTerminated.
             if let call { await self.notifyBackendCallTerminated(call) }
             self.activeCall = nil
+            self.endNotice = nil
             self.showCallScreen = false
             action.fulfill()
         }

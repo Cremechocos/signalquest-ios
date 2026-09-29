@@ -7,6 +7,10 @@ struct MessageSearchView: View {
     let conversation: MessageConversation
     let service: MessagesServicing
     let e2ee: E2EEServicing?
+    /// Conversation chiffrée : messages déjà déchiffrés sur l'appareil. La
+    /// recherche s'y fait localement ; le mot cherché partait sinon en clair
+    /// dans l'adresse de la requête (E2E-04).
+    var localCorpus: [(message: MessageItem, text: String)]? = nil
     /// Callback déclenché au tap d'un résultat : renvoie l'id du message ciblé.
     let onSelectMessage: (String) -> Void
 
@@ -52,11 +56,11 @@ struct MessageSearchView: View {
             // recherche par mot-clé ne peut rien matcher. On l'explique plutôt que
             // de laisser croire à tort que le message n'existe pas (UX-1).
             EmptyStateView(
-                title: isE2EE ? "Recherche limitée" : "Aucun résultat",
-                message: isE2EE
-                    ? "Cette conversation est chiffrée de bout en bout : la recherche par mot-clé n’est pas disponible côté serveur."
-                    : "Aucun message ne correspond à « \(query) ».",
-                systemImage: isE2EE ? "lock.fill" : "magnifyingglass"
+                title: "Aucun résultat",
+                message: localCorpus != nil
+                    ? String(localized: "Aucun message déjà ouvert ne contient « \(query) ». La recherche se fait sur ton téléphone : le mot cherché n’est jamais envoyé.")
+                    : String(localized: "Aucun message ne correspond à « \(query) »."),
+                systemImage: localCorpus != nil ? "lock.fill" : "magnifyingglass"
             )
             Spacer()
         } else if !hasSearched {
@@ -149,6 +153,17 @@ struct MessageSearchView: View {
     private func performSearch() async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        if let localCorpus {
+            // Plus récents d'abord, comme la recherche du serveur.
+            let matches = localCorpus.filter {
+                $0.text.range(of: trimmed, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+            }
+            for match in matches { decrypted[match.message.id] = match.text }
+            results = matches.reversed().prefix(50).map { MessageSearchResult(message: $0.message) }
+            hasSearched = true
+            errorMessage = nil
+            return
+        }
         isSearching = true
         defer { isSearching = false }
         do {
@@ -160,7 +175,7 @@ struct MessageSearchView: View {
             errorMessage = nil
             await decryptResults()
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
             hasSearched = true
         }
     }

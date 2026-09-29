@@ -99,6 +99,8 @@ protocol MessagesServicing: Sendable {
     func savedMessages() async throws -> [SavedMessageEntry]
     func saveMessage(messageId: String) async throws
     func unsaveMessage(messageId: String) async throws
+    // Modération (Guideline 1.2)
+    func reportMessages(messageIds: [String], reason: String, details: String?, moderationWrappedKeyB64: String?) async throws
 }
 
 extension MessagesServicing {
@@ -163,8 +165,11 @@ enum LegacyE2EEWriteFeature: CaseIterable, Sendable {
 }
 
 enum LegacyE2EEWritePolicy {
-    static let v2RequiredMessage =
-        "Cette action nécessite E2EE v2 vérifié. Rien n’a été envoyé au serveur."
+    /// Dit sans jargon (« E2EE v2 ») et traduit : la chaîne brute s'affichait
+    /// en français dans l'app anglaise (SOC-29).
+    static let v2RequiredMessage = String(
+        localized: "Dans une conversation chiffrée, seul le texte peut être envoyé pour l’instant. Rien n’a été envoyé."
+    )
 
     static func isAllowed(e2eeEnabled: Bool, feature: LegacyE2EEWriteFeature) -> Bool {
         !e2eeEnabled || feature == .text
@@ -1387,6 +1392,34 @@ final class MessagesService: MessagesServicing {
             "/api/messages/saved/\(messageId)",
             method: .delete,
             body: [String: String]()
+        )
+    }
+
+    // MARK: Signalement
+
+    /// Signale des messages d'une même conversation. En conversation chiffrée,
+    /// `moderationWrappedKeyB64` porte la clé de la conversation chiffrée pour
+    /// la seule modération, comme le fait le web (SOC-12).
+    func reportMessages(messageIds: [String], reason: String, details: String?, moderationWrappedKeyB64: String?) async throws {
+        if AppEnvironment.usesDemoData {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            return
+        }
+        struct Body: Encodable {
+            let messageIds: [String]
+            let reason: String
+            let details: String?
+            let moderationWrappedKeyB64: String?
+        }
+        struct Response: Decodable { let created: Int? }
+        let _: Response = try await api.requestJSON(
+            "/api/messages/reports",
+            body: Body(
+                messageIds: messageIds,
+                reason: reason,
+                details: details,
+                moderationWrappedKeyB64: moderationWrappedKeyB64
+            )
         )
     }
 }

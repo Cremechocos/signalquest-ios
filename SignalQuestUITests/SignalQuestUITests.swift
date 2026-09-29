@@ -365,12 +365,20 @@ final class SignalQuestUITests: XCTestCase {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])
         SignalQuestUITestSupport.openMessages(in: app)
+        let inboxUnlockCancel = app.buttons["Annuler"].firstMatch
+        if inboxUnlockCancel.waitForExistence(timeout: 3) { inboxUnlockCancel.tap() }
         let conversation = app.staticTexts["SignalQuest iOS"]
         XCTAssertTrue(conversation.waitForExistence(timeout: 5))
         // The row text lives inside a hittable List button, so it isn't independently
         // hittable; tap its coordinate to forward the tap to the row.
         conversation.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        XCTAssertTrue(app.staticTexts["Tu peux partager un post, une photo ou un speedtest vers cette conversation."].waitForExistence(timeout: 5))
+        // Une bulle de texte est lue d'un bloc (« expéditeur : texte, heure »,
+        // SOC-31) : on la cherche par son contenu, pas par un libellé exact.
+        let bubble = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label CONTAINS %@",
+            "Tu peux partager un post, une photo ou un speedtest vers cette conversation."
+        )).firstMatch
+        XCTAssertTrue(bubble.waitForExistence(timeout: 5))
     }
 
     func testEncryptedConversationExplainsUnavailableCall() {

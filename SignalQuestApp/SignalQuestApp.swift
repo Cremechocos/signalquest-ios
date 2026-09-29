@@ -416,6 +416,12 @@ struct RootView: View {
         .overlay(alignment: .top) {
             OfflineBanner(isVisible: !networkPath.isOnline)
         }
+        // Écran d'appel réduit : on y revient par ce bandeau (SOC-13).
+        .overlay(alignment: .top) {
+            ActiveCallBanner(callManager: callManager)
+                .padding(.top, networkPath.isOnline ? SQSpace.xs : 52)
+                .sqAnimation(SQMotion.smooth, value: callManager.showCallScreen)
+        }
         .overlay(alignment: .top) {
             SQInAppNotificationHost()
                 .padding(.top, networkPath.isOnline ? SQSpace.sm : 52)
@@ -628,6 +634,9 @@ struct MainTabView: View {
         tabContainer
         .task(id: user?.id) {
             consumeIntentRoutes()
+            #if DEBUG
+            if AppEnvironment.showsCallEndQA { services.callManager.presentQAEndNotice() }
+            #endif
             guard let user else { return }
             await services.refreshInboxBadge()
             await services.refreshNotificationBadge()

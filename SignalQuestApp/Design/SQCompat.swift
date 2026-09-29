@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UserNotifications
 
 /// Shims de rétro-compatibilité iOS 16 : on garde les APIs iOS 17/18/26 derrière
@@ -146,6 +147,48 @@ private struct SQPresentationBackground<S: ShapeStyle>: ViewModifier {
             }
         } else {
             content
+        }
+    }
+}
+
+extension View {
+    /// Garde le balayage retour d'un écran poussé dont la barre de navigation
+    /// est masquée (en-tête maison) : UIKit coupe ce geste avec la barre, et la
+    /// messagerie ne se quittait plus que par le chevron (SOC-30).
+    func sqKeepsSwipeBack() -> some View {
+        background(SQSwipeBackEnabler().frame(width: 0, height: 0).accessibilityHidden(true))
+    }
+}
+
+/// Se substitue au délégué du geste de retour tant que l'écran est affiché,
+/// puis rend la main au délégué d'origine : les autres écrans gardent le
+/// comportement système.
+private struct SQSwipeBackEnabler: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+    func updateUIViewController(_ controller: Controller, context: Context) {}
+
+    final class Controller: UIViewController, UIGestureRecognizerDelegate {
+        private weak var recognizer: UIGestureRecognizer?
+        private weak var previousDelegate: UIGestureRecognizerDelegate?
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            guard let recognizer = navigationController?.interactivePopGestureRecognizer,
+                  recognizer.delegate !== self else { return }
+            previousDelegate = recognizer.delegate
+            self.recognizer = recognizer
+            recognizer.delegate = self
+        }
+
+        override func viewWillDisappear(_ animated: Bool) {
+            super.viewWillDisappear(animated)
+            guard let recognizer, recognizer.delegate === self else { return }
+            recognizer.delegate = previousDelegate
+            self.recognizer = nil
+        }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            (navigationController?.viewControllers.count ?? 0) > 1
         }
     }
 }

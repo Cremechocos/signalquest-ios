@@ -78,6 +78,10 @@ final class LiveKitClient: ObservableObject {
     /// « Reconnexion… » tant que ce drapeau est vrai ; il revient à false dès que la
     /// liaison est rétablie ou que l'appel se termine.
     @Published private(set) var isReconnecting = false
+    /// Arrivée du premier participant distant : la sonnerie s'arrête et le
+    /// minuteur de l'appel démarre. Une room connectée où personne n'a encore
+    /// décroché affichait « En appel » (SOC-13).
+    @Published private(set) var remoteJoinedAt: Date?
     @Published private(set) var isMicMuted = false
     @Published private(set) var isCameraOn = false
     @Published private(set) var canSwitchCamera = false
@@ -189,6 +193,7 @@ final class LiveKitClient: ObservableObject {
         didDisconnectDuringConnect = false
         didE2EEFailDuringConnect = false
         isReconnecting = false
+        remoteJoinedAt = nil
         isE2EEVerified = false
         e2eeDataDecryptionFailureCount = 0
         emptyRoomTask?.cancel()
@@ -492,6 +497,7 @@ final class LiveKitClient: ObservableObject {
         }
         state = .ended
         isReconnecting = false
+        remoteJoinedAt = nil
         isMicMuted = false
         isCameraOn = false
         canSwitchCamera = false
@@ -855,6 +861,7 @@ final class LiveKitClient: ObservableObject {
         if !room.remoteParticipants.isEmpty {
             emptyRoomTask?.cancel()
             emptyRoomTask = nil
+            if remoteJoinedAt == nil { remoteJoinedAt = Date() }
             return
         }
         guard state == .connected || state == .connecting, emptyRoomTask == nil else { return }

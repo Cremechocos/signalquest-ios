@@ -134,7 +134,12 @@ final class AccessibilityAuditTests: XCTestCase {
                 "drivetest.", "Démarrer le Drive Test",
                 // Lot 4d : texte de l'étiquette d'un `Menu` (pastille opérateur de la
                 // Carte), en `.subheadline` ; la Carte passe en AX XXL (TRX-38).
-                "map.operator.label"
+                "map.operator.label",
+                // Lot 4e : textes de la messagerie et de la fin d'appel, en styles
+                // relatifs ; `testAuditMessagingAtAccessibilityTextSize` et
+                // `testAuditCallEndAtAccessibilityTextSize` les rendent en AX XXL.
+                "message.", "messages.row.", "conversation.title", "conversation.status",
+                "liveshare.", "call.end.caption"
             ]
             if issue.auditType == .dynamicType,
                semanticDynamicIdentifiers.contains(where: name.hasPrefix) {
@@ -157,7 +162,13 @@ final class AccessibilityAuditTests: XCTestCase {
                 "home.nearby.context", "home.pulse.unit",
                 "speedtest.driveTest.label", "speedtest.account.",
                 // Bilan du dernier trajet, à l'encre sur `surfaceMuted` (Lot 4c).
-                "drivetest.lastTrip."
+                "drivetest.lastTrip.",
+                // Messagerie (Lot 4e) : `label`/`labelSecondary`/`accentInk` sur
+                // les surfaces, `onAccent` sur brique, `dangerInk` sur `surfaceMuted`
+                // (`testBodyTextTokensMeetAA`, `testSemanticTokensMeetAA`,
+                // `testOnAccentIsReadableOnBrandSurface`).
+                "message.text", "message.time", "messages.row.", "liveshare.",
+                "conversation.stamp", "conversation.status"
             ]
             if issue.auditType == .contrast,
                provenContrastIdentifiers.contains(where: name.hasPrefix) {
@@ -325,6 +336,65 @@ final class AccessibilityAuditTests: XCTestCase {
         }
         print("SQ_A11Y onglets AX XXL : \(visited)/\(SignalQuestUITestSupport.tabs.count) audités")
         XCTAssertEqual(visited, SignalQuestUITestSupport.tabs.count)
+    }
+
+    /// Messagerie (Lot 4e) : liste des conversations puis conversation, telles
+    /// qu'on les ouvre depuis Communauté.
+    func testAuditMessaging() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        let app = launch()
+        openDemoConversation(in: app) { screen in
+            audit(app, screen: "Messagerie — \(screen)", blocking: true)
+        }
+    }
+
+    func testAuditMessagingAtAccessibilityTextSize() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        let app = launch([
+            "--mock-auth",
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityXXL"
+        ])
+        openDemoConversation(in: app) { screen in
+            audit(app, screen: "Messagerie — \(screen) — texte accessibilité", blocking: true,
+                  types: Self.renderedLargeTextTypes)
+        }
+    }
+
+    /// Fin d'appel expliquée (SOC-13) : le simulateur n'aboutit à aucun vrai
+    /// appel, l'écran est donc ouvert par son point d'entrée QA.
+    func testAuditCallEnd() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        let app = launch(["--mock-auth", "--qa-call-ended"])
+        XCTAssertTrue(app.buttons["call.end.redial"].waitForExistence(timeout: 20), "Écran de fin d'appel absent")
+        audit(app, screen: "Appel — fin", blocking: true)
+        app.buttons["call.end.close"].tap()
+        XCTAssertTrue(app.buttons["call.end.close"].waitForNonExistence(timeout: 5), "« Fermer » laisse l'écran d'appel ouvert")
+    }
+
+    func testAuditCallEndAtAccessibilityTextSize() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        let app = launch([
+            "--mock-auth", "--qa-call-ended",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXL"
+        ])
+        XCTAssertTrue(app.buttons["call.end.redial"].waitForExistence(timeout: 20), "Écran de fin d'appel absent")
+        audit(app, screen: "Appel — fin — texte accessibilité", blocking: true, types: Self.renderedLargeTextTypes)
+    }
+
+    private func openDemoConversation(in app: XCUIApplication, audit: (String) -> Void) {
+        SignalQuestUITestSupport.openMessages(in: app)
+        let unlockCancel = app.buttons["Annuler"].firstMatch
+        if unlockCancel.waitForExistence(timeout: 3) { unlockCancel.tap() }
+        let row = app.staticTexts["SignalQuest iOS"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "Conversation de démonstration absente")
+        audit("liste")
+        row.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let bubble = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label CONTAINS %@", "Tu peux partager un post"
+        )).firstMatch
+        XCTAssertTrue(bubble.waitForExistence(timeout: 10), "Conversation non ouverte")
+        audit("conversation")
     }
 
     func testAuditSentinelleAtAccessibilityTextSize() throws {

@@ -1552,9 +1552,13 @@ struct SettingsView: View {
                 NavigationLink {
                     ChangePasswordView()
                 } label: { settingsLabel("Changer le mot de passe", systemImage: "key.fill") }
-                NavigationLink {
-                    E2EEV2TrustedDevicesView(api: services.api)
-                } label: { settingsLabel("Appareils E2EE v2", systemImage: "lock.shield") }
+                // Masqué tant que la v2 dort : l'écran créait une identité locale
+                // pour un chiffrement qui ne peut encore ni envoyer ni lire (E2E-03).
+                if E2EEV2RuntimeWriteGate.enabled {
+                    NavigationLink {
+                        E2EEV2TrustedDevicesView(api: services.api)
+                    } label: { settingsLabel("Appareils E2EE v2", systemImage: "lock.shield") }
+                }
             } header: {
                 Text("Sécurité")
                     .foregroundStyle(SQColor.label)

@@ -101,6 +101,8 @@ struct FriendsListView: View {
     /// Débloquer réintroduit quelqu'un dans le champ social de l'utilisateur :
     /// confirmation explicite, comme pour bloquer.
     @State private var unblockTarget: BlockedUser?
+    /// Retirer un ami se confirme, comme débloquer (SOC-22).
+    @State private var removalTarget: Friend?
     init(service: FriendsServicing) {
         _model = StateObject(wrappedValue: FriendsViewModel(service: service))
     }
@@ -172,7 +174,7 @@ struct FriendsListView: View {
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 5, leading: SQSpace.lg, bottom: 5, trailing: SQSpace.lg))
                     .swipeActions {
-                        Button(role: .destructive) { Task { await model.remove(friend) } } label: {
+                        Button(role: .destructive) { removalTarget = friend } label: {
                             Label("Retirer", systemImage: "person.fill.xmark")
                         }
                     }
@@ -261,6 +263,20 @@ struct FriendsListView: View {
             Button("Annuler", role: .cancel) { unblockTarget = nil }
         } message: { user in
             Text("\(user.displayName) pourra de nouveau voir ton profil et te contacter.")
+        }
+        .confirmationDialog(
+            "Retirer cette personne de tes amis ?",
+            isPresented: Binding(get: { removalTarget != nil }, set: { if !$0 { removalTarget = nil } }),
+            titleVisibility: .visible,
+            presenting: removalTarget
+        ) { friend in
+            Button("Retirer", role: .destructive) {
+                removalTarget = nil
+                Task { await model.remove(friend) }
+            }
+            Button("Annuler", role: .cancel) { removalTarget = nil }
+        } message: { friend in
+            Text("\(friend.displayName) ne sera plus dans ta liste d’amis.")
         }
         .task { await model.load() }
         .refreshable { await model.load() }

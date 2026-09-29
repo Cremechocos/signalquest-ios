@@ -2400,6 +2400,42 @@ final class E2EETests: XCTestCase {
         XCTAssertEqual(unwrapped, rawKey)
     }
 
+    /// Signalement d'un message chiffré (SOC-12) : la clé de la conversation
+    /// part chiffrée pour la clé publique de modération, en base64 standard
+    /// comme le web, et seule la clé privée de modération la rouvre.
+    func testModerationWrapOpensOnlyWithModerationKey() async throws {
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data("{\"ok\":true}".utf8))
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+        let sessionConfig = URLSessionConfiguration.ephemeral
+        sessionConfig.protocolClasses = [MockURLProtocol.self]
+        let store = InMemoryTokenStore()
+        let api = APIClient(
+            config: .test,
+            cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore()),
+            session: URLSession(configuration: sessionConfig)
+        )
+        // Une paire RSA quelconque tient lieu de clé de modération.
+        try await E2EEService(api: api, tokenStore: store)
+            .generateAndRegisterKey(userId: "moderation", password: "correct horse battery")
+        let moderationPrivate = try XCTUnwrap(store.string(for: "privateJwk:current"))
+        let fields = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(moderationPrivate.utf8)) as? [String: String])
+        let moderationPublic = "{\"kty\":\"RSA\",\"n\":\"\(fields["n"]!)\",\"e\":\"\(fields["e"]!)\"}"
+
+        let rawKey = Data((0..<32).map { _ in UInt8.random(in: 0...255) })
+        let wrapped = try E2EEService.wrapForModeration(rawKey: rawKey, publicJwk: moderationPublic)
+        XCTAssertNotNil(Data(base64Encoded: wrapped), "base64 standard attendu, comme le web")
+        XCTAssertEqual(try E2EEService.unwrapConversationKey(wrappedKeyB64: wrapped, privateJwk: moderationPrivate), rawKey)
+        XCTAssertThrowsError(try E2EEService.wrapForModeration(rawKey: rawKey, publicJwk: "{}"))
+    }
+
     /// La clé privée générée doit pouvoir être re-déverrouillée à partir des
     /// champs envoyés au serveur (PBKDF2 + AES-GCM), comme le ferait un autre
     /// appareil après GET /api/e2ee/bootstrap.

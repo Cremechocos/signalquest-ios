@@ -232,11 +232,9 @@ final class AppServices: ObservableObject {
     func refreshInboxBadge(force: Bool = false) async {
         guard let ticket = inboxBadgeState.beginRefresh(force: force) else { return }
         guard let conversations = try? await messages.conversations() else { return }
-        let unread = conversations.reduce(into: 0) { count, conversation in
-            guard let lastMessageAt = conversation.lastMessageAt else { return }
-            let lastReadAt = conversation.lastReadAt ?? .distantPast
-            if lastMessageAt > lastReadAt { count += 1 }
-        }
+        // Même règle que la liste : son propre dernier message ne compte pas.
+        let userId = LocalAccountScope.currentUserId
+        let unread = conversations.filter { $0.isUnread(currentUserId: userId) }.count
         guard inboxBadgeState.publish(unreadCount: unread, for: ticket) else { return }
         unreadConversations = inboxBadgeState.unreadCount
     }

@@ -174,6 +174,8 @@ private extension AppNotification {
 struct NotificationsCenterView: View {
     @StateObject private var model: NotificationsCenterViewModel
     @EnvironmentObject private var router: AppRouter
+    /// « Tout supprimer » est définitif : il se confirme (SOC-22).
+    @State private var confirmDeleteAll = false
     init(service: NotificationsServicing, badge: AppServices? = nil) {
         _model = StateObject(wrappedValue: NotificationsCenterViewModel(service: service, badge: badge))
     }
@@ -277,11 +279,16 @@ struct NotificationsCenterView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button("Tout marquer comme lu") { Task { await model.markAll() } }
-                    Button("Tout supprimer", role: .destructive) { Task { await model.deleteAll() } }
+                    Button("Tout supprimer", role: .destructive) { confirmDeleteAll = true }
                 } label: { Image(systemName: "ellipsis.circle").foregroundStyle(SQColor.label) }
                 .accessibilityLabel("Options")
                 .disabled(model.isMutating || !model.pendingReadIDs.isEmpty)
             }
+        }
+        .confirmationDialog("Supprimer toutes les notifications ?", isPresented: $confirmDeleteAll, titleVisibility: .visible) {
+            Button("Tout supprimer", role: .destructive) { Task { await model.deleteAll() } }
+        } message: {
+            Text("Cette action est définitive.")
         }
         .task { await model.load() }
         .refreshable { await model.load() }

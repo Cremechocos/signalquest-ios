@@ -106,6 +106,8 @@ final class DesignTokenContrastTests: XCTestCase {
         assertMinimum(UIColor(SQColor.warning), named: "warning", atLeast: 4.5)
         assertMinimum(UIColor(SQColor.success), named: "success", atLeast: 4.5)
         assertMinimum(UIColor(SQColor.dangerInk), named: "dangerInk", atLeast: 4.5)
+        // Date non lue de la messagerie, lien « Gérer » du partage en direct (Lot 4e).
+        assertMinimum(UIColor(SQColor.accentInk), named: "accentInk", atLeast: 4.5)
     }
 
     /// `brandRed` et `danger` portent l'identité de marque : ils restent

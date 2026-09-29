@@ -65,7 +65,10 @@ struct ScheduleMessageSheet: View {
                         Text("Envoyer le")
                             .font(SQType.subhead)
                             .foregroundStyle(SQColor.labelSecondary)
-                        DatePicker("", selection: $sendAt, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                            .accessibilityHidden(true)
+                        // Libellé masqué à l'écran mais lu par VoiceOver : le
+                        // sélecteur n'avait pas de nom (SOC-31).
+                        DatePicker("Envoyer le", selection: $sendAt, in: Date()..., displayedComponents: [.date, .hourAndMinute])
                             .labelsHidden()
                             .tint(SQColor.brandRed)
                     }
@@ -142,20 +145,30 @@ struct AddReminderSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    VStack(alignment: .leading, spacing: SQSpace.sm) {
-                        Text("Motif (optionnel)")
-                            .font(SQType.subhead)
+                    // Le motif partirait en clair : pas de champ en conversation
+                    // chiffrée (E2E-05).
+                    if conversation.e2eeEnabled == true {
+                        Label("En conversation chiffrée, un rappel n’a pas de motif : il serait stocké en clair sur nos serveurs.", systemImage: "lock.fill")
+                            .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
-                        TextField("Pourquoi ce rappel ?", text: $reason, axis: .vertical)
-                            .lineLimit(1...3)
-                            .sqCapsuleField()
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        VStack(alignment: .leading, spacing: SQSpace.sm) {
+                            Text("Motif (optionnel)")
+                                .font(SQType.subhead)
+                                .foregroundStyle(SQColor.labelSecondary)
+                            TextField("Pourquoi ce rappel ?", text: $reason, axis: .vertical)
+                                .lineLimit(1...3)
+                                .sqCapsuleField()
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: SQSpace.sm) {
                         Text("Me rappeler le")
                             .font(SQType.subhead)
                             .foregroundStyle(SQColor.labelSecondary)
-                        DatePicker("", selection: $remindAt, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                            .accessibilityHidden(true)
+                        DatePicker("Me rappeler le", selection: $remindAt, in: Date()..., displayedComponents: [.date, .hourAndMinute])
                             .labelsHidden()
                             .tint(SQColor.brandRed)
                     }
@@ -189,11 +202,12 @@ struct AddReminderSheet: View {
         guard canAdd else { return }
         isBusy = true
         defer { isBusy = false }
+        let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
             _ = try await service.createReminder(
                 conversationId: conversation.id,
                 messageId: message.id,
-                reason: reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : reason.trimmingCharacters(in: .whitespacesAndNewlines),
+                reason: conversation.e2eeEnabled == true || trimmed.isEmpty ? nil : trimmed,
                 remindAt: remindAt
             )
             Haptics.success()

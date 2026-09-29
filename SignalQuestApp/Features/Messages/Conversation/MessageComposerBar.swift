@@ -26,6 +26,7 @@ struct MessageComposerBar: View {
     let onVoiceNote: (URL, TimeInterval) -> Void
 
     @State private var text = ""
+    @FocusState private var fieldFocused: Bool
     @State private var pickerItem: PhotosPickerItem?
     @StateObject private var recorder = VoiceNoteRecorder()
     @Environment(\.openURL) private var openURL
@@ -138,11 +139,19 @@ struct MessageComposerBar: View {
                 .lineLimit(1...4)
                 .font(SQType.body)
                 .foregroundStyle(SQColor.label)
+                .focused($fieldFocused)
                 .padding(.horizontal, SQSpace.lg + 2)
                 .padding(.vertical, SQSpace.sm)
                 .frame(minHeight: 44)
-                .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                // Toute la capsule ouvre le clavier, pas seulement la ligne de
+                // texte qu'elle entoure : le fond reçoit les touchers autour.
+                .background {
+                    RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
+                        .fill(SQColor.surfaceMuted)
+                        .onTapGesture { if canSend { fieldFocused = true } }
+                }
                 .disabled(!canSend)
+                .accessibilityIdentifier("composer.field")
 
             // Micro OU envoi, selon qu'il y a du texte : c'est la convention de
             // toutes les messageries, et ça évite un bouton de plus dans une

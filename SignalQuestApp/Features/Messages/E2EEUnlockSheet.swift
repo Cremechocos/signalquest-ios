@@ -9,7 +9,11 @@ struct E2EEUnlockSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var passwordFocused: Bool
+    @FocusState private var confirmationFocused: Bool
     @State private var password = ""
+    /// Création : la clé ne se récupère pas, une faute de frappe la rendrait
+    /// inutilisable (SOC-08).
+    @State private var confirmation = ""
     @State private var isBusy = false
     @State private var error: String?
     @State private var needsCreation = false
@@ -20,7 +24,14 @@ struct E2EEUnlockSheet: View {
     @State private var badgeAppeared = false
     var onUnlock: () -> Void
 
-    private var canSubmit: Bool { password.count >= (needsCreation ? 6 : 1) && !isBusy }
+    private var canSubmit: Bool {
+        guard !isBusy else { return false }
+        return needsCreation ? password.count >= 6 && password == confirmation : !password.isEmpty
+    }
+
+    private var confirmationMismatch: Bool {
+        needsCreation && !confirmation.isEmpty && confirmation != password
+    }
 
     var body: some View {
         NavigationStack {
@@ -34,9 +45,11 @@ struct E2EEUnlockSheet: View {
                             .font(SQType.title)
                             .foregroundStyle(SQColor.label)
                             .multilineTextAlignment(.center)
+                        // Deux mots de passe distincts : celui du compte et celui du
+                        // chiffrement. Le texte le dit, pour qu'on ne les confonde pas.
                         Text(needsCreation
-                             ? "Aucune clé de chiffrement de bout en bout n'existe encore pour ce compte. Choisis un mot de passe : il chiffre ta clé privée et lui seul peut la déverrouiller — ne le perds pas."
-                             : "Ton mot de passe déverrouille la clé de chiffrement en mémoire, le temps de la session.")
+                             ? "Choisis un mot de passe de chiffrement, différent de celui de ton compte. Lui seul ouvre tes conversations chiffrées : s’il est perdu, personne ne peut le retrouver, pas même SignalQuest, et les messages chiffrés deviennent illisibles."
+                             : "Ton mot de passe de chiffrement, choisi à la création de ta clé et différent de celui de ton compte, ouvre tes conversations chiffrées le temps de la session.")
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
                             .multilineTextAlignment(.center)
@@ -44,8 +57,9 @@ struct E2EEUnlockSheet: View {
                     }
 
                     VStack(alignment: .leading, spacing: SQSpace.sm) {
-                        SecureField(needsCreation ? "Nouveau mot de passe E2EE" : "Mot de passe", text: $password)
-                            .textContentType(needsCreation ? .newPassword : .password)
+                        // Pas de `textContentType` mot de passe : iOS proposait un mot de
+                        // passe fort et l'enregistrait pour le compte SignalQuest.
+                        SecureField("Mot de passe de chiffrement", text: $password)
                             .font(SQType.body)
                             .foregroundStyle(SQColor.label)
                             .padding(.horizontal, SQSpace.lg)
@@ -53,12 +67,35 @@ struct E2EEUnlockSheet: View {
                             .frame(minHeight: 44)
                             .background(SQColor.surfaceMuted, in: Capsule())
                             .focused($passwordFocused)
-                            .submitLabel(needsCreation ? .done : .go)
-                            .onSubmit { if canSubmit { Task { await unlockOrCreate() } } }
+                            .submitLabel(needsCreation ? .next : .go)
+                            .onSubmit {
+                                if needsCreation { confirmationFocused = true }
+                                else if canSubmit { Task { await unlockOrCreate() } }
+                            }
+
+                        if needsCreation {
+                            SecureField("Confirme ce mot de passe", text: $confirmation)
+                                .font(SQType.body)
+                                .foregroundStyle(SQColor.label)
+                                .padding(.horizontal, SQSpace.lg)
+                                .padding(.vertical, SQSpace.sm + 2)
+                                .frame(minHeight: 44)
+                                .background(SQColor.surfaceMuted, in: Capsule())
+                                .focused($confirmationFocused)
+                                .submitLabel(.done)
+                                .onSubmit { if canSubmit { Task { await unlockOrCreate() } } }
+                                .accessibilityIdentifier("e2ee.key.confirmation")
+                            if confirmationMismatch {
+                                Label("Les deux mots de passe ne correspondent pas.", systemImage: "exclamationmark.circle")
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.dangerInk)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
 
                         if needsCreation {
                             Label("6 caractères minimum. Ce mot de passe ne quitte jamais ton appareil.", systemImage: "info.circle")
-                                .font(SQFont.body(11.5))
+                                .font(SQType.caption)
                                 // `Label` porte du texte : `labelTertiary` est
                                 // désormais réservé aux éléments graphiques (3:1),
                                 // pas au texte courant (4,5:1).
@@ -173,6 +210,7 @@ struct E2EEUnlockSheet: View {
 
     private func unlockOrCreate() async {
         passwordFocused = false
+        confirmationFocused = false
         isBusy = true
         defer { isBusy = false }
         do {

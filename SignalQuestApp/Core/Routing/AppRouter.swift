@@ -46,6 +46,9 @@ final class AppRouter: ObservableObject {
     @Published var openPostId: String?
     /// Set to request opening a user profile on the Feed tab (notification de follow).
     @Published var openUserProfileId: String?
+    /// Demande d'ami : la liste des amis, où elle s'accepte ; le profil n'a
+    /// pas de bouton « Accepter » (SOC-25).
+    @Published var openFriendRequests = false
     /// Set to request opening a site sheet on the Map tab (deep link carte).
     @Published var openSiteId: String?
     /// Panne communautaire dont la feuille doit s'ouvrir sur la carte, posée par la page
@@ -168,9 +171,21 @@ final class AppRouter: ObservableObject {
         switch rawType?.lowercased() {
         case "message", "conversation", "call", "dm", "e2ee_v2_envelope":
             route(toConversation: conversationId)
-        case "post", "reaction", "comment", "like", "favorite", "repost", "mention", "story":
+        // Réaction ou mention sur un MESSAGE : elle porte sa conversation, pas
+        // un post ; elle ouvrait le fil sur rien (SOC-25).
+        case "reaction" where conversationId != nil && postId == nil:
+            route(toConversation: conversationId)
+        case "mention" where conversationId != nil && postId == nil:
+            route(toConversation: conversationId)
+        case "post", "reaction", "comment", "like", "favorite", "repost", "mention":
             route(toPost: postId)
-        case "follow", "friend", "friend_request", "profile":
+        // Pas d'écran dédié aux stories : leur rail est en tête de Communauté.
+        case "story":
+            selectedTab = .community
+        case "friend_request":
+            selectedTab = .community
+            openFriendRequests = true
+        case "follow", "friend", "profile":
             route(toUserProfile: userId)
         case "antenna_report_reply", "antenna_report", "site_report":
             route(toAntennaReport: reportId)

@@ -712,6 +712,9 @@ struct FeedView: View {
         .onChangeCompat(of: router.openPostId) { _, _ in
             Task { await consumeFeedRoutesIfNeeded() }
         }
+        .onChangeCompat(of: router.openFriendRequests) { _, _ in
+            Task { await consumeFeedRoutesIfNeeded() }
+        }
         .onChangeCompat(of: router.openConversationId) { _, conversationId in
             if conversationId != nil { showMessages = true }
         }
@@ -845,6 +848,10 @@ struct FeedView: View {
     /// (.task) ET sur changement du routeur, pour ne pas perdre une route au lancement
     /// à froid (NAV-BUG-01).
     private func consumeFeedRoutesIfNeeded() async {
+        if router.openFriendRequests {
+            router.openFriendRequests = false
+            showFriends = true
+        }
         if let id = router.openUserProfileId {
             router.openUserProfileId = nil
             routedProfileId = id

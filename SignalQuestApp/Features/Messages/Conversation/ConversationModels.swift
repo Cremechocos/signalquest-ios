@@ -19,4 +19,7 @@ struct PendingSend {
     let replyToId: String?
     let idempotencyKey: String
     let ttlSeconds: Int
+    /// Relu dans la file d'envoi durable après une fermeture : on le renvoie
+    /// tel qu'il a été préparé (texte chiffré compris), pas en le réécrivant.
+    var restored = false
 }

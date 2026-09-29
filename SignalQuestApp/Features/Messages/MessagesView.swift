@@ -80,6 +80,8 @@ struct MessagesView: View {
     @State private var showNewConversation = false
     @State private var showE2EEUnlock = false
     @State private var routedConversationId: String?
+    /// Quitter se confirme : le balayage suffisait à perdre la conversation (SOC-22).
+    @State private var pendingLeave: MessageConversation?
 
     /// Insets des rangées : gap vertical de 14 pt entre cartes (2 × 7),
     /// marge d'écran 20 pt.
@@ -132,7 +134,7 @@ struct MessagesView: View {
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
-                        Task { await model.leave(conversation); await services.refreshInboxBadge(force: true) }
+                        pendingLeave = conversation
                     } label: {
                         Label("Quitter", systemImage: "rectangle.portrait.and.arrow.right")
                     }
@@ -163,8 +165,11 @@ struct MessagesView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .sqReadableWidth()
+        // Comme la conversation : balayage retour rétabli malgré la barre
+        // masquée (SOC-30).
         .toolbar(.hidden, for: .navigationBar)
-        .navigationBarBackButtonHidden(true)
+        .sqKeepsSwipeBack()
         .signalQuestBackground()
         .task {
             if model.conversations.isEmpty { await model.load() }
@@ -172,9 +177,33 @@ struct MessagesView: View {
             await model.decryptPreviews(e2ee: e2ee)
             await openRoutedConversationIfNeeded()
         }
+        // Au retour d'une conversation : la liste restait figée jusqu'au
+        // tirer-pour-rafraîchir (SOC-23). Le premier affichage passe par `.task`.
+        .onAppear {
+            guard !model.conversations.isEmpty else { return }
+            Task {
+                await model.load()
+                await model.decryptPreviews(e2ee: e2ee)
+                await services.refreshInboxBadge(force: true)
+            }
+        }
         .refreshable {
             await model.load()
             await model.decryptPreviews(e2ee: e2ee)
+        }
+        .confirmationDialog(
+            "Quitter cette conversation ?",
+            isPresented: Binding(get: { pendingLeave != nil }, set: { if !$0 { pendingLeave = nil } }),
+            titleVisibility: .visible,
+            presenting: pendingLeave
+        ) { conversation in
+            Button("Quitter", role: .destructive) {
+                pendingLeave = nil
+                Task { await model.leave(conversation); await services.refreshInboxBadge(force: true) }
+            }
+            Button("Annuler", role: .cancel) { pendingLeave = nil }
+        } message: { _ in
+            Text("Elle disparaîtra de ta liste et tu ne recevras plus ses messages.")
         }
         .navigationDestinationItemCompat($routedConversationId) { id in
             if let conversation = model.conversations.first(where: { $0.id == id }) {
@@ -206,13 +235,18 @@ struct MessagesView: View {
     /// After a successful unlock all conversations share the same in-Keychain
     /// private JWK — the per-conversation prompt becomes unnecessary.
     private func maybePresentE2EEUnlock() async {
-        guard let e2ee else { return }
+        guard let e2ee, !Self.unlockOffered else { return }
         guard model.conversations.contains(where: { $0.e2eeEnabled == true }) else { return }
         let already = await e2ee.isUnlocked()
         if !already && !showE2EEUnlock {
+            // Une fois par lancement : la feuille revenait à chaque retour sur
+            // la liste (SOC-23). Le bandeau d'une conversation chiffrée reste là.
+            Self.unlockOffered = true
             showE2EEUnlock = true
         }
     }
+
+    @MainActor private static var unlockOffered = false
 
     /// Opens the conversation requested by a notification tap (via AppRouter),
     /// loading the list first if needed. Falls back to just landing on the
@@ -334,6 +368,7 @@ struct MessagesView: View {
                         .font(SQFont.body(16, .semibold))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
+                        .accessibilityIdentifier("messages.row.title")
                     // Badges de l'interlocuteur, comme dans le fil.
                     SQUserBadges(badges: conversation.otherParticipantBadges(excluding: currentUserId), size: 12)
                 }
@@ -348,14 +383,17 @@ struct MessagesView: View {
                         .font(unread ? SQFont.body(13.5, .medium) : SQFont.body(13.5))
                         .foregroundStyle(unread ? SQColor.label : SQColor.labelSecondary)
                         .lineLimit(1)
+                        .accessibilityIdentifier("messages.row.preview")
                 }
             }
             Spacer(minLength: SQSpace.sm)
             VStack(alignment: .trailing, spacing: 5) {
                 if let date = conversation.lastMessageAt ?? conversation.updatedAt {
-                    Text(date, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                    // `accentInk` : la brique n'est garantie que pour le grand texte.
+                    Text(verbatim: ConversationListDate.label(for: date))
                         .font(SQFont.body(12, .medium))
-                        .foregroundStyle(unread ? SQColor.brandRed : SQColor.labelSecondary)
+                        .foregroundStyle(unread ? SQColor.accentInk : SQColor.labelSecondary)
+                        .accessibilityIdentifier("messages.row.date")
                 }
                 if unread {
                     Circle()
@@ -379,10 +417,7 @@ struct MessagesView: View {
     /// Conversation non lue (MSG-UX-02) : dernier message reçu d'un autre, postérieur
     /// au marqueur de lecture courant.
     private func isUnread(_ conversation: MessageConversation) -> Bool {
-        guard let last = conversation.lastMessage, last.senderId != currentUserId,
-              let lastAt = conversation.lastMessageAt else { return false }
-        if let read = conversation.lastReadAt { return lastAt > read }
-        return true
+        conversation.isUnread(currentUserId: currentUserId)
     }
 }
 
@@ -403,9 +438,22 @@ private struct NewConversationSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Groupe") {
+                Section {
                     TextField("Nom du groupe optionnel", text: $title)
-                    Toggle("Chiffrement E2EE", isOn: $e2ee)
+                    Toggle(isOn: $e2ee) {
+                        HStack(spacing: SQSpace.xs) {
+                            Text("Conversation chiffrée")
+                            SQInfoButton(term: .endToEndEncryption)
+                        }
+                    }
+                } header: {
+                    Text("Groupe")
+                } footer: {
+                    // La limite se dit AVANT de créer : on la découvrait au premier
+                    // envoi de photo refusé (SOC-07).
+                    if e2ee {
+                        Text("Pour l’instant, une conversation chiffrée n’accepte que du texte : ni photo, ni vocal, ni sondage, ni réaction, ni appel.")
+                    }
                 }
 
                 if !selected.isEmpty {
@@ -468,7 +516,7 @@ private struct NewConversationSheet: View {
                     Button("Annuler") { dismiss() }.tint(SQColor.brandRed)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(isBusy ? "Creation..." : "Creer") {
+                    Button(isBusy ? "Création…" : "Créer") {
                         Task { await create() }
                     }
                     .disabled(selected.isEmpty || isBusy)
@@ -590,5 +638,27 @@ extension MessageItem {
                 reactions: []
             )
         ]
+    }
+}
+
+/// Date d'une conversation dans la liste, comme les messageries : l'heure
+/// aujourd'hui, « Hier », le jour de la semaine, puis la date. « il y a 2 m. »
+/// se lisait minutes ou mois (UI-12).
+enum ConversationListDate {
+    static func label(for date: Date, now: Date = Date(), calendar: Calendar = .current, locale: Locale = .current) -> String {
+        if calendar.isDate(date, inSameDayAs: now) {
+            return date.formatted(.dateTime.hour().minute().locale(locale))
+        }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: yesterday) {
+            return String(localized: "Hier")
+        }
+        let startOfToday = calendar.startOfDay(for: now)
+        if let weekAgo = calendar.date(byAdding: .day, value: -6, to: startOfToday), date >= weekAgo, date < now {
+            return date.formatted(.dateTime.weekday(.wide).locale(locale))
+        }
+        if calendar.component(.year, from: date) == calendar.component(.year, from: now) {
+            return date.formatted(.dateTime.day().month(.abbreviated).locale(locale))
+        }
+        return date.formatted(.dateTime.day().month(.abbreviated).year().locale(locale))
     }
 }

@@ -82,7 +82,7 @@ struct SavedMessagesView: View {
                     .multilineTextAlignment(.leading)
                 HStack(spacing: SQSpace.xs) {
                     if let sender = message.sender?.displayName {
-                        Text(message.senderId == currentUserId ? "Vous" : sender)
+                        Text(message.senderId == currentUserId ? String(localized: "Toi") : sender)
                             .font(SQType.micro)
                             .foregroundStyle(SQColor.labelSecondary)
                     }

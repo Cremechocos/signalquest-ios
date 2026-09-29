@@ -799,6 +799,12 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
             center.removeDeliveredNotifications(withIdentifiers: [notification.request.identifier])
             return completionHandler([])
         }
+        // La conversation est déjà à l'écran : ni bannière ni son pour elle,
+        // la synchro l'affiche déjà (SOC-24).
+        if let conversationId = Self.string(info, "conversationId", "conversation_id"),
+           conversationId == OpenConversationTracker.conversationId {
+            return completionHandler([])
+        }
         Task { @MainActor in await AppServicesHolder.services.refreshNotificationBadge(force: true) }
         completionHandler([.banner, .sound, .badge])
     }
@@ -899,5 +905,21 @@ private extension PushNotificationService {
             "approvalId": approvalId,
             "expiresAt": expiresAt,
         ])
+    }
+}
+
+/// Conversation affichée à l'écran, lue par le délégué des notifications quel
+/// que soit son fil d'exécution (SOC-24).
+enum OpenConversationTracker {
+    private static let state = OSAllocatedUnfairLock<String?>(initialState: nil)
+
+    static var conversationId: String? { state.withLock { $0 } }
+
+    static func opened(_ id: String) { state.withLock { $0 = id } }
+
+    /// Ne vide que si c'est bien elle : une autre conversation a pu s'ouvrir
+    /// entre-temps (navigation empilée).
+    static func closed(_ id: String) {
+        state.withLock { current in if current == id { current = nil } }
     }
 }
