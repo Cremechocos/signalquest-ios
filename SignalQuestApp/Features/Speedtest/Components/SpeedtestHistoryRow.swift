@@ -40,12 +40,12 @@ struct SpeedtestHistoryRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// « 10 juil. · 388 Mbps · 21 ms »
+    /// « 10 juil. · 388 Mbit/s · 21 ms » (« Mbps » en anglais).
     var titleLine: String {
         var parts = [result.createdAt.formatted(.dateTime.day().month(.abbreviated))]
-        parts.append("\(shortSpeed(result.downloadAverageMbps)) Mbps")
+        parts.append(shortSpeed(result.downloadAverageMbps))
         if let ping = result.primaryPingMs, ping.isFinite, ping >= 0 {
-            parts.append("\(Int(ping.rounded())) ms")
+            parts.append(SQUnits.milliseconds(ping))
         }
         return parts.joined(separator: " · ")
     }
@@ -66,7 +66,6 @@ struct SpeedtestHistoryRow: View {
 
     func shortSpeed(_ value: Double?) -> String {
         guard let value, value.isFinite, value > 0 else { return "—" }
-        if value >= 100 { return "\(Int(value.rounded()))" }
-        return String(format: "%.1f", value)
+        return SQUnits.throughput(mbps: value)
     }
 }

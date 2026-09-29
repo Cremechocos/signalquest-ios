@@ -816,6 +816,9 @@ struct SocialUserSearchResult: Codable, Identifiable, Equatable {
 struct SocialShareableSpeedtest: Codable, Identifiable, Equatable {
     let id: String
     let downloadSpeed: Double?
+    /// Réception moyenne. Selon la plateforme d'origine, `downloadSpeed` porte la
+    /// moyenne (iOS) ou le pic ; l'affichage lit celle-ci d'abord.
+    var averageSpeed: Double? = nil
     let uploadSpeed: Double?
     let ping: Double?
     let networkType: String?
@@ -823,8 +826,11 @@ struct SocialShareableSpeedtest: Codable, Identifiable, Equatable {
     let timestamp: Date?
 
     enum CodingKeys: String, CodingKey {
-        case id, downloadSpeed, uploadSpeed, ping, networkType, mobileOperator, timestamp
+        case id, downloadSpeed, averageSpeed, uploadSpeed, ping, networkType, mobileOperator, timestamp
     }
+
+    /// La réception à afficher : la moyenne quand le serveur la donne.
+    var downloadAverageMbps: Double? { averageSpeed ?? downloadSpeed }
 
     init(
         id: String,
@@ -848,6 +854,7 @@ struct SocialShareableSpeedtest: Codable, Identifiable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
         downloadSpeed = try? c.decodeIfPresent(Double.self, forKey: .downloadSpeed)
+        averageSpeed = try? c.decodeIfPresent(Double.self, forKey: .averageSpeed)
         uploadSpeed = try? c.decodeIfPresent(Double.self, forKey: .uploadSpeed)
         ping = try? c.decodeIfPresent(Double.self, forKey: .ping)
         networkType = c.decodeFlexibleString(forKey: .networkType)

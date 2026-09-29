@@ -7,8 +7,6 @@ import CoreLocation
 enum NearbyOperatorSource: Equatable, Sendable {
     case ipAsn
     case simPlmn
-
-    var shortLabel: String { self == .ipAsn ? "IP/ASN" : "SIM" }
 }
 
 /// Verdict de qualité réseau COMMUNAUTAIRE pour un opérateur identifié autour

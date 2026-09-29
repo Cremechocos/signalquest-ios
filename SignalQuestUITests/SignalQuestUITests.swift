@@ -339,12 +339,17 @@ final class SignalQuestUITests: XCTestCase {
         let labels = app.staticTexts.allElementsBoundByIndex.map { $0.label }.joined(separator: " | ")
         print("REAL_SPEEDTEST_LABELS: \(labels)")
 
-        XCTAssertTrue(app.staticTexts["DL moyen"].exists)
-        XCTAssertTrue(app.staticTexts["DL max"].exists)
-        XCTAssertTrue(app.staticTexts["UL moyen"].exists)
-        XCTAssertTrue(app.staticTexts["UL max"].exists)
-        XCTAssertTrue(app.staticTexts["Ping"].exists)
-        XCTAssertTrue(app.staticTexts["Jitter"].exists)
+        // Le verdict d'abord ; les métriques d'expert sont repliées (MES-05).
+        XCTAssertTrue(app.descendants(matching: .any)["speedtest.verdict"].exists)
+        let details = app.buttons["speedtest.result.details"]
+        for _ in 0..<4 where details.exists && !details.isHittable { app.swipeUp() }
+        if details.exists { details.tap() }
+        XCTAssertTrue(app.staticTexts["Réception (moyenne)"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Réception (pic)"].exists)
+        XCTAssertTrue(app.staticTexts["Envoi (moyenne)"].exists)
+        XCTAssertTrue(app.staticTexts["Envoi (pic)"].exists)
+        XCTAssertTrue(app.staticTexts["Latence"].exists)
+        XCTAssertTrue(app.staticTexts["Gigue"].exists)
         XCTAssertTrue(app.staticTexts["Réseau"].exists)
         XCTAssertFalse(app.staticTexts["P90"].exists)
         XCTAssertFalse(app.staticTexts["P95"].exists)

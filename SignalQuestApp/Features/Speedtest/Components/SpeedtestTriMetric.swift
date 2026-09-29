@@ -21,13 +21,15 @@ struct SpeedtestTriMetric: View {
     @ViewBuilder
     private var metricCells: some View {
             cell(
-                title: "Ping",
+                id: "latency",
+                title: "Latence",
                 value: pingText,
                 unit: "ms",
                 state: state(for: .ping),
                 quality: pingQuality
             )
             cell(
+                id: "download",
                 title: "Réception",
                 value: mbpsText(downloadMbps),
                 unit: SpeedtestDetailContent.formatSpeedParts(downloadMbps).unit,
@@ -35,6 +37,7 @@ struct SpeedtestTriMetric: View {
                 quality: mbpsQuality(downloadMbps)
             )
             cell(
+                id: "upload",
                 title: "Envoi",
                 value: mbpsText(uploadMbps),
                 unit: SpeedtestDetailContent.formatSpeedParts(uploadMbps).unit,
@@ -123,23 +126,24 @@ struct SpeedtestTriMetric: View {
     }
 
     @ViewBuilder
-    func cell(title: String, value: String, unit: String, state: CellState, quality: Color?) -> some View {
+    /// `id` : identifiant stable des tests, indépendant du libellé affiché.
+    func cell(id: String, title: String, value: String, unit: String, state: CellState, quality: Color?) -> some View {
         VStack(spacing: 3) {
             Text(LocalizedStringKey(title))
                 .font(SQFont.body(12))
                 .foregroundStyle(SQColor.label)
-                .accessibilityIdentifier("speedtest.metric.\(title.lowercased()).title")
+                .accessibilityIdentifier("speedtest.metric.\(id).title")
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
                     .font(SQFont.display(20, .bold, relativeTo: .title3))
                     .monospacedDigit()
                     .foregroundStyle(valueColor(value, state: state, quality: quality))
                     .contentTransition(.numericText())
-                    .accessibilityIdentifier("speedtest.metric.\(title.lowercased()).value")
+                    .accessibilityIdentifier("speedtest.metric.\(id).value")
                 Text(unit)
                     .font(SQFont.body(10.5, .semibold, relativeTo: .caption))
                     .foregroundStyle(SQColor.labelSecondary)
-                    .accessibilityIdentifier("speedtest.metric.\(title.lowercased()).unit")
+                    .accessibilityIdentifier("speedtest.metric.\(id).unit")
             }
             .lineLimit(1)
             .minimumScaleFactor(0.82)
@@ -154,7 +158,7 @@ struct SpeedtestTriMetric: View {
         .sqShadowSoft()
         .sqAnimation(.snappy(duration: 0.25), value: state)
         .accessibilityElement(children: .ignore)
-        .accessibilityIdentifier("speedtest.metric.\(title.lowercased())")
+        .accessibilityIdentifier("speedtest.metric.\(id)")
         // `title` est un littéral d'interface, `value` une mesure : seul le
         // premier — et le repli « non mesuré » — passent par le catalogue.
         .accessibilityLabel(

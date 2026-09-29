@@ -12,6 +12,16 @@ struct LocationPrimingSheet: View {
     let onSkip: () -> Void
 
     var body: some View {
+        // En grand texte, le contenu dépasse la demi-hauteur : il défile au lieu
+        // d'être coupé (MES-09).
+        ViewThatFits(in: .vertical) {
+            content
+            ScrollView { content }
+        }
+        .signalQuestBackground()
+    }
+
+    private var content: some View {
         VStack(spacing: SQSpace.lg) {
             SQSheetHandle()
             Spacer()
@@ -51,9 +61,9 @@ struct LocationPrimingSheet: View {
                 Button("Continuer sans") { onSkip() }
                     .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
                     .tint(SQColor.labelSecondary)
+                    .frame(minHeight: 44)
             }
         }
         .padding(SQSpace.xl)
-        .signalQuestBackground()
     }
 }

@@ -78,6 +78,8 @@ protocol SocialFeedServicing: Sendable {
     func searchUsers(query: String, limit: Int) async throws -> [SocialUserSearchResult]
     /// Dernier speedtest sauvegardé côté backend (pour l'attacher à un post).
     func myLatestSpeedtest() async throws -> SocialShareableSpeedtest?
+    /// Derniers speedtests du compte, tous appareils confondus (onglet Tester).
+    func mySpeedtests(limit: Int) async throws -> [SocialShareableSpeedtest]
     /// Pouls réseau autour d'une position : `GET /api/social/network-pulse`.
     /// `radiusMeters` optionnel (défaut backend 3 km si nil/≤0).
     func networkPulse(latitude: Double, longitude: Double, radiusMeters: Int?) async throws -> NetworkPulse
@@ -712,15 +714,19 @@ final class SocialFeedService: SocialFeedServicing {
     // MARK: - Speedtest joignable au composer
 
     func myLatestSpeedtest() async throws -> SocialShareableSpeedtest? {
+        try await mySpeedtests(limit: 1).first
+    }
+
+    func mySpeedtests(limit: Int) async throws -> [SocialShareableSpeedtest] {
         let response: UserSpeedtestsResponse = try await api.request(
             APIEndpoint(path: "/api/user/speedtests", query: [
                 URLQueryItem(name: "period", value: "all"),
-                URLQueryItem(name: "limit", value: "1"),
+                URLQueryItem(name: "limit", value: String(limit)),
                 URLQueryItem(name: "page", value: "1")
             ]),
             as: UserSpeedtestsResponse.self
         )
-        return response.speedtests.first
+        return response.speedtests
     }
 }
 

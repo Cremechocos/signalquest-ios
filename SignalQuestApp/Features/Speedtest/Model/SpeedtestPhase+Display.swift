@@ -1,15 +1,17 @@
 import SwiftUI
 
 extension SpeedtestPhase {
+    /// Vocabulaire du lexique, traduit : « Ping », « Sync » et « Erreur »
+    /// restaient en français dans l'app anglaise (MES-24, TRX-25).
     var displayTitle: String {
         switch self {
         case .idle: return String(localized: "Prêt")
-        case .ping: return "Ping"
+        case .ping: return String(localized: "Latence")
         case .download: return String(localized: "Réception")
-        case .upload: return "Envoi"
-        case .saving: return "Sync"
+        case .upload: return String(localized: "Envoi")
+        case .saving: return String(localized: "Synchronisation")
         case .finished: return String(localized: "Résultat")
-        case .failed: return "Erreur"
+        case .failed: return String(localized: "Erreur")
         }
     }
 
@@ -18,12 +20,12 @@ extension SpeedtestPhase {
     var dialTitle: String {
         switch self {
         case .idle: return String(localized: "Prêt à mesurer")
-        case .ping: return "Latence"
-        case .download: return String(localized: "Téléchargement")
-        case .upload: return "Envoi"
-        case .saving: return "Synchronisation"
+        case .ping: return String(localized: "Latence")
+        case .download: return String(localized: "Réception")
+        case .upload: return String(localized: "Envoi")
+        case .saving: return String(localized: "Synchronisation")
         case .finished: return String(localized: "Résultat")
-        case .failed: return "Erreur"
+        case .failed: return String(localized: "Erreur")
         }
     }
 

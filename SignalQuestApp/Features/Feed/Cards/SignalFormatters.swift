@@ -98,6 +98,19 @@ enum TechAccent {
         guard let tech, !tech.isEmpty else { return SQColor.label }
         return SQBrand.techColor(tech)
     }
+
+    /// Libellé court de techno pour une pastille (« 5G », « 4G », « Wi-Fi »), ou
+    /// nil si la valeur du serveur est trop brute pour être affichée.
+    static func shortLabel(for tech: String?) -> String? {
+        guard let tech, !tech.isEmpty else { return nil }
+        let upper = tech.uppercased()
+        if upper.contains("5G") || upper.contains("NR") { return "5G" }
+        if upper.contains("4G") || upper.contains("LTE") { return "4G" }
+        if upper.contains("3G") || upper.contains("UMTS") { return "3G" }
+        if upper.contains("2G") || upper.contains("GSM") { return "2G" }
+        if upper.contains("WIFI") || upper.contains("WI-FI") { return "Wi-Fi" }
+        return nil
+    }
 }
 
 /// Tag de carte (DA Crème) : capsule teintée douce, libellé Figtree SemiBold

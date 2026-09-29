@@ -343,11 +343,12 @@ struct SignalQuestHomeView: View {
         // médian communautaire. Le détail RSRP vit dans la sheet explicative
         // (peu lisible en un coup d'œil sur la pastille).
         if !networkStatus.isConstrained, let quality = networkQuality {
-            let operatorAndSource = "\(quality.operatorLabel) · \(quality.operatorSource.shortLabel)"
+            // La provenance de l'opérateur (« IP/ASN », « SIM ») n'a rien à faire
+            // sur cette ligne : la feuille explicative la détaille (MES-35).
             if let mbps = quality.medianDownloadMbps {
-                return "\(operatorAndSource) · \(SQUnits.throughput(mbps: Double(mbps)))"
+                return "\(quality.operatorLabel) · \(SQUnits.throughput(mbps: Double(mbps)))"
             }
-            return "\(operatorAndSource) · " + String(localized: "\(quality.sampleCount) mesures")
+            return "\(quality.operatorLabel) · " + String(localized: "\(quality.sampleCount) mesures")
         }
         switch networkStatus.connection {
         case .cellular:
@@ -784,18 +785,7 @@ struct SignalQuestHomeView: View {
         .accessibilityLabel("Mesure communautaire : \(Int(measure.downloadMbps)) mégabits. \(nearbyContext(for: measure)). Ouvre la carte.")
     }
 
-    /// Libellé court de techno pour la pastille (« 5G », « 4G », « Wi-Fi »)
-    /// ou nil si la valeur backend est trop brute pour être affichée.
-    private static func techShortLabel(_ tech: String?) -> String? {
-        guard let tech, !tech.isEmpty else { return nil }
-        let upper = tech.uppercased()
-        if upper.contains("5G") || upper.contains("NR") { return "5G" }
-        if upper.contains("4G") || upper.contains("LTE") { return "4G" }
-        if upper.contains("3G") || upper.contains("UMTS") { return "3G" }
-        if upper.contains("2G") || upper.contains("GSM") { return "2G" }
-        if upper.contains("WIFI") || upper.contains("WI-FI") { return "Wi-Fi" }
-        return nil
-    }
+    private static func techShortLabel(_ tech: String?) -> String? { TechAccent.shortLabel(for: tech) }
 
     /// « Orange · il y a 2 h · à 450 m » — ce qui est connu, dans cet ordre.
     private func nearbyContext(for measure: AndroidSpeedtestMarker) -> String {
@@ -830,7 +820,7 @@ struct SignalQuestHomeView: View {
                                  latencyMs: $0.pingMinMs ?? $0.pingMs, technology: measurementTech($0))
         }
         let account = accountLatest.flatMap { test -> DisplayedMeasurement? in
-            guard let download = test.downloadSpeed else { return nil }
+            guard let download = test.downloadAverageMbps else { return nil }
             return DisplayedMeasurement(date: test.timestamp, downloadMbps: download,
                                         latencyMs: test.ping, technology: Self.techShortLabel(test.networkType))
         }

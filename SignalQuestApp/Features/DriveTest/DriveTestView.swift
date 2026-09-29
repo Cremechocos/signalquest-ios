@@ -1054,7 +1054,9 @@ final class DriveTestViewModel: ObservableObject {
 
     private func makeSettings() -> SpeedtestRunSettings {
         let defaults = UserDefaults.standard
-        let duration = (defaults.object(forKey: "speedtest_duration_seconds") as? Int) ?? 10
+        // Durée propre au Drive Test : celle du test ponctuel (jusqu'à 30 s)
+        // triplait le volume de chaque test du trajet (MES-26).
+        let duration = (defaults.object(forKey: "drive_test_duration_seconds") as? Int) ?? 10
         let streams = (defaults.object(forKey: "speedtest_streams") as? Int) ?? 16
         let reliability = (defaults.object(forKey: "speedtest_reliability_mode") as? Bool) ?? true
         let target = SpeedtestDownloadTarget(rawValue: defaults.string(forKey: "speedtest_download_target") ?? "") ?? .hybridAuto

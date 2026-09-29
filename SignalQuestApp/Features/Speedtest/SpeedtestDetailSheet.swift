@@ -77,6 +77,12 @@ struct SpeedtestDetailContent: View {
     var body: some View {
         VStack(spacing: SQSpace.lg) {
             header
+            // Le verdict en mots avant les courbes ; sans comparaison de zone :
+            // un test ancien ne se compare pas à l'habitude d'aujourd'hui.
+            if result.downloadAverageMbps > 0 {
+                SpeedtestVerdictCard(verdict: SpeedtestVerdict(result: result),
+                                     measuredMbps: result.downloadAverageMbps)
+            }
             speedCards
             latencyGrid
             metaCard
@@ -261,12 +267,14 @@ struct SpeedtestDetailContent: View {
             columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2),
             spacing: SQSpace.sm
         ) {
-            latencyTile("Ping", value: Self.msText(result.primaryPingMs), tint: SQColor.labelSecondary, sub: pingSub)
-            latencyTile("Jitter", value: Self.decimalText(result.jitterMs), tint: SQColor.labelSecondary,
+            // Libellés du lexique, traduits : « Ping » et « Jitter » restaient en
+            // dur, en majuscules et en 11 pt (TRX-25, TRX-12, TRX-30).
+            latencyTile(String(localized: "Latence"), value: Self.msText(result.primaryPingMs), tint: SQColor.labelSecondary, sub: pingSub)
+            latencyTile(String(localized: "Gigue"), value: Self.decimalText(result.jitterMs), tint: SQColor.labelSecondary,
                 sub: String(localized: "au repos"))
-            latencyTile(String(localized: "Ping chargé ↓"), value: Self.msText(result.pingDlMs),
+            latencyTile(String(localized: "Latence en réception"), value: Self.msText(result.pingDlMs),
                 tint: SQColor.success, sub: gigue(result.jitterDlMs))
-            latencyTile(String(localized: "Ping chargé ↑"), value: Self.msText(result.pingUlMs),
+            latencyTile(String(localized: "Latence en envoi"), value: Self.msText(result.pingUlMs),
                 tint: SQColor.warning, sub: gigue(result.jitterUlMs))
         }
     }
@@ -284,8 +292,8 @@ struct SpeedtestDetailContent: View {
 
     private func latencyTile(_ label: String, value: String, tint: Color, sub: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(label.uppercased())
-                .font(SQFont.body(11, .semibold))
+            Text(verbatim: label)
+                .font(SQType.micro)
                 .foregroundStyle(SQColor.label)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -299,7 +307,7 @@ struct SpeedtestDetailContent: View {
                     .foregroundStyle(SQColor.labelSecondary)
             }
             Text(sub)
-                .font(SQFont.body(11))
+                .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -314,7 +322,7 @@ struct SpeedtestDetailContent: View {
     private var metaCard: some View {
         VStack(spacing: 0) {
             if let server = (result.serverName ?? result.downloadServerName)?.trimmedNonEmptyDetail {
-                metaRow("Serveur", server, icon: "server.rack")
+                metaRow("Serveur de mesure", server, icon: "server.rack")
                 Divider().overlay(SQColor.separator)
             }
             if let city = result.city?.trimmedNonEmptyDetail {
@@ -327,29 +335,29 @@ struct SpeedtestDetailContent: View {
                 metaRow("Appareil", device, icon: "iphone")
             }
             if let host = result.downloadServerHost {
-                metaRow("Serveur réception", endpoint(host, result.downloadServerPort), icon: "arrow.down")
+                metaRow("Serveur de réception", endpoint(host, result.downloadServerPort), icon: "arrow.down")
             }
             if let host = result.uploadServerHost {
-                metaRow("Serveur envoi", endpoint(host, result.uploadServerPort), icon: "arrow.up")
+                metaRow("Serveur d’envoi", endpoint(host, result.uploadServerPort), icon: "arrow.up")
             }
             if let host = result.pingServerHost {
-                metaRow("Ancre ping", endpoint(host, result.pingServerPort), icon: "timer")
+                metaRow("Serveur de latence", endpoint(host, result.pingServerPort), icon: "timer")
             }
             if let version = result.methodologyVersion {
                 metaRow("Méthodologie", String(version), icon: "info.circle")
             }
             if let source = Self.resultByteSource(result.measurementTrace?.phases.first(where: { $0.phase == "upload" }), fallback: result.uploadMeasurementSource) {
-                metaRow("Octets envoi", Self.byteSourceLabel(source), icon: "arrow.up")
+                metaRow("Comptage de l’envoi", Self.byteSourceLabel(source), icon: "arrow.up")
             }
             if let average = result.pingMs {
-                metaRow("Ping moyen", "\(Self.msText(average)) ms", icon: "timer")
+                metaRow("Latence moyenne", "\(Self.msText(average)) ms", icon: "timer")
             }
             if result.methodologyVersion == nil {
-                metaRow("Ping", String(localized: "Valeur historique"), icon: "clock")
+                metaRow("Latence", String(localized: "Valeur historique"), icon: "clock")
             }
             if let proto = result.pingProtocol?.trimmedNonEmptyDetail {
                 Divider().overlay(SQColor.separator)
-                metaRow("Ping", "\(String(localized: "mesuré en")) \(proto)", icon: "timer")
+                metaRow("Latence", String(localized: "mesurée en \(proto)"), icon: "timer")
             }
         }
         .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
@@ -473,12 +481,11 @@ struct SpeedtestDetailContent: View {
         return formatter
     }()
 
-    /// « 487 Mbps », « 45,3 Mbps », « 1,42 Gbps » — mêmes règles que le partage.
+    /// « 487 Mbit/s », « 45,3 Mbit/s », « 1,4 Gbit/s » (« Mbps » en anglais) :
+    /// le formateur commun (`SQUnits`), plus un tiret quand la mesure manque.
     static func formatSpeedParts(_ mbps: Double?) -> (value: String, unit: String) {
-        guard let mbps, mbps.isFinite, mbps > 0 else { return ("—", "Mbps") }
-        if mbps >= 1_000 { return (decimal(mbps / 1_000, digits: 2), "Gbps") }
-        if mbps >= 100 { return (decimal(mbps, digits: 0), "Mbps") }
-        return (decimal(mbps, digits: 1), "Mbps")
+        guard let mbps, mbps.isFinite, mbps > 0 else { return ("—", SQUnits.throughputUnit(mbps: 0)) }
+        return (SQUnits.throughputValue(mbps: mbps), SQUnits.throughputUnit(mbps: mbps))
     }
 
     /// Résumé textuel de la courbe de débit pour VoiceOver : direction (Réception /

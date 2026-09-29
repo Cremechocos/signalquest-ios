@@ -180,6 +180,19 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// Serveurs Bouygues déclinés en BBR et CUBIC (réglage TCP côté serveur).
+    var isCongestionVariant: Bool {
+        switch self {
+        case .bytelParisBbr, .bytelParisCubic, .bytelMrsBbr, .bytelMrsCubic,
+             .bytelLyoBbr, .bytelLyoCubic, .bytelTlsBbr, .bytelTlsCubic,
+             .bytelStrBbr, .bytelStrCubic, .bytelPoiBbr, .bytelPoiCubic,
+             .bytelRenBbr, .bytelRenCubic:
+            return true
+        default:
+            return false
+        }
+    }
+
     /// Libellé court (cartes, badges, historique).
     var displayName: String {
         switch self {
@@ -268,8 +281,8 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .leasewebFra: return "Leaseweb · speedtest.fra1.de.leaseweb.net · :5201–5210"
         case .init7: return "Init7 · speedtest.init7.net · :5201–5204"
         case .cloudflare: return String(localized: "Edge anycast mondial · HTTPS · DL/UL/ping même serveur")
-        case .libreSpeed: return "POP LibreSpeed le plus proche · HTTPS · DL/UL/ping"
-        case .iperfCatalog: return "POP iPerf3 du catalogue · TCP · DL/UL/ping"
+        case .libreSpeed: return String(localized: "Serveur LibreSpeed le plus proche")
+        case .iperfCatalog: return String(localized: "Serveur iPerf3 du catalogue")
         case .cloudflareR2: return "CDN Cloudflare"
         case .awsCloudFront: return "CDN AWS"
         case .vpsInternal: return "VPS SignalQuest"

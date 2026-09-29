@@ -121,7 +121,10 @@ final class AccessibilityAuditTests: XCTestCase {
                 "community.networkPulse", "feed.metadata", "feed.tag", "feed.metric.label",
                 "feed.metric.value", "feed.speedtest.subtitle",
                 "feed.story.name", "feed.hashtag", "feed.avatar.initial",
-                "settings.label.Noir intense (OLED)"
+                "settings.label.Noir intense (OLED)",
+                // Lot 4b : la pastille « Drive Test » cède la place à l'icône aux
+                // grandes tailles (ViewThatFits) ; la passe AX XXL la vérifie.
+                "speedtest.driveTest.label"
             ]
             if issue.auditType == .dynamicType,
                semanticDynamicIdentifiers.contains(where: name.hasPrefix) {
@@ -138,9 +141,11 @@ final class AccessibilityAuditTests: XCTestCase {
                 "profile.progression.tile.", "feed.hashtag", "home.network.title",
                 "map.friends.count", "map.friends.empty",
                 "map.status.text", "state.error.title",
-                // Encre sur la carte et sur la tuile du pouls (Lot 4a) :
+                // Encre sur la carte et sur la tuile du pouls (Lot 4a), pastille
+                // Drive Test et historique du compte (Lot 4b) :
                 // `testBodyTextTokensMeetAA`, plus de 11:1.
-                "home.nearby.context", "home.pulse.unit"
+                "home.nearby.context", "home.pulse.unit",
+                "speedtest.driveTest.label", "speedtest.account."
             ]
             if issue.auditType == .contrast,
                provenContrastIdentifiers.contains(where: name.hasPrefix) {

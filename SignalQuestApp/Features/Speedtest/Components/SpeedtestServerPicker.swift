@@ -199,6 +199,16 @@ struct SpeedtestServerPicker: View {
 
                     if isExpanded {
                         VStack(spacing: 6) {
+                            // BBR et CUBIC en clair : deux noms de réglage TCP
+                            // affichés sans explication (MES-35).
+                            if group.targets.contains(where: \.isCongestionVariant) {
+                                Text("BBR et CUBIC sont deux façons de régler le débit TCP. BBR monte plus vite et tient mieux sur un réseau mobile ; CUBIC reflète le réglage classique des serveurs.")
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, SQSpace.xs)
+                            }
                             ForEach(group.targets) { target in
                                 serverRow(target)
                             }
@@ -471,7 +481,7 @@ struct SpeedtestServerPicker: View {
             Haptics.selection()
         } label: {
             libreSpeedRowLabel(icon: "location.magnifyingglass", title: "Le plus proche (auto)",
-                               subtitle: "POP LibreSpeed le plus proche", selected: selected)
+                               subtitle: String(localized: "Serveur LibreSpeed le plus proche"), selected: selected)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("LibreSpeed le plus proche")
