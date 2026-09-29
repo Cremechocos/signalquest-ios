@@ -2656,9 +2656,9 @@
 			targets = (
 				9023B26AAE2BC6AEEBAC8CE6 /* SignalQuest */,
 				13DE19508C5112844FFA597A /* SignalQuestNotificationService */,
+				CD7D689ABD04AE8BCC254A5A /* SignalQuestWidget */,
 				27D68F01D65D0B4BB086ADB6 /* SignalQuestTests */,
 				F0008CBF468668149A9A5EA6 /* SignalQuestUITests */,
-				CD7D689ABD04AE8BCC254A5A /* SignalQuestWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -3450,7 +3450,7 @@
 			baseConfigurationReference = C5B4A61B546243ACDB9EAA06 /* Staging.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
-				CURRENT_PROJECT_VERSION = 158;
+				CURRENT_PROJECT_VERSION = 159;
 				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -3508,7 +3508,7 @@
 			baseConfigurationReference = 53482F595BA7C9973BE76955 /* Debug.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
-				CURRENT_PROJECT_VERSION = 158;
+				CURRENT_PROJECT_VERSION = 159;
 				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -3616,7 +3616,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestNotificationService/SignalQuestNotificationService.entitlements;
-				CURRENT_PROJECT_VERSION = 158;
+				CURRENT_PROJECT_VERSION = 159;
 				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3638,7 +3638,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestNotificationService/SignalQuestNotificationService.entitlements;
-				CURRENT_PROJECT_VERSION = 158;
+				CURRENT_PROJECT_VERSION = 159;
 				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3661,7 +3661,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 158;
+				CURRENT_PROJECT_VERSION = 159;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3702,7 +3702,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 158;
+				CURRENT_PROJECT_VERSION = 159;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3723,7 +3723,7 @@
 			baseConfigurationReference = 0412AAD8AE4FABC8AFE66ADE /* Release.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
-				CURRENT_PROJECT_VERSION = 158;
+				CURRENT_PROJECT_VERSION = 159;
 				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -3763,7 +3763,7 @@
 			baseConfigurationReference = 9752903ED64C1C7546E4C054 /* DebugBeta.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SignalQuestWidget/SignalQuestWidget.entitlements;
-				CURRENT_PROJECT_VERSION = 158;
+				CURRENT_PROJECT_VERSION = 159;
 				INFOPLIST_FILE = SignalQuestWidget/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -3847,7 +3847,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 158;
+				CURRENT_PROJECT_VERSION = 159;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3905,7 +3905,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestNotificationService/SignalQuestNotificationService.entitlements;
-				CURRENT_PROJECT_VERSION = 158;
+				CURRENT_PROJECT_VERSION = 159;
 				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3927,7 +3927,7 @@
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = SignalQuestNotificationService/SignalQuestNotificationService.entitlements;
-				CURRENT_PROJECT_VERSION = 158;
+				CURRENT_PROJECT_VERSION = 159;
 				INFOPLIST_FILE = SignalQuestNotificationService/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3950,7 +3950,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "$(SQ_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 158;
+				CURRENT_PROJECT_VERSION = 159;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SignalQuestApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
