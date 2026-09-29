@@ -152,4 +152,16 @@ extension Error {
         if let url = self as? URLError, url.code == .cancelled { return true }
         return false
     }
+
+    /// Vrai si le serveur a refusé la requête pour de bon : la rejouer à
+    /// l'identique échouera toujours (droits retirés, conversation supprimée,
+    /// contenu invalide…). Une file d'envoi doit alors retirer l'élément au lieu
+    /// de le garder en tête et de bloquer tout ce qui suit (SOC-02, SOC-04).
+    ///
+    /// Restent temporaires : 401 (session à renouveler), 408 (délai), 425 et
+    /// 429 (trop tôt, trop de requêtes), et toute erreur réseau ou 5xx.
+    var isPermanentRequestFailure: Bool {
+        guard let api = self as? APIError, case .http(let status, _, _, _, _) = api else { return false }
+        return (400..<500).contains(status) && ![401, 408, 425, 429].contains(status)
+    }
 }

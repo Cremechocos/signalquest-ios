@@ -250,6 +250,9 @@ struct SpeedtestView: View {
         .task {
             DriveTestViewModel.migrateLegacyDataCap()
             if await presentSpeedtestSharePreviewQAIfNeeded() { return }
+            // L'historique est local : l'afficher tout de suite, avant les appels
+            // réseau ci-dessous qui peuvent traîner hors couverture (MES-04).
+            history = await services.speedtest.history()
             // Relecture fraîche de CoreTelephony (opérateur/techno) à l'ouverture
             // de la page, plutôt que le dernier statut publié au démarrage.
             services.networkPath.refreshNow()

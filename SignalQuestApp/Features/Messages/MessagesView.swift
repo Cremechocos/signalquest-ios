@@ -442,9 +442,11 @@ private struct NewConversationSheet: View {
                                     .accessibilityHidden(true)
                                 VStack(alignment: .leading) {
                                     Text(user.displayName)
-                                    Text(user.email)
-                                        .font(.caption)
-                                        .foregroundStyle(SQColor.labelSecondary)
+                                    if let subtitle = user.publicSubtitle {
+                                        Text(verbatim: subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(SQColor.labelSecondary)
+                                    }
                                 }
                                 Spacer()
                                 Image(systemName: "plus.circle")

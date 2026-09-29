@@ -422,9 +422,11 @@ private struct AddFriendSheet: View {
                                 Text(user.displayName)
                                     .font(SQType.body)
                                     .foregroundStyle(SQColor.label)
-                                Text(user.email)
-                                    .font(SQType.caption)
-                                    .foregroundStyle(SQColor.labelSecondary)
+                                if let subtitle = user.publicSubtitle {
+                                    Text(verbatim: subtitle)
+                                        .font(SQType.caption)
+                                        .foregroundStyle(SQColor.labelSecondary)
+                                }
                             }
                             Spacer()
                             if busyId == user.id {

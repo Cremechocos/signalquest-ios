@@ -1502,6 +1502,13 @@ struct SettingsView: View {
         return false
     }
 
+    /// Vrai tant que le profil n'a pas dit si la 2FA est active. Proposer
+    /// « Activer la 2FA » dans cet état trompait un compte qui l'a déjà (TRX-33).
+    private var twoFactorStateUnknown: Bool {
+        if case .authenticated(let user) = session.state { return user.twoFactorEnabled == nil }
+        return false
+    }
+
     init(userService: UserServicing, authService: AuthServicing) {
         _model = StateObject(wrappedValue: SettingsViewModel(userService: userService, authService: authService))
     }
@@ -1509,7 +1516,15 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                if twoFactorEnabled {
+                if twoFactorStateUnknown {
+                    HStack(spacing: SQSpace.sm) {
+                        settingsLabel("Double authentification", systemImage: "lock.shield")
+                        Spacer(minLength: 0)
+                        ProgressView()
+                            .accessibilityLabel(Text("Vérification de la double authentification"))
+                    }
+                    .task { await session.refreshUser() }
+                } else if twoFactorEnabled {
                     Button(role: .destructive) {
                         guard case .authenticated(let user) = session.state,
                               let operation = TwoFactorEnrollmentService(api: services.api, userID: user.id) else {

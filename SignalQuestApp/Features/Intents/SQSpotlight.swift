@@ -18,4 +18,10 @@ enum SQSpotlight {
         )
         CSSearchableIndex.default().indexSearchableItems([item])
     }
+
+    /// Retire les éléments indexés par l'app. Appelé à la déconnexion : le
+    /// dernier speedtest restait sinon cherchable depuis Spotlight (MES-13).
+    static func removeAll() {
+        CSSearchableIndex.default().deleteSearchableItems(withDomainIdentifiers: ["fr.signalquest.speedtest"])
+    }
 }

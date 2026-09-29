@@ -333,7 +333,9 @@ struct UserProfileView: View {
         }
         .sheet(item: $presentedSheet) { sheet in
             switch sheet {
-            case .detail(let item):
+            case .detail(let opened):
+                // Élément courant, pas la copie prise à l'ouverture (SOC-17).
+                let item = model.items.first { $0.id == opened.id } ?? opened
                 SignalDetailSheet(
                     item: item,
                     onLike: { model.react(item) },

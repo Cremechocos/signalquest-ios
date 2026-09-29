@@ -9,6 +9,8 @@ struct GroupSettingsView: View {
     let conversation: MessageConversation
     let service: MessagesServicing
     let e2ee: E2EEServicing?
+    /// Appelé après un départ réussi : la conversation quittée se ferme aussi.
+    var onLeft: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AuthSessionViewModel
@@ -17,6 +19,7 @@ struct GroupSettingsView: View {
     @State private var participants: [ConversationParticipant]
     @State private var searchQuery = ""
     @State private var searchResults: [MessageSearchUser] = []
+    @State private var searchTask: Task<Void, Never>?
     @State private var photoItem: PhotosPickerItem?
     @State private var showAvatarPicker = false
     @State private var isBusy = false
@@ -29,10 +32,12 @@ struct GroupSettingsView: View {
     /// Aperçu local immédiat de la photo choisie (optimiste, avant l'aller-retour réseau).
     @State private var pickedPreview: UIImage?
 
-    init(conversation: MessageConversation, service: MessagesServicing, e2ee: E2EEServicing?) {
+    init(conversation: MessageConversation, service: MessagesServicing, e2ee: E2EEServicing?,
+         onLeft: @escaping () -> Void = {}) {
         self.conversation = conversation
         self.service = service
         self.e2ee = e2ee
+        self.onLeft = onLeft
         _title = State(initialValue: conversation.title ?? "")
         _participants = State(initialValue: conversation.participants)
         _groupPhotoURL = State(initialValue: conversation.groupPhotoUrl)
@@ -43,8 +48,11 @@ struct GroupSettingsView: View {
         return nil
     }
 
+    /// Le créateur du groupe (`owner`) a tous les droits d'un admin ; il les
+    /// perdait ici alors que la conversation, elle, les lui reconnaissait (SOC-10).
     private var isAdmin: Bool {
-        participants.first { $0.userId == currentUserId }?.role == "admin"
+        let role = participants.first { $0.userId == currentUserId }?.role
+        return role == "owner" || role == "admin"
     }
 
     var body: some View {
@@ -198,11 +206,16 @@ struct GroupSettingsView: View {
                 }
             }
             .onChangeCompat(of: searchQuery) { _, _ in
-                Task {
+                // Une frappe annule la recherche précédente : sans cela, une
+                // réponse lente pour « al » pouvait remplacer celle d'« alex ».
+                searchTask?.cancel()
+                searchTask = Task {
                     try? await Task.sleep(for: .milliseconds(350))
+                    guard !Task.isCancelled else { return }
                     await search()
                 }
             }
+            .onDisappear { searchTask?.cancel() }
             .onChangeCompat(of: photoItem) { _, newValue in
                 guard let newValue else { return }
                 Task { await uploadPhoto(item: newValue) }
@@ -224,7 +237,9 @@ struct GroupSettingsView: View {
             searchResults = []
             return
         }
-        searchResults = (try? await service.searchUsers(query: trimmed)) ?? []
+        let results = (try? await service.searchUsers(query: trimmed)) ?? []
+        guard !Task.isCancelled else { return }
+        searchResults = results
     }
 
     private func rename() async {
@@ -319,9 +334,13 @@ struct GroupSettingsView: View {
 
     private func uploadPhoto(item: PhotosPickerItem) async {
         defer { photoItem = nil }
-        guard let raw = try? await item.loadTransferable(type: Data.self),
-              let image = UIImage(data: raw),
-              let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
+        guard let raw = try? await item.loadTransferable(type: Data.self) else { return }
+        // La photo d'un groupe s'affiche en petit : on la décode réduite, hors du
+        // fil principal, au lieu de l'image pleine taille (SOC-33).
+        let prepared = await Task.detached(priority: .userInitiated) {
+            ImagePipeline.downsample(data: raw, maxPixel: 1024)?.jpegData(compressionQuality: 0.85)
+        }.value
+        guard let jpeg = prepared, let image = UIImage(data: jpeg) else { return }
         // Aperçu optimiste immédiat, puis upload ; on confirme avec l'URL renvoyée.
         // On conserve l'aperçu local en cas de succès (il EST la photo uploadée)
         // pour éviter un flash le temps que l'image distante se charge.
@@ -339,6 +358,7 @@ struct GroupSettingsView: View {
         await run {
             try await service.leaveConversation(id: conversation.id)
             dismiss()
+            onLeft()
         }
     }
 

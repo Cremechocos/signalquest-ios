@@ -36,9 +36,18 @@ final class ComposerViewModel: ObservableObject {
             refreshMentionToken()
         }
     }
+    /// Option de sondage avec identité stable. Éditer les options par position
+    /// (`ForEach(indices)` + binding par index) plantait sur « Index out of
+    /// range » quand on supprimait une option pendant sa saisie : SwiftUI
+    /// réévalue encore le champ supprimé (SOC-01). Même modèle que `NewPollView`.
+    struct PollOptionDraft: Identifiable, Equatable {
+        let id = UUID()
+        var text = ""
+    }
+
     /// Sondage en cours de composition. Vide = pas de sondage.
     @Published var pollQuestion = ""
-    @Published var pollOptions: [String] = ["", ""]
+    @Published var pollOptions: [PollOptionDraft] = [PollOptionDraft(), PollOptionDraft()]
     @Published var pollAllowMultiple = false
     @Published var pollEnabled = false
 
@@ -47,7 +56,7 @@ final class ComposerViewModel: ObservableObject {
     var preparedPoll: CreatePostPoll? {
         guard pollEnabled else { return nil }
         return CreatePostPoll.make(
-            question: pollQuestion, options: pollOptions, allowMultiple: pollAllowMultiple
+            question: pollQuestion, options: pollOptions.map(\.text), allowMultiple: pollAllowMultiple
         )
     }
 
@@ -390,20 +399,21 @@ struct ComposerSheet: View {
                 .font(SQFont.body(15, .medium))
                 .submitLabel(.next)
 
-            ForEach(model.pollOptions.indices, id: \.self) { index in
+            ForEach($model.pollOptions) { $option in
+                let position = (model.pollOptions.firstIndex { $0.id == option.id } ?? 0) + 1
                 HStack(spacing: SQSpace.sm) {
-                    TextField("Choix \(index + 1)", text: $model.pollOptions[index])
+                    TextField("Choix \(position)", text: $option.text)
                         .font(SQType.body)
                     // Le retrait n'est offert qu'au-dessus du minimum : le
                     // proposer puis refuser l'action serait pire que l'absence.
                     if model.pollOptions.count > CreatePostPoll.minimumOptions {
                         Button {
-                            model.pollOptions.remove(at: index)
+                            model.pollOptions.removeAll { $0.id == option.id }
                         } label: {
                             Image(systemName: "minus.circle.fill")
                                 .foregroundStyle(SQColor.labelTertiary)
                         }
-                        .accessibilityLabel(Text("Supprimer l'option \(index + 1)"))
+                        .accessibilityLabel(Text("Supprimer l'option \(position)"))
                     }
                 }
                 .padding(.vertical, SQSpace.xs)
@@ -411,7 +421,7 @@ struct ComposerSheet: View {
 
             if model.pollOptions.count < CreatePostPoll.maximumOptions {
                 Button {
-                    model.pollOptions.append("")
+                    model.pollOptions.append(ComposerViewModel.PollOptionDraft())
                 } label: {
                     Label("Ajouter une option", systemImage: "plus.circle")
                         .font(SQFont.body(13, .semibold))

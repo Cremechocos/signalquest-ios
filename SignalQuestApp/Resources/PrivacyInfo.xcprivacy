@@ -25,14 +25,38 @@
 		<!-- DiskCache.evict() lit .contentModificationDateKey et .fileSizeKey
 		     pour l'éviction par âge et par taille, sur des fichiers du dossier
 		     Caches de l'app (DiskCache.swift:21,83). C617.1 = fichiers situés
-		     dans le conteneur de l'app. Ni DiskSpace ni SystemBootTime ne sont
-		     déclarés : aucune API correspondante dans le code (vérifié). -->
+		     dans le conteneur de l'app. -->
 		<dict>
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
 				<string>C617.1</string>
+			</array>
+		</dict>
+		<!-- ProcessInfo.systemUptime sert d'horloge monotone : durée des
+		     mesures du speedtest (SpeedtestService.swift, SpeedtestMeasurementTrace)
+		     et délai du verrouillage de l'app (AppLockController.swift:61).
+		     35F9.1 = mesurer le temps écoulé entre deux événements de l'app. -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>35F9.1</string>
+			</array>
+		</dict>
+		<!-- Le préflight du Drive Test lit l'espace disponible
+		     (volumeAvailableCapacityForImportantUsageKey, DriveTestView.swift) :
+		     il vérifie qu'il reste de la place pour enregistrer le trajet (E174.1)
+		     et l'affiche à l'utilisateur (85F4.1). -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>E174.1</string>
+				<string>85F4.1</string>
 			</array>
 		</dict>
 	</array>
@@ -127,6 +151,51 @@
 			<string>NSPrivacyCollectedDataTypeOtherDataTypes</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>
 			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<!-- FeedSignalsCollector envoie les signaux d'engagement du fil
+		     (publications vues, temps de lecture, réactions) pour classer
+		     l'onglet « Pour toi ». -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeProductInteraction</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
+			</array>
+		</dict>
+		<!-- AppStoreTransactionSynchronizer transmet les transactions StoreKit
+		     au serveur pour activer les droits de l'abonnement sur toutes les
+		     plateformes. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePurchaseHistory</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<!-- MetricKitReporter relaie à Crashlytics le rapport quotidien d'iOS
+		     (énergie, blocages, sorties forcées). Crashlytics déclare déjà les
+		     données de crash et les autres diagnostics dans son propre manifeste. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePerformanceData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
 			<key>NSPrivacyCollectedDataTypeTracking</key>
 			<false/>
 			<key>NSPrivacyCollectedDataTypePurposes</key>

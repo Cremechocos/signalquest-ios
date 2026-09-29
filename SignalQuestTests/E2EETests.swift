@@ -5608,6 +5608,69 @@ final class MessageTextOutboxTests: XCTestCase {
         XCTAssertEqual(requestBodies.last?["ttlSeconds"] as? Int, 120)
     }
 
+    func testPermanentRefusalStaysUnsentWithoutBlockingOtherConversations() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("message-text-blocking-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            MockURLProtocol.requestHandler = nil
+            LocalAccountScope.deactivate()
+            try? FileManager.default.removeItem(at: root)
+        }
+        LocalAccountScope.activate(userId: "message-outbox-blocking-user")
+        let session = try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-message-token")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let api = APIClient(config: .test, credentials: credentials,
+                            session: URLSession(configuration: configuration))
+        let outbox = MessageTextOutboxStore(baseDirectory: root)
+        let service = MessagesService(api: api, textOutbox: outbox)
+        func conversation(_ id: String) -> MessageConversation {
+            MessageConversation(id: id, title: "Fixture", isGroup: false, e2eeEnabled: false,
+                                groupPhotoUrl: nil, createdAt: nil, updatedAt: nil, lastMessageAt: nil,
+                                lastReadAt: nil, pinnedAt: nil, participants: [], lastMessage: nil)
+        }
+        var online = false
+        var posted: [String] = []
+        MockURLProtocol.requestHandler = { request in
+            guard online else { throw URLError(.notConnectedToInternet) }
+            let path = try XCTUnwrap(request.url?.path)
+            posted.append(path)
+            let removed = path.contains("conversation-removed")
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: removed ? 404 : 200,
+                                           httpVersion: nil, headerFields: nil)!
+            let json = removed
+                ? #"{"error":"NOT_FOUND","message":"Conversation introuvable"}"#
+                : #"{"message":{"id":"server-kept","conversationId":"conversation-kept","senderId":"message-outbox-blocking-user","kind":"TEXT","content":"kept","attachments":[],"reactions":[]}}"#
+            return (response, Data(json.utf8))
+        }
+        for id in ["conversation-removed", "conversation-kept"] {
+            do {
+                _ = try await service.sendText(id, in: conversation(id), e2ee: nil,
+                                               idempotencyKey: "local-\(id)-0123456789abcdef")
+                XCTFail("Hors ligne, l'envoi doit rester en file")
+            } catch {}
+        }
+
+        online = true
+        await service.retryPendingTextMessages()
+        XCTAssertTrue(posted.contains { $0.contains("conversation-kept") },
+                      "Un refus dans une conversation ne retient plus les autres (SOC-04)")
+        let remaining = try await outbox.pending(session: session)
+        XCTAssertEqual(remaining.map(\.conversationId), ["conversation-removed"])
+        XCTAssertNotNil(remaining.first?.failureReason, "Le message refusé reste visible comme non envoyé")
+        let shown = await service.pendingTextMessages(conversationId: "conversation-removed")
+        XCTAssertEqual(shown.count, 1)
+
+        let attempts = posted.count
+        await service.retryPendingTextMessages()
+        XCTAssertEqual(posted.count, attempts, "Un message refusé n'est plus rejoué sans geste")
+        await service.discardPendingText(clientRequestId: "local-conversation-removed-0123456789abcdef")
+        let afterDiscard = try await outbox.pending(session: session)
+        XCTAssertTrue(afterDiscard.isEmpty)
+    }
+
     func testExactCiphertextReplyTtlAndRequestIdSurviveStoreRecreation() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("message-text-outbox-\(UUID().uuidString)", isDirectory: true)
@@ -5979,6 +6042,53 @@ final class SocialPostOutboxTests: XCTestCase {
         let reopened = ComposerViewModel(service: service)
         XCTAssertEqual(reopened.text, composer.text)
         reopened.clearDraft()
+    }
+
+    func testPublishingTheSameDraftTwiceReusesTheQueuedRequest() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("social-dedupe-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            MockURLProtocol.requestHandler = nil
+            LocalAccountScope.deactivate()
+            try? FileManager.default.removeItem(at: root)
+        }
+        LocalAccountScope.activate(userId: "social-dedupe-\(UUID().uuidString)")
+        let session = try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-social-token")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let api = APIClient(config: .test, credentials: credentials,
+                            session: URLSession(configuration: configuration))
+        let outbox = SocialPostOutboxStore(baseDirectory: root)
+        let service = SocialFeedService(api: api, postOutbox: outbox)
+        var online = false
+        var postedRequestIds: [String] = []
+        MockURLProtocol.requestHandler = { request in
+            guard online else { throw URLError(.notConnectedToInternet) }
+            let body = (try? JSONSerialization.jsonObject(with: Self.requestBody(request)) as? [String: Any]) ?? [:]
+            postedRequestIds.append(body["clientRequestId"] as? String ?? "")
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 201,
+                                           httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"post":null,"requestId":"post-request"}"#.utf8))
+        }
+        for _ in 0..<2 {
+            do {
+                _ = try await service.publishPost(text: "Même brouillon", visibility: "friends",
+                                                  imageData: nil, imageMimeType: "image/jpeg",
+                                                  targetType: nil, targetId: nil,
+                                                  extraMetadata: nil, poll: nil)
+                XCTFail("Hors ligne, la publication doit rester en file")
+            } catch {}
+        }
+        let staged = try await outbox.pending(session: session)
+        XCTAssertEqual(staged.count, 1, "Un second appui sur Publier ne crée plus de doublon (SOC-02)")
+
+        online = true
+        await service.retryPendingPosts()
+        XCTAssertEqual(postedRequestIds, [staged.first?.clientRequestId ?? "?"])
+        let afterReplay = try await outbox.pending(session: session)
+        XCTAssertTrue(afterReplay.isEmpty)
     }
 
     func testImageMetadataAndReceiptSurviveRecreationThenAckPurgesFiles() async throws {

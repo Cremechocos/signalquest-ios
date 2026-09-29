@@ -1,5 +1,6 @@
 import UIKit
 import SwiftUI
+import UserNotifications
 import os
 import FirebaseCore
 import FirebaseMessaging
@@ -27,12 +28,30 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        // Le délégué des notifications doit être posé AVANT la fin du lancement :
+        // c'est à lui qu'iOS remet le tap qui a ouvert l'app. Posé plus tard (après
+        // la connexion), ce tap était perdu au démarrage à froid et l'app s'ouvrait
+        // sur l'accueil au lieu de la conversation ou du post visé (TRX-02).
+        // Indépendant de Firebase : les notifications locales et APNs en dépendent aussi.
+        UNUserNotificationCenter.current().delegate = AppServicesHolder.services.push
         guard Bundle.main.url(forResource: "GoogleService-Info", withExtension: "plist") != nil else {
             Self.logger.error("GoogleService-Info.plist absent : Firebase désactivé (push et Crashlytics inopérants).")
             return true
         }
         FirebaseApp.configure()
         Self.isFirebaseConfigured = true
+        // Sorties par chien de garde ou mémoire, blocages, énergie : ce que
+        // Crashlytics ne voit pas seul (OBS-01).
+        MetricKitReporter.shared.start()
+        #if DEBUG
+        // Preuve de bout en bout de la remontée : un non-fatal reconnaissable,
+        // envoyé au prochain lancement par le SDK.
+        if ProcessInfo.processInfo.arguments.contains("--qa-crashlytics-proof") {
+            SQDiagnostics.recordReport("chain_proof", area: .qa, info: [
+                "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+            ])
+        }
+        #endif
         // FCM remonte le token de registration via MessagingDelegate ci-dessous.
         Messaging.messaging().delegate = self
         return true

@@ -8,11 +8,46 @@ enum MessageSyncLog {
 /// Déclencheur de synchronisation d'une conversation — parité Android
 /// (`MessageSyncEngine.kt`). Le SSE ne porte jamais l'état : il signale qu'un
 /// re-sync est nécessaire, le polling delta reste la source de vérité.
-enum SyncTrigger: Sendable {
+enum SyncTrigger: Sendable, Equatable {
     case polling
     case serverEvent
+    /// Réaction, vote, accusé de lecture, édition ou suppression : le delta ne
+    /// porte pas ces changements, la conversation relit sa dernière page (SOC-05).
+    case stateEvent
     case typingEvent
     case viewingEvent
+
+    /// Événements relayés par le flux de la conversation.
+    static let relayedEvents: Set<String> = [
+        "update", "message", "read_state", "feature_sync", "thread_reply",
+        "poll_created", "poll_voted", "poll_closed",
+        "task_created", "task_updated", "task_completed",
+        "mention", "typing", "viewing", "reaction"
+    ]
+
+    /// Types d'événement (champ `type` du payload) qui changent l'état d'un
+    /// message déjà affiché plutôt que d'en ajouter un.
+    private static let stateTypes: Set<String> = [
+        "message_updated", "message_reaction", "reaction", "message_edited", "message_deleted",
+        "message_pinned", "message_unpinned", "poll_created", "poll_voted", "poll_closed", "read_state"
+    ]
+
+    /// Le serveur envoie un événement nommé (ex. `poll_voted`) PUIS un `update`
+    /// générique portant le même `type` : on lit le `type` du payload pour ne pas
+    /// traiter une réaction comme un nouveau message.
+    static func from(event: String, data: String) -> SyncTrigger {
+        let name = event.lowercased()
+        if name == "typing" { return .typingEvent }
+        if name == "viewing" { return .viewingEvent }
+        if stateTypes.contains(name) { return .stateEvent }
+        if let payload = data.data(using: .utf8),
+           let object = try? JSONSerialization.jsonObject(with: payload) as? [String: Any],
+           let type = (object["type"] as? String)?.lowercased(),
+           stateTypes.contains(type) {
+            return .stateEvent
+        }
+        return .serverEvent
+    }
 }
 
 struct MessageSyncEngine: Sendable {
@@ -37,15 +72,24 @@ struct MessageSyncEngine: Sendable {
             let lastServerEvent = OSAllocatedUnfairLock<ContinuousClock.Instant>(initialState: clock.now)
             let interval = pollInterval
             let sseTask = Task {
-                for await eventName in sse.events(path: "/api/messages/conversations/\(conversationId)/events") {
-                    let trigger: SyncTrigger = eventName == "typing"
-                        ? .typingEvent
-                        : (eventName == "viewing" ? .viewingEvent : .serverEvent)
-                    // Seuls les serverEvent déclenchent un refreshDelta : ce sont eux
-                    // qui « rafraîchissent » le compteur de repli (pas typing/viewing).
-                    if case .serverEvent = trigger {
+                // Le serveur double certains événements (`poll_voted` puis `update`) :
+                // un même déclencheur reçu à moins d'une demi-seconde n'en fait qu'un.
+                var lastYield: (trigger: SyncTrigger, at: ContinuousClock.Instant)?
+                for await frame in sse.dataStream(
+                    path: "/api/messages/conversations/\(conversationId)/events",
+                    keep: SyncTrigger.relayedEvents
+                ) {
+                    let trigger = SyncTrigger.from(event: frame.event, data: frame.data)
+                    // Seuls les événements serveur « rafraîchissent » le compteur de
+                    // repli (pas typing/viewing).
+                    if trigger == .serverEvent || trigger == .stateEvent {
                         lastServerEvent.withLock { $0 = clock.now }
                     }
+                    let now = clock.now
+                    if let lastYield, lastYield.trigger == trigger, now - lastYield.at < .milliseconds(500) {
+                        continue
+                    }
+                    lastYield = (trigger, now)
                     continuation.yield(trigger)
                 }
             }

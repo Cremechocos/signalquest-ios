@@ -401,6 +401,11 @@ final class FeedViewModel: ObservableObject {
         }
     }
 
+    /// Version courante d'une publication du fil (à défaut, celle reçue).
+    func currentItem(_ item: UnifiedSocialFeedItem) -> UnifiedSocialFeedItem {
+        page?.items.first { $0.id == item.id } ?? item
+    }
+
     /// Garde le fil cohérent avec le détail ouvert par notification/lien,
     /// même si son rechargement réseau au retour échoue.
     func acceptDetailItem(_ item: UnifiedSocialFeedItem) {
@@ -729,7 +734,10 @@ struct FeedView: View {
         }
         .sheet(item: $presentedSheet) { sheet in
             switch sheet {
-            case .detail(let item):
+            case .detail(let opened):
+                // L'élément courant du fil, pas la copie prise à l'ouverture : sans
+                // cela, un like donné dans la feuille n'y apparaissait pas (SOC-17).
+                let item = model.currentItem(opened)
                 SignalDetailSheet(
                     item: item,
                     onLike: { model.react(item) },

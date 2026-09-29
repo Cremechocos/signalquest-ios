@@ -2770,6 +2770,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 try await entry.store.removeValidated(id: entry.save.id)
                 try? await pendingStore.removeValidated(id: entry.save.id)
                 try? await rescueStore.removeValidated(id: entry.save.id)
+            } catch where Self.shouldAbandonPending(entry.save, after: error) {
+                // Le résultat reste dans l'historique local ; seul l'envoi est abandonné.
+                sqDebugLog("Pending speedtest abandoned after \(error)")
+                SQDiagnostics.record(error, area: .speedtestQueue, context: ["action": "abandoned"])
+                try? await entry.store.removeValidated(id: entry.save.id)
+                try? await pendingStore.removeValidated(id: entry.save.id)
+                try? await rescueStore.removeValidated(id: entry.save.id)
             } catch {
                 if firstError == nil { firstError = error }
                 if let apiError = error as? APIError,
@@ -2778,6 +2785,19 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             }
         }
         if let firstError { throw firstError }
+    }
+
+    static let pendingLifetime: TimeInterval = 30 * 24 * 3600
+
+    /// MES-37 — Une mesure quitte la file quand le serveur l'a refusée pour de bon
+    /// (400, 409, 413, 422 : la même requête sera toujours refusée), ou quand elle
+    /// a plus de 30 jours et que le serveur, joignable, la refuse encore. 404 n'est
+    /// pas définitif : il a déjà signalé une route mal servie, pas une mesure
+    /// invalide. Hors ligne ou sans session, rien n'est abandonné.
+    static func shouldAbandonPending(_ save: PendingSpeedtestSave, after error: Error, now: Date = Date()) -> Bool {
+        guard let api = error as? APIError, case .http(let status, _, _, _, _) = api else { return false }
+        if [400, 409, 413, 422].contains(status) { return true }
+        return now.timeIntervalSince(save.createdAt) > pendingLifetime && ![401, 429].contains(status)
     }
 
     static func retryAfterKey(for ownerScopeId: String) -> String {
@@ -5401,6 +5421,71 @@ enum SpeedtestPendingStoreError: LocalizedError {
     }
 }
 
+/// Élément de file lu sans exiger qu'il soit décodable : une entrée abîmée ou
+/// écrite par une ancienne version ne rend plus toute la file illisible (MES-37).
+/// Un fichier qui n'est pas un tableau reste, lui, une erreur de lecture.
+struct LossyPendingSpeedtestSave: Codable {
+    let save: PendingSpeedtestSave?
+    let raw: JSONValue
+
+    init(from decoder: Decoder) throws {
+        save = try? PendingSpeedtestSave(from: decoder)
+        raw = save == nil ? try JSONValue(from: decoder) : .null
+    }
+
+    func encode(to encoder: Encoder) throws {
+        if let save { try save.encode(to: encoder) } else { try raw.encode(to: encoder) }
+    }
+}
+
+/// Entrées de file illisibles, copiées telles quelles hors de la file pour
+/// qu'elles ne bloquent plus les autres mesures (MES-37). Gardées 30 jours pour
+/// diagnostic, puis effacées ; jamais renvoyées automatiquement.
+struct SpeedtestPendingQuarantine: Sendable {
+    static let lifetime: TimeInterval = 30 * 24 * 3600
+    let directory: URL
+
+    static let standard: SpeedtestPendingQuarantine = {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        return SpeedtestPendingQuarantine(directory: appSupport
+            .appendingPathComponent("SignalQuest", isDirectory: true)
+            .appendingPathComponent("SpeedtestPendingQuarantine", isDirectory: true))
+    }()
+
+    /// Lève si une copie échoue : l'appelant garde alors l'entrée dans la file.
+    func store(_ payloads: [Data], now: Date = Date()) throws {
+        guard !payloads.isEmpty else { return }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        purgeExpired(now: now)
+        for payload in payloads {
+            let url = directory.appendingPathComponent(UUID().uuidString).appendingPathExtension("json")
+            try payload.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        }
+        SQDiagnostics.recordReport("quarantine", area: .speedtestQueue, info: ["count": String(payloads.count)])
+    }
+
+    func files() -> [URL] {
+        (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+    }
+
+    func purgeExpired(now: Date = Date()) {
+        let key: URLResourceKey = .contentModificationDateKey
+        guard let urls = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [key]) else { return }
+        for url in urls {
+            let date = (try? url.resourceValues(forKeys: [key]).contentModificationDate) ?? now
+            if now.timeIntervalSince(date) > Self.lifetime { try? FileManager.default.removeItem(at: url) }
+        }
+    }
+}
+
+extension DiskCache {
+    /// Lecture tolérante d'une file JSON de sauvegardes en attente (MES-37).
+    func readPendingSaves(for key: String) async throws -> [LossyPendingSpeedtestSave] {
+        try await read([LossyPendingSpeedtestSave].self, for: key) ?? []
+    }
+}
+
 /// Fabrique : SwiftData si iOS 17+ ET l'init réussit (migration depuis la file durable),
 /// sinon repli sur la file durable JSON (`DiskCache`).
 enum SpeedtestPendingStoreFactory {
@@ -5419,20 +5504,29 @@ enum SpeedtestPendingStoreFactory {
 struct DiskCacheSpeedtestPendingStore: SpeedtestPendingStoring {
     let cache: DiskCache
     let key: String
+    let quarantine: SpeedtestPendingQuarantine
     private let mutations = SpeedtestMutationQueue()
 
-    init(cache: DiskCache, key: String) { self.cache = cache; self.key = key }
+    init(cache: DiskCache, key: String, quarantine: SpeedtestPendingQuarantine = .standard) {
+        self.cache = cache; self.key = key; self.quarantine = quarantine
+    }
 
     func loadAll() async -> [PendingSpeedtestSave] {
         (try? await loadAllValidated()) ?? []
     }
 
+    /// Les entrées illisibles sont ignorées ici ; la prochaine écriture les
+    /// déplace en quarantaine.
     func loadAllValidated() async throws -> [PendingSpeedtestSave] {
-        try await cache.read([PendingSpeedtestSave].self, for: key) ?? []
+        try await cache.readPendingSaves(for: key).compactMap(\.save)
     }
 
     func replaceAll(_ values: [PendingSpeedtestSave]) async throws {
-        _ = try await loadAllValidated()
+        // Un fichier illisible en entier lève ici et n'est jamais écrasé. Les
+        // seules entrées illisibles sont copiées en quarantaine AVANT de quitter
+        // la file.
+        let unreadable = try await cache.readPendingSaves(for: key).filter { $0.save == nil }
+        try quarantine.store(try unreadable.map { try JSONEncoder().encode($0.raw) })
         if values.isEmpty {
             await cache.remove(key)
         } else {
@@ -5498,13 +5592,16 @@ actor SwiftDataSpeedtestPendingStore: SpeedtestPendingStoring {
     private let encoder = JSONEncoder.signalQuest
     private let decoder = JSONDecoder.signalQuest
     private let beforeMigrationSave: (@Sendable () throws -> Void)?
+    private let quarantine: SpeedtestPendingQuarantine
 
     /// `init?` : si le `ModelContainer` ne peut pas être créé, la fabrique retombe sur JSON.
     init?(storeURL: URL? = nil, legacyCache: DiskCache? = nil, legacyKey: String,
-          beforeMigrationSave: (@Sendable () throws -> Void)? = nil) {
+          beforeMigrationSave: (@Sendable () throws -> Void)? = nil,
+          quarantine: SpeedtestPendingQuarantine = .standard) {
         self.beforeMigrationSave = beforeMigrationSave
         self.legacyCache = legacyCache
         self.legacyKey = legacyKey
+        self.quarantine = quarantine
         let url = storeURL ?? Self.defaultStoreURL()
         guard let container = try? ModelContainer(
             for: SpeedtestPendingEntity.self,
@@ -5520,6 +5617,7 @@ actor SwiftDataSpeedtestPendingStore: SpeedtestPendingStoring {
     func loadAllValidated() async throws -> [PendingSpeedtestSave] {
         await importLegacyIfPresent()
         try await ensureLegacyMigrated()
+        try quarantineUnreadableRows()
         var descriptor = FetchDescriptor<SpeedtestPendingEntity>()
         descriptor.sortBy = [SortDescriptor(\SpeedtestPendingEntity.createdAtMs, order: .forward)]
         return try context.fetch(descriptor).map { try decoder.decode(PendingSpeedtestSave.self, from: $0.payload) }
@@ -5581,15 +5679,30 @@ actor SwiftDataSpeedtestPendingStore: SpeedtestPendingStoring {
     }
 
     private func validatedEntities() throws -> [SpeedtestPendingEntity] {
+        try quarantineUnreadableRows()
         let entities = try context.fetch(FetchDescriptor<SpeedtestPendingEntity>())
         for entity in entities { _ = try decoder.decode(PendingSpeedtestSave.self, from: entity.payload) }
         return entities
     }
 
+    /// Une ligne illisible bloquait toute la file (MES-37). Elle est copiée telle
+    /// quelle en quarantaine, PUIS retirée de la base ; si la copie échoue, elle
+    /// reste en place et la lecture échoue comme avant. Sans suspension : la
+    /// réentrance d'acteur ne peut pas s'intercaler.
+    private func quarantineUnreadableRows() throws {
+        let unreadable = try context.fetch(FetchDescriptor<SpeedtestPendingEntity>()).filter {
+            (try? decoder.decode(PendingSpeedtestSave.self, from: $0.payload)) == nil
+        }
+        guard !unreadable.isEmpty else { return }
+        try quarantine.store(unreadable.map(\.payload))
+        for entity in unreadable { context.delete(entity) }
+        try saveContextOrRollback()
+    }
+
     private func ensureLegacyMigrated() async throws {
         guard let legacyCache else { return }
-        let remaining = try await legacyCache.read([PendingSpeedtestSave].self, for: legacyKey)
-        if remaining?.isEmpty == false { throw SpeedtestPendingStoreError.migrationIncomplete }
+        let remaining = try await legacyCache.readPendingSaves(for: legacyKey)
+        if !remaining.isEmpty { throw SpeedtestPendingStoreError.migrationIncomplete }
     }
 
     /// Import unique depuis la file durable JSON (`DiskCache`) au premier `loadAll`, puis
@@ -5598,12 +5711,12 @@ actor SwiftDataSpeedtestPendingStore: SpeedtestPendingStoring {
     /// suspension) → pas de conflit d'unicité en cas de réentrance d'acteur.
     private func importLegacyIfPresent() async {
         guard let legacyCache else { return }
-        let legacy = (try? await legacyCache.read([PendingSpeedtestSave].self, for: legacyKey)) ?? []
+        let legacy = (try? await legacyCache.readPendingSaves(for: legacyKey)) ?? []
         guard !legacy.isEmpty else { return }
         do {
             let existing = Set(try validatedEntities().map(\.saveId))
             var inserted = false
-            for save in legacy where !existing.contains(save.id) {
+            for save in legacy.compactMap(\.save) where !existing.contains(save.id) {
                 let payload = try encoder.encode(save)
                 context.insert(SpeedtestPendingEntity(saveId: save.id,
                     createdAtMs: Int(save.createdAt.timeIntervalSince1970 * 1000), payload: payload))
@@ -5613,6 +5726,8 @@ actor SwiftDataSpeedtestPendingStore: SpeedtestPendingStoring {
                 try beforeMigrationSave?()
                 try saveContextOrRollback()
             }
+            // Une entrée illisible de l'ancienne file ne bloque plus la migration.
+            try quarantine.store(try legacy.filter { $0.save == nil }.map { try JSONEncoder().encode($0.raw) })
         } catch {
             context.rollback()
             return // The source journal remains the recoverable authority.

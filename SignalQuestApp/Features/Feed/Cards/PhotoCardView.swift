@@ -95,7 +95,9 @@ struct PhotoCardView: View {
         .contentShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .onTapGesture(count: 2) {
             Haptics.medium()
-            onLike()
+            // Le double-tap ne fait qu'aimer : sur une photo déjà aimée, il
+            // retirait le like tout en jouant l'animation du cœur (SOC-16).
+            if !item.likedByMe { onLike() }
             withAnimation(SQMotion.resolve(.snappy(duration: 0.35), reduceMotion)) { likeBurst = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 withAnimation(SQMotion.resolve(.snappy(duration: 0.25), reduceMotion)) { likeBurst = false }

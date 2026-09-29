@@ -6,9 +6,11 @@ import SwiftUI
 struct SavedMessagesView: View {
     let service: MessagesServicing
     let currentUserId: String?
+    var e2ee: E2EEServicing? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var entries: [SavedMessageEntry] = []
+    @State private var decrypted: [String: String] = [:]
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var removing: Set<String> = []
@@ -123,7 +125,7 @@ struct SavedMessagesView: View {
     }
 
     private func snippet(_ message: MessageItem) -> String {
-        if message.isEncrypted { return String(localized: "🔒 Message chiffré") }
+        if message.isEncrypted { return decrypted[message.id] ?? String(localized: "🔒 Message chiffré") }
         if let card = ShareCardData.parse(fromMetadataJSON: message.metadata) { return card.title }
         if MessageLocationData.parse(fromMetadataJSON: message.metadata) != nil { return String(localized: "📍 Position partagée") }
         let content = message.content ?? ""
@@ -139,6 +141,20 @@ struct SavedMessagesView: View {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+        await decryptEntries()
+    }
+
+    /// Les messages chiffrés enregistrés restaient « Message chiffré » (SOC-32) :
+    /// ils sont déchiffrés avec la clé déjà déverrouillée. Sans clé, l'extrait
+    /// reste masqué et aucune demande de déverrouillage n'est lancée d'ici.
+    private func decryptEntries() async {
+        guard let e2ee, await e2ee.isUnlocked() else { return }
+        for entry in entries where entry.message.isEncrypted && decrypted[entry.message.id] == nil {
+            guard let conversationId = entry.message.conversationId ?? entry.conversation?.id,
+                  let text = try? await e2ee.decryptText(conversationId: conversationId, message: entry.message)
+            else { continue }
+            decrypted[entry.message.id] = text
+        }
     }
 
     private func remove(_ entry: SavedMessageEntry) async {

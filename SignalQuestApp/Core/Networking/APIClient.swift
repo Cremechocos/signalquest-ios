@@ -100,6 +100,10 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         configuration.httpShouldSetCookies = false
         configuration.httpCookieStorage = nil
         configuration.httpMaximumConnectionsPerHost = 6
+        // Une coupure brève (changement de cellule) ne doit pas faire échouer la
+        // requête : on attend le retour du réseau. Les lectures sont bornées à
+        // part (`readConnectivityBudget`), sinon elles attendaient jusqu'à 7 jours
+        // hors couverture (MES-04).
         configuration.waitsForConnectivity = true
         configuration.timeoutIntervalForRequest = 30
         return URLSession(configuration: configuration)
@@ -154,6 +158,9 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         do {
             decoded = try decoder.decode(T.self, from: result.data)
         } catch {
+            // Un contrat serveur qui dérive ne se voyait qu'en « Réponse
+            // inattendue » chez l'utilisateur (OBS-01).
+            SQDiagnostics.record(error, area: .decoding, context: SQDiagnostics.decodingContext(error, type: T.self))
             throw APIError.decoding(error.localizedDescription)
         }
         guard credentials.isCurrent(result.context) else { throw APIError.cancelled }
@@ -596,8 +603,12 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         }
         let data: Data
         let response: URLResponse
+        // Une lecture sans délai propre est plafonnée : la session attend le
+        // retour du réseau (coupure brève tolérée), mais pas indéfiniment.
+        let deadline = endpoint.responseDeadline
+            ?? ((request.httpMethod ?? "GET") == "GET" ? Self.readConnectivityBudget : nil)
         do {
-            (data, response) = try await responseData(for: request, deadline: endpoint.responseDeadline)
+            (data, response) = try await responseData(for: request, deadline: deadline)
             try Task.checkCancellation()
             guard credentials.isCurrent(context) else { throw APIError.cancelled }
         } catch is CancellationError {
@@ -622,6 +633,12 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         let captured = try credentials.captureFromResponse(response, for: context, startsNewSession: !endpoint.authenticated)
         return Response(data: data, context: captured)
     }
+
+    /// Plafond d'une lecture (GET) sans délai propre. Hors couverture, la session
+    /// attendait le retour du réseau jusqu'à 7 jours : spinners sans fin en zone
+    /// blanche (MES-04). Large pour ne pas couper une lecture lente mais réelle ;
+    /// les envois n'y sont pas soumis (un gros fichier peut prendre plus longtemps).
+    static let readConnectivityBudget: Duration = .seconds(60)
 
     private func responseData(for request: URLRequest, deadline: Duration?) async throws -> (Data, URLResponse) {
         guard let deadline else { return try await session.data(for: request) }

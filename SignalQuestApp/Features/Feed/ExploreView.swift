@@ -38,6 +38,12 @@ final class ExploreViewModel: ObservableObject {
         self.service = service
     }
 
+    /// Reporte des interactions confirmées par le serveur sur les listes affichées.
+    func accept(_ item: UnifiedSocialFeedItem) {
+        searchPosts = searchPosts.map { $0.id == item.id ? $0.adoptingInteractions(from: item) : $0 }
+        hashtagItems = hashtagItems.map { $0.id == item.id ? $0.adoptingInteractions(from: item) : $0 }
+    }
+
     func load() async {
         if AppEnvironment.usesDemoData {
             loadDemo()
@@ -93,7 +99,10 @@ final class ExploreViewModel: ObservableObject {
             searchPosts = result.posts
             searchHashtags = result.hashtags
         } catch {
-            if !(error is CancellationError) {
+            // Une frappe rapide annule la recherche précédente : URLSession lève
+            // alors `URLError(.cancelled)` ou `APIError.cancelled`, pas
+            // `CancellationError`. Elle s'affichait « Requête annulée » (SOC-15).
+            if !error.isCancellation {
                 errorMessage = error.localizedDescription
             }
         }
@@ -258,10 +267,24 @@ struct ExploreView: View {
         .sheet(item: $detailItem) { item in
             SignalDetailSheet(
                 item: item,
-                onLike: { Task { _ = try? await service.react(postId: item.id, emoji: "❤️") } },
-                onRepost: { Task { _ = try? await service.repost(postId: item.id) } },
-                onFavorite: { Task { _ = try? await service.favorite(postId: item.id) } }
+                onLike: { interact(with: item) { try await service.react(postId: $0, emoji: "❤️") } },
+                onRepost: { interact(with: item) { try await service.repost(postId: $0) } },
+                onFavorite: { interact(with: item) { try await service.favorite(postId: $0) } }
             )
+        }
+    }
+
+    /// La feuille gardait l'état d'ouverture et le fil de l'écran ne bougeait
+    /// pas : la réponse du serveur est appliquée aux deux (SOC-17).
+    private func interact(
+        with item: UnifiedSocialFeedItem,
+        _ action: @escaping @MainActor (String) async throws -> ReactionResponse
+    ) {
+        Task { @MainActor in
+            guard let response = try? await action(item.id) else { return }
+            let updated = item.applying(response)
+            if detailItem?.id == updated.id { detailItem = updated }
+            model.accept(updated)
         }
     }
 

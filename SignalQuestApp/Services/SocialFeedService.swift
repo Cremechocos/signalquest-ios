@@ -251,6 +251,21 @@ final class SocialFeedService: SocialFeedServicing {
         guard let session = LocalAccountScope.sessionSnapshot() else {
             throw CancellationError()
         }
+        let imageSha256 = imageData.map(Self.sha256Hex)
+        // SOC-02 : un second appui sur « Publier » après un échec créait un
+        // second envoi, et le premier repartait plus tard tout seul : doublon.
+        // Si le même contenu attend déjà dans la file, on le renvoie avec son
+        // identifiant d'origine, que le serveur dédoublonne (clé d'idempotence).
+        if let existing = try? await postOutbox.pending(session: session).first(where: { staged in
+            staged.request.text == text
+                && staged.request.visibility == visibility
+                && staged.request.targetType == targetType
+                && staged.request.targetId == targetId
+                && staged.request.poll == poll
+                && staged.imageSha256 == imageSha256
+        }) {
+            return try await submitPreparedPost(existing, session: session)
+        }
         let requestId = "post:\(UUID().uuidString.lowercased())"
         var metadata: [String: JSONValue] = ["platform": .string("ios")]
         if let extraMetadata {
@@ -276,7 +291,7 @@ final class SocialFeedService: SocialFeedServicing {
             clientRequestId: requestId,
             request: request,
             imageMimeType: imageData == nil ? nil : imageMimeType,
-            imageSha256: imageData.map(Self.sha256Hex),
+            imageSha256: imageSha256,
             uploadedAttachment: nil,
             createdAt: Date()
         )
@@ -284,14 +299,27 @@ final class SocialFeedService: SocialFeedServicing {
         return try await submitPreparedPost(record, session: session)
     }
 
+    /// Au-delà, un envoi resté en attente n'est plus d'actualité : le publier des
+    /// jours plus tard surprendrait l'auteur, qui l'a peut-être abandonné (SOC-02).
+    static let pendingPostLifetime: TimeInterval = 7 * 24 * 3600
+
     func retryPendingPosts() async {
         guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return }
         guard let records = try? await postOutbox.pending(session: session) else { return }
         for record in records {
             guard session.isCurrent else { return }
+            if Date().timeIntervalSince(record.createdAt) > Self.pendingPostLifetime {
+                try? await postOutbox.acknowledge(session: session, clientRequestId: record.clientRequestId)
+                continue
+            }
             do {
                 _ = try await submitPreparedPost(record, session: session)
+            } catch where error.isPermanentRequestFailure {
+                // Déjà retiré de la file par `submitPreparedPost` : on passe au
+                // suivant au lieu de bloquer toute la file derrière un refus.
+                continue
             } catch {
+                // Réseau ou serveur indisponible : les suivants échoueraient aussi.
                 return
             }
         }
@@ -306,6 +334,27 @@ final class SocialFeedService: SocialFeedServicing {
               staged.sessionId == session.sessionId else {
             throw CancellationError()
         }
+        do {
+            return try await sendPreparedPost(staged, session: session)
+        } catch where error.isPermanentRequestFailure {
+            // Refus définitif, avant ou pendant la création (e-mail non vérifié,
+            // image refusée, contenu invalide…) : le texte reste dans le
+            // brouillon du composer. Garder l'envoi en file le rejouerait sans
+            // geste explicite, puis un second tap sur Publier ferait un doublon ;
+            // et il bloquerait les envois suivants (SOC-02).
+            try? await postOutbox.acknowledge(
+                session: session,
+                clientRequestId: staged.clientRequestId
+            )
+            SQDiagnostics.record(error, area: .postOutbox)
+            throw error
+        }
+    }
+
+    private func sendPreparedPost(
+        _ staged: SocialPostOutboxRecord,
+        session: LocalAccountSession
+    ) async throws -> UnifiedSocialFeedItem? {
         var record = try await postOutbox.record(
             session: session,
             clientRequestId: staged.clientRequestId
@@ -357,26 +406,11 @@ final class SocialFeedService: SocialFeedServicing {
             poll: record.request.poll,
             clientRequestId: record.clientRequestId
         )
-        let response: CreatePostResponse
-        do {
-            response = try await api.requestJSON(
-                "/api/social/v2/posts",
-                body: request,
-                idempotencyKey: record.clientRequestId
-            )
-        } catch let error as APIError {
-            if case .http(403, "EMAIL_NOT_VERIFIED", _, _, _) = error {
-                // Refus métier avant création : le texte reste dans le brouillon
-                // du composer. Rejouer cet outbox automatiquement après la
-                // confirmation publierait sans geste explicite, puis un second
-                // tap sur Publier ferait un doublon.
-                try await postOutbox.acknowledge(
-                    session: session,
-                    clientRequestId: record.clientRequestId
-                )
-            }
-            throw error
-        }
+        let response: CreatePostResponse = try await api.requestJSON(
+            "/api/social/v2/posts",
+            body: request,
+            idempotencyKey: record.clientRequestId
+        )
         try await postOutbox.acknowledge(
             session: session,
             clientRequestId: record.clientRequestId
@@ -786,7 +820,13 @@ actor SocialPostOutboxStore {
         ).filter { $0.pathExtension == "json" }
         var active: [SocialPostOutboxRecord] = []
         for url in files {
-            let value = try decoder.decode(SocialPostOutboxRecord.self, from: Data(contentsOf: url))
+            guard let value = try? decoder.decode(SocialPostOutboxRecord.self, from: Data(contentsOf: url)) else {
+                // Un fichier illisible (écriture interrompue, format ancien) ne
+                // doit pas bloquer toute la file : on le met de côté, sans le
+                // supprimer, pour pouvoir l'examiner.
+                try? FileManager.default.moveItem(at: url, to: url.appendingPathExtension("corrupt"))
+                continue
+            }
             if value.ownerScopeId == session.ownerScopeId && value.sessionId == session.sessionId {
                 active.append(value)
             } else {

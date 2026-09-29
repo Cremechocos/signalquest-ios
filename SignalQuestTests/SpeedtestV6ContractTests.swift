@@ -448,23 +448,26 @@ extension SpeedtestV6ContractTests {
         await cache.remove("rescue")
     }
 
-    func testUnreadableSwiftDataRowBlocksReplacementWithoutDeletingIt() async throws {
+    func testUnreadableSwiftDataRowIsQuarantinedWithoutBlockingTheQueue() async throws {
         guard #available(iOS 17, *) else { throw XCTSkip("SwiftData requires iOS 17") }
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("SpeedtestV6CorruptSwiftData-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let url = directory.appendingPathComponent("pending.store")
+        let quarantine = SpeedtestPendingQuarantine(directory: directory.appendingPathComponent("quarantine"))
+        let brokenPayload = Data("not a pending save".utf8)
         do {
             let container = try ModelContainer(for: SpeedtestPendingEntity.self,
                 configurations: ModelConfiguration(url: url))
             let context = ModelContext(container)
-            context.insert(SpeedtestPendingEntity(saveId: "broken", createdAtMs: 0,
-                payload: Data("not a pending save".utf8)))
+            context.insert(SpeedtestPendingEntity(saveId: "broken", createdAtMs: 0, payload: brokenPayload))
             try context.save()
         }
-        let store = try XCTUnwrap(SwiftDataSpeedtestPendingStore(storeURL: url, legacyKey: "none"))
-        do { _ = try await store.loadAllValidated(); XCTFail("Corrupt row appeared empty") } catch { }
+        let store = try XCTUnwrap(SwiftDataSpeedtestPendingStore(storeURL: url, legacyKey: "none",
+            quarantine: quarantine))
+        let initial = try await store.loadAllValidated()
+        XCTAssertTrue(initial.isEmpty)
         let result = SpeedtestRunResult(label: "new", downloadMbps: 10,
             downloadAverageMbps: 10, downloadMaxMbps: 10, durationSeconds: 10,
             connectionType: .wifi, ownerScopeId: "guest")
@@ -472,12 +475,75 @@ extension SpeedtestV6ContractTests {
             streams: 1, deviceModel: "QA", createdAt: Date(), isVisibleOnMap: true,
             shareExactLocation: true, guestDeleteToken: nil, driveSessionId: nil,
             ownerScopeId: "guest")
-        do { try await store.upsert(pending); XCTFail("Corrupt row accepted a new save") } catch { }
-        do { try await store.replaceAll([]); XCTFail("Corrupt row was deleted") } catch { }
-        let verification = try ModelContainer(for: SpeedtestPendingEntity.self,
-            configurations: ModelConfiguration(url: url))
-        let rows = try ModelContext(verification).fetch(FetchDescriptor<SpeedtestPendingEntity>())
-        XCTAssertEqual(rows.map(\.saveId), ["broken"])
+        try await store.upsert(pending)
+        let reloaded = try await store.loadAllValidated()
+        XCTAssertEqual(reloaded.map(\.id), [pending.id], "Une ligne illisible ne bloque plus les autres mesures")
+        let copies = quarantine.files()
+        XCTAssertEqual(copies.count, 1)
+        XCTAssertEqual(try Data(contentsOf: XCTUnwrap(copies.first)), brokenPayload,
+            "La ligne illisible est conservée telle quelle avant d'être retirée")
+    }
+
+    func testUnreadableJSONEntryIsQuarantinedAndOthersStayReadable() async throws {
+        let cache = DiskCache(folderName: "SpeedtestV6Lossy-\(UUID().uuidString)", evicts: false)
+        let quarantineDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SpeedtestV6Quarantine-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: quarantineDirectory) }
+        let quarantine = SpeedtestPendingQuarantine(directory: quarantineDirectory)
+        let result = SpeedtestRunResult(label: "valid", downloadMbps: 10,
+            downloadAverageMbps: 10, downloadMaxMbps: 10, durationSeconds: 10,
+            connectionType: .wifi, ownerScopeId: "guest")
+        let valid = PendingSpeedtestSave(id: result.id.uuidString, result: result,
+            streams: 1, deviceModel: "QA", createdAt: Date(), isVisibleOnMap: false,
+            shareExactLocation: false, guestDeleteToken: nil, driveSessionId: nil,
+            ownerScopeId: "guest")
+        let validJSON = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder.signalQuest.encode(valid))
+        let broken = JSONValue.object(["id": .string("broken"), "streams": .string("not a number")])
+        try await cache.write([validJSON, broken], for: "pending")
+        let store = DiskCacheSpeedtestPendingStore(cache: cache, key: "pending", quarantine: quarantine)
+
+        let readable = try await store.loadAllValidated()
+        XCTAssertEqual(readable.map(\.id), [valid.id], "L'entrée valide reste lisible malgré sa voisine abîmée")
+        XCTAssertTrue(quarantine.files().isEmpty, "Une lecture ne modifie rien")
+
+        try await store.removeValidated(id: valid.id)
+        let remaining = try await store.loadAllValidated()
+        XCTAssertTrue(remaining.isEmpty)
+        let copies = quarantine.files()
+        XCTAssertEqual(copies.count, 1)
+        let copied = try JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: XCTUnwrap(copies.first)))
+        XCTAssertEqual(copied, broken, "L'entrée illisible est copiée avant de quitter la file")
+        await cache.remove("pending")
+    }
+
+    func testDefinitiveRejectionOrExpiryAbandonsPendingSave() {
+        let result = SpeedtestRunResult(label: "old", downloadMbps: 10,
+            downloadAverageMbps: 10, downloadMaxMbps: 10, durationSeconds: 10,
+            connectionType: .wifi, ownerScopeId: "guest")
+        let now = Date()
+        func save(ageDays: Double) -> PendingSpeedtestSave {
+            PendingSpeedtestSave(id: UUID().uuidString, result: result, streams: 1, deviceModel: "QA",
+                createdAt: now.addingTimeInterval(-ageDays * 86_400), isVisibleOnMap: false,
+                shareExactLocation: false, guestDeleteToken: nil, driveSessionId: nil, ownerScopeId: "guest")
+        }
+        func http(_ status: Int) -> APIError {
+            .http(status: status, code: nil, message: "", requestId: nil, retryAfter: nil)
+        }
+        let fresh = save(ageDays: 1)
+        let expired = save(ageDays: 31)
+        for status in [400, 409, 413, 422] {
+            XCTAssertTrue(SpeedtestService.shouldAbandonPending(fresh, after: http(status), now: now), "\(status)")
+        }
+        for status in [401, 404, 429, 500, 503] {
+            XCTAssertFalse(SpeedtestService.shouldAbandonPending(fresh, after: http(status), now: now), "\(status)")
+        }
+        XCTAssertTrue(SpeedtestService.shouldAbandonPending(expired, after: http(503), now: now))
+        XCTAssertTrue(SpeedtestService.shouldAbandonPending(expired, after: http(404), now: now))
+        XCTAssertFalse(SpeedtestService.shouldAbandonPending(expired, after: http(401), now: now))
+        XCTAssertFalse(SpeedtestService.shouldAbandonPending(expired, after: http(429), now: now))
+        XCTAssertFalse(SpeedtestService.shouldAbandonPending(expired, after: URLError(.notConnectedToInternet), now: now),
+            "Hors ligne, une vieille mesure attend encore le réseau")
+        XCTAssertFalse(SpeedtestService.shouldAbandonPending(expired, after: CancellationError(), now: now))
     }
 
     func testRateLimitKeepsPendingSaveAndDefersReplayAcrossServiceRecreation() async throws {

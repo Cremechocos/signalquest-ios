@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import UserNotifications
+import WidgetKit
 
 struct LocalAccountSession: Codable, Equatable, Sendable {
     let ownerScopeId: String
@@ -368,8 +369,17 @@ final class AuthService: AuthServicing {
         }
         LocalAccountScope.deactivate()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+        Self.clearDeviceSurfaces()
         api.credentials.clearAll()
         try? sessionStore.remove(Self.cachedUserKey)
+    }
+
+    /// Ce que l'app expose HORS de l'app (widgets, Spotlight) appartient au compte
+    /// qui se déconnecte : on l'efface avec la session (MES-13).
+    private static func clearDeviceSurfaces() {
+        WidgetSharedStore.clear()
+        SQSpotlight.removeAll()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     func clearLocalSession() async {
@@ -385,6 +395,7 @@ final class AuthService: AuthServicing {
         }
         LocalAccountScope.deactivate()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+        Self.clearDeviceSurfaces()
         api.credentials.clearAll()
         try? sessionStore.remove(Self.cachedUserKey)
     }
@@ -707,6 +718,13 @@ final class AuthSessionViewModel: ObservableObject {
         state = .authenticated(user)
     }
 
+    /// La réponse de connexion ne contient qu'une partie du profil (ni
+    /// `twoFactorEnabled`, ni `emailVerified`) : on relit /api/auth/me en arrière-
+    /// plan pour que Réglages et Profil affichent l'état réel du compte (TRX-33).
+    private func completeProfileAfterLogin() {
+        Task { [weak self] in await self?.refreshUser() }
+    }
+
     /// Le reçu d'activation est une preuve serveur : l'afficher immédiatement,
     /// même si la relecture du profil échoue ensuite. Aucune requête supplémentaire.
     func acknowledgeTwoFactorState(enabled: Bool = true, expectedUserID: String, isCurrent: @MainActor () -> Bool) throws {
@@ -729,6 +747,7 @@ final class AuthSessionViewModel: ObservableObject {
                 state = .requires2FA(tempToken: tempToken)
             } else if let user = response.user {
                 await setAuthenticated(user)
+                completeProfileAfterLogin()
             } else {
                 errorMessage = String(localized: "Réponse auth invalide")
             }
@@ -837,7 +856,12 @@ final class AuthSessionViewModel: ObservableObject {
         do {
             let response = try await service.verify2FA(tempToken: tempToken, code: code)
             if let user = response.user {
-                await setAuthenticated(user)
+                // La réponse de validation ne porte pas `twoFactorEnabled` (seul
+                // /api/auth/me le donne) ; or elle prouve justement que la 2FA est
+                // active. Sans ce marquage, Réglages proposait « Activer la 2FA »
+                // juste après une connexion par code (TRX-33).
+                await setAuthenticated(user.withConfirmedTwoFactor(enabled: true))
+                completeProfileAfterLogin()
             } else {
                 errorMessage = String(localized: "Code 2FA accepté mais utilisateur absent")
             }

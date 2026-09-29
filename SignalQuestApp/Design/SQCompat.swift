@@ -63,14 +63,18 @@ extension View {
         _ item: Binding<Item?>,
         @ViewBuilder destination: @escaping (Item) -> Destination
     ) -> some View {
+        // `.id(value)` : si la cible change pendant que l'écran est affiché (ex.
+        // notification pour la conversation B pendant qu'on lit A), SwiftUI doit
+        // recréer la destination. Sans identité, iOS 16 gardait la vue de A et
+        // son état sous l'en-tête de B (SOC-11).
         if #available(iOS 17.0, *) {
-            self.navigationDestination(item: item) { destination($0) }
+            self.navigationDestination(item: item) { destination($0).id($0) }
         } else {
             self.navigationDestination(isPresented: Binding(
                 get: { item.wrappedValue != nil },
                 set: { if !$0 { item.wrappedValue = nil } }
             )) {
-                if let value = item.wrappedValue { destination(value) }
+                if let value = item.wrappedValue { destination(value).id(value) }
             }
         }
     }

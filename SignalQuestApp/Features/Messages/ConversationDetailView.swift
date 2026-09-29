@@ -41,6 +41,9 @@ struct ConversationDetailView: View {
     @State private var showUnlockSheet = false
     @State private var showE2EECallUnavailable = false
     @State private var syncTask: Task<Void, Never>?
+    /// Vrai entre l'apparition et la disparition de l'écran : ni la synchro ni la
+    /// présence ne démarrent pour une conversation qui n'est plus affichée (SOC-03).
+    @State private var isOnScreen = false
     @State private var isE2EEUnlocked = false
     @State private var decryptedMessages: [String: String] = [:]
     /// MSG-API-01 — statut d'envoi optimiste, indexé par id LOCAL de bulle.
@@ -57,6 +60,8 @@ struct ConversationDetailView: View {
     @State private var isResyncingKey = false
     @State private var showReportUser = false
     @State private var showGroupSettings = false
+    /// Posé par les réglages après un départ du groupe : la conversation se ferme.
+    @State private var leftGroup = false
     @State private var typingUntil: Date?
     @State private var lastTypingSignal: Date = .distantPast
     /// Borne du dernier sync delta — max des dates créé/édité/supprimé vues.
@@ -334,11 +339,14 @@ struct ConversationDetailView: View {
                 ReportSheet(target: .profile(id), service: services.reports)
             }
         }
-        .sheet(isPresented: $showGroupSettings) {
-            GroupSettingsView(conversation: conversation, service: service, e2ee: e2ee)
+        .sheet(isPresented: $showGroupSettings, onDismiss: { if leftGroup { dismiss() } }) {
+            GroupSettingsView(conversation: conversation, service: service, e2ee: e2ee) {
+                // Groupe quitté : rester sur la conversation n'aurait plus de sens.
+                leftGroup = true
+            }
         }
         .sheet(isPresented: $showSaved) {
-            SavedMessagesView(service: service, currentUserId: currentUserId)
+            SavedMessagesView(service: service, currentUserId: currentUserId, e2ee: e2ee)
         }
         // Photo de la conversation en plein écran (zoom + glisser pour fermer).
         .fullScreenCover(item: $imageViewerTarget) { target in
@@ -367,10 +375,18 @@ struct ConversationDetailView: View {
         .onAppear {
             // Le dock flottant global est masqué le temps de la conversation.
             router.isDockHidden = true
+            isOnScreen = true
         }
         .task {
+            // SwiftUI annule cette tâche quand on quitte l'écran, mais les appels
+            // en cours finissent quand même : sans ces gardes, une sortie rapide
+            // démarrait ensuite la synchro et la présence que plus rien n'arrêtait
+            // (flux, relevé toutes les 12 s, ping toutes les 30 s) et envoyait un
+            // faux « Vu » à l'autre personne (SOC-03).
             await load()
+            guard !Task.isCancelled else { return }
             await markRead()
+            guard !Task.isCancelled else { return }
             await shareKeyIfNeeded()
             await loadPinned()
             if let currentUserId, !isE2EE {
@@ -379,18 +395,22 @@ struct ConversationDetailView: View {
                     currentUserId: currentUserId
                 )
             }
+            guard !Task.isCancelled, isOnScreen else { return }
             startSync()
             startActivePing()
         }
         .onDisappear {
+            isOnScreen = false
             router.isDockHidden = false
             stopSync()
             stopActivePing(sendLeave: true)
         }
         .onChangeCompat(of: scenePhase) { _, phase in
             // Le flux SSE ne survit pas à la mise en arrière-plan : on le coupe
-            // proprement et on resynchronise au retour.
+            // proprement et on resynchronise au retour — seulement si la
+            // conversation est encore à l'écran.
             if phase == .active {
+                guard isOnScreen else { return }
                 startSync()
                 startActivePing()
                 Task { await refreshDelta() }
@@ -1072,7 +1092,7 @@ struct ConversationDetailView: View {
                     }
                 }
             }
-            if transcriptions[message.id] == nil {
+            if message.hasVoiceNote, transcriptions[message.id] == nil {
                 Button {
                     Task { await requestTranscription(message: message) }
                 } label: {
@@ -1505,11 +1525,15 @@ struct ConversationDetailView: View {
         }
         do {
             let page = try await service.messages(conversationId: conversation.id, cursor: nil)
-            messages = Self.normalized(page.messages)
+            // Les bulles locales encore en cours d'envoi (ou en échec, rejouables)
+            // ne sont pas encore sur le serveur : un rechargement ne doit pas les
+            // faire disparaître.
+            let localPending = messages.filter { pendingSends[$0.id] != nil }
+            messages = Self.normalized(page.messages + localPending)
             olderCursor = (page.hasMore ?? (page.nextCursor != nil)) ? page.nextCursor : nil
             readReceipts = page.readReceipts ?? []
             errorMessage = nil
-            advanceLastSync(with: messages)
+            advanceLastSync(with: page.messages)
             await refreshE2EEState()
             await decryptLoadedMessages()
             refreshPolls()
@@ -1542,7 +1566,12 @@ struct ConversationDetailView: View {
     }
 
     private func advanceLastSync(with items: [MessageItem]) {
-        var bound = lastSync == .distantPast ? Date() : lastSync
+        // La borne suit uniquement les dates SERVEUR des messages reçus. Partir de
+        // l'horloge du téléphone faisait sauter, à un appareil en avance, les
+        // messages arrivés entre l'heure serveur et la sienne (SOC-40). Sans
+        // message, elle reste à `.distantPast` et le prochain rafraîchissement
+        // recharge la page, ce qui est sans coût pour une conversation vide.
+        var bound = lastSync
         for item in items {
             for date in [item.createdAt, item.editedAt, item.deletedAt].compactMap({ $0 }) where date > bound {
                 bound = date
@@ -1568,6 +1597,8 @@ struct ConversationDetailView: View {
                     }
                 case .viewingEvent:
                     await refreshViewers()
+                case .stateEvent:
+                    await refreshLatestPageState()
                 case .serverEvent, .polling:
                     await refreshDelta()
                 }
@@ -1651,6 +1682,7 @@ struct ConversationDetailView: View {
             await markRead()
         } catch {
             MessageSyncLog.logger.error("delta erreur: \(error.localizedDescription, privacy: .public)")
+            SQDiagnostics.record(error, area: .messageSync)
         }
     }
 
@@ -2020,6 +2052,17 @@ struct ConversationDetailView: View {
 
     private func toggleReaction(message: MessageItem, emoji: String) async {
         let alreadyMine = message.reactions.contains { $0.emoji == emoji && $0.userId == currentUserId }
+        // Affichage immédiat : la réaction n'apparaissait qu'au rechargement
+        // suivant, car le delta ne renvoie pas les réactions (SOC-05).
+        if let uid = currentUserId {
+            var updated = message
+            if alreadyMine {
+                updated.reactions.removeAll { $0.emoji == emoji && $0.userId == uid }
+            } else {
+                updated.reactions.append(MessageReaction(emoji: emoji, userId: uid))
+            }
+            messages = messages.map { $0.id == message.id ? updated : $0 }
+        }
         do {
             if alreadyMine {
                 try await service.removeReaction(
@@ -2034,9 +2077,31 @@ struct ConversationDetailView: View {
                     in: conversation
                 )
             }
-            await refreshDelta()
+            await refreshLatestPageState()
         } catch {
+            // Échec : on remet l'état d'avant plutôt que d'afficher une
+            // réaction que le serveur n'a pas enregistrée.
+            messages = messages.map { $0.id == message.id ? message : $0 }
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Réactions, votes et accusés de lecture ne passent pas par le delta, qui ne
+    /// renvoie que les messages nouveaux ou modifiés : sur un événement d'état, on
+    /// relit la dernière page et on met à jour les messages affichés, en gardant
+    /// les bulles locales encore en attente (SOC-05).
+    private func refreshLatestPageState() async {
+        guard !AppEnvironment.usesDemoData else { return }
+        do {
+            let page = try await service.messages(conversationId: conversation.id, cursor: nil)
+            let fresh = Self.normalized(page.messages)
+            messages = Self.normalized(messages + fresh)
+            if let receipts = page.readReceipts { readReceipts = receipts }
+            advanceLastSync(with: fresh)
+            await decryptLoadedMessages()
+            refreshPolls()
+        } catch {
+            MessageSyncLog.logger.error("état erreur: \(error.localizedDescription, privacy: .public)")
         }
     }
 

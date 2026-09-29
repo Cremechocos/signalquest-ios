@@ -152,7 +152,12 @@ struct MessageSearchUser: Decodable, Identifiable, Equatable {
     let blockedByMe: Bool?
     let blockedMe: Bool?
 
-    var displayName: String { name ?? handle ?? email.components(separatedBy: "@").first ?? "Utilisateur" }
+    /// Jamais dérivé de l'e-mail : l'adresse d'un autre membre ne doit pas
+    /// s'afficher, même tronquée (SOC-09).
+    var displayName: String { name ?? handle ?? String(localized: "Membre") }
+
+    /// Ce qu'on montre sous le nom dans une recherche : le @pseudo, jamais l'e-mail.
+    var publicSubtitle: String? { handle.map { "@\($0)" } }
 
     enum CodingKeys: String, CodingKey { case id, name, handle, email, avatarUrl, isFriend, hasPendingRequest, blockedByMe, blockedMe }
 
@@ -420,10 +425,17 @@ struct MessageItem: Decodable, Identifiable, Equatable {
     let threadReplyCount: Int?
     let sender: MessageUser?
     let attachments: [MessageAttachment]
-    let reactions: [MessageReaction]
+    var reactions: [MessageReaction]
 
     var isEncrypted: Bool {
         e2eeVersion != nil || e2eeCiphertextB64 != nil
+    }
+
+    /// Note vocale : la seule forme de message qui peut avoir une transcription.
+    var hasVoiceNote: Bool {
+        kind.uppercased() == "AUDIO" || attachments.contains {
+            $0.kind.uppercased() == "AUDIO" || ($0.contentType?.lowercased().hasPrefix("audio/") ?? false)
+        }
     }
 
     enum CodingKeys: String, CodingKey {

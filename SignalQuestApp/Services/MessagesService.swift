@@ -10,6 +10,10 @@ protocol MessagesServicing: Sendable {
     func messagesDelta(conversationId: String, since: Date) async throws -> [MessageItem]
     func sendText(_ text: String, in conversation: MessageConversation, replyToId: String?, e2ee: E2EEServicing?, idempotencyKey: String?, ttlSeconds: Int) async throws -> MessageItem
     func retryPendingTextMessages() async
+    /// Messages texte encore en file pour une conversation (en attente ou « non envoyés »).
+    func pendingTextMessages(conversationId: String) async -> [MessageTextOutboxRecord]
+    func discardPendingText(clientRequestId: String) async
+    func resendPendingText(clientRequestId: String) async throws -> MessageItem
     /// Partage une position (kind LOCATION). Refusé par le backend en conversation
     /// E2EE (allowedKinds) → l'appelant ne le propose qu'en conversation non chiffrée.
     func sendLocation(latitude: Double, longitude: Double, place: String?, accuracyMeters: Double,
@@ -107,6 +111,9 @@ extension MessagesServicing {
 
     func activeLiveShareSessions() async throws -> [LiveShareSession] { [] }
     func retryPendingTextMessages() async {}
+    func pendingTextMessages(conversationId: String) async -> [MessageTextOutboxRecord] { [] }
+    func discardPendingText(clientRequestId: String) async {}
+    func resendPendingText(clientRequestId: String) async throws -> MessageItem { throw CancellationError() }
     func retryPendingAttachments() async {}
 
     func sendAttachmentData(
@@ -346,15 +353,52 @@ final class MessagesService: MessagesServicing {
     func retryPendingTextMessages() async {
         guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return }
         guard let records = try? await textOutbox.pending(session: session) else { return }
-        for record in records {
+        // L'ordre ne compte qu'au sein d'une conversation : un envoi bloqué dans A
+        // (exclusion d'un groupe, conversation supprimée, réseau) ne doit plus
+        // retenir ceux de B (SOC-04).
+        var blockedConversations = Set<String>()
+        for record in records where record.failureReason == nil {
             guard session.isCurrent else { return }
+            guard !blockedConversations.contains(record.conversationId) else { continue }
             do {
                 _ = try await submitPreparedText(record, session: session)
+            } catch where error.isPermanentRequestFailure {
+                // Marqué « non envoyé » par `submitPreparedText` : la conversation
+                // l'affichera avec Réessayer / Supprimer, les suivants continuent.
+                continue
             } catch {
-                // Conserver l'ordre : ne pas depasser un message dont l'issue est inconnue.
-                return
+                // Issue inconnue (réseau, serveur) : ne pas dépasser ce message
+                // dans SA conversation, mais laisser partir les autres.
+                blockedConversations.insert(record.conversationId)
             }
         }
+    }
+
+    /// Messages texte encore en file pour une conversation : en attente d'envoi,
+    /// ou refusés (`failureReason`) et affichés « non envoyé ».
+    func pendingTextMessages(conversationId: String) async -> [MessageTextOutboxRecord] {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return [] }
+        let records = (try? await textOutbox.pending(session: session)) ?? []
+        return records.filter { $0.conversationId == conversationId }
+    }
+
+    /// Supprime définitivement un message resté en file (geste « Supprimer »).
+    func discardPendingText(clientRequestId: String) async {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return }
+        try? await textOutbox.acknowledge(session: session, clientRequestId: clientRequestId)
+    }
+
+    /// Renvoie un message refusé (geste « Réessayer ») avec son identifiant
+    /// d'origine : le serveur le dédoublonne s'il était finalement passé.
+    func resendPendingText(clientRequestId: String) async throws -> MessageItem {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              let record = try await textOutbox.record(session: session, clientRequestId: clientRequestId) else {
+            throw CancellationError()
+        }
+        try await textOutbox.setFailure(nil, session: session, clientRequestId: clientRequestId)
+        var cleared = record
+        cleared.failureReason = nil
+        return try await submitPreparedText(cleared, session: session)
     }
 
     private func submitPreparedText(
@@ -366,11 +410,24 @@ final class MessagesService: MessagesServicing {
               record.sessionId == session.sessionId else {
             throw CancellationError()
         }
-        let response: CreatedMessageResponse = try await api.requestJSON(
-            "/api/messages/conversations/\(record.conversationId)/messages",
-            body: record.request,
-            idempotencyKey: record.clientRequestId
-        )
+        let response: CreatedMessageResponse
+        do {
+            response = try await api.requestJSON(
+                "/api/messages/conversations/\(record.conversationId)/messages",
+                body: record.request,
+                idempotencyKey: record.clientRequestId
+            )
+        } catch where error.isPermanentRequestFailure {
+            // Refus définitif : le message reste stocké, marqué « non envoyé »,
+            // au lieu de bloquer la file ou de disparaître (SOC-04).
+            try? await textOutbox.setFailure(
+                error.localizedDescription,
+                session: session,
+                clientRequestId: record.clientRequestId
+            )
+            SQDiagnostics.record(error, area: .messageOutbox)
+            throw error
+        }
         try await textOutbox.acknowledge(
             session: session,
             clientRequestId: record.clientRequestId
@@ -1408,6 +1465,12 @@ struct MessageTextOutboxRecord: Codable, Equatable, Sendable {
     let clientRequestId: String
     let request: SendMessageRequest
     let createdAt: Date
+    /// Renseigné quand le serveur a refusé le message pour de bon (exclu du
+    /// groupe, conversation supprimée…). Le message reste en file pour que la
+    /// conversation l'affiche « non envoyé » avec Réessayer / Supprimer, au lieu
+    /// de disparaître ou de bloquer les envois suivants (SOC-04). Optionnel :
+    /// les files écrites avant ce champ se relisent sans lui.
+    var failureReason: String? = nil
 }
 
 /// File texte durable, exacte et liee a la session. Une reconnexion cree une nouvelle session et
@@ -1475,6 +1538,20 @@ actor MessageTextOutboxStore {
         let previousCount = records.count
         records.removeAll { $0.clientRequestId == clientRequestId }
         if records.count != previousCount { try persist(records, session: session) }
+    }
+
+    /// Marque un message refusé pour de bon (`reason`), ou le remet en attente
+    /// d'envoi (`nil`) quand l'utilisateur demande de réessayer.
+    func setFailure(
+        _ reason: String?,
+        session: LocalAccountSession,
+        clientRequestId: String
+    ) throws {
+        var records = try activeRecords(session: session)
+        guard let index = records.firstIndex(where: { $0.clientRequestId == clientRequestId }),
+              records[index].failureReason != reason else { return }
+        records[index].failureReason = reason
+        try persist(records, session: session)
     }
 
     private func activeRecords(session: LocalAccountSession) throws -> [MessageTextOutboxRecord] {

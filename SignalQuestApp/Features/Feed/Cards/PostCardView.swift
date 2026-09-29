@@ -53,7 +53,8 @@ struct PostCardView: View {
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                     .onTapGesture(count: 2) {
                         Haptics.medium()
-                        onLike()
+                        // Double-tap = aimer, jamais retirer un like (SOC-16).
+                        if !item.likedByMe { onLike() }
                     }
                 }
 

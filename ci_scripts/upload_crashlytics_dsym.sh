@@ -36,7 +36,9 @@ plist="${SQ_FIREBASE_CONFIG_PATH:-${SRCROOT:-.}/SignalQuestApp/GoogleService-Inf
 
 # Le SDK est résolu par SwiftPM ; son emplacement dérive de BUILD_DIR.
 run="${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run"
-[ -x "$run" ] || skip "script Crashlytics introuvable ($run)"
+# Introuvable quand `-clonedSourcePackagesDirPath` déplace les paquets : l'archive
+# passe alors par ci_scripts/upload_archive_dsyms.sh (qui, lui, échoue).
+[ -x "$run" ] || skip "script Crashlytics introuvable ($run) ; envoyer depuis l'archive avec ci_scripts/upload_archive_dsyms.sh"
 
 dsym="${DWARF_DSYM_FOLDER_PATH:-}/${DWARF_DSYM_FILE_NAME:-}"
 [ -d "$dsym" ] || skip "bundle dSYM introuvable ($dsym)"

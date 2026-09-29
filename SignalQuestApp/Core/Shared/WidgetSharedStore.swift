@@ -171,4 +171,14 @@ enum WidgetSharedStore {
         guard let defaults, let data = defaults.data(forKey: networkGlanceKey) else { return nil }
         return try? JSONDecoder().decode(NetworkGlanceSnapshot.self, from: data)
     }
+
+    /// Efface les instantanés affichés par les widgets. Appelé à la
+    /// déconnexion : le dernier test, le nom du Wi-Fi et « réseau autour de
+    /// moi » restaient sinon visibles sur l'écran d'accueil (MES-13).
+    static func clear() {
+        guard let defaults else { return }
+        for key in [speedtestKey, recentKey, networkGlanceKey] {
+            defaults.removeObject(forKey: key)
+        }
+    }
 }

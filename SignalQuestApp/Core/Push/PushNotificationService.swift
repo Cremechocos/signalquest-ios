@@ -778,10 +778,17 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
 }
 
 extension PushNotificationService: UNUserNotificationCenterDelegate {
+    // Variantes à completion handler, jamais les variantes `async` : ces dernières
+    // rendaient la main à iOS depuis le pool coopératif de Swift, et UIKit
+    // s'arrêtait sur une assertion (`_performBlockAfterCATransactionCommitSynchronizes`).
+    // Toucher une notification faisait planter l'app, en particulier app fermée.
+    // Le traitement reste asynchrone ; seul l'accusé de fin repasse par le fil
+    // principal (`MainQueueCompletion`).
     func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+                                willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         let info = notification.request.content.userInfo
-        guard acceptsPush(info) else { return [] }
+        guard acceptsPush(info) else { return completionHandler([]) }
         if let receipt = OutageNotificationReceiptPayload.parse(info, state: "received") {
             Task { [weak self, receipt] in
                 _ = await self?.acknowledgeOutageNotification(id: receipt.id, payload: receipt.payload)
@@ -790,10 +797,10 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         if Self.string(info, "type")?.lowercased() == "e2ee_v2_device_approval",
            Self.e2eeDeviceApprovalID(info) == nil {
             center.removeDeliveredNotifications(withIdentifiers: [notification.request.identifier])
-            return []
+            return completionHandler([])
         }
         Task { @MainActor in await AppServicesHolder.services.refreshNotificationBadge(force: true) }
-        return [.banner, .sound, .badge]
+        completionHandler([.banner, .sound, .badge])
     }
 
     /// Cible du lien « Réglages de notifications » exposé par iOS grâce à l'option
@@ -812,13 +819,16 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
     /// payload here, then hand only `String?` values to the MainActor router so a
     /// tap reliably deep-links instead of doing nothing.
     func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                didReceive response: UNNotificationResponse) async {
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        let completion = MainQueueCompletion(handler: completionHandler)
         let info = response.notification.request.content.userInfo
+        let identifier = response.notification.request.identifier
         guard acceptsPush(info) else {
-            center.removeDeliveredNotifications(withIdentifiers: [response.notification.request.identifier])
-            return
+            center.removeDeliveredNotifications(withIdentifiers: [identifier])
+            return completion()
         }
-        _ = await acknowledgeOutageNotification(info, state: "opened")
+        let receipt = OutageNotificationReceiptPayload.parse(info, state: "opened")
         let type = Self.string(info, "type")
         let conversationId = Self.string(info, "conversationId", "conversation_id")
         let postId = Self.string(info, "postId", "post_id")
@@ -831,24 +841,44 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         let outageId = Self.string(info, "outageId", "outage_id")
         let e2eeDeviceApprovalId = Self.e2eeDeviceApprovalID(info)
         if type?.lowercased() == "e2ee_v2_device_approval", e2eeDeviceApprovalId == nil {
-            center.removeDeliveredNotifications(withIdentifiers: [response.notification.request.identifier])
-            return
+            center.removeDeliveredNotifications(withIdentifiers: [identifier])
+            return completion()
         }
-        await MainActor.run {
-            self.router.handle(
-                type: type,
-                conversationId: conversationId,
-                postId: postId,
-                userId: userId,
-                siteId: siteId,
-                reportId: reportId,
-                targetId: targetId,
-                outageId: outageId,
-                e2eeDeviceApprovalId: e2eeDeviceApprovalId
-            )
-            UNUserNotificationCenter.current().setBadgeCountCompat(0)
+        Task { [weak self] in
+            if let receipt {
+                _ = await self?.acknowledgeOutageNotification(id: receipt.id, payload: receipt.payload)
+            }
+            await MainActor.run {
+                self?.router.handle(
+                    type: type,
+                    conversationId: conversationId,
+                    postId: postId,
+                    userId: userId,
+                    siteId: siteId,
+                    reportId: reportId,
+                    targetId: targetId,
+                    outageId: outageId,
+                    e2eeDeviceApprovalId: e2eeDeviceApprovalId
+                )
+                UNUserNotificationCenter.current().setBadgeCountCompat(0)
+            }
+            completion()
+            Task { @MainActor in await AppServicesHolder.services.refreshNotificationBadge(force: true) }
         }
-        Task { @MainActor in await AppServicesHolder.services.refreshNotificationBadge(force: true) }
+    }
+}
+
+/// Accusé de fin rendu à iOS sur le fil principal, quel que soit le fil où le
+/// traitement s'achève (voir le délégué des notifications ci-dessus).
+private struct MainQueueCompletion: @unchecked Sendable {
+    let handler: () -> Void
+
+    func callAsFunction() {
+        if Thread.isMainThread {
+            handler()
+        } else {
+            DispatchQueue.main.async { self.handler() }
+        }
     }
 }
 

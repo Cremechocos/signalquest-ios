@@ -27359,6 +27359,22 @@
         }
       }
     },
+    "Membre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Member"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membre"
+          }
+        }
+      }
+    },
     "Membre depuis %@" : {
       "localizations" : {
         "en" : {
@@ -46613,6 +46629,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vérification de la disponibilité…"
+          }
+        }
+      }
+    },
+    "Vérification de la double authentification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking two-factor authentication"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérification de la double authentification"
           }
         }
       }
