@@ -172,11 +172,11 @@ struct OutageVoteRow: View {
 
     private var myVoteLabel: String {
         switch outage.myVote {
-        case "report": return String(localized: "Vous avez signalé cette panne.")
-        case "confirm": return String(localized: "Vous avez confirmé cette panne.")
-        case "dispute": return String(localized: "Vous avez indiqué que ça marche.")
-        case "repaired": return String(localized: "Vous avez signalé le rétablissement.")
-        default: return String(localized: "Approchez-vous du site pour vous prononcer.")
+        case "report": return String(localized: "Tu as signalé cette panne.")
+        case "confirm": return String(localized: "Tu as confirmé cette panne.")
+        case "dispute": return String(localized: "Tu as indiqué que ça marche.")
+        case "repaired": return String(localized: "Tu as signalé le rétablissement.")
+        default: return String(localized: "Approche-toi du site pour donner ton avis.")
         }
     }
 

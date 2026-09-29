@@ -1713,7 +1713,7 @@ struct SettingsView: View {
             } header: {
                 Text("Antennes suivies")
             } footer: {
-                Text("Les seules antennes pour lesquelles vous êtes prévenu dès le premier signalement, sans attendre que la communauté confirme.")
+                Text("Les seules antennes pour lesquelles tu reçois une alerte dès le premier signalement, sans attendre que la communauté confirme.")
             }
             .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)

@@ -252,6 +252,7 @@ struct SpeedtestView: View {
                 // pas la carte sur un lieu qu'on ignore.
                 onShowOnMap: item.coordinate == nil ? nil : { coordinate in
                     router.pendingMapFocus = coordinate
+                    router.pendingMapLayer = .speedtest
                     router.selectedTab = .map
                 },
                 visibilityService: services.speedtest,

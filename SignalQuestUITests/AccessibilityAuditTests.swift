@@ -131,7 +131,10 @@ final class AccessibilityAuditTests: XCTestCase {
                 // (ViewThatFits) ; `testAuditDriveTestAtAccessibilityTextSize`.
                 // Le bouton de démarrage est nommé par son libellé : l'identifiant
                 // posé sur `GradientButton` ne descend pas jusqu'à son texte.
-                "drivetest.", "Démarrer le Drive Test"
+                "drivetest.", "Démarrer le Drive Test",
+                // Lot 4d : texte de l'étiquette d'un `Menu` (pastille opérateur de la
+                // Carte), en `.subheadline` ; la Carte passe en AX XXL (TRX-38).
+                "map.operator.label"
             ]
             if issue.auditType == .dynamicType,
                semanticDynamicIdentifiers.contains(where: name.hasPrefix) {

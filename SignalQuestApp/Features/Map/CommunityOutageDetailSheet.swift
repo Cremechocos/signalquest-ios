@@ -422,28 +422,28 @@ struct CommunityOutageDetailSheet: View {
         switch entry.kind {
         case .reported:
             return entry.isSelf
-                ? String(localized: "Vous avez signalé la panne")
+                ? String(localized: "Tu as signalé la panne")
                 : String(localized: "Signalé par quelqu'un")
         case .reportedAgain:
             return entry.isSelf
-                ? String(localized: "Vous signalez aussi la panne")
+                ? String(localized: "Tu signales aussi la panne")
                 : String(localized: "Quelqu'un signale aussi la panne")
         case .confirm:
             guard let services = inlineServices(entry.services) else {
                 return entry.isSelf
-                    ? String(localized: "Vous confirmez")
+                    ? String(localized: "Tu confirmes")
                     : String(localized: "Quelqu'un confirme")
             }
             return entry.isSelf
-                ? String(localized: "Vous confirmez — \(services)")
+                ? String(localized: "Tu confirmes — \(services)")
                 : String(localized: "Quelqu'un confirme — \(services)")
         case .dispute:
             return entry.isSelf
-                ? String(localized: "Vous dites que ça marche")
+                ? String(localized: "Tu dis que ça marche")
                 : String(localized: "Quelqu'un dit que ça marche")
         case .repaired:
             return entry.isSelf
-                ? String(localized: "Vous signalez le rétablissement")
+                ? String(localized: "Tu signales le rétablissement")
                 : String(localized: "Quelqu'un signale le rétablissement")
         case .stateConfirmed:
             return String(localized: "Panne confirmée par la communauté")
@@ -455,7 +455,7 @@ struct CommunityOutageDetailSheet: View {
             return String(localized: "La communauté signale le rétablissement")
         case .resolvedAuthor:
             return entry.isSelf
-                ? String(localized: "Vous avez refermé la panne")
+                ? String(localized: "Tu as refermé la panne")
                 : String(localized: "Panne refermée par son auteur")
         case .resolvedOperator:
             return String(localized: "\(operatorLabel) a rétabli le service")

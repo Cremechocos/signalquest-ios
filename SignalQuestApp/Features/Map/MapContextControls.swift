@@ -6,12 +6,19 @@ struct MapContextControls: View {
     @Binding var byGeneration: Bool
     let showsCoverage: Bool
     let limitMessages: [String]
+    /// Opérateurs du marché affiché, dans la couleur de leurs marqueurs.
+    var antennaOperators: [MapAntennaLegendOperator] = []
+    /// Marché affiché : la 4G se lit « LTE » en Amérique du Nord.
+    var marketCode: String?
+    /// Au zoom où les secteurs se dessinent : couleurs et traits n'avaient
+    /// aucune légende (UI-11).
+    var showsAntennaKey = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var presentedPanel: Panel?
 
     private enum Panel: String, Identifiable {
-        case coverage, limits
+        case coverage, limits, antennas
         var id: Self { self }
     }
 
@@ -25,11 +32,14 @@ struct MapContextControls: View {
             Group {
                 switch panel {
                 case .coverage:
-                    MapCoverageDetails(byGeneration: $byGeneration)
+                    MapCoverageDetails(byGeneration: $byGeneration, marketCode: marketCode)
                         .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.height(360), .medium, .large])
                 case .limits:
                     MapDisplayLimitDetails(messages: limitMessages)
                         .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.height(240), .medium, .large])
+                case .antennas:
+                    MapAntennaLegendDetails(operators: antennaOperators)
+                        .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
                 }
             }
             .presentationDragIndicator(.visible)
@@ -40,6 +50,9 @@ struct MapContextControls: View {
         }
         .onChangeCompat(of: limitMessages.isEmpty) { _, empty in
             if empty && presentedPanel == .limits { presentedPanel = nil }
+        }
+        .onChangeCompat(of: showsAntennaKey) { _, visible in
+            if !visible && presentedPanel == .antennas { presentedPanel = nil }
         }
     }
 
@@ -52,6 +65,121 @@ struct MapContextControls: View {
         if !limitMessages.isEmpty {
             MapDisplayLimitControl { presentedPanel = .limits }
                 .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .bottom)))
+        }
+        if showsAntennaKey {
+            MapAntennaKeyControl(operators: antennaOperators) { presentedPanel = .antennas }
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .bottom)))
+        }
+    }
+}
+
+/// Un opérateur de la légende des antennes.
+struct MapAntennaLegendOperator: Identifiable, Equatable {
+    let key: String
+    let label: String
+    let color: Color
+    var id: String { key }
+}
+
+/// Pastille « Antennes » : les couleurs des opérateurs en aperçu, la légende
+/// complète à la demande.
+private struct MapAntennaKeyControl: View {
+    let operators: [MapAntennaLegendOperator]
+    let onOpen: () -> Void
+
+    var body: some View {
+        Button {
+            Haptics.light()
+            onOpen()
+        } label: {
+            HStack(spacing: SQSpace.sm) {
+                HStack(spacing: 3) {
+                    ForEach(operators.prefix(5)) { op in
+                        Circle().fill(op.color).frame(width: 8, height: 8)
+                    }
+                }
+                .accessibilityHidden(true)
+                Text("Antennes")
+                    .font(SQFont.body(13, .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityHidden(true)
+            }
+            .foregroundStyle(SQColor.label)
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.xs)
+            .frame(minHeight: 44)
+            .background(SQColor.surface, in: Capsule())
+            .sqShadowSoft()
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel("Légende des antennes")
+        .accessibilityHint("Couleurs des opérateurs, secteurs et repères des sites")
+        .accessibilityIdentifier("map.antenna.legend")
+    }
+}
+
+/// Comment lire un site sur la carte zoomée : couleurs des opérateurs, parts
+/// d'un site partagé, traits de secteur, anneau 5G et coche 4G.
+private struct MapAntennaLegendDetails: View {
+    let operators: [MapAntennaLegendOperator]
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: SQSpace.lg) {
+                    if !operators.isEmpty {
+                        VStack(alignment: .leading, spacing: SQSpace.md) {
+                            Text("Opérateurs").font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
+                            ForEach(operators) { op in
+                                entry(op.label) { Circle().fill(op.color).frame(width: 12, height: 12) }
+                            }
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: SQSpace.md) {
+                        Text("Sur un site").font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
+                        entry(String(localized: "Site partagé : une part par opérateur"), term: .siteSharing) {
+                            Image(systemName: "chart.pie.fill").foregroundStyle(SQColor.label)
+                        }
+                        entry(String(localized: "Trait : direction d’un secteur"), term: .azimuth) {
+                            Capsule().fill(SQColor.label).frame(width: 18, height: 3)
+                        }
+                        entry(String(localized: "Anneau : le site émet en 5G, vert quand son identifiant 5G est connu"), term: .cellIdentifiers) {
+                            Circle().strokeBorder(SQColor.success, lineWidth: 3).frame(width: 16, height: 16)
+                        }
+                        entry(String(localized: "Coche : identifiant 4G connu")) {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(SQColor.success)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(SQSpace.xl)
+            }
+            .background(SQColor.surface)
+            .navigationTitle("Antennes")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Fermer") { dismiss() }
+                        .tint(SQColor.accentInk)
+                        .accessibilityIdentifier("map.antenna.legend.close")
+                }
+            }
+        }
+    }
+
+    private func entry<Symbol: View>(_ title: String, term: SQTerm? = nil, @ViewBuilder symbol: () -> Symbol) -> some View {
+        HStack(spacing: SQSpace.md) {
+            symbol()
+                .frame(width: 24)
+                .accessibilityHidden(true)
+            Text(title).font(SQType.subhead).foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            if let term { SQInfoButton(term: term) }
         }
     }
 }
@@ -117,6 +245,7 @@ private struct MapCoverageKeyControl: View {
 
 private struct MapCoverageDetails: View {
     @Binding var byGeneration: Bool
+    let marketCode: String?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) private var dismiss
@@ -141,7 +270,7 @@ private struct MapCoverageDetails: View {
                     VStack(alignment: .leading, spacing: SQSpace.md) {
                         if byGeneration {
                             ForEach(CoverageGenerationBand.visibleBands) { band in
-                                legendEntry(band.title, color: band.swiftUIColor)
+                                legendEntry(band.title(forMarket: marketCode), color: band.swiftUIColor)
                             }
                         } else {
                             ForEach(CoverageQualityBand.visibleBands) { band in

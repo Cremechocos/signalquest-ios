@@ -239,8 +239,8 @@ struct SignalQuestHomeView: View {
     /// celle d'un opérateur sur un pylône, pas forcément la nôtre.
     private func outageBannerTitle(_ outage: CommunityOutage) -> String {
         outage.state == .confirmed
-            ? String(localized: "Panne confirmée près de vous")
-            : String(localized: "Panne signalée près de vous")
+            ? String(localized: "Panne confirmée près de toi")
+            : String(localized: "Panne signalée près de toi")
     }
 
     private func outageBannerSubtitle(_ outage: CommunityOutage) -> String {

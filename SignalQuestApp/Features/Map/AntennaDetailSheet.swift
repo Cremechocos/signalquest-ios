@@ -534,15 +534,11 @@ struct AntennaDetailSheet: View {
                         .foregroundStyle(SQColor.label)
                     // L'adresse était reléguée tout en bas de la fiche : c'est
                     // pourtant ce qui permet de reconnaître le site sur place.
-                    if let location = locationLine {
-                        Text(location)
+                    if let subtitle = headerSubtitle {
+                        Text(subtitle)
                             .font(SQType.subhead)
                             .foregroundStyle(SQColor.labelSecondary)
                             .fixedSize(horizontal: false, vertical: true)
-                    } else {
-                        Text(site.owner ?? "Opérateurs inconnus")
-                            .font(SQType.subhead)
-                            .foregroundStyle(SQColor.labelSecondary)
                     }
                 }
                 Spacer()
@@ -758,12 +754,27 @@ struct AntennaDetailSheet: View {
         customSite != nil || model.details?.core?.isCustomSite == true
     }
 
-    /// Un site relevé porte un nom donné par son auteur ; un site officiel n'a
-    /// que son identifiant de registre.
+    /// Un site relevé porte un nom donné par son auteur ; un site officiel n'en
+    /// a pas : son adresse le désigne mieux que le numéro du registre, qui reste
+    /// dans le détail (UI-10).
     private var headerTitle: String {
-        model.details?.core?.displayName
-            ?? customSite?.name
-            ?? String(localized: "Site \(site.siteId ?? site.id)")
+        siteName ?? locationLine ?? String(localized: "Site \(site.siteId ?? site.id)")
+    }
+
+    private var siteName: String? {
+        model.details?.core?.displayName ?? customSite?.name
+    }
+
+    /// Sous le titre : l'adresse quand le titre est un nom ; sinon ce qu'est le
+    /// site, en mots.
+    private var headerSubtitle: String? {
+        if siteName != nil { return locationLine }
+        if locationLine != nil {
+            return site.operators.count > 1
+                ? String(localized: "Antenne partagée par \(site.operators.count) opérateurs")
+                : nil
+        }
+        return site.owner ?? String(localized: "Opérateurs inconnus")
     }
 
     /// Adresse lisible : celle de la fiche détaillée si elle est chargée, sinon
@@ -925,8 +936,8 @@ struct AntennaDetailSheet: View {
                         Image(systemName: "checkmark")
                             .font(.system(size: 9, weight: .bold))
                     }
-                    Text(op)
-                        .font(SQFont.body(11.5, .semibold))
+                    Text(photoOperatorLabel(op))
+                        .font(SQFont.body(12, .semibold))
                         .lineLimit(1)
                 }
                 .padding(.horizontal, SQSpace.sm + 2)
@@ -941,7 +952,9 @@ struct AntennaDetailSheet: View {
             .accessibilityAddTraits(isActive ? .isSelected : [])
             .accessibilityHint(isActive ? "" : String(localized: "Affiche la fiche de cet opérateur"))
         } else {
-            SQEditorialTag(text: op, color: color)
+            // Nom du registre (« Orange »), pas la clé brute (« ORANGE ») : les
+            // pastilles étaient en capitales, sauf SFR (UI-10).
+            SQEditorialTag(text: photoOperatorLabel(op), color: color)
         }
     }
 
@@ -1043,7 +1056,7 @@ struct AntennaDetailSheet: View {
         ) {
             photosContent(details)
         }
-        Text("Les données radio affichées ici viennent du backend SignalQuest, d’Android ou de sources publiques. iOS ne collecte pas ces métriques.")
+        Text("Ces données radio viennent des mesures faites avec l’app Android et de sources publiques : un iPhone ne peut pas les relever.")
             .font(SQType.caption)
             .foregroundStyle(SQColor.labelSecondary)
     }
@@ -1068,14 +1081,16 @@ struct AntennaDetailSheet: View {
 
     private func siteContent(_ core: AntennaCoreDetails) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-                detailRow("SUP ID", core.supId)
+                detailRow("Numéro du support", core.supId)
                 // Le libellé suit le régulateur du marché : « Code ANFR » devant un
                 // identifiant ISED ou OFCOM serait faux.
-                detailRow(core.registryLabel, core.anfrCode.isEmpty ? nil : core.anfrCode)
-                detailRow("Marché", core.market)
+                detailRow(core.registryLabel, core.anfrCode.isEmpty ? nil : core.anfrCode,
+                          term: !core.isCustomSite && ["FR", "DROM"].contains(core.market?.uppercased() ?? "") ? .anfr : nil)
+                // « France » plutôt que « FR ».
+                detailRow("Marché", core.market.map { Locale.current.localizedString(forRegionCode: $0) ?? $0 })
                 detailRow(core.localityLabel, [core.postalCode, core.commune].compactMap { $0 }.joined(separator: " "))
                 detailRow("Adresse", core.address)
-                detailRow("Partage", [core.sharingKind, core.crozonLeader.map { "Crozon \($0)" }, core.zbLeader.map { "ZB \($0)" }].compactMap { $0 }.joined(separator: " · "))
+                detailRow("Partage", sharingDescription(core), term: .siteSharing)
                 if leaderReport != nil {
                     // Demande d'Alexandre : l'opérateur porteur d'un site partagé se
                     // corrige depuis la fiche même, sans chercher le bon type.
@@ -1121,14 +1136,14 @@ struct AntennaDetailSheet: View {
 
     private func technicalContent(_ core: AntennaCoreDetails) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-                detailRow("Technos", core.technologies.joined(separator: " / "))
+                detailRow("Technologies", core.technologies.joined(separator: " / "))
                 if !core.technologiesInProject.isEmpty {
                     // Déclaré à l'ANFR mais pas allumé : la distinction n'était
                     // visible que sur le site web.
                     detailRow("En projet", core.technologiesInProject.joined(separator: " · "))
                 }
-                detailRow("Bandes", core.frequencyBands.joined(separator: " / "))
-                detailRow("Azimuts", core.azimuts.prefix(12).map { "\(Int($0.rounded()))°" }.joined(separator: " · "))
+                detailRow("Bandes", core.frequencyBands.joined(separator: " / "), term: .band)
+                detailRow("Azimuts", core.azimuts.prefix(12).map { "\(Int($0.rounded()))°" }.joined(separator: " · "), term: .azimuth)
                 detailRow("Support", core.siteInfo.supportType ?? core.technical.supportType)
                 // `supportHeight` est une chaîne brute du registre (« 29,5 », « 4 ») :
                 // l'afficher telle quelle donnait une hauteur sans unité.
@@ -1139,7 +1154,7 @@ struct AntennaDetailSheet: View {
                 )
                 detailRow("Types d'antennes", core.siteInfo.antennaTypes.prefix(6).joined(separator: " · "))
                 detailRow("Propriétaire", core.siteInfo.supportOwner ?? core.rawLicenseeName)
-                detailRow("Secteurs", core.siteInfo.sectorCount.map(String.init))
+                detailRow("Secteurs", core.siteInfo.sectorCount.map(String.init), term: .sector)
                 // « Oui » ne disait rien : ni combien, ni où. Quand le registre
                 // publie les directions, on les donne ; sinon on garde le seul
                 // fait connu, mais formulé — pas en booléen.
@@ -1209,12 +1224,12 @@ struct AntennaDetailSheet: View {
                                 }
                                 detailRow("Fréquences", [carrier.txFrequencyMhz.map { "\($0) MHz TX" }, carrier.rxFrequencyMhz.map { "\($0) MHz RX" }].compactMap { $0 }.joined(separator: " · "))
                                 detailRow("Bande passante", carrier.bandwidthMhz.map { "\($0) MHz" })
-                                detailRow("DL effectif", carrier.effectiveDownlinkBandwidthMhz.map { "\($0) MHz" })
-                                detailRow("Allocation DL", carrier.downlinkAllocationPercent.map { "\(Int($0.rounded())) %" })
+                                detailRow("Bande passante utile", carrier.effectiveDownlinkBandwidthMhz.map { "\($0) MHz" })
+                                detailRow("Part en réception", carrier.downlinkAllocationPercent.map { "\(Int($0.rounded())) %" })
                                 detailRow("Puissance", carrier.txPowerDbm.map { "\($0) dBm" })
                                 detailRow("Secteur", [carrier.sectorAzimuthDeg.map { "\(Int($0.rounded()))°" }, carrier.sectorBeamwidthDeg.map { "beam \(Int($0.rounded()))°" }, carrier.antennaType].compactMap { $0 }.joined(separator: " · "))
-                                detailRow("Cell IDs", carrier.cellIds.prefix(5).joined(separator: " · "))
-                                detailRow("Physical IDs", carrier.physicalIds.prefix(5).joined(separator: " · "))
+                                detailRow("Identifiants de cellule", carrier.cellIds.prefix(5).joined(separator: " · "), term: .cellIdentifiers)
+                                detailRow("Identifiants physiques (PCI)", carrier.physicalIds.prefix(5).joined(separator: " · "))
                                 detailRow("Mise à jour", SignalFormatters.date(carrier.dateLastChanged))
                             }
                             .padding(.vertical, 8)
@@ -1272,12 +1287,34 @@ struct AntennaDetailSheet: View {
         .foregroundStyle(SQColor.label)
     }
 
-    private func detailRow(_ label: String, _ value: String?) -> some View {
+    /// « single », « crozon » et « zb » s'affichaient tels que le serveur les
+    /// envoie (TRX-26).
+    private func sharingDescription(_ core: AntennaCoreDetails) -> String? {
+        switch core.sharingKind?.lowercased() {
+        case "single":
+            return String(localized: "Non partagé")
+        case "crozon":
+            guard let leader = core.crozonLeader else { return String(localized: "Réseau partagé SFR et Bouygues (Crozon)") }
+            return String(localized: "Réseau partagé SFR et Bouygues (Crozon), opéré par \(photoOperatorLabel(leader))")
+        case "zb":
+            guard let leader = core.zbLeader else { return String(localized: "Zone blanche partagée") }
+            return String(localized: "Zone blanche partagée, opérée par \(photoOperatorLabel(leader))")
+        case nil, "":
+            return nil
+        default:
+            return core.sharingKind
+        }
+    }
+
+    /// `term` : ⓘ du glossaire à côté du libellé, à la première occurrence du
+    /// terme dans la fiche.
+    private func detailRow(_ label: String, _ value: String?, term: SQTerm? = nil) -> some View {
         let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines)
         return HStack(alignment: .firstTextBaseline) {
             Text(LocalizedStringKey(label))
                 .font(SQFont.body(12))
                 .foregroundStyle(SQColor.labelSecondary)
+            if let term { SQInfoButton(term: term) }
             Spacer(minLength: SQSpace.md)
             Text((normalized?.isEmpty == false ? normalized : "—") ?? "—")
                 .font(SQFont.body(13, .semibold))

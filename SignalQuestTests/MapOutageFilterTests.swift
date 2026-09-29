@@ -150,9 +150,9 @@ final class MapOutageFilterTests: XCTestCase {
             "Internet", "Voix", "SMS", "Touché", "%lld pannes signalées",
             "Panne signalée : service dégradé", "Panne confirmée : plus aucun service",
             // Formulaire v2 et étiquette de gravité de la carte de fil.
-            "Technologies touchées", "Technologies", "Si vous le savez. Sinon, laissez vide.",
+            "Technologies touchées", "Technologies", "Si tu le sais. Sinon, laisse vide.",
             "Rien ne passe : ni Internet, ni appels", "Panne", "Dégradé", "Rétabli",
-            "Services touchés", "Que constatez-vous ?", "Plus rien", "Touché : %@",
+            "Services touchés", "Que constates-tu ?", "Plus rien", "Touché : %@",
         ]
         for key in keys {
             XCTAssertNotEqual(

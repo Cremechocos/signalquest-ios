@@ -74,6 +74,9 @@ final class AppRouter: ObservableObject {
     /// Coordonnée à cadrer sur la carte (posée depuis un test de l'historique,
     /// consommée par MapExplorerView une fois l'onglet carte actif).
     @Published var pendingMapFocus: Coordinates?
+    /// Couche à allumer avec ce cadrage : speedtests et pannes sont éteints par
+    /// défaut, « Voir sur la carte » cadrait sur un point invisible (MES-15).
+    @Published var pendingMapLayer: MapDisplayItem.Kind?
     /// Demande de présentation du mode Drive Test (posée par l'App Intent F4 ;
     /// consommée par SpeedtestView une fois l'onglet Speed actif).
     @Published var pendingDriveTest = false
@@ -248,6 +251,7 @@ final class AppRouter: ObservableObject {
         // carte au large du golfe de Guinée. La feuille, elle, s'ouvre quand même.
         if outage.latitude != 0 || outage.longitude != 0 {
             pendingMapFocus = Coordinates(latitude: outage.latitude, longitude: outage.longitude)
+            pendingMapLayer = .outage
         }
     }
 

@@ -35,7 +35,7 @@ struct FavoriteAntennasView: View {
                     }
                 }
             } footer: {
-                Text("Les antennes suivies sont les seules pour lesquelles vous êtes prévenu dès le premier signalement, sans attendre que la communauté confirme.")
+                Text("Les antennes suivies sont les seules pour lesquelles tu reçois une alerte dès le premier signalement, sans attendre que la communauté confirme.")
             }
             .listRowBackground(SQColor.surface)
 
@@ -97,7 +97,7 @@ struct FavoriteAntennasView: View {
             Text("Aucune antenne suivie")
                 .font(SQFont.body(15, .semibold))
                 .foregroundStyle(SQColor.label)
-            Text("Ouvrez la fiche d'une antenne sur la carte et touchez l'étoile. Vous serez prévenu dès qu'un problème y est signalé.")
+            Text("Ouvre la fiche d'une antenne sur la carte et touche l'étoile. Tu recevras une alerte dès qu'un problème y est signalé.")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
         }

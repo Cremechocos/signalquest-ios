@@ -114,11 +114,13 @@ struct OutageDetailSheet: View {
         }
     }
 
+    /// Teintes des pannes communautaires (`OutageTint`, identiques sur Android) :
+    /// le jaune Tailwind d'avant tombait à 1,8:1 sur la crème (MES-36).
     var issueColor: Color {
         switch issueKey {
-        case "maintenance": return Color(hex: 0xF97316)
-        case "degraded": return Color(hex: 0xEAB308)
-        default: return Color(hex: 0xEF4444)
+        case "maintenance": return SQColor.info
+        case "degraded": return OutageTint.degraded
+        default: return OutageTint.down
         }
     }
 
@@ -151,9 +153,9 @@ struct OutageDetailSheet: View {
 
     func serviceColor(_ status: String) -> Color {
         switch status.uppercased() {
-        case "HS": return Color(hex: 0xEF4444)
-        case "DE": return Color(hex: 0xF59E0B)
-        case "OK": return Color(hex: 0x10B981)
+        case "HS": return OutageTint.down
+        case "DE": return OutageTint.degraded
+        case "OK": return OutageTint.resolved
         default: return SQColor.labelSecondary
         }
     }

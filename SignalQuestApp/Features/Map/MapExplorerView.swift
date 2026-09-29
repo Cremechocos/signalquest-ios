@@ -1327,6 +1327,10 @@ final class MapExplorerViewModel: ObservableObject {
             searchResults = []; isSearching = false; searchFailed = false
             return
         }
+        // En recherche dès la frappe : pendant l'anti-rebond, la liste encore vide
+        // affichait « Aucun résultat » avant même d'avoir cherché (UI-14).
+        isSearching = true
+        searchFailed = false
         searchTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
@@ -1956,6 +1960,13 @@ struct MapExplorerView: View {
     private func focusFromRouterIfNeeded() {
         guard let focus = router.pendingMapFocus else { return }
         router.pendingMapFocus = nil
+        if let layer = router.pendingMapLayer {
+            router.pendingMapLayer = nil
+            if !filters.contains(layer) {
+                filters.insert(layer)
+                MapFilterStore.save(filters)
+            }
+        }
         let coordinate = CLLocationCoordinate2D(latitude: focus.latitude, longitude: focus.longitude)
         requestCamera(center: coordinate, zoom: 15)
     }
@@ -2023,7 +2034,9 @@ struct MapExplorerView: View {
                     // Le mode de couverture et les limites restent dans la rangée basse.
                     // Panneau de recherche : visible dès qu'une requête est saisie
                     // (résultats, ou message « aucun résultat »/erreur).
-                    if !model.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+                    // Retours à la ligne compris : le champ multiligne en accepte, et une
+                    // requête faite d'un seul retour ouvrait le panneau sur « Aucun résultat ».
+                    if !model.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         searchSuggestions
                             .padding(.horizontal, SQSpace.md)
                     }
@@ -2219,7 +2232,11 @@ struct MapExplorerView: View {
             MapContextControls(
                 byGeneration: $coverageByGeneration,
                 showsCoverage: showsCoverageKey,
-                limitMessages: showsDisplayLimit ? model.displayLimitMessages : []
+                limitMessages: showsDisplayLimit ? model.displayLimitMessages : [],
+                antennaOperators: antennaLegendOperators,
+                marketCode: model.marketFilter,
+                // Même seuil que les traits de secteur des marqueurs.
+                showsAntennaKey: filters.contains(.antenna) && mapZoom >= 13
             )
             mapStatusToast
             HStack {
@@ -2344,7 +2361,16 @@ struct MapExplorerView: View {
                     .accessibilityIdentifier("map.search.input")
                     .onSubmit { Task { await model.search() } }
                     // Suggestions à la frappe (anti-rebond + annulation côté modèle).
-                    .onChangeCompat(of: model.searchQuery) { _, _ in model.scheduleSearch() }
+                    .onChangeCompat(of: model.searchQuery) { _, newValue in
+                        // Le champ est multiligne pour afficher deux lignes : la touche
+                        // Retour y insère un saut au lieu de lancer la recherche.
+                        if newValue.contains("\n") {
+                            model.searchQuery = newValue.replacingOccurrences(of: "\n", with: "")
+                            Task { await model.search() }
+                            return
+                        }
+                        model.scheduleSearch()
+                    }
             }
             if !model.searchQuery.isEmpty || sightOrigin != .device {
                 Button {
@@ -2428,14 +2454,15 @@ struct MapExplorerView: View {
                 Text(model.operatorShortLabel(model.operatorFilter))
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(SQColor.label)
+                    .accessibilityIdentifier("map.operator.label")
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(SQColor.label)
             }
             .padding(.horizontal, SQSpace.md)
             .frame(minHeight: 44)
-            .foregroundStyle(Color.primary)
+            .foregroundStyle(SQColor.label)
             .background(SQColor.surface, in: Capsule(style: .continuous))
             .sqShadowCard()
         }
@@ -2688,28 +2715,17 @@ struct MapExplorerView: View {
                 Image(systemName: "antenna.radiowaves.left.and.right")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(SQColor.brandRed)
-                Text(site.siteId ?? site.id)
-                    .font(SQFont.body(14, .semibold))
-                    .lineLimit(2)
-                if let address = site.address {
-                    Text(address)
-                        .font(SQFont.body(13))
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(2)
-                }
+                // L'adresse d'abord, le numéro ensuite : « 37199 40 av leclerc
+                // 69007 » accolait les deux sur une ligne (UI-10).
+                searchResultText(
+                    title: site.address ?? String(localized: "Site \(site.siteId ?? site.id)"),
+                    subtitle: antennaSearchSubtitle(site)
+                )
             case .place(let place):
                 Image(systemName: "mappin.circle.fill")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(SQColor.brandRed)
-                Text(place.name)
-                    .font(SQFont.body(14, .semibold))
-                    .lineLimit(2)
-                if let subtitle = place.subtitle {
-                    Text(subtitle)
-                        .font(SQFont.body(13))
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(2)
-                }
+                searchResultText(title: place.name, subtitle: place.subtitle)
             }
             Spacer()
         }
@@ -2718,6 +2734,50 @@ struct MapExplorerView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
         .sqShadowSoft()
+    }
+
+    /// Opérateurs du marché affiché, dans la couleur exacte de leurs marqueurs.
+    private var antennaLegendOperators: [MapAntennaLegendOperator] {
+        (model.currentMarketEntry?.operators ?? [])
+            .filter { $0.key.uppercased() != "ALL" }
+            .map { MapAntennaLegendOperator(key: $0.key, label: $0.label, color: model.operatorAccent($0.key)) }
+    }
+
+    private func searchResultText(title: String, subtitle: String?) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title)
+                .font(SQFont.body(14, .semibold))
+                .lineLimit(2)
+            if let subtitle, !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(SQFont.body(13))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(2)
+            }
+        }
+    }
+
+    /// « Orange · Free · site n° 37199 ». Le numéro n'apparaît que s'il vient du
+    /// registre (pas un identifiant interne) et que l'adresse fait déjà le titre.
+    private func antennaSearchSubtitle(_ site: AntennaSite) -> String {
+        var seen = Set<String>()
+        var parts = site.operators
+            .filter { seen.insert($0.uppercased()).inserted }
+            .map(searchOperatorLabel)
+        if site.address != nil, let number = site.siteId, !number.isEmpty {
+            parts.append(String(localized: "site n° \(number)"))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// La recherche couvre tous les pays : une clé d'un autre marché
+    /// (« ORANGE_LU ») se nomme dans le registre de son pays, désigné par son
+    /// suffixe.
+    private func searchOperatorLabel(_ key: String) -> String {
+        let label = model.operatorLabel(key)
+        guard label == key, let suffix = key.split(separator: "_").last, suffix.count == 2,
+              let entry = model.registryMarket(forCode: String(suffix)) else { return label }
+        return MarketRegistryEntry.operatorLabel(key, in: entry)
     }
 
     private func selectSearchResult(_ result: MapSearchResult) {

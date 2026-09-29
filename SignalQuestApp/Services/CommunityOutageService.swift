@@ -215,25 +215,25 @@ enum OutageWriteError {
     static func phrase(forCode code: String?) -> String? {
         switch code?.trimmingCharacters(in: .whitespaces).uppercased() {
         case "UNAUTHORIZED":
-            return String(localized: "Connectez-vous pour signaler une panne ou vous prononcer.")
+            return String(localized: "Connecte-toi pour signaler une panne ou donner ton avis.")
         case "NOT_FOUND", "OUTAGE_NOT_FOUND":
             return String(localized: "Cette panne n'existe plus.")
         case "NOT_AUTHOR":
             return String(localized: "Seul l'auteur du signalement peut refermer cette panne.")
         case "OUTAGE_CLOSED":
-            return String(localized: "Cette panne est refermée. Signalez-en une nouvelle si le problème dure.")
+            return String(localized: "Cette panne est refermée. Signales-en une nouvelle si le problème dure.")
         case "SELF_CONFIRMATION":
-            return String(localized: "Vous ne pouvez pas confirmer votre propre signalement.")
+            return String(localized: "Tu ne peux pas confirmer ton propre signalement.")
         case "ALREADY_REPORTED", "DUPLICATE_REPORT":
-            return String(localized: "Vous avez déjà signalé cette panne.")
+            return String(localized: "Tu as déjà signalé cette panne.")
         case "OPERATOR_INCIDENT_ACTIVE":
             return String(localized: "L’opérateur a déjà déclaré cet incident. Il est affiché sur la carte, sans doublon communautaire.")
         case "OPEN_CONFLICT":
             return String(localized: "Une panne est déjà ouverte sur ce site pour cet opérateur.")
         case "NOT_ELIGIBLE":
-            return String(localized: "Approchez-vous du site, ou relevez-y du signal : c'est ce qui vous permet de vous prononcer.")
+            return String(localized: "Approche-toi du site, ou relèves-y du signal : c'est ce qui te permet de donner ton avis.")
         case "POSITION_REQUIRED":
-            return String(localized: "Activez la localisation pour signaler une panne ici.")
+            return String(localized: "Active la localisation pour signaler une panne ici.")
         case "UNKNOWN_SITE", "INVALID_TARGET_KIND":
             return String(localized: "Ce site n'a pas été reconnu.")
         case "MISSING_SCOPE", "INVALID_OPERATOR", "MARKET_OPERATOR_MISMATCH":
@@ -243,7 +243,7 @@ enum OutageWriteError {
         case "PAYLOAD_TOO_LARGE":
             return String(localized: "Les mesures jointes sont trop volumineuses.")
         case "INVALID_DEVICE_ID":
-            return String(localized: "SignalQuest n’a pas pu vérifier cette installation. Relancez l’application puis réessayez.")
+            return String(localized: "SignalQuest n’a pas pu vérifier cette installation. Relance l’app puis réessaie.")
         default:
             return nil
         }

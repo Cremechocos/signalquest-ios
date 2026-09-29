@@ -215,18 +215,21 @@ struct CommunityOutagesListView: View {
                     }
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
+                    // Seule ligne de sa section : le séparateur ne séparait rien (UI-18).
+                    .listRowSeparator(.hidden)
                 }
             } else if !model.isLoading, model.outages.isEmpty {
                 Section {
                     EmptyStateView(
                         title: model.scope == .mine ? "Rien signalé pour l'instant" : "Aucune panne signalée",
                         message: model.scope == .mine
-                            ? "Ouvrez la fiche d'une antenne sur la carte pour signaler une panne, ou confirmez celle de quelqu'un d'autre."
+                            ? "Ouvre la fiche d'une antenne sur la carte pour signaler une panne, ou confirme celle de quelqu'un d'autre."
                             : "Personne n'a signalé de panne en ce moment. Bonne nouvelle.",
                         systemImage: "exclamationmark.triangle"
                     )
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
                 }
             } else {
                 Section {

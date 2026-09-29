@@ -4654,6 +4654,22 @@
         }
       }
     },
+    "Active la localisation pour signaler une panne ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on location to report an outage here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active la localisation pour signaler une panne ici."
+          }
+        }
+      }
+    },
     "Active la localisation pour situer ce site par rapport à toi." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -4812,22 +4828,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activer le partage"
-          }
-        }
-      }
-    },
-    "Activez la localisation pour signaler une panne ici." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Turn on location to report an outage here."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activez la localisation pour signaler une panne ici."
           }
         }
       }
@@ -6115,6 +6115,22 @@
         }
       }
     },
+    "Anneau : le site émet en 5G, vert quand son identifiant 5G est connu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ring: the site broadcasts 5G, green when its 5G identifier is known"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anneau : le site émet en 5G, vert quand son identifiant 5G est connu"
+          }
+        }
+      }
+    },
     "Annulé" : {
       "localizations" : {
         "en" : {
@@ -6304,6 +6320,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Antenne la plus proche · %1$@ · écart %2$lld°"
+          }
+        }
+      }
+    },
+    "Antenne partagée par %lld opérateurs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna shared by %lld carriers"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenne partagée par %lld opérateurs"
           }
         }
       }
@@ -6871,7 +6903,23 @@
         }
       }
     },
-    "Approchez-vous du site pour vous prononcer." : {
+    "Approche-toi du site, ou relèves-y du signal : c'est ce qui te permet de donner ton avis." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get closer to the site, or record signal there: that is what lets you have your say."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approche-toi du site, ou relèves-y du signal : c'est ce qui te permet de donner ton avis."
+          }
+        }
+      }
+    },
+    "Approche-toi du site pour donner ton avis." : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -6883,23 +6931,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Approchez-vous du site pour vous prononcer."
-          }
-        }
-      }
-    },
-    "Approchez-vous du site, ou relevez-y du signal : c'est ce qui vous permet de vous prononcer." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Get closer to the site, or record signal there: that is what lets you have your say."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Approchez-vous du site, ou relevez-y du signal : c'est ce qui vous permet de vous prononcer."
+            "value" : "Approche-toi du site pour donner ton avis."
           }
         }
       }
@@ -9388,6 +9420,7 @@
       }
     },
     "Azimuts" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9701,7 +9734,42 @@
         }
       }
     },
+    "Bande passante" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bandwidth"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bande passante"
+          }
+        }
+      }
+    },
+    "Bande passante utile" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usable bandwidth"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bande passante utile"
+          }
+        }
+      }
+    },
     "Bandes" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -10786,7 +10854,7 @@
         }
       }
     },
-    "Ce que l'iPhone sait du réseau. Votre position n'est jamais publiée." : {
+    "Ce que l'iPhone sait du réseau. Ta position n'est jamais publiée." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -10797,7 +10865,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce que l'iPhone sait du réseau. Votre position n'est jamais publiée."
+            "value" : "Ce que l'iPhone sait du réseau. Ta position n'est jamais publiée."
           }
         }
       }
@@ -11388,6 +11456,22 @@
         }
       }
     },
+    "Ces données radio viennent des mesures faites avec l’app Android et de sources publiques : un iPhone ne peut pas les relever." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This radio data comes from measurements made with the Android app and from public sources: an iPhone cannot record it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ces données radio viennent des mesures faites avec l’app Android et de sources publiques : un iPhone ne peut pas les relever."
+          }
+        }
+      }
+    },
     "Ces partages sont désactivés par défaut. Les désactiver retire aussi les données temps réel déjà publiées." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -11696,7 +11780,7 @@
         }
       }
     },
-    "Cette panne est refermée. Signalez-en une nouvelle si le problème dure." : {
+    "Cette panne est refermée. Signales-en une nouvelle si le problème dure." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -11707,7 +11791,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cette panne est refermée. Signalez-en une nouvelle si le problème dure."
+            "value" : "Cette panne est refermée. Signales-en une nouvelle si le problème dure."
           }
         }
       }
@@ -13130,6 +13214,22 @@
         }
       }
     },
+    "Coche : identifiant 4G connu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check mark: 4G identifier known"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coche : identifiant 4G connu"
+          }
+        }
+      }
+    },
     "Code 2FA accepté mais utilisateur absent" : {
       "localizations" : {
         "en" : {
@@ -14141,6 +14241,22 @@
         }
       }
     },
+    "Connecte-toi pour signaler une panne ou donner ton avis." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to report an outage or have your say."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecte-toi pour signaler une panne ou donner ton avis."
+          }
+        }
+      }
+    },
     "Connectez-vous pour la suivre et la retrouver ici." : {
       "localizations" : {
         "en" : {
@@ -14153,22 +14269,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Connectez-vous pour la suivre et la retrouver ici."
-          }
-        }
-      }
-    },
-    "Connectez-vous pour signaler une panne ou vous prononcer." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sign in to report an outage or have your say."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connectez-vous pour signaler une panne ou vous prononcer."
           }
         }
       }
@@ -14724,7 +14824,7 @@
       }
     },
     "Coordonnées" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14939,6 +15039,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Layers"
+          }
+        }
+      }
+    },
+    "Couleurs des opérateurs, secteurs et repères des sites" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carrier colors, sectors and site markers"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleurs des opérateurs, secteurs et repères des sites"
           }
         }
       }
@@ -17055,7 +17171,7 @@
         }
       }
     },
-    "Depuis quand, ce que vous avez essayé…" : {
+    "Depuis quand, ce que tu as essayé…" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -17066,7 +17182,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Depuis quand, ce que vous avez essayé…"
+            "value" : "Depuis quand, ce que tu as essayé…"
           }
         }
       }
@@ -17251,6 +17367,7 @@
       }
     },
     "Dernière mesure" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -17294,6 +17411,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dernière mesure · %@"
+          }
+        }
+      }
+    },
+    "Dernière mise à jour" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last update"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière mise à jour"
           }
         }
       }
@@ -19551,6 +19685,23 @@
         }
       }
     },
+    "En projet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En projet"
+          }
+        }
+      }
+    },
     "en service" : {
       "localizations" : {
         "en" : {
@@ -21271,6 +21422,7 @@
       }
     },
     "Faisceau hertzien" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -21634,7 +21786,7 @@
       }
     },
     "Fréquences" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -22096,6 +22248,23 @@
         }
       }
     },
+    "Hauteur support" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Structure height"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hauteur support"
+          }
+        }
+      }
+    },
     "Heure" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -22403,6 +22572,7 @@
       }
     },
     "Identifiants de cellule" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -22414,6 +22584,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Identifiants de cellule"
+          }
+        }
+      }
+    },
+    "Identifiants physiques (PCI)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Physical IDs (PCI)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifiants physiques (PCI)"
           }
         }
       }
@@ -24907,7 +25094,7 @@
         }
       }
     },
-    "La direction dans laquelle pointe l'antenne. Sinon, laissez vide." : {
+    "La direction dans laquelle pointe l'antenne. Sinon, laisse vide." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -24918,7 +25105,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La direction dans laquelle pointe l'antenne. Sinon, laissez vide."
+            "value" : "La direction dans laquelle pointe l'antenne. Sinon, laisse vide."
           }
         }
       }
@@ -27252,6 +27439,22 @@
         }
       }
     },
+    "Légende des antennes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna legend"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Légende des antennes"
+          }
+        }
+      }
+    },
     "Légende génération" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -27415,7 +27618,7 @@
         }
       }
     },
-    "Les antennes suivies sont les seules pour lesquelles vous êtes prévenu dès le premier signalement, sans attendre que la communauté confirme." : {
+    "Les antennes suivies sont les seules pour lesquelles tu reçois une alerte dès le premier signalement, sans attendre que la communauté confirme." : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -27427,7 +27630,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les antennes suivies sont les seules pour lesquelles vous êtes prévenu dès le premier signalement, sans attendre que la communauté confirme."
+            "value" : "Les antennes suivies sont les seules pour lesquelles tu reçois une alerte dès le premier signalement, sans attendre que la communauté confirme."
           }
         }
       }
@@ -27574,22 +27777,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les deux mots de passe ne correspondent pas."
-          }
-        }
-      }
-    },
-    "Les données radio affichées ici viennent du backend SignalQuest, d’Android ou de sources publiques. iOS ne collecte pas ces métriques." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The radio data shown here comes from the SignalQuest backend, from Android or from public sources. iOS doesn't collect these metrics."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les données radio affichées ici viennent du backend SignalQuest, d’Android ou de sources publiques. iOS ne collecte pas ces métriques."
           }
         }
       }
@@ -27925,7 +28112,7 @@
         }
       }
     },
-    "Les seules antennes pour lesquelles vous êtes prévenu dès le premier signalement, sans attendre que la communauté confirme." : {
+    "Les seules antennes pour lesquelles tu reçois une alerte dès le premier signalement, sans attendre que la communauté confirme." : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -27937,7 +28124,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les seules antennes pour lesquelles vous êtes prévenu dès le premier signalement, sans attendre que la communauté confirme."
+            "value" : "Les seules antennes pour lesquelles tu reçois une alerte dès le premier signalement, sans attendre que la communauté confirme."
           }
         }
       }
@@ -28624,7 +28811,7 @@
       }
     },
     "Marché" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -30221,7 +30408,7 @@
       }
     },
     "Mise à jour" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -31523,6 +31710,22 @@
         }
       }
     },
+    "Non partagé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not shared"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non partagé"
+          }
+        }
+      }
+    },
     "Non précisé" : {
       "localizations" : {
         "en" : {
@@ -31990,6 +32193,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouvelle zone privée"
+          }
+        }
+      }
+    },
+    "Numéro du support" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Structure number"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numéro du support"
           }
         }
       }
@@ -32849,6 +33069,40 @@
         }
       }
     },
+    "Ouvre la fiche d'une antenne sur la carte pour signaler une panne, ou confirme celle de quelqu'un d'autre." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open an antenna on the map to report an outage, or confirm someone else's."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre la fiche d'une antenne sur la carte pour signaler une panne, ou confirme celle de quelqu'un d'autre."
+          }
+        }
+      }
+    },
+    "Ouvre la fiche d'une antenne sur la carte et touche l'étoile. Tu recevras une alerte dès qu'un problème y est signalé." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open an antenna on the map and tap the star. You will hear about it as soon as a problem is reported there."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre la fiche d'une antenne sur la carte et touche l'étoile. Tu recevras une alerte dès qu'un problème y est signalé."
+          }
+        }
+      }
+    },
     "Ouvre la fiche de l'ami" : {
       "localizations" : {
         "en" : {
@@ -33156,40 +33410,6 @@
         }
       }
     },
-    "Ouvrez la fiche d'une antenne sur la carte et touchez l'étoile. Vous serez prévenu dès qu'un problème y est signalé." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open an antenna on the map and tap the star. You will hear about it as soon as a problem is reported there."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ouvrez la fiche d'une antenne sur la carte et touchez l'étoile. Vous serez prévenu dès qu'un problème y est signalé."
-          }
-        }
-      }
-    },
-    "Ouvrez la fiche d'une antenne sur la carte pour signaler une panne, ou confirmez celle de quelqu'un d'autre." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open an antenna on the map to report an outage, or confirm someone else's."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ouvrez la fiche d'une antenne sur la carte pour signaler une panne, ou confirmez celle de quelqu'un d'autre."
-          }
-        }
-      }
-    },
     "Ouvrez SignalQuest pour afficher le message." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -33486,7 +33706,7 @@
         }
       }
     },
-    "Panne confirmée près de vous" : {
+    "Panne confirmée près de toi" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -33498,7 +33718,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Panne confirmée près de vous"
+            "value" : "Panne confirmée près de toi"
           }
         }
       }
@@ -33605,7 +33825,7 @@
         }
       }
     },
-    "Panne signalée près de vous" : {
+    "Panne signalée près de toi" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -33617,7 +33837,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Panne signalée près de vous"
+            "value" : "Panne signalée près de toi"
           }
         }
       }
@@ -33834,6 +34054,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Paris centre"
+          }
+        }
+      }
+    },
+    "Partage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sharing"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partage"
+          }
+        }
+      }
+    },
+    "Part en réception" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download share"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Part en réception"
           }
         }
       }
@@ -36048,7 +36302,7 @@
         }
       }
     },
-    "Position inconnue — le signalement partira si vous avez déjà relevé du signal ici." : {
+    "Position inconnue : le signalement partira si tu as déjà relevé du signal ici." : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -36060,7 +36314,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Position inconnue — le signalement partira si vous avez déjà relevé du signal ici."
+            "value" : "Position inconnue : le signalement partira si tu as déjà relevé du signal ici."
           }
         }
       }
@@ -37024,7 +37278,7 @@
       }
     },
     "Propriétaire" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -37371,6 +37625,23 @@
         }
       }
     },
+    "Puissance" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Power"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puissance"
+          }
+        }
+      }
+    },
     "Puissance du signal (RSRP)" : {
       "localizations" : {
         "en" : {
@@ -37547,7 +37818,7 @@
         }
       }
     },
-    "Que constatez-vous ?" : {
+    "Que constates-tu ?" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -37559,7 +37830,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Que constatez-vous ?"
+            "value" : "Que constates-tu ?"
           }
         }
       }
@@ -40474,6 +40745,38 @@
         }
       }
     },
+    "Réseau partagé SFR et Bouygues (Crozon)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network shared by SFR and Bouygues (Crozon)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réseau partagé SFR et Bouygues (Crozon)"
+          }
+        }
+      }
+    },
+    "Réseau partagé SFR et Bouygues (Crozon), opéré par %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network shared by SFR and Bouygues (Crozon), run by %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réseau partagé SFR et Bouygues (Crozon), opéré par %@"
+          }
+        }
+      }
+    },
     "Réseau rétabli" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -41453,7 +41756,7 @@
       }
     },
     "RSRQ moy." : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -41958,6 +42261,7 @@
       }
     },
     "Secteur" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -42070,7 +42374,7 @@
       }
     },
     "Secteurs" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -42883,7 +43187,7 @@
         }
       }
     },
-    "Seules les bandes de ce site sont proposées. Sinon, laissez vide." : {
+    "Seules les bandes de ce site sont proposées. Sinon, laisse vide." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -42894,7 +43198,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seules les bandes de ce site sont proposées. Sinon, laissez vide."
+            "value" : "Seules les bandes de ce site sont proposées. Sinon, laisse vide."
           }
         }
       }
@@ -42980,6 +43284,23 @@
         }
       }
     },
+    "Si tu le sais. Sinon, laisse vide." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you know. Otherwise leave it empty."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si tu le sais. Sinon, laisse vide."
+          }
+        }
+      }
+    },
     "Si un compte correspond à cette adresse, un lien de réinitialisation t’a été envoyé. Ouvre ce lien pour choisir ton nouveau mot de passe." : {
       "localizations" : {
         "en" : {
@@ -42992,23 +43313,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Si un compte correspond à cette adresse, un lien de réinitialisation t’a été envoyé. Ouvre ce lien pour choisir ton nouveau mot de passe."
-          }
-        }
-      }
-    },
-    "Si vous le savez. Sinon, laissez vide." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "If you know. Otherwise leave it empty."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Si vous le savez. Sinon, laissez vide."
           }
         }
       }
@@ -43358,7 +43662,7 @@
         }
       }
     },
-    "SignalQuest n’a pas pu vérifier cette installation. Relancez l’application puis réessayez." : {
+    "SignalQuest n’a pas pu vérifier cette installation. Relance l’app puis réessaie." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -43369,7 +43673,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SignalQuest n’a pas pu vérifier cette installation. Relancez l’application puis réessayez."
+            "value" : "SignalQuest n’a pas pu vérifier cette installation. Relance l’app puis réessaie."
           }
         }
       }
@@ -43815,6 +44119,22 @@
         }
       }
     },
+    "site n° %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "site no. %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "site n° %@"
+          }
+        }
+      }
+    },
     "Site partagé — touche un opérateur pour voir sa fiche" : {
       "localizations" : {
         "en" : {
@@ -43827,6 +44147,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Site partagé — touche un opérateur pour voir sa fiche"
+          }
+        }
+      }
+    },
+    "Site partagé : une part par opérateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared site: one slice per carrier"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site partagé : une part par opérateur"
           }
         }
       }
@@ -44078,7 +44414,7 @@
       }
     },
     "SNR moy." : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -44700,6 +45036,7 @@
       }
     },
     "Statut" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -45084,6 +45421,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "support"
+          }
+        }
+      }
+    },
+    "Support" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Structure"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support"
           }
         }
       }
@@ -45668,6 +46022,22 @@
         }
       }
     },
+    "Sur un site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On a site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur un site"
+          }
+        }
+      }
+    },
     "Surveillance suspendue : l’adresse a changé de réseau. Vérifiez depuis le site qu’elle vous appartient toujours." : {
       "localizations" : {
         "en" : {
@@ -45924,6 +46294,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ta story"
+          }
+        }
+      }
+    },
+    "TAC" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TAC"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TAC"
           }
         }
       }
@@ -46947,6 +47334,23 @@
         }
       }
     },
+    "Ton signalement est visible tout de suite. Il devient « confirmé » quand deux autres personnes constatent la même chose." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your report shows up right away. It becomes “confirmed” once two other people see the same thing."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton signalement est visible tout de suite. Il devient « confirmé » quand deux autres personnes constatent la même chose."
+          }
+        }
+      }
+    },
     "Total : %@ s" : {
       "localizations" : {
         "en" : {
@@ -47550,6 +47954,22 @@
         }
       }
     },
+    "Trait : direction d’un secteur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Line: direction of a sector"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trait : direction d’un secteur"
+          }
+        }
+      }
+    },
     "Traits" : {
       "localizations" : {
         "en" : {
@@ -47841,6 +48261,124 @@
         }
       }
     },
+    "Tu as déjà signalé cette panne." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have already reported this outage."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as déjà signalé cette panne."
+          }
+        }
+      }
+    },
+    "Tu as signalé cette panne." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You reported this outage."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as signalé cette panne."
+          }
+        }
+      }
+    },
+    "Tu as confirmé cette panne." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You confirmed this outage."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as confirmé cette panne."
+          }
+        }
+      }
+    },
+    "Tu as indiqué que ça marche." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You said it works."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as indiqué que ça marche."
+          }
+        }
+      }
+    },
+    "Tu as signalé le rétablissement." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You reported it as back up."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as signalé le rétablissement."
+          }
+        }
+      }
+    },
+    "Tu as signalé la panne" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You reported the outage"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as signalé la panne"
+          }
+        }
+      }
+    },
+    "Tu as refermé la panne" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You closed the outage"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as refermé la panne"
+          }
+        }
+      }
+    },
     "Tu avais déjà signalé ce problème pour ce site. Merci !" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -47854,6 +48392,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tu avais déjà signalé ce problème pour ce site. Merci !"
+          }
+        }
+      }
+    },
+    "Tu confirmes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You confirm"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu confirmes"
+          }
+        }
+      }
+    },
+    "Tu confirmes — %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You confirm — %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu confirmes — %@"
+          }
+        }
+      }
+    },
+    "Tu dis que ça marche" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You say it works"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu dis que ça marche"
           }
         }
       }
@@ -47888,6 +48477,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tu es à %@ du site."
+          }
+        }
+      }
+    },
+    "Tu es à %lld m du site." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You are %lld m from the site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu es à %lld m du site."
+          }
+        }
+      }
+    },
+    "Tu es à %lld m du site, à %lld m près." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You are %lld m from the site, give or take %lld m."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu es à %lld m du site, à %lld m près."
           }
         }
       }
@@ -47954,6 +48577,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "tu es très près du pied du support"
+          }
+        }
+      }
+    },
+    "Tu ne peux pas confirmer ton propre signalement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You cannot confirm your own report."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu ne peux pas confirmer ton propre signalement."
           }
         }
       }
@@ -48104,6 +48743,40 @@
         }
       }
     },
+    "Tu signales aussi la panne" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You are also reporting the outage"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu signales aussi la panne"
+          }
+        }
+      }
+    },
+    "Tu signales le rétablissement" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You report it as back up"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu signales le rétablissement"
+          }
+        }
+      }
+    },
     "Tuiles Carto Positron (raster, clair)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -48200,6 +48873,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Type de support"
+          }
+        }
+      }
+    },
+    "Types d'antennes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna types"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Types d'antennes"
           }
         }
       }
@@ -50236,226 +50926,6 @@
         }
       }
     },
-    "Votre signalement est visible tout de suite. Il devient « confirmé » quand deux autres personnes constatent la même chose." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your report shows up right away. It becomes “confirmed” once two other people see the same thing."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Votre signalement est visible tout de suite. Il devient « confirmé » quand deux autres personnes constatent la même chose."
-          }
-        }
-      }
-    },
-    "Vous avez confirmé cette panne." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You confirmed this outage."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous avez confirmé cette panne."
-          }
-        }
-      }
-    },
-    "Vous avez déjà signalé cette panne." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You have already reported this outage."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous avez déjà signalé cette panne."
-          }
-        }
-      }
-    },
-    "Vous avez indiqué que ça marche." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You said it works."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous avez indiqué que ça marche."
-          }
-        }
-      }
-    },
-    "Vous avez refermé la panne" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You closed the outage"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous avez refermé la panne"
-          }
-        }
-      }
-    },
-    "Vous avez signalé cette panne." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You reported this outage."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous avez signalé cette panne."
-          }
-        }
-      }
-    },
-    "Vous avez signalé la panne" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You reported the outage"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous avez signalé la panne"
-          }
-        }
-      }
-    },
-    "Vous avez signalé le rétablissement." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You reported it as back up."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous avez signalé le rétablissement."
-          }
-        }
-      }
-    },
-    "Vous confirmez" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You confirm"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous confirmez"
-          }
-        }
-      }
-    },
-    "Vous confirmez — %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You confirm — %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous confirmez — %@"
-          }
-        }
-      }
-    },
-    "Vous dites que ça marche" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You say it works"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous dites que ça marche"
-          }
-        }
-      }
-    },
-    "Vous êtes à %lld m du site, à %lld m près." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You are %lld m from the site, give or take %lld m."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous êtes à %lld m du site, à %lld m près."
-          }
-        }
-      }
-    },
-    "Vous êtes à %lld m du site." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You are %lld m from the site."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous êtes à %lld m du site."
-          }
-        }
-      }
-    },
     "Vous êtes arrivé." : {
       "localizations" : {
         "en" : {
@@ -50484,56 +50954,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vous ne partagerez plus vos positions ni vos mesures. Tu pourras renvoyer une demande plus tard."
-          }
-        }
-      }
-    },
-    "Vous ne pouvez pas confirmer votre propre signalement." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You cannot confirm your own report."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous ne pouvez pas confirmer votre propre signalement."
-          }
-        }
-      }
-    },
-    "Vous signalez aussi la panne" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You are also reporting the outage"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous signalez aussi la panne"
-          }
-        }
-      }
-    },
-    "Vous signalez le rétablissement" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You report it as back up"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous signalez le rétablissement"
           }
         }
       }
@@ -50811,6 +51231,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zone blanche"
+          }
+        }
+      }
+    },
+    "Zone blanche partagée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared white-zone site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zone blanche partagée"
+          }
+        }
+      }
+    },
+    "Zone blanche partagée, opérée par %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared white-zone site, run by %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zone blanche partagée, opérée par %@"
           }
         }
       }

@@ -131,6 +131,13 @@ enum CoverageGenerationBand: String, CaseIterable, Identifiable {
 
     var title: String { scale.label }
 
+    /// « LTE » au Canada et aux États-Unis, comme le filtre : un testeur de
+    /// Montréal lisait « 4G » dans la légende (UI-02).
+    func title(forMarket code: String?) -> String {
+        guard self == .g4, let code else { return title }
+        return MapFilterCatalog.technologies(forMarket: code).first { $0.value == "4G" }?.label ?? title
+    }
+
     var colorHex: UInt32 { scale.hex }
 
     var swiftUIColor: Color { Color(hex: colorHex) }

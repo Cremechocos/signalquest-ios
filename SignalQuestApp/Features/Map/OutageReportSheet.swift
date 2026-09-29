@@ -90,7 +90,7 @@ struct OutageReportSheet: View {
                             .foregroundStyle(SQColor.danger)
                     }
                     submitButton
-                    Text("Votre signalement est visible tout de suite. Il devient « confirmé » quand deux autres personnes constatent la même chose.")
+                    Text("Ton signalement est visible tout de suite. Il devient « confirmé » quand deux autres personnes constatent la même chose.")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
@@ -143,7 +143,7 @@ struct OutageReportSheet: View {
     }
 
     private var whatSection: some View {
-        module("Que constatez-vous ?") {
+        module("Que constates-tu ?") {
             VStack(spacing: SQSpace.sm) {
                 severityOption(
                     .down,
@@ -190,7 +190,7 @@ struct OutageReportSheet: View {
                         technologyChip(token)
                     }
                 }
-                Text("Si vous le savez. Sinon, laissez vide.")
+                Text("Si tu le sais. Sinon, laisse vide.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
             }
@@ -210,7 +210,7 @@ struct OutageReportSheet: View {
                         tint: tint
                     ) { draft.toggle(band: band.token) }
                 }
-                Text("Seules les bandes de ce site sont proposées. Sinon, laissez vide.")
+                Text("Seules les bandes de ce site sont proposées. Sinon, laisse vide.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
             }
@@ -236,7 +236,7 @@ struct OutageReportSheet: View {
                         tint: tint
                     ) { draft.toggle(sector: azimuth) }
                 }
-                Text("La direction dans laquelle pointe l'antenne. Sinon, laissez vide.")
+                Text("La direction dans laquelle pointe l'antenne. Sinon, laisse vide.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
             }
@@ -252,7 +252,7 @@ struct OutageReportSheet: View {
         module("Joindre la mesure") {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
                 Toggle(isOn: $draft.attachRadio) {
-                    Text("Ce que l'iPhone sait du réseau. Votre position n'est jamais publiée.")
+                    Text("Ce que l'iPhone sait du réseau. Ta position n'est jamais publiée.")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
@@ -278,7 +278,7 @@ struct OutageReportSheet: View {
         module("Précisions") {
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 TextField(
-                    "Depuis quand, ce que vous avez essayé…",
+                    "Depuis quand, ce que tu as essayé…",
                     text: $draft.comment,
                     axis: .vertical
                 )
@@ -318,12 +318,12 @@ struct OutageReportSheet: View {
     /// affichées en français. Même correction que `module` / `severityOption` juste au-dessus.
     private var positionLabel: String {
         guard let distanceMeters else {
-            return String(localized: "Position inconnue — le signalement partira si vous avez déjà relevé du signal ici.")
+            return String(localized: "Position inconnue : le signalement partira si tu as déjà relevé du signal ici.")
         }
         guard let accuracyMeters else {
-            return String(localized: "Vous êtes à \(distanceMeters) m du site.")
+            return String(localized: "Tu es à \(distanceMeters) m du site.")
         }
-        return String(localized: "Vous êtes à \(distanceMeters) m du site, à \(accuracyMeters) m près.")
+        return String(localized: "Tu es à \(distanceMeters) m du site, à \(accuracyMeters) m près.")
     }
 
     private var submitButton: some View {

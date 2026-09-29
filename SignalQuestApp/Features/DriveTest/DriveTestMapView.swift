@@ -250,7 +250,8 @@ struct DriveTestMapView: UIViewRepresentable {
             }
             if let poly = overlay as? MKPolygon {
                 let r = MKPolygonRenderer(polygon: poly)
-                let color: UIColor = (coneInSector[ObjectIdentifier(poly)] ?? false) ? .systemGreen : .systemOrange
+                // Mêmes couleurs que le bandeau « Dans le secteur / Hors secteur » (MES-36).
+                let color = UIColor((coneInSector[ObjectIdentifier(poly)] ?? false) ? SQColor.success : SQColor.warning)
                 r.fillColor = color.withAlphaComponent(0.20)
                 r.strokeColor = color.withAlphaComponent(0.6)
                 r.lineWidth = 1
