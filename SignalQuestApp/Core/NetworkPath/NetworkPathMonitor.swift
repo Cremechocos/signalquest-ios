@@ -190,12 +190,28 @@ struct NetworkPathStatus: Equatable, Sendable {
     }
 }
 
+/// Dernier état cellulaire vu au moment où TOUT réseau a disparu : c'est ce que
+/// « Plus de réseau depuis 12 min, dernière vue 4G » raconte dans une panne.
+struct CellularServiceLoss: Equatable, Sendable {
+    let technology: CellularRadioTechnology
+    let operatorName: String?
+    let operatorMcc: Int?
+    let operatorMnc: Int?
+    let lostAt: Date
+}
+
 @MainActor
 final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkInfoDelegate {
     @Published private(set) var status: NetworkPathStatus = .unknown
     /// `false` quand aucun chemin réseau n'est exploitable (mode avion, perte de
     /// connexion). Pilote la bannière hors-ligne globale.
     @Published private(set) var isOnline = true
+    /// Perte du réseau cellulaire observée par CE processus, effacée au retour d'un chemin :
+    /// tant qu'elle existe, l'appareil est resté hors ligne depuis `lostAt`.
+    private(set) var lastCellularLoss: CellularServiceLoss?
+    /// iOS refuse les données cellulaires À CETTE APP (Réglages > Données cellulaires) :
+    /// hors ligne ne dit alors rien du réseau lui-même.
+    private(set) var isCellularDataDeniedForApp = false
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "SignalQuest.NetworkPathMonitor")
     private let telephony = CTTelephonyNetworkInfo()
@@ -228,8 +244,10 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
         monitor.pathUpdateHandler = { [weak self] path in
             let snapshot = NetworkPathSnapshot(path: path)
             let satisfied = path.status == .satisfied
+            let cellularDenied = !satisfied && path.unsatisfiedReason == .cellularDenied
             Task { @MainActor in
                 guard let self else { return }
+                self.recordCellularLoss(satisfied: satisfied, cellularDenied: cellularDenied)
                 self.latestPathSnapshot = snapshot
                 // `@Published` émet à CHAQUE assignation, égalité ou non. Cet
                 // objet est injecté en `@EnvironmentObject` à la racine : une
@@ -255,6 +273,24 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
     nonisolated func dataServiceIdentifierDidChange(_ identifier: String) {
         Task { @MainActor [weak self] in
             self?.refreshStatus()
+        }
+    }
+
+    /// Photographie le cellulaire au moment où il disparaît, AVANT que `refreshStatus()`
+    /// n'efface techno et opérateur d'un chemin devenu indisponible.
+    private func recordCellularLoss(satisfied: Bool, cellularDenied: Bool) {
+        isCellularDataDeniedForApp = cellularDenied
+        if satisfied {
+            lastCellularLoss = nil
+        } else if lastCellularLoss == nil, status.connection == .cellular,
+                  let technology = status.cellularTechnology {
+            lastCellularLoss = CellularServiceLoss(
+                technology: technology,
+                operatorName: status.operatorName,
+                operatorMcc: status.operatorMcc,
+                operatorMnc: status.operatorMnc,
+                lostAt: Date()
+            )
         }
     }
 

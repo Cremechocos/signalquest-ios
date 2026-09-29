@@ -730,23 +730,79 @@ final class MapOutageFilterTests: XCTestCase {
             status: .unknown, isOnline: false, position: nil
         )
         XCTAssertEqual(capture.platform, "ios")
-        XCTAssertEqual(capture.state, "unknown", "Hors ligne IP ne prouve pas l'absence de service cellulaire")
+        XCTAssertEqual(capture.state, "out_of_service", "Plus aucun réseau : c'est le constat (décision du 29/09)")
+        XCTAssertNil(capture.lastServing, "Sans perte observée, aucune dernière cellule inventée")
         XCTAssertEqual(OutageRadioCaptureBuilder.previewText(status: .unknown, isOnline: false),
-                       "Connexion indisponible · État du réseau inconnu")
+                       "Aucun réseau — le constat sera daté de maintenant")
     }
 
-    func testUnavailableIPPathDoesNotTurnStaleCellularMetadataIntoNoService() {
-        let lastCellular = NetworkPathStatus(
-            connection: .cellular, cellularTechnology: .fourG, operatorName: "Orange",
-            operatorMcc: nil, operatorMnc: nil, isExpensive: true, isConstrained: false
+    /// « Plus de réseau depuis 12 min, dernière vue 4G » : la perte vient du moniteur, pas des
+    /// champs de `status`, déjà vidés quand le chemin tombe.
+    func testOfflineCaptureReportsTheRecordedLossNotStaleStatus() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let staleCellular = NetworkPathStatus(
+            connection: .cellular, cellularTechnology: .fiveGNSA, operatorName: "SFR",
+            operatorMcc: 208, operatorMnc: 10, isExpensive: true, isConstrained: false
+        )
+        let loss = CellularServiceLoss(
+            technology: .fourG, operatorName: "Orange", operatorMcc: 208, operatorMnc: 1,
+            lostAt: now.addingTimeInterval(-720)
         )
         let capture = OutageRadioCaptureBuilder.make(
-            status: lastCellular, isOnline: false, position: nil
+            status: staleCellular, isOnline: false, position: nil,
+            lastCellularLoss: loss, now: now
+        )
+        XCTAssertEqual(capture.state, "out_of_service")
+        XCTAssertEqual(capture.lastServing?.technology, "4G")
+        XCTAssertEqual(capture.lastServing?.ageSeconds, 720)
+        XCTAssertEqual(capture.operator?.name, "Orange")
+        XCTAssertEqual(capture.operator?.source, "sim")
+        XCTAssertNil(capture.fallbackTechnology)
+        XCTAssertEqual(capture.connection, "other")
+        XCTAssertEqual(
+            OutageRadioCaptureBuilder.previewText(
+                status: staleCellular, isOnline: false, lastCellularLoss: loss, now: now
+            ),
+            "Aucun réseau depuis 12 min · dernière vue 4G"
+        )
+    }
+
+    /// Données mobiles refusées à l'app : l'absence d'Internet ne dit rien du réseau.
+    func testCellularDataDeniedForTheAppKeepsTheStateUnknown() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let loss = CellularServiceLoss(
+            technology: .fourG, operatorName: "Orange", operatorMcc: 208, operatorMnc: 1,
+            lostAt: now.addingTimeInterval(-60)
+        )
+        let capture = OutageRadioCaptureBuilder.make(
+            status: .unknown, isOnline: false, position: nil,
+            lastCellularLoss: loss, cellularDataDenied: true, now: now
         )
         XCTAssertEqual(capture.state, "unknown")
-        XCTAssertNil(capture.fallbackTechnology)
+        XCTAssertNil(capture.lastServing)
         XCTAssertNil(capture.operator?.name)
-        XCTAssertEqual(capture.connection, "other")
+        XCTAssertEqual(
+            OutageRadioCaptureBuilder.previewText(
+                status: .unknown, isOnline: false, lastCellularLoss: loss,
+                cellularDataDenied: true, now: now
+            ),
+            "Données mobiles coupées pour SignalQuest · État du réseau inconnu"
+        )
+    }
+
+    /// Une perte vieille de plusieurs heures raconterait une nuit en arrière-plan, pas la panne.
+    func testOldLossIsNotReportedAsTheStartOfTheOutage() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let loss = CellularServiceLoss(
+            technology: .fourG, operatorName: "Orange", operatorMcc: 208, operatorMnc: 1,
+            lostAt: now.addingTimeInterval(-4 * 3600)
+        )
+        let capture = OutageRadioCaptureBuilder.make(
+            status: .unknown, isOnline: false, position: nil, lastCellularLoss: loss, now: now
+        )
+        XCTAssertEqual(capture.state, "out_of_service")
+        XCTAssertNil(capture.lastServing)
+        XCTAssertNil(capture.operator?.name)
     }
 
     /// Le Wi-Fi ne dit RIEN du réseau mobile : prétendre qu'il fonctionne serait faux.

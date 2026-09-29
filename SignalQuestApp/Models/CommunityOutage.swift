@@ -488,9 +488,12 @@ struct OutageRadioCapture: Encodable, Equatable {
     let v: Int
     let platform: String
     let capturedAt: String
-    /// iOS émet `in_service` si le chemin cellulaire fonctionne, sinon `unknown`.
-    /// `out_of_service` ne se déduit pas d'un chemin Internet indisponible.
+    /// `in_service` si le chemin cellulaire fonctionne, `out_of_service` quand plus aucun
+    /// réseau ne répond, `unknown` en Wi-Fi ou quand iOS coupe les données mobiles à l'app.
     let state: String
+    /// Dernier état cellulaire vu avant la perte du réseau ; absent si l'appareil n'était
+    /// pas en cellulaire à ce moment-là.
+    let lastServing: OutageRadioLastServing?
     let fallbackTechnology: String?
     let connection: String?
     let viaVpn: Bool?
@@ -499,6 +502,12 @@ struct OutageRadioCapture: Encodable, Equatable {
     /// recoupements et reste lisible par son auteur.
     let position: OutageRadioPosition?
     let probe: OutageRadioProbe?
+}
+
+struct OutageRadioLastServing: Encodable, Equatable {
+    let technology: String
+    let seenAt: String
+    let ageSeconds: Int
 }
 
 struct OutageRadioOperator: Encodable, Equatable {

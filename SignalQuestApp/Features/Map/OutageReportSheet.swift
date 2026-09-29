@@ -260,7 +260,9 @@ struct OutageReportSheet: View {
                 if draft.attachRadio {
                     Text(OutageRadioCaptureBuilder.previewText(
                         status: services.networkPath.status,
-                        isOnline: services.networkPath.isOnline
+                        isOnline: services.networkPath.isOnline,
+                        lastCellularLoss: services.networkPath.lastCellularLoss,
+                        cellularDataDenied: services.networkPath.isCellularDataDeniedForApp
                     ))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.label)
@@ -463,7 +465,9 @@ struct OutageReportSheet: View {
                         longitude: $0.coordinate.longitude,
                         accuracy: $0.horizontalAccuracy > 0 ? $0.horizontalAccuracy : nil
                     )
-                }
+                },
+                lastCellularLoss: services.networkPath.lastCellularLoss,
+                cellularDataDenied: services.networkPath.isCellularDataDeniedForApp
             ),
             deviceId: InstallationIdentity().deviceID(),
             // L'heure du CONSTAT : elle vaut celle de l'envoi ici (iOS n'a pas de file hors

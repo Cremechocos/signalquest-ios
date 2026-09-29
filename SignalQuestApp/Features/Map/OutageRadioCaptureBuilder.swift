@@ -10,9 +10,10 @@ import Foundation
  (« ne tente pas d'ajouter du scan modem ») et dans le README. Le détail radio d'une panne vient
  d'Android ; iOS apporte autre chose — un constat daté, situé, et honnêtement étiqueté.
 
- Ce qui reste lisible permet de signaler la génération et l'opérateur exposés, ainsi que la
- disponibilité du chemin Internet. Un chemin indisponible ne prouve pas, à lui seul, l'absence
- de service cellulaire.
+ Ce qui reste lisible suffit à établir ce qui compte : y avait-il du réseau, de quelle génération,
+ chez quel opérateur. « Plus de réseau depuis 12 min, dernière vue 4G » est une contribution
+ réelle. Seule exception (décision du 29/09) : quand iOS coupe les données mobiles à l'app,
+ l'absence d'Internet ne dit rien du réseau, et l'état reste inconnu.
 
  ── Ce que cette fonction refuse de faire ──
 
@@ -26,6 +27,9 @@ enum OutageRadioCaptureBuilder {
     /// Version du format partagé (`@sq/core/outage-radio-context`).
     static let version = 1
 
+    /// Au-delà, « plus de réseau depuis… » raconterait une nuit en arrière-plan, pas une panne.
+    static let lastServingMaxAge: TimeInterval = 3 * 3600
+
     /**
      Construit la capture depuis l'état réseau courant.
 
@@ -33,8 +37,10 @@ enum OutageRadioCaptureBuilder {
        - status: l'état lu par `NetworkPathMonitor` — génération, opérateur, chemin.
        - position: la position, si elle est connue. Jamais publiée par le serveur.
        - pingMs: la latence mesurée, quand une sonde a pu tourner.
-       - isOnline: `NetworkPathMonitor.isOnline`, état du chemin Internet. Hors ligne ne
-         prouve pas une absence de service cellulaire (VPN, politique réseau, données coupées).
+       - isOnline: `NetworkPathMonitor.isOnline`. Hors ligne = plus aucun réseau utilisable,
+         sauf si `cellularDataDenied` : iOS refuse alors les données mobiles à l'app.
+       - lastCellularLoss: le cellulaire vu au moment de la perte (`NetworkPathMonitor`) ; les
+         champs de `status` sont déjà vidés quand le chemin tombe.
        - viaVpn: un tunnel fausse l'attribution d'opérateur par IP ; le dire évite un faux constat.
      */
     static func make(
@@ -43,37 +49,63 @@ enum OutageRadioCaptureBuilder {
         position: (latitude: Double, longitude: Double, accuracy: Double?)?,
         pingMs: Double? = nil,
         viaVpn: Bool? = nil,
+        lastCellularLoss: CellularServiceLoss? = nil,
+        cellularDataDenied: Bool = false,
         now: Date = Date()
     ) -> OutageRadioCapture {
-        // Seul un chemin Internet cellulaire actif prouve ici un service positif. Ni un
-        // chemin IP indisponible ni le Wi-Fi ne prouvent une coupure du réseau mobile.
-        let state = isOnline && status.connection == .cellular ? "in_service" : "unknown"
-
-        let capturedAt = ISO8601DateFormatter().string(from: now)
+        let state: String
+        if isOnline {
+            // Le Wi-Fi ne dit rien du réseau MOBILE : on ne prétend pas qu'il fonctionne.
+            state = status.connection == .cellular ? "in_service" : "unknown"
+        } else {
+            state = cellularDataDenied ? "unknown" : "out_of_service"
+        }
+        let loss = state == "out_of_service" ? recentLoss(lastCellularLoss, now: now) : nil
+        let formatter = ISO8601DateFormatter()
 
         return OutageRadioCapture(
             v: version,
             platform: "ios",
-            capturedAt: capturedAt,
+            capturedAt: formatter.string(from: now),
             state: state,
+            lastServing: loss.map {
+                OutageRadioLastServing(
+                    technology: $0.technology.displayName,
+                    seenAt: formatter.string(from: $0.lostAt),
+                    ageSeconds: Int(now.timeIntervalSince($0.lostAt).rounded())
+                )
+            },
             // La génération courante tient lieu de « technologie de repli » : c'est la seule
             // information de niveau radio qu'iOS rende, et elle dit si le téléphone est retombé.
             fallbackTechnology: isOnline ? status.cellularTechnology?.displayName : nil,
             connection: isOnline ? connectionToken(status.connection) : "other",
             viaVpn: viaVpn,
-            operator: OutageRadioOperator(
-                name: isOnline ? status.operatorName : nil,
-                mcc: isOnline ? status.operatorMcc : nil,
-                mnc: isOnline ? status.operatorMnc : nil,
-                // `sim` seulement quand CoreTelephony a répondu : depuis iOS 16.4 il rend souvent
-                // un placeholder, et l'opérateur vient alors d'une résolution serveur par IP.
-                source: isOnline && status.operatorName != nil ? "sim" : "unknown"
-            ),
+            operator: isOnline
+                ? OutageRadioOperator(
+                    name: status.operatorName,
+                    mcc: status.operatorMcc,
+                    mnc: status.operatorMnc,
+                    // `sim` seulement quand CoreTelephony a répondu : depuis iOS 16.4 il rend
+                    // souvent un placeholder, et l'opérateur vient alors d'une résolution par IP.
+                    source: status.operatorName != nil ? "sim" : "unknown"
+                )
+                : OutageRadioOperator(
+                    name: loss?.operatorName,
+                    mcc: loss?.operatorMcc,
+                    mnc: loss?.operatorMnc,
+                    source: loss?.operatorName != nil ? "sim" : "unknown"
+                ),
             position: position.map {
                 OutageRadioPosition(lat: $0.latitude, lng: $0.longitude, accuracyM: $0.accuracy)
             },
             probe: pingMs.map { OutageRadioProbe(pingMs: $0, dnsOk: nil) }
         )
+    }
+
+    private static func recentLoss(_ loss: CellularServiceLoss?, now: Date) -> CellularServiceLoss? {
+        guard let loss else { return nil }
+        let age = now.timeIntervalSince(loss.lostAt)
+        return age >= 0 && age <= lastServingMaxAge ? loss : nil
     }
 
     /// Le vocabulaire du contrat partagé, distinct des libellés affichés.
@@ -93,10 +125,24 @@ enum OutageRadioCaptureBuilder {
      joindre. Le serveur, lui, rédige le résumé PUBLIC, qui est un autre texte pour un autre
      lecteur — et sans position.
      */
-    static func previewText(status: NetworkPathStatus, isOnline: Bool) -> String {
+    static func previewText(
+        status: NetworkPathStatus,
+        isOnline: Bool,
+        lastCellularLoss: CellularServiceLoss? = nil,
+        cellularDataDenied: Bool = false,
+        now: Date = Date()
+    ) -> String {
         guard isOnline else {
-            return String(localized: "Connexion indisponible") + " · "
-                + String(localized: "État du réseau inconnu")
+            if cellularDataDenied {
+                return String(localized: "Données mobiles coupées pour SignalQuest") + " · "
+                    + String(localized: "État du réseau inconnu")
+            }
+            if let loss = recentLoss(lastCellularLoss, now: now) {
+                let minutes = max(1, Int((now.timeIntervalSince(loss.lostAt) / 60).rounded()))
+                let technology = loss.technology.displayName
+                return String(localized: "Aucun réseau depuis \(minutes) min · dernière vue \(technology)")
+            }
+            return String(localized: "Aucun réseau — le constat sera daté de maintenant")
         }
         switch status.connection {
         case .cellular:

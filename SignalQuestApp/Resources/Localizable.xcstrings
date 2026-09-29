@@ -7526,18 +7526,33 @@
       }
     },
     "Aucun réseau — le constat sera daté de maintenant" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No network — the observation will be timestamped now"
+            "value" : "No network — the report is timestamped now"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun réseau — le constat sera daté de maintenant"
+          }
+        }
+      }
+    },
+    "Aucun réseau depuis %lld min · dernière vue %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No network for %1$lld min · last seen %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun réseau depuis %lld min · dernière vue %@"
           }
         }
       }
@@ -17478,6 +17493,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Données incomplètes. Certaines zones sont indisponibles."
+          }
+        }
+      }
+    },
+    "Données mobiles coupées pour SignalQuest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mobile data turned off for SignalQuest"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Données mobiles coupées pour SignalQuest"
           }
         }
       }
