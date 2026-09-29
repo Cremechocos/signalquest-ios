@@ -1,4 +1,5 @@
 import XCTest
+import CoreLocation
 import MapKit
 @testable import SignalQuest
 
@@ -117,16 +118,50 @@ final class DriveTestDataBudgetTests: XCTestCase {
     }
 
     func testLostGpsDoesNotStartUnlimitedSpeedtests() {
-        XCTAssertTrue(DriveTestViewModel.isAutomaticTestDue(testCount: 0, secondsWaited: 0, metersMoved: nil,
-                          intervalMeters: 500, maxSeconds: 30))
-        XCTAssertFalse(DriveTestViewModel.isAutomaticTestDue(testCount: 1, secondsWaited: 0, metersMoved: nil,
-                           intervalMeters: 500, maxSeconds: 30))
-        XCTAssertFalse(DriveTestViewModel.isAutomaticTestDue(testCount: 1, secondsWaited: 29, metersMoved: nil,
-                           intervalMeters: 500, maxSeconds: 30))
-        XCTAssertTrue(DriveTestViewModel.isAutomaticTestDue(testCount: 1, secondsWaited: 30, metersMoved: nil,
-                          intervalMeters: 500, maxSeconds: 30))
-        XCTAssertTrue(DriveTestViewModel.isAutomaticTestDue(testCount: 1, secondsWaited: 0, metersMoved: 500,
-                          intervalMeters: 500, maxSeconds: 30))
+        func decide(count: Int, seconds: Int) -> DriveTestCadence.Decision {
+            DriveTestCadence.decide(testCount: count, secondsSinceLastTest: seconds, metersMoved: nil,
+                                    stationarySeconds: nil, intervalMeters: 500)
+        }
+        XCTAssertEqual(decide(count: 0, seconds: 0), .testNow)
+        XCTAssertEqual(decide(count: 1, seconds: 0), .waitForTime(secondsRemaining: 30))
+        XCTAssertEqual(decide(count: 1, seconds: 29), .waitForTime(secondsRemaining: 1))
+        XCTAssertEqual(decide(count: 1, seconds: 30), .testNow)
+    }
+
+    func testStandingStillNoLongerTestsEveryThirtySecondsAndPauses() {
+        // Position connue, pas de déplacement : plus aucune mesure au temps (MES-03).
+        XCTAssertEqual(DriveTestCadence.decide(testCount: 3, secondsSinceLastTest: 600, metersMoved: 10,
+                                               stationarySeconds: 120, intervalMeters: 500),
+                       .waitForDistance(metersRemaining: 490))
+        XCTAssertEqual(DriveTestCadence.decide(testCount: 3, secondsSinceLastTest: 600, metersMoved: 10,
+                                               stationarySeconds: 180, intervalMeters: 500),
+                       .pausedStationary)
+    }
+
+    func testDistanceTriggersWithAMinimumSpacing() {
+        XCTAssertEqual(DriveTestCadence.decide(testCount: 3, secondsSinceLastTest: 12, metersMoved: 600,
+                                               stationarySeconds: 0, intervalMeters: 500),
+                       .waitForSpacing(secondsRemaining: 8))
+        XCTAssertEqual(DriveTestCadence.decide(testCount: 3, secondsSinceLastTest: 20, metersMoved: 600,
+                                               stationarySeconds: 0, intervalMeters: 500),
+                       .testNow)
+    }
+
+    func testStationaryAnchorFollowsMovementAndMeasuresStillness() {
+        func fix(_ latitude: Double, _ seconds: TimeInterval) -> CLLocation {
+            CLLocation(coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: 5.0), altitude: 0,
+                       horizontalAccuracy: 10, verticalAccuracy: -1,
+                       timestamp: Date(timeIntervalSince1970: 1_000 + seconds))
+        }
+        var anchor = DriveTestCadence.StationaryAnchor()
+        XCTAssertNil(anchor.stationarySeconds(now: Date(timeIntervalSince1970: 1_000)))
+        anchor.update(with: fix(45.0, 0))
+        // Dérive d'une vingtaine de mètres : l'ancre ne bouge pas.
+        anchor.update(with: fix(45.00018, 60))
+        XCTAssertEqual(anchor.stationarySeconds(now: Date(timeIntervalSince1970: 1_200)), 200)
+        // Cent mètres plus loin : l'ancre suit, l'arrêt repart de zéro.
+        anchor.update(with: fix(45.0009, 210))
+        XCTAssertEqual(anchor.stationarySeconds(now: Date(timeIntervalSince1970: 1_215)), 5)
     }
 
     @MainActor

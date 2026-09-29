@@ -9,10 +9,14 @@ struct AntennaReportSheet: View {
     /// Azimuts connus du site (degrés arrondis) proposés comme « secteur concerné ».
     let availableSectors: [Int]
     let service: AntennaReportsServicing
+    /// Site partagé (Crozon, zone blanche) : seul cas où « opérateur porteur
+    /// incorrect » a un sens, avec la liste des opérateurs possibles.
+    let leaderReport: AntennaLeaderReport?
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var reportType: AntennaReportType = .other
+    @State private var reportType: AntennaReportType
+    @State private var suggestedLeader: String?
     @State private var reason: String = ""
     @State private var currentValue: String = ""
     @State private var suggestedValue: String = ""
@@ -21,12 +25,34 @@ struct AntennaReportSheet: View {
     @State private var error: String?
     @State private var duplicateMessage: String?
 
+    init(
+        siteId: String,
+        siteLabel: String,
+        availableSectors: [Int],
+        service: AntennaReportsServicing,
+        leaderReport: AntennaLeaderReport? = nil,
+        initialType: AntennaReportType = .other
+    ) {
+        self.siteId = siteId
+        self.siteLabel = siteLabel
+        self.availableSectors = availableSectors
+        self.service = service
+        self.leaderReport = leaderReport
+        _reportType = State(initialValue: leaderReport == nil && initialType == .incorrectLeader ? .other : initialType)
+    }
+
+    private var availableTypes: [AntennaReportType] {
+        AntennaReportType.allCases.filter { $0 != .incorrectLeader || leaderReport != nil }
+    }
+
+    private var isLeaderReport: Bool { reportType == .incorrectLeader && leaderReport != nil }
+
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     Picker(selection: $reportType) {
-                        ForEach(AntennaReportType.allCases) { type in
+                        ForEach(availableTypes) { type in
                             Label(type.label, systemImage: type.systemImage).tag(type)
                         }
                     } label: {
@@ -40,6 +66,34 @@ struct AntennaReportSheet: View {
                         .font(SQType.caption)
                 }
                 .listRowBackground(SQColor.surface)
+
+                if isLeaderReport, let leaderReport {
+                    Section {
+                        if let current = leaderReport.currentLeader {
+                            LabeledContent("Opérateur affiché") {
+                                Text(verbatim: AntennaLeaderReport.displayName(current))
+                            }
+                        }
+                        Picker(selection: $suggestedLeader) {
+                            Text("À choisir").tag(String?.none)
+                            ForEach(leaderReport.choices, id: \.self) { key in
+                                Text(verbatim: AntennaLeaderReport.displayName(key)).tag(String?.some(key))
+                            }
+                        } label: {
+                            Label("Opérateur qui porte le site", systemImage: "building.2")
+                        }
+                        .pickerStyle(.menu)
+                    } header: {
+                        Text("Opérateur porteur")
+                    } footer: {
+                        Text(leaderReport.sharingKind == "crozon"
+                             ? "Site partagé entre SFR et Bouygues Telecom : l’un des deux le porte pour l’autre."
+                             : "Site en zone blanche : un seul opérateur le porte pour tous les autres.")
+                            .font(SQType.caption)
+                    }
+                    .foregroundStyle(SQColor.label)
+                    .listRowBackground(SQColor.surface)
+                }
 
                 if reportType.suggestsValues {
                     Section("Correction proposée (optionnel)") {
@@ -104,7 +158,7 @@ struct AntennaReportSheet: View {
                         .frame(maxWidth: .infinity)
                         .foregroundStyle(SQColor.accentInk)
                     }
-                    .disabled(isBusy)
+                    .disabled(isBusy || (isLeaderReport && suggestedLeader == nil))
                     .listRowBackground(SQColor.accentSoft)
                 }
             }
@@ -132,8 +186,8 @@ struct AntennaReportSheet: View {
             let result = try await service.submit(
                 siteId: siteId,
                 reportType: reportType,
-                currentValue: currentValue,
-                suggestedValue: suggestedValue,
+                currentValue: isLeaderReport ? leaderReport?.currentLeader : currentValue,
+                suggestedValue: isLeaderReport ? suggestedLeader : suggestedValue,
                 reason: reason,
                 sector: sector
             )

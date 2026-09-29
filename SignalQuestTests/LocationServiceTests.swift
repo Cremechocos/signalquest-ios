@@ -25,6 +25,41 @@ final class LocationServiceTests: XCTestCase {
         return (service, tracking, single, clock)
     }
 
+    func testScreenObserverReleasesTheGPSInBackground() {
+        let (service, tracking, _, _) = makeService()
+        let token = service.addLocationObserver { _ in }
+        XCTAssertTrue(service.wantsTracking)
+        XCTAssertEqual(tracking.starts, 1)
+        XCTAssertFalse(tracking.allowsBackgroundLocationUpdates,
+                       "Un écran ouvert n'autorise pas le GPS écran verrouillé (MES-01)")
+        service.setAppActive(false)
+        XCTAssertFalse(service.wantsTracking)
+        XCTAssertEqual(tracking.stops, 1)
+        service.setAppActive(true)
+        XCTAssertTrue(service.wantsTracking)
+        XCTAssertEqual(tracking.starts, 2)
+        service.removeLocationObserver(token)
+        XCTAssertFalse(service.wantsTracking)
+    }
+
+    func testSessionObserverAndStartedTripKeepBackgroundUpdates() {
+        let (service, tracking, _, _) = makeService()
+        let token = service.addLocationObserver(scope: .session) { _ in }
+        XCTAssertTrue(tracking.allowsBackgroundLocationUpdates)
+        XCTAssertTrue(tracking.showsBackgroundLocationIndicator)
+        service.setAppActive(false)
+        XCTAssertTrue(service.wantsTracking, "CarPlay garde ses positions téléphone verrouillé")
+        XCTAssertEqual(tracking.stops, 0)
+        service.removeLocationObserver(token)
+        XCTAssertFalse(service.wantsTracking)
+
+        service.startTracking()
+        XCTAssertTrue(tracking.allowsBackgroundLocationUpdates)
+        XCTAssertEqual(tracking.activityType, .automotiveNavigation)
+        service.stopTracking()
+        XCTAssertFalse(tracking.allowsBackgroundLocationUpdates)
+    }
+
     func testFreshCachedFixIsReusedWithoutAOneShot() async {
         let (service, _, single, _) = makeService()
         let point = fix(age: 20)
@@ -442,6 +477,8 @@ final class LocationTestDriver: LocationManagerDriving {
     var allowsBackgroundLocationUpdates = false
     var pausesLocationUpdatesAutomatically = true
     var headingFilter: CLLocationDegrees = 0
+    var activityType: CLActivityType = .other
+    var showsBackgroundLocationIndicator = false
     var requests = 0
     var starts = 0
     var stops = 0

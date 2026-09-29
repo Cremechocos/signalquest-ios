@@ -91,6 +91,8 @@ struct AntennaDetailSheet: View {
     @State private var pendingPhotoUploadItem: PhotosPickerItem?
     @State private var showPhotoOperatorPicker = false
     @State private var showReportSheet = false
+    /// Type présélectionné à l'ouverture du signalement (lien « opérateur porteur »).
+    @State private var reportInitialType: AntennaReportType = .other
     /// Pannes communautaires ouvertes sur ce site, rechargées à chaque changement d'opérateur :
     /// une panne est scopée à un opérateur, donc basculer de facette change la réponse.
     @State private var outages: [CommunityOutage] = []
@@ -269,7 +271,9 @@ struct AntennaDetailSheet: View {
                 siteId: site.siteId ?? site.id,
                 siteLabel: site.siteId ?? site.id,
                 availableSectors: reportSectors,
-                service: services.antennaReports
+                service: services.antennaReports,
+                leaderReport: leaderReport,
+                initialType: reportInitialType
             )
         }
         .onChangeCompat(of: photoPickerItem) { _, newValue in
@@ -437,12 +441,20 @@ struct AntennaDetailSheet: View {
         .buttonStyle(SQPressButtonStyle())
     }
 
+    /// Site partagé (Crozon, zone blanche) dont l'opérateur porteur peut être signalé.
+    private var leaderReport: AntennaLeaderReport? {
+        guard let core = model.details?.core else { return nil }
+        return AntennaLeaderReport(sharingKind: core.sharingKind, crozonLeader: core.crozonLeader,
+                                   zbLeader: core.zbLeader, operators: core.operators)
+    }
+
     /// Carte « Signaler un problème » : ouvre le formulaire de signalement d'antenne.
     /// Style secondaire (surface) pour respecter la règle brique (le bouton photo
     /// tient déjà l'unique grand aplat brique de la fiche).
     private var reportCard: some View {
         Button {
             Haptics.light()
+            reportInitialType = .other
             showReportSheet = true
         } label: {
             HStack(spacing: SQSpace.md) {
@@ -1065,6 +1077,21 @@ struct AntennaDetailSheet: View {
                 detailRow(core.localityLabel, [core.postalCode, core.commune].compactMap { $0 }.joined(separator: " "))
                 detailRow("Adresse", core.address)
                 detailRow("Partage", [core.sharingKind, core.crozonLeader.map { "Crozon \($0)" }, core.zbLeader.map { "ZB \($0)" }].compactMap { $0 }.joined(separator: " · "))
+                if leaderReport != nil {
+                    // Demande d'Alexandre : l'opérateur porteur d'un site partagé se
+                    // corrige depuis la fiche même, sans chercher le bon type.
+                    Button {
+                        Haptics.light()
+                        reportInitialType = .incorrectLeader
+                        showReportSheet = true
+                    } label: {
+                        Label("Opérateur porteur erroné ? Le signaler", systemImage: "exclamationmark.bubble")
+                            .font(SQType.caption)
+                            .frame(minHeight: 44, alignment: .leading)
+                    }
+                    .tint(SQColor.accentInk)
+                    .accessibilityIdentifier("antenna.report.leader")
+                }
                 detailRow("Coordonnées", String(format: "%.5f, %.5f", core.lat, core.lng))
         }
         .foregroundStyle(SQColor.label)

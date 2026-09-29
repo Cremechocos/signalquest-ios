@@ -62,7 +62,7 @@ final class CarPlayDashboardSceneDelegate: UIResponder, CPTemplateApplicationDas
         ]
 
         controller.setZoom(Self.dashboardZoom, animated: false)
-        locationObserver = services.location.addLocationObserver { [weak self] location in
+        locationObserver = services.location.addLocationObserver(scope: .session) { [weak self] location in
             self?.reloadIfNeeded(around: location.coordinate)
         }
         if let location = services.location.cachedLocation() {

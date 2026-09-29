@@ -64,10 +64,9 @@ targets:
         buildPhase: resources
       - path: SignalQuestApp/Resources/market_location_areas.json
         buildPhase: resources
-      - path: SignalQuestApp/Resources/plmn_assignment_registry.json
-        buildPhase: resources
-      - path: SignalQuestApp/Resources/radio_channel_registry_v1.json
-        buildPhase: resources
+      # plmn_assignment_registry.json et radio_channel_registry_v1.json restent
+      # dans le dépôt (contrats partagés, lus par les tests) mais ne sont plus
+      # embarqués : l'app ne les lit jamais (SIZE-01, environ 0,9 Mo).
       - path: SignalQuestApp/Resources/Localizable.xcstrings
         buildPhase: resources
       # Clés lues par le SYSTÈME (prompts de permission, nom de l'app). Une app

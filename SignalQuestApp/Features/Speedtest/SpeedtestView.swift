@@ -868,6 +868,12 @@ struct SpeedtestView: View {
             showDriveTest = true
             return
         }
+        // Un Drive Test mesure déjà : deux tests simultanés se partageraient la
+        // bande passante et se fausseraient l'un l'autre (MES-18).
+        if services.driveTest.isRunning {
+            errorMessage = String(localized: "Un Drive Test est en cours : ouvre-le pour suivre ses mesures, ou arrête-le avant un test simple.")
+            return
+        }
         // Priming des permissions : si la localisation n'a jamais été demandée, on
         // explique POURQUOI avant de déclencher le prompt système (cf. audit UX-01).
         if !AppEnvironment.runsSpeedtestQA, services.location.authorizationStatus == .notDetermined {

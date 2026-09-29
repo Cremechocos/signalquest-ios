@@ -57,8 +57,62 @@ enum AntennaReportType: String, CaseIterable, Identifiable, Codable {
     /// de localisation n'appellent pas de couple de valeurs discrètes.
     var suggestsValues: Bool {
         switch self {
-        case .other, .wrongLocation, .incorrectLocation, .duplicate: return false
+        // Le leader se choisit dans une liste (`AntennaLeaderReport`), jamais au clavier.
+        case .other, .wrongLocation, .incorrectLocation, .duplicate, .incorrectLeader: return false
         default: return true
+        }
+    }
+}
+
+/// Signalement d'un « leader » erroné sur un site partagé : l'opérateur qui
+/// porte le site pour les autres. Il n'a de sens que sur un site Crozon (SFR ou
+/// Bouygues) ou en zone blanche (un des opérateurs présents) ; ailleurs, l'option
+/// n'est pas proposée. Le serveur attend l'une des clés SFR, BOUYGUES, ORANGE, FREE.
+struct AntennaLeaderReport: Equatable {
+    /// `crozon` ou `zb`.
+    let sharingKind: String
+    /// Leader affiché aujourd'hui, s'il est connu.
+    let currentLeader: String?
+    /// Leaders proposables, hors celui déjà affiché.
+    let choices: [String]
+
+    static let operatorKeys = ["SFR", "BOUYGUES", "ORANGE", "FREE"]
+
+    init?(sharingKind: String?, crozonLeader: String?, zbLeader: String?, operators: [String]) {
+        let kind = (sharingKind ?? "").lowercased()
+        let candidates: [String]
+        let current: String?
+        switch kind {
+        case "crozon":
+            candidates = ["SFR", "BOUYGUES"]
+            current = Self.key(crozonLeader)
+        case "zb":
+            let present = Set(operators.compactMap(Self.key))
+            candidates = Self.operatorKeys.filter { present.contains($0) }
+            current = Self.key(zbLeader)
+        default:
+            return nil
+        }
+        let choices = candidates.filter { $0 != current }
+        guard !choices.isEmpty else { return nil }
+        self.sharingKind = kind
+        self.currentLeader = current
+        self.choices = choices
+    }
+
+    /// « Bouygues Telecom », « bouygues » ou « BOUYGUES » : une seule clé serveur.
+    static func key(_ value: String?) -> String? {
+        let upper = (value ?? "").uppercased()
+        return operatorKeys.first { upper.contains($0) }
+    }
+
+    /// Nom affiché d'une clé serveur.
+    static func displayName(_ key: String) -> String {
+        switch key {
+        case "BOUYGUES": return "Bouygues Telecom"
+        case "ORANGE": return "Orange"
+        case "FREE": return "Free"
+        default: return key
         }
     }
 }

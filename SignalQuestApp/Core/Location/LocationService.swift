@@ -2,6 +2,16 @@ import Foundation
 import CoreLocation
 import Combine
 
+/// Portée d'un abonnement aux positions (MES-01).
+enum LocationObserverScope: Sendable {
+    /// Un écran affiché : les positions ne servent qu'au premier plan. L'app
+    /// passée en arrière-plan, le suivi s'arrête pour lui.
+    case foreground
+    /// Une session voulue par l'utilisateur (CarPlay, partage en direct) :
+    /// les positions continuent écran verrouillé, indicateur iOS affiché.
+    case session
+}
+
 @MainActor
 final class LocationService: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published private(set) var authorizationStatus: CLAuthorizationStatus
@@ -49,7 +59,11 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     @Published private(set) var wantsTracking = false
     /// Abonnés aux positions. Chaque consommateur possède son jeton : Drive Test,
     /// CarPlay et les alertes peuvent ainsi coexister sans s'écraser.
-    private var locationObservers: [UUID: @MainActor (CLLocation) -> Void] = [:]
+    private var locationObservers: [UUID: (scope: LocationObserverScope, handler: @MainActor (CLLocation) -> Void)] = [:]
+    /// Premier plan ou non, tenu par `AppServices` : hors premier plan, seuls
+    /// les abonnés `.session` et le suivi explicite gardent le GPS allumé.
+    private var appIsActive = true
+    private nonisolated(unsafe) var energyObservers: [NSObjectProtocol] = []
 
     /// Suivi réclamé explicitement par `startTracking()` (drive test, rafale),
     /// par opposition au suivi INDUIT par la présence d'abonnés.
@@ -65,10 +79,17 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     /// appelait `startUpdatingLocation()`. Un abonné qui ne démarrait pas lui-même
     /// le suivi n'était donc jamais appelé — c'est ce qui rendait les alertes de
     /// couverture CarPlay muettes hors guidage.
+    ///
+    /// Par défaut, un abonné ne compte qu'au premier plan (`.foreground`) : ouvrir
+    /// l'écran du Drive Test laissait sinon le GPS actif écran verrouillé, sans
+    /// fin, même sans avoir lancé de trajet (MES-01).
     @discardableResult
-    func addLocationObserver(_ handler: @escaping @MainActor (CLLocation) -> Void) -> UUID {
+    func addLocationObserver(
+        scope: LocationObserverScope = .foreground,
+        _ handler: @escaping @MainActor (CLLocation) -> Void
+    ) -> UUID {
         let token = UUID()
-        locationObservers[token] = handler
+        locationObservers[token] = (scope, handler)
         syncTracking()
         return token
     }
@@ -110,6 +131,13 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        // Économie d'énergie et échauffement changent le profil du suivi en cours.
+        let center = NotificationCenter.default
+        for name in [Notification.Name.NSProcessInfoPowerStateDidChange, ProcessInfo.thermalStateDidChangeNotification] {
+            energyObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.applyTrackingProfileIfActive() }
+            })
+        }
     }
 
     /// Ne confond pas le dernier relevé reçu avec une position admissible.
@@ -127,7 +155,10 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
             && LocationFixPolicy(maxAge: maxAge, maximumAccuracy: maximumAccuracy).accepts(fix, now: now())
     }
 
-    deinit { cacheExpiration?.cancel() }
+    deinit {
+        cacheExpiration?.cancel()
+        for observer in energyObservers { NotificationCenter.default.removeObserver(observer) }
+    }
 
     func requestWhenInUse() {
         guard manager.authorizationStatus == .notDetermined, !authorizationRequested else { return }
@@ -153,17 +184,17 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     /// `allowsBackgroundLocationUpdates` actifs indéfiniment — y compris après
     /// débranchement du véhicule.
     private func syncTracking() {
-        let desired = explicitTrackingRequested || !locationObservers.isEmpty
-        guard desired != wantsTracking else { return }
-        wantsTracking = desired
+        let desired = explicitTrackingRequested || hasActiveObservers
+        if desired != wantsTracking { wantsTracking = desired }
 
         guard desired else {
-            endTrackingNow()
+            if trackingIsActive { endTrackingNow() }
             return
         }
         switch authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:
             beginTrackingNow()
+            applyTrackingProfileIfActive()
         case .notDetermined:
             requestWhenInUse() // le tracking démarrera à l'octroi
         default:
@@ -171,18 +202,51 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         }
     }
 
+    /// Premier plan ou arrière-plan, appelé par `AppServices`. Au passage en
+    /// arrière-plan, les abonnés d'écran relâchent le GPS ; au retour, il repart.
+    func setAppActive(_ active: Bool) {
+        guard appIsActive != active else { return }
+        appIsActive = active
+        syncTracking()
+    }
+
+    private var hasActiveObservers: Bool {
+        locationObservers.values.contains { $0.scope == .session || appIsActive }
+    }
+
+    /// Seuls un suivi lancé (Drive Test, rafale) et une session autorisent les
+    /// positions écran verrouillé.
+    private var needsBackgroundUpdates: Bool {
+        explicitTrackingRequested || locationObservers.values.contains { $0.scope == .session }
+    }
+
     private func beginTrackingNow() {
         guard !trackingIsActive else { return }
         trackingIsActive = true
-        manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
-        // PERF-GPS-01 : ne livrer un fix que tous les 8 m (= le seuil applicatif de la
-        // trace). Supprime les fixes redondants à l'arrêt / basse vitesse, qui
-        // déclenchaient sinon à chaque fois recomputeNearest (O(antennes)) + écriture
-        // App Group + tâches sur le main thread. Densité de trace inchangée (seuil 8 m).
-        manager.distanceFilter = 8
-        manager.allowsBackgroundLocationUpdates = true
         manager.pausesLocationUpdatesAutomatically = false
+        applyTrackingProfileIfActive()
         manager.startUpdatingLocation()
+    }
+
+    /// Réglages du suivi selon ce qui le réclame (MES-01, MES-30).
+    ///
+    /// PERF-GPS-01 : un fix tous les 8 m (= le seuil applicatif de la trace), ce qui
+    /// supprime les fixes redondants à l'arrêt. En Économie d'énergie ou quand
+    /// l'appareil chauffe, la précision baisse au lieu d'arrêter : un suivi
+    /// arrêté en arrière-plan ne peut pas reprendre avec « Pendant l'utilisation ».
+    private func applyTrackingProfileIfActive() {
+        guard trackingIsActive else { return }
+        let background = needsBackgroundUpdates
+        if manager.allowsBackgroundLocationUpdates != background {
+            manager.allowsBackgroundLocationUpdates = background
+        }
+        manager.showsBackgroundLocationIndicator = background
+        manager.activityType = explicitTrackingRequested ? .automotiveNavigation : .other
+        let processInfo = ProcessInfo.processInfo
+        let constrained = processInfo.isLowPowerModeEnabled
+            || processInfo.thermalState == .serious || processInfo.thermalState == .critical
+        manager.desiredAccuracy = constrained ? kCLLocationAccuracyHundredMeters : kCLLocationAccuracyNearestTenMeters
+        manager.distanceFilter = constrained ? 25 : 8
     }
 
     /// Relâche la demande explicite de suivi continu.
@@ -325,7 +389,9 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         authorizationStatus = status
         if status != .notDetermined { authorizationRequested = false }
         if LocationFixPolicy.isAuthorized(status) {
-            if wantsTracking, !trackingIsActive { beginTrackingNow() }
+            if wantsTracking, !trackingIsActive {
+                beginTrackingNow()
+            }
             if changed { beginOneShotIfNeeded() }
         } else if status != .notDetermined {
             cachedFix = nil
@@ -366,7 +432,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         // relevé livré par les gestionnaires ponctuel et continu.
         if isUsable(newest), previous.map({ newest.timestamp >= $0.timestamp }) ?? true,
            previous?.timestamp != newest.timestamp || previous?.coordinate.latitude != newest.coordinate.latitude || previous?.coordinate.longitude != newest.coordinate.longitude {
-            for observer in Array(locationObservers.values) { observer(newest) }
+            for observer in Array(locationObservers.values) { observer.handler(newest) }
         }
         for (id, request) in Array(pending) {
             guard let value = admissible.first(where: { request.policy.accepts($0, now: clock, requestedAt: request.startedAt) }) else { continue }

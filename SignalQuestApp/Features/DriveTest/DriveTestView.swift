@@ -137,10 +137,6 @@ final class DriveTestViewModel: ObservableObject {
     /// lentement, et la consommation était sans limite. Espacer par la DISTANCE
     /// répartit les mesures dans l'espace, sans remplacer la borne temporelle.
     static let defaultTestIntervalMeters: Double = 500
-    /// Délai au bout duquel un test part même sans déplacement. C'est LUI qui fait
-    /// avancer la session : la distance ne sert plus qu'à mesurer plus tôt quand on
-    /// roule (cf. `waitUntilNextTestIsDue`).
-    static let maxSecondsBetweenTests = 30
     /// Plafond par défaut : 5 Go (Mo décimaux, comme le compteur). Au-delà, la
     /// session s'arrête proprement et le dit — jamais en silence.
     static let defaultDataCapMegabytes = 5_000
@@ -168,6 +164,15 @@ final class DriveTestViewModel: ObservableObject {
     /// Position du dernier speedtest — origine de la distance à parcourir avant le
     /// suivant.
     private var lastTestCoordinate: CLLocationCoordinate2D?
+    /// Dernière position reçue pendant le trajet, même ancienne : à l'arrêt, le
+    /// suivi (filtre de 8 m) n'en livre plus, et c'est bien la position courante.
+    private var latestTripFix: CLLocation?
+    /// Mesure de l'immobilité qui déclenche la pause automatique (MES-03).
+    private var stationaryAnchor = DriveTestCadence.StationaryAnchor()
+    /// Session en pause parce que l'appareil ne bouge plus.
+    @Published private(set) var isPausedStationary = false
+    /// Dernière publication des valeurs en direct (MES-07).
+    private var lastLiveReadoutAt: Date = .distantPast
     /// L'utilisateur a demandé un test tout de suite (arrêt volontaire, bouchon) :
     /// sans cette échappatoire, une cadence à la distance ne teste jamais à l'arrêt.
     private var manualTestRequested = false
@@ -222,6 +227,7 @@ final class DriveTestViewModel: ObservableObject {
         Task { await prepareOperatorSelector() }
         if locationObserverToken == nil {
             locationObserverToken = services.location.addLocationObserver { [weak self] location in
+                self?.receiveTripFix(location)
                 self?.apply(coordinate: location.coordinate)
             }
         }
@@ -249,6 +255,13 @@ final class DriveTestViewModel: ObservableObject {
     /// l'alimente reste branché.
     func onDisappear(isLeavingScreen: Bool) {
         guard isLeavingScreen else { return }
+        shutDown()
+    }
+
+    /// Arrêt complet : trajet, GPS, Live Activity, veille de l'écran. Appelé en
+    /// quittant l'écran, et par `AppServices` au changement de compte ou sur une
+    /// mise à jour forcée, quand plus aucune interface ne peut le faire (MES-02).
+    func shutDown() {
         stop()
         if let token = locationObserverToken {
             services.location.removeLocationObserver(token)
@@ -290,6 +303,9 @@ final class DriveTestViewModel: ObservableObject {
         distanceMeters = 0
         lastTestCoordinate = nil
         manualTestRequested = false
+        latestTripFix = nil
+        stationaryAnchor.reset()
+        isPausedStationary = false
         trace.removeAll()
         speedtestTrail.removeAll()
         liveMbps = 0
@@ -333,6 +349,7 @@ final class DriveTestViewModel: ObservableObject {
         }
         isRunning = false
         isPausedForWiFi = false
+        isPausedStationary = false
         liveMbps = 0
         livePhase = .idle
     }
@@ -757,82 +774,71 @@ final class DriveTestViewModel: ObservableObject {
     /// Attend que le prochain test soit dû. Renvoie `false` si la session est
     /// annulée pendant l'attente.
     ///
-    /// Le premier test part immédiatement — attendre avant la moindre mesure
-    /// donnerait l'impression d'une session qui ne démarre pas.
-    ///
-    /// ⚠️ La distance N'EST PLUS BLOQUANTE. Elle l'était, et c'était la cause du
-    /// « le premier test marche, les suivants ne partent jamais » : à l'arrêt (banc
-    /// d'essai, fenêtre, test de stabilité) on ne parcourt jamais les 500 m requis,
-    /// donc aucun second test ne partait — sans que rien ne l'explique à l'écran.
-    /// Pire, si le fix GPS était perdu après le premier test, le `if let current`
-    /// n'entrait jamais et la boucle tournait indéfiniment SANS même mettre à jour
-    /// le statut : session muette, définitivement.
-    ///
-    /// Le modèle est désormais celui d'Android, qui n'a jamais eu ce problème (ses
-    /// tests programmés sont périodiques) : le temps déclenche, la distance ne fait
-    /// qu'anticiper quand on roule. Un espacement minimal subsiste — sans lui, un
-    /// appareil posé sur un bureau accumulerait des centaines de mesures au même
-    /// point, ce qui brouille le trajet et brûle le forfait.
+    /// La distance déclenche, le temps n'est qu'un repli sans position, et un
+    /// arrêt prolongé met la session en pause (`DriveTestCadence`, MES-03). Le
+    /// statut dit toujours ce qu'on attend : c'est l'absence de ce retour qui
+    /// faisait passer un comportement voulu pour une panne.
     private func waitUntilNextTestIsDue() async -> Bool {
         var secondsWaited = 0
         while !Task.isCancelled {
             if manualTestRequested {
                 manualTestRequested = false
+                setStationaryPause(false)
                 return true
             }
-            // Déclencheur DISTANCE — on roule, on mesure plus tôt.
-            var metersRemaining: Double?
             var metersMoved: Double?
-            if let origin = lastTestCoordinate,
-               let current = services.location.cachedLocation()?.coordinate {
-                let moved = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
-                    .distance(from: CLLocation(latitude: current.latitude, longitude: current.longitude))
-                if moved.isFinite {
-                    metersMoved = moved
-                    metersRemaining = max(0, testIntervalMeters - moved).rounded()
-                }
+            if let origin = lastTestCoordinate, let current = latestTripFix {
+                let moved = current.distance(from: CLLocation(latitude: origin.latitude, longitude: origin.longitude))
+                if moved.isFinite { metersMoved = moved }
             }
-
-            // Le premier test part immédiatement. Ensuite, perdre le GPS ne doit
-            // jamais transformer une session en boucle de tests sans pause.
-            if Self.isAutomaticTestDue(
+            let decision = DriveTestCadence.decide(
                 testCount: testCount,
-                secondsWaited: secondsWaited,
+                secondsSinceLastTest: secondsWaited,
                 metersMoved: metersMoved,
-                intervalMeters: testIntervalMeters,
-                maxSeconds: Self.maxSecondsBetweenTests
-            ) { return true }
-
-            // Déclencheur TEMPS — garantit que la session avance à l'arrêt, et même
-            // sans le moindre point GPS.
-            let secondsRemaining = Self.maxSecondsBetweenTests - secondsWaited
-
-            // Toujours dire ce qu'on attend : c'est l'absence de ce retour qui faisait
-            // passer un comportement voulu pour une panne.
-            if let metersRemaining {
-                statusLabel = String(
-                    localized: "Prochain test dans \(Int(metersRemaining)) m ou \(secondsRemaining) s"
-                )
-            } else {
-                statusLabel = String(localized: "Prochain test dans \(secondsRemaining) s")
+                stationarySeconds: stationaryAnchor.stationarySeconds(now: Date()),
+                intervalMeters: testIntervalMeters
+            )
+            switch decision {
+            case .testNow:
+                setStationaryPause(false)
+                return true
+            case .waitForDistance(let meters):
+                setStationaryPause(false)
+                statusLabel = String(localized: "Prochain test dans \(meters) m")
+            case .waitForSpacing(let seconds), .waitForTime(let seconds):
+                setStationaryPause(false)
+                statusLabel = String(localized: "Prochain test dans \(seconds) s")
+            case .pausedStationary:
+                setStationaryPause(true)
             }
-
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             secondsWaited += 1
         }
         return false
     }
 
-    nonisolated static func isAutomaticTestDue(
-        testCount: Int,
-        secondsWaited: Int,
-        metersMoved: Double?,
-        intervalMeters: Double,
-        maxSeconds: Int
-    ) -> Bool {
-        if testCount == 0 { return true }
-        if let metersMoved, metersMoved.isFinite, metersMoved >= intervalMeters { return true }
-        return secondsWaited >= maxSeconds
+    /// Positions du trajet : dernière position connue et ancre d'immobilité.
+    private func receiveTripFix(_ location: CLLocation) {
+        guard isRunning else { return }
+        latestTripFix = location
+        stationaryAnchor.update(with: location)
+    }
+
+    /// Entrée et sortie de la pause « à l'arrêt », visibles aussi écran verrouillé.
+    private func setStationaryPause(_ paused: Bool) {
+        guard paused != isPausedStationary else { return }
+        isPausedStationary = paused
+        guard paused else { return }
+        statusLabel = String(localized: "En pause — à l’arrêt")
+        liveActivity.update(
+            phaseLabel: String(localized: "En pause — à l’arrêt"),
+            downloadMbps: liveDownload,
+            uploadMbps: liveUpload,
+            pingMs: livePing,
+            progress: 0,
+            runIndex: testCount,
+            runTotal: 0
+        )
     }
 
     /// Déclenche un test sans attendre la distance — pour un arrêt volontaire
@@ -987,6 +993,13 @@ final class DriveTestViewModel: ObservableObject {
     /// panneau et la Live Activity (visible écran verrouillé).
     private func applyLiveProgress(_ live: SpeedtestLiveProgress, testIndex: Int) {
         guard isRunning else { return }
+        // Le moteur émet ~7 fois par seconde, et chaque publication redessinait tout
+        // l'écran, carte et tracé compris (MES-07). Deux lectures par seconde
+        // suffisent à l'œil ; un changement de phase passe toujours, et le résultat
+        // final est appliqué à part.
+        let now = Date()
+        guard live.phase != livePhase || now.timeIntervalSince(lastLiveReadoutAt) >= 0.5 else { return }
+        lastLiveReadoutAt = now
         livePhase = live.phase
         liveMbps = live.currentMbps
         // Le compteur monte PENDANT le transfert, pas seulement entre deux tests :
@@ -1067,7 +1080,7 @@ final class DriveTestViewModel: ObservableObject {
 struct DriveTestView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var services: AppServices
-    @StateObject private var model: DriveTestViewModel
+    @ObservedObject private var model: DriveTestViewModel
     @State private var selectedAntenna: AntennaSite?
     @State private var selectedSpeedtest: DriveSpeedtestPoint?
     @State private var showMapLegend = false
@@ -1082,7 +1095,7 @@ struct DriveTestView: View {
     @State private var preflightReport: DriveTestPreflightReport?
 
     init(services: AppServices) {
-        _model = StateObject(wrappedValue: DriveTestViewModel(services: services))
+        _model = ObservedObject(wrappedValue: services.driveTest)
     }
 
     var body: some View {

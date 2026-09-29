@@ -3805,6 +3805,22 @@
         }
       }
     },
+    "À choisir" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À choisir"
+          }
+        }
+      }
+    },
     "À confirmer" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -18602,6 +18618,22 @@
         }
       }
     },
+    "En pause — à l’arrêt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paused — not moving"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En pause — à l’arrêt"
+          }
+        }
+      }
+    },
     "En pause — Wi-Fi détecté" : {
       "localizations" : {
         "en" : {
@@ -30325,6 +30357,22 @@
         }
       }
     },
+    "Opérateur affiché" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operator shown"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opérateur affiché"
+          }
+        }
+      }
+    },
     "Opérateur affiché : %@" : {
       "localizations" : {
         "en" : {
@@ -30520,6 +30568,38 @@
         }
       }
     },
+    "Opérateur porteur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Host operator"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opérateur porteur"
+          }
+        }
+      }
+    },
+    "Opérateur porteur erroné ? Le signaler" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wrong host operator? Report it"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opérateur porteur erroné ? Le signaler"
+          }
+        }
+      }
+    },
     "Opérateur porteur incorrect" : {
       "localizations" : {
         "en" : {
@@ -30532,6 +30612,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Opérateur porteur incorrect"
+          }
+        }
+      }
+    },
+    "Opérateur qui porte le site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operator hosting the site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opérateur qui porte le site"
           }
         }
       }
@@ -41323,6 +41419,22 @@
         }
       }
     },
+    "Site en zone blanche : un seul opérateur le porte pour tous les autres." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "White-zone site: a single operator hosts it for all the others."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site en zone blanche : un seul opérateur le porte pour tous les autres."
+          }
+        }
+      }
+    },
     "Site estimé par les observations communautaires" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -41451,6 +41563,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Site partagé — touche un opérateur pour voir sa fiche"
+          }
+        }
+      }
+    },
+    "Site partagé entre SFR et Bouygues Telecom : l’un des deux le porte pour l’autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site shared by SFR and Bouygues Telecom: one of them hosts it for the other."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site partagé entre SFR et Bouygues Telecom : l’un des deux le porte pour l’autre."
           }
         }
       }
@@ -45651,6 +45779,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un code à usage unique sera envoyé à %@."
+          }
+        }
+      }
+    },
+    "Un Drive Test est en cours sur l’iPhone : il mesure déjà le réseau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A Drive Test is running on the iPhone: it is already measuring the network."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un Drive Test est en cours sur l’iPhone : il mesure déjà le réseau."
+          }
+        }
+      }
+    },
+    "Un Drive Test est en cours : ouvre-le pour suivre ses mesures, ou arrête-le avant un test simple." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A Drive Test is running: open it to follow its measurements, or stop it before a single test."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un Drive Test est en cours : ouvre-le pour suivre ses mesures, ou arrête-le avant un test simple."
           }
         }
       }

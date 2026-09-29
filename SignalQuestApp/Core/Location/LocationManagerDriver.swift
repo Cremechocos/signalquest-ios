@@ -11,6 +11,8 @@ protocol LocationManagerDriving: AnyObject {
     var allowsBackgroundLocationUpdates: Bool { get set }
     var pausesLocationUpdatesAutomatically: Bool { get set }
     var headingFilter: CLLocationDegrees { get set }
+    var activityType: CLActivityType { get set }
+    var showsBackgroundLocationIndicator: Bool { get set }
     func requestWhenInUseAuthorization()
     func requestLocation()
     func startUpdatingLocation()
@@ -20,6 +22,19 @@ protocol LocationManagerDriving: AnyObject {
 }
 
 extension CLLocationManager: LocationManagerDriving {}
+
+/// Valeurs neutres pour les doublures de test qui n'observent pas ces réglages.
+extension LocationManagerDriving {
+    var activityType: CLActivityType {
+        get { .other }
+        set {}
+    }
+
+    var showsBackgroundLocationIndicator: Bool {
+        get { false }
+        set {}
+    }
+}
 
 /// Un delegate par acquisition lie les callbacks à leur lot, même s'ils sont
 /// déjà en attente sur le MainActor lors d'une annulation suivie d'une reprise.

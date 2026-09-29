@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // sur l'accueil au lieu de la conversation ou du post visé (TRX-02).
         // Indépendant de Firebase : les notifications locales et APNs en dépendent aussi.
         UNUserNotificationCenter.current().delegate = AppServicesHolder.services.push
+        SpeedtestLiveActivityController.endLeftoversFromPreviousLaunch()
         guard Bundle.main.url(forResource: "GoogleService-Info", withExtension: "plist") != nil else {
             Self.logger.error("GoogleService-Info.plist absent : Firebase désactivé (push et Crashlytics inopérants).")
             return true

@@ -13,6 +13,21 @@ final class SpeedtestLiveActivityController {
     // PERF-LA-01 : throttle des pushes ActivityKit (le moteur speedtest émet ~7/s).
     private var lastPushDate: Date?
     private var lastPhaseLabel: String?
+    /// Contenu déclaré périmé passé ce délai sans mise à jour (MES-06) : une app
+    /// tuée en pleine mesure ne laisse plus un état présenté comme actuel.
+    static let staleAfter: TimeInterval = 5 * 60
+
+    /// Une mesure ne survit pas à son processus : toute activité encore affichée
+    /// au lancement vient d'une app tuée en plein test et resterait figée dans
+    /// l'Île dynamique jusqu'à sa fin forcée par iOS, des heures plus tard (MES-06).
+    static func endLeftoversFromPreviousLaunch() {
+        guard #available(iOS 16.2, *) else { return }
+        Task {
+            for activity in Activity<SpeedtestActivityAttributes>.activities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+        }
+    }
 
     /// Vrai si les Live Activities sont autorisées (réglages système) et l'API dispo.
     var isAvailable: Bool {
@@ -38,7 +53,7 @@ final class SpeedtestLiveActivityController {
         let attributes = SpeedtestActivityAttributes(serverName: serverName, network: network)
         _ = try? Activity.request(
             attributes: attributes,
-            content: ActivityContent(state: state, staleDate: nil)
+            content: ActivityContent(state: state, staleDate: Date().addingTimeInterval(Self.staleAfter))
         )
     }
 
@@ -101,7 +116,7 @@ final class SpeedtestLiveActivityController {
 
     @available(iOS 16.2, *)
     private func push(_ state: SpeedtestActivityAttributes.ContentState) {
-        let content = ActivityContent(state: state, staleDate: nil)
+        let content = ActivityContent(state: state, staleDate: Date().addingTimeInterval(Self.staleAfter))
         Task {
             for activity in Activity<SpeedtestActivityAttributes>.activities {
                 await activity.update(content)

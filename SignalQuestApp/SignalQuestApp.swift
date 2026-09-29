@@ -387,6 +387,8 @@ struct RootView: View {
                 // Un ancien build ne construit rien d'autre : le dock restait
                 // atteignable sous un simple overlay de mise à jour forcée.
                 ForcedUpdateView(message: message, storeURL: storeURL)
+                    // Plus d'interface pour arrêter un trajet en cours (MES-02).
+                    .onAppear { services.stopMeasurementSessions() }
             } else if isAuthenticated || isGuestApplicationAllowed {
                 MainTabView(user: authenticatedUser)
                     .onAppear {

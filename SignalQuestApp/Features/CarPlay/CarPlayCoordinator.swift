@@ -130,7 +130,7 @@ final class CarPlayCoordinator {
         // jamais du tout avec la catégorie « driving task » réellement accordée.
         // Le réglage était visible dans l'app et sans le moindre effet.
         if CarPlayAlertSettings.coverageAlertsEnabled {
-            alertObserver = services.location.addLocationObserver { [weak self] location in
+            alertObserver = services.location.addLocationObserver(scope: .session) { [weak self] location in
                 self?.evaluateCoverageAlert(at: location)
             }
         }
@@ -1048,7 +1048,7 @@ final class CarPlayCoordinator {
 
         mapController?.showRoute(plan.polyline)
         updateGuidanceControls(isGuiding: true)
-        locationObserver = services.location.addLocationObserver { [weak self] location in
+        locationObserver = services.location.addLocationObserver(scope: .session) { [weak self] location in
             self?.handleGuidance(location: location)
         }
     }
@@ -1126,6 +1126,11 @@ final class CarPlayCoordinator {
         // Un seul test à la fois : deux mesures concurrentes se partageraient la
         // bande passante et se fausseraient l'une l'autre.
         guard speedtestTask == nil else { return }
+        // Un Drive Test mesure déjà : un second test fausserait les deux (MES-18).
+        guard !services.driveTest.isRunning else {
+            updateSpeedtest(state: .failed(String(localized: "Un Drive Test est en cours sur l’iPhone : il mesure déjà le réseau.")))
+            return
+        }
         updateSpeedtest(state: .running(SpeedtestLiveProgress(phase: .idle)))
 
         speedtestTask = Task { [weak self] in

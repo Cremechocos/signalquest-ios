@@ -124,6 +124,12 @@ final class AppServices: ObservableObject {
     /// App Store, et conditionne tout durcissement de contrat côté backend.
     let versionPolicy: VersionPolicyService
 
+    /// Session du Drive Test, détenue ici et non par l'écran (MES-02). Détenue
+    /// par la vue, une boucle de mesure survivait à la déconnexion ou à une mise
+    /// à jour forcée, sans plus rien pour l'arrêter : GPS, tests, Live Activity
+    /// et écran allumé continuaient.
+    lazy var driveTest = DriveTestViewModel(services: self)
+
     /// Nombre de conversations non lues — alimente le badge de l'onglet Messages.
     @Published var unreadConversations = 0
     private let inboxBadgeState = InboxBadgePresentationState()
@@ -260,6 +266,7 @@ final class AppServices: ObservableObject {
     /// invalide aussi les requêtes déjà parties et rouvre le throttle pour que le
     /// nouveau compte puisse charger son propre badge sans attendre 20 secondes.
     func resetAccountPresentationState() {
+        stopMeasurementSessions()
         inboxBadgeState.reset()
         unreadConversations = 0
         notificationBadgeState.reset()
@@ -268,6 +275,14 @@ final class AppServices: ObservableObject {
         favoriteRefreshTask = nil
         favoriteAntennas.resetForAccountChange()
         refreshFavoritesForCurrentAccount()
+    }
+
+    /// Arrête toute mesure en cours : changement de compte, mise à jour
+    /// obligatoire. Un trajet appartient au compte qui l'a lancé ; le suivant
+    /// repart d'un écran vierge, sans la trace ni le bilan du précédent.
+    func stopMeasurementSessions() {
+        driveTest.shutDown()
+        driveTest = DriveTestViewModel(services: self)
     }
 
     // MARK: - Amorçage partagé
@@ -391,6 +406,10 @@ final class AppServices: ObservableObject {
         // sinon cet observateur serait pris à tort pour un Drive Test explicite
         // et maintiendrait lui-même l'application active écran verrouillé.
         liveShare.setAppActive(false)
+        // Les écrans qui suivent la position relâchent le GPS ; seuls un trajet
+        // lancé et CarPlay le gardent écran verrouillé (MES-01). Avant la garde
+        // `wantsTracking`, qui doit refléter ce qui reste réellement actif.
+        location.setAppActive(false)
         // `isCarPlayConnected` rejoint la même logique que le drive test et
         // l'appel en cours : l'écran du véhicule affiche l'app, donc l'activité
         // de fond est voulue — couper la présence pendant que l'utilisateur
@@ -405,6 +424,7 @@ final class AppServices: ObservableObject {
     /// et le mode l'autorisent (`reevaluate()` tranche).
     func enterForeground() {
         if networkPath.isOnline { epochRotations.resume() }
+        location.setAppActive(true)
         livePresence.setAppActive(true)
         liveShare.setAppActive(true)
         refreshFavoritesForCurrentAccount()

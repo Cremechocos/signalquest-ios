@@ -1821,8 +1821,11 @@ struct MapExplorerView: View {
             }
         }
         // La fraîcheur progresse sans paquet réseau : estompage à 3 min et retrait
-        // à 15 min restent vrais même pendant une panne du flux.
-        .task {
+        // à 15 min restent vrais même pendant une panne du flux. Seulement quand le
+        // calque des amis est affiché : sinon la carte se réveillait toutes les
+        // 30 s pour rien (MES-31).
+        .task(id: filters.contains(.friend)) {
+            guard filters.contains(.friend) else { return }
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(30))
                 guard !Task.isCancelled else { return }
