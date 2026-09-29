@@ -99,22 +99,14 @@ struct SpeedtestDetailContent: View {
             Group {
                 if dynamicTypeSize.isAccessibilitySize {
                     VStack(alignment: .leading, spacing: SQSpace.xs) {
-                        if let generation {
-                            Text(generation)
-                                .font(SQFont.display(20, .bold))
-                                .foregroundStyle(SQColor.brandRed)
-                        }
+                        if let generation { generationTitle(generation) }
                         Text(Self.dateFormatter.string(from: result.createdAt))
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
                     }
                 } else {
                     HStack(spacing: SQSpace.sm) {
-                        if let generation {
-                            Text(generation)
-                                .font(SQFont.display(20, .bold))
-                                .foregroundStyle(SQColor.brandRed)
-                        }
+                        if let generation { generationTitle(generation) }
                         Spacer(minLength: 0)
                         Text(Self.dateFormatter.string(from: result.createdAt))
                             .font(SQType.caption)
@@ -129,6 +121,19 @@ struct SpeedtestDetailContent: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// « 5G NSA » et « 5G SA » sont le seul jargon de l'en-tête : ⓘ (MES-35).
+    private func generationTitle(_ generation: String) -> some View {
+        HStack(spacing: SQSpace.xs) {
+            Text(generation)
+                .font(SQFont.display(20, .bold))
+                .foregroundStyle(SQColor.brandRed)
+            if result.connectionType == .cellular,
+               result.cellularTechnology == .fiveGNSA || result.cellularTechnology == .fiveGSA {
+                SQInfoButton(term: .fiveGModes)
+            }
+        }
     }
 
     private var generation: String? {
@@ -213,7 +218,8 @@ struct SpeedtestDetailContent: View {
                 labelColor: SQColor.labelSecondary,
                 timedSeries: trace?.recentSeries,
                 timedAverageSeries: trace?.averageSeries,
-                timeOriginMs: trace?.sampleStartMs
+                timeOriginMs: trace?.sampleStartMs,
+                unitLabel: SQUnits.throughputUnit(mbps: 0)
             )
             .frame(height: 108)
             // Alternative non visuelle (A11Y-08) : la courbe de débit n'a aucun

@@ -48,19 +48,22 @@ enum SQUnits {
 
     /// Distance depuis des MÈTRES. Bascule vers l'unité longue au-delà d'un
     /// millier — le seuil que toutes les vues appliquaient déjà, à la main.
-    static func distance(meters: Double, system: SQUnitsSystem = current) -> String {
+    /// Une décimale à la virgule en français (« 12,3 km ») : `String(format:)`
+    /// écrivait « 12.3 km » dans toutes les langues (MES-25).
+    static func distance(meters: Double, system: SQUnitsSystem = current, locale: Locale = .current) -> String {
         guard meters.isFinite else { return "—" }
+        let oneDecimal = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(1)).locale(locale)
         switch system {
         case .metric:
             return meters >= 1000
-                ? String(format: "%.1f km", meters / 1000)
+                ? "\((meters / 1000).formatted(oneDecimal)) km"
                 : "\(Int(meters.rounded())) m"
         case .imperial:
             let miles = meters / metersPerMile
             // Sous un dixième de mile (~160 m), le pied est plus parlant : « 0,1 mi »
             // couvrirait indistinctement 80 et 240 mètres.
             return miles >= 0.1
-                ? String(format: "%.1f mi", miles)
+                ? "\(miles.formatted(oneDecimal)) mi"
                 : "\(Int((meters / metersPerFoot).rounded())) ft"
         }
     }

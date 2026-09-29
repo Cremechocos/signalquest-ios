@@ -201,26 +201,23 @@ struct DriveTestPreflightSheet: View {
                 }
             }
 
-            HStack(spacing: SQSpace.sm) {
-                Button("Fermer", role: .cancel) { close() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                    .frame(maxWidth: .infinity)
+            // Boutons Crème empilés : côte à côte, « Démarrer quand même » passait
+            // sur deux lignes dans des capsules système (Lot 4c).
+            VStack(spacing: SQSpace.xs) {
                 if !report.isBlocked {
-                    Button("Démarrer quand même") {
+                    GradientButton("Démarrer quand même", systemImage: "play.fill") {
                         dismiss()
                         onStartAnyway()
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(SQColor.brandRed)
-                    .controlSize(.large)
-                    .frame(maxWidth: .infinity)
                 }
+                GradientButton("Fermer", style: report.isBlocked ? .primary : .ghost) { close() }
             }
         }
         .padding(SQSpace.lg)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        // Opaque : le verre laissait voir, flou, le bouton du panneau derrière.
+        .presentationBackgroundCompat(SQColor.bg)
     }
 
     private func issueRow(_ issue: DriveTestPreflightIssue) -> some View {
@@ -240,13 +237,17 @@ struct DriveTestPreflightSheet: View {
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if issue.action != .none {
-                    Button(actionTitle(for: issue.action)) {
+                    Button {
                         dismiss()
                         onAction(issue.action)
+                    } label: {
+                        Text(actionTitle(for: issue.action))
+                            .font(SQFont.body(14, .semibold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-                    .padding(.top, 3)
+                    .buttonStyle(.plain)
                 }
             }
             Spacer(minLength: 0)

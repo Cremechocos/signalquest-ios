@@ -1759,47 +1759,6 @@
         }
       }
     },
-    "%lld m parcourus" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld m travelled"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld m travelled"
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld m parcouru"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld m parcourus"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "%lld masqué(s) sur la carte" : {
       "localizations" : {
         "en" : {
@@ -4435,23 +4394,6 @@
         }
       }
     },
-    "Accès Internet (IP/ASN)" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Internet access (IP/ASN)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Accès Internet (IP/ASN)"
-          }
-        }
-      }
-    },
     "Accès refusé : clé d'API requise." : {
       "localizations" : {
         "en" : {
@@ -5324,6 +5266,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher la transcription"
+          }
+        }
+      }
+    },
+    "Afficher le détail du trajet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show trip details"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher le détail du trajet"
           }
         }
       }
@@ -6346,6 +6304,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Antenne la plus proche · %1$@ · écart %2$lld°"
+          }
+        }
+      }
+    },
+    "Antenne, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna, %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenne, %@"
           }
         }
       }
@@ -17211,6 +17185,22 @@
         }
       }
     },
+    "Dernier trajet · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last trip · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier trajet · %@"
+          }
+        }
+      }
+    },
     "Dernière activité" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -17998,6 +17988,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Déverrouiller avec %@"
+          }
+        }
+      }
+    },
+    "Deviné par l’adresse IP" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guessed from the IP address"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deviné par l’adresse IP"
           }
         }
       }
@@ -22090,6 +22096,23 @@
         }
       }
     },
+    "Heure" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Time"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heure"
+          }
+        }
+      }
+    },
     "Historique des modifications" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -25979,6 +26002,22 @@
         }
       }
     },
+    "latence minimale %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "minimum latency %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "latence minimale %@"
+          }
+        }
+      }
+    },
     "Latence moyenne" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -28011,22 +28050,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les speedtests resteront en pause et reprendront automatiquement en cellulaire."
-          }
-        }
-      }
-    },
-    "Les tests suivent la distance et le plafond choisis. Chaque résultat garde sa position." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tests follow your chosen distance and data limit. Each result keeps its location."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les tests suivent la distance et le plafond choisis. Chaque résultat garde sa position."
           }
         }
       }
@@ -33020,6 +33043,22 @@
         }
       }
     },
+    "Ouvre le détail du test" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the test details"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre le détail du test"
+          }
+        }
+      }
+    },
     "Ouvre le lien reçu pour publier et contacter la communauté. La carte et les tests restent disponibles." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -35135,6 +35174,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "pic"
+          }
+        }
+      }
+    },
+    "Pic : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Peak: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pic : %@"
           }
         }
       }
@@ -38375,6 +38430,22 @@
         }
       }
     },
+    "réception moyenne %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "average download %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "réception moyenne %@"
+          }
+        }
+      }
+    },
     "Réception typique" : {
       "localizations" : {
         "en" : {
@@ -38903,6 +38974,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réduire"
+          }
+        }
+      }
+    },
+    "Réduire le panneau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collapse the panel"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réduire le panneau"
           }
         }
       }
@@ -42635,23 +42722,6 @@
         }
       }
     },
-    "Session terminée" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Session finished"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Session terminée"
-          }
-        }
-      }
-    },
     "Session terrain" : {
       "localizations" : {
         "en" : {
@@ -44365,6 +44435,22 @@
         }
       }
     },
+    "Speedtest, réception %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speedtest, download %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speedtest, réception %@"
+          }
+        }
+      }
+    },
     "Speedtests" : {
       "localizations" : {
         "en" : {
@@ -44462,23 +44548,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "SSE refusé"
-          }
-        }
-      }
-    },
-    "stabilité" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "stability"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "stabilité"
           }
         }
       }
@@ -46385,6 +46454,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Test"
+          }
+        }
+      }
+    },
+    "Test %lld · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test %lld · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test %lld · %@"
           }
         }
       }
@@ -49286,6 +49371,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Valider le code"
+          }
+        }
+      }
+    },
+    "variation de la latence" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "latency variation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "variation de la latence"
           }
         }
       }

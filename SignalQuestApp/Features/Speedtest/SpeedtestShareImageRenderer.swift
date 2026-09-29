@@ -639,6 +639,9 @@ struct SpeedtestShareGraph: View {
     var timedSeries: [SpeedtestTimedRate]? = nil
     var timedAverageSeries: [SpeedtestTimedRate]? = nil
     var timeOriginMs: Int64? = nil
+    /// Unité de l'axe dans l'app (« Mbit/s », « Mbps » en anglais) ; `nil` garde
+    /// les codes universels de l'image de partage, comme sur Android.
+    var unitLabel: String? = nil
 
     /// Série affichée : mesures du moteur si ≥ 2 points ; sinon moyenne réelle
     /// plate (toujours une donnée mesurée, jamais une courbe fantaisie).
@@ -684,7 +687,11 @@ struct SpeedtestShareGraph: View {
     private var axisLabels: some View {
         let maxV = displaySeries.max() ?? 0
         return VStack(alignment: .leading, spacing: 0) {
-            Text("\(axisLabel(maxV)) Mbps")
+            if let unitLabel {
+                Text(verbatim: "\(maxV.formatted(.number.precision(.fractionLength(maxV >= 10 ? 0 : 1)))) \(unitLabel)")
+            } else {
+                Text("\(axisLabel(maxV)) Mbps")
+            }
             Spacer(minLength: 0)
             if timedSeries == nil { Text("0") }
         }

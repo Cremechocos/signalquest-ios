@@ -74,7 +74,9 @@ final class AccessibilityAuditTests: XCTestCase {
             // Contrôle système MapKit fourni par Apple. Sa cible et son rendu ne
             // sont pas modifiables par l'application ; il ouvre les attributions
             // légales et reste correctement nommé par le framework.
-            if screen.hasPrefix("Carte"), name == "Mentions légales" {
+            // Le Drive Test pose la même carte MapKit que l'onglet Carte (Lot 4c).
+            let showsMapKit = screen.hasPrefix("Carte") || screen.hasPrefix("Drive Test")
+            if showsMapKit, name == "Mentions légales" {
                 return exclude("contrôle système MapKit nommé par Apple", name, issue.auditType)
             }
             // La barre Liquid Glass native recouvre volontairement la fin des
@@ -98,11 +100,11 @@ final class AccessibilityAuditTests: XCTestCase {
             // ils n'ont ni XCUIElement ni frame. La carte expose séparément ses
             // annotations et contrôles applicatifs ; on n'invente pas de nœud
             // pour le texte cartographique fourni par Apple.
-            if screen.hasPrefix("Carte"), name == "sans nom", element == nil,
+            if showsMapKit, name == "sans nom", element == nil,
                issue.auditType == .elementDetection {
                 return exclude("libellé raster MapKit sans nœud accessible", name, issue.auditType)
             }
-            if screen.hasPrefix("Carte"), name == "sans nom", element == nil,
+            if showsMapKit, name == "sans nom", element == nil,
                issue.auditType == .dynamicType {
                 return exclude("libellé raster MapKit sans nœud accessible", name, issue.auditType)
             }
@@ -124,7 +126,12 @@ final class AccessibilityAuditTests: XCTestCase {
                 "settings.label.Noir intense (OLED)",
                 // Lot 4b : la pastille « Drive Test » cède la place à l'icône aux
                 // grandes tailles (ViewThatFits) ; la passe AX XXL la vérifie.
-                "speedtest.driveTest.label"
+                "speedtest.driveTest.label",
+                // Lot 4c : le panneau du Drive Test défile aux grandes tailles
+                // (ViewThatFits) ; `testAuditDriveTestAtAccessibilityTextSize`.
+                // Le bouton de démarrage est nommé par son libellé : l'identifiant
+                // posé sur `GradientButton` ne descend pas jusqu'à son texte.
+                "drivetest.", "Démarrer le Drive Test"
             ]
             if issue.auditType == .dynamicType,
                semanticDynamicIdentifiers.contains(where: name.hasPrefix) {
@@ -145,7 +152,9 @@ final class AccessibilityAuditTests: XCTestCase {
                 // Drive Test et historique du compte (Lot 4b) :
                 // `testBodyTextTokensMeetAA`, plus de 11:1.
                 "home.nearby.context", "home.pulse.unit",
-                "speedtest.driveTest.label", "speedtest.account."
+                "speedtest.driveTest.label", "speedtest.account.",
+                // Bilan du dernier trajet, à l'encre sur `surfaceMuted` (Lot 4c).
+                "drivetest.lastTrip."
             ]
             if issue.auditType == .contrast,
                provenContrastIdentifiers.contains(where: name.hasPrefix) {
@@ -162,10 +171,12 @@ final class AccessibilityAuditTests: XCTestCase {
             }
             // Ces avertissements sont des prédictions à taille normale. Ils ne
             // sont ignorés que pour les composants rendus de nouveau dans la
-            // passe AX XXL, où `.textClipped` reste bloquant.
+            // passe AX XXL, où `.textClipped` reste bloquant : l'exclusion
+            // valait aussi dans cette passe, qui ne gardait donc rien (Lot 4c).
+            let rendersLargeText = screen.hasSuffix("texte accessibilité")
             if issue.auditType == .textClipped,
-               (semanticDynamicIdentifiers.contains(where: name.hasPrefix) ||
-                (element == nil && screen.hasPrefix("Communauté"))) {
+               (semanticDynamicIdentifiers.contains(where: name.hasPrefix) && !rendersLargeText) ||
+                (element == nil && screen.hasPrefix("Communauté")) {
                 return exclude("composant revu à AX XXL avec textClipped bloquant", name, issue.auditType)
             }
             issues.append("[\(Self.name(for: issue.auditType))] « \(name) » \(frame) · \(detail)")
@@ -218,6 +229,43 @@ final class AccessibilityAuditTests: XCTestCase {
         }
         print("SQ_A11Y onglets standard : \(visited)/\(SignalQuestUITestSupport.tabs.count) audités")
         XCTAssertEqual(visited, SignalQuestUITestSupport.tabs.count)
+    }
+
+    /// Drive Test (Lot 4c) : explication, puis carte et panneau avec le trajet
+    /// de démonstration, comme le voit l'utilisateur.
+    func testAuditDriveTest() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        let app = launch(["--mock-auth", "-drivetest_speedtests_disclosure_seen_v2", "NO"])
+        let speed = SignalQuestUITestSupport.tab(named: "Tester", in: app)
+        XCTAssertTrue(speed.waitForExistence(timeout: 20), "Onglet Tester absent de l'audit Drive Test")
+        speed.tap()
+        let entry = app.buttons["Mode Drive Test"].firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 10), "Entrée Drive Test introuvable")
+        entry.tap()
+        let acknowledge = app.buttons["J'ai compris"].firstMatch
+        XCTAssertTrue(acknowledge.waitForExistence(timeout: 8), "Explication du Drive Test absente")
+        audit(app, screen: "Drive Test — explication", blocking: true)
+        acknowledge.tap()
+        _ = acknowledge.waitForNonExistence(timeout: 5)
+        XCTAssertTrue(app.buttons["Démarrer le Drive Test"].waitForExistence(timeout: 8))
+        audit(app, screen: "Drive Test", blocking: true)
+    }
+
+    /// Rendu réel à AX XXL : le panneau défile, rien ne doit être coupé.
+    func testAuditDriveTestAtAccessibilityTextSize() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        let app = launch([
+            "--mock-auth", "-drivetest_speedtests_disclosure_seen_v2", "YES",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXL"
+        ])
+        let speed = SignalQuestUITestSupport.tab(named: "Tester", in: app)
+        XCTAssertTrue(speed.waitForExistence(timeout: 20), "Onglet Tester absent de l'audit Drive Test AX XXL")
+        speed.tap()
+        let entry = app.buttons["Mode Drive Test"].firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 10), "Entrée Drive Test introuvable")
+        entry.tap()
+        XCTAssertTrue(app.buttons["drivetest.start"].waitForExistence(timeout: 10))
+        audit(app, screen: "Drive Test — texte accessibilité", blocking: true, types: Self.renderedLargeTextTypes)
     }
 
     func testAuditSettings() throws {

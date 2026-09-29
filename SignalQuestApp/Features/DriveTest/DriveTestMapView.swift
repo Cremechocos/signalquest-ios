@@ -48,17 +48,28 @@ struct DriveTestMapView: UIViewRepresentable {
     var onSelectSite: (AntennaSite) -> Void = { _ in }
     /// Tap sur un point speedtest → ouvre la feuille de détails.
     var onSelectSpeedtest: (DriveSpeedtestPoint) -> Void = { _ in }
+    /// Point bleu et suivi seulement une fois la localisation accordée : les
+    /// demander avant faisait partir l'invite système avant l'explication du
+    /// Drive Test (MES-10).
+    var showsUser: Bool = true
+    /// Incrémenté par le bouton « Recentrer » : la carte reprend le suivi.
+    var recenterToken: Int = 0
+    /// Suivi actif ou non : un geste sur la carte l'interrompt (MES-19).
+    var onFollowChange: (Bool) -> Void = { _ in }
 
     @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
     private var backdrop: MapBackdrop { MapBackdrop.resolve(backdropRaw) }
 
-    func makeCoordinator() -> Coordinator { Coordinator(onSelectSite: onSelectSite, onSelectSpeedtest: onSelectSpeedtest) }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onSelectSite: onSelectSite, onSelectSpeedtest: onSelectSpeedtest, onFollowChange: onFollowChange)
+    }
 
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView(frame: .zero)
         map.delegate = context.coordinator
-        map.showsUserLocation = true
-        map.userTrackingMode = .follow
+        map.showsUserLocation = showsUser
+        if showsUser { map.userTrackingMode = .follow }
+        context.coordinator.lastRecenterToken = recenterToken
         map.pointOfInterestFilter = .excludingAll
         context.coordinator.applyBackdrop(backdrop, on: map)
         map.register(DriveAntennaMarkerView.self, forAnnotationViewWithReuseIdentifier: DriveAntennaMarkerView.reuseID)
@@ -71,6 +82,14 @@ struct DriveTestMapView: UIViewRepresentable {
 
     func updateUIView(_ map: MKMapView, context: Context) {
         context.coordinator.applyBackdrop(backdrop, on: map)
+        if map.showsUserLocation != showsUser {
+            map.showsUserLocation = showsUser
+            if showsUser { map.setUserTrackingMode(.follow, animated: false) }
+        }
+        if context.coordinator.lastRecenterToken != recenterToken {
+            context.coordinator.lastRecenterToken = recenterToken
+            if showsUser { map.setUserTrackingMode(.follow, animated: true) }
+        }
         context.coordinator.sync(
             antennas: antennas, trace: trace, speedtestTrail: speedtestTrail,
             highlightedSiteId: highlightedSiteId, userLocation: userLocation,
@@ -92,11 +111,22 @@ struct DriveTestMapView: UIViewRepresentable {
         private var tileOverlay: MKTileOverlay?
         private let onSelectSite: (AntennaSite) -> Void
         private let onSelectSpeedtest: (DriveSpeedtestPoint) -> Void
+        private let onFollowChange: (Bool) -> Void
+        var lastRecenterToken = 0
 
-        init(onSelectSite: @escaping (AntennaSite) -> Void, onSelectSpeedtest: @escaping (DriveSpeedtestPoint) -> Void) {
+        init(onSelectSite: @escaping (AntennaSite) -> Void, onSelectSpeedtest: @escaping (DriveSpeedtestPoint) -> Void, onFollowChange: @escaping (Bool) -> Void = { _ in }) {
             self.onSelectSite = onSelectSite
             self.onSelectSpeedtest = onSelectSpeedtest
+            self.onFollowChange = onFollowChange
             super.init()
+        }
+
+        /// Un glissé sur la carte coupe le suivi : l'écran propose alors de
+        /// recentrer. Différé : MapKit peut appeler pendant une mise à jour de vue.
+        func mapView(_ mapView: MKMapView, didChange mode: MKUserTrackingMode, animated: Bool) {
+            let following = mode != .none
+            let onFollowChange = onFollowChange
+            DispatchQueue.main.async { onFollowChange(following) }
         }
 
         func applyBackdrop(_ backdrop: MapBackdrop, on map: MKMapView) {
@@ -234,12 +264,17 @@ struct DriveTestMapView: UIViewRepresentable {
                 let v = map.dequeueReusableAnnotationView(withIdentifier: DriveSpeedtestMarkerView.reuseID, for: annotation) as? DriveSpeedtestMarkerView
                     ?? DriveSpeedtestMarkerView(annotation: annotation, reuseIdentifier: DriveSpeedtestMarkerView.reuseID)
                 v.annotation = annotation; v.canShowCallout = false; v.apply(color: st.color)
+                v.accessibilityLabel = String(localized: "Speedtest, réception \(SQUnits.throughput(mbps: st.point.result.downloadAverageMbps))")
+                v.accessibilityHint = String(localized: "Ouvre le détail du test")
                 return v
             }
             if let ant = annotation as? DriveAntennaAnnotation {
                 let v = map.dequeueReusableAnnotationView(withIdentifier: DriveAntennaMarkerView.reuseID, for: annotation) as? DriveAntennaMarkerView
                     ?? DriveAntennaMarkerView(annotation: annotation, reuseIdentifier: DriveAntennaMarkerView.reuseID)
                 v.annotation = annotation; v.canShowCallout = false; v.apply(color: ant.color)
+                let address = ant.site.address?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                v.accessibilityLabel = address.isEmpty ? String(localized: "Antenne") : String(localized: "Antenne, \(address)")
+                v.accessibilityHint = String(localized: "Ouvre la fiche de l'antenne")
                 return v
             }
             return nil // position utilisateur → puck par défaut
@@ -273,15 +308,19 @@ final class DriveSpeedtestAnnotation: NSObject, MKAnnotation {
     }
 }
 
-/// Marqueur d'antenne minimal (petit disque coloré par opérateur).
+/// Marqueur d'antenne minimal (petit disque coloré par opérateur). Le disque
+/// garde 14 pt, la zone de toucher en fait 44 : un marqueur de la taille du
+/// dessin se ratait au doigt (audit d'accessibilité, Lot 4c).
 final class DriveAntennaMarkerView: MKAnnotationView {
     static let reuseID = "drivetest-antenna"
     private let dot = UIView()
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
-        frame = CGRect(x: 0, y: 0, width: 14, height: 14)
+        frame = CGRect(x: 0, y: 0, width: 44, height: 44)
         backgroundColor = .clear
-        dot.frame = bounds
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+        dot.frame = CGRect(x: 15, y: 15, width: 14, height: 14)
         dot.layer.cornerRadius = 7
         dot.layer.borderWidth = 2
         dot.layer.borderColor = UIColor.white.cgColor
@@ -302,9 +341,11 @@ final class DriveSpeedtestMarkerView: MKAnnotationView {
     private let diamond = UIView()
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
-        frame = CGRect(x: 0, y: 0, width: 16, height: 16)
+        frame = CGRect(x: 0, y: 0, width: 44, height: 44)
         backgroundColor = .clear
-        diamond.frame = bounds
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+        diamond.frame = CGRect(x: 14, y: 14, width: 16, height: 16)
         diamond.layer.cornerRadius = 3
         diamond.layer.borderWidth = 2
         diamond.layer.borderColor = UIColor.white.cgColor

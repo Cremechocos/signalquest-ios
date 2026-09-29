@@ -640,6 +640,7 @@
 		FC00E6124A3556DA366FD4AE /* MessageRenderCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 375FEBD8DD79973A3821B193 /* MessageRenderCache.swift */; };
 		FC56E7C3FFDFBDBD65E65037 /* SQComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0078226636E735A7665D8A3 /* SQComponents.swift */; };
 		FCA0F934683B2BC6C982C8B8 /* DriveTestDataBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AE9139473E16EE1FB4FFE7 /* DriveTestDataBudgetTests.swift */; };
+		FCDA55A3E109754904290CDF /* DriveTestSessionRecapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1882206E87BDC3D7752ECD /* DriveTestSessionRecapTests.swift */; };
 		FD138DC8B007C51B00E95A22 /* OutageNotificationReceiptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFE20C5C158D1152BD31B74A /* OutageNotificationReceiptTests.swift */; };
 		FD8C8A4E55F6F7F937636C0E /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C14BE7BE1D4056FB4421D16 /* APIClientTests.swift */; };
 		FDA2C57555313AB1FFCCAB35 /* CarPlayTabBarBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48863C421024F2F856B8E0EE /* CarPlayTabBarBuilder.swift */; };
@@ -1171,6 +1172,7 @@
 		BBEA8942969B9394C2019221 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		BC0528597DB985754DD4A9AD /* WeeklyRecapCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyRecapCard.swift; sourceTree = "<group>"; };
 		BC160421CE1CD7BA1CC39557 /* LocationFixPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationFixPolicy.swift; sourceTree = "<group>"; };
+		BE1882206E87BDC3D7752ECD /* DriveTestSessionRecapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveTestSessionRecapTests.swift; sourceTree = "<group>"; };
 		BE36E5E28521B4EE522771A1 /* nci-provenance-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "nci-provenance-v1.json"; sourceTree = "<group>"; };
 		BEAB0F4B51977FF72375533F /* NotificationsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsService.swift; sourceTree = "<group>"; };
 		BF5C473D670B7B2938ABCB45 /* ReportsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsService.swift; sourceTree = "<group>"; };
@@ -2301,6 +2303,7 @@
 				A84A348D80B0B5882E1A9AC9 /* DesignTokenContrastTests.swift */,
 				1DD63B04CFDED17637F04A03 /* DirectionsRequestTests.swift */,
 				87AE9139473E16EE1FB4FFE7 /* DriveTestDataBudgetTests.swift */,
+				BE1882206E87BDC3D7752ECD /* DriveTestSessionRecapTests.swift */,
 				1483D87FE8E1D946F88F7C05 /* E2EETests.swift */,
 				9527CF7BC5A3B9F6DA2DEC71 /* E2EEV2NotificationProcessorTests.swift */,
 				F23ED8BD3711812342EC5C19 /* EntitlementsTests.swift */,
@@ -3359,6 +3362,7 @@
 				5D7466C54936C9FAEC120C2D /* DesignTokenContrastTests.swift in Sources */,
 				B08E0E2192F630A0ECEECCE9 /* DirectionsRequestTests.swift in Sources */,
 				FCA0F934683B2BC6C982C8B8 /* DriveTestDataBudgetTests.swift in Sources */,
+				FCDA55A3E109754904290CDF /* DriveTestSessionRecapTests.swift in Sources */,
 				A9AA093F88B7A4E23A7EE3A7 /* E2EETests.swift in Sources */,
 				E5843F42151B296385A9B784 /* E2EEV2NotificationProcessorTests.swift in Sources */,
 				4EA76BC1BEB2621F9B74C6ED /* EntitlementsTests.swift in Sources */,

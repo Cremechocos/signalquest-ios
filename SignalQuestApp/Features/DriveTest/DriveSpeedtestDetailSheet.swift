@@ -56,11 +56,12 @@ struct DriveSpeedtestDetailSheet: View {
                     .stroke(color, style: StrokeStyle(lineWidth: 14, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 VStack(spacing: 2) {
-                    Text(Self.format(download))
+                    Text(verbatim: SQUnits.throughputValue(mbps: download))
                         .font(SQFont.display(46, .bold))
                         .monospacedDigit()
                         .foregroundStyle(SQColor.label)
-                    Text("Mbps").font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
+                    Text(verbatim: SQUnits.throughputUnit(mbps: download))
+                        .font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
                     Text(Self.speedLabel(download))
                         .font(SQFont.body(12, .bold))
                         .foregroundStyle(color)
@@ -92,29 +93,35 @@ struct DriveSpeedtestDetailSheet: View {
         let columns = Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2)
         return GlassCard {
             LazyVGrid(columns: columns, spacing: SQSpace.sm) {
-                metricTile("Download", value: Self.format(result.downloadAverageMbps), unit: "Mbps",
-                           detail: "max \(Self.format(result.downloadMaxMbps))", color: Self.speedColor(result.downloadAverageMbps), icon: "arrow.down")
-                metricTile("Upload", value: Self.format(result.uploadAverageMbps ?? 0), unit: "Mbps",
-                           detail: result.uploadMaxMbps.map { "max \(Self.format($0))" } ?? "—", color: SQColor.success, icon: "arrow.up")
-                metricTile("Ping", value: Self.format(result.primaryPingMs ?? 0), unit: "ms",
-                           detail: pingRange, color: SQColor.warning, icon: "bolt.horizontal")
-                metricTile("Gigue", value: Self.format(result.jitterMs ?? 0), unit: "ms",
-                           detail: "stabilité", color: SQColor.info, icon: "waveform.path")
+                // Vocabulaire du lexique et unités de SQUnits, comme le test
+                // ponctuel : « Download », « Ping » et « Mbps » restaient ici (MES-24).
+                metricTile("Réception", value: SQUnits.throughputValue(mbps: result.downloadAverageMbps),
+                           unit: SQUnits.throughputUnit(mbps: result.downloadAverageMbps),
+                           detail: Self.peak(result.downloadMaxMbps), color: Self.speedColor(result.downloadAverageMbps), icon: "arrow.down")
+                metricTile("Envoi", value: result.uploadAverageMbps.map { SQUnits.throughputValue(mbps: $0) } ?? "—",
+                           unit: SQUnits.throughputUnit(mbps: result.uploadAverageMbps ?? 0),
+                           detail: Self.peak(result.uploadMaxMbps), color: SQColor.success, icon: "arrow.up")
+                metricTile("Latence", value: Self.wholeMs(result.primaryPingMs), unit: "ms",
+                           detail: pingRange, color: SQColor.warning, icon: "bolt.horizontal", term: .latency)
+                metricTile("Gigue", value: Self.wholeMs(result.jitterMs), unit: "ms",
+                           detail: String(localized: "variation de la latence"), color: SQColor.info, icon: "waveform.path", term: .jitter)
             }
         }
     }
 
-    private func metricTile(_ title: String, value: String, unit: String, detail: String, color: Color, icon: String) -> some View {
+    private func metricTile(_ title: String, value: String, unit: String, detail: String, color: Color, icon: String, term: SQTerm? = nil) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
             HStack(spacing: 6) {
                 Image(systemName: icon).font(.caption.weight(.semibold)).foregroundStyle(color)
-                Text(LocalizedStringKey(title)).font(SQFont.body(11.5, .semibold)).foregroundStyle(SQColor.labelSecondary)
+                Text(LocalizedStringKey(title)).font(SQType.micro).foregroundStyle(SQColor.labelSecondary)
+                Spacer(minLength: 0)
+                if let term { SQInfoButton(term: term) }
             }
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value).font(SQFont.display(24, .bold)).monospacedDigit().foregroundStyle(SQColor.label)
-                Text(unit).font(SQFont.body(11)).foregroundStyle(SQColor.labelSecondary)
+                Text(unit).font(SQType.micro).foregroundStyle(SQColor.labelSecondary)
             }
-            Text(detail).font(SQFont.body(11)).foregroundStyle(SQColor.labelSecondary).lineLimit(1)
+            Text(detail).font(SQType.micro).foregroundStyle(SQColor.labelSecondary).lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SQSpace.md)
@@ -134,10 +141,10 @@ struct DriveSpeedtestDetailSheet: View {
                     accent: Self.speedColor(result.downloadAverageMbps), plotBackground: SQColor.surfaceMuted,
                     gridColor: SQColor.separator, labelColor: SQColor.labelSecondary,
                     timedSeries: trace?.recentSeries, timedAverageSeries: trace?.averageSeries,
-                    timeOriginMs: trace?.sampleStartMs)
+                    timeOriginMs: trace?.sampleStartMs, unitLabel: SQUnits.throughputUnit(mbps: 0))
                     .frame(height: 108)
                 if trace == nil {
-                    Text("Courbe historique sans horodatage").font(.caption)
+                    Text("Courbe historique sans horodatage").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -150,15 +157,16 @@ struct DriveSpeedtestDetailSheet: View {
         VStack(spacing: 0) {
             metaRow("antenna.radiowaves.left.and.right", "Opérateur", operatorText ?? "—")
             metaDivider
-            metaRow("cellularbars", "Génération", generationText ?? connectionText)
+            metaRow("cellularbars", "Réseau", generationText ?? connectionText,
+                    term: generationText?.hasPrefix("5G") == true ? .fiveGModes : nil)
             if let ssid = result.wifiSSID, !ssid.isEmpty {
                 metaDivider
                 metaRow("wifi", "Wi-Fi", ssid)
             }
             metaDivider
-            metaRow("server.rack", "Serveur", serverText)
+            metaRow("server.rack", "Serveur de mesure", serverText)
             metaDivider
-            metaRow("timer", "Durée", "\(Self.format(result.durationSeconds)) s")
+            metaRow("timer", "Durée", "\(result.durationSeconds.formatted(.number.precision(.fractionLength(0...1)))) s")
             metaDivider
             metaRow("clock", "Heure", result.createdAt.formatted(date: .abbreviated, time: .shortened))
             if let place = placeText {
@@ -170,7 +178,7 @@ struct DriveSpeedtestDetailSheet: View {
         .sqCardBackground()
     }
 
-    private func metaRow(_ icon: String, _ label: String, _ value: String) -> some View {
+    private func metaRow(_ icon: String, _ label: String, _ value: String, term: SQTerm? = nil) -> some View {
         HStack(spacing: SQSpace.md) {
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .medium))
@@ -178,6 +186,7 @@ struct DriveSpeedtestDetailSheet: View {
                 .frame(width: 36, height: 36)
                 .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             Text(LocalizedStringKey(label)).font(SQFont.body(14.5, .medium)).foregroundStyle(SQColor.labelSecondary)
+            if let term { SQInfoButton(term: term) }
             Spacer()
             Text(value).font(SQFont.body(14.5, .semibold)).foregroundStyle(SQColor.label)
                 .multilineTextAlignment(.trailing).lineLimit(2)
@@ -200,7 +209,7 @@ struct DriveSpeedtestDetailSheet: View {
         return name?.isEmpty == false ? name : nil
     }
     private var connectionText: String {
-        (result.wifiSSID?.isEmpty == false) ? "Wi-Fi" : "Cellulaire"
+        (result.wifiSSID?.isEmpty == false) ? "Wi-Fi" : String(localized: "Cellulaire")
     }
     private var serverText: String {
         if let dl = result.downloadServerName, let s = result.serverName, dl != s { return "\(s) · \(dl)" }
@@ -208,7 +217,7 @@ struct DriveSpeedtestDetailSheet: View {
     }
     private var pingRange: String {
         guard let mn = result.pingMinMs, let mx = result.pingMaxMs else { return "—" }
-        return "\(Self.format(mn))–\(Self.format(mx)) ms"
+        return "\(Int(mn.rounded()))–\(SQUnits.milliseconds(mx))"
     }
     private var placeText: String? {
         let parts = [result.address, result.city].compactMap { $0 }.filter { !$0.isEmpty }
@@ -217,8 +226,15 @@ struct DriveSpeedtestDetailSheet: View {
 
     // MARK: Helpers couleur/format (échelle SpeedBand)
 
-    static func format(_ v: Double) -> String {
-        v >= 100 ? String(Int(v.rounded())) : String(format: "%.1f", v)
+    /// « Pic : 412 Mbit/s ».
+    static func peak(_ mbps: Double?) -> String {
+        guard let mbps, mbps.isFinite, mbps > 0 else { return "—" }
+        return String(localized: "Pic : \(SQUnits.throughput(mbps: mbps))")
+    }
+
+    static func wholeMs(_ value: Double?) -> String {
+        guard let value, value.isFinite, value >= 0 else { return "—" }
+        return "\(Int(value.rounded()))"
     }
 
     static func gaugeFraction(_ mbps: Double) -> CGFloat {

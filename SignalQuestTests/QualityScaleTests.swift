@@ -62,6 +62,15 @@ final class QualityScaleTests: XCTestCase {
         XCTAssertEqual(SQUnits.throughputValue(mbps: .nan, locale: fr), "—")
     }
 
+    /// Même règle pour les distances : « 12,3 km » en français (MES-25).
+    func testDistanceUsesTheLocaleDecimalSeparator() {
+        let fr = Locale(identifier: "fr_FR"), en = Locale(identifier: "en_US")
+        XCTAssertEqual(SQUnits.distance(meters: 12_345, system: .metric, locale: fr), "12,3 km")
+        XCTAssertEqual(SQUnits.distance(meters: 12_345, system: .metric, locale: en), "12.3 km")
+        XCTAssertEqual(SQUnits.distance(meters: 340, system: .metric, locale: fr), "340 m")
+        XCTAssertEqual(SQUnits.distance(meters: 2_414, system: .imperial, locale: fr), "1,5 mi")
+    }
+
     /// Le lexique veut « Mbps » en anglais ; les unités manquaient au catalogue,
     /// l'anglais affichait donc « Mbit/s ». Lu dans le fichier compilé : cette
     /// suite tourne en français.

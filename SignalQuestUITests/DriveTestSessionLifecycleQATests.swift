@@ -99,6 +99,34 @@ final class DriveTestSessionLifecycleQATests: XCTestCase {
         if stop.exists { stop.tap() }
     }
 
+    /// MES-10 : l'explication du Drive Test passe avant la demande système de
+    /// localisation. Ni l'ouverture de l'écran ni la fermeture de l'explication
+    /// ne la déclenchent : elle vient du préflight de « Démarrer ».
+    func testExplanationComesBeforeLocationPrompt() throws {
+        let app = XCUIApplication()
+        app.resetAuthorizationStatus(for: .location)
+        SignalQuestUITestSupport.launch(app, arguments: [
+            "--mock-auth", "-drivetest_speedtests_disclosure_seen_v2", "NO"
+        ])
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let speedTab = SignalQuestUITestSupport.tab(named: "Tester", in: app)
+        XCTAssertTrue(speedTab.waitForExistence(timeout: 20), "Onglet Tester introuvable")
+        speedTab.tap()
+        let entry = app.buttons["Mode Drive Test"].firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 10), "Bouton « Mode Drive Test » introuvable")
+        entry.tap()
+
+        let acknowledge = app.buttons["J'ai compris"].firstMatch
+        XCTAssertTrue(acknowledge.waitForExistence(timeout: 8), "L'explication du Drive Test n'apparaît pas")
+        XCTAssertFalse(springboard.alerts.firstMatch.waitForExistence(timeout: 3),
+                       "Demande de localisation affichée avant l'explication")
+        acknowledge.tap()
+        XCTAssertTrue(acknowledge.waitForNonExistence(timeout: 5))
+        XCTAssertFalse(springboard.alerts.firstMatch.waitForExistence(timeout: 3),
+                       "Demande de localisation affichée dès la fermeture de l'explication")
+        diagnose(app, "mes10-apres-explication")
+    }
+
     /// Contrôle de référence : le bouton d'arrêt n'est pas un faux positif qui
     /// resterait affiché quoi qu'il arrive. Un arrêt explicite doit bien le faire
     /// disparaître.
