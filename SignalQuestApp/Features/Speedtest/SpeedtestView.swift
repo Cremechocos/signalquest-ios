@@ -40,6 +40,9 @@ struct SpeedtestView: View {
     /// Un test vaut débit × durée : à 300 Mb/s sur 10 s, c'est ~375 Mo. Sans
     /// plafond une session pouvait engloutir des dizaines de gigaoctets.
     @AppStorage("speedtest_drive_data_cap_mb") private var driveDataCapMB = 5_000
+    /// Les anciens speedtests cellulaires sont publiés à leur tour (hors zones
+    /// privées) : on le dit une fois, au-dessus de l'historique où l'on masque un test.
+    @AppStorage("speedtest_map_publication_notice_seen_v1") private var mapPublicationNoticeSeen = false
     @State private var phase: SpeedtestPhase = .idle
     @State private var result: SpeedtestRunResult?
     @State private var liveProgress = SpeedtestLiveProgress(phase: .idle)
@@ -732,6 +735,9 @@ struct SpeedtestView: View {
     // bouton, sans titre de section (le contexte suffit).
     private var historySection: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
+            if !guestMode, !history.isEmpty, !mapPublicationNoticeSeen {
+                mapPublicationNotice
+            }
             if history.isEmpty {
                 EmptyStateView(
                     title: "Aucun test",
@@ -757,6 +763,37 @@ struct SpeedtestView: View {
                 }
             }
         }
+    }
+
+    private var mapPublicationNotice: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Label {
+                Text("Tes speedtests sur la carte")
+                    .font(SQFont.body(15, .semibold))
+                    .foregroundStyle(SQColor.label)
+            } icon: {
+                Image(systemName: "map")
+                    .foregroundStyle(SQColor.brandRed)
+            }
+            Text("Tes speedtests en réseau mobile, anciens compris, apparaissent sur la carte à l’endroit où tu les as faits. Ceux faits dans tes zones privées restent cachés. Pour en masquer un, ouvre-le dans ton historique.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Compris") {
+                Haptics.selection()
+                mapPublicationNoticeSeen = true
+            }
+            .font(SQFont.body(14, .semibold))
+            .foregroundStyle(SQColor.accentInk)
+            .frame(minHeight: 44)
+            .accessibilityIdentifier("speedtest.mapPublicationNotice.dismiss")
+        }
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqShadowSoft()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("speedtest.mapPublicationNotice")
     }
 
     // MARK: - Derived state

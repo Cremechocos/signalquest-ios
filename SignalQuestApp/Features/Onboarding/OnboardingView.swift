@@ -184,6 +184,8 @@ struct OnboardingView: View {
         .padding(.horizontal, SQSpace.xl)
         .padding(.top, SQSpace.lg)
         .padding(.bottom, SQSpace.xl)
+        // iPad : les boutons ne s'étirent plus sur toute la largeur sous un texte étroit.
+        .sqReadableWidth(560)
     }
 
     // MARK: Navigation

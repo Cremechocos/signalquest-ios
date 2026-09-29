@@ -13040,6 +13040,22 @@
         }
       }
     },
+    "Compris" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Got it"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compris"
+          }
+        }
+      }
+    },
     "Compte Apple" : {
       "localizations" : {
         "en" : {
@@ -43824,6 +43840,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tes speedtests en réseau mobile apparaissent sur la carte, à l’endroit où tu les fais. Tes zones privées restent protégées et tu peux masquer une mesure."
+          }
+        }
+      }
+    },
+    "Tes speedtests sur la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your speedtests on the map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes speedtests sur la carte"
+          }
+        }
+      }
+    },
+    "Tes speedtests en réseau mobile, anciens compris, apparaissent sur la carte à l’endroit où tu les as faits. Ceux faits dans tes zones privées restent cachés. Pour en masquer un, ouvre-le dans ton historique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your mobile network speedtests, including older ones, appear on the map where you ran them. Those run in your private zones stay hidden. To hide one, open it in your history."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes speedtests en réseau mobile, anciens compris, apparaissent sur la carte à l’endroit où tu les as faits. Ceux faits dans tes zones privées restent cachés. Pour en masquer un, ouvre-le dans ton historique."
           }
         }
       }
