@@ -24,7 +24,7 @@ enum AntennaReportImage: Identifiable {
         if raw.hasPrefix("data:") {
             guard let comma = raw.firstIndex(of: ","),
                   let data = Data(base64Encoded: String(raw[raw.index(after: comma)...])),
-                  let image = UIImage(data: data) else { return nil }
+                  let image = ImagePipeline.downsample(data: data, maxPixel: 1200) else { return nil }
             return .inline(image)
         }
         guard let url = URL(string: raw), url.scheme?.hasPrefix("http") == true else { return nil }

@@ -91,6 +91,24 @@ final class LivePresenceServiceTests: XCTestCase {
         XCTAssertTrue(recorder.bodies.allSatisfy { $0["location"] == nil })
     }
 
+    /// SOC-35 : le seul partage radio ne réveille plus le GPS, carte des amis fermée.
+    func testRadioSharingAloneNeverWakesTheGPS() async throws {
+        let (service, credentials, gate, gps, recorder) = try fixture()
+        defer { credentials.clearAccessToken(); service.stopForSignOut(); MockURLProtocol.requestHandler = nil }
+        let loading = Task { await service.refreshSharingSettings() }
+        await gate.waitForRequests(1)
+        await gate.resolve(0, response(sharing: true))
+        await loading.value
+        service.applySharingSettings(shareLocation: false, shareRadio: true,
+                                     expectedSessionID: credentials.snapshot().sessionID)
+        let sent = expectation(description: "heartbeat without GPS")
+        recorder.onRequest = { sent.fulfill() }
+        service.setAppActive(true)
+        await fulfillment(of: [sent], timeout: 2)
+        XCTAssertEqual(gps.requests, 0)
+        XCTAssertTrue(recorder.bodies.allSatisfy { $0["location"] == nil })
+    }
+
     func testPartialInitialSettingsCannotPublishWithAnUnknownPresencePreference() async throws {
         let (service, credentials, gate, gps, recorder) = try fixture()
         defer { credentials.clearAccessToken(); service.stopForSignOut(); MockURLProtocol.requestHandler = nil }

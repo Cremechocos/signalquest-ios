@@ -87,7 +87,7 @@ struct DriveTestMapView: UIViewRepresentable {
         private var lastAntennaSig = 0
         private var lastConeSig = ""
         private var lastTrace: [CLLocationCoordinate2D] = []
-        private var lastSpeedtestCount = -1
+        private var lastSpeedtestSig = SpeedtestTrailSignature(count: -1, lastId: nil)
         private var appliedBackdrop: MapBackdrop?
         private var tileOverlay: MKTileOverlay?
         private let onSelectSite: (AntennaSite) -> Void
@@ -179,9 +179,27 @@ struct DriveTestMapView: UIViewRepresentable {
         }
 
         // MARK: Speedtests (annotations tappables colorées par débit)
+        /// Le nombre de points ET le dernier : passé 500, chaque mesure chasse la
+        /// plus ancienne et le nombre ne bouge plus. Comparer ce seul nombre
+        /// figeait les losanges pour le reste du trajet (MES-27).
+        struct SpeedtestTrailSignature: Equatable {
+            let count: Int
+            let lastId: UUID?
+
+            init(count: Int, lastId: UUID?) {
+                self.count = count
+                self.lastId = lastId
+            }
+
+            init(_ points: [DriveSpeedtestPoint]) {
+                self.init(count: points.count, lastId: points.last?.id)
+            }
+        }
+
         private func syncSpeedtests(_ points: [DriveSpeedtestPoint], on map: MKMapView) {
-            guard points.count != lastSpeedtestCount else { return }
-            lastSpeedtestCount = points.count
+            let sig = SpeedtestTrailSignature(points)
+            guard sig != lastSpeedtestSig else { return }
+            lastSpeedtestSig = sig
             if !speedtestAnnotations.isEmpty { map.removeAnnotations(speedtestAnnotations) }
             speedtestAnnotations = points.map { DriveSpeedtestAnnotation(point: $0, coordinate: $0.coordinate, color: Self.speedColor($0.result.downloadAverageMbps)) }
             if !speedtestAnnotations.isEmpty { map.addAnnotations(speedtestAnnotations) }

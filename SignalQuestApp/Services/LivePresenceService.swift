@@ -306,16 +306,20 @@ final class LivePresenceService: ObservableObject {
 
     private func publishTick(generation: UUID) async {
         guard shouldBroadcast, loopGeneration == generation else { return }
-        let needsFix = shouldPublishLocation || shareRadio
         let owner = api.credentials.snapshot()
-        let fix = needsFix ? await location.currentLocation(timeoutSeconds: 4) : nil
+        // Le GPS ne se réveille que pour la position partagée. Le relevé radio se
+        // contente d'une position déjà connue, ou part sans : le serveur n'en
+        // déduit que la ville, et Android n'en envoie pas. Avant, activer le seul
+        // partage radio relevait le GPS sur n'importe quel écran (SOC-35).
+        let fix = shouldPublishLocation ? await location.currentLocation(timeoutSeconds: 4) : nil
         guard !Task.isCancelled, shouldBroadcast, loopGeneration == generation, api.credentials.isCurrent(owner) else { return }
+        let radioFix = fix ?? location.cachedLocation()
         let privacyVersion = settingsRevision
         let presenceVersion = presenceRevision
         let locationDue = fix.map { telemetryDelivery.shouldSend($0, channel: .location, now: Date(),
             minDistance: minDistanceMeters, maxSilence: maxSilence) } ?? false
-        let radioDue = fix.map { telemetryDelivery.shouldSend($0, channel: .radio, now: Date(),
-            minDistance: minDistanceMeters, maxSilence: maxSilence) } ?? false
+        let radioDue = shareRadio && telemetryDelivery.shouldSend(radioFix, channel: .radio, now: Date(),
+            minDistance: minDistanceMeters, maxSilence: maxSilence)
         let positionSubmitted = shouldPublishLocation && locationDue
         let acknowledged = await publishPresence(
             status: status, location: positionSubmitted ? fix : nil,
@@ -323,18 +327,16 @@ final class LivePresenceService: ObservableObject {
         )
         guard !Task.isCancelled, shouldBroadcast, loopGeneration == generation, api.credentials.isCurrent(owner),
               settingsRevision == privacyVersion, presenceRevision == presenceVersion else { return }
-        if let fix {
-            if positionSubmitted {
-                telemetryDelivery.acknowledge(fix, channel: .location,
-                    accepted: acknowledged?.ok == true && acknowledged?.locationAccepted != false, now: Date())
-            }
-            if shareRadio, radioDue {
-                let radioAccepted = await publishRadio(at: fix)
-                guard !Task.isCancelled, shouldBroadcast, loopGeneration == generation,
-                      settingsRevision == privacyVersion, presenceRevision == presenceVersion,
-                      api.credentials.isCurrent(owner) else { return }
-                telemetryDelivery.acknowledge(fix, channel: .radio, accepted: radioAccepted, now: Date())
-            }
+        if let fix, positionSubmitted {
+            telemetryDelivery.acknowledge(fix, channel: .location,
+                accepted: acknowledged?.ok == true && acknowledged?.locationAccepted != false, now: Date())
+        }
+        if radioDue {
+            let radioAccepted = await publishRadio(at: radioFix)
+            guard !Task.isCancelled, shouldBroadcast, loopGeneration == generation,
+                  settingsRevision == privacyVersion, presenceRevision == presenceVersion,
+                  api.credentials.isCurrent(owner) else { return }
+            telemetryDelivery.acknowledge(radioFix, channel: .radio, accepted: radioAccepted, now: Date())
         }
     }
 
@@ -407,8 +409,10 @@ final class LivePresenceService: ObservableObject {
         minDistanceMeters = isObserved ? 5 : 15
     }
 
-    private func publishRadio(at fix: CLLocation) async -> Bool {
-        guard !Task.isCancelled, shouldBroadcast, shareRadio, location.isUsable(fix) else { return false }
+    private func publishRadio(at candidate: CLLocation?) async -> Bool {
+        guard !Task.isCancelled, shouldBroadcast, shareRadio else { return false }
+        // Une position devenue inutilisable (âge, autorisation) n'accompagne pas le relevé.
+        let fix = candidate.flatMap { location.isUsable($0) ? $0 : nil }
         let owner = api.credentials.snapshot().sessionID
         let runtime = loopGeneration
         let privacyVersion = settingsRevision
@@ -421,10 +425,10 @@ final class LivePresenceService: ObservableObject {
         let body = RadioSnapshotPublishRequest(
             technology: status.cellularTechnology?.displayName,
             operator: status.operatorName,
-            lat: fix.coordinate.latitude,
-            lng: fix.coordinate.longitude,
+            lat: fix?.coordinate.latitude,
+            lng: fix?.coordinate.longitude,
             observedAt: capturedAt,
-            locationObservedAt: fix.timestamp
+            locationObservedAt: fix?.timestamp
         )
         // 403 attendu si le partage radio est coupé côté serveur : silencieux.
         do {
@@ -453,8 +457,12 @@ final class LivePresenceService: ObservableObject {
         guard api.credentials.snapshot().sessionID == owner, loopGeneration == runtime,
               settingsRevision == privacyVersion, presenceRevision == presenceVersion,
               offline || shouldBroadcast else { throw APIError.cancelled }
+        // Le relevé radio peut partir sans position : son consentement se vérifie à part.
+        if radio {
+            guard shareRadio else { throw APIError.cancelled }
+        }
         if let fix {
-            guard location.isUsable(fix), radio ? shareRadio : shouldPublishLocation else { throw APIError.cancelled }
+            guard location.isUsable(fix), radio || shouldPublishLocation else { throw APIError.cancelled }
         }
     }
 

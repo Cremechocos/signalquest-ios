@@ -448,6 +448,36 @@ extension SpeedtestV6ContractTests {
         await cache.remove("rescue")
     }
 
+    /// TRX-29 : la base ne s'ouvre qu'au premier accès, puis se comporte comme avant.
+    func testDeferredPendingStoreOpensOnFirstUseAndKeepsTheQueue() async throws {
+        guard #available(iOS 17, *) else { throw XCTSkip("SwiftData requires iOS 17") }
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SpeedtestV6DeferredStore-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("pending.store")
+        let cache = DiskCache(folderName: "SpeedtestV6Deferred-\(UUID().uuidString)", evicts: false)
+        let store = DeferredSpeedtestPendingStore(durableCache: cache, key: "none", storeURL: url)
+        let openedAtCreation = await store.isOpened
+        XCTAssertFalse(openedAtCreation)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path), "Rien n'est ouvert avant le premier accès")
+
+        let result = SpeedtestRunResult(label: "deferred", downloadMbps: 10,
+            downloadAverageMbps: 10, downloadMaxMbps: 10, durationSeconds: 10,
+            connectionType: .wifi, ownerScopeId: "guest")
+        let pending = PendingSpeedtestSave(id: result.id.uuidString, result: result,
+            streams: 1, deviceModel: "QA", createdAt: Date(), isVisibleOnMap: true,
+            shareExactLocation: true, guestDeleteToken: nil, driveSessionId: nil,
+            ownerScopeId: "guest")
+        try await store.upsert(pending)
+        let openedAfterUse = await store.isOpened
+        XCTAssertTrue(openedAfterUse)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path), "La mesure vit dans la base SwiftData")
+        let reloaded = try await DeferredSpeedtestPendingStore(durableCache: cache, key: "none", storeURL: url)
+            .loadAllValidated()
+        XCTAssertEqual(reloaded.map(\.id), [pending.id])
+    }
+
     func testUnreadableSwiftDataRowIsQuarantinedWithoutBlockingTheQueue() async throws {
         guard #available(iOS 17, *) else { throw XCTSkip("SwiftData requires iOS 17") }
         let directory = FileManager.default.temporaryDirectory

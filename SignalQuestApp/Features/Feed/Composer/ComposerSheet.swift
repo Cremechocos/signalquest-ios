@@ -224,8 +224,10 @@ final class ComposerViewModel: ObservableObject {
     func loadPickerImage() async {
         guard let item = selectedItem else { return }
         do {
+            // Aperçu décodé réduit : une photo de 48 Mpx pleine taille pour une
+            // vignette coûtait des centaines de Mo et figeait l'écran (SOC-36).
             if let data = try await item.loadTransferable(type: Data.self),
-               let image = UIImage(data: data) {
+               let image = ImagePipeline.downsample(data: data, maxPixel: 1600) {
                 previewImage = image
                 pickedImageData = data
             }

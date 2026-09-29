@@ -2,8 +2,8 @@ import Foundation
 import os
 
 protocol MarketRegistryServicing: Sendable {
-    /// Toujours non-throwing : mémoire → réseau (+ cache disque 24 h) →
-    /// cache disque → JSON bundlé.
+    /// Toujours non-throwing et sans attente réseau : mémoire → cache disque
+    /// récent (24 h) → JSON bundlé ; le réseau rafraîchit en arrière-plan.
     func registry() async -> MarketRegistryPayload
     func market(forCode code: String?) async -> MarketRegistryEntry?
     /// Première aire (ordre de déclaration Android) contenant le point.
@@ -30,7 +30,9 @@ final class MarketRegistryService: MarketRegistryServicing, @unchecked Sendable 
         var payload: MarketRegistryPayload?
         var isAuthoritative = false
         var lastAttempt: Date?
-        var inFlight: Task<Resolved, Never>?
+        /// Premier chargement local, partagé par les appels concurrents.
+        var localLoad: Task<Resolved, Never>?
+        var refresh: Task<Void, Never>?
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
@@ -41,6 +43,18 @@ final class MarketRegistryService: MarketRegistryServicing, @unchecked Sendable 
     /// Quand on tourne sur le fallback bundlé, on ne retente le réseau
     /// qu'à cet intervalle pour ne pas marteler à chaque mouvement de carte.
     private static let retryInterval: TimeInterval = 120
+    /// ~900 Ko de JSON décodés une seule fois par processus : c'est à la fois le
+    /// repli hors ligne et la référence de chaque comparaison (MES-29).
+    private static let bundled: MarketRegistryPayload = {
+        guard let url = Bundle.main.url(forResource: "market_registry_fallback", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let payload = try? JSONDecoder.signalQuest.decode(MarketRegistryPayload.self, from: data) else {
+            Logger(subsystem: "fr.signalquest.ios", category: "MarketRegistry")
+                .error("market_registry_fallback.json introuvable ou illisible")
+            return .empty
+        }
+        return payload
+    }()
 
     // Dossier dédié — cf. la note dans MapSnapshotService : les deux partageaient
     // « SignalQuestCache » et s'évinçaient mutuellement.
@@ -52,35 +66,52 @@ final class MarketRegistryService: MarketRegistryServicing, @unchecked Sendable 
     // MARK: Registre
 
     func registry() async -> MarketRegistryPayload {
-        let now = Date()
-        if let cached = state.withLock({ st -> MarketRegistryPayload? in
-            guard let payload = st.payload else { return nil }
-            if st.isAuthoritative { return payload }
-            if let last = st.lastAttempt, now.timeIntervalSince(last) < Self.retryInterval {
-                return payload
-            }
-            return nil
-        }) {
-            return cached
+        if let payload = state.withLock({ $0.payload }) {
+            refreshIfNeeded()
+            return payload
         }
-
+        // Premier appel : le cache disque récent, sinon le registre embarqué. On
+        // n'attend jamais le réseau ici — la carte choisit son pays avec ce
+        // registre avant son premier chargement, et une requête lente ou hors
+        // ligne la retenait jusqu'à 30 s au démarrage (TRX-18).
         let task: Task<Resolved, Never> = state.withLock { st in
-            if let inFlight = st.inFlight { return inFlight }
-            st.lastAttempt = now
-            let task = Task { [api, cache, logger] in
-                await Self.resolveRegistry(api: api, cache: cache, logger: logger)
+            if let localLoad = st.localLoad { return localLoad }
+            let task = Task { [cache] in
+                await Self.loadLocal(cache: cache)
             }
-            st.inFlight = task
+            st.localLoad = task
             return task
         }
-
         let resolved = await task.value
-        state.withLock { st in
-            st.payload = resolved.payload
-            st.isAuthoritative = resolved.isAuthoritative
-            st.inFlight = nil
+        let payload = state.withLock { st -> MarketRegistryPayload in
+            if st.payload == nil {
+                st.payload = resolved.payload
+                st.isAuthoritative = resolved.isAuthoritative
+            }
+            return st.payload ?? resolved.payload
         }
-        return resolved.payload
+        refreshIfNeeded()
+        return payload
+    }
+
+    /// Réseau en arrière-plan tant qu'on sert le registre embarqué ; au plus une
+    /// tentative par `retryInterval`. Les appels suivants voient le résultat.
+    private func refreshIfNeeded(now: Date = Date()) {
+        state.withLock { st in
+            guard !st.isAuthoritative, st.refresh == nil else { return }
+            if let last = st.lastAttempt, now.timeIntervalSince(last) < Self.retryInterval { return }
+            st.lastAttempt = now
+            st.refresh = Task { [weak self, api, cache, logger] in
+                let fetched = await Self.fetchRemote(api: api, cache: cache, logger: logger)
+                self?.state.withLock { st in
+                    if let fetched {
+                        st.payload = fetched
+                        st.isAuthoritative = true
+                    }
+                    st.refresh = nil
+                }
+            }
+        }
     }
 
     func market(forCode code: String?) async -> MarketRegistryEntry? {
@@ -127,38 +158,29 @@ final class MarketRegistryService: MarketRegistryServicing, @unchecked Sendable 
 
     // MARK: Chargements
 
-    private static func resolveRegistry(api: APIClient, cache: DiskCache, logger: Logger) async -> Resolved {
-        let bundled = bundledFallback(logger: logger)
-        // 1. Réseau, puis mise en cache disque (TTL 24 h).
+    private static func loadLocal(cache: DiskCache) async -> Resolved {
+        if let payload = try? await cache.read(MarketRegistryPayload.self, for: diskKey, maxAge: diskTTL),
+           payload.canReplaceRadioReference(bundled) {
+            return Resolved(payload: payload, isAuthoritative: true)
+        }
+        return Resolved(payload: bundled, isAuthoritative: false)
+    }
+
+    /// Registre du serveur, mis en cache disque (TTL 24 h) s'il vaut au moins
+    /// la référence embarquée ; `nil` sinon.
+    private static func fetchRemote(api: APIClient, cache: DiskCache, logger: Logger) async -> MarketRegistryPayload? {
         do {
             let payload = try await api.request(
                 APIEndpoint(path: "/api/android/markets", authenticated: false),
                 as: MarketRegistryPayload.self
             )
-            if payload.canReplaceRadioReference(bundled) {
-                try? await cache.write(payload, for: diskKey)
-                return Resolved(payload: payload, isAuthoritative: true)
-            }
+            guard payload.canReplaceRadioReference(bundled) else { return nil }
+            try? await cache.write(payload, for: diskKey)
+            return payload
         } catch {
             logger.debug("Registre marchés réseau indisponible: \(error.localizedDescription, privacy: .public)")
+            return nil
         }
-        // 2. Cache disque encore frais.
-        if let payload = try? await cache.read(MarketRegistryPayload.self, for: diskKey, maxAge: diskTTL),
-           payload.canReplaceRadioReference(bundled) {
-            return Resolved(payload: payload, isAuthoritative: true)
-        }
-        // 3. Fallback bundlé — garanti présent dans les ressources.
-        return Resolved(payload: bundled, isAuthoritative: false)
-    }
-
-    private static func bundledFallback(logger: Logger) -> MarketRegistryPayload {
-        guard let url = Bundle.main.url(forResource: "market_registry_fallback", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let payload = try? JSONDecoder.signalQuest.decode(MarketRegistryPayload.self, from: data) else {
-            logger.error("market_registry_fallback.json introuvable ou illisible")
-            return .empty
-        }
-        return payload
     }
 
     private func locationAreas() -> MarketLocationAreasFile {

@@ -243,7 +243,7 @@ final class RadioLogsViewModel: ObservableObject {
     /// Ouverture : le cache d'abord (affichage immédiat), le réseau seulement
     /// s'il a des chances d'apporter quelque chose.
     func onAppear() async {
-        loadFromCache()
+        await loadFromCache()
         if let lastSyncedAt, Date().timeIntervalSince(lastSyncedAt) < syncCooldown {
             // Rien à retélécharger, mais le balayage peut avoir des sites dont
             // le statut a expiré depuis la dernière fois.
@@ -253,13 +253,25 @@ final class RadioLogsViewModel: ObservableObject {
         await sync()
     }
 
-    private func loadFromCache() {
-        let snapshot = service.cachedSnapshot()
+    /// Le journal pèse environ 2 Mo : le lire, le décoder et le regrouper en sites
+    /// se fait hors du fil principal, sinon l'écran restait figé à l'ouverture
+    /// (MES-17). Seules les affectations reviennent ici.
+    private func loadFromCache() async {
+        let service = self.service
+        let (snapshot, builtSites, cachedStates) = await Task.detached(priority: .userInitiated) {
+            let snapshot = service.cachedSnapshot()
+            return (snapshot, RadioLogSiteBuilder.build(from: snapshot.entries), service.cachedSiteStates())
+        }.value
         logCount = snapshot.entries.count
         lastSyncedAt = snapshot.lastSyncedAt
-        sites = RadioLogSiteBuilder.build(from: snapshot.entries)
-        states = service.cachedSiteStates()
+        sites = builtSites
+        states = cachedStates
         rebuild()
+    }
+
+    /// Regroupement d'une page de rattrapage, lui aussi hors du fil principal.
+    nonisolated private static func buildSites(_ entries: [RadioLogEntry]) async -> [RadioLogSite] {
+        await Task.detached(priority: .userInitiated) { RadioLogSiteBuilder.build(from: entries) }.value
     }
 
     func sync() async {
@@ -270,11 +282,12 @@ final class RadioLogsViewModel: ObservableObject {
         premiumMessage = nil
 
         for await progress in service.syncStream() {
+            let builtSites = await Self.buildSites(progress.snapshot.entries)
             logCount = progress.snapshot.entries.count
             lastSyncedAt = progress.snapshot.lastSyncedAt
             syncReceived = progress.received
             readOnly = progress.readOnly
-            sites = RadioLogSiteBuilder.build(from: progress.snapshot.entries)
+            sites = builtSites
             rebuild()
             switch progress.failure {
             case let .premiumRequired(message): premiumMessage = message

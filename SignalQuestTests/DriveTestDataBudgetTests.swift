@@ -110,6 +110,22 @@ final class DriveTestDataBudgetTests: XCTestCase {
             deviceModel: "iPhone").coordinates, restored.coordinate)
     }
 
+    /// MES-27 : passé 500 mesures, le nombre de points ne bouge plus, le dernier si.
+    func testFullTrailStillRefreshesItsDiamonds() throws {
+        func point() throws -> DriveSpeedtestPoint {
+            let result = SpeedtestRunResult(label: "Drive Test", downloadMbps: 80,
+                downloadAverageMbps: 80, downloadMaxMbps: 90, durationSeconds: 10,
+                connectionType: .cellular, coordinate: Coordinates(latitude: 48.85, longitude: 2.35))
+            return try XCTUnwrap(DriveSpeedtestPoint(result: result))
+        }
+        var trail = try (0..<500).map { _ in try point() }
+        let before = DriveTestMapView.Coordinator.SpeedtestTrailSignature(trail)
+        trail.removeFirst()
+        trail.append(try point())
+        XCTAssertEqual(trail.count, 500)
+        XCTAssertNotEqual(DriveTestMapView.Coordinator.SpeedtestTrailSignature(trail), before)
+    }
+
     func testUnlocatedSpeedtestCreatesNoMapPoint() {
         let result = SpeedtestRunResult(label: "Drive Test", downloadMbps: 80,
             downloadAverageMbps: 80, downloadMaxMbps: 90, durationSeconds: 10,

@@ -173,6 +173,8 @@ final class DriveTestViewModel: ObservableObject {
     @Published private(set) var isPausedStationary = false
     /// Dernière publication des valeurs en direct (MES-07).
     private var lastLiveReadoutAt: Date = .distantPast
+    /// Dernier résumé écrit pour le widget (MES-28).
+    private var lastGlance: (content: String, at: Date)?
     /// L'utilisateur a demandé un test tout de suite (arrêt volontaire, bouchon) :
     /// sans cette échappatoire, une cadence à la distance ne teste jamais à l'arrêt.
     private var manualTestRequested = false
@@ -460,15 +462,27 @@ final class DriveTestViewModel: ObservableObject {
     }
 
     /// Met à jour l'instantané « réseau autour de moi » (F8) lu par le widget d'accueil.
+    /// Le widget ne relit ce résumé qu'à son propre rafraîchissement : l'écrire
+    /// à chaque position, soit environ une fois par seconde en roulant, ne
+    /// servait à rien (MES-28). Une écriture par demi-minute, ou dès que le
+    /// contenu change vraiment (distance à la centaine de mètres près).
     private func writeNetworkGlance() {
-        WidgetSharedStore.saveNetworkGlance(NetworkGlanceSnapshot(
+        let now = Date()
+        let snapshot = NetworkGlanceSnapshot(
             operatorLabel: displayedOperatorLabel,
             generation: services.networkPath.status.cellularTechnology?.rawValue,
             nearestDistanceMeters: nearestDistanceMeters,
             nearestOperator: nearestSite?.operators.first,
             lastDownloadMbps: lastResult?.downloadAverageMbps,
-            date: Date()
-        ))
+            date: now
+        )
+        let content = [snapshot.operatorLabel, snapshot.generation, snapshot.nearestOperator,
+                       snapshot.lastDownloadMbps.map { String($0) },
+                       snapshot.nearestDistanceMeters.map { String(Int($0 / 100)) }]
+            .map { $0 ?? "-" }.joined(separator: "|")
+        if let last = lastGlance, last.content == content, now.timeIntervalSince(last.at) < 30 { return }
+        lastGlance = (content, now)
+        WidgetSharedStore.saveNetworkGlance(snapshot)
     }
 
     private func recomputeNearest() {

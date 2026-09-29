@@ -107,12 +107,14 @@ final class SSEClient: Sendable {
     /// que le NOM de l'événement — on accumule ici les lignes `data:` et on renvoie
     /// le payload complet. Ne relaie que les événements de `keep`. Ignore les lignes
     /// de commentaire SSE (`: heartbeat`). Reconnexion auto (backoff 1,5 s → 30 s) ;
-    /// se termine à l'annulation de la Task consommatrice.
+    /// se termine à l'annulation de la Task consommatrice. `onConnectionChange`
+    /// reçoit `true` à chaque ouverture du flux et `false` à sa coupure.
     func dataStream(
         path: String,
         query: [URLQueryItem] = [],
         keep: Set<String>,
-        bufferingPolicy: AsyncStream<(event: String, data: String)>.Continuation.BufferingPolicy = .unbounded
+        bufferingPolicy: AsyncStream<(event: String, data: String)>.Continuation.BufferingPolicy = .unbounded,
+        onConnectionChange: (@Sendable (Bool) -> Void)? = nil
     ) -> AsyncStream<(event: String, data: String)> {
         AsyncStream(bufferingPolicy: bufferingPolicy) { continuation in
             let task = Task { [api, session, logger] in
@@ -134,6 +136,8 @@ final class SSEClient: Sendable {
                         }
 
                         backoff = 1.5
+                        onConnectionChange?(true)
+                        defer { onConnectionChange?(false) }
                         var parser = SSEFrameParser()
                         for try await byte in bytes {
                             if Task.isCancelled { break }

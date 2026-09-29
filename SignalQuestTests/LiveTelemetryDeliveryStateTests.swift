@@ -31,6 +31,16 @@ final class LiveTelemetryDeliveryStateTests: XCTestCase {
         XCTAssertFalse(state.shouldSend(fix, channel: .radio, now: now, minDistance: 15, maxSilence: 120))
     }
 
+    /// SOC-35 : un relevé radio parti sans position ne se renvoie qu'après le silence.
+    func testRadioWithoutPositionRepublishesOnlyAfterSilence() {
+        var state = LiveTelemetryDeliveryState()
+        XCTAssertTrue(state.shouldSend(nil, channel: .radio, now: now, minDistance: 15, maxSilence: 120))
+        state.acknowledge(nil, channel: .radio, accepted: true, now: now)
+        XCTAssertFalse(state.shouldSend(nil, channel: .radio, now: now.addingTimeInterval(60), minDistance: 15, maxSilence: 120))
+        XCTAssertFalse(state.shouldSend(fix, channel: .radio, now: now.addingTimeInterval(60), minDistance: 15, maxSilence: 120))
+        XCTAssertTrue(state.shouldSend(nil, channel: .radio, now: now.addingTimeInterval(120), minDistance: 15, maxSilence: 120))
+    }
+
     func testAcceptedFixRepublishesAfterSilenceOrMovement() {
         var state = LiveTelemetryDeliveryState()
         state.acknowledge(fix, channel: .location, accepted: true, now: now)

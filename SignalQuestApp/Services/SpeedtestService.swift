@@ -5491,12 +5491,47 @@ extension DiskCache {
 enum SpeedtestPendingStoreFactory {
     static func make(durableCache: DiskCache, key: String) -> SpeedtestPendingStoring {
         if #available(iOS 17, *) {
-            if let store = SwiftDataSpeedtestPendingStore(legacyCache: durableCache, legacyKey: key) {
-                return store
-            }
+            return DeferredSpeedtestPendingStore(durableCache: durableCache, key: key)
         }
         return DiskCacheSpeedtestPendingStore(cache: durableCache, key: key)
     }
+}
+
+/// Ouvre la base SwiftData au premier accès, sur l'exécuteur de l'acteur, et non
+/// plus à la construction des services : le premier chargement de SwiftData
+/// coûtait ~60 ms au thread principal avant la première image (TRX-29). Le repli
+/// JSON, si la base ne s'ouvre pas, et la migration restent ceux d'avant.
+@available(iOS 17, *)
+actor DeferredSpeedtestPendingStore: SpeedtestPendingStoring {
+    private let durableCache: DiskCache
+    private let key: String
+    private let storeURL: URL?
+    private var opened: SpeedtestPendingStoring?
+
+    init(durableCache: DiskCache, key: String, storeURL: URL? = nil) {
+        self.durableCache = durableCache
+        self.key = key
+        self.storeURL = storeURL
+    }
+
+    /// Synchrone dans l'acteur : deux premiers accès concurrents ouvrent une seule base.
+    private func store() -> SpeedtestPendingStoring {
+        if let opened { return opened }
+        let store: SpeedtestPendingStoring = SwiftDataSpeedtestPendingStore(
+            storeURL: storeURL, legacyCache: durableCache, legacyKey: key
+        ) ?? DiskCacheSpeedtestPendingStore(cache: durableCache, key: key)
+        opened = store
+        return store
+    }
+
+    var isOpened: Bool { opened != nil }
+
+    func loadAll() async -> [PendingSpeedtestSave] { await store().loadAll() }
+    func loadAllValidated() async throws -> [PendingSpeedtestSave] { try await store().loadAllValidated() }
+    func replaceAll(_ values: [PendingSpeedtestSave]) async throws { try await store().replaceAll(values) }
+    func upsert(_ value: PendingSpeedtestSave) async throws { try await store().upsert(value) }
+    func remove(id: String) async { await store().remove(id: id) }
+    func removeValidated(id: String) async throws { try await store().removeValidated(id: id) }
 }
 
 /// Repli iOS 16 : lit/écrit tout le tableau dans la file durable (`DiskCache` en

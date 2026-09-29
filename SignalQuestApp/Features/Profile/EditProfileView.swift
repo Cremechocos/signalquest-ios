@@ -109,8 +109,9 @@ struct EditProfileView: View {
             .onChangeCompat(of: avatarItem) { _, newValue in
                 guard let newValue else { return }
                 Task {
+                    // Aperçu d'avatar décodé réduit, pas en pleine taille (SOC-36).
                     if let data = try? await newValue.loadTransferable(type: Data.self),
-                       let img = UIImage(data: data) {
+                       let img = ImagePipeline.downsample(data: data, maxPixel: 600) {
                         avatarPreview = img
                     }
                 }

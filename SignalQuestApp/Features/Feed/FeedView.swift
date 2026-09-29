@@ -126,14 +126,22 @@ final class FeedViewModel: ObservableObject {
     deinit { streamTask?.cancel() }
 
     private func handleSnapshot(_ raw: String, context: Query, streamID: UUID) async {
-        struct Snapshot: Decodable { let items: [UnifiedSocialFeedItem] }
-        guard context == query, streamID == streamRevision, !Task.isCancelled,
-              let data = raw.data(using: .utf8),
-              (try? JSONDecoder.signalQuest.decode(Snapshot.self, from: data)) != nil else { return }
+        guard await Self.isValidSnapshot(raw),
+              context == query, streamID == streamRevision, !Task.isCancelled else { return }
         // The shared SSE endpoint sends global latest posts, not this tab or
         // hashtag. Treat it as an invalidation and re-read the exact filter.
         guard !isLoading, page != nil else { needsLiveCheck = true; return }
         await refreshPending(context: context, streamID: streamID)
+    }
+
+    /// L'instantané porte les derniers posts complets : il était décodé sur le fil
+    /// principal à chaque événement, rien que pour le valider (SOC-43).
+    nonisolated private static func isValidSnapshot(_ raw: String) async -> Bool {
+        await Task.detached(priority: .utility) {
+            struct Snapshot: Decodable { let items: [UnifiedSocialFeedItem] }
+            guard let data = raw.data(using: .utf8) else { return false }
+            return (try? JSONDecoder.signalQuest.decode(Snapshot.self, from: data)) != nil
+        }.value
     }
 
     private func refreshPending(context: Query, streamID: UUID) async {

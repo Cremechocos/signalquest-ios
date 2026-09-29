@@ -2037,17 +2037,13 @@ struct ConversationDetailView: View {
     /// Recompresse l'image en JPEG ≤ 1280 px qualité 0,85 (HEIC converti
     /// d'office) — même normalisation qu'Android avant upload.
     nonisolated private static func preparedJPEG(from data: Data) -> (data: Data, width: Int, height: Int)? {
-        guard let image = UIImage(data: data) else { return nil }
-        let maxSide: CGFloat = 1280
-        let largest = max(image.size.width, image.size.height)
-        let scale = largest > maxSide ? maxSide / largest : 1
-        let target = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-        let renderer = UIGraphicsImageRenderer(size: target)
-        let resized = renderer.image { _ in
-            image.draw(in: CGRect(origin: .zero, size: target))
-        }
-        guard let jpeg = resized.jpegData(compressionQuality: 0.85) else { return nil }
-        return (jpeg, Int(target.width), Int(target.height))
+        // Décodage réduit directement à 1 280 px. L'ancien chemin décodait la photo
+        // en pleine taille puis la redessinait à l'échelle de l'écran (×3) : le
+        // JPEG envoyé faisait environ 3 840 px pour 1 280 annoncés (SOC-36).
+        guard let image = ImagePipeline.downsample(data: data, maxPixel: 1280),
+              let cgImage = image.cgImage,
+              let jpeg = image.jpegData(compressionQuality: 0.85) else { return nil }
+        return (jpeg, cgImage.width, cgImage.height)
     }
 
     private func toggleReaction(message: MessageItem, emoji: String) async {

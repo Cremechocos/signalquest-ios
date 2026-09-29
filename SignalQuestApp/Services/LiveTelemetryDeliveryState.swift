@@ -5,17 +5,20 @@ import Foundation
 /// Chaque destination conserve donc sa propre fenêtre de retransmission.
 struct LiveTelemetryDeliveryState {
     enum Channel: Hashable { case location, radio }
-    private struct Receipt { let fix: CLLocation; let receivedAt: Date }
+    /// `fix` vaut `nil` pour un relevé radio parti sans position (SOC-35).
+    private struct Receipt { let fix: CLLocation?; let receivedAt: Date }
     private var receipts: [Channel: Receipt] = [:]
 
-    func shouldSend(_ fix: CLLocation, channel: Channel, now: Date,
+    /// Sans position d'un côté ou de l'autre, seul le silence déclenche un renvoi.
+    func shouldSend(_ fix: CLLocation?, channel: Channel, now: Date,
                     minDistance: CLLocationDistance, maxSilence: TimeInterval) -> Bool {
         guard let receipt = receipts[channel] else { return true }
-        return fix.distance(from: receipt.fix) >= minDistance
-            || now.timeIntervalSince(receipt.receivedAt) >= maxSilence
+        if now.timeIntervalSince(receipt.receivedAt) >= maxSilence { return true }
+        guard let fix, let previous = receipt.fix else { return false }
+        return fix.distance(from: previous) >= minDistance
     }
 
-    mutating func acknowledge(_ fix: CLLocation, channel: Channel, accepted: Bool, now: Date) {
+    mutating func acknowledge(_ fix: CLLocation?, channel: Channel, accepted: Bool, now: Date) {
         guard accepted else { return }
         receipts[channel] = Receipt(fix: fix, receivedAt: now)
     }

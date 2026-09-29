@@ -1078,8 +1078,9 @@ struct PhotoUploadView: View {
                     .buttonStyle(SQPressButtonStyle())
                     .onChangeCompat(of: pickerItem) { _, newItem in
                         Task {
+                            // Aperçu décodé réduit ; l'envoi garde l'original (SOC-36).
                             guard let data = try? await newItem?.loadTransferable(type: Data.self),
-                                  let loaded = UIImage(data: data) else { return }
+                                  let loaded = ImagePipeline.downsample(data: data, maxPixel: 1600) else { return }
                             imageData = data
                             image = loaded
                         }
